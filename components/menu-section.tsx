@@ -68,9 +68,7 @@ export function MenuSection({ category }: MenuSectionProps) {
         ))}
       </div>
 
-      {category.id === "pastas" && (
-        <p className="mt-3 text-sm font-medium text-primary">* También tenemos SIN GLUTEN</p>
-      )}
+
 
       <QuantitySelectorDialog
         item={selectedItem}
@@ -126,19 +124,11 @@ function MenuItemCard({
                 Especial
               </Badge>
             )}
-            {item.glutenFree && (
-              <Badge variant="outline" className="text-[10px]">
-                Sin gluten
-              </Badge>
-            )}
+
           </div>
         </div>
 
-        {item.minPersons && (
-          <p className="text-xs text-muted-foreground mb-1">
-            (min. {item.minPersons} px)
-          </p>
-        )}
+
 
         {item.description && (
           <p className="mb-3 flex-1 text-sm leading-relaxed text-muted-foreground">
