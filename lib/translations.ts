@@ -3,6 +3,9 @@ import type { Language } from "./language-context"
 export const translations = {
   es: {
     // UI
+    selectQuantity: "Seleccionar cantidad",
+    quantityFor: "Cantidad para",
+    quantity: "Cantidad",
     openCart: "Abrir carrito",
     yourOrder: "Tu Pedido",
     emptyCart: "Tu carrito esta vacio",
@@ -31,6 +34,9 @@ export const translations = {
   },
   en: {
     // UI
+    selectQuantity: "Select quantity",
+    quantityFor: "Quantity for",
+    quantity: "Quantity",
     openCart: "Open cart",
     yourOrder: "Your Order",
     emptyCart: "Your cart is empty",
@@ -59,6 +65,9 @@ export const translations = {
   },
   fr: {
     // UI
+    selectQuantity: "Selectionner la quantite",
+    quantityFor: "Quantite pour",
+    quantity: "Quantite",
     openCart: "Ouvrir le panier",
     yourOrder: "Votre Commande",
     emptyCart: "Votre panier est vide",
@@ -87,6 +96,9 @@ export const translations = {
   },
   it: {
     // UI
+    selectQuantity: "Seleziona quantita",
+    quantityFor: "Quantita per",
+    quantity: "Quantita",
     openCart: "Apri carrello",
     yourOrder: "Il Tuo Ordine",
     emptyCart: "Il tuo carrello e vuoto",
@@ -115,6 +127,9 @@ export const translations = {
   },
   de: {
     // UI
+    selectQuantity: "Menge auswahlen",
+    quantityFor: "Menge fur",
+    quantity: "Menge",
     openCart: "Warenkorb offnen",
     yourOrder: "Ihre Bestellung",
     emptyCart: "Ihr Warenkorb ist leer",

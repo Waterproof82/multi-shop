@@ -14,10 +14,14 @@ export function CategoryNav({ categories }: CategoryNavProps) {
   const [activeId, setActiveId] = useState(categories[0]?.id ?? "")
   const { language } = useLanguage()
   const navRef = useRef<HTMLDivElement>(null)
+  const isManualScrolling = useRef(false)
+  const timeoutRef = useRef<NodeJS.Timeout>(null)
 
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
+        if (isManualScrolling.current) return
+
         const visible = entries.filter((e) => e.isIntersecting)
         if (visible.length > 0) {
           const sorted = visible.sort(
@@ -34,13 +38,44 @@ export function CategoryNav({ categories }: CategoryNavProps) {
       if (el) observer.observe(el)
     }
 
-    return () => observer.disconnect()
+    return () => {
+      observer.disconnect()
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    }
   }, [categories])
+
+  useEffect(() => {
+    if (activeId && navRef.current) {
+      const activeBtn = navRef.current.querySelector(`button[data-id="${activeId}"]`)
+      if (activeBtn) {
+        activeBtn.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+          inline: "center",
+        })
+      }
+    }
+  }, [activeId])
 
   const scrollTo = (id: string) => {
     const el = document.getElementById(id)
     if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" })
+      isManualScrolling.current = true
+      setActiveId(id)
+
+      const offset = window.innerWidth >= 768 ? 140 : 120
+      const elementPosition = el.getBoundingClientRect().top + window.scrollY
+      const offsetPosition = elementPosition - offset
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: "smooth",
+      })
+
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      timeoutRef.current = setTimeout(() => {
+        isManualScrolling.current = false
+      }, 1000)
     }
   }
 
@@ -54,8 +89,12 @@ export function CategoryNav({ categories }: CategoryNavProps) {
         {categories.map((cat) => (
           <button
             key={cat.id}
+            data-id={cat.id}
             type="button"
-            onClick={() => scrollTo(cat.id)}
+            onClick={() => {
+              setActiveId(cat.id)
+              scrollTo(cat.id)
+            }}
             className={cn(
               "whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors",
               activeId === cat.id
