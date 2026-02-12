@@ -9,7 +9,8 @@ interface CategoryNavProps {
   categories: MenuCategoryVM[]
 }
 
-export function CategoryNav({ categories }: CategoryNavProps) {
+export function CategoryNav(props: Readonly<CategoryNavProps>) {
+  const { categories } = props;
   const [activeId, setActiveId] = useState(categories[0]?.id ?? "")
   const { language } = useLanguage()
   const navRef = useRef<HTMLDivElement>(null)
@@ -23,7 +24,7 @@ export function CategoryNav({ categories }: CategoryNavProps) {
 
         const visible = entries.filter((e) => e.isIntersecting)
         if (visible.length > 0) {
-          const sorted = visible.sort(
+          const sorted = [...visible].sort(
             (a, b) => a.boundingClientRect.top - b.boundingClientRect.top
           )
           setActiveId(sorted[0].target.id)

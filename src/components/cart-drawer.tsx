@@ -8,7 +8,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { Separator } from "@/components/ui/separator"
+
 import { useCart } from "@/lib/cart-context"
 import { useLanguage } from "@/lib/language-context"
 import { t } from "@/lib/translations"
@@ -18,7 +18,8 @@ interface CartDrawerProps {
   onOpenChange: (open: boolean) => void
 }
 
-export function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
+export function CartDrawer(props: Readonly<CartDrawerProps>) {
+  const { open, onOpenChange } = props;
   const { items, updateQuantity, removeItem, clearCart, totalPrice } = useCart()
   const { language } = useLanguage()
 

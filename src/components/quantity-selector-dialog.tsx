@@ -24,18 +24,14 @@ interface QuantitySelectorDialogProps {
   onAddToCart: (item: MenuItemVM, quantity: number) => void
 }
 
-export function QuantitySelectorDialog({
-  item,
-  open,
-  onOpenChange,
-  onAddToCart,
-}: QuantitySelectorDialogProps) {
+export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogProps>) {
+  const { item, open, onOpenChange, onAddToCart } = props;
   const [quantity, setQuantity] = useState(1)
   const { language } = useLanguage()
 
   const handleQuantityChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(event.target.value, 10)
-    if (!isNaN(value) && value >= 1) {
+    const value = Number.parseInt(event.target.value, 10)
+    if (!Number.isNaN(value) && value >= 1) {
       setQuantity(value)
     } else if (event.target.value === "") {
       setQuantity(0) // Allow empty input temporarily for typing
@@ -62,8 +58,6 @@ export function QuantitySelectorDialog({
   useEffect(() => {
     if (open && item) {
       setQuantity(1) // Reset to 1 when a new item is selected for the dialog
-    } else if (!open) {
-      setQuantity(1) // Reset when dialog closes
     }
   }, [open, item])
 

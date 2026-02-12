@@ -12,32 +12,36 @@ import { t } from "@/lib/translations"
 import { MenuCategoryVM, MenuItemVM } from "@/core/application/dtos/menu-view-model"
 import { QuantitySelectorDialog } from "@/components/quantity-selector-dialog"
 
+type LanguageKey = 'en' | 'fr' | 'it' | 'de';
+
 interface MenuSectionProps {
   category: MenuCategoryVM
 }
 
-export function MenuSection({ category }: MenuSectionProps) {
-  const { addItem } = useCart()
-  const { language } = useLanguage()
-  const [selectedItem, setSelectedItem] = useState<MenuItemVM | null>(null)
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
+export function MenuSection(props: Readonly<MenuSectionProps>) {
+  const { category } = props;
+  const { addItem } = useCart();
+  const { language } = useLanguage() as { language: string };
+  const [selectedItem, setSelectedItem] = useState<MenuItemVM | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const handleItemClick = (item: MenuItemVM) => {
-    setSelectedItem(item)
-    setIsDialogOpen(true)
-  }
+    setSelectedItem(item);
+    setIsDialogOpen(true);
+  };
 
   const handleAddToCartWithQuantity = (item: MenuItemVM, quantity: number) => {
-    addItem(item, quantity)
-  }
+    addItem(item, quantity);
+  };
 
-  const isSalsas = category.id === "salsas"
+  const isSalsas = category.id === "salsas";
+  const translationLang = (['en', 'fr', 'it', 'de'].includes(language) ? language : undefined) as LanguageKey | undefined;
 
   return (
     <section id={category.id} className="scroll-mt-32">
       <div className="mb-6 flex items-center gap-4">
         <h2 className="font-serif text-2xl font-bold text-foreground md:text-3xl">
-          {(language !== "es" && category.translations?.[language]) || category.label}
+          {(translationLang && category.translations?.[translationLang]) || category.label}
         </h2>
         <div className="h-px flex-1 bg-border" />
       </div>
@@ -58,17 +62,15 @@ export function MenuSection({ category }: MenuSectionProps) {
             transition={{ duration: 0.4, delay: index * 0.08 }}
             className="h-full"
           >
-            <MenuItemCard 
-              item={item} 
-              isSalsas={isSalsas} 
-              language={language} 
-              onItemClick={handleItemClick} 
+            <MenuItemCard
+              item={item}
+              isSalsas={isSalsas}
+              language={translationLang}
+              onItemClick={handleItemClick}
             />
           </motion.div>
         ))}
       </div>
-
-
 
       <QuantitySelectorDialog
         item={selectedItem}
@@ -77,28 +79,31 @@ export function MenuSection({ category }: MenuSectionProps) {
         onAddToCart={handleAddToCartWithQuantity}
       />
     </section>
-  )
+  );
 }
 
-function MenuItemCard({
-  item,
-  isSalsas,
-  language,
-  onItemClick,
-}: {
-  item: MenuItemVM
-  isSalsas: boolean
-  language: any
-  onItemClick: (item: MenuItemVM) => void
-}) {
-  const [imageError, setImageError] = useState(false)
+function MenuItemCard(props: Readonly<{
+  item: MenuItemVM;
+  isSalsas: boolean;
+  language: LanguageKey | undefined;
+  onItemClick: (item: MenuItemVM) => void;
+}>) {
+  const { item, isSalsas, language, onItemClick } = props;
+  const [imageError, setImageError] = useState(false);
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onItemClick(item)}
+      onKeyDown={e => {
+        if (e.key === "Enter" || e.key === " ") {
+          onItemClick(item);
+        }
+      }}
       className={`group flex h-full flex-col overflow-hidden rounded-xl bg-card shadow-sm transition-all hover:shadow-md border cursor-pointer ${
         item.highlight ? "border-accent/30 bg-accent/5" : "border-border"
       }`}
-      onClick={() => onItemClick(item)}
     >
       {item.image && !imageError && (
         <div className="relative aspect-[4/3] w-full overflow-hidden">
@@ -116,7 +121,7 @@ function MenuItemCard({
       <div className="flex flex-1 flex-col p-5">
         <div className="mb-2 flex items-start justify-between gap-2">
           <h3 className="font-serif text-xl font-bold text-foreground">
-            {(language !== "es" && item.translations?.[language]?.name) || item.name}
+            {(language && item.translations?.[language]?.name) || item.name}
           </h3>
           <div className="flex flex-col gap-1 items-end shrink-0">
             {item.highlight && (
@@ -128,11 +133,9 @@ function MenuItemCard({
           </div>
         </div>
 
-
-
-        {(item.description || item.translations?.[language]?.description) && (
+        {(item.description || (language && item.translations?.[language]?.description)) && (
           <p className="mb-3 flex-1 text-sm leading-relaxed text-muted-foreground">
-            {(language !== "es" && item.translations?.[language]?.description) || item.description}
+            {(language && item.translations?.[language]?.description) || item.description}
           </p>
         )}
 
@@ -148,16 +151,16 @@ function MenuItemCard({
               size="default"
               className="bg-primary text-primary-foreground hover:bg-primary/90"
               onClick={(e) => {
-                e.stopPropagation()
-                onItemClick(item)
+                e.stopPropagation();
+                onItemClick(item);
               }}
             >
               <Plus className="mr-2 size-4" />
-              {t("addToCart", language)}
+              {t("addToCart", language || 'es')}
             </Button>
           </div>
         )}
       </div>
     </div>
-  )
+  );
 }

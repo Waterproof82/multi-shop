@@ -4,8 +4,8 @@ import { MenuCategoryVM } from "@/core/application/dtos/menu-view-model";
 
 export class GetMenuUseCase {
   constructor(
-    private productRepo: IProductRepository,
-    private categoryRepo: ICategoryRepository
+    private readonly productRepo: IProductRepository,
+    private readonly categoryRepo: ICategoryRepository
   ) {}
 
   async execute(empresaId: string): Promise<MenuCategoryVM[]> {
@@ -21,7 +21,7 @@ export class GetMenuUseCase {
       const catProducts = products.filter((p) => p.categoriaId === cat.id && p.activo);
 
       return {
-        id: cat.nombre.toLowerCase().replace(/ /g, "-"), // Generamos un slug simple
+        id: cat.nombre.toLowerCase().replaceAll(" ", "-"), // Generamos un slug simple
         label: cat.nombre,
         translations: cat.translations,
         items: catProducts.map((p) => ({
@@ -29,7 +29,7 @@ export class GetMenuUseCase {
           name: p.titulo,
           description: p.descripcion || undefined,
           price: p.precio,
-          category: cat.nombre.toLowerCase().replace(/ /g, "-"),
+          category: cat.nombre.toLowerCase().replaceAll(" ", "-"),
           image: p.fotoUrl || undefined,
           highlight: p.esEspecial,
           translations: p.translations ? {

@@ -3,7 +3,7 @@ import { ICategoryRepository } from "@/core/domain/repositories/ICategoryReposit
 import { Category } from "@/core/domain/entities/types";
 
 export class SupabaseCategoryRepository implements ICategoryRepository {
-  constructor(private supabase: SupabaseClient) {}
+  constructor(private readonly supabase: SupabaseClient) {}
 
   async findAllByTenant(empresaId: string): Promise<Category[]> {
     const { data, error } = await this.supabase
