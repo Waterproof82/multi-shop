@@ -5,8 +5,6 @@ export interface MenuItem {
   price: number
   category: string
   highlight?: boolean
-  glutenFree?: boolean
-  minPersons?: number
   image?: string
 }
 
@@ -27,7 +25,7 @@ export const menuCategories: MenuCategory[] = [
       { id: "e4", name: "Masa Frita con Serrano y Queso", price: 12, category: "entrantes", highlight: true },
       { id: "e5", name: "Flan de Verdura", description: "Cebolla roja, puerros, espinaca, calabacin, ajo, aceite de oliva", price: 12, category: "entrantes" },
       { id: "e6", name: "Burrata con Serrano y Tomate Azul", price: 12, category: "entrantes" },
-      { id: "e7", name: "De la Casa", description: "Embutidos, queso, masa frita, aceitunas, alcachofa, perlas de mozzarella", price: 15, category: "entrantes", minPersons: 2 },
+      { id: "e7", name: "De la Casa", description: "Embutidos, queso, masa frita, aceitunas, alcachofa, perlas de mozzarella", price: 15, category: "entrantes" },
     ],
   },
   {

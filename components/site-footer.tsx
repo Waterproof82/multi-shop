@@ -22,7 +22,7 @@ export function SiteFooter() {
             <p>{t("allergenDisclaimer", language)}</p>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground">
-            <span>Gluten</span>
+
             <span>Crustaceos</span>
             <span>Pescado</span>
             <span>Huevos</span>
