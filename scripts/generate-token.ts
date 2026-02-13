@@ -18,7 +18,7 @@ async function generateToken() {
   const jwt = await new SignJWT({ authorized: true })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('2h') // Token expires in 2 hours
+    .setExpirationTime('15m') // Token expires in 15 minutes
     .sign(secret);
 
   console.log('\n✅ Token generated successfully!');

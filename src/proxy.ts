@@ -32,16 +32,24 @@ export async function proxy(request: NextRequest) {
       // Token is valid
       url.searchParams.delete('access');
       const response = NextResponse.redirect(url);
-      
-      response.cookies.set('cart_authorized', 'true', {
+
+      // Calcular duración restante del token en segundos
+      let maxAge = 15 * 60; // fallback por si no hay exp
+      if (payload?.exp) {
+        const now = Math.floor(Date.now() / 1000);
+        maxAge = Math.max(payload.exp - now, 0);
+      }
+
+      // Solo guardar access_token, NO cart_authorized
+      response.cookies.set('access_token', sanitizedToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         path: '/',
-        maxAge: 15 * 60, // 15 minutes
+        maxAge,
       });
-      
-      console.log('Proxy: Cookie set, redirecting...');
+
+      console.log('Proxy: Cookie access_token set, redirecting...');
       return response;
     } catch (error) {
       console.error('Proxy: Token verification failed', error);

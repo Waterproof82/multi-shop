@@ -2,6 +2,7 @@ import { getMenuUseCase } from "@/lib/server-services"
 import { MenuPage } from "@/components/client-menu-page"
 import SiteHeaderWrapper from "@/components/site-header-wrapper";
 import type { MenuCategoryVM } from "@/core/application/dtos/menu-view-model"
+import { jwtVerify } from 'jose';
 
 export const revalidate = 3600;
 
@@ -11,10 +12,21 @@ export default async function Home() {
   const empresaId = process.env.NEXT_PUBLIC_DEFAULT_TENANT_ID || "demo-empresa-id";
   let menuData: MenuCategoryVM[] = [];
   const cookieStore = await cookies();
-  const cartAuthorizedCookie = cookieStore.get('cart_authorized');
-  const showCart = cartAuthorizedCookie?.value === 'true';
-  console.log('Page: cart_authorized cookie:', cartAuthorizedCookie);
-  console.log('Page: showCart:', showCart);
+  let showCart = false;
+
+  // JWT validation
+  const accessToken = cookieStore.get('access_token');
+  const secretKey = process.env.ACCESS_TOKEN_SECRET;
+  if (accessToken && secretKey) {
+    try {
+      const secret = new TextEncoder().encode(secretKey);
+      await jwtVerify(accessToken.value, secret);
+      showCart = true;
+    } catch (e) {
+      showCart = false;
+      console.error('JWT invalid or expired:', e);
+    }
+  }
 
   try {
     menuData = await getMenuUseCase.execute(empresaId);
