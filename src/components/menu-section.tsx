@@ -1,14 +1,11 @@
 "use client"
 
-import { Plus } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import Image from "next/image"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useCart } from "@/lib/cart-context"
 import { useLanguage } from "@/lib/language-context"
-import { t } from "@/lib/translations"
 import { MenuCategoryVM, MenuItemVM } from "@/core/application/dtos/menu-view-model"
 import { QuantitySelectorDialog } from "@/components/quantity-selector-dialog"
 
@@ -93,22 +90,31 @@ function MenuItemCard(props: Readonly<{
 }>) {
   const { item, isSalsas, language, onItemClick, showCart } = props;
   const [imageError, setImageError] = useState(false);
+  const [clientName, setClientName] = useState(item.name);
+  const [clientDescription, setClientDescription] = useState(item.description || "");
+
+  // Update name and description on client after mount to avoid hydration mismatch
+  useEffect(() => {
+    if (language && item.translations?.[language]?.name) {
+      setClientName(item.translations[language].name);
+    } else {
+      setClientName(item.name);
+    }
+    if (language && item.translations?.[language]?.description) {
+      setClientDescription(item.translations[language].description);
+    } else {
+      setClientDescription(item.description || "");
+    }
+  }, [language, item]);
 
   return (
     <div
-      role={showCart ? "button" : undefined}
-      tabIndex={showCart ? 0 : -1}
-      onClick={() => showCart && onItemClick(item)}
-      onKeyDown={e => {
-        if (showCart && (e.key === "Enter" || e.key === " ")) {
-          onItemClick(item);
-        }
-      }}
       className={`group flex h-full flex-col overflow-hidden rounded-xl bg-card shadow-sm transition-all hover:shadow-md border ${
-        showCart ? "cursor-pointer" : ""
+        showCart ? "cursor-pointer" : "" // visual cue only
       } ${
         item.highlight ? "border-accent/30 bg-accent/5" : "border-border"
       }`}
+      // No role/button/tabIndex for accessibility, only visual cue
     >
       {item.image && !imageError && (
         <div className="relative aspect-[4/3] w-full overflow-hidden">
@@ -118,15 +124,15 @@ function MenuItemCard(props: Readonly<{
             fill
             className="object-cover transition-transform duration-300 group-hover:scale-105"
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            loading="eager"
             onError={() => setImageError(true)}
           />
         </div>
       )}
-
       <div className="flex flex-1 flex-col p-5">
         <div className="mb-2 flex items-start justify-between gap-2">
           <h3 className="font-serif text-xl font-bold text-foreground">
-            {(language && item.translations?.[language]?.name) || item.name}
+            {clientName}
           </h3>
           <div className="flex flex-col gap-1 items-end shrink-0">
             {item.highlight && (
@@ -134,35 +140,30 @@ function MenuItemCard(props: Readonly<{
                 Especial
               </Badge>
             )}
-
           </div>
         </div>
-
-        {(item.description || (language && item.translations?.[language]?.description)) && (
+        {clientDescription && (
           <p className="mb-3 flex-1 text-sm leading-relaxed text-muted-foreground">
-            {(language && item.translations?.[language]?.description) || item.description}
+            {clientDescription}
           </p>
         )}
-
-        {/* Always ensure content pushes footer down */}
         <div className="flex-1" />
-
         {!isSalsas && showCart && (
           <div className="flex items-center justify-between gap-3 pt-4 mt-auto">
             <span className="font-serif text-2xl font-bold text-foreground">
               {item.price.toFixed(2).replace(".", ",")}€
             </span>
-            <Button
-              size="default"
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
+            <button
+              type="button"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-4 py-2 font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               onClick={(e) => {
                 e.stopPropagation();
                 onItemClick(item);
               }}
+              aria-label={`Añadir ${clientName} al carrito`}
             >
-              <Plus className="mr-2 size-4" />
-              {t("addToCart", language || 'es')}
-            </Button>
+              Añadir al carrito
+            </button>
           </div>
         )}
         {!isSalsas && !showCart && (

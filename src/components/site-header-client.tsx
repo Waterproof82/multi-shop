@@ -51,6 +51,7 @@ export function SiteHeaderClient({ showCart }: SiteHeaderClientProps) {
               src={logoUrl}
               alt="Mermelada de Tomate"
               className="h-12 w-auto md:h-16"
+              loading="eager"
             />
           )}
         </a>
