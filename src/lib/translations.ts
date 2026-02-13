@@ -19,6 +19,7 @@ export const translations = {
     remove: "Eliminar",
     askWaiter: "Preguntale al camarero",
     allergenDisclaimer: "TODOS NUESTROS PRODUCTOS SON SUSCEPTIBLES DE CONTENER DE MANERA DIRECTA O A TRAVES DE CONTAMINACION CRUZADA ALGUN TIPO DE ALERGENO",
+    sessionExpired: "Sesion expirada. Solicita un nuevo enlace al camarero.",
   },
   en: {
     // UI
@@ -38,6 +39,7 @@ export const translations = {
     remove: "Remove",
     askWaiter: "Ask the waiter",
     allergenDisclaimer: "ALL OUR PRODUCTS MAY CONTAIN ALLERGENS EITHER DIRECTLY OR THROUGH CROSS-CONTAMINATION",
+    sessionExpired: "Session expired. Request a new link from the waiter.",
   },
   fr: {
     // UI
@@ -57,6 +59,7 @@ export const translations = {
     remove: "Supprimer",
     askWaiter: "Demandez au serveur",
     allergenDisclaimer: "TOUS NOS PRODUITS SONT SUSCEPTIBLES DE CONTENIR DES ALLERGENES DIRECTEMENT OU PAR CONTAMINATION CROISEE",
+    sessionExpired: "Session expiree. Demandez un nouveau lien au serveur.",
   },
   it: {
     // UI
@@ -76,6 +79,7 @@ export const translations = {
     remove: "Rimuovi",
     askWaiter: "Chiedi al cameriere",
     allergenDisclaimer: "TUTTI I NOSTRI PRODOTTI POSSONO CONTENERE ALLERGENI DIRETTAMENTE O ATTRAVERSO CONTAMINAZIONE INCROCIATA",
+    sessionExpired: "Sessione scaduta. Richiedi un nuovo link al cameriere.",
   },
   de: {
     // UI
@@ -95,6 +99,7 @@ export const translations = {
     remove: "Entfernen",
     askWaiter: "Fragen Sie den Kellner",
     allergenDisclaimer: "ALLE UNSERE PRODUKTE KONNEN ALLERGENE DIREKT ODER DURCH KREUZKONTAMINATION ENTHALTEN",
+    sessionExpired: "Sitzung abgelaufen. Fordern Sie einen neuen Link vom Kellner an.",
   },
 }
 

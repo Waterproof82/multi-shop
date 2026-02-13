@@ -13,6 +13,7 @@ export default async function Home() {
   let menuData: MenuCategoryVM[] = [];
   const cookieStore = await cookies();
   let showCart = false;
+  let tokenExpiresAt: number | null = null;
 
   // JWT validation
   const accessToken = cookieStore.get('access_token');
@@ -20,8 +21,9 @@ export default async function Home() {
   if (accessToken && secretKey) {
     try {
       const secret = new TextEncoder().encode(secretKey);
-      await jwtVerify(accessToken.value, secret);
+      const { payload } = await jwtVerify(accessToken.value, secret);
       showCart = true;
+      tokenExpiresAt = payload.exp ? payload.exp * 1000 : null;
     } catch (e) {
       showCart = false;
       console.error('JWT invalid or expired:', e);
@@ -36,5 +38,5 @@ export default async function Home() {
   }
 
   const header = await SiteHeaderWrapper();
-  return <MenuPage menuData={menuData} header={header} showCart={showCart} />;
+  return <MenuPage menuData={menuData} header={header} showCart={showCart} tokenExpiresAt={tokenExpiresAt} />;
 }

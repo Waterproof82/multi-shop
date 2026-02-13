@@ -18,14 +18,19 @@ async function generateToken() {
   const jwt = await new SignJWT({ authorized: true })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('15m') // Token expires in 15 minutes
+    .setExpirationTime('1m') // Token expires in 15 minutes
     .sign(secret);
 
+  const decoded = JSON.parse(Buffer.from(jwt.split('.')[1], 'base64').toString());
+  const expDate = new Date(decoded.exp * 1000).toLocaleString();
+
   console.log('\n✅ Token generated successfully!');
+  console.log(`Generated at: ${new Date().toLocaleString()}`);
+  console.log(`Expires at:   ${expDate}`);
   console.log('--------------------------------------------------');
   console.log(`http://localhost:3000/?access=${jwt}`);
   console.log('--------------------------------------------------');
-  console.log('This link will authorize cart access for 7 days (via cookie).');
+  console.log('This link will authorize cart access for 15 minutes (via cookie).');
 }
 
 generateToken().catch(console.error);

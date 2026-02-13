@@ -5,20 +5,20 @@ import { cookies } from 'next/headers';
 
 export default async function SiteHeaderWrapper() {
   const cookieStore = await cookies();
-  // Validar solo con access_token (JWT)
   const accessToken = cookieStore.get('access_token');
   let showCart = false;
+  let tokenExpiresAt: number | null = null;
   const secretKey = process.env.ACCESS_TOKEN_SECRET;
   if (accessToken && secretKey) {
     try {
       const secret = new TextEncoder().encode(secretKey);
-      // Importar jwtVerify dinámicamente para evitar problemas SSR
       const { jwtVerify } = await import('jose');
-      await jwtVerify(accessToken.value, secret);
+      const { payload } = await jwtVerify(accessToken.value, secret);
       showCart = true;
+      tokenExpiresAt = payload.exp ? payload.exp * 1000 : null;
     } catch {
       showCart = false;
     }
   }
-  return <SiteHeaderClient key="site-header" showCart={showCart} />;
+  return <SiteHeaderClient key="site-header" showCart={showCart} tokenExpiresAt={tokenExpiresAt} />;
 }

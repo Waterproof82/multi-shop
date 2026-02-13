@@ -1,20 +1,75 @@
 "use client";
 
-import { ShoppingCart } from "lucide-react";
+import { ShoppingCart, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LanguageSelector } from "@/components/language-selector";
 import { t } from "@/lib/translations";
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useCart } from "@/lib/cart-context";
+import { checkCartAuthorization } from "@/app/actions";
+import { useLanguage } from "@/lib/language-context";
+import { useToast } from "@/hooks/use-toast";
 
 interface SiteHeaderClientProps {
   readonly showCart: boolean;
+  readonly tokenExpiresAt: number | null;
 }
 
-export function SiteHeaderClient({ showCart }: SiteHeaderClientProps) {
+function formatTime(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+export function SiteHeaderClient({ showCart, tokenExpiresAt }: SiteHeaderClientProps) {
   const { openCart, totalItems } = useCart();
+  const { language } = useLanguage();
+  const { toast } = useToast();
   const [animate, setAnimate] = useState(false);
+  const [isAuthorized, setIsAuthorized] = useState(showCart);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!tokenExpiresAt) {
+      setTimeLeft(null);
+      return;
+    }
+
+    const calculateTimeLeft = () => {
+      const now = Date.now();
+      const remaining = Math.max(0, Math.floor((tokenExpiresAt - now) / 1000));
+      return remaining;
+    };
+
+    setTimeLeft(calculateTimeLeft());
+
+    const interval = setInterval(() => {
+      const remaining = calculateTimeLeft();
+      setTimeLeft(remaining);
+
+      if (remaining <= 0) {
+        setIsAuthorized(false);
+        clearInterval(interval);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [tokenExpiresAt]);
+
+  const handleOpenCart = async () => {
+    const authorized = await checkCartAuthorization();
+    if (authorized) {
+      setIsAuthorized(true);
+      openCart();
+    } else {
+      setIsAuthorized(false);
+      toast({
+        variant: "destructive",
+        title: t("sessionExpired", language),
+      });
+    }
+  };
 
   useEffect(() => {
     if (totalItems > 0) {
@@ -57,12 +112,20 @@ export function SiteHeaderClient({ showCart }: SiteHeaderClientProps) {
         </a>
         <div className="flex items-center gap-1">
           <LanguageSelector />
-          {showCart ? (
+          {isAuthorized && timeLeft !== null && timeLeft > 0 && (
+            <div className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium ${
+              timeLeft <= 60 ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300'
+            }`}>
+              <Clock className="size-3" />
+              <span>{formatTime(timeLeft)}</span>
+            </div>
+          )}
+          {isAuthorized ? (
             <Button
               variant="ghost"
               size="icon"
               className="relative"
-              onClick={openCart}
+              onClick={handleOpenCart}
               aria-label={t("openCart", "es")}
             >
               <ShoppingCart className="size-5" />
