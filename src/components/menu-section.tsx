@@ -5,7 +5,8 @@ import { motion } from "framer-motion"
 import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
 import { useCart } from "@/lib/cart-context"
-import { useLanguage } from "@/lib/language-context"
+import { useLanguage, type Language } from "@/lib/language-context"
+import { t } from "@/lib/translations"
 import { MenuCategoryVM, MenuItemVM } from "@/core/application/dtos/menu-view-model"
 import { QuantitySelectorDialog } from "@/components/quantity-selector-dialog"
 
@@ -19,7 +20,7 @@ interface MenuSectionProps {
 export function MenuSection(props: Readonly<MenuSectionProps>) {
   const { category, showCart } = props;
   const { addItem } = useCart();
-  const { language } = useLanguage() as { language: string };
+  const { language } = useLanguage();
   const [selectedItem, setSelectedItem] = useState<MenuItemVM | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -34,6 +35,7 @@ export function MenuSection(props: Readonly<MenuSectionProps>) {
 
   const isSalsas = category.label.toLowerCase() === "salsas";
   const translationLang = (['en', 'fr', 'it', 'de'].includes(language) ? language : undefined) as LanguageKey | undefined;
+  const safeLanguage: Language = language || "es";
 
   return (
     <section id={category.id} className="scroll-mt-32">
@@ -89,6 +91,8 @@ function MenuItemCard(props: Readonly<{
   showCart?: boolean;
 }>) {
   const { item, isSalsas, language, onItemClick, showCart } = props;
+  const { language: appLanguage } = useLanguage();
+  const safeLanguage = appLanguage || "es";
   const [imageError, setImageError] = useState(false);
   const [clientName, setClientName] = useState(item.name);
   const [clientDescription, setClientDescription] = useState(item.description || "");
@@ -160,9 +164,9 @@ function MenuItemCard(props: Readonly<{
                 e.stopPropagation();
                 onItemClick(item);
               }}
-              aria-label={`Añadir ${clientName} al carrito`}
+              aria-label={`${t("addToCart", safeLanguage)} ${clientName}`}
             >
-              Añadir al carrito
+              {t("addToCart", safeLanguage)}
             </button>
           </div>
         )}

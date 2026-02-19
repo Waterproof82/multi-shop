@@ -91,22 +91,25 @@ export function CartDrawer() {
               </div>
             </div>
 
-            <div className="border-t border-border pt-4">
-              <div className="mb-4 flex items-center justify-between">
+            <div className="border-t border-border pt-4 pb-6 px-2 bg-background/80 shadow-[0_-2px_16px_0_rgba(0,0,0,0.04)] rounded-b-xl">
+              <div className="mb-4 flex items-center justify-between px-2">
                 <span className="text-lg font-semibold text-foreground">{t("total", language)}</span>
                 <span className="font-serif text-2xl font-bold text-foreground">
-                  {totalPrice.toFixed(2).replace(".", ",")}{"€"}
+                  {totalPrice.toFixed(2).replace(".", ",") + "€"}
                 </span>
               </div>
 
-              <div className="flex flex-col gap-2">
-                <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90" size="lg">
+              <div className="flex flex-col gap-2 px-1">
+                <Button 
+                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full py-3 text-lg font-semibold shadow-md transition-all duration-200"
+                  size="lg"
+                >
                   {t("confirmOrder", language)}
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-muted-foreground"
+                  className="text-muted-foreground rounded-full py-2 font-medium hover:bg-muted/40 transition-all duration-200"
                   onClick={clearCart}
                 >
                   {t("clearCart", language)}

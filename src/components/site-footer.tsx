@@ -39,20 +39,28 @@ export function SiteFooter() {
             <p>{t("allergenDisclaimer", language)}</p>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground">
-            <span>Crustaceos</span>
-            <span>Pescado</span>
-            <span>Huevos</span>
-            <span>Cacahuetes</span>
-            <span>Soja</span>
-            <span>Lacteos</span>
-            <span>Frutos con cascara</span>
-            <span>Apio</span>
-            <span>Moluscos</span>
-            <span>Altramuces</span>
-            <span>Mostaza</span>
-            <span>Granos sesamo</span>
-            <span>Dioxido azufre y sulfitos</span>
+            <span>{t("allergenCrustaceans", language)}</span>
+            <span>{t("allergenFish", language)}</span>
+            <span>{t("allergenEggs", language)}</span>
+            <span>{t("allergenPeanuts", language)}</span>
+            <span>{t("allergenSoy", language)}</span>
+            <span>{t("allergenDairy", language)}</span>
+            <span>{t("allergenTreeNuts", language)}</span>
+            <span>{t("allergenCelery", language)}</span>
+            <span>{t("allergenMolluscs", language)}</span>
+            <span>{t("allergenLupin", language)}</span>
+            <span>{t("allergenMustard", language)}</span>
+            <span>{t("allergenSesame", language)}</span>
+            <span>{t("allergenSulphites", language)}</span>
           </div>
+        </div>
+        <div className="mt-8 text-center">
+          <a 
+            href="/admin/login" 
+            className="text-[10px] text-muted-foreground/30 hover:text-muted-foreground/50 transition-colors"
+          >
+            Admin
+          </a>
         </div>
       </div>
     </footer>

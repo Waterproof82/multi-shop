@@ -37,3 +37,12 @@ export interface Tenant {
   dominio: string;
   logoUrl: string | null;
 }
+
+export interface Empresa {
+  id: string;
+  nombre: string;
+  dominio: string;
+  logoUrl: string | null;
+  mostrarCarrito: boolean;
+  moneda: string;
+}
