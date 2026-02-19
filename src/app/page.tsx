@@ -1,42 +1,50 @@
-import { getMenuUseCase } from "@/lib/server-services"
+import { getMenuUseCase, getEmpresaByDomain, isPedidosSubdomain, extractMainDomain } from "@/lib/server-services"
 import { MenuPage } from "@/components/client-menu-page"
 import SiteHeaderWrapper from "@/components/site-header-wrapper";
 import type { MenuCategoryVM } from "@/core/application/dtos/menu-view-model"
-import { jwtVerify } from 'jose';
+import { headers } from 'next/headers';
 
-export const revalidate = 3600;
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
-import { cookies } from 'next/headers';
+async function getDomainFromHeaders(): Promise<string> {
+  try {
+    const headersList = await headers();
+    const host = headersList.get('host');
+    if (!host) return '';
+    const domainWithPort = host.replace(/^www\./, '').toLowerCase();
+    return domainWithPort.split(':')[0];
+  } catch (e) {
+    return '';
+  }
+}
 
 export default async function Home() {
-  const empresaId = process.env.NEXT_PUBLIC_DEFAULT_TENANT_ID || "demo-empresa-id";
-  let menuData: MenuCategoryVM[] = [];
-  const cookieStore = await cookies();
-  let showCart = false;
-  let tokenExpiresAt: number | null = null;
-
-  // JWT validation
-  const accessToken = cookieStore.get('access_token');
-  const secretKey = process.env.ACCESS_TOKEN_SECRET;
-  if (accessToken && secretKey) {
-    try {
-      const secret = new TextEncoder().encode(secretKey);
-      const { payload } = await jwtVerify(accessToken.value, secret);
-      showCart = true;
-      tokenExpiresAt = payload.exp ? payload.exp * 1000 : null;
-    } catch (e) {
-      showCart = false;
-      console.error('JWT invalid or expired:', e);
-    }
+  const fullDomain = await getDomainFromHeaders();
+  
+  let empresa = fullDomain ? await getEmpresaByDomain(fullDomain) : null;
+  
+  const subdomainConfig = empresa?.subdomainPedidos ?? 'pedidos';
+  const isPedidos = isPedidosSubdomain(fullDomain, subdomainConfig);
+  
+  if (!empresa && isPedidos) {
+    const mainDomain = extractMainDomain(fullDomain, subdomainConfig);
+    empresa = await getEmpresaByDomain(mainDomain);
   }
+  
+  const empresaId = empresa?.id || process.env.NEXT_PUBLIC_DEFAULT_TENANT_ID || "demo-empresa-id";
+  const mostrarCarritoEmpresa = empresa?.mostrarCarrito ?? false;
+  
+  const showCart = isPedidos || mostrarCarritoEmpresa;
+  
+  let menuData: MenuCategoryVM[] = [];
 
   try {
     menuData = await getMenuUseCase.execute(empresaId);
-    console.log("Menu data loaded successfully:", menuData.length);
   } catch (error) {
     console.error("Error fetching menu from Supabase:", error);
   }
 
-  const header = await SiteHeaderWrapper();
-  return <MenuPage menuData={menuData} header={header} showCart={showCart} tokenExpiresAt={tokenExpiresAt} />;
+  const header = await SiteHeaderWrapper({ showCart });
+  return <MenuPage menuData={menuData} header={header} showCart={showCart} />;
 }

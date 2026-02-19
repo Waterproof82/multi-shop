@@ -8,9 +8,6 @@ import { useCart } from "@/lib/cart-context"
 import { useLanguage } from "@/lib/language-context"
 import { MenuCategoryVM, MenuItemVM } from "@/core/application/dtos/menu-view-model"
 import { QuantitySelectorDialog } from "@/components/quantity-selector-dialog"
-import { checkCartAuthorization } from "@/app/actions"
-import { useToast } from "@/hooks/use-toast"
-import { t } from "@/lib/translations"
 
 type LanguageKey = 'en' | 'fr' | 'it' | 'de';
 
@@ -23,28 +20,12 @@ export function MenuSection(props: Readonly<MenuSectionProps>) {
   const { category, showCart } = props;
   const { addItem } = useCart();
   const { language } = useLanguage() as { language: string };
-  const { toast } = useToast();
   const [selectedItem, setSelectedItem] = useState<MenuItemVM | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isAuthorized, setIsAuthorized] = useState(showCart ?? false);
 
-  useEffect(() => {
-    setIsAuthorized(showCart ?? false);
-  }, [showCart]);
-
-  const handleItemClick = async (item: MenuItemVM) => {
-    const authorized = await checkCartAuthorization();
-    if (authorized) {
-      setIsAuthorized(true);
-      setSelectedItem(item);
-      setIsDialogOpen(true);
-    } else {
-      setIsAuthorized(false);
-      toast({
-        variant: "destructive",
-        title: t("sessionExpired", language),
-      });
-    }
+  const handleItemClick = (item: MenuItemVM) => {
+    setSelectedItem(item);
+    setIsDialogOpen(true);
   };
 
   const handleAddToCartWithQuantity = (item: MenuItemVM, quantity: number) => {
@@ -84,7 +65,7 @@ export function MenuSection(props: Readonly<MenuSectionProps>) {
               isSalsas={isSalsas}
               language={translationLang}
               onItemClick={handleItemClick}
-              showCart={isAuthorized}
+              showCart={showCart}
             />
           </motion.div>
         ))}
