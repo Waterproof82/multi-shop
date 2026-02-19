@@ -2,9 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { Upload, X, Loader2, Image as ImageIcon } from 'lucide-react';
-import { R2StorageRepository } from '@/core/infrastructure/storage/R2StorageRepository';
-
-const storageRepo = new R2StorageRepository();
+import { uploadImageAction, deleteImageAction } from '@/core/application/actions/storage.actions';
 
 interface ImageUploaderProps {
   value: string;
@@ -37,7 +35,19 @@ export function ImageUploader({ value, onChange, label = 'Imagen' }: ImageUpload
     setError('');
 
     try {
-      const result = await storageRepo.upload(file);
+      const result = await uploadImageAction(file.name, file.type, file.size);
+      
+      // Upload directo a R2
+      const uploadResponse = await fetch(result.url, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type },
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Error al subir imagen');
+      }
+
       onChange(result.publicUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al subir imagen');
