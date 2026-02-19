@@ -8,15 +8,11 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 async function getDomainFromHeaders(): Promise<string> {
-  try {
-    const headersList = await headers();
-    const host = headersList.get('host');
-    if (!host) return '';
-    const domainWithPort = host.replace(/^www\./, '').toLowerCase();
-    return domainWithPort.split(':')[0];
-  } catch (e) {
-    return '';
-  }
+  const headersList = await headers();
+  const host = headersList.get('host');
+  if (!host) return '';
+  const domainWithPort = host.replace(/^www\./, '').toLowerCase();
+  return domainWithPort.split(':')[0];
 }
 
 export default async function Home() {

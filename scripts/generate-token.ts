@@ -1,6 +1,6 @@
 import { SignJWT } from 'jose';
 import dotenv from 'dotenv';
-import path from 'path';
+import path from 'node:path';
 
 // Load .env.local
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
@@ -33,4 +33,9 @@ async function generateToken() {
   console.log('This link will authorize cart access for 15 minutes (via cookie).');
 }
 
-generateToken().catch(console.error);
+
+try {
+  await generateToken();
+} catch (err) {
+  console.error(err);
+}
