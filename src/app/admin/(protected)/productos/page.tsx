@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Plus, Pencil, Trash2, X, Loader2, Image as ImageIcon, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { ImageUploader } from '@/components/ui/image-uploader';
 
 interface Categoria {
   id: string;
@@ -572,15 +573,10 @@ export default function ProductosPage() {
                 </div>
 
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    URL de Imagen
-                  </label>
-                  <input
-                    type="url"
+                  <ImageUploader
                     value={formData.foto_url}
-                    onChange={(e) => setFormData({ ...formData, foto_url: e.target.value })}
-                    placeholder="https://..."
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    onChange={(url) => setFormData({ ...formData, foto_url: url })}
+                    label="Imagen del producto"
                   />
                 </div>
 

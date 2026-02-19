@@ -21,6 +21,7 @@ const s3Client = new S3Client({
     accessKeyId: R2_ACCESS_KEY_ID || "",
     secretAccessKey: R2_SECRET_ACCESS_KEY || "",
   },
+  forcePathStyle: true, // Necesario para R2
 });
 
 const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -34,8 +35,19 @@ export async function getPresignedUploadUrlAction(
   fileType: string,
   fileSize: number
 ) {
+  console.log('[R2] Starting upload:', { fileName, fileType, fileSize });
+  console.log('[R2] Env check:', { 
+    R2_ACCOUNT_ID: !!R2_ACCOUNT_ID, 
+    R2_ACCESS_KEY_ID: !!R2_ACCESS_KEY_ID, 
+    R2_SECRET_ACCESS_KEY: !!R2_SECRET_ACCESS_KEY, 
+    R2_BUCKET_NAME: !!R2_BUCKET_NAME,
+    R2_PUBLIC_DOMAIN: R2_PUBLIC_DOMAIN
+  });
+
   if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET_NAME) {
-    throw new Error("Missing R2 Environment Variables");
+    const errorMsg = "Missing R2 Environment Variables";
+    console.error('[R2]', errorMsg);
+    throw new Error(errorMsg);
   }
 
   // 1. Validaciones de Seguridad
@@ -48,9 +60,9 @@ export async function getPresignedUploadUrlAction(
   }
 
   // 2. Sanitización y Generación de Key única
-  // Estructura: year/month/uuid-filename.ext para evitar colisiones y organizar bucket
+  // Estructura: mermelada_tomate/year/month/uuid-filename.ext
   const date = new Date();
-  const path = `${date.getFullYear()}/${date.getMonth() + 1}`;
+  const path = `mermelada_tomate/${date.getFullYear()}/${date.getMonth() + 1}`;
   const cleanFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
   const uniqueKey = `${path}/${uuidv4()}-${cleanFileName}`;
 
@@ -71,8 +83,9 @@ export async function getPresignedUploadUrlAction(
 
     return { success: true, url: signedUrl, key: uniqueKey, publicUrl };
   } catch (error) {
-    console.error("Error generating presigned URL:", error);
-    throw new Error("Error interno al generar autorización de subida.");
+    console.error('[R2] Error generating presigned URL:', error);
+    const message = error instanceof Error ? error.message : 'Error desconocido';
+    throw new Error(`Error interno al generar autorización de subida: ${message}`);
   }
 }
 
