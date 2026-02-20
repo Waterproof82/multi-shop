@@ -47,4 +47,5 @@ export interface Empresa {
   logoUrl: string | null;
   mostrarCarrito: boolean;
   moneda: string;
+  emailNotification: string | null;
 }

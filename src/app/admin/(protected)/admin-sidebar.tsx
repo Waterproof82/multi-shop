@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Utensils, Tags, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Utensils, Tags, LogOut, Menu, X, Bell } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
 interface NavItem {
@@ -16,6 +16,7 @@ const navItems: NavItem[] = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/categorias', label: 'Categorías', icon: Tags },
   { href: '/admin/productos', label: 'Productos', icon: Utensils },
+  { href: '/admin/notificaciones', label: 'Notificaciones', icon: Bell },
 ];
 
 interface AdminSidebarProps {

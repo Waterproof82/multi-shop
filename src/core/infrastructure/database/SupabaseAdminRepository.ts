@@ -105,6 +105,7 @@ export class SupabaseAdminRepository implements IAdminRepository {
       logoUrl: row.logo_url,
       mostrarCarrito: row.mostrar_carrito ?? true,
       moneda: row.moneda ?? "EUR",
+      emailNotification: row.email_notification ?? null,
     };
   }
 }

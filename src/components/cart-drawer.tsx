@@ -9,6 +9,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet"
+import { useState } from "react"
 
 import { useCart, type Complement } from "@/lib/cart-context"
 import { useLanguage } from "@/lib/language-context"
@@ -31,6 +32,49 @@ export function CartDrawer() {
     closeCart 
   } = useCart()
   const { language } = useLanguage()
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
+
+  const handleConfirmOrder = async () => {
+    setSending(true);
+    try {
+      const res = await fetch('/api/admin/pedidos/enviar-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: items.map(ci => ({
+            item: {
+              name: (language !== 'es' && ci.item.translations?.[language]?.name) || ci.item.name,
+              price: ci.item.price,
+              translations: ci.item.translations,
+            },
+            quantity: ci.quantity,
+            selectedComplements: ci.selectedComplements?.map(c => ({
+              name: c.name,
+              price: c.price,
+            })),
+          })),
+          total: totalPrice,
+        }),
+      });
+      
+      if (res.ok) {
+        setSent(true);
+        setTimeout(() => {
+          clearCart();
+          closeCart();
+          setSent(false);
+        }, 2000);
+      } else {
+        alert('Error al enviar pedido. Inténtalo de nuevo.');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error al enviar pedido.');
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <Sheet open={isCartOpen} onOpenChange={closeCart}>
@@ -123,8 +167,10 @@ export function CartDrawer() {
                 <Button 
                   className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full py-3 text-lg font-semibold shadow-md transition-all duration-200"
                   size="lg"
+                  onClick={handleConfirmOrder}
+                  disabled={sending || sent}
                 >
-                  {t("confirmOrder", language)}
+                  {sending ? 'Enviando...' : sent ? '¡Pedido enviado!' : t("confirmOrder", language)}
                 </Button>
                 <Button
                   variant="ghost"
