@@ -3,7 +3,7 @@
 import { Minus, Plus, Trash2, ShoppingBag, User, Phone } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+// Removed unused import 'Label'
 import {
   Sheet,
   SheetContent,
@@ -52,7 +52,7 @@ export function CartDrawer() {
   const validatePhone = (phone: string): string | undefined => {
     const trimmed = phone.trim();
     if (!trimmed) return 'El teléfono es obligatorio';
-    const digitsOnly = trimmed.replace(/\D/g, '');
+    const digitsOnly = trimmed.replaceAll(/\D/g, '');
     if (digitsOnly.length < 9) return 'Mínimo 9 dígitos';
     if (digitsOnly.length > 15) return 'Máximo 15 dígitos';
     return undefined;
@@ -70,7 +70,7 @@ export function CartDrawer() {
     }
 
     const sanitizedNombre = nombre.trim().slice(0, 100);
-    const sanitizedTelefono = telefono.replace(/\D/g, '').slice(0, 15);
+    const sanitizedTelefono = telefono.replaceAll(/\D/g, '').slice(0, 15);
 
     setSending(true);
     try {
@@ -222,7 +222,7 @@ export function CartDrawer() {
                       type="tel"
                       placeholder="Tu teléfono"
                       value={telefono}
-                      onChange={(e) => { const val = e.target.value.replace(/\D/g, '').slice(0, 15); setTelefono(val); setErrors(prev => ({ ...prev, telefono: undefined })); }}
+                      onChange={(e) => { const val = e.target.value.replaceAll(/\D/g, '').slice(0, 15); setTelefono(val); setErrors(prev => ({ ...prev, telefono: undefined })); }}
                       className={`h-9 ${errors.telefono ? 'border-red-500' : ''}`}
                       maxLength={15}
                       autoComplete="tel"
@@ -246,7 +246,11 @@ export function CartDrawer() {
                   onClick={handleConfirmOrder}
                   disabled={sending || sent}
                 >
-                  {sending ? 'Enviando...' : sent ? '¡Pedido enviado!' : t("confirmOrder", language)}
+                  {(() => {
+                    if (sending) return 'Enviando...';
+                    if (sent) return '¡Pedido enviado!';
+                    return t("confirmOrder", language);
+                  })()}
                 </Button>
                 <Button
                   variant="ghost"

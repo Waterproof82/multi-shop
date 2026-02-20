@@ -148,7 +148,7 @@ export async function POST(request: Request) {
     };
 
     const sanitizedNombre = typeof nombre === 'string' ? nombre.trim().slice(0, 100) : '';
-    const sanitizedTelefono = typeof telefono === 'string' ? telefono.replace(/\D/g, '').slice(0, 15) : '';
+    const sanitizedTelefono = typeof telefono === 'string' ? telefono.replaceAll(/\D/g, '').slice(0, 15) : '';
 
     if (!sanitizedNombre || sanitizedNombre.length < 2) {
       return NextResponse.json({ error: 'Nombre inválido' }, { status: 400 });
@@ -170,7 +170,7 @@ export async function POST(request: Request) {
 
     const nuevoNumeroPedido = (lastOrder?.numero_pedido || 0) + 1;
 
-    const { data: pedido, error: pedidoError } = await supabase
+    const { error: pedidoError } = await supabase
       .from('pedidos')
       .insert({
         empresa_id: empresa.id,
@@ -196,8 +196,9 @@ export async function POST(request: Request) {
     }
 
     if (RESEND_API_KEY && empresa.email_notification) {
-      const html = generateOrderEmail(items, total, empresa.nombre, nuevoNumeroPedido, nombre, telefono);
-      
+      const safeNombre = typeof nombre === 'string' ? nombre : '';
+      const safeTelefono = typeof telefono === 'string' ? telefono : '';
+      const html = generateOrderEmail(items, total, empresa.nombre, nuevoNumeroPedido, safeNombre, safeTelefono);
       await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -207,7 +208,7 @@ export async function POST(request: Request) {
         body: JSON.stringify({
           from: 'Pedidos <pedidos@resend.dev>',
           to: empresa.email_notification,
-          subject: `Nuevo pedido #${nuevoNumeroPedido} de ${nombre} - ${total.toFixed(2)}€`,
+          subject: `Nuevo pedido #${nuevoNumeroPedido} de ${safeNombre} - ${total.toFixed(2)}€`,
           html,
         }),
       });
