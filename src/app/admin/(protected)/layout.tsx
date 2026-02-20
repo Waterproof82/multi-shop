@@ -2,6 +2,9 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { jwtVerify } from 'jose';
 import { AdminSidebar } from './admin-sidebar';
+import { AdminProvider } from '@/lib/admin-context';
+import { adminRepository } from '@/core/infrastructure/database/SupabaseAdminRepository';
+import { AdminThemeProvider } from '@/components/admin-theme-provider';
 
 const ADMIN_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET!;
 
@@ -33,12 +36,21 @@ export default async function AdminProtectedLayout({
     redirect('/admin/login');
   }
 
+  // Obtener datos de la empresa
+  const admin = await adminRepository.findById(session.adminId as string);
+  const empresaNombre = admin?.empresa.nombre || 'default';
+  const empresaId = session.empresaId as string || '';
+
   return (
-    <div className="min-h-screen bg-gray-100">
-      <AdminSidebar session={session} />
-      <main className="lg:ml-64 min-h-screen">
-        {children}
-      </main>
-    </div>
+    <AdminThemeProvider>
+      <AdminProvider empresaId={empresaId} empresaNombre={empresaNombre}>
+        <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+          <AdminSidebar session={session} />
+          <main className="lg:ml-64 min-h-screen">
+            {children}
+          </main>
+        </div>
+      </AdminProvider>
+    </AdminThemeProvider>
   );
 }

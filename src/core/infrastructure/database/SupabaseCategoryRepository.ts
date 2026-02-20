@@ -19,6 +19,8 @@ export class SupabaseCategoryRepository implements ICategoryRepository {
       empresaId: row.empresa_id,
       nombre: row.nombre_es, // Por ahora devolvemos ES por defecto
       orden: row.orden || 0,
+      categoriaComplementoDe: row.categoria_complemento_de || null,
+      complementoObligatorio: row.complemento_obligatorio || false,
       translations: {
         en: row.nombre_en,
         fr: row.nombre_fr,

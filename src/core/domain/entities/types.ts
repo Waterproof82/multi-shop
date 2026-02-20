@@ -23,6 +23,8 @@ export interface Category {
   empresaId: string;
   nombre: string;
   orden: number;
+  categoriaComplementoDe: string | null;
+  complementoObligatorio: boolean;
   translations?: {
     en?: string;
     fr?: string;

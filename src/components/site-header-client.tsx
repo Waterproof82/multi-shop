@@ -73,8 +73,7 @@ export function SiteHeaderClient({ showCart }: SiteHeaderClientProps) {
               {totalItems > 0 && (
                 <span
                   key={totalItems}
-                  className={`absolute -top-2 -right-2 flex items-center justify-center rounded-full bg-red-600 text-white text-xs w-6 h-6 font-bold transition-transform ${animate ? 'animate-bounce-long' : ''}`}
-                  style={{ pointerEvents: 'none' }}
+                  className={`absolute -top-1.5 -right-1.5 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-600 px-1 text-xs font-bold text-white ${animate ? 'animate-bounce-long' : ''}`}
                 >
                   {totalItems}
                 </span>

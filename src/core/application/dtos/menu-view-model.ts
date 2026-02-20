@@ -12,6 +12,13 @@ export interface MenuItemVM {
     it?: { name: string; description?: string };
     de?: { name: string; description?: string };
   };
+  complements?: {
+    id: string;
+    name: string;
+    price: number;
+    description?: string;
+  }[];
+  requiresComplement?: boolean;
 }
 
 export interface MenuCategoryVM {
@@ -24,4 +31,5 @@ export interface MenuCategoryVM {
     it?: string;
     de?: string;
   };
+  complementoDeId?: string;
 }

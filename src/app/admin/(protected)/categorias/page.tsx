@@ -12,6 +12,8 @@ interface Category {
   nombre_it: string;
   nombre_de: string;
   orden: number;
+  categoria_complemento_de: string | null;
+  complemento_obligatorio: boolean;
 }
 
 interface CategoryFormData {
@@ -21,6 +23,8 @@ interface CategoryFormData {
   nombre_it: string;
   nombre_de: string;
   orden: number;
+  categoria_complemento_de: string | null;
+  complemento_obligatorio: boolean;
 }
 
 const emptyForm: CategoryFormData = {
@@ -30,6 +34,8 @@ const emptyForm: CategoryFormData = {
   nombre_it: '',
   nombre_de: '',
   orden: 0,
+  categoria_complemento_de: null,
+  complemento_obligatorio: false,
 };
 
 export default function CategoriasPage() {
@@ -117,6 +123,8 @@ export default function CategoriasPage() {
       nombre_it: categoria.nombre_it || '',
       nombre_de: categoria.nombre_de || '',
       orden: categoria.orden,
+      categoria_complemento_de: categoria.categoria_complemento_de,
+      complemento_obligatorio: categoria.complemento_obligatorio || false,
     });
     setEditingId(categoria.id);
     setIsModalOpen(true);
@@ -178,11 +186,11 @@ export default function CategoriasPage() {
   }
 
   return (
-    <div className="pt-20 lg:pt-0 px-4 lg:px-0">
+    <div className="pt-20 lg:pt-0 px-6 lg:px-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-serif font-bold text-gray-900">Categorías</h1>
-          <p className="text-gray-600">Gestiona las categorías del menú</p>
+          <h1 className="text-2xl font-serif font-bold text-gray-900 dark:text-white">Categorías</h1>
+          <p className="text-gray-600 dark:text-gray-400">Gestiona las categorías del menú</p>
         </div>
         <div className="flex items-center gap-4 w-full sm:w-auto">
           <div className="relative flex-1 sm:flex-initial">
@@ -192,7 +200,7 @@ export default function CategoriasPage() {
               placeholder="Buscar..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 border rounded-lg w-full sm:w-48 focus:outline-none focus:ring-2 focus:ring-primary"
+              className="pl-10 pr-4 py-2 border rounded-lg w-full sm:w-48 focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-white"
             />
           </div>
           <button
@@ -206,19 +214,19 @@ export default function CategoriasPage() {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md">
+        <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-md">
           {error}
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 overflow-hidden">
         {/* Desktop table */}
         <div className="hidden md:block overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
                 <th 
-                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
                   onClick={() => handleSort('orden')}
                 >
                   <div className="flex items-center gap-1">
@@ -229,7 +237,7 @@ export default function CategoriasPage() {
                   </div>
                 </th>
                 <th 
-                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
                   onClick={() => handleSort('nombre_es')}
                 >
                   <div className="flex items-center gap-1">
@@ -239,25 +247,33 @@ export default function CategoriasPage() {
                     ) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
                   </div>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
                   Traducciones
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                  Complemento de
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
                   Acciones
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {filteredCategorias.map((cat) => (
-                <tr key={cat.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                <tr key={cat.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                     {cat.orden}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
                     {cat.nombre_es}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {getTraducciones(cat)}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {cat.categoria_complemento_de 
+                      ? categorias.find(c => c.id === cat.categoria_complemento_de)?.nombre_es || '—'
+                      : '—'}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
                     <button
@@ -277,7 +293,7 @@ export default function CategoriasPage() {
               ))}
               {filteredCategorias.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={5} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                     {searchTerm ? 'No se encontraron categorías.' : 'No hay categorías. Crea la primera.'}
                   </td>
                 </tr>
@@ -287,27 +303,27 @@ export default function CategoriasPage() {
         </div>
 
         {/* Mobile cards */}
-        <div className="md:hidden divide-y divide-gray-200">
+        <div className="md:hidden divide-y divide-gray-200 dark:divide-gray-700">
           {filteredCategorias.map((cat) => (
-            <div key={cat.id} className="p-4 hover:bg-gray-50">
+            <div key={cat.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-400">#{cat.orden}</span>
-                    <p className="font-medium text-gray-900">{cat.nombre_es}</p>
+                    <span className="text-xs text-gray-400 dark:text-gray-500">#{cat.orden}</span>
+                    <p className="font-medium text-gray-900 dark:text-gray-100">{cat.nombre_es}</p>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">{getTraducciones(cat)}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{getTraducciones(cat)}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => openEditModal(cat)}
-                    className="p-1.5 text-primary hover:bg-primary/10 rounded"
+                    className="p-1.5 text-primary hover:bg-primary/10 dark:hover:bg-primary/20 rounded"
                   >
                     <Pencil className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => handleDelete(cat.id)}
-                    className="p-1.5 text-red-600 hover:bg-red-50 rounded"
+                    className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -316,7 +332,7 @@ export default function CategoriasPage() {
             </div>
           ))}
           {filteredCategorias.length === 0 && (
-            <div className="p-8 text-center text-gray-500">
+            <div className="p-8 text-center text-gray-500 dark:text-gray-400">
               {searchTerm ? 'No se encontraron categorías.' : 'No hay categorías. Crea la primera.'}
             </div>
           )}
@@ -325,19 +341,19 @@ export default function CategoriasPage() {
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center p-6 border-b">
-              <h2 className="text-xl font-semibold">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center p-6 border-b dark:border-gray-700">
+              <h2 className="text-xl font-semibold dark:text-white">
                 {editingId ? 'Editar Categoría' : 'Nueva Categoría'}
               </h2>
-              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600">
+              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                   Nombre (Español) *
                 </label>
                 <input
@@ -345,74 +361,112 @@ export default function CategoriasPage() {
                   required
                   value={formData.nombre_es}
                   onChange={(e) => setFormData({ ...formData, nombre_es: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                     Nombre (Inglés)
                   </label>
                   <input
                     type="text"
                     value={formData.nombre_en}
                     onChange={(e) => setFormData({ ...formData, nombre_en: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                     Nombre (Francés)
                   </label>
                   <input
                     type="text"
                     value={formData.nombre_fr}
                     onChange={(e) => setFormData({ ...formData, nombre_fr: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                     Nombre (Italiano)
                   </label>
                   <input
                     type="text"
                     value={formData.nombre_it}
                     onChange={(e) => setFormData({ ...formData, nombre_it: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                     Nombre (Alemán)
                   </label>
                   <input
                     type="text"
                     value={formData.nombre_de}
                     onChange={(e) => setFormData({ ...formData, nombre_de: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                   Orden
                 </label>
                 <input
                   type="number"
                   value={formData.orden}
                   onChange={(e) => setFormData({ ...formData, orden: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                 />
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                  Complemento de categoría
+                </label>
+                <select
+                  value={formData.categoria_complemento_de || ''}
+                  onChange={(e) => setFormData({ ...formData, categoria_complemento_de: e.target.value || null })}
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                >
+                  <option value="">Ninguna (categoría principal)</option>
+                  {categorias
+                    .filter((c) => c.id !== editingId)
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre_es}
+                      </option>
+                    ))}
+                </select>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Los productos de esta categoría aparecerán como complemento al añadir productos de la categoría seleccionada.
+                </p>
+              </div>
+
+              {formData.categoria_complemento_de && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="complemento_obligatorio"
+                    checked={formData.complemento_obligatorio}
+                    onChange={(e) => setFormData({ ...formData, complemento_obligatorio: e.target.checked })}
+                    className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  />
+                  <label htmlFor="complemento_obligatorio" className="text-sm text-gray-700 dark:text-gray-200">
+                    Seleccionar complemento obligatorio
+                  </label>
+                </div>
+              )}
 
               <div className="flex justify-end gap-3 pt-4">
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="px-4 py-2 border rounded-md hover:bg-gray-50"
+                  className="px-4 py-2 border rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
                 >
                   Cancelar
                 </button>

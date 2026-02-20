@@ -8,17 +8,20 @@ export const translations = {
     quantity: "Cantidad",
     openCart: "Abrir carrito",
     yourOrder: "Tu Pedido",
+    cartDescription: "Revisa y confirma tu pedido",
     emptyCart: "Tu carrito esta vacio",
     addDishesToStart: "Anade platos del menu para empezar",
     total: "Total",
     confirmOrder: "Confirmar Pedido",
     clearCart: "Vaciar carrito",
-    addToCart: "Añadir al carrito",
+    addToCart: "Anadir al carrito",
     reduceQuantity: "Reducir cantidad",
     increaseQuantity: "Aumentar cantidad",
     remove: "Eliminar",
     askWaiter: "Preguntale al camarero",
     allergenDisclaimer: "TODOS NUESTROS PRODUCTOS SON SUSCEPTIBLES DE CONTENER DE MANERA DIRECTA O A TRAVES DE CONTAMINACION CRUZADA ALGUN TIPO DE ALERGENO",
+    complementsOptional: "Complementos (opcional)",
+    complementsRequired: "Complementos (obligatorio)",
     // Allergens
     allergenCrustaceans: "Crustáceos",
     allergenFish: "Pescado",
@@ -42,6 +45,7 @@ export const translations = {
     quantity: "Quantity",
     openCart: "Open cart",
     yourOrder: "Your Order",
+    cartDescription: "Review and confirm your order",
     emptyCart: "Your cart is empty",
     addDishesToStart: "Add dishes from the menu to start",
     total: "Total",
@@ -68,6 +72,8 @@ export const translations = {
     allergenSesame: "Sesame seeds",
     allergenSulphites: "Sulphur dioxide and sulphites",
     sessionExpired: "Session expired. Request a new link from the waiter.",
+    complementsOptional: "Complements (optional)",
+    complementsRequired: "Complements (required)",
   },
   fr: {
     // UI
@@ -76,6 +82,7 @@ export const translations = {
     quantity: "Quantite",
     openCart: "Ouvrir le panier",
     yourOrder: "Votre Commande",
+    cartDescription: "Review et confirmez votre commande",
     emptyCart: "Votre panier est vide",
     addDishesToStart: "Ajoutez des plats du menu pour commencer",
     total: "Total",
@@ -102,6 +109,8 @@ export const translations = {
     allergenSesame: "Graines de sesame",
     allergenSulphites: "Dioxyde de soufre et sulfites",
     sessionExpired: "Session expiree. Demandez un nouveau lien au serveur.",
+    complementsOptional: "Complements (optionnel)",
+    complementsRequired: "Complements (obligatoire)",
   },
   it: {
     // UI
@@ -110,6 +119,7 @@ export const translations = {
     quantity: "Quantita",
     openCart: "Apri carrello",
     yourOrder: "Il Tuo Ordine",
+    cartDescription: "Rivedi e conferma il tuo ordine",
     emptyCart: "Il tuo carrello e vuoto",
     addDishesToStart: "Aggiungi piatti dal menu per iniziare",
     total: "Totale",
@@ -136,6 +146,8 @@ export const translations = {
     allergenSesame: "Semi di sesamo",
     allergenSulphites: "Anidride solforosa e solfiti",
     sessionExpired: "Sessione scaduta. Richiedi un nuovo link al cameriere.",
+    complementsOptional: "Complementi (opzionale)",
+    complementsRequired: "Complementi (obbligatorio)",
   },
   de: {
     // UI
@@ -144,6 +156,7 @@ export const translations = {
     quantity: "Menge",
     openCart: "Warenkorb offnen",
     yourOrder: "Ihre Bestellung",
+    cartDescription: "Uberprufen und bestatigen Sie Ihre Bestellung",
     emptyCart: "Ihr Warenkorb ist leer",
     addDishesToStart: "Fugen Sie Gerichte aus der Speisekarte hinzu",
     total: "Gesamt",
@@ -170,6 +183,8 @@ export const translations = {
     allergenSesame: "Sesamsamen",
     allergenSulphites: "Schwefeldioxid und Sulfite",
     sessionExpired: "Sitzung abgelaufen. Fordern Sie einen neuen Link vom Kellner an.",
+    complementsOptional: "Beilagen (optional)",
+    complementsRequired: "Beilagen (erforderlich)",
   },
 }
 

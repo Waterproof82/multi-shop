@@ -16,9 +16,7 @@ export async function checkCartAuthorization() {
     const secret = new TextEncoder().encode(secretKey);
     await jwtVerify(accessToken.value, secret);
     return true;
-  } catch (error) {
-    // Token expired or invalid - clear cookie
-    const response = { success: false };
+  } catch {
     cookieStore.delete('access_token');
     return false;
   }

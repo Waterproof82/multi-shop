@@ -1,14 +1,20 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, memo, useCallback } from "react"
 import { motion } from "framer-motion"
 import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
-import { useCart } from "@/lib/cart-context"
 import { useLanguage, type Language } from "@/lib/language-context"
 import { t } from "@/lib/translations"
 import { MenuCategoryVM, MenuItemVM } from "@/core/application/dtos/menu-view-model"
 import { QuantitySelectorDialog } from "@/components/quantity-selector-dialog"
+
+interface Complement {
+  id: string;
+  name: string;
+  price: number;
+  description?: string;
+}
 
 type LanguageKey = 'en' | 'fr' | 'it' | 'de';
 
@@ -17,23 +23,18 @@ interface MenuSectionProps {
   showCart?: boolean
 }
 
-export function MenuSection(props: Readonly<MenuSectionProps>) {
+export const MenuSection = memo(function MenuSection(props: Readonly<MenuSectionProps>) {
   const { category, showCart } = props;
-  const { addItem } = useCart();
   const { language } = useLanguage();
   const [selectedItem, setSelectedItem] = useState<MenuItemVM | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const handleItemClick = (item: MenuItemVM) => {
+  const handleItemClick = useCallback((item: MenuItemVM) => {
     setSelectedItem(item);
     setIsDialogOpen(true);
-  };
+  }, []);
 
-  const handleAddToCartWithQuantity = (item: MenuItemVM, quantity: number) => {
-    addItem(item, quantity);
-  };
-
-  const isSalsas = category.label.toLowerCase() === "salsas";
+  const isCategoryWithComplements = category.items.some((item) => item.complements && item.complements.length > 0);
   const translationLang = (['en', 'fr', 'it', 'de'].includes(language) ? language : undefined) as LanguageKey | undefined;
   const safeLanguage: Language = language || "es";
 
@@ -46,9 +47,9 @@ export function MenuSection(props: Readonly<MenuSectionProps>) {
         <div className="h-px flex-1 bg-border" />
       </div>
 
-      {isSalsas && (
+      {isCategoryWithComplements && category.complementoDeId && (
         <p className="mb-4 text-sm text-muted-foreground">
-          Elige tu salsa favorita para acompañar tu pasta. Pasta con salsa Frutti di Mare +2.50€
+          Selecciona los complementos opcionales al añadir productos.
         </p>
       )}
 
@@ -64,7 +65,6 @@ export function MenuSection(props: Readonly<MenuSectionProps>) {
           >
             <MenuItemCard
               item={item}
-              isSalsas={isSalsas}
               language={translationLang}
               onItemClick={handleItemClick}
               showCart={showCart}
@@ -77,66 +77,57 @@ export function MenuSection(props: Readonly<MenuSectionProps>) {
         item={selectedItem}
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
-        onAddToCart={handleAddToCartWithQuantity}
       />
     </section>
   );
-}
+})
 
-function MenuItemCard(props: Readonly<{
+const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
   item: MenuItemVM;
-  isSalsas: boolean;
   language: LanguageKey | undefined;
   onItemClick: (item: MenuItemVM) => void;
   showCart?: boolean;
 }>) {
-  const { item, isSalsas, language, onItemClick, showCart } = props;
+  const { item, language, onItemClick, showCart } = props;
   const { language: appLanguage } = useLanguage();
   const safeLanguage = appLanguage || "es";
   const [imageError, setImageError] = useState(false);
-  const [clientName, setClientName] = useState(item.name);
-  const [clientDescription, setClientDescription] = useState(item.description || "");
 
-  // Update name and description on client after mount to avoid hydration mismatch
-  useEffect(() => {
-    if (language && item.translations?.[language]?.name) {
-      setClientName(item.translations[language].name);
-    } else {
-      setClientName(item.name);
-    }
-    if (language && item.translations?.[language]?.description) {
-      setClientDescription(item.translations[language].description);
-    } else {
-      setClientDescription(item.description || "");
-    }
-  }, [language, item]);
+  const displayName = language && item.translations?.[language]?.name 
+    ? item.translations[language].name 
+    : item.name;
+  const displayDescription = language && item.translations?.[language]?.description 
+    ? item.translations[language].description 
+    : item.description;
 
   return (
     <div
       className={`group flex h-full flex-col overflow-hidden rounded-xl bg-card shadow-sm transition-all hover:shadow-md border ${
-        showCart ? "cursor-pointer" : "" // visual cue only
+        showCart ? "cursor-pointer" : ""
       } ${
         item.highlight ? "border-accent/30 bg-accent/5" : "border-border"
       }`}
-      // No role/button/tabIndex for accessibility, only visual cue
     >
       {item.image && !imageError && (
         <div className="relative aspect-[4/3] w-full overflow-hidden">
           <Image
+            key={item.id}
             src={item.image}
-            alt={item.name}
+            alt={displayName}
             fill
+            unoptimized
             className="object-cover transition-transform duration-300 group-hover:scale-105"
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
             loading="eager"
             onError={() => setImageError(true)}
+            suppressHydrationWarning
           />
         </div>
       )}
       <div className="flex flex-1 flex-col p-5">
         <div className="mb-2 flex items-start justify-between gap-2">
           <h3 className="font-serif text-xl font-bold text-foreground">
-            {clientName}
+            {displayName}
           </h3>
           <div className="flex flex-col gap-1 items-end shrink-0">
             {item.highlight && (
@@ -146,13 +137,13 @@ function MenuItemCard(props: Readonly<{
             )}
           </div>
         </div>
-        {clientDescription && (
+        {displayDescription && (
           <p className="mb-3 flex-1 text-sm leading-relaxed text-muted-foreground">
-            {clientDescription}
+            {displayDescription}
           </p>
         )}
         <div className="flex-1" />
-        {!isSalsas && showCart && (
+        {showCart && (
           <div className="flex items-center justify-between gap-3 pt-4 mt-auto">
             <span className="font-serif text-2xl font-bold text-foreground">
               {item.price.toFixed(2).replace(".", ",")}€
@@ -164,13 +155,13 @@ function MenuItemCard(props: Readonly<{
                 e.stopPropagation();
                 onItemClick(item);
               }}
-              aria-label={`${t("addToCart", safeLanguage)} ${clientName}`}
+              aria-label={`${t("addToCart", safeLanguage)} ${displayName}`}
             >
               {t("addToCart", safeLanguage)}
             </button>
           </div>
         )}
-        {!isSalsas && !showCart && (
+        {!showCart && (
           <div className="flex items-center justify-between gap-3 pt-4 mt-auto">
             <span className="font-serif text-2xl font-bold text-foreground">
               {item.price.toFixed(2).replace(".", ",")}€
@@ -180,4 +171,4 @@ function MenuItemCard(props: Readonly<{
       </div>
     </div>
   );
-}
+})

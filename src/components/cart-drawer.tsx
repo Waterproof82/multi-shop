@@ -7,11 +7,18 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
+  SheetDescription,
 } from "@/components/ui/sheet"
 
-import { useCart } from "@/lib/cart-context"
+import { useCart, type Complement } from "@/lib/cart-context"
 import { useLanguage } from "@/lib/language-context"
 import { t } from "@/lib/translations"
+import type { MenuItemVM } from "@/core/application/dtos/menu-view-model"
+
+function getItemKey(item: MenuItemVM, complements?: Complement[]): string {
+  const complementIds = complements?.map(c => c.id).sort().join(',') || '';
+  return `${item.id}-${complementIds}`;
+}
 
 export function CartDrawer() {
   const { 
@@ -33,6 +40,9 @@ export function CartDrawer() {
             <ShoppingBag className="size-5" />
             {t("yourOrder", language)}
           </SheetTitle>
+          <SheetDescription>
+            {t("cartDescription", language)}
+          </SheetDescription>
         </SheetHeader>
 
         {items.length === 0 ? (
@@ -45,49 +55,59 @@ export function CartDrawer() {
           <>
             <div className="flex-1 overflow-y-auto">
               <div className="flex flex-col gap-3 py-4">
-                {items.map((ci) => (
-                  <div key={ci.item.id} className="flex items-center gap-3 rounded-lg bg-card p-3">
-                    <div className="flex-1">
-                      <p className="font-semibold text-card-foreground">
-                        {(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {ci.item.price.toFixed(2).replace(".", ",")}{"€"}
-                      </p>
-                    </div>
+                {items.map((ci) => {
+                  const itemKey = getItemKey(ci.item, ci.selectedComplements);
+                  const complementPrice = ci.selectedComplements?.reduce((sum, c) => sum + c.price, 0) || 0;
+                  const totalItemPrice = ci.item.price + complementPrice;
+                  return (
+                    <div key={itemKey} className="flex items-center gap-3 rounded-lg bg-card p-3">
+                      <div className="flex-1">
+                        <p className="font-semibold text-card-foreground">
+                          {(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}
+                        </p>
+                        {ci.selectedComplements && ci.selectedComplements.length > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            + {ci.selectedComplements.map(c => c.name).join(', ')}
+                          </p>
+                        )}
+                        <p className="text-sm text-muted-foreground">
+                          {totalItemPrice.toFixed(2).replace(".", ",")}{"€"}
+                        </p>
+                      </div>
 
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="size-7 bg-transparent"
-                        onClick={() => updateQuantity(ci.item.id, ci.quantity - 1)}
-                        aria-label={t("reduceQuantity", language)}
-                      >
-                        <Minus className="size-3" />
-                      </Button>
-                      <span className="w-6 text-center font-semibold text-foreground">{ci.quantity}</span>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="size-7 bg-transparent"
-                        onClick={() => updateQuantity(ci.item.id, ci.quantity + 1)}
-                        aria-label={t("increaseQuantity", language)}
-                      >
-                        <Plus className="size-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-7 text-destructive hover:text-destructive"
-                        onClick={() => removeItem(ci.item.id)}
-                        aria-label={`${t("remove", language)} ${(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}`}
-                      >
-                        <Trash2 className="size-3" />
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="size-7 bg-transparent"
+                          onClick={() => updateQuantity(itemKey, ci.quantity - 1)}
+                          aria-label={t("reduceQuantity", language)}
+                        >
+                          <Minus className="size-3" />
+                        </Button>
+                        <span className="w-6 text-center font-semibold text-foreground">{ci.quantity}</span>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="size-7 bg-transparent"
+                          onClick={() => updateQuantity(itemKey, ci.quantity + 1)}
+                          aria-label={t("increaseQuantity", language)}
+                        >
+                          <Plus className="size-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-7 text-destructive hover:text-destructive"
+                          onClick={() => removeItem(itemKey)}
+                          aria-label={`${t("remove", language)} ${(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}`}
+                        >
+                          <Trash2 className="size-3" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
