@@ -14,12 +14,14 @@ export const translations = {
     total: "Total",
     confirmOrder: "Confirmar Pedido",
     clearCart: "Vaciar carrito",
-    addToCart: "Añadir al carrito",
+    addToCart: "Anadir al carrito",
     reduceQuantity: "Reducir cantidad",
     increaseQuantity: "Aumentar cantidad",
     remove: "Eliminar",
     askWaiter: "Preguntale al camarero",
     allergenDisclaimer: "TODOS NUESTROS PRODUCTOS SON SUSCEPTIBLES DE CONTENER DE MANERA DIRECTA O A TRAVES DE CONTAMINACION CRUZADA ALGUN TIPO DE ALERGENO",
+    complementsOptional: "Complementos (opcional)",
+    complementsRequired: "Complementos (obligatorio)",
     // Allergens
     allergenCrustaceans: "Crustáceos",
     allergenFish: "Pescado",
@@ -70,6 +72,8 @@ export const translations = {
     allergenSesame: "Sesame seeds",
     allergenSulphites: "Sulphur dioxide and sulphites",
     sessionExpired: "Session expired. Request a new link from the waiter.",
+    complementsOptional: "Complements (optional)",
+    complementsRequired: "Complements (required)",
   },
   fr: {
     // UI
@@ -105,6 +109,8 @@ export const translations = {
     allergenSesame: "Graines de sesame",
     allergenSulphites: "Dioxyde de soufre et sulfites",
     sessionExpired: "Session expiree. Demandez un nouveau lien au serveur.",
+    complementsOptional: "Complements (optionnel)",
+    complementsRequired: "Complements (obligatoire)",
   },
   it: {
     // UI
@@ -140,6 +146,8 @@ export const translations = {
     allergenSesame: "Semi di sesamo",
     allergenSulphites: "Anidride solforosa e solfiti",
     sessionExpired: "Sessione scaduta. Richiedi un nuovo link al cameriere.",
+    complementsOptional: "Complementi (opzionale)",
+    complementsRequired: "Complementi (obbligatorio)",
   },
   de: {
     // UI
@@ -175,6 +183,8 @@ export const translations = {
     allergenSesame: "Sesamsamen",
     allergenSulphites: "Schwefeldioxid und Sulfite",
     sessionExpired: "Sitzung abgelaufen. Fordern Sie einen neuen Link vom Kellner an.",
+    complementsOptional: "Beilagen (optional)",
+    complementsRequired: "Beilagen (erforderlich)",
   },
 }
 

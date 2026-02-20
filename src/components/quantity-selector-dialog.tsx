@@ -105,7 +105,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
           {complements.length > 0 && (
             <div className="space-y-2 pb-4">
               <Label className="text-sm font-medium">
-                Complementos {item.requiresComplement ? '(obligatorio)' : '(opcional)'}
+                {item.requiresComplement ? t("complementsRequired", language) : t("complementsOptional", language)}
               </Label>
               <div className="space-y-2">
                 {complements.map((complement) => {
@@ -152,10 +152,11 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
             <Label htmlFor="quantity" className="text-right">
               {t("quantity", language)}
             </Label>
-            <div className="col-span-3 flex items-center gap-2">
+            <div className="col-span-3 flex items-center justify-center">
               <Button
                 variant="outline"
                 size="icon"
+                className="h-10 w-10"
                 onClick={handleDecrement}
                 disabled={quantity <= 1}
               >
@@ -163,13 +164,13 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
               </Button>
               <Input
                 id="quantity"
-                type="number"
+                type="text"
                 value={quantity}
-                onChange={handleQuantityChange}
-                className="w-16 text-center"
-                min="1"
+                className="mx-1 h-10 w-12 flex items-center justify-center text-center text-lg font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                readOnly
+                tabIndex={-1}
               />
-              <Button variant="outline" size="icon" onClick={handleIncrement}>
+              <Button variant="outline" size="icon" className="h-10 w-10" onClick={handleIncrement}>
                 <Plus className="h-4 w-4" />
               </Button>
             </div>
