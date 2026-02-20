@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { useAdmin } from '@/lib/admin-context';
 import { Search, ChevronDown, ChevronUp, Check, X, Clock, AlertCircle } from 'lucide-react';
 
@@ -161,8 +161,8 @@ export default function PedidosPage() {
                 </tr>
               ) : (
                 filteredPedidos.map((pedido) => (
-                  <>
-                    <tr key={pedido.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer" onClick={() => toggleExpand(pedido.id)}>
+                  <Fragment key={pedido.id}>
+                    <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer" onClick={() => toggleExpand(pedido.id)}>
                       <td className="px-4 py-3 whitespace-nowrap font-medium text-gray-900 dark:text-white">
                         #{pedido.numero_pedido}
                       </td>
@@ -186,7 +186,7 @@ export default function PedidosPage() {
                       </td>
                     </tr>
                     {expandedPedido === pedido.id && (
-                      <tr key={`${pedido.id}-details`}>
+                      <tr>
                         <td colSpan={6} className="px-4 py-4 bg-gray-50 dark:bg-gray-700/30">
                           <div className="max-w-2xl">
                             <h4 className="font-medium mb-2 dark:text-white">Detalles del pedido:</h4>
@@ -211,7 +211,7 @@ export default function PedidosPage() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 ))
               )}
             </tbody>
