@@ -29,13 +29,18 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 /**
  * Genera una URL prefirmada para subida directa (PUT).
+ * @param fileName - Nombre original del archivo
+ * @param fileType - Tipo MIME del archivo
+ * @param fileSize - Tamaño en bytes
+ * @param empresaSlug - Slug de la empresa para organizar archivos (opcional)
  */
 export async function getPresignedUploadUrlAction(
   fileName: string,
   fileType: string,
-  fileSize: number
+  fileSize: number,
+  empresaSlug: string = 'default'
 ) {
-  console.log('[R2] Starting upload:', { fileName, fileType, fileSize });
+  console.log('[R2] Starting upload:', { fileName, fileType, fileSize, empresaSlug });
   console.log('[R2] Env check:', { 
     R2_ACCOUNT_ID: !!R2_ACCOUNT_ID, 
     R2_ACCESS_KEY_ID: !!R2_ACCESS_KEY_ID, 
@@ -60,9 +65,10 @@ export async function getPresignedUploadUrlAction(
   }
 
   // 2. Sanitización y Generación de Key única
-  // Estructura: mermelada_tomate/year/month/uuid-filename.ext
+  // Estructura: {empresaSlug}/year/month/uuid-filename.ext
   const date = new Date();
-  const path = `mermelada_tomate/${date.getFullYear()}/${date.getMonth() + 1}`;
+  const sanitizedSlug = empresaSlug.toLowerCase().replace(/[^a-z0-9]/g, '-');
+  const path = `${sanitizedSlug}/${date.getFullYear()}/${date.getMonth() + 1}`;
   const cleanFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
   const uniqueKey = `${path}/${uuidv4()}-${cleanFileName}`;
 

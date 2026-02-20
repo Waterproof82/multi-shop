@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Pencil, Trash2, X, Loader2, Image as ImageIcon, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { ImageUploader } from '@/components/ui/image-uploader';
+import { useAdmin } from '@/lib/admin-context';
 
 interface Categoria {
   id: string;
@@ -65,6 +66,7 @@ const emptyForm: ProductoFormData = {
 };
 
 export default function ProductosPage() {
+  const { empresaSlug } = useAdmin();
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);
@@ -577,6 +579,7 @@ export default function ProductosPage() {
                     value={formData.foto_url}
                     onChange={(url) => setFormData({ ...formData, foto_url: url })}
                     label="Imagen del producto"
+                    empresaSlug={empresaSlug}
                   />
                 </div>
 

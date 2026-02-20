@@ -5,16 +5,19 @@ import { getPresignedUploadUrlAction } from "@/core/infrastructure/storage/actio
 /**
  * Server Action para obtener URL de upload
  * Maneja la lógica de negocio y delega la implementación a infraestructura
+ * @param fileName - Nombre del archivo
+ * @param fileType - Tipo MIME
+ * @param fileSize - Tamaño en bytes
+ * @param empresaSlug - Slug de la empresa (usa 'default' si no se provee)
  */
 export async function uploadImageAction(
   fileName: string,
   fileType: string,
-  fileSize: number
+  fileSize: number,
+  empresaSlug: string = 'default'
 ) {
-  // Validaciones de negocio pueden ir aquí si es necesario
   // Las validaciones técnicas ya están en la infraestructura
-  
-  const result = await getPresignedUploadUrlAction(fileName, fileType, fileSize);
+  const result = await getPresignedUploadUrlAction(fileName, fileType, fileSize, empresaSlug);
   
   if (!result.success) {
     throw new Error("No se pudo obtener la autorización de subida");

@@ -3,7 +3,7 @@
 ## Overview del Proyecto
 
 **Nombre:** Mermelada de Tomate  
-**Stack:** Next.js 16 + React 19 + TypeScript + Supabase + Tailwind CSS v4  
+**Stack:** Next.js 16 + React 19 + TypeScript + Supabase + Tailwind CSS v4 + Cloudflare R2
 **Tipo:** E-commerce / Carta digital multi-idioma con gestión de pedidos  
 **Arquitectura:** Clean Architecture con principios SOLID
 
@@ -17,88 +17,107 @@ src/
 │   ├── actions.ts           # Server Actions (seguridad JWT)
 │   ├── layout.tsx          # Root layout con providers
 │   └── page.tsx            # Página principal
+│   └── admin/              # Panel de administración
+│       ├── (protected)/     # Rutas protegidas
+│       │   ├── layout.tsx  # Layout con AdminProvider
+│       │   ├── page.tsx    # Dashboard
+│       │   ├── categorias/
+│       │   └── productos/
+│       └── login/
 │
 ├── core/                    # CLEAN ARCHITECTURE
 │   ├── domain/             # Entidades e Interfaces (DDD)
 │   │   ├── entities/       # Types: Product, Category, Tenant
-│   │   └── repositories/  # Interfaces: IProductRepository, ICategoryRepository, IStorageRepository
+│   │   └── repositories/   # Interfaces: IProductRepository, ICategoryRepository, IStorageRepository
 │   │
-│   ├── application/        # Casos de Uso (Use Cases)
+│   ├── application/        # Casos de Uso (Use Cases) + Actions
 │   │   ├── dtos/          # Data Transfer Objects + Zod schemas
-│   │   └── use-cases/     # GetMenuUseCase, CreateProductUseCase
+│   │   ├── use-cases/     # GetMenuUseCase, CreateProductUseCase
+│   │   └── actions/       # Server Actions (storage.actions.ts)
 │   │
-│   └── infrastructure/     # Implementaciones concretas
+│   └── infrastructure/    # Implementaciones concretas
 │       ├── database/       # SupabaseProductRepository, SupabaseCategoryRepository
-│       └── storage/        # R2StorageRepository
+│       └── storage/        # R2StorageRepository, actions.ts
 │
 ├── components/              # Componentes React
-│   ├── ui/                 # Componentes Radix UI (botones, dialogs, etc.)
-│   ├── cart-drawer.tsx     # Carrito de compras
-│   ├── menu-section.tsx    # Sección del menú
-│   ├── category-nav.tsx    # Navegación por categorías
-│   ├── hero-banner.tsx     # Banner principal
-│   ├── site-header*.tsx    # Header con variantes client/server
-│   ├── language-selector.tsx
-│   └── theme-provider.tsx
+│   └── ui/                 # Componentes UI (ImageUploader, etc.)
 │
 ├── lib/                    # Utilidades y contexto
-│   ├── supabaseClient.ts   # Cliente Supabase ( público )
-│   ├── server-services.ts  # Servicios server-only
-│   ├── cart-context.tsx    # Context API para carrito
-│   ├── language-context.tsx # Context para i18n
-│   ├── translations.ts     # Traducciones estáticas
-│   └── utils.ts            # Utilidades (cn, etc.)
+│   ├── admin-context.tsx   # Context para datos del admin (empresaId, empresaSlug)
+│   └── ...
 │
-├── hooks/                  # Custom hooks
-│   └── use-toast.ts        # Hook para notificaciones
-│
-├── styles/                # Estilos globales
-│   └── globals.css        # Tailwind v4 + variables CSS + tema italiano
-│
-└── proxy.ts               # Proxy para APIs (si aplica)
-
 scripts/
-└── generate-token.ts      # Script para generar JWT de acceso
-
-context/
-└── bbdd.md               # Esquema de base de datos (Supabase/PostgreSQL)
+├── generate-token.ts       # Script para generar JWT de acceso
+└── setup-r2-cors.ts       # Script para configurar CORS en R2
 ```
 
 ---
 
 ## Panel de Administración (/admin)
 
+### Características
+- **Diseño Responsive:** Sidebar con hamburger menu en móvil
+- **Buscador:** Filtra productos/categorías en todos los idiomas
+- **Ordenamiento:** Click en columnas para ordenar
+- **Vista móvil:** Cards en lugar de tablas
+
 ### Estructura de Rutas
 ```
 src/app/
 ├── admin/
-│   ├── layout.tsx           # Layout con sidebar y protección de rutas
-│   ├── page.tsx             # Dashboard principal
-│   ├── login/
-│   │   └── page.tsx         # Página de login
-│   ├── categorias/
-│   │   └── page.tsx         # CRUD de categorías
-│   └── productos/
-│       └── page.tsx         # CRUD de productos
-│
-└── api/admin/
-    ├── login/route.ts        # Endpoint login
-    ├── logout/route.ts      # Endpoint logout
-    ├── categorias/route.ts   # CRUD categorías
-    └── productos/route.ts    # CRUD productos
+│   ├── (protected)/
+│   │   ├── layout.tsx      # Layout con sidebar + AdminProvider
+│   │   ├── page.tsx        # Dashboard
+│   │   ├── categorias/      # CRUD categorías
+│   │   └── productos/      # CRUD productos + upload imágenes
+│   └── login/
+│       └── page.tsx
 ```
 
-### Autenticación Admin
-- **Proveedor:** Supabase Auth (Authentication/Users)
-- **Vinculación:** Tabla `perfiles_admin` con FK a `auth.users`
-- **Sesión:** JWT personalizado en cookie `admin_token` (24h)
-- **Repositorio:** `SupabaseAdminRepository` usa SERVICE_ROLE_KEY para bypass RLS
+### AdminProvider
+Provee datos de la empresa logueada:
+```typescript
+interface AdminContextType {
+  empresaId: string;
+  empresaSlug: string;  // Para organizar archivos en R2
+}
+```
 
-### Flujo de Acceso Admin
-1. **Usuario creado manualmente** en Supabase Dashboard → Authentication → Users
-2. **Perfil creado** en tabla `perfiles_admin` vinculado al usuario de auth
-3. **Login** → Valida credenciales en Supabase Auth → Genera JWT propio
-4. **Protección** → Layout admin verifica cookie y JWT en cada request
+---
+
+## Upload de Imágenes (Cloudflare R2)
+
+### Flujo
+1. **ImageUploader** (componente UI) → Server Action
+2. **storage.actions.ts** → Genera URL firmada
+3. **Upload directo** desde el navegador a R2
+4. **URL pública** guardada en la BBDD
+
+### Estructura de Archivos en R2
+```
+{_bucket}/
+└── {empresa_slug}/
+    └── {año}/
+        └── {mes}/
+            └── {uuid}-{filename}.{ext}
+```
+
+Ejemplo: `images/mermelada-de-tomate/2026/2/abc123-ensalada.webp`
+
+### Variables de Entorno (R2)
+```env
+R2_ACCOUNT_ID=tu_account_id
+R2_ACCESS_KEY_ID=tu_access_key
+R2_SECRET_ACCESS_KEY=tu_secret_key
+R2_BUCKET_NAME=images
+NEXT_PUBLIC_R2_DOMAIN=https://tu-dominio.r2.dev
+```
+
+### Configuración CORS
+El bucket necesita CORS configurado. Ejecutar:
+```bash
+npx tsx scripts/setup-r2-cors.ts
+```
 
 ---
 
@@ -115,116 +134,47 @@ src/app/
 | `pedidos` | Pedidos realizados | FK: `empresa_id` |
 | `perfiles_admin` | Admin users | FK: `id` → auth.users, `empresa_id` |
 
-### Columnas Relevantes
-
-**productos:**
-- Multi-idioma: `titulo_es/en/fr/it/de`, `descripcion_es/en/fr/it/de`
-- `precio` (numeric), `foto_url`, `es_especial`, `activo`
-
-**categorias:**
-- Multi-idioma: `nombre_es/en/fr/it/de`
-- `orden` (integer)
-
-**pedidos:**
-- `detalle_pedido` (jsonb): estructura del pedido
-- `estado`: pendiente, confirmado, etc.
-
-### Ubicación Cliente Supabase
-- **Archivo:** `src/lib/supabaseClient.ts`
-- **Variables:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-
----
-
-## Estilos y Tema
-
-### Tailwind CSS v4
-- **Configuración:** CSS-first (no tailwind.config.ts)
-- **Archivo principal:** `src/styles/globals.css`
-- **Variables CSS:** Tema italiano con colores Verde, Rojo, Oro, Crema, Terracota, Oliva, Espresso
-
-### Colores del Tema (CSS Variables)
-```css
---color-primary: #008C45     /* Verde italiano */
---color-accent: #CF0921     /* Rojo italiano */
---color-italian-gold: #F4C430
---color-italian-cream: #F7E7CE
---color-italian-terracotta: #C75B39
---color-italian-olive: #B7B3F
-```
-
-### Fuentes
-- **Serif:** Playfair Display
-- **Sans:** Inter
-
 ---
 
 ## Principios SOLID Aplicados
 
-### 1. Single Responsibility Principle (SRP)
-- Cada repositorio solo maneja una entidad (`SupabaseProductRepository` → solo productos)
-- Cada use case tiene una única responsabilidad (`GetMenuUseCase` → obtener menú)
-- Los componentes UI tienen una función clara
+### Dependency Inversion (DIP) - Ejemplo Storage
+```typescript
+// Componente UI NO usa implementación directa
+import { uploadImageAction } from '@/core/application/actions/storage.actions';
 
-### 2. Open/Closed Principle (OCP)
-- Interfaces de repositorio (`IProductRepository`) abiertas para extensión, cerradas para modificación
-- Nuevas implementaciones de BBDD pueden agregarse sin cambiar la lógica de negocio
+// Server Action delega a infraestructura
+import { getPresignedUploadUrlAction } from '@/core/infrastructure/storage/actions';
 
-### 3. Liskov Substitution Principle (LSP)
-- `SupabaseProductRepository` implementa `IProductRepository` intercambiable con cualquier otra implementación
+// Infraestructura implementa la interfaz
+import { R2StorageRepository } from '@/core/infrastructure/storage/R2StorageRepository';
+```
 
-### 4. Interface Segregation Principle (ISP)
-- Interfaces pequeñas y específicas (`IProductRepository`, `ICategoryRepository`, `IStorageRepository`)
-- No hay interfaces monolíticas
-
-### 5. Dependency Inversion Principle (DIP)
-- Los use cases dependen de abstracciones (interfaces), no de implementaciones concretas
-- `GetMenuUseCase` depende de `IProductRepository` y `ICategoryRepository`, no de Supabase directamente
+Flujo: **UI → Server Action → Interface → Implementación**
 
 ---
 
 ## Seguridad OWASP
 
 ### 1. A01: Broken Access Control
-- **Implementado:** Cookies `HttpOnly` para token de acceso al carrito
-- **Archivo:** `src/app/actions.ts` - verificación JWT server-side
-- **Flujo:** Token JWT → Cookie HttpOnly → Verificación en Server Actions
+- Cookies `HttpOnly` para token admin
+- Verificación JWT en Server Actions
 
 ### 2. A02: Cryptographic Failures
-- JWT con `jose` library (`scripts/generate-token.ts`)
-- Secrets en variables de entorno (`ACCESS_TOKEN_SECRET`)
+- JWT con `jose`
+- Secrets en variables de entorno
 
 ### 3. A03: Injection
-- Zod validation en DTOs (`src/core/application/dtos/product.dto.ts`)
-- Parámetros parametrizados en Supabase queries
+- Zod validation en DTOs
+- Parámetros parametrizados
 
 ### 4. A04: Insecure Design
-- Clean Architecture para separación de responsabilidades
-- Validación en múltiples capas (DTO → Use Case → Repository)
+- Clean Architecture
+- Validación en múltiples capas
 
 ### 5. A05: Security Misconfiguration
-- Solo variables públicas necesarias en cliente (`NEXT_PUBLIC_*`)
-- Server-only code marcado con `"server-only"` package
-
-### 6. A06: Vulnerable Components
-- Dependencias actualizables vía pnpm
-- ESLint configurado
-
-### 7: Identification and Authentication
-- JWT con expiración (2 horas)
-- Limpieza de cookies en logout
-
-### 8: Software and Data Integrity Failures
-- Tipos TypeScript estrictos
-- Zod para validación de datos
-
----
-
-## Flujo de Acceso al Carrito (Seguridad)
-
-1. **Generación Token:** `scripts/generate-token.ts` → JWT firmado
-2. **Validación:** `src/app/actions.ts` → `jwtVerify()` con `ACCESS_TOKEN_SECRET`
-3. **Cookie:** Creación de cookie `access_token` (HttpOnly, Secure)
-4. **UI:** Si autenticado → mostrar botones "Añadir", drawer del carrito
+- Solo variables `NEXT_PUBLIC_*` en cliente
+- Código server-only marcado
 
 ---
 
@@ -240,8 +190,11 @@ pnpm build
 # Lint
 pnpm lint
 
-# Generar token acceso (desarrollo)
+# Generar token acceso
 npx tsx scripts/generate-token.ts
+
+# Configurar CORS en R2
+npx tsx scripts/setup-r2-cors.ts
 ```
 
 ---
@@ -253,53 +206,19 @@ npx tsx scripts/generate-token.ts
 | Next.js | 16.0.10 | Framework full-stack |
 | React | 19.2.0 | UI Library |
 | TypeScript | 5.x | Tipado estático |
-| Supabase | ^2.95.3 | BBDD + Auth + Storage |
+| Supabase | ^2.95.3 | BBDD + Auth |
+| Cloudflare R2 | - | Storage imágenes |
 | Tailwind CSS | 4.1.9 | Estilos |
-| Radix UI | 1.x | Componentes UI accesibles |
+| AWS SDK | ^3.994 | S3/R2 |
 | Zod | 3.25.76 | Validación schemas |
 | jose | 6.1.3 | JWT |
-| Framer Motion | 11.x | Animaciones |
-| Lucide React | 0.454.0 | Iconos |
-
----
-
-## Patrones de Código
-
-### Repository Pattern
-```typescript
-// Interfaz (dominio)
-interface IProductRepository {
-  create(data: CreateProductDTO): Promise<Product>;
-  findAllByTenant(empresaId: string): Promise<Product[]>;
-}
-
-// Implementación (infraestructura)
-class SupabaseProductRepository implements IProductRepository { ... }
-```
-
-### Use Case Pattern
-```typescript
-class GetMenuUseCase {
-  constructor(
-    private readonly productRepo: IProductRepository,
-    private readonly categoryRepo: ICategoryRepository
-  ) {}
-  
-  async execute(empresaId: string): Promise<MenuCategoryVM[]> { ... }
-}
-```
-
-### Context API (Estado Global)
-- `CartProvider`: Estado del carrito (items, total, abierto/cerrado)
-- `LanguageProvider`: Idioma actual (i18n)
-- `ThemeProvider`: Tema claro/oscuro
 
 ---
 
 ## Notas Importantes
 
-- **Multi-tenant:** Sistema diseñado para múltiples empresas, filtrado por `empresa_id`
-- **i18n:** Soporte para ES, EN, FR, IT, DE (columnas separadas en BBDD)
-- **SSR:** Renderizado server-side para SEO y performance
-- **Server Actions:** `src/app/actions.ts` para operaciones seguras
-- **Server-only:** Servicios que no deben llega al cliente marcados con `"server-only"`
+- **Multi-tenant:** Sistema para múltiples empresas, cada una con su propio directorio en R2
+- **i18n:** Soporte para ES, EN, FR, IT, DE
+- **SSR:** Renderizado server-side para SEO
+- **Clean Architecture:** UI → Server Actions → Use Cases → Repositories → Infrastructure
+- **Admin responsive:** Vista adaptativa para móvil y desktop

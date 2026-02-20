@@ -2,15 +2,21 @@
 
 import { useState, useRef } from 'react';
 import { Upload, X, Loader2, Image as ImageIcon } from 'lucide-react';
-import { uploadImageAction, deleteImageAction } from '@/core/application/actions/storage.actions';
+import { uploadImageAction } from '@/core/application/actions/storage.actions';
 
 interface ImageUploaderProps {
   value: string;
   onChange: (url: string) => void;
   label?: string;
+  empresaSlug?: string;
 }
 
-export function ImageUploader({ value, onChange, label = 'Imagen' }: ImageUploaderProps) {
+export function ImageUploader({ 
+  value, 
+  onChange, 
+  label = 'Imagen',
+  empresaSlug = 'default'
+}: ImageUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [dragOver, setDragOver] = useState(false);
@@ -35,7 +41,7 @@ export function ImageUploader({ value, onChange, label = 'Imagen' }: ImageUpload
     setError('');
 
     try {
-      const result = await uploadImageAction(file.name, file.type, file.size);
+      const result = await uploadImageAction(file.name, file.type, file.size, empresaSlug);
       
       // Upload directo a R2
       const uploadResponse = await fetch(result.url, {
