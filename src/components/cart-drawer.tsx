@@ -53,7 +53,7 @@ export function CartDrawer() {
 
     setSending(true);
     try {
-      const res = await fetch('/api/admin/pedidos', {
+      const res = await fetch('/api/pedidos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
