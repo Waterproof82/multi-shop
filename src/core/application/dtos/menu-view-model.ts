@@ -18,6 +18,7 @@ export interface MenuItemVM {
     price: number;
     description?: string;
   }[];
+  requiresComplement?: boolean;
 }
 
 export interface MenuCategoryVM {

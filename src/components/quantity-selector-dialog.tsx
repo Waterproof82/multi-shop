@@ -67,6 +67,9 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
 
   const handleConfirmAddToCart = () => {
     if (item && quantity > 0) {
+      if (item.requiresComplement && !selectedComplement) {
+        return;
+      }
       onAddToCart(item, quantity, selectedComplement ? [selectedComplement] : undefined);
       onOpenChange(false);
       setQuantity(1); // Reset quantity for next time
@@ -100,7 +103,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
           {complements.length > 0 && (
             <div className="space-y-2">
               <Label className="text-sm font-medium">
-                Complementos (opcional)
+                Complementos {item.requiresComplement ? '(obligatorio)' : '(opcional)'}
               </Label>
               <div className="space-y-2">
                 {complements.map((complement) => {
@@ -171,7 +174,11 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
           </div>
         </div>
         <DialogFooter>
-          <Button type="button" onClick={handleConfirmAddToCart} disabled={quantity < 1}>
+          <Button 
+            type="button" 
+            onClick={handleConfirmAddToCart} 
+            disabled={quantity < 1 || (item.requiresComplement && !selectedComplement)}
+          >
             {t("addToCart", language)}
           </Button>
         </DialogFooter>

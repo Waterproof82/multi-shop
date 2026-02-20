@@ -13,6 +13,7 @@ interface Category {
   nombre_de: string;
   orden: number;
   categoria_complemento_de: string | null;
+  complemento_obligatorio: boolean;
 }
 
 interface CategoryFormData {
@@ -23,6 +24,7 @@ interface CategoryFormData {
   nombre_de: string;
   orden: number;
   categoria_complemento_de: string | null;
+  complemento_obligatorio: boolean;
 }
 
 const emptyForm: CategoryFormData = {
@@ -33,6 +35,7 @@ const emptyForm: CategoryFormData = {
   nombre_de: '',
   orden: 0,
   categoria_complemento_de: null,
+  complemento_obligatorio: false,
 };
 
 export default function CategoriasPage() {
@@ -121,6 +124,7 @@ export default function CategoriasPage() {
       nombre_de: categoria.nombre_de || '',
       orden: categoria.orden,
       categoria_complemento_de: categoria.categoria_complemento_de,
+      complemento_obligatorio: categoria.complemento_obligatorio || false,
     });
     setEditingId(categoria.id);
     setIsModalOpen(true);
@@ -442,6 +446,21 @@ export default function CategoriasPage() {
                   Los productos de esta categoría aparecerán como complemento al añadir productos de la categoría seleccionada.
                 </p>
               </div>
+
+              {formData.categoria_complemento_de && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="complemento_obligatorio"
+                    checked={formData.complemento_obligatorio}
+                    onChange={(e) => setFormData({ ...formData, complemento_obligatorio: e.target.checked })}
+                    className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  />
+                  <label htmlFor="complemento_obligatorio" className="text-sm text-gray-700 dark:text-gray-200">
+                    Seleccionar complemento obligatorio
+                  </label>
+                </div>
+              )}
 
               <div className="flex justify-end gap-3 pt-4">
                 <button

@@ -40,6 +40,9 @@ export class GetMenuUseCase {
         products.filter((p) => p.categoriaId === compCat.id && p.activo)
       );
 
+      // Verificar si algún complemento es obligatorio
+      const hasRequiredComplement = complementProds.some((compCat) => compCat.complementoObligatorio);
+
       return {
         id: `category-${cat.id}`, // Use UUID to ensure uniqueness
         label: cat.nombre,
@@ -64,6 +67,7 @@ export class GetMenuUseCase {
             price: p.precio,
             description: p.descripcion || undefined,
           })) : undefined,
+          requiresComplement: hasRequiredComplement ? true : undefined,
         })),
       };
     });
