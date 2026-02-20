@@ -120,10 +120,12 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                          isSelected ? 'bg-primary border-primary' : 'border-gray-300'
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                          isSelected 
+                            ? 'bg-primary border-primary dark:bg-primary dark:border-primary' 
+                            : 'border-gray-300 dark:border-gray-600'
                         }`}>
-                          {isSelected && <Check className="w-3 h-3 text-white" />}
+                          {isSelected && <Check className="w-2.5 h-2.5 text-white" />}
                         </div>
                         <div className="text-left">
                           <p className="font-medium text-sm">{complement.name}</p>
