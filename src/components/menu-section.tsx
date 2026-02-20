@@ -10,6 +10,13 @@ import { t } from "@/lib/translations"
 import { MenuCategoryVM, MenuItemVM } from "@/core/application/dtos/menu-view-model"
 import { QuantitySelectorDialog } from "@/components/quantity-selector-dialog"
 
+interface Complement {
+  id: string;
+  name: string;
+  price: number;
+  description?: string;
+}
+
 type LanguageKey = 'en' | 'fr' | 'it' | 'de';
 
 interface MenuSectionProps {
@@ -29,11 +36,21 @@ export function MenuSection(props: Readonly<MenuSectionProps>) {
     setIsDialogOpen(true);
   };
 
-  const handleAddToCartWithQuantity = (item: MenuItemVM, quantity: number) => {
-    addItem(item, quantity);
+  const handleAddToCartWithQuantity = (item: MenuItemVM, quantity: number, complements?: Complement[]) => {
+    if (complements && complements.length > 0) {
+      const complementTotal = complements.reduce((sum, c) => sum + c.price, 0);
+      const itemWithComplements = {
+        ...item,
+        name: `${item.name} + ${complements.map(c => c.name).join(', ')}`,
+        price: item.price + complementTotal,
+      };
+      addItem(itemWithComplements, quantity);
+    } else {
+      addItem(item, quantity);
+    }
   };
 
-  const isSalsas = category.label.toLowerCase() === "salsas";
+  const isCategoryWithComplements = category.items.some((item) => item.complements && item.complements.length > 0);
   const translationLang = (['en', 'fr', 'it', 'de'].includes(language) ? language : undefined) as LanguageKey | undefined;
   const safeLanguage: Language = language || "es";
 
@@ -46,9 +63,9 @@ export function MenuSection(props: Readonly<MenuSectionProps>) {
         <div className="h-px flex-1 bg-border" />
       </div>
 
-      {isSalsas && (
+      {isCategoryWithComplements && category.complementoDeId && (
         <p className="mb-4 text-sm text-muted-foreground">
-          Elige tu salsa favorita para acompañar tu pasta. Pasta con salsa Frutti di Mare +2.50€
+          Selecciona los complementos opcionales al añadir productos.
         </p>
       )}
 
@@ -64,7 +81,6 @@ export function MenuSection(props: Readonly<MenuSectionProps>) {
           >
             <MenuItemCard
               item={item}
-              isSalsas={isSalsas}
               language={translationLang}
               onItemClick={handleItemClick}
               showCart={showCart}
@@ -85,12 +101,11 @@ export function MenuSection(props: Readonly<MenuSectionProps>) {
 
 function MenuItemCard(props: Readonly<{
   item: MenuItemVM;
-  isSalsas: boolean;
   language: LanguageKey | undefined;
   onItemClick: (item: MenuItemVM) => void;
   showCart?: boolean;
 }>) {
-  const { item, isSalsas, language, onItemClick, showCart } = props;
+  const { item, language, onItemClick, showCart } = props;
   const { language: appLanguage } = useLanguage();
   const safeLanguage = appLanguage || "es";
   const [imageError, setImageError] = useState(false);
@@ -152,7 +167,7 @@ function MenuItemCard(props: Readonly<{
           </p>
         )}
         <div className="flex-1" />
-        {!isSalsas && showCart && (
+        {showCart && (
           <div className="flex items-center justify-between gap-3 pt-4 mt-auto">
             <span className="font-serif text-2xl font-bold text-foreground">
               {item.price.toFixed(2).replace(".", ",")}€
@@ -170,7 +185,7 @@ function MenuItemCard(props: Readonly<{
             </button>
           </div>
         )}
-        {!isSalsas && !showCart && (
+        {!showCart && (
           <div className="flex items-center justify-between gap-3 pt-4 mt-auto">
             <span className="font-serif text-2xl font-bold text-foreground">
               {item.price.toFixed(2).replace(".", ",")}€

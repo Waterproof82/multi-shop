@@ -30,40 +30,40 @@ export default async function AdminDashboard() {
   );
 
   return (
-    <div className="pt-20 lg:pt-0 px-4 lg:px-0">
-      <h1 className="text-2xl font-serif font-bold text-gray-900 mb-2">
+    <div className="pt-20 lg:pt-0 px-6 lg:px-8">
+      <h1 className="text-2xl font-serif font-bold text-gray-900 dark:text-white mb-2">
         Dashboard
       </h1>
-      <p className="text-gray-600 mb-6">
+      <p className="text-gray-600 dark:text-gray-400 mb-6">
         Gestionando: <strong>{admin.empresa.nombre}</strong>
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6 mb-6 lg:mb-8">
-        <div className="bg-white p-4 lg:p-6 rounded-lg shadow-sm border">
-          <p className="text-sm text-gray-500">Categorías</p>
+        <div className="bg-white dark:bg-gray-800 p-4 lg:p-6 rounded-lg shadow-sm border dark:border-gray-700">
+          <p className="text-sm text-gray-500 dark:text-gray-400">Categorías</p>
           <p className="text-2xl lg:text-3xl font-bold text-primary">{totalCategorias}</p>
         </div>
-        <div className="bg-white p-4 lg:p-6 rounded-lg shadow-sm border">
-          <p className="text-sm text-gray-500">Productos</p>
+        <div className="bg-white dark:bg-gray-800 p-4 lg:p-6 rounded-lg shadow-sm border dark:border-gray-700">
+          <p className="text-sm text-gray-500 dark:text-gray-400">Productos</p>
           <p className="text-2xl lg:text-3xl font-bold text-primary">{totalProductos}</p>
         </div>
-        <div className="bg-white p-4 lg:p-6 rounded-lg shadow-sm border">
-          <p className="text-sm text-gray-500">Productos Especiales</p>
+        <div className="bg-white dark:bg-gray-800 p-4 lg:p-6 rounded-lg shadow-sm border dark:border-gray-700">
+          <p className="text-sm text-gray-500 dark:text-gray-400">Productos Especiales</p>
           <p className="text-2xl lg:text-3xl font-bold text-accent">{productosEspeciales}</p>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border p-4 lg:p-6">
-        <h2 className="text-lg font-semibold mb-4">Vista Previa del Menú</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-4 lg:p-6">
+        <h2 className="text-lg font-semibold mb-4 dark:text-white">Vista Previa del Menú</h2>
         <div className="space-y-4">
           {menu.map((categoria) => (
-            <div key={categoria.id} className="border-b pb-4 last:border-0">
-              <h3 className="font-semibold text-gray-800">{categoria.label}</h3>
-              <p className="text-sm text-gray-500">{categoria.items.length} productos</p>
+            <div key={categoria.id} className="border-b pb-4 last:border-0 dark:border-gray-700">
+              <h3 className="font-semibold text-gray-800 dark:text-gray-200">{categoria.label}</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{categoria.items.length} productos</p>
             </div>
           ))}
           {menu.length === 0 && (
-            <p className="text-gray-500 text-center py-8">
+            <p className="text-gray-500 dark:text-gray-400 text-center py-8">
               No hay categorías configuradas
             </p>
           )}

@@ -7,6 +7,7 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
+  SheetDescription,
 } from "@/components/ui/sheet"
 
 import { useCart } from "@/lib/cart-context"
@@ -33,6 +34,9 @@ export function CartDrawer() {
             <ShoppingBag className="size-5" />
             {t("yourOrder", language)}
           </SheetTitle>
+          <SheetDescription>
+            {t("cartDescription", language)}
+          </SheetDescription>
         </SheetHeader>
 
         {items.length === 0 ? (

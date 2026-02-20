@@ -15,10 +15,30 @@ export class GetMenuUseCase {
       this.categoryRepo.findAllByTenant(empresaId),
     ]);
 
-    // 2. Mapear y agrupar
-    const menu: MenuCategoryVM[] = categories.map((cat) => {
+    // 2. Separar categorías principales de complementos
+    const mainCategories = categories.filter((cat) => !cat.categoriaComplementoDe);
+    const complementCategories = categories.filter((cat) => cat.categoriaComplementoDe);
+
+    // 3. Crear mapa de categorías complemento por su categoría padre
+    const complementsByParent = new Map<string, typeof complementCategories>();
+    for (const comp of complementCategories) {
+      const parentId = comp.categoriaComplementoDe!;
+      if (!complementsByParent.has(parentId)) {
+        complementsByParent.set(parentId, []);
+      }
+      complementsByParent.get(parentId)!.push(comp);
+    }
+
+    // 4. Mapear y agrupar - solo categorías principales
+    const menu: MenuCategoryVM[] = mainCategories.map((cat) => {
       // Filtrar productos de esta categoría
       const catProducts = products.filter((p) => p.categoriaId === cat.id && p.activo);
+
+      // Obtener productos de categorías complemento
+      const complementProds = complementsByParent.get(cat.id) || [];
+      const allComplementProducts = complementProds.flatMap((compCat) =>
+        products.filter((p) => p.categoriaId === compCat.id && p.activo)
+      );
 
       return {
         id: `category-${cat.id}`, // Use UUID to ensure uniqueness
@@ -38,11 +58,17 @@ export class GetMenuUseCase {
             it: p.translations.it ? { name: p.translations.it.titulo, description: p.translations.it.descripcion || undefined } : undefined,
             de: p.translations.de ? { name: p.translations.de.titulo, description: p.translations.de.descripcion || undefined } : undefined,
           } : undefined,
+          complements: allComplementProducts.length > 0 ? allComplementProducts.map((p) => ({
+            id: p.id,
+            name: p.titulo,
+            price: p.precio,
+            description: p.descripcion || undefined,
+          })) : undefined,
         })),
       };
     });
 
-    // Filtrar categorías vacías si se desea
+    // 5. Filtrar categorías vacías - NO mostrar categorías complemento como secciones separadas
     return menu.filter((cat) => cat.items.length > 0);
   }
 }
