@@ -140,15 +140,19 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { items, total, nombre, telefono } = body as { 
+    const { items, total, nombre, telefono, email } = body as { 
       items: CartItem[]; 
       total: number;
       nombre: unknown;
       telefono: unknown;
+      email?: string;
     };
 
     const sanitizedNombre = typeof nombre === 'string' ? nombre.trim().slice(0, 100) : '';
     const sanitizedTelefono = typeof telefono === 'string' ? telefono.replaceAll(/\D/g, '').slice(0, 15) : '';
+    const sanitizedEmail = typeof email === 'string' && email.trim() 
+      ? email.trim().toLowerCase().slice(0, 100) 
+      : null;
 
     if (!sanitizedNombre || sanitizedNombre.length < 2) {
       return NextResponse.json({ error: 'Nombre inválido' }, { status: 400 });
@@ -175,7 +179,8 @@ export async function POST(request: Request) {
       .insert({
         empresa_id: empresa.id,
         numero_pedido: nuevoNumeroPedido,
-        cliente_email: sanitizedNombre,
+        nombre_cliente: sanitizedNombre,
+        cliente_email: sanitizedEmail,
         cliente_telefono: sanitizedTelefono,
         detalle_pedido: items.map(ci => ({
           producto_id: ci.item.id,

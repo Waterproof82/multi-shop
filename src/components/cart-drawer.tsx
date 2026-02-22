@@ -1,6 +1,6 @@
 "use client"
 
-import { Minus, Plus, Trash2, ShoppingBag, User, Phone } from "lucide-react"
+import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 // Removed unused import 'Label'
@@ -38,6 +38,7 @@ export function CartDrawer() {
   const [sent, setSent] = useState(false)
   const [nombre, setNombre] = useState('')
   const [telefono, setTelefono] = useState('')
+  const [email, setEmail] = useState('')
   const [errors, setErrors] = useState<{ nombre?: string; telefono?: string }>({})
 
   const validateName = (name: string): string | undefined => {
@@ -71,6 +72,7 @@ export function CartDrawer() {
 
     const sanitizedNombre = nombre.trim().slice(0, 100);
     const sanitizedTelefono = telefono.replaceAll(/\D/g, '').slice(0, 15);
+    const sanitizedEmail = email.trim().toLowerCase().slice(0, 100);
 
     setSending(true);
     try {
@@ -94,6 +96,7 @@ export function CartDrawer() {
           total: totalPrice,
           nombre: sanitizedNombre,
           telefono: sanitizedTelefono,
+          email: sanitizedEmail,
         }),
       });
       
@@ -103,6 +106,7 @@ export function CartDrawer() {
         setSent(true);
         setNombre('');
         setTelefono('');
+        setEmail('');
         setTimeout(() => {
           clearCart();
           closeCart();
@@ -229,6 +233,21 @@ export function CartDrawer() {
                     />
                   </div>
                   {errors.telefono && <p className="text-xs text-red-500 mt-1 ml-6">{errors.telefono}</p>}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Mail className="size-4 text-muted-foreground" />
+                    <Input
+                      type="email"
+                      placeholder="Tu email (opcional)"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="h-9"
+                      maxLength={100}
+                      autoComplete="email"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1 ml-6">¡Y recibe promociones y descuentos!</p>
                 </div>
               </div>
 

@@ -7,7 +7,7 @@ import { Search, ChevronDown, ChevronUp, Check, Clock, Trash2 } from 'lucide-rea
 interface Pedido {
   id: string;
   numero_pedido: number;
-  cliente_email: string;
+  nombre_cliente: string;
   cliente_telefono: string | null;
   total: number;
   moneda: string;
@@ -46,7 +46,7 @@ export default function PedidosPage() {
   const filteredPedidos = pedidos
     .filter(p => 
       p.numero_pedido.toString().includes(searchTerm) ||
-      p.cliente_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.nombre_cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (p.cliente_telefono?.includes(searchTerm))
     )
     .sort((a, b) => {
@@ -170,9 +170,9 @@ export default function PedidosPage() {
                   </button>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  <button onClick={() => handleSort('cliente_email')} className="flex items-center gap-1">
+                  <button onClick={() => handleSort('nombre_cliente')} className="flex items-center gap-1">
                     Cliente
-                    {sortField === 'cliente_email' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                    {sortField === 'nombre_cliente' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                   </button>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -216,7 +216,7 @@ export default function PedidosPage() {
                         #{pedido.numero_pedido}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-gray-600 dark:text-gray-300" onClick={() => toggleExpand(pedido.id)}>
-                        {pedido.cliente_email}
+                        {pedido.nombre_cliente}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-gray-600 dark:text-gray-300" onClick={() => toggleExpand(pedido.id)}>
                         {pedido.cliente_telefono || '-'}
