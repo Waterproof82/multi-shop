@@ -118,16 +118,43 @@ function generateOrderEmail(items: CartItem[], total: number, empresaNombre: str
   `.trim();
 }
 
+
+function parseMainDomain(domain: string): string {
+  const subdomainPedidos = 'pedidos';
+  const isPedidos = domain.startsWith(subdomainPedidos + '.') || domain.includes('-pedidos');
+  return isPedidos
+    ? domain.replace(/^pedidos\./, '').replace(/-pedidos$/, '')
+    : domain;
+}
+
+function validateOrderInputs(nombre: unknown, telefono: unknown, email?: string) {
+  const sanitizedNombre = typeof nombre === 'string' ? nombre.trim().slice(0, 100) : '';
+  const sanitizedTelefono = typeof telefono === 'string' ? telefono.replaceAll(/\D/g, '').slice(0, 15) : '';
+  const sanitizedEmail = typeof email === 'string' && email.trim()
+    ? email.trim().toLowerCase().slice(0, 100)
+    : null;
+
+  if (!sanitizedNombre || sanitizedNombre.length < 2) {
+    return { error: 'Nombre inválido', status: 400 };
+  }
+  if (!/^[a-zA-ZÀ-ÿ\s'-]+$/u.test(sanitizedNombre)) {
+    return { error: 'Nombre contiene caracteres inválidos', status: 400 };
+  }
+  if (!sanitizedTelefono || sanitizedTelefono.length < 9) {
+    return { error: 'Teléfono inválido', status: 400 };
+  }
+  return {
+    sanitizedNombre,
+    sanitizedTelefono,
+    sanitizedEmail,
+  };
+}
+
 export async function POST(request: Request) {
   try {
     const supabase = createClient(supabaseUrl, supabaseKey);
     const domain = await getDomainFromHeaders();
-    
-    const subdomainPedidos = 'pedidos';
-    const isPedidos = domain.startsWith(subdomainPedidos + '.') || domain.includes('-pedidos');
-    const mainDomain = isPedidos 
-      ? domain.replace(/^pedidos\./, '').replace(/-pedidos$/, '')
-      : domain;
+    const mainDomain = parseMainDomain(domain);
 
     const { data: empresa } = await supabase
       .from('empresas')
@@ -140,28 +167,83 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { items, total, nombre, telefono, email } = body as { 
-      items: CartItem[]; 
+    const { items, total, nombre, telefono, email } = body as {
+      items: CartItem[];
       total: number;
       nombre: unknown;
       telefono: unknown;
       email?: string;
     };
 
-    const sanitizedNombre = typeof nombre === 'string' ? nombre.trim().slice(0, 100) : '';
-    const sanitizedTelefono = typeof telefono === 'string' ? telefono.replaceAll(/\D/g, '').slice(0, 15) : '';
-    const sanitizedEmail = typeof email === 'string' && email.trim() 
-      ? email.trim().toLowerCase().slice(0, 100) 
-      : null;
+    const validation = validateOrderInputs(nombre, telefono, email);
+    if ('error' in validation) {
+      return NextResponse.json({ error: validation.error }, { status: validation.status });
+    }
+    const { sanitizedNombre, sanitizedTelefono, sanitizedEmail } = validation;
 
-    if (!sanitizedNombre || sanitizedNombre.length < 2) {
-      return NextResponse.json({ error: 'Nombre inválido' }, { status: 400 });
-    }
-    if (!/^[a-zA-ZÀ-ÿ\s'-]+$/u.test(sanitizedNombre)) {
-      return NextResponse.json({ error: 'Nombre contiene caracteres inválidos' }, { status: 400 });
-    }
-    if (!sanitizedTelefono || sanitizedTelefono.length < 9) {
-      return NextResponse.json({ error: 'Teléfono inválido' }, { status: 400 });
+    let clienteId: string | null = null;
+    
+    if (sanitizedEmail) {
+      const { data: existingCliente } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('empresa_id', empresa.id)
+        .eq('email', sanitizedEmail)
+        .single();
+
+      if (existingCliente) {
+        await supabase
+          .from('clientes')
+          .update({ nombre: sanitizedNombre, telefono: sanitizedTelefono })
+          .eq('id', existingCliente.id);
+        clienteId = existingCliente.id;
+      } else {
+        const { data: newCliente, error: clienteError } = await supabase
+          .from('clientes')
+          .insert({
+            empresa_id: empresa.id,
+            email: sanitizedEmail,
+            nombre: sanitizedNombre,
+            telefono: sanitizedTelefono,
+            aceptar_promociones: true,
+          })
+          .select('id')
+          .single();
+        
+        if (!clienteError && newCliente) {
+          clienteId = newCliente.id;
+        }
+      }
+    } else if (sanitizedTelefono) {
+      const { data: existingCliente } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('empresa_id', empresa.id)
+        .eq('telefono', sanitizedTelefono)
+        .is('email', null)
+        .single();
+
+      if (existingCliente) {
+        await supabase
+          .from('clientes')
+          .update({ nombre: sanitizedNombre })
+          .eq('id', existingCliente.id);
+        clienteId = existingCliente.id;
+      } else {
+        const { data: newCliente, error: clienteError } = await supabase
+          .from('clientes')
+          .insert({
+            empresa_id: empresa.id,
+            nombre: sanitizedNombre,
+            telefono: sanitizedTelefono,
+          })
+          .select('id')
+          .single();
+        
+        if (!clienteError && newCliente) {
+          clienteId = newCliente.id;
+        }
+      }
     }
 
     const { data: lastOrder } = await supabase
@@ -179,9 +261,7 @@ export async function POST(request: Request) {
       .insert({
         empresa_id: empresa.id,
         numero_pedido: nuevoNumeroPedido,
-        nombre_cliente: sanitizedNombre,
-        cliente_email: sanitizedEmail,
-        cliente_telefono: sanitizedTelefono,
+        cliente_id: clienteId,
         detalle_pedido: items.map(ci => ({
           producto_id: ci.item.id,
           nombre: ci.item.name,
@@ -201,8 +281,22 @@ export async function POST(request: Request) {
     }
 
     if (RESEND_API_KEY && empresa.email_notification) {
-      const safeNombre = typeof nombre === 'string' ? nombre : '';
-      const safeTelefono = typeof telefono === 'string' ? telefono : '';
+      let safeNombre = sanitizedNombre;
+      let safeTelefono = sanitizedTelefono;
+      
+      if (clienteId) {
+        const { data: cliente } = await supabase
+          .from('clientes')
+          .select('nombre, telefono')
+          .eq('id', clienteId)
+          .single();
+        
+        if (cliente) {
+          safeNombre = cliente.nombre || safeNombre;
+          safeTelefono = cliente.telefono || safeTelefono;
+        }
+      }
+      
       const html = generateOrderEmail(items, total, empresa.nombre, nuevoNumeroPedido, safeNombre, safeTelefono);
       await fetch('https://api.resend.com/emails', {
         method: 'POST',

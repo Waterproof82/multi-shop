@@ -4,11 +4,17 @@ import { useState, useEffect, Fragment } from 'react';
 // Removed unused import 'useAdmin'
 import { Search, ChevronDown, ChevronUp, Check, Clock, Trash2 } from 'lucide-react';
 
+interface Cliente {
+  nombre: string | null;
+  email: string | null;
+  telefono: string | null;
+}
+
 interface Pedido {
   id: string;
   numero_pedido: number;
-  nombre_cliente: string;
-  cliente_telefono: string | null;
+  cliente_id: string | null;
+  clientes: Cliente | null;
   total: number;
   moneda: string;
   detalle_pedido: any[];
@@ -46,8 +52,9 @@ export default function PedidosPage() {
   const filteredPedidos = pedidos
     .filter(p => 
       p.numero_pedido.toString().includes(searchTerm) ||
-      p.nombre_cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (p.cliente_telefono?.includes(searchTerm))
+      p.clientes?.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.clientes?.telefono?.includes(searchTerm) ||
+      p.clientes?.email?.toLowerCase().includes(searchTerm.toLowerCase())
     )
     .sort((a, b) => {
       const aVal = a[sortField];
@@ -170,10 +177,7 @@ export default function PedidosPage() {
                   </button>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  <button onClick={() => handleSort('nombre_cliente')} className="flex items-center gap-1">
-                    Cliente
-                    {sortField === 'nombre_cliente' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-                  </button>
+                  Cliente
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Teléfono
@@ -216,10 +220,10 @@ export default function PedidosPage() {
                         #{pedido.numero_pedido}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-gray-600 dark:text-gray-300" onClick={() => toggleExpand(pedido.id)}>
-                        {pedido.nombre_cliente}
+                        {pedido.clientes?.nombre || '-'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-gray-600 dark:text-gray-300" onClick={() => toggleExpand(pedido.id)}>
-                        {pedido.cliente_telefono || '-'}
+                        {pedido.clientes?.telefono || '-'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap font-medium text-gray-900 dark:text-white" onClick={() => toggleExpand(pedido.id)}>
                         {pedido.total.toFixed(2)} {pedido.moneda || '€'}

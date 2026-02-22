@@ -34,7 +34,10 @@ export async function GET() {
 
     const { data: pedidos, error } = await supabase
       .from('pedidos')
-      .select('*')
+      .select(`
+        *,
+        clientes:cliente_id (nombre, email, telefono)
+      `)
       .eq('empresa_id', perfil.empresa_id)
       .order('created_at', { ascending: false });
 
