@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Utensils, Tags, LogOut, Menu, X } from 'lucide-react';
-import { useTheme } from 'next-themes';
+import { LayoutDashboard, Utensils, Tags, LogOut, Menu, X, Bell, ShoppingCart, BarChart3 } from 'lucide-react';
+// Removed unused import 'useTheme'
 
 interface NavItem {
   href: string;
@@ -16,13 +16,16 @@ const navItems: NavItem[] = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/categorias', label: 'Categorías', icon: Tags },
   { href: '/admin/productos', label: 'Productos', icon: Utensils },
+  { href: '/admin/pedidos', label: 'Pedidos', icon: ShoppingCart },
+  { href: '/admin/estadisticas', label: 'Estadísticas', icon: BarChart3 },
+  { href: '/admin/notificaciones', label: 'Notificaciones', icon: Bell },
 ];
 
 interface AdminSidebarProps {
   session: any;
 }
 
-export function AdminSidebar({ session }: AdminSidebarProps) {
+export function AdminSidebar({ session }: Readonly<AdminSidebarProps>) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
 
@@ -45,8 +48,10 @@ export function AdminSidebar({ session }: AdminSidebarProps) {
 
       {/* Overlay para mobile */}
       {isOpen && (
-        <div 
+        <button
+          type="button"
           className="lg:hidden fixed inset-0 bg-black/50 z-40"
+          aria-label="Cerrar menú"
           onClick={closeMenu}
         />
       )}

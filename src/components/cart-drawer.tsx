@@ -1,7 +1,9 @@
 "use client"
 
-import { Minus, Plus, Trash2, ShoppingBag } from "lucide-react"
+import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+// Removed unused import 'Label'
 import {
   Sheet,
   SheetContent,
@@ -9,6 +11,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet"
+import { useState } from "react"
 
 import { useCart, type Complement } from "@/lib/cart-context"
 import { useLanguage } from "@/lib/language-context"
@@ -31,6 +34,94 @@ export function CartDrawer() {
     closeCart 
   } = useCart()
   const { language } = useLanguage()
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
+  const [nombre, setNombre] = useState('')
+  const [telefono, setTelefono] = useState('')
+  const [email, setEmail] = useState('')
+  const [errors, setErrors] = useState<{ nombre?: string; telefono?: string }>({})
+
+  const validateName = (name: string): string | undefined => {
+    const trimmed = name.trim();
+    if (!trimmed) return 'El nombre es obligatorio';
+    if (trimmed.length < 2) return 'Mínimo 2 caracteres';
+    if (trimmed.length > 100) return 'Máximo 100 caracteres';
+    if (!/^[a-zA-ZÀ-ÿ\s'-]+$/u.test(trimmed)) return 'Solo letras y espacios';
+    return undefined;
+  };
+
+  const validatePhone = (phone: string): string | undefined => {
+    const trimmed = phone.trim();
+    if (!trimmed) return 'El teléfono es obligatorio';
+    const digitsOnly = trimmed.replaceAll(/\D/g, '');
+    if (digitsOnly.length < 9) return 'Mínimo 9 dígitos';
+    if (digitsOnly.length > 15) return 'Máximo 15 dígitos';
+    return undefined;
+  };
+
+  const handleConfirmOrder = async () => {
+    setErrors({});
+    
+    const nombreError = validateName(nombre);
+    const telefonoError = validatePhone(telefono);
+    
+    if (nombreError || telefonoError) {
+      setErrors({ nombre: nombreError, telefono: telefonoError });
+      return;
+    }
+
+    const sanitizedNombre = nombre.trim().slice(0, 100);
+    const sanitizedTelefono = telefono.replaceAll(/\D/g, '').slice(0, 15);
+    const sanitizedEmail = email.trim().toLowerCase().slice(0, 100);
+
+    setSending(true);
+    try {
+      const res = await fetch('/api/pedidos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: items.map(ci => ({
+            item: {
+              id: ci.item.id,
+              name: (language !== 'es' && ci.item.translations?.[language]?.name) || ci.item.name,
+              price: ci.item.price,
+              translations: ci.item.translations,
+            },
+            quantity: ci.quantity,
+            selectedComplements: ci.selectedComplements?.map(c => ({
+              name: c.name,
+              price: c.price,
+            })),
+          })),
+          total: totalPrice,
+          nombre: sanitizedNombre,
+          telefono: sanitizedTelefono,
+          email: sanitizedEmail,
+        }),
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok) {
+        setSent(true);
+        setNombre('');
+        setTelefono('');
+        setEmail('');
+        setTimeout(() => {
+          clearCart();
+          closeCart();
+          setSent(false);
+        }, 2000);
+      } else {
+        setErrors({ nombre: data.error || 'Error al enviar pedido' });
+      }
+    } catch (err) {
+      console.error('Error:', err);
+      setErrors({ nombre: 'Error al enviar pedido' });
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <Sheet open={isCartOpen} onOpenChange={closeCart}>
@@ -112,6 +203,54 @@ export function CartDrawer() {
             </div>
 
             <div className="border-t border-border pt-4 pb-6 px-2 bg-background/80 shadow-[0_-2px_16px_0_rgba(0,0,0,0.04)] rounded-b-xl">
+              <div className="space-y-3 mb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <User className="size-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Tu nombre"
+                      value={nombre}
+                      onChange={(e) => { setNombre(e.target.value); setErrors(prev => ({ ...prev, nombre: undefined })); }}
+                      className={`h-9 ${errors.nombre ? 'border-red-500' : ''}`}
+                      maxLength={100}
+                      autoComplete="name"
+                    />
+                  </div>
+                  {errors.nombre && <p className="text-xs text-red-500 mt-1 ml-6">{errors.nombre}</p>}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Phone className="size-4 text-muted-foreground" />
+                    <Input
+                      type="tel"
+                      placeholder="Tu teléfono"
+                      value={telefono}
+                      onChange={(e) => { const val = e.target.value.replaceAll(/\D/g, '').slice(0, 15); setTelefono(val); setErrors(prev => ({ ...prev, telefono: undefined })); }}
+                      className={`h-9 ${errors.telefono ? 'border-red-500' : ''}`}
+                      maxLength={15}
+                      autoComplete="tel"
+                    />
+                  </div>
+                  {errors.telefono && <p className="text-xs text-red-500 mt-1 ml-6">{errors.telefono}</p>}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Mail className="size-4 text-muted-foreground" />
+                    <Input
+                      type="email"
+                      placeholder="Tu email (opcional)"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="h-9"
+                      maxLength={100}
+                      autoComplete="email"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1 ml-6">¡Y recibe promociones y descuentos!</p>
+                </div>
+              </div>
+
               <div className="mb-4 flex items-center justify-between px-2">
                 <span className="text-lg font-semibold text-foreground">{t("total", language)}</span>
                 <span className="font-serif text-2xl font-bold text-foreground">
@@ -123,8 +262,14 @@ export function CartDrawer() {
                 <Button 
                   className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full py-3 text-lg font-semibold shadow-md transition-all duration-200"
                   size="lg"
+                  onClick={handleConfirmOrder}
+                  disabled={sending || sent}
                 >
-                  {t("confirmOrder", language)}
+                  {(() => {
+                    if (sending) return 'Enviando...';
+                    if (sent) return '¡Pedido enviado!';
+                    return t("confirmOrder", language);
+                  })()}
                 </Button>
                 <Button
                   variant="ghost"
