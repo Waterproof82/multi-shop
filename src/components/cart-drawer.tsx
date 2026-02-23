@@ -247,7 +247,7 @@ export function CartDrawer() {
                       autoComplete="email"
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1 ml-6">¡Y recibe promociones y descuentos!</p>
+                  <p className="text-xs mt-1 ml-6 bg-gradient-to-r from-orange-500 via-pink-500 to-purple-500 bg-clip-text text-transparent font-medium">¡Y recibe promociones y descuentos!</p>
                 </div>
               </div>
 
