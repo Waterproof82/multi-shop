@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Utensils, Tags, LogOut, Menu, X, Bell, ShoppingCart, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Utensils, Tags, LogOut, Menu, X, Bell, ShoppingCart, BarChart3, Users, Megaphone } from 'lucide-react';
 // Removed unused import 'useTheme'
 
 interface NavItem {
@@ -17,6 +17,8 @@ const navItems: NavItem[] = [
   { href: '/admin/categorias', label: 'Categorías', icon: Tags },
   { href: '/admin/productos', label: 'Productos', icon: Utensils },
   { href: '/admin/pedidos', label: 'Pedidos', icon: ShoppingCart },
+  { href: '/admin/clientes', label: 'Clientes', icon: Users },
+  { href: '/admin/promociones', label: 'Promociones', icon: Megaphone },
   { href: '/admin/estadisticas', label: 'Estadísticas', icon: BarChart3 },
   { href: '/admin/notificaciones', label: 'Notificaciones', icon: Bell },
 ];
