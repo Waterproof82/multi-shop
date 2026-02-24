@@ -6,7 +6,7 @@ import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
 import { useLanguage, type Language } from "@/lib/language-context"
 import { t } from "@/lib/translations"
-import { MenuCategoryVM, MenuItemVM } from "@/core/application/dtos/menu-view-model"
+import { MenuCategoryVM, MenuItemVM, MenuSubcategoryVM } from "@/core/application/dtos/menu-view-model"
 import { QuantitySelectorDialog } from "@/components/quantity-selector-dialog"
 
 interface Complement {
@@ -53,8 +53,65 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
         </p>
       )}
 
+      {category.subcategories && category.subcategories.length > 0 ? (
+        <div className="space-y-8">
+          {category.subcategories.map((subcat) => (
+            <SubcategorySection
+              key={subcat.id}
+              subcategory={subcat}
+              translationLang={translationLang}
+              onItemClick={handleItemClick}
+              showCart={showCart}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {category.items.map((item, index) => (
+            <motion.div
+              key={item.id}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-40px" }}
+              transition={{ duration: 0.4, delay: index * 0.08 }}
+              className="h-full"
+            >
+              <MenuItemCard
+                item={item}
+                language={translationLang}
+                onItemClick={handleItemClick}
+                showCart={showCart}
+              />
+            </motion.div>
+          ))}
+        </div>
+      )}
+
+      <QuantitySelectorDialog
+        item={selectedItem}
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+      />
+    </section>
+  );
+})
+
+const SubcategorySection = memo(function SubcategorySection(props: Readonly<{
+  subcategory: MenuSubcategoryVM;
+  translationLang: LanguageKey | undefined;
+  onItemClick: (item: MenuItemVM) => void;
+  showCart?: boolean;
+}>) {
+  const { subcategory, translationLang, onItemClick, showCart } = props;
+
+  return (
+    <div className="space-y-4">
+      <h3 className="font-serif text-xl font-semibold text-foreground flex items-center gap-2">
+        <span className="w-2 h-2 rounded-full bg-primary/50" />
+        {(translationLang && subcategory.translations?.[translationLang]) || subcategory.nombre}
+      </h3>
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {category.items.map((item, index) => (
+        {subcategory.products.map((item, index) => (
           <motion.div
             key={item.id}
             initial={{ opacity: 0, y: 20 }}
@@ -66,19 +123,13 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
             <MenuItemCard
               item={item}
               language={translationLang}
-              onItemClick={handleItemClick}
+              onItemClick={onItemClick}
               showCart={showCart}
             />
           </motion.div>
         ))}
       </div>
-
-      <QuantitySelectorDialog
-        item={selectedItem}
-        open={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
-      />
-    </section>
+    </div>
   );
 })
 

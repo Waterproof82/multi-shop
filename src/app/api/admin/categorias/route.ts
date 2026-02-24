@@ -72,6 +72,7 @@ export async function POST(request: NextRequest) {
       orden: orden || 0,
       categoria_complemento_de: categoria_complemento_de || null,
       complemento_obligatorio: complemento_obligatorio || false,
+      categoria_padre_id: body.categoria_padre_id || null,
     })
     .select()
     .single();
@@ -97,7 +98,7 @@ export async function PUT(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { nombre_es, nombre_en, nombre_fr, nombre_it, nombre_de, orden, categoria_complemento_de, complemento_obligatorio } = body;
+  const { nombre_es, nombre_en, nombre_fr, nombre_it, nombre_de, orden, categoria_complemento_de, complemento_obligatorio, categoria_padre_id } = body;
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -114,6 +115,7 @@ export async function PUT(request: NextRequest) {
       orden: orden || 0,
       categoria_complemento_de: categoria_complemento_de || null,
       complemento_obligatorio: complemento_obligatorio || false,
+      categoria_padre_id: categoria_padre_id || null,
     })
     .eq('id', id)
     .eq('empresa_id', empresaId)

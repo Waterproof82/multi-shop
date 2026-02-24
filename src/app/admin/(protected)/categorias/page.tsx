@@ -14,6 +14,7 @@ interface Category {
   orden: number;
   categoria_complemento_de: string | null;
   complemento_obligatorio: boolean;
+  categoria_padre_id: string | null;
 }
 
 interface CategoryFormData {
@@ -25,6 +26,7 @@ interface CategoryFormData {
   orden: number;
   categoria_complemento_de: string | null;
   complemento_obligatorio: boolean;
+  categoria_padre_id: string | null;
 }
 
 const emptyForm: CategoryFormData = {
@@ -36,6 +38,7 @@ const emptyForm: CategoryFormData = {
   orden: 0,
   categoria_complemento_de: null,
   complemento_obligatorio: false,
+  categoria_padre_id: null,
 };
 
 export default function CategoriasPage() {
@@ -125,6 +128,7 @@ export default function CategoriasPage() {
       orden: categoria.orden,
       categoria_complemento_de: categoria.categoria_complemento_de,
       complemento_obligatorio: categoria.complemento_obligatorio || false,
+      categoria_padre_id: categoria.categoria_padre_id,
     });
     setEditingId(categoria.id);
     setIsModalOpen(true);
@@ -422,6 +426,29 @@ export default function CategoriasPage() {
                   onChange={(e) => setFormData({ ...formData, orden: parseInt(e.target.value) || 0 })}
                   className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                  Categoría Padre (para subcategorías)
+                </label>
+                <select
+                  value={formData.categoria_padre_id || ''}
+                  onChange={(e) => setFormData({ ...formData, categoria_padre_id: e.target.value || null })}
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                >
+                  <option value="">Ninguna (categoría principal)</option>
+                  {categorias
+                    .filter((c) => !c.categoria_padre_id && c.id !== editingId)
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre_es}
+                      </option>
+                    ))}
+                </select>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Selecciona una categoría padre para crear una subcategoría.
+                </p>
               </div>
 
               <div>

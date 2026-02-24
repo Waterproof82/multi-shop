@@ -17,10 +17,11 @@ export class SupabaseCategoryRepository implements ICategoryRepository {
     return data.map((row: any) => ({
       id: row.id,
       empresaId: row.empresa_id,
-      nombre: row.nombre_es, // Por ahora devolvemos ES por defecto
+      nombre: row.nombre_es,
       orden: row.orden || 0,
       categoriaComplementoDe: row.categoria_complemento_de || null,
       complementoObligatorio: row.complemento_obligatorio || false,
+      categoriaPadreId: row.categoria_padre_id || null,
       translations: {
         en: row.nombre_en,
         fr: row.nombre_fr,

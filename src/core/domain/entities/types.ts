@@ -25,6 +25,7 @@ export interface Category {
   orden: number;
   categoriaComplementoDe: string | null;
   complementoObligatorio: boolean;
+  categoriaPadreId: string | null;
   translations?: {
     en?: string;
     fr?: string;

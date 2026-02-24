@@ -21,6 +21,18 @@ export interface MenuItemVM {
   requiresComplement?: boolean;
 }
 
+export interface MenuSubcategoryVM {
+  id: string;
+  nombre: string;
+  translations?: {
+    en?: string;
+    fr?: string;
+    it?: string;
+    de?: string;
+  };
+  products: MenuItemVM[];
+}
+
 export interface MenuCategoryVM {
   id: string;
   label: string;
@@ -32,4 +44,5 @@ export interface MenuCategoryVM {
     de?: string;
   };
   complementoDeId?: string;
+  subcategories?: MenuSubcategoryVM[];
 }
