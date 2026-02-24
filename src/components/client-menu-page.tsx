@@ -7,19 +7,21 @@ import { CategoryNav } from "@/components/category-nav"
 import { MenuSection } from "@/components/menu-section"
 import { SiteFooter } from "@/components/site-footer"
 import { CartDrawer } from "@/components/cart-drawer"
+import type { EmpresaInfo } from "@/lib/server-services"
 
 interface MenuPageProps {
   menuData: MenuCategoryVM[];
   header?: ReactNode;
   showCart?: boolean;
+  empresa?: EmpresaInfo | null;
 }
 
-export function MenuPage({ menuData, header, showCart = false }: MenuPageProps) {
+export function MenuPage({ menuData, header, showCart = false, empresa }: MenuPageProps) {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       {typeof header !== 'undefined' ? header : null}
       <main className="flex-1">
-        <HeroBanner />
+        <HeroBanner empresa={empresa} />
         <div className="container mx-auto max-w-6xl px-4 py-8 md:px-6">
           {menuData.length > 0 ? (
             <>
@@ -37,7 +39,7 @@ export function MenuPage({ menuData, header, showCart = false }: MenuPageProps) 
           )}
         </div>
       </main>
-      <SiteFooter />
+      <SiteFooter empresa={empresa} />
       <CartDrawer />
     </div>
   );

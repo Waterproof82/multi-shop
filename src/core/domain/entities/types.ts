@@ -48,4 +48,12 @@ export interface Empresa {
   mostrarCarrito: boolean;
   moneda: string;
   emailNotification: string | null;
+  urlImage: string | null;
+  descripcion: {
+    es?: string;
+    en?: string;
+    fr?: string;
+    it?: string;
+    de?: string;
+  } | null;
 }

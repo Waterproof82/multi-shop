@@ -2,25 +2,20 @@
 
 import { useLanguage } from "@/lib/language-context"
 import { t } from "@/lib/translations"
-import { useEffect, useState } from "react"
-import { supabase } from "../lib/supabaseClient"
+import type { EmpresaInfo } from "@/lib/server-services"
 
-export function SiteFooter() {
+interface SiteFooterProps {
+  empresa?: EmpresaInfo | null;
+}
+
+export function SiteFooter({ empresa }: SiteFooterProps) {
   const { language } = useLanguage()
-  const [logoUrl, setLogoUrl] = useState<string | null>(null)
-  useEffect(() => {
-    const fetchLogo = async () => {
-      const { data, error } = await supabase
-        .from("empresas")
-        .select("logo_url")
-        .limit(1)
-        .single()
-      if (!error && data?.logo_url) {
-        setLogoUrl(data.logo_url)
-      }
-    }
-    fetchLogo()
-  }, [])
+  const logoUrl = empresa?.logoUrl ?? null
+  
+  const footer1 = empresa?.footer1?.[language] ?? empresa?.footer1?.es ?? null
+  const footer2Raw = empresa?.footer2?.[language] ?? empresa?.footer2?.es ?? null
+  const footer2List = footer2Raw ? footer2Raw.split('|') : null
+
   return (
     <footer className="border-t border-border bg-card">
       <div className="mx-auto max-w-6xl px-4 py-10 md:px-6">
@@ -28,31 +23,22 @@ export function SiteFooter() {
           {logoUrl && (
             <img
               src={logoUrl}
-              alt="Mermelada de Tomate"
+              alt={empresa?.nombre ?? "Logo"}
               className="h-16 w-auto opacity-80"
             />
           )}
-          <p className="max-w-md font-serif text-lg italic text-muted-foreground">
-            {"\"...il risultato di farlo con amore\""}
-          </p>
-          <div className="text-sm text-muted-foreground">
-            <p>{t("allergenDisclaimer", language)}</p>
-          </div>
-          <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground">
-            <span>{t("allergenCrustaceans", language)}</span>
-            <span>{t("allergenFish", language)}</span>
-            <span>{t("allergenEggs", language)}</span>
-            <span>{t("allergenPeanuts", language)}</span>
-            <span>{t("allergenSoy", language)}</span>
-            <span>{t("allergenDairy", language)}</span>
-            <span>{t("allergenTreeNuts", language)}</span>
-            <span>{t("allergenCelery", language)}</span>
-            <span>{t("allergenMolluscs", language)}</span>
-            <span>{t("allergenLupin", language)}</span>
-            <span>{t("allergenMustard", language)}</span>
-            <span>{t("allergenSesame", language)}</span>
-            <span>{t("allergenSulphites", language)}</span>
-          </div>
+          {footer1 && (
+            <div className="text-sm text-muted-foreground">
+              <p>{footer1}</p>
+            </div>
+          )}
+          {footer2List ? (
+            <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground">
+              {footer2List.map((item, index) => (
+                <span key={index}>{item.trim()}</span>
+              ))}
+            </div>
+          ) : null}
         </div>
         <div className="mt-8 text-center">
           <a 

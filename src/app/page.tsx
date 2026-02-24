@@ -1,4 +1,4 @@
-import { getMenuUseCase, getEmpresaByDomain, isPedidosSubdomain, extractMainDomain } from "@/lib/server-services"
+import { getMenuUseCase, getEmpresaByDomain, isPedidosSubdomain, extractMainDomain, type EmpresaInfo } from "@/lib/server-services"
 import { MenuPage } from "@/components/client-menu-page"
 import SiteHeaderWrapper from "@/components/site-header-wrapper";
 import type { MenuCategoryVM } from "@/core/application/dtos/menu-view-model"
@@ -41,6 +41,6 @@ export default async function Home() {
     console.error("Error fetching menu from Supabase:", error);
   }
 
-  const header = await SiteHeaderWrapper({ showCart });
-  return <MenuPage menuData={menuData} header={header} showCart={showCart} />;
+  const header = await SiteHeaderWrapper({ showCart, empresa });
+  return <MenuPage menuData={menuData} header={header} showCart={showCart} empresa={empresa} />;
 }

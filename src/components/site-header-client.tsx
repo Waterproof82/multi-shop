@@ -5,14 +5,15 @@ import { Button } from "@/components/ui/button";
 import { LanguageSelector } from "@/components/language-selector";
 import { t } from "@/lib/translations";
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
 import { useCart } from "@/lib/cart-context";
+import type { EmpresaInfo } from "@/lib/server-services";
 
 interface SiteHeaderClientProps {
   readonly showCart: boolean;
+  readonly empresa?: EmpresaInfo | null;
 }
 
-export function SiteHeaderClient({ showCart }: SiteHeaderClientProps) {
+export function SiteHeaderClient({ showCart, empresa }: SiteHeaderClientProps) {
   const { openCart, totalItems } = useCart();
   const [animate, setAnimate] = useState(false);
 
@@ -31,20 +32,8 @@ export function SiteHeaderClient({ showCart }: SiteHeaderClientProps) {
       };
     }
   }, [totalItems]);
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  useEffect(() => {
-    const fetchLogo = async () => {
-      const { data, error } = await supabase
-        .from("empresas")
-        .select("logo_url")
-        .limit(1)
-        .single();
-      if (!error && data?.logo_url) {
-        setLogoUrl(data.logo_url);
-      }
-    };
-    fetchLogo();
-  }, []);
+
+  const logoUrl = empresa?.logoUrl ?? null;
 
   return (
     <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-md">

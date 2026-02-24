@@ -22,6 +22,7 @@ export const translations = {
     allergenDisclaimer: "TODOS NUESTROS PRODUCTOS SON SUSCEPTIBLES DE CONTENER DE MANERA DIRECTA O A TRAVES DE CONTAMINACION CRUZADA ALGUN TIPO DE ALERGENO",
     complementsOptional: "Complementos (opcional)",
     complementsRequired: "Complementos (obligatorio)",
+    nuestraCarta: "Nuestra Carta",
     // Allergens
     allergenCrustaceans: "Crustáceos",
     allergenFish: "Pescado",
@@ -74,6 +75,7 @@ export const translations = {
     sessionExpired: "Session expired. Request a new link from the waiter.",
     complementsOptional: "Complements (optional)",
     complementsRequired: "Complements (required)",
+    nuestraCarta: "Our Menu",
   },
   fr: {
     // UI
@@ -111,6 +113,7 @@ export const translations = {
     sessionExpired: "Session expiree. Demandez un nouveau lien au serveur.",
     complementsOptional: "Complements (optionnel)",
     complementsRequired: "Complements (obligatoire)",
+    nuestraCarta: "Notre Carte",
   },
   it: {
     // UI
@@ -148,6 +151,7 @@ export const translations = {
     sessionExpired: "Sessione scaduta. Richiedi un nuovo link al cameriere.",
     complementsOptional: "Complementi (opzionale)",
     complementsRequired: "Complementi (obbligatorio)",
+    nuestraCarta: "Il Nostro Menu",
   },
   de: {
     // UI
@@ -185,6 +189,7 @@ export const translations = {
     sessionExpired: "Sitzung abgelaufen. Fordern Sie einen neuen Link vom Kellner an.",
     complementsOptional: "Beilagen (optional)",
     complementsRequired: "Beilagen (erforderlich)",
+    nuestraCarta: "Unsere Speisekarte",
   },
 }
 

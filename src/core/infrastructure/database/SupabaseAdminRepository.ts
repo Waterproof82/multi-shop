@@ -98,6 +98,16 @@ export class SupabaseAdminRepository implements IAdminRepository {
   }
 
   private mapEmpresa(row: any): Empresa {
+    const descripcion = row.descripcion_es || row.descripcion_en || row.descripcion_fr || row.descripcion_it || row.descripcion_de
+      ? {
+          es: row.descripcion_es || null,
+          en: row.descripcion_en || null,
+          fr: row.descripcion_fr || null,
+          it: row.descripcion_it || null,
+          de: row.descripcion_de || null,
+        }
+      : null;
+
     return {
       id: row.id,
       nombre: row.nombre,
@@ -106,6 +116,8 @@ export class SupabaseAdminRepository implements IAdminRepository {
       mostrarCarrito: row.mostrar_carrito ?? true,
       moneda: row.moneda ?? "EUR",
       emailNotification: row.email_notification ?? null,
+      urlImage: row.url_image ?? null,
+      descripcion,
     };
   }
 }

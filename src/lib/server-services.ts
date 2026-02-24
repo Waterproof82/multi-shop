@@ -23,12 +23,64 @@ export interface EmpresaInfo {
   mostrarCarrito: boolean;
   moneda: string;
   subdomainPedidos: string | null;
+  logoUrl: string | null;
+  urlImage: string | null;
+  descripcion: {
+    es?: string;
+    en?: string;
+    fr?: string;
+    it?: string;
+    de?: string;
+  } | null;
+  titulo: string | null;
+  subtitulo: string | null;
+  subtitulo2: {
+    es?: string;
+    en?: string;
+    fr?: string;
+    it?: string;
+    de?: string;
+  } | null;
+  footer1: {
+    es?: string;
+    en?: string;
+    fr?: string;
+    it?: string;
+    de?: string;
+  } | null;
+  footer2: {
+    es?: string;
+    en?: string;
+    fr?: string;
+    it?: string;
+    de?: string;
+  } | null;
+}
+
+function mapTranslations(data: any, prefix: string) {
+  return data[`${prefix}_es`] || data[`${prefix}_en`] || data[`${prefix}_fr`] || data[`${prefix}_it`] || data[`${prefix}_de`]
+    ? {
+        es: data[`${prefix}_es`] || null,
+        en: data[`${prefix}_en`] || null,
+        fr: data[`${prefix}_fr`] || null,
+        it: data[`${prefix}_it`] || null,
+        de: data[`${prefix}_de`] || null,
+      }
+    : null;
 }
 
 export async function getEmpresaByDomain(domain: string): Promise<EmpresaInfo | null> {
   const { data, error } = await supabase
     .from("empresas")
-    .select("id, nombre, dominio, mostrar_carrito, moneda, subdomain_pedidos")
+    .select(`
+      id, nombre, dominio, mostrar_carrito, moneda, subdomain_pedidos, 
+      logo_url, url_image, 
+      descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de,
+      titulo, subtitulo,
+      subtitulo2_es, subtitulo2_en, subtitulo2_fr, subtitulo2_it, subtitulo2_de,
+      footer1_es, footer1_en, footer1_fr, footer1_it, footer1_de,
+      footer2_es, footer2_en, footer2_fr, footer2_it, footer2_de
+    `)
     .ilike("dominio", domain)
     .maybeSingle();
 
@@ -41,6 +93,14 @@ export async function getEmpresaByDomain(domain: string): Promise<EmpresaInfo | 
     mostrarCarrito: data.mostrar_carrito ?? false,
     moneda: data.moneda ?? "EUR",
     subdomainPedidos: data.subdomain_pedidos ?? null,
+    logoUrl: data.logo_url ?? null,
+    urlImage: data.url_image ?? null,
+    descripcion: mapTranslations(data, 'descripcion'),
+    titulo: data.titulo ?? null,
+    subtitulo: data.subtitulo ?? null,
+    subtitulo2: mapTranslations(data, 'subtitulo2'),
+    footer1: mapTranslations(data, 'footer1'),
+    footer2: mapTranslations(data, 'footer2'),
   };
 }
 
