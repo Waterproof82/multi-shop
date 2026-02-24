@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Pencil, Trash2, X, Loader2, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Loader2, Search, ArrowUpDown, ArrowUp, ArrowDown, Languages, ChevronDown, ChevronRight } from 'lucide-react';
 
 interface Category {
   id: string;
@@ -454,28 +454,6 @@ export default function CategoriasPage() {
                 />
               </div>
 
-              <button
-                type="button"
-                onClick={() => setShowTranslations(!showTranslations)}
-                className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-primary dark:hover:text-primary"
-              >
-                {showTranslations ? (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                    Ocultar traducciones
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                    Mostrar traducciones
-                  </>
-                )}
-              </button>
-
               {showTranslations && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -660,7 +638,19 @@ export default function CategoriasPage() {
                 </div>
               )}
 
-              <div className="flex justify-end gap-3 pt-4">
+              <div className="col-span-2">
+                <button
+                  type="button"
+                  onClick={() => setShowTranslations(!showTranslations)}
+                  className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-primary dark:hover:text-primary"
+                >
+                  {showTranslations ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  <Languages className="h-4 w-4" />
+                  Traducciones ({showTranslations ? 'ocultar' : 'mostrar'})
+                </button>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 col-span-2">
                 <button
                   type="button"
                   onClick={closeModal}
