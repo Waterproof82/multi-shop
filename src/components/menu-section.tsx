@@ -38,6 +38,10 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
   const translationLang = (['en', 'fr', 'it', 'de'].includes(language) ? language : undefined) as LanguageKey | undefined;
   const safeLanguage: Language = language || "es";
 
+  const displayDescripcion = translationLang && category.descripcionTranslations?.[translationLang]
+    ? category.descripcionTranslations[translationLang]
+    : category.descripcion;
+
   return (
     <section id={category.id} className="scroll-mt-32">
       <div className="mb-6 flex items-center gap-4">
@@ -46,6 +50,15 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
         </h2>
         <div className="h-px flex-1 bg-border" />
       </div>
+
+      {displayDescripcion && (
+        <div className="mb-8 relative overflow-hidden rounded-xl bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 dark:from-primary/10 dark:via-primary/20 dark:to-primary/10 p-6 border border-primary/10">
+          <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-primary/50 to-primary/20" />
+          <p className="font-serif text-lg text-foreground/90 leading-relaxed italic">
+            {displayDescripcion}
+          </p>
+        </div>
+      )}
 
       {isCategoryWithComplements && category.complementoDeId && (
         <p className="mb-4 text-sm text-muted-foreground">
@@ -104,12 +117,21 @@ const SubcategorySection = memo(function SubcategorySection(props: Readonly<{
 }>) {
   const { subcategory, translationLang, onItemClick, showCart } = props;
 
+  const displayDescripcion = translationLang && subcategory.descripcionTranslations?.[translationLang]
+    ? subcategory.descripcionTranslations[translationLang]
+    : subcategory.descripcion;
+
   return (
     <div className="space-y-4">
       <h3 className="font-serif text-xl font-semibold text-foreground flex items-center gap-2">
         <span className="w-2 h-2 rounded-full bg-primary/50" />
         {(translationLang && subcategory.translations?.[translationLang]) || subcategory.nombre}
       </h3>
+      {displayDescripcion && (
+        <p className="text-sm text-muted-foreground italic border-l-2 border-primary/30 pl-3">
+          {displayDescripcion}
+        </p>
+      )}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {subcategory.products.map((item, index) => (
           <motion.div

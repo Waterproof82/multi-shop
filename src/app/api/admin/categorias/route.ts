@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { nombre_es, nombre_en, nombre_fr, nombre_it, nombre_de, orden, categoria_complemento_de, complemento_obligatorio } = body;
+  const { nombre_es, nombre_en, nombre_fr, nombre_it, nombre_de, descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de, orden, categoria_complemento_de, complemento_obligatorio } = body;
 
   if (!nombre_es) {
     return NextResponse.json({ error: 'El nombre en español es requerido' }, { status: 400 });
@@ -69,6 +69,11 @@ export async function POST(request: NextRequest) {
       nombre_fr: nombre_fr || null,
       nombre_it: nombre_it || null,
       nombre_de: nombre_de || null,
+      descripcion_es: descripcion_es || null,
+      descripcion_en: descripcion_en || null,
+      descripcion_fr: descripcion_fr || null,
+      descripcion_it: descripcion_it || null,
+      descripcion_de: descripcion_de || null,
       orden: orden || 0,
       categoria_complemento_de: categoria_complemento_de || null,
       complemento_obligatorio: complemento_obligatorio || false,
@@ -98,7 +103,7 @@ export async function PUT(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { nombre_es, nombre_en, nombre_fr, nombre_it, nombre_de, orden, categoria_complemento_de, complemento_obligatorio, categoria_padre_id } = body;
+  const { nombre_es, nombre_en, nombre_fr, nombre_it, nombre_de, descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de, orden, categoria_complemento_de, complemento_obligatorio, categoria_padre_id } = body;
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -112,6 +117,11 @@ export async function PUT(request: NextRequest) {
       nombre_fr: nombre_fr || null,
       nombre_it: nombre_it || null,
       nombre_de: nombre_de || null,
+      descripcion_es: descripcion_es || null,
+      descripcion_en: descripcion_en || null,
+      descripcion_fr: descripcion_fr || null,
+      descripcion_it: descripcion_it || null,
+      descripcion_de: descripcion_de || null,
       orden: orden || 0,
       categoria_complemento_de: categoria_complemento_de || null,
       complemento_obligatorio: complemento_obligatorio || false,

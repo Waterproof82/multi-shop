@@ -22,11 +22,18 @@ export interface Category {
   id: string;
   empresaId: string;
   nombre: string;
+  descripcion: string | null;
   orden: number;
   categoriaComplementoDe: string | null;
   complementoObligatorio: boolean;
   categoriaPadreId: string | null;
   translations?: {
+    en?: string;
+    fr?: string;
+    it?: string;
+    de?: string;
+  };
+  descripcionTranslations?: {
     en?: string;
     fr?: string;
     it?: string;

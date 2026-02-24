@@ -51,11 +51,15 @@ export class GetMenuUseCase {
       return {
         id: `category-${parentCat.id}`,
         label: parentCat.nombre,
+        descripcion: parentCat.descripcion || undefined,
         translations: parentCat.translations,
+        descripcionTranslations: parentCat.descripcionTranslations,
         subcategories: childSubcategories.length > 0 ? childSubcategories.map((subCat) => ({
           id: subCat.id,
           nombre: subCat.nombre,
+          descripcion: subCat.descripcion || undefined,
           translations: subCat.translations,
+          descripcionTranslations: subCat.descripcionTranslations,
           products: products.filter((p) => p.categoriaId === subCat.id && p.activo).map((p) => ({
             id: p.id,
             name: p.titulo,

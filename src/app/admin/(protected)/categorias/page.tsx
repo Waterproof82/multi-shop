@@ -11,10 +11,16 @@ interface Category {
   nombre_fr: string;
   nombre_it: string;
   nombre_de: string;
+  descripcion_es: string | null;
+  descripcion_en: string | null;
+  descripcion_fr: string | null;
+  descripcion_it: string | null;
+  descripcion_de: string | null;
   orden: number;
   categoria_complemento_de: string | null;
   complemento_obligatorio: boolean;
   categoria_padre_id: string | null;
+  hasSubcategories?: boolean;
 }
 
 interface CategoryFormData {
@@ -23,6 +29,11 @@ interface CategoryFormData {
   nombre_fr: string;
   nombre_it: string;
   nombre_de: string;
+  descripcion_es: string;
+  descripcion_en: string;
+  descripcion_fr: string;
+  descripcion_it: string;
+  descripcion_de: string;
   orden: number;
   categoria_complemento_de: string | null;
   complemento_obligatorio: boolean;
@@ -35,6 +46,11 @@ const emptyForm: CategoryFormData = {
   nombre_fr: '',
   nombre_it: '',
   nombre_de: '',
+  descripcion_es: '',
+  descripcion_en: '',
+  descripcion_fr: '',
+  descripcion_it: '',
+  descripcion_de: '',
   orden: 0,
   categoria_complemento_de: null,
   complemento_obligatorio: false,
@@ -53,6 +69,7 @@ export default function CategoriasPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState<'orden' | 'nombre_es'>('orden');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [showTranslations, setShowTranslations] = useState(false);
 
   useEffect(() => {
     fetchCategorias();
@@ -125,6 +142,11 @@ export default function CategoriasPage() {
       nombre_fr: categoria.nombre_fr || '',
       nombre_it: categoria.nombre_it || '',
       nombre_de: categoria.nombre_de || '',
+      descripcion_es: categoria.descripcion_es || '',
+      descripcion_en: categoria.descripcion_en || '',
+      descripcion_fr: categoria.descripcion_fr || '',
+      descripcion_it: categoria.descripcion_it || '',
+      descripcion_de: categoria.descripcion_de || '',
       orden: categoria.orden,
       categoria_complemento_de: categoria.categoria_complemento_de,
       complemento_obligatorio: categoria.complemento_obligatorio || false,
@@ -166,12 +188,27 @@ export default function CategoriasPage() {
         cat.nombre_de?.toLowerCase().includes(term)
       );
     })
+    .map(cat => {
+      const parentCat = cat.categoria_padre_id 
+        ? categorias.find(c => c.id === cat.categoria_padre_id) 
+        : null;
+      return {
+        ...cat,
+        hasSubcategories: categorias.some(c => c.categoria_padre_id === cat.id),
+        parentName: parentCat?.nombre_es || null
+      };
+    })
     .sort((a, b) => {
+      // Put categories with subcategories first, then subcategories
+      if (a.categoria_padre_id !== b.categoria_padre_id) {
+        if (a.categoria_padre_id && !b.categoria_padre_id) return 1;
+        if (!a.categoria_padre_id && b.categoria_padre_id) return -1;
+      }
       if (sortField === 'orden') {
         return sortDirection === 'asc' ? a.orden - b.orden : b.orden - a.orden;
       }
-      const aVal = (a[sortField] || '').toLowerCase();
-      const bVal = (b[sortField] || '').toLowerCase();
+      const aVal = (a[sortField as keyof Category] || '').toLowerCase();
+      const bVal = (b[sortField as keyof Category] || '').toLowerCase();
       return sortDirection === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
     });
 
@@ -255,6 +292,12 @@ export default function CategoriasPage() {
                   Traducciones
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                  Tipo
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                  Subcategorías
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
                   Complemento de
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
@@ -273,6 +316,37 @@ export default function CategoriasPage() {
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {getTraducciones(cat)}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm">
+                    {cat.categoria_padre_id ? (
+                      <div className="flex flex-col gap-1">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-xs font-medium">
+                          Subcategoría
+                        </span>
+                        {cat.parentName && (
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            → {cat.parentName}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 text-xs font-medium">
+                        Principal
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm">
+                    {cat.hasSubcategories ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+                          <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
+                        </svg>
+                        Sí
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {cat.categoria_complemento_de 
@@ -297,7 +371,7 @@ export default function CategoriasPage() {
               ))}
               {filteredCategorias.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                     {searchTerm ? 'No se encontraron categorías.' : 'No hay categorías. Crea la primera.'}
                   </td>
                 </tr>
@@ -315,8 +389,19 @@ export default function CategoriasPage() {
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-gray-400 dark:text-gray-500">#{cat.orden}</span>
                     <p className="font-medium text-gray-900 dark:text-gray-100">{cat.nombre_es}</p>
+                    {cat.categoria_padre_id ? (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-[10px] font-medium">
+                        Sub
+                      </span>
+                    ) : cat.hasSubcategories ? (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium">
+                        Principal
+                      </span>
+                    ) : null}
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{getTraducciones(cat)}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {cat.categoria_padre_id && cat.parentName ? `Subcategoría de ${cat.parentName}` : getTraducciones(cat)}
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -369,18 +454,41 @@ export default function CategoriasPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
-                    Nombre (Inglés)
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.nombre_en}
-                    onChange={(e) => setFormData({ ...formData, nombre_en: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  />
-                </div>
+              <button
+                type="button"
+                onClick={() => setShowTranslations(!showTranslations)}
+                className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-primary dark:hover:text-primary"
+              >
+                {showTranslations ? (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                    Ocultar traducciones
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                    Mostrar traducciones
+                  </>
+                )}
+              </button>
+
+              {showTranslations && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                      Nombre (Inglés)
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.nombre_en}
+                      onChange={(e) => setFormData({ ...formData, nombre_en: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    />
+                  </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                     Nombre (Francés)
@@ -389,7 +497,7 @@ export default function CategoriasPage() {
                     type="text"
                     value={formData.nombre_fr}
                     onChange={(e) => setFormData({ ...formData, nombre_fr: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    className="w-full px-3 py-2 border rounded-ui focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                   />
                 </div>
                 <div>
@@ -415,6 +523,69 @@ export default function CategoriasPage() {
                   />
                 </div>
               </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                  Descripción (Español)
+                </label>
+                <textarea
+                  value={formData.descripcion_es}
+                  onChange={(e) => setFormData({ ...formData, descripcion_es: e.target.value })}
+                  rows={2}
+                  placeholder="Texto que se mostrará encima de los productos..."
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                />
+              </div>
+
+              {showTranslations && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                      Descripción (Inglés)
+                    </label>
+                  <textarea
+                    value={formData.descripcion_en}
+                    onChange={(e) => setFormData({ ...formData, descripcion_en: e.target.value })}
+                    rows={2}
+                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                    Descripción (Francés)
+                  </label>
+                  <textarea
+                    value={formData.descripcion_fr}
+                    onChange={(e) => setFormData({ ...formData, descripcion_fr: e.target.value })}
+                    rows={2}
+                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                    Descripción (Italiano)
+                  </label>
+                  <textarea
+                    value={formData.descripcion_it}
+                    onChange={(e) => setFormData({ ...formData, descripcion_it: e.target.value })}
+                    rows={2}
+                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                    Descripción (Alemán)
+                  </label>
+                  <textarea
+                    value={formData.descripcion_de}
+                    onChange={(e) => setFormData({ ...formData, descripcion_de: e.target.value })}
+                    rows={2}
+                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  />
+                </div>
+              </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">

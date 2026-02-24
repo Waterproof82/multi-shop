@@ -18,6 +18,7 @@ export class SupabaseCategoryRepository implements ICategoryRepository {
       id: row.id,
       empresaId: row.empresa_id,
       nombre: row.nombre_es,
+      descripcion: row.descripcion_es || null,
       orden: row.orden || 0,
       categoriaComplementoDe: row.categoria_complemento_de || null,
       complementoObligatorio: row.complemento_obligatorio || false,
@@ -27,6 +28,12 @@ export class SupabaseCategoryRepository implements ICategoryRepository {
         fr: row.nombre_fr,
         it: row.nombre_it,
         de: row.nombre_de,
+      },
+      descripcionTranslations: {
+        en: row.descripcion_en,
+        fr: row.descripcion_fr,
+        it: row.descripcion_it,
+        de: row.descripcion_de,
       },
     }));
   }

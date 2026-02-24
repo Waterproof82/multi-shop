@@ -24,7 +24,14 @@ export interface MenuItemVM {
 export interface MenuSubcategoryVM {
   id: string;
   nombre: string;
+  descripcion?: string;
   translations?: {
+    en?: string;
+    fr?: string;
+    it?: string;
+    de?: string;
+  };
+  descripcionTranslations?: {
     en?: string;
     fr?: string;
     it?: string;
@@ -36,8 +43,15 @@ export interface MenuSubcategoryVM {
 export interface MenuCategoryVM {
   id: string;
   label: string;
+  descripcion?: string;
   items: MenuItemVM[];
   translations?: {
+    en?: string;
+    fr?: string;
+    it?: string;
+    de?: string;
+  };
+  descripcionTranslations?: {
     en?: string;
     fr?: string;
     it?: string;
