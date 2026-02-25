@@ -8,6 +8,7 @@ import { useAdmin } from '@/lib/admin-context';
 interface Categoria {
   id: string;
   nombre_es: string;
+  categoria_padre_id: string | null;
 }
 
 interface Producto {
@@ -567,11 +568,23 @@ export default function ProductosPage() {
                     className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                   >
                     <option value="">Sin categoría</option>
-                    {categorias.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.nombre_es}
-                      </option>
-                    ))}
+                    {(() => {
+                      const parents = categorias.filter(c => !c.categoria_padre_id);
+                      const children = categorias.filter(c => c.categoria_padre_id);
+                      
+                      return parents.map(parent => {
+                        const childCats = children.filter(c => c.categoria_padre_id === parent.id);
+                        return (
+                          <optgroup key={parent.id} label={parent.nombre_es}>
+                            {childCats.map(sub => (
+                              <option key={sub.id} value={sub.id}>
+                                └─ {sub.nombre_es}
+                              </option>
+                            ))}
+                          </optgroup>
+                        );
+                      });
+                    })()}
                   </select>
                 </div>
 

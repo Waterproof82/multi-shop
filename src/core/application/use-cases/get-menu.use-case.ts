@@ -15,44 +15,73 @@ export class GetMenuUseCase {
       this.categoryRepo.findAllByTenant(empresaId),
     ]);
 
-    // 2. Separar categorías principales de complementos
+    // 2. Filtrar categorías que no son complemento (excluir categoriaComplementoDe)
     const mainCategories = categories.filter((cat) => !cat.categoriaComplementoDe);
-    const complementCategories = categories.filter((cat) => cat.categoriaComplementoDe);
 
-    // 3. Crear mapa de categorías complemento por su categoría padre
-    const complementsByParent = new Map<string, typeof complementCategories>();
-    for (const comp of complementCategories) {
-      const parentId = comp.categoriaComplementoDe!;
-      if (!complementsByParent.has(parentId)) {
-        complementsByParent.set(parentId, []);
+    // 3. Separar categorías principales de subcategorías (por categoriaPadreId)
+    const parentCategories = mainCategories.filter((cat) => !cat.categoriaPadreId);
+    const subCategories = mainCategories.filter((cat) => cat.categoriaPadreId);
+
+    // 4. Crear mapa de subcategorías por su categoría padre
+    const subcategoriesByParent = new Map<string, typeof subCategories>();
+    for (const subCat of subCategories) {
+      const parentId = subCat.categoriaPadreId!;
+      if (!subcategoriesByParent.has(parentId)) {
+        subcategoriesByParent.set(parentId, []);
       }
-      complementsByParent.get(parentId)!.push(comp);
+      subcategoriesByParent.get(parentId)!.push(subCat);
     }
 
-    // 4. Mapear y agrupar - solo categorías principales
-    const menu: MenuCategoryVM[] = mainCategories.map((cat) => {
-      // Filtrar productos de esta categoría
-      const catProducts = products.filter((p) => p.categoriaId === cat.id && p.activo);
+    // 5. Mapear y agrupar - solo categorías principales (padres)
+    const menu: MenuCategoryVM[] = parentCategories.map((parentCat) => {
+      // Obtener subcategorías de esta categoría padre
+      const childSubcategories = subcategoriesByParent.get(parentCat.id) || [];
 
-      // Obtener productos de categorías complemento
-      const complementProds = complementsByParent.get(cat.id) || [];
-      const allComplementProducts = complementProds.flatMap((compCat) =>
-        products.filter((p) => p.categoriaId === compCat.id && p.activo)
+      // Productos de la categoría padre (si los hay, aunque normalmente estarán en subcategorías)
+      const parentProducts = products.filter((p) => p.categoriaId === parentCat.id && p.activo);
+
+      // Productos de las subcategorías
+      const subcategoryProducts = childSubcategories.flatMap((subCat) =>
+        products.filter((p) => p.categoriaId === subCat.id && p.activo)
       );
 
-      // Verificar si algún complemento es obligatorio
-      const hasRequiredComplement = complementProds.some((compCat) => compCat.complementoObligatorio);
+      // Combinar todos los productos
+      const allProducts = [...parentProducts, ...subcategoryProducts];
 
       return {
-        id: `category-${cat.id}`, // Use UUID to ensure uniqueness
-        label: cat.nombre,
-        translations: cat.translations,
-        items: catProducts.map((p) => ({
+        id: `category-${parentCat.id}`,
+        label: parentCat.nombre,
+        descripcion: parentCat.descripcion || undefined,
+        translations: parentCat.translations,
+        descripcionTranslations: parentCat.descripcionTranslations,
+        subcategories: childSubcategories.length > 0 ? childSubcategories.map((subCat) => ({
+          id: subCat.id,
+          nombre: subCat.nombre,
+          descripcion: subCat.descripcion || undefined,
+          translations: subCat.translations,
+          descripcionTranslations: subCat.descripcionTranslations,
+          products: products.filter((p) => p.categoriaId === subCat.id && p.activo).map((p) => ({
+            id: p.id,
+            name: p.titulo,
+            description: p.descripcion || undefined,
+            price: p.precio,
+            category: subCat.nombre.toLowerCase().replaceAll(" ", "-"),
+            image: p.fotoUrl || undefined,
+            highlight: p.esEspecial,
+            translations: p.translations ? {
+              en: p.translations.en ? { name: p.translations.en.titulo, description: p.translations.en.descripcion || undefined } : undefined,
+              fr: p.translations.fr ? { name: p.translations.fr.titulo, description: p.translations.fr.descripcion || undefined } : undefined,
+              it: p.translations.it ? { name: p.translations.it.titulo, description: p.translations.it.descripcion || undefined } : undefined,
+              de: p.translations.de ? { name: p.translations.de.titulo, description: p.translations.de.descripcion || undefined } : undefined,
+            } : undefined,
+          })),
+        })) : undefined,
+        items: allProducts.map((p) => ({
           id: p.id,
           name: p.titulo,
           description: p.descripcion || undefined,
           price: p.precio,
-          category: cat.nombre.toLowerCase().replaceAll(" ", "-"),
+          category: parentCat.nombre.toLowerCase().replaceAll(" ", "-"),
           image: p.fotoUrl || undefined,
           highlight: p.esEspecial,
           translations: p.translations ? {
@@ -61,18 +90,11 @@ export class GetMenuUseCase {
             it: p.translations.it ? { name: p.translations.it.titulo, description: p.translations.it.descripcion || undefined } : undefined,
             de: p.translations.de ? { name: p.translations.de.titulo, description: p.translations.de.descripcion || undefined } : undefined,
           } : undefined,
-          complements: allComplementProducts.length > 0 ? allComplementProducts.map((p) => ({
-            id: p.id,
-            name: p.titulo,
-            price: p.precio,
-            description: p.descripcion || undefined,
-          })) : undefined,
-          requiresComplement: hasRequiredComplement ? true : undefined,
         })),
       };
     });
 
-    // 5. Filtrar categorías vacías - NO mostrar categorías complemento como secciones separadas
+    // 6. Filtrar categorías vacías
     return menu.filter((cat) => cat.items.length > 0);
   }
 }

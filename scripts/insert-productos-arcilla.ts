@@ -4,20 +4,31 @@ import path from "node:path";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
   auth: {
     autoRefreshToken: false,
     persistSession: false,
   },
 });
 
+const EMPRESA_ID = "f919fa96-06e8-41d3-b236-c02421775219";
+
+const CAT_COLLARES_RAIZ = "85f39f9d-b458-4b25-8e7e-208ad251bca9";
+const CAT_PULSERAS_RAIZ = "ffc04380-262d-4cf9-850b-30d4ad048c00";
+const CAT_ANILLOS_RAIZ = "4a4492ef-0317-474b-878c-671a17a42049";
+const CAT_PENDIENTES_RAIZ = "7f8445ee-cb4d-42e0-a682-efa626d957d0";
+const CAT_COLLARES_RENACER = "70f50c03-5592-4e3e-941d-6c526ec3693b";
+const CAT_PULSERAS_RENACER = "1a38542d-5daf-4408-af70-66467772ee2f";
+const CAT_ANILLOS_RENACER = "31ef9b08-8bb3-4bc2-b800-3907d38903e4";
+const CAT_PENDIENTES_RENACER = "e8d9bbaf-e2e0-448d-a12e-eded40b82091";
+const CAT_EDICIONES_ESPECIALES = "bbdf8041-65e2-48f7-b022-7df3cdbfbe5b";
+const CAT_REGALOS = "ff3c7254-77c6-4e4c-b588-7f23ba8681bf";
+
 const productos = [
+  // Colección Raíz - Collares
   {
-    empresa_id: "f919fa96-06e8-41d3-b236-c02421775219",
-    categoria_id: "cat-collares-raiz",
+    empresa_id: EMPRESA_ID,
+    categoria_id: CAT_COLLARES_RAIZ,
     titulo_es: "Collar Volcán",
     titulo_en: "Volcano Necklace",
     titulo_fr: "Collier Volcan",
@@ -34,8 +45,8 @@ const productos = [
     activo: true,
   },
   {
-    empresa_id: "f919fa96-06e8-41d3-b236-c02421775219",
-    categoria_id: "cat-collares-raiz",
+    empresa_id: EMPRESA_ID,
+    categoria_id: CAT_COLLARES_RAIZ,
     titulo_es: "Collar Origen",
     titulo_en: "Origin Necklace",
     titulo_fr: "Collier Origine",
@@ -52,8 +63,8 @@ const productos = [
     activo: true,
   },
   {
-    empresa_id: "f919fa96-06e8-41d3-b236-c02421775219",
-    categoria_id: "cat-collares-raiz",
+    empresa_id: EMPRESA_ID,
+    categoria_id: CAT_COLLARES_RAIZ,
     titulo_es: "Collar Lava",
     titulo_en: "Lava Necklace",
     titulo_fr: "Collier Lave",
@@ -69,9 +80,10 @@ const productos = [
     es_especial: true,
     activo: true,
   },
+  // Colección Raíz - Pulseras
   {
-    empresa_id: "f919fa96-06e8-41d3-b236-c02421775219",
-    categoria_id: "cat-pulseras-raiz",
+    empresa_id: EMPRESA_ID,
+    categoria_id: CAT_PULSERAS_RAIZ,
     titulo_es: "Pulsera Volcánica",
     titulo_en: "Volcanic Bracelet",
     titulo_fr: "Bracelet Volcanique",
@@ -88,8 +100,8 @@ const productos = [
     activo: true,
   },
   {
-    empresa_id: "f919fa96-06e8-41d3-b236-c02421775219",
-    categoria_id: "cat-pulseras-raiz",
+    empresa_id: EMPRESA_ID,
+    categoria_id: CAT_PULSERAS_RAIZ,
     titulo_es: "Pulsera Fuerza",
     titulo_en: "Strength Bracelet",
     titulo_fr: "Bracelet Force",
@@ -105,9 +117,10 @@ const productos = [
     es_especial: false,
     activo: true,
   },
+  // Colección Raíz - Anillos
   {
-    empresa_id: "f919fa96-06e8-41d3-b236-c02421775219",
-    categoria_id: "cat-anillos-raiz",
+    empresa_id: EMPRESA_ID,
+    categoria_id: CAT_ANILLOS_RAIZ,
     titulo_es: "Anillo Tierra",
     titulo_en: "Earth Ring",
     titulo_fr: "Bague Terre",
@@ -124,8 +137,8 @@ const productos = [
     activo: true,
   },
   {
-    empresa_id: "f919fa96-06e8-41d3-b236-c02421775219",
-    categoria_id: "cat-anillos-raiz",
+    empresa_id: EMPRESA_ID,
+    categoria_id: CAT_ANILLOS_RAIZ,
     titulo_es: "Anillo Carácter",
     titulo_en: "Character Ring",
     titulo_fr: "Bague Caractère",
@@ -141,9 +154,10 @@ const productos = [
     es_especial: false,
     activo: true,
   },
+  // Colección Raíz - Pendientes
   {
-    empresa_id: "f919fa96-06e8-41d3-b236-c02421775219",
-    categoria_id: "cat-pendientes-raiz",
+    empresa_id: EMPRESA_ID,
+    categoria_id: CAT_PENDIENTES_RAIZ,
     titulo_es: "Pendientes Obsidiana",
     titulo_en: "Obsidian Earrings",
     titulo_fr: "Boucles d'Oreilles Obsidienne",
@@ -160,8 +174,8 @@ const productos = [
     activo: true,
   },
   {
-    empresa_id: "f919fa96-06e8-41d3-b236-c02421775219",
-    categoria_id: "cat-pendientes-raiz",
+    empresa_id: EMPRESA_ID,
+    categoria_id: CAT_PENDIENTES_RAIZ,
     titulo_es: "Pendientes Colada",
     titulo_en: "Lava Flow Earrings",
     titulo_fr: "Boucles d'Oreilles Coulée",
@@ -177,9 +191,10 @@ const productos = [
     es_especial: false,
     activo: true,
   },
+  // Colección Renacer - Collares
   {
-    empresa_id: "f919fa96-06e8-41d3-b236-c02421775219",
-    categoria_id: "cat-collares-renacer",
+    empresa_id: EMPRESA_ID,
+    categoria_id: CAT_COLLARES_RENACER,
     titulo_es: "Collar Alba",
     titulo_en: "Dawn Necklace",
     titulo_fr: "Collier Aube",
@@ -196,8 +211,8 @@ const productos = [
     activo: true,
   },
   {
-    empresa_id: "f919fa96-06e8-41d3-b236-c02421775219",
-    categoria_id: "cat-collares-renacer",
+    empresa_id: EMPRESA_ID,
+    categoria_id: CAT_COLLARES_RENACER,
     titulo_es: "Collar Marea",
     titulo_en: "Tide Necklace",
     titulo_fr: "Collier Marée",
@@ -214,8 +229,8 @@ const productos = [
     activo: true,
   },
   {
-    empresa_id: "f919fa96-06e8-41d3-b236-c02421775219",
-    categoria_id: "cat-collares-renacer",
+    empresa_id: EMPRESA_ID,
+    categoria_id: CAT_COLLARES_RENACER,
     titulo_es: "Collar Horizonte",
     titulo_en: "Horizon Necklace",
     titulo_fr: "Collier Horizon",
@@ -231,9 +246,10 @@ const productos = [
     es_especial: true,
     activo: true,
   },
+  // Colección Renacer - Pulseras
   {
-    empresa_id: "f919fa96-06e8-41d3-b236-c02421775219",
-    categoria_id: "cat-pulseras-renacer",
+    empresa_id: EMPRESA_ID,
+    categoria_id: CAT_PULSERAS_RENACER,
     titulo_es: "Pulsera Luz",
     titulo_en: "Light Bracelet",
     titulo_fr: "Bracelet Lumière",
@@ -250,8 +266,8 @@ const productos = [
     activo: true,
   },
   {
-    empresa_id: "f919fa96-06e8-41d3-b236-c02421775219",
-    categoria_id: "cat-pulseras-renacer",
+    empresa_id: EMPRESA_ID,
+    categoria_id: CAT_PULSERAS_RENACER,
     titulo_es: "Pulsera Calma",
     titulo_en: "Calm Bracelet",
     titulo_fr: "Bracelet Calme",
@@ -267,9 +283,10 @@ const productos = [
     es_especial: false,
     activo: true,
   },
+  // Colección Renacer - Anillos
   {
-    empresa_id: "f919fa96-06e8-41d3-b236-c02421775219",
-    categoria_id: "cat-anillos-renacer",
+    empresa_id: EMPRESA_ID,
+    categoria_id: CAT_ANILLOS_RENACER,
     titulo_es: "Anillo Blanco",
     titulo_en: "White Ring",
     titulo_fr: "Bague Blanche",
@@ -286,8 +303,8 @@ const productos = [
     activo: true,
   },
   {
-    empresa_id: "f919fa96-06e8-41d3-b236-c02421775219",
-    categoria_id: "cat-anillos-renacer",
+    empresa_id: EMPRESA_ID,
+    categoria_id: CAT_ANILLOS_RENACER,
     titulo_es: "Anillo Nueva Era",
     titulo_en: "New Era Ring",
     titulo_fr: "Bague Nouvelle Ère",
@@ -303,9 +320,10 @@ const productos = [
     es_especial: false,
     activo: true,
   },
+  // Colección Renacer - Pendientes
   {
-    empresa_id: "f919fa96-06e8-41d3-b236-c02421775219",
-    categoria_id: "cat-pendientes-renacer",
+    empresa_id: EMPRESA_ID,
+    categoria_id: CAT_PENDIENTES_RENACER,
     titulo_es: "Pendientes Espuma",
     titulo_en: "Sea Foam Earrings",
     titulo_fr: "Boucles d'Oreilles Écume",
@@ -322,14 +340,14 @@ const productos = [
     activo: true,
   },
   {
-    empresa_id: "f919fa96-06e8-41d3-b236-c02421775219",
-    categoria_id: "cat-pendientes-renacer",
+    empresa_id: EMPRESA_ID,
+    categoria_id: CAT_PENDIENTES_RENACER,
     titulo_es: "Pendientes Brisa",
     titulo_en: "Breeze Earrings",
     titulo_fr: "Boucles d'Oreilles Brise",
     titulo_it: "Orecchini Brezza",
     titulo_de: "Brise-Ohrringe",
-    descripcion_es: "Pendientes colgantes con cápsula alargada de arena clara. Movimiento suave, energía positiva.",
+    descripcion_es: "Pendientes colgantes con胶囊 alargada de arena clara. Movimiento suave, energía positiva.",
     descripcion_en: "Drop earrings with elongated clear sand capsule. Gentle movement, positive energy.",
     descripcion_fr: "Boucles pendantes avec capsule allongée de sable clair. Mouvement doux, énergie positive.",
     descripcion_it: "Orecchini pendenti con capsula allungata di sabbia chiara. Movimento delicato, energia positiva.",
@@ -339,9 +357,10 @@ const productos = [
     es_especial: false,
     activo: true,
   },
+  // Ediciones Especiales
   {
-    empresa_id: "f919fa96-06e8-41d3-b236-c02421775219",
-    categoria_id: "cat-ediciones-especiales",
+    empresa_id: EMPRESA_ID,
+    categoria_id: CAT_EDICIONES_ESPECIALES,
     titulo_es: "Collar Dualidad",
     titulo_en: "Duality Necklace",
     titulo_fr: "Collier Dualité",
@@ -358,8 +377,8 @@ const productos = [
     activo: true,
   },
   {
-    empresa_id: "f919fa96-06e8-41d3-b236-c02421775219",
-    categoria_id: "cat-ediciones-especiales",
+    empresa_id: EMPRESA_ID,
+    categoria_id: CAT_EDICIONES_ESPECIALES,
     titulo_es: "Set Dualidad",
     titulo_en: "Duality Set",
     titulo_fr: "Parure Dualité",
@@ -375,9 +394,10 @@ const productos = [
     es_especial: true,
     activo: true,
   },
+  // Regalos con Significado
   {
-    empresa_id: "f919fa96-06e8-41d3-b236-c02421775219",
-    categoria_id: "cat-regalos",
+    empresa_id: EMPRESA_ID,
+    categoria_id: CAT_REGALOS,
     titulo_es: "Pack Regalo Raíz",
     titulo_en: "Root Gift Pack",
     titulo_fr: "Pack Cadeau Racine",
@@ -394,8 +414,8 @@ const productos = [
     activo: true,
   },
   {
-    empresa_id: "f919fa96-06e8-41d3-b236-c02421775219",
-    categoria_id: "cat-regalos",
+    empresa_id: EMPRESA_ID,
+    categoria_id: CAT_REGALOS,
     titulo_es: "Pack Regalo Renacer",
     titulo_en: "Rebirth Gift Pack",
     titulo_fr: "Pack Cadeau Renaissance",
@@ -412,8 +432,8 @@ const productos = [
     activo: true,
   },
   {
-    empresa_id: "f919fa96-06e8-41d3-b236-c02421775219",
-    categoria_id: "cat-regalos",
+    empresa_id: EMPRESA_ID,
+    categoria_id: CAT_REGALOS,
     titulo_es: "Pack Regalo Dualidad",
     titulo_en: "Duality Gift Pack",
     titulo_fr: "Pack Cadeau Dualité",
@@ -442,7 +462,7 @@ async function insertProducts() {
   }
 
   console.log(`✅ Successfully inserted ${data?.length || 0} products`);
-  console.log("Inserted IDs:", data?.map((p) => p.id).join(", "));
+  console.log("Inserted IDs:", data?.map((p: any) => p.id).join(", "));
 }
 
 insertProducts();

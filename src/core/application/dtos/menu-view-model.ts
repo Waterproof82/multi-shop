@@ -21,9 +21,29 @@ export interface MenuItemVM {
   requiresComplement?: boolean;
 }
 
+export interface MenuSubcategoryVM {
+  id: string;
+  nombre: string;
+  descripcion?: string;
+  translations?: {
+    en?: string;
+    fr?: string;
+    it?: string;
+    de?: string;
+  };
+  descripcionTranslations?: {
+    en?: string;
+    fr?: string;
+    it?: string;
+    de?: string;
+  };
+  products: MenuItemVM[];
+}
+
 export interface MenuCategoryVM {
   id: string;
   label: string;
+  descripcion?: string;
   items: MenuItemVM[];
   translations?: {
     en?: string;
@@ -31,5 +51,12 @@ export interface MenuCategoryVM {
     it?: string;
     de?: string;
   };
+  descripcionTranslations?: {
+    en?: string;
+    fr?: string;
+    it?: string;
+    de?: string;
+  };
   complementoDeId?: string;
+  subcategories?: MenuSubcategoryVM[];
 }
