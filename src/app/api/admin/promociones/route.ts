@@ -75,6 +75,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Admin no encontrado' }, { status: 404 });
     }
 
+    const { data: empresa } = await supabase
+      .from('empresas')
+      .select('email_notification, nombre')
+      .eq('id', perfil.empresa_id)
+      .single();
+
     const body = await request.json();
     const { texto_promocion } = body;
 
@@ -149,7 +155,8 @@ export async function POST(request: Request) {
             to: emails,
             subject: 'Nueva promocion disponible',
             htmlContent: emailHtml,
-            senderName: 'Promociones',
+            senderName: empresa?.nombre || 'Promociones',
+            senderEmail: empresa?.email_notification || 'a369cb001@smtp-brevo.com',
           });
           
           console.log('Promo emails sent successfully via Brevo');

@@ -136,7 +136,7 @@ export async function POST(request: Request) {
 
     const { data: empresa } = await supabase
       .from('empresas')
-      .select('email_notification, nombre')
+      .select('email_notification, email, nombre')
       .eq('dominio', mainDomain)
       .single();
 
@@ -171,6 +171,7 @@ export async function POST(request: Request) {
       subject: `Nuevo pedido de ${empresa.nombre} - ${total.toFixed(2)}€`,
       htmlContent: html,
       senderName: empresa.nombre,
+      senderEmail: empresa.email_notification,
     });
 
     return NextResponse.json({ success: true });

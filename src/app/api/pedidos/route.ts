@@ -293,6 +293,7 @@ async function sendOrderEmail(supabase: any, info: OrderEmailInfo) {
     subject: `Nuevo pedido #${info.nuevoNumeroPedido} de ${safeNombre} - ${info.total.toFixed(2)}€`,
     htmlContent: html,
     senderName: info.empresa.nombre,
+    senderEmail: info.empresa.email_notification,
   });
 }
 
@@ -304,7 +305,7 @@ export async function POST(request: Request) {
 
     const { data: empresa } = await supabase
       .from('empresas')
-      .select('id, nombre, email_notification')
+      .select('id, nombre, email, email_notification')
       .eq('dominio', mainDomain)
       .single();
 
