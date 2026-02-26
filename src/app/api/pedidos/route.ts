@@ -25,7 +25,7 @@ async function getDomainFromHeaders(): Promise<string> {
   return host.replace(/^www\./, '').toLowerCase().split(':')[0];
 }
 
-function generateOrderEmail(items: CartItem[], total: number, empresaNombre: string, numeroPedido: number, nombre: string, telefono: string, email: string | null): string {
+function generateOrderEmail(items: CartItem[], total: number, empresaNombre: string, numeroPedido: number, nombre: string, telefono: string, email: string | null, whatsappLink?: string): string {
   const itemsHtml = items.map(ci => {
     const complementPrice = ci.selectedComplements?.reduce((sum, c) => sum + c.price, 0) || 0;
     const itemTotal = (ci.item.price + complementPrice) * ci.quantity;
@@ -72,6 +72,7 @@ function generateOrderEmail(items: CartItem[], total: number, empresaNombre: str
                     <p style="margin: 0; color: #333; font-size: 14px;"><strong>Cliente:</strong> ${nombre}</p>
                     <p style="margin: 8px 0 0 0; color: #333; font-size: 14px;"><strong>Teléfono:</strong> ${telefono}</p>
                     ${email ? `<p style="margin: 8px 0 0 0; color: #333; font-size: 14px;"><strong>Email:</strong> ${email}</p>` : ''}
+                    ${whatsappLink ? `<p style="margin: 8px 0 0 0; font-size: 14px;"><a href="${whatsappLink}" style="background-color: #25D366; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block; font-weight: 600;">📱 Enviar WhatsApp</a></p>` : ''}
                   </td>
                 </tr>
               </table>
@@ -266,6 +267,7 @@ type OrderEmailInfo = {
   items: CartItem[];
   total: number;
   nuevoNumeroPedido: number;
+  whatsappLink?: string;
 };
 
 async function sendOrderEmail(supabase: any, info: OrderEmailInfo) {
@@ -291,7 +293,8 @@ async function sendOrderEmail(supabase: any, info: OrderEmailInfo) {
     info.nuevoNumeroPedido,
     safeNombre,
     safeTelefono,
-    safeEmail
+    safeEmail,
+    info.whatsappLink
   );
   await sendEmail({
     to: info.empresa.email_notification,
@@ -312,7 +315,7 @@ export async function POST(request: Request) {
 
     const { data: empresa } = await supabase
       .from('empresas')
-      .select('id, nombre, email_notification')
+      .select('id, nombre, email_notification, telefono_whatsapp')
       .eq('dominio', mainDomain)
       .single();
 
@@ -343,20 +346,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Error guardando pedido' }, { status: 500 });
     }
 
-    if (BREVO_API_KEY && empresa.email_notification) {
-      await sendOrderEmail(supabase, {
-        empresa,
-        clienteId,
-        sanitizedNombre,
-        sanitizedTelefono,
-        sanitizedEmail,
-        items,
-        total,
-        nuevoNumeroPedido,
-      });
+    let whatsappLink: string | undefined;
+    if (empresa.telefono_whatsapp) {
+      const telefonoLimpio = empresa.telefono_whatsapp.replaceAll(/\D/g, '');
+      const mensaje = `Hola! Acabo de hacer un pedido (${nuevoNumeroPedido}) en la web. Cuanto tardara en estar listo para recoger?`;
+      whatsappLink = `https://api.whatsapp.com/send/?phone=${telefonoLimpio}&text=${encodeURIComponent(mensaje)}&type=phone_number&app_absent=0`;
     }
 
-    return NextResponse.json({ success: true, numeroPedido: nuevoNumeroPedido });
+    return NextResponse.json({ success: true, numeroPedido: nuevoNumeroPedido, whatsappLink });
   } catch (error) {
     console.error('Error creating order:', error);
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });

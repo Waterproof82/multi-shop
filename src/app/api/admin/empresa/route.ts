@@ -34,12 +34,13 @@ export async function GET() {
 
     const { data: empresa } = await supabase
       .from('empresas')
-      .select('email_notification')
+      .select('email_notification, telefono_whatsapp')
       .eq('id', perfil.empresa_id)
       .single();
 
     return NextResponse.json({
       email_notification: empresa?.email_notification || '',
+      telefono_whatsapp: empresa?.telefono_whatsapp || '',
     });
   } catch (error) {
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });
@@ -71,11 +72,11 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { email_notification } = body;
+    const { email_notification, telefono_whatsapp } = body;
 
     const { error } = await supabase
       .from('empresas')
-      .update({ email_notification })
+      .update({ email_notification, telefono_whatsapp })
       .eq('id', perfil.empresa_id);
 
     if (error) {

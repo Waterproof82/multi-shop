@@ -110,6 +110,9 @@ export function CartDrawer() {
       const data = await res.json();
       
       if (res.ok) {
+        if (data.whatsappLink) {
+          window.open(data.whatsappLink, '_blank');
+        }
         setSent(true);
         setNombre('');
         setTelefono('');

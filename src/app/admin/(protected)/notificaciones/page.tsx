@@ -8,11 +8,13 @@ import { Label } from '@/components/ui/label';
 
 interface SettingsData {
   email_notification: string;
+  telefono_whatsapp: string;
 }
 
 export default function NotificacionesPage() {
   const { empresaId } = useAdmin();
   const [email, setEmail] = useState('');
+  const [telefonoWhatsapp, setTelefonoWhatsapp] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -24,6 +26,7 @@ export default function NotificacionesPage() {
         if (res.ok) {
           const data = await res.json();
           setEmail(data.email_notification || '');
+          setTelefonoWhatsapp(data.telefono_whatsapp || '');
         }
       } catch (error) {
         console.error('Error fetching settings:', error);
@@ -43,7 +46,10 @@ export default function NotificacionesPage() {
       const res = await fetch('/api/admin/empresa', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email_notification: email }),
+        body: JSON.stringify({ 
+          email_notification: email,
+          telefono_whatsapp: telefonoWhatsapp,
+        }),
       });
       if (res.ok) {
         setSaved(true);
@@ -89,6 +95,23 @@ export default function NotificacionesPage() {
             />
             <p className="text-xs text-gray-500 mt-1">
               Los pedidos confirmados se enviarán a este email
+            </p>
+          </div>
+
+          <div>
+            <Label htmlFor="telefonoWhatsapp" className="text-sm font-medium dark:text-gray-200">
+              Teléfono WhatsApp
+            </Label>
+            <Input
+              id="telefonoWhatsapp"
+              type="tel"
+              value={telefonoWhatsapp}
+              onChange={(e) => setTelefonoWhatsapp(e.target.value)}
+              placeholder="+34 612 345 678"
+              className="mt-1"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Recibirás un enlace en el email para enviar WhatsApp al confirmar pedidos
             </p>
           </div>
 
