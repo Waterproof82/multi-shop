@@ -11,6 +11,13 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
 import { useState } from "react"
 
 import { useCart, type Complement } from "@/lib/cart-context"
@@ -43,19 +50,19 @@ export function CartDrawer() {
 
   const validateName = (name: string): string | undefined => {
     const trimmed = name.trim();
-    if (!trimmed) return 'El nombre es obligatorio';
-    if (trimmed.length < 2) return 'Mínimo 2 caracteres';
-    if (trimmed.length > 100) return 'Máximo 100 caracteres';
-    if (!/^[a-zA-ZÀ-ÿ\s'-]+$/u.test(trimmed)) return 'Solo letras y espacios';
+    if (!trimmed) return t("validationNameRequired", language);
+    if (trimmed.length < 2) return t("validationNameMin", language);
+    if (trimmed.length > 100) return t("validationNameMax", language);
+    if (!/^[a-zA-ZÀ-ÿ\s'-]+$/u.test(trimmed)) return t("validationNameFormat", language);
     return undefined;
   };
 
   const validatePhone = (phone: string): string | undefined => {
     const trimmed = phone.trim();
-    if (!trimmed) return 'El teléfono es obligatorio';
+    if (!trimmed) return t("validationPhoneRequired", language);
     const digitsOnly = trimmed.replaceAll(/\D/g, '');
-    if (digitsOnly.length < 9) return 'Mínimo 9 dígitos';
-    if (digitsOnly.length > 15) return 'Máximo 15 dígitos';
+    if (digitsOnly.length < 9) return t("validationPhoneMin", language);
+    if (digitsOnly.length > 15) return t("validationPhoneMax", language);
     return undefined;
   };
 
@@ -107,24 +114,40 @@ export function CartDrawer() {
         setNombre('');
         setTelefono('');
         setEmail('');
-        setTimeout(() => {
-          clearCart();
-          closeCart();
-          setSent(false);
-        }, 2000);
       } else {
-        setErrors({ nombre: data.error || 'Error al enviar pedido' });
+        setErrors({ nombre: data.error || t("validationOrderError", language) });
       }
     } catch (err) {
       console.error('Error:', err);
-      setErrors({ nombre: 'Error al enviar pedido' });
+      setErrors({ nombre: t("validationOrderError", language) });
     } finally {
       setSending(false);
     }
   };
 
   return (
-    <Sheet open={isCartOpen} onOpenChange={closeCart}>
+    <>
+      <Dialog open={sent} onOpenChange={(open) => {
+        if (!open) {
+          setSent(false)
+          clearCart()
+          closeCart()
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-600">
+              <span className="text-2xl">✓</span>
+              {t("orderReceivedTitle", language)}
+            </DialogTitle>
+            <DialogDescription className="text-base">
+              {t("orderReceivedMessage", language)}
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+
+      <Sheet open={isCartOpen} onOpenChange={closeCart}>
       <SheetContent className="flex w-full flex-col sm:max-w-md bg-background">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 font-serif text-foreground">
@@ -135,6 +158,14 @@ export function CartDrawer() {
             {t("cartDescription", language)}
           </SheetDescription>
         </SheetHeader>
+
+        {items.length > 0 && (
+          <div className="mx-1 mb-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+            <p className="text-sm text-amber-800 font-medium">
+              {t("noPaymentRequired", language)}
+            </p>
+          </div>
+        )}
 
         {items.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-muted-foreground">
@@ -209,7 +240,7 @@ export function CartDrawer() {
                     <User className="size-4 text-muted-foreground" />
                     <Input
                       type="text"
-                      placeholder="Tu nombre"
+                      placeholder={t("placeholderName", language)}
                       value={nombre}
                       onChange={(e) => { setNombre(e.target.value); setErrors(prev => ({ ...prev, nombre: undefined })); }}
                       className={`h-9 ${errors.nombre ? 'border-red-500' : ''}`}
@@ -224,7 +255,7 @@ export function CartDrawer() {
                     <Phone className="size-4 text-muted-foreground" />
                     <Input
                       type="tel"
-                      placeholder="Tu teléfono"
+                      placeholder={t("placeholderPhone", language)}
                       value={telefono}
                       onChange={(e) => { const val = e.target.value.replaceAll(/\D/g, '').slice(0, 15); setTelefono(val); setErrors(prev => ({ ...prev, telefono: undefined })); }}
                       className={`h-9 ${errors.telefono ? 'border-red-500' : ''}`}
@@ -239,7 +270,7 @@ export function CartDrawer() {
                     <Mail className="size-4 text-muted-foreground" />
                     <Input
                       type="email"
-                      placeholder="Tu email (opcional)"
+                      placeholder={t("placeholderEmail", language)}
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       className="h-9"
@@ -247,7 +278,7 @@ export function CartDrawer() {
                       autoComplete="email"
                     />
                   </div>
-                  <p className="text-xs mt-1 ml-6 bg-gradient-to-r from-orange-500 via-pink-500 to-purple-500 bg-clip-text text-transparent font-medium">¡Y recibe promociones y descuentos!</p>
+                  <p className="text-xs mt-1 ml-6 bg-gradient-to-r from-orange-500 via-pink-500 to-purple-500 bg-clip-text text-transparent font-medium">{t("promoMessage", language)}</p>
                 </div>
               </div>
 
@@ -285,5 +316,6 @@ export function CartDrawer() {
         )}
       </SheetContent>
     </Sheet>
+    </>
   )
 }

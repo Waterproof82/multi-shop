@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { jwtVerify } from 'jose';
 import { createClient } from '@supabase/supabase-js';
+import { sendEmail } from '@/lib/brevo-email';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 const ADMIN_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET!;
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
 
 export async function GET() {
   try {
@@ -106,11 +107,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    if (RESEND_API_KEY && numeroEnvios > 0) {
+    if (BREVO_API_KEY && numeroEnvios > 0) {
       const emails = clientesConPromo?.map(c => c.email).filter(Boolean) as string[];
       
       console.log('Enviando a emails:', emails);
-      console.log('RESEND_API_KEY configurado:', !!RESEND_API_KEY);
+      console.log('BREVO_API_KEY configurado:', !!BREVO_API_KEY);
       
       if (emails && emails.length > 0) {
         try {
@@ -144,22 +145,14 @@ export async function POST(request: Request) {
 </html>
           `.trim();
 
-          const emailResponse = await fetch('https://api.resend.com/emails', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${RESEND_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              from: 'onboarding@resend.dev',
-              to: emails,
-              subject: 'Nueva promocion disponible',
-              html: emailHtml,
-            }),
+          await sendEmail({
+            to: emails,
+            subject: 'Nueva promocion disponible',
+            htmlContent: emailHtml,
+            senderName: 'Promociones',
           });
           
-          const emailResult = await emailResponse.json();
-          console.log('Resend API response:', emailResponse.status, emailResult);
+          console.log('Promo emails sent successfully via Brevo');
         } catch (emailError) {
           console.error('Error sending promo emails:', emailError);
         }

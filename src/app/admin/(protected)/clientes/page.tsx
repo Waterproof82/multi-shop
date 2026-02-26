@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Search, Mail, Phone, User, Users, Pencil, X } from 'lucide-react';
+import { Search, Mail, Phone, User, Users, Pencil, X, Plus, MapPin, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface Cliente {
@@ -9,6 +9,7 @@ interface Cliente {
   nombre: string | null;
   email: string | null;
   telefono: string | null;
+  direccion: string | null;
   aceptar_promociones: boolean | null;
   created_at: string;
 }
@@ -18,7 +19,8 @@ export default function ClientesPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingCliente, setEditingCliente] = useState<Cliente | null>(null);
-  const [editForm, setEditForm] = useState({ nombre: '', email: '', telefono: '' });
+  const [creatingCliente, setCreatingCliente] = useState(false);
+  const [editForm, setEditForm] = useState({ nombre: '', email: '', telefono: '', direccion: '' });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -73,12 +75,23 @@ export default function ClientesPage() {
       nombre: cliente.nombre || '',
       email: cliente.email || '',
       telefono: cliente.telefono || '',
+      direccion: cliente.direccion || '',
     });
   };
 
   const closeEditModal = () => {
     setEditingCliente(null);
-    setEditForm({ nombre: '', email: '', telefono: '' });
+    setEditForm({ nombre: '', email: '', telefono: '', direccion: '' });
+  };
+
+  const openCreateModal = () => {
+    setCreatingCliente(true);
+    setEditForm({ nombre: '', email: '', telefono: '', direccion: '' });
+  };
+
+  const closeCreateModal = () => {
+    setCreatingCliente(false);
+    setEditForm({ nombre: '', email: '', telefono: '', direccion: '' });
   };
 
   const handleSaveEdit = async () => {
@@ -94,6 +107,7 @@ export default function ClientesPage() {
           nombre: editForm.nombre || null,
           email: editForm.email || null,
           telefono: editForm.telefono || null,
+          direccion: editForm.direccion || null,
         }),
       });
       
@@ -104,6 +118,7 @@ export default function ClientesPage() {
             nombre: editForm.nombre || null,
             email: editForm.email || null,
             telefono: editForm.telefono || null,
+            direccion: editForm.direccion || null,
           } : c
         ));
         closeEditModal();
@@ -115,19 +130,79 @@ export default function ClientesPage() {
     }
   };
 
+  const handleCreateCliente = async () => {
+    if (!editForm.nombre && !editForm.email && !editForm.telefono) return;
+    
+    setSaving(true);
+    try {
+      const res = await fetch('/api/admin/clientes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre: editForm.nombre || null,
+          email: editForm.email || null,
+          telefono: editForm.telefono || null,
+          direccion: editForm.direccion || null,
+        }),
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setClientes(prev => [data.cliente, ...prev]);
+        closeCreateModal();
+      }
+    } catch (error) {
+      console.error('Error creating cliente:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteCliente = async (id: string) => {
+    if (!confirm('¿Estás seguro de que quieres eliminar este cliente?')) return;
+    
+    setSaving(true);
+    try {
+      const res = await fetch('/api/admin/clientes', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      
+      if (res.ok) {
+        setClientes(prev => prev.filter(c => c.id !== id));
+      }
+    } catch (error) {
+      console.error('Error deleting cliente:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       {/* Header con contador */}
       <div className="bg-gradient-to-r from-primary to-primary/80 rounded-xl p-6 shadow-lg">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white">Clientes</h1>
-            <p className="text-white/80 text-sm mt-1">Gestiona tus clientes</p>
+          <div className="flex items-center gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-white">Clientes</h1>
+              <p className="text-white/80 text-sm mt-1">Gestiona tus clientes</p>
+            </div>
           </div>
-          <div className="bg-white/20 rounded-lg px-6 py-4 text-center">
-            <Users className="w-8 h-8 text-white mx-auto mb-1" />
-            <span className="text-3xl font-bold text-white">{clientes.length}</span>
-            <p className="text-white/80 text-xs">Total clientes</p>
+          <div className="flex items-center gap-4">
+            <Button 
+              onClick={openCreateModal}
+              className="bg-white text-primary hover:bg-white/90 font-semibold"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Nuevo Cliente
+            </Button>
+            <div className="bg-white/20 rounded-lg px-6 py-4 text-center">
+              <Users className="w-8 h-8 text-white mx-auto mb-1" />
+              <span className="text-3xl font-bold text-white">{clientes.length}</span>
+              <p className="text-white/80 text-xs">Total clientes</p>
+            </div>
           </div>
         </div>
       </div>
@@ -162,6 +237,7 @@ export default function ClientesPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Nombre</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Email</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Teléfono</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Dirección</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Fecha</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Promociones</th>
                   <th className="px-4 py-3"></th>
@@ -194,6 +270,14 @@ export default function ClientesPage() {
                         </span>
                       </div>
                     </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="size-4 text-muted-foreground" />
+                        <span className="text-foreground">
+                          {cliente.direccion || '-'}
+                        </span>
+                      </div>
+                    </td>
                     <td className="px-4 py-3 text-muted-foreground text-sm">
                       {cliente.created_at ? new Date(cliente.created_at).toLocaleDateString('es-ES') : '-'}
                     </td>
@@ -220,6 +304,15 @@ export default function ClientesPage() {
                         title="Editar"
                       >
                         <Pencil className="size-4 text-muted-foreground" />
+                      </button>
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => handleDeleteCliente(cliente.id)}
+                        className="p-2 hover:bg-muted rounded-lg transition-colors text-red-500 hover:text-red-600"
+                        title="Eliminar"
+                      >
+                        <Trash2 className="size-4" />
                       </button>
                     </td>
                   </tr>
@@ -280,6 +373,18 @@ export default function ClientesPage() {
                   className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
+                  Dirección <span className="text-muted-foreground font-normal">(opcional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={editForm.direccion}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, direccion: e.target.value }))}
+                  placeholder="Dirección del cliente"
+                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                />
+              </div>
             </div>
             <div className="flex justify-end gap-2 p-4 border-t">
               <Button variant="outline" onClick={closeEditModal}>
@@ -287,6 +392,81 @@ export default function ClientesPage() {
               </Button>
               <Button onClick={handleSaveEdit} disabled={saving}>
                 {saving ? 'Guardando...' : 'Guardar'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de creación */}
+      {creatingCliente && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-xl border shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-lg font-semibold">Nuevo Cliente</h2>
+              <button
+                onClick={closeCreateModal}
+                className="p-1 hover:bg-muted rounded"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
+                  Nombre
+                </label>
+                <input
+                  type="text"
+                  value={editForm.nombre}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, nombre: e.target.value }))}
+                  placeholder="Nombre del cliente"
+                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="email@ejemplo.com"
+                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
+                  Teléfono
+                </label>
+                <input
+                  type="tel"
+                  value={editForm.telefono}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, telefono: e.target.value }))}
+                  placeholder="Teléfono"
+                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
+                  Dirección <span className="text-muted-foreground font-normal">(opcional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={editForm.direccion}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, direccion: e.target.value }))}
+                  placeholder="Dirección del cliente"
+                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 p-4 border-t">
+              <Button variant="outline" onClick={closeCreateModal}>
+                Cancelar
+              </Button>
+              <Button onClick={handleCreateCliente} disabled={saving || (!editForm.nombre && !editForm.email && !editForm.telefono)}>
+                {saving ? 'Creando...' : 'Crear Cliente'}
               </Button>
             </div>
           </div>

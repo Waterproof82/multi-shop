@@ -19,6 +19,8 @@ async function getDomainFromHeaders(): Promise<string> {
 export default async function Home() {
   const fullDomain = await getDomainFromHeaders();
   
+  console.log('DEBUG: fullDomain:', fullDomain);
+  
   let empresa = fullDomain ? await getEmpresaByDomain(fullDomain) : null;
   
   const subdomainConfig = empresa?.subdomainPedidos ?? 'pedidos';
@@ -29,15 +31,29 @@ export default async function Home() {
     empresa = await getEmpresaByDomain(mainDomain);
   }
   
-  const empresaId = empresa?.id || process.env.NEXT_PUBLIC_DEFAULT_TENANT_ID || "demo-empresa-id";
+  const empresaId = empresa?.id;
+  
+  console.log('DEBUG: empresa:', empresa, 'empresaId:', empresaId);
+  
+  if (!empresa && empresaId === undefined) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#FDFBF7]">
+        <div className="text-center p-8">
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">Dominio no configurado</h1>
+          <p className="text-gray-600">Esta web no está asociada a ninguna empresa.</p>
+        </div>
+      </div>
+    );
+  }
+  
   const mostrarCarritoEmpresa = empresa?.mostrarCarrito ?? false;
   
   const showCart = isPedidos || mostrarCarritoEmpresa;
-  
+
   let menuData: MenuCategoryVM[] = [];
 
   try {
-    menuData = await getMenuUseCase.execute(empresaId);
+    menuData = await getMenuUseCase.execute(empresaId!);
   } catch (error) {
     console.error("Error fetching menu from Supabase:", error);
   }
