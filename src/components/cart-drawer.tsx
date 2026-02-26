@@ -110,10 +110,11 @@ export function CartDrawer() {
       const data = await res.json();
       
       if (res.ok) {
-        if (data.whatsappLink) {
-          window.location.href = data.whatsappLink;
-        }
         setSent(true);
+        if (data.whatsappLink) {
+          // Store WhatsApp link for the confirmation dialog
+          (window as any).__whatsappLink = data.whatsappLink;
+        }
         setNombre('');
         setTelefono('');
         setEmail('');
@@ -147,6 +148,14 @@ export function CartDrawer() {
               {t("orderReceivedMessage", language)}
             </DialogDescription>
           </DialogHeader>
+          <a
+            href={(typeof window !== 'undefined' ? (window as any).__whatsappLink : null) || '#'}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full text-center bg-[#25D366] text-white py-3 px-4 rounded-full font-semibold hover:bg-[#20BD5A] transition-colors"
+          >
+            CONSULTAR TIEMPO DE RECOGIDA
+          </a>
         </DialogContent>
       </Dialog>
 
