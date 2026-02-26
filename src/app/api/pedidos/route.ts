@@ -305,7 +305,7 @@ export async function POST(request: Request) {
 
     const { data: empresa } = await supabase
       .from('empresas')
-      .select('id, nombre, email, email_notification')
+      .select('id, nombre, email_notification')
       .eq('dominio', mainDomain)
       .single();
 
