@@ -25,7 +25,7 @@ async function getDomainFromHeaders(): Promise<string> {
   return host.replace(/^www\./, '').toLowerCase().split(':')[0];
 }
 
-function generateOrderEmail(items: CartItem[], total: number, empresaNombre: string, numeroOrden: number, nombre: string, telefono: string): string {
+function generateOrderEmail(items: CartItem[], total: number, empresaNombre: string, numeroOrden: number, nombre: string, telefono: string, email: string | null): string {
   const itemsHtml = items.map(ci => {
     const complementPrice = ci.selectedComplements?.reduce((sum, c) => sum + c.price, 0) || 0;
     const itemTotal = (ci.item.price + complementPrice) * ci.quantity;
@@ -71,6 +71,7 @@ function generateOrderEmail(items: CartItem[], total: number, empresaNombre: str
                   <td style="padding: 16px;">
                     <p style="margin: 0; color: #333; font-size: 14px;"><strong>Cliente:</strong> ${nombre}</p>
                     <p style="margin: 8px 0 0 0; color: #333; font-size: 14px;"><strong>Teléfono:</strong> ${telefono}</p>
+                    ${email ? `<p style="margin: 8px 0 0 0; color: #333; font-size: 14px;"><strong>Email:</strong> ${email}</p>` : ''}
                   </td>
                 </tr>
               </table>
@@ -149,12 +150,13 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { items, total, numeroOrden, nombre, telefono } = body as { 
+    const { items, total, numeroOrden, nombre, telefono, email } = body as { 
       items: CartItem[]; 
       total: number;
       numeroOrden?: number;
       nombre?: string;
       telefono?: string;
+      email?: string;
     };
 
     const html = generateOrderEmail(
@@ -163,7 +165,8 @@ export async function POST(request: Request) {
       empresa.nombre, 
       numeroOrden || 1,
       nombre || 'Cliente',
-      telefono || 'No proporcionado'
+      telefono || 'No proporcionado',
+      email || null
     );
 
     await sendEmail({

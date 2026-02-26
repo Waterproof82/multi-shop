@@ -25,7 +25,7 @@ async function getDomainFromHeaders(): Promise<string> {
   return host.replace(/^www\./, '').toLowerCase().split(':')[0];
 }
 
-function generateOrderEmail(items: CartItem[], total: number, empresaNombre: string, numeroPedido: number, nombre: string, telefono: string): string {
+function generateOrderEmail(items: CartItem[], total: number, empresaNombre: string, numeroPedido: number, nombre: string, telefono: string, email: string | null): string {
   const itemsHtml = items.map(ci => {
     const complementPrice = ci.selectedComplements?.reduce((sum, c) => sum + c.price, 0) || 0;
     const itemTotal = (ci.item.price + complementPrice) * ci.quantity;
@@ -71,6 +71,7 @@ function generateOrderEmail(items: CartItem[], total: number, empresaNombre: str
                   <td style="padding: 16px;">
                     <p style="margin: 0; color: #333; font-size: 14px;"><strong>Cliente:</strong> ${nombre}</p>
                     <p style="margin: 8px 0 0 0; color: #333; font-size: 14px;"><strong>Teléfono:</strong> ${telefono}</p>
+                    ${email ? `<p style="margin: 8px 0 0 0; color: #333; font-size: 14px;"><strong>Email:</strong> ${email}</p>` : ''}
                   </td>
                 </tr>
               </table>
@@ -261,6 +262,7 @@ type OrderEmailInfo = {
   clienteId: string | null;
   sanitizedNombre: string;
   sanitizedTelefono: string;
+  sanitizedEmail: string | null;
   items: CartItem[];
   total: number;
   nuevoNumeroPedido: number;
@@ -269,15 +271,17 @@ type OrderEmailInfo = {
 async function sendOrderEmail(supabase: any, info: OrderEmailInfo) {
   let safeNombre = info.sanitizedNombre;
   let safeTelefono = info.sanitizedTelefono;
+  let safeEmail = info.sanitizedEmail;
   if (info.clienteId) {
     const { data: cliente } = await supabase
       .from('clientes')
-      .select('nombre, telefono')
+      .select('nombre, telefono, email')
       .eq('id', info.clienteId)
       .single();
     if (cliente) {
       safeNombre = cliente.nombre || safeNombre;
       safeTelefono = cliente.telefono || safeTelefono;
+      safeEmail = cliente.email || safeEmail;
     }
   }
   const html = generateOrderEmail(
@@ -286,7 +290,8 @@ async function sendOrderEmail(supabase: any, info: OrderEmailInfo) {
     info.empresa.nombre,
     info.nuevoNumeroPedido,
     safeNombre,
-    safeTelefono
+    safeTelefono,
+    safeEmail
   );
   await sendEmail({
     to: info.empresa.email_notification,
@@ -344,6 +349,7 @@ export async function POST(request: Request) {
         clienteId,
         sanitizedNombre,
         sanitizedTelefono,
+        sanitizedEmail,
         items,
         total,
         nuevoNumeroPedido,
