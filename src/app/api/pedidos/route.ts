@@ -302,6 +302,8 @@ export async function POST(request: Request) {
     const supabase = createClient(supabaseUrl, supabaseKey);
     const domain = await getDomainFromHeaders();
     const mainDomain = parseMainDomain(domain);
+    
+    console.log('DEBUG: domain:', domain, 'mainDomain:', mainDomain);
 
     const { data: empresa } = await supabase
       .from('empresas')
