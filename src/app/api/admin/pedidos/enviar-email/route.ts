@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { headers } from 'next/headers';
+import { sendEmail } from '@/lib/brevo-email';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
 
 interface CartItem {
   item: {
@@ -120,7 +121,7 @@ function generateOrderEmail(items: CartItem[], total: number, empresaNombre: str
 
 export async function POST(request: Request) {
   try {
-    if (!RESEND_API_KEY) {
+    if (!BREVO_API_KEY) {
       return NextResponse.json({ error: 'Email service not configured' }, { status: 500 });
     }
 
@@ -165,24 +166,12 @@ export async function POST(request: Request) {
       telefono || 'No proporcionado'
     );
 
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: 'Pedidos <pedidos@resend.dev>',
-        to: empresa.email_notification,
-        subject: `Nuevo pedido de ${empresa.nombre} - ${total.toFixed(2)}€`,
-        html,
-      }),
+    await sendEmail({
+      to: empresa.email_notification,
+      subject: `Nuevo pedido de ${empresa.nombre} - ${total.toFixed(2)}€`,
+      htmlContent: html,
+      senderName: empresa.nombre,
     });
-
-    if (!res.ok) {
-      const error = await res.text();
-      return NextResponse.json({ error: 'Error enviando email', details: error }, { status: 500 });
-    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
