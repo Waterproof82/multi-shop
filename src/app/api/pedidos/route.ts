@@ -350,7 +350,7 @@ export async function POST(request: Request) {
     if (empresa.telefono_whatsapp) {
       const telefonoLimpio = empresa.telefono_whatsapp.replaceAll(/\D/g, '');
       const mensaje = `Hola! Acabo de hacer un pedido (${nuevoNumeroPedido}) en la web. Cuanto tardara en estar listo para recoger?`;
-      whatsappLink = `https://api.whatsapp.com/send/?phone=${telefonoLimpio}&text=${encodeURIComponent(mensaje)}&type=phone_number&app_absent=0`;
+      whatsappLink = `https://wa.me/${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`;
     }
 
     return NextResponse.json({ success: true, numeroPedido: nuevoNumeroPedido, whatsappLink });
