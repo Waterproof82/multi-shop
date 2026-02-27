@@ -48,6 +48,99 @@ export function CartDrawer() {
   const [email, setEmail] = useState('')
   const [errors, setErrors] = useState<{ nombre?: string; telefono?: string }>({})
 
+  const abrirWhatsApp = (numero: string, mensaje: string) => {
+    const textoEncoded = encodeURIComponent(mensaje);
+    const urlConMensaje = `https://wa.me/${numero}?text=${textoEncoded}`;
+    const esMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+
+    if (esMobile) {
+      window.location.href = `whatsapp://send?phone=${numero}&text=${textoEncoded}`;
+      setTimeout(() => {
+        window.location.href = urlConMensaje;
+      }, 2000);
+    } else {
+      const urlSinMensaje = `https://wa.me/${numero}`;
+      const waWindow = window.open(urlSinMensaje, 'whatsapp_window');
+      let aviso = document.getElementById('whatsapp-aviso');
+      if (!aviso) {
+        aviso = document.createElement('div');
+        aviso.id = 'whatsapp-aviso';
+        aviso.style.cssText = `
+          position: fixed;
+          bottom: 24px;
+          right: 24px;
+          background: #fff;
+          border: 1px solid #ddd;
+          border-radius: 12px;
+          padding: 16px 20px;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+          font-family: sans-serif;
+          font-size: 14px;
+          z-index: 9999;
+          max-width: 300px;
+        `;
+        document.body.appendChild(aviso);
+      }
+
+      const ocultarAviso = () => {
+        const el = document.getElementById('whatsapp-aviso');
+        if (el) el.style.display = 'none';
+      };
+
+      aviso.innerHTML = `
+        <p style="margin: 0 0 12px; color: #333;">
+          ⏳ Cuando WhatsApp Web haya cargado, pulsa el botón para enviar el mensaje:
+        </p>
+        <button id="whatsapp-reintento-btn" style="
+          background: #25D366;
+          color: white;
+          border: none;
+          border-radius: 8px;
+          padding: 10px 16px;
+          cursor: pointer;
+          font-size: 14px;
+          width: 100%;
+        ">
+          ✅ Abrir chat con mensaje
+        </button>
+        <button id="whatsapp-cerrar-btn" style="
+          background: none;
+          border: none;
+          color: #999;
+          cursor: pointer;
+          font-size: 12px;
+          margin-top: 8px;
+          width: 100%;
+        ">
+          Cancelar
+        </button>
+      `;
+      aviso.style.display = 'block';
+
+      document.getElementById('whatsapp-reintento-btn')?.addEventListener('click', () => {
+        try {
+          if (waWindow) {
+            waWindow.location.href = urlConMensaje;
+          }
+        } catch {
+          window.open(urlConMensaje, '_blank');
+        }
+        ocultarAviso();
+      });
+
+      document.getElementById('whatsapp-cerrar-btn')?.addEventListener('click', ocultarAviso);
+    }
+  };
+
+  const handleWhatsAppClick = () => {
+    const link = (window as any).__whatsappLink;
+    if (!link) return;
+    const match = link.match(/wa\.me\/(\d+)\?text=(.+)/);
+    if (match) {
+      abrirWhatsApp(match[1], decodeURIComponent(match[2]));
+    }
+  };
+
   const validateName = (name: string): string | undefined => {
     const trimmed = name.trim();
     if (!trimmed) return t("validationNameRequired", language);
@@ -148,14 +241,12 @@ export function CartDrawer() {
               {t("orderReceivedMessage", language)}
             </DialogDescription>
           </DialogHeader>
-          <a
-            href={(typeof window !== 'undefined' ? (window as any).__whatsappLink : null) || '#'}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            onClick={handleWhatsAppClick}
             className="block w-full text-center bg-[#25D366] text-white py-3 px-4 rounded-full font-semibold hover:bg-[#20BD5A] transition-colors"
           >
             CONSULTAR TIEMPO DE RECOGIDA
-          </a>
+          </button>
         </DialogContent>
       </Dialog>
 
