@@ -128,8 +128,9 @@ export async function POST(request: Request) {
       console.log('BREVO_API_KEY configurado:', !!BREVO_API_KEY);
       
       if (emails && emails.length > 0) {
-        try {
-          const emailHtml = `
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || '';
+        
+        const emailHtml = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -146,31 +147,33 @@ export async function POST(request: Request) {
         ${texto_promocion}
       </p>
       <p style="margin: 0; color: #888888; font-size: 14px;">
-        ¡No olvides usar el código o consultar en tu próximo pedido!
+        Muestra este mensaje para canjear la promoción.
       </p>
     </div>
     <div style="background-color: #f9f9f9; padding: 16px; text-align: center;">
       <p style="margin: 0; color: #888888; font-size: 12px;">
-        ¿No quieres recibir más promociones? Desactiva las notificaciones en tu perfil.
+        <a href="${baseUrl}/api/admin/promociones/unsubscribe?email=__EMAIL__&empresa=${perfil.empresa_id}" style="color: #888888;">No quiero recibir más promociones</a>
       </p>
     </div>
   </div>
 </body>
 </html>
-          `.trim();
+        `.trim();
 
-          await sendEmail({
-            to: emails,
-            subject: 'Nueva promocion disponible',
-            htmlContent: emailHtml,
-            senderName: empresa?.nombre || 'Promociones',
-            senderEmail: empresa?.email_notification || 'a369cb001@smtp-brevo.com',
-          });
+          // Enviar emails individualmente para incluir el link de baja personalizado
+          for (const email of emails) {
+            const personalizedHtml = emailHtml.replace('__EMAIL__', encodeURIComponent(email));
+            
+            await sendEmail({
+              to: [email],
+              subject: 'Nueva promocion disponible',
+              htmlContent: personalizedHtml,
+              senderName: empresa?.nombre || 'Promociones',
+              senderEmail: empresa?.email_notification || 'a369cb001@smtp-brevo.com',
+            });
+          }
           
           console.log('Promo emails sent successfully via Brevo');
-        } catch (emailError) {
-          console.error('Error sending promo emails:', emailError);
-        }
       }
     }
 
