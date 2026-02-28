@@ -183,10 +183,10 @@ export default function PromocionesPage() {
         <div className="bg-white dark:bg-gray-800 rounded-xl border shadow-sm p-6">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
             <FileText className="w-5 h-5" />
-            Historial de Promociones
+            Última Promoción
           </h2>
           <div className="space-y-3">
-            {promociones.map((promo) => (
+            {promociones.slice(0, 1).map((promo) => (
               <div key={promo.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
                 <div className="flex-1">
                   <p className="font-medium text-gray-900 dark:text-white">{promo.texto_promocion}</p>

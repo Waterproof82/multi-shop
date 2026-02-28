@@ -98,6 +98,12 @@ export async function POST(request: Request) {
     const numeroEnvios = clientesConPromo?.length || 0;
     console.log('Clientes con promociones:', numeroEnvios, clientesConPromo);
 
+    // Eliminar promociones anteriores de esta empresa
+    await supabase
+      .from('promociones')
+      .delete()
+      .eq('empresa_id', perfil.empresa_id);
+
     const { data: promo, error } = await supabase
       .from('promociones')
       .insert({
