@@ -18,6 +18,28 @@ interface CartItem {
   selectedComplements?: { name: string; price: number }[];
 }
 
+function generateWhatsAppMessage(items: CartItem[], total: number, nombre: string, numeroPedido: number): string {
+  let mensaje = `*Pedido #${numeroPedido}*\n`;
+  mensaje += `*Cliente:* ${nombre}\n\n`;
+  mensaje += `*PEDIDO:*\n`;
+  
+  items.forEach((cartItem, index) => {
+    const itemName = cartItem.item.name;
+    const quantity = cartItem.quantity;
+    
+    mensaje += `${index + 1}. ${itemName}`;
+    if (cartItem.selectedComplements && cartItem.selectedComplements.length > 0) {
+      mensaje += ` (+${cartItem.selectedComplements.map(c => c.name).join(', ')})`;
+    }
+    mensaje += ` x${quantity}\n`;
+  });
+  
+  mensaje += `\n*TOTAL: ${total.toFixed(2)}€*\n`;
+  mensaje += `¿Cuándo puedo pasar a recoger el pedido?`;
+  
+  return mensaje;
+}
+
 async function getDomainFromHeaders(): Promise<string> {
   const headersList = await headers();
   const host = headersList.get('host');
@@ -349,7 +371,7 @@ export async function POST(request: Request) {
     let whatsappLink: string | undefined;
     if (empresa.telefono_whatsapp) {
       const telefonoLimpio = empresa.telefono_whatsapp.replaceAll(/\D/g, '');
-      const mensaje = `Hola! Acabo de hacer un pedido (${nuevoNumeroPedido}) en la web. Cuanto tardara en estar listo para recoger?`;
+      const mensaje = generateWhatsAppMessage(items, total, sanitizedNombre, nuevoNumeroPedido);
       whatsappLink = `https://wa.me/${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`;
     }
 
