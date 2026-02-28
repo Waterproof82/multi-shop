@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { BarChart3, ShoppingCart, Euro, TrendingUp } from 'lucide-react';
+import { BarChart3, ShoppingCart, Euro, TrendingUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
 import { motion } from 'framer-motion';
 import { useTheme } from 'next-themes';
@@ -14,6 +14,17 @@ interface Stats {
   totalMes: number;
   totalAno: number;
   topPlatos: { nombre: string; cantidad: number; total: number }[];
+  mesSeleccionado: string;
+}
+
+const meses = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+];
+
+function getInitialMonth(): { mes: number; año: number } {
+  const now = new Date();
+  return { mes: now.getMonth(), año: now.getFullYear() };
 }
 
 function EstadisticasContent({ mountKey }: { mountKey: number }) {
@@ -21,6 +32,7 @@ function EstadisticasContent({ mountKey }: { mountKey: number }) {
   const [loading, setLoading] = useState(true);
   const { theme } = useTheme();
   const [chartKey, setChartKey] = useState(0);
+  const [selectedMonth, setSelectedMonth] = useState(getInitialMonth());
 
   useEffect(() => {
     if (stats) {
@@ -40,8 +52,9 @@ function EstadisticasContent({ mountKey }: { mountKey: number }) {
 
   useEffect(() => {
     async function fetchStats() {
+      setLoading(true);
       try {
-        const res = await fetch('/api/admin/pedidos', { method: 'PUT' });
+        const res = await fetch(`/api/admin/pedidos?mes=${selectedMonth.mes}&año=${selectedMonth.año}`, { method: 'PUT' });
         if (res.ok) {
           const data = await res.json();
           setStats(data);
@@ -53,7 +66,28 @@ function EstadisticasContent({ mountKey }: { mountKey: number }) {
       }
     }
     fetchStats();
-  }, []);
+  }, [selectedMonth]);
+
+  const cambiarMes = (delta: number) => {
+    setSelectedMonth(prev => {
+      let nuevoMes = prev.mes + delta;
+      let nuevoAño = prev.año;
+      
+      if (nuevoMes < 0) {
+        nuevoMes = 11;
+        nuevoAño--;
+      } else if (nuevoMes > 11) {
+        nuevoMes = 0;
+        nuevoAño++;
+      }
+      
+      return { mes: nuevoMes, año: nuevoAño };
+    });
+  };
+
+  const mesActual = selectedMonth.mes;
+  const añoActual = selectedMonth.año;
+  const esMesActual = mesActual === new Date().getMonth() && añoActual === new Date().getFullYear();
 
   if (loading) {
     return (
@@ -65,12 +99,36 @@ function EstadisticasContent({ mountKey }: { mountKey: number }) {
 
   return (
     <div className="pt-20 lg:pt-0 px-6 lg:px-8">
-      <h1 className="text-2xl font-serif font-bold text-gray-900 dark:text-white mb-2">
-        Estadísticas
-      </h1>
-      <p className="text-gray-600 dark:text-gray-400 mb-6">
-        Resumen de pedidos y facturación
-      </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-serif font-bold text-gray-900 dark:text-white mb-1">
+            Estadísticas
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Resumen de pedidos y facturación
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => cambiarMes(-1)}
+            className="p-2 rounded-lg bg-white dark:bg-gray-800 border dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+          </button>
+          <div className="px-4 py-2 bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 min-w-[160px] text-center">
+            <span className="font-medium text-gray-900 dark:text-white">
+              {meses[mesActual]} {añoActual}
+            </span>
+          </div>
+          <button
+            onClick={() => cambiarMes(1)}
+            disabled={esMesActual}
+            className="p-2 rounded-lg bg-white dark:bg-gray-800 border dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ChevronRight className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+          </button>
+        </div>
+      </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
         <motion.div
