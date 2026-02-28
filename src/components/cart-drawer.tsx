@@ -43,6 +43,7 @@ export function CartDrawer() {
   const { language } = useLanguage()
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const [nombre, setNombre] = useState('')
   const [telefono, setTelefono] = useState('')
   const [email, setEmail] = useState('')
@@ -65,6 +66,7 @@ export function CartDrawer() {
     if (esMobile) {
       window.location.href = appUrl;
       setTimeout(() => {
+        if (!document.hasFocus()) return;
         window.location.href = webUrl;
       }, 1500);
       return;
@@ -76,29 +78,22 @@ export function CartDrawer() {
     document.body.appendChild(anchor);
     anchor.click();
     document.body.removeChild(anchor);
-
-    let appOpened = false;
-    const checkOpened = setInterval(() => {
-      if (!document.hidden) {
-        appOpened = true;
-        clearInterval(checkOpened);
-      }
-    }, 500);
-
-    setTimeout(() => {
-      clearInterval(checkOpened);
-      if (!appOpened) {
-        window.location.href = webUrl;
-      }
-    }, 8000);
   };
 
-  const handleWhatsAppClick = () => {
+  const handleWhatsAppClick = (useWeb: boolean = false) => {
     const link = (window as any).__whatsappLink;
     if (!link) return;
     const match = link.match(/wa\.me\/(\d+)\?text=(.+)/);
     if (match) {
-      abrirWhatsApp(match[1], decodeURIComponent(match[2]));
+      const numero = match[1];
+      const mensaje = decodeURIComponent(match[2]);
+      const textoEncoded = encodeURIComponent(mensaje);
+      
+      if (useWeb) {
+        window.open(`https://wa.me/${numero}?text=${textoEncoded}`, '_blank');
+      } else {
+        abrirWhatsApp(numero, mensaje);
+      }
     }
   };
 
@@ -164,14 +159,30 @@ export function CartDrawer() {
       const data = await res.json();
       
       if (res.ok) {
-        setSent(true);
-        if (data.whatsappLink) {
-          // Store WhatsApp link for the confirmation dialog
-          (window as any).__whatsappLink = data.whatsappLink;
-        }
+        setConfirming(true);
         setNombre('');
         setTelefono('');
         setEmail('');
+        
+        if (data.whatsappLink) {
+          (window as any).__whatsappLink = data.whatsappLink;
+          const match = data.whatsappLink.match(/wa\.me\/(\d+)\?text=(.+)/);
+          if (match) {
+            const numero = match[1];
+            const mensaje = decodeURIComponent(match[2]);
+            setSent(true);
+            setTimeout(() => {
+              setConfirming(false);
+              abrirWhatsApp(numero, mensaje);
+            }, 100);
+          } else {
+            setSent(true);
+            setConfirming(false);
+          }
+        } else {
+          setSent(true);
+          setConfirming(false);
+        }
       } else {
         setErrors({ nombre: data.error || t("validationOrderError", language) });
       }
@@ -188,6 +199,7 @@ export function CartDrawer() {
       <Dialog open={sent} onOpenChange={(open) => {
         if (!open) {
           setSent(false)
+          setConfirming(false)
           clearCart()
           closeCart()
         }
@@ -196,18 +208,28 @@ export function CartDrawer() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-green-600">
               <span className="text-2xl">✓</span>
-              {t("orderReceivedTitle", language)}
+              {t("sendingOrder", language)}
             </DialogTitle>
             <DialogDescription className="text-base">
-              {t("orderReceivedMessage", language)}
+              {confirming ? "Procesando tu pedido..." : "Por favor, comprueba que se nos envió el mensaje con tu pedido por WhatsApp"}
             </DialogDescription>
           </DialogHeader>
-          <button
-            onClick={handleWhatsAppClick}
-            className="block w-full text-center bg-[#25D366] text-white py-3 px-4 rounded-full font-semibold hover:bg-[#20BD5A] transition-colors"
-          >
-            CONSULTAR TIEMPO DE RECOGIDA
-          </button>
+          {!confirming && (
+            <>
+              <button
+                onClick={() => handleWhatsAppClick(false)}
+                className="block w-full text-center bg-[#25D366] text-white py-3 px-4 rounded-full font-semibold hover:bg-[#20BD5A] transition-colors"
+              >
+                REENVIAR MENSAJE CON PEDIDO
+              </button>
+              <button
+                onClick={() => handleWhatsAppClick(true)}
+                className="block w-full text-center text-[#25D366] text-sm py-2 font-medium hover:underline"
+              >
+                ¿No se abrió la app? Abrir WhatsApp Web
+              </button>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -357,14 +379,10 @@ export function CartDrawer() {
                 <Button 
                   className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full py-3 text-lg font-semibold shadow-md transition-all duration-200"
                   size="lg"
-                  onClick={handleConfirmOrder}
-                  disabled={sending || sent}
+                  onClick={() => { closeCart(); handleConfirmOrder(); }}
+                  disabled={sending || confirming}
                 >
-                  {(() => {
-                    if (sending) return 'Enviando...';
-                    if (sent) return '¡Pedido enviado!';
-                    return t("confirmOrder", language);
-                  })()}
+                  {sending || confirming ? 'Enviando...' : 'Enviar Pedido'}
                 </Button>
                 <Button
                   variant="ghost"
