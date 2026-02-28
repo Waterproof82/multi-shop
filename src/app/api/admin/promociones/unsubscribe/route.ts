@@ -19,7 +19,6 @@ export async function GET(request: Request) {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Obtener datos del cliente
     const { data: cliente } = await supabase
       .from('clientes')
       .select('*')
@@ -31,20 +30,17 @@ export async function GET(request: Request) {
       return NextResponse.redirect(new URL('/?error=cliente_no_encontrado', request.url));
     }
 
-    // Obtener email de la empresa
     const { data: empresa } = await supabase
       .from('empresas')
       .select('email_notification, nombre, dominio')
       .eq('id', empresaId)
       .single();
 
-    // Actualizar cliente para no recibir promociones
     await supabase
       .from('clientes')
       .update({ aceptar_promociones: false })
       .eq('id', cliente.id);
 
-    // Enviar email a la empresa notificando la baja
     if (BREVO_API_KEY && empresa?.email_notification) {
       const notifyHtml = `
 <!DOCTYPE html>
@@ -74,71 +70,10 @@ export async function GET(request: Request) {
       }
     }
 
-    // Redirigir a la página de la empresa con mensaje de éxito
     const baseUrl = empresa?.dominio ? `https://${empresa.dominio}` : '/';
     return NextResponse.redirect(new URL(`/?baja=ok`, baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`));
   } catch (error) {
     console.error('Error processing unsubscribe:', error);
     return NextResponse.redirect(new URL('/?error=internal', request.url));
-  }
-}
-
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // Obtener datos del cliente
-    const { data: cliente } = await supabase
-      .from('clientes')
-      .select('*')
-      .eq('empresa_id', empresaId)
-      .eq('email', email)
-      .single();
-
-    if (!cliente) {
-      return NextResponse.json({ error: 'Cliente no encontrado' }, { status: 404 });
-    }
-
-    // Obtener email de la empresa
-    const { data: empresa } = await supabase
-      .from('empresas')
-      .select('email_notification, nombre')
-      .eq('id', empresaId)
-      .single();
-
-    // Actualizar cliente para no recibir promociones
-    await supabase
-      .from('clientes')
-      .update({ aceptar_promociones: false })
-      .eq('id', cliente.id);
-
-    // Enviar email a la empresa notificando la baja
-    if (BREVO_API_KEY && empresa?.email_notification) {
-      const notifyHtml = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-</head>
-<body>
-  <p>Un cliente ha solicitado darse de baja de las promociones.</p>
-  <p><strong>Email:</strong> ${email}</p>
-  <p><strong>Nombre:</strong> ${cliente.nombre || 'No especificado'}</p>
-  <p><strong>Teléfono:</strong> ${cliente.telefono || 'No especificado'}</p>
-</body>
-</html>
-      `.trim();
-
-      await sendEmail({
-        to: [empresa.email_notification],
-        subject: 'Solicitud de baja de promociones',
-        htmlContent: notifyHtml,
-        senderName: 'Sistema de Promociones',
-        senderEmail: 'a369cb001@smtp-brevo.com',
-      });
-    }
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error processing unsubscribe:', error);
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
   }
 }
