@@ -1,4 +1,4 @@
-import { getMenuUseCase, getEmpresaByDomain, isPedidosSubdomain, extractMainDomain, type EmpresaInfo } from "@/lib/server-services"
+import { getMenuUseCase, getEmpresaByDomain, isPedidosSubdomain, extractMainDomain } from "@/lib/server-services"
 import { MenuPage } from "@/components/client-menu-page"
 import SiteHeaderWrapper from "@/components/site-header-wrapper";
 import type { MenuCategoryVM } from "@/core/application/dtos/menu-view-model"

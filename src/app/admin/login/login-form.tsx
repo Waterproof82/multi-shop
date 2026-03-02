@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
 
 interface LoginFormProps {
-  empresaNombre: string | null;
+  readonly empresaNombre: string | null;
 }
 
 export default function LoginForm({ empresaNombre }: LoginFormProps) {
@@ -16,7 +16,7 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
     setLoading(true);
