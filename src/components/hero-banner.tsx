@@ -1,13 +1,12 @@
 "use client"
 
-
 import { motion } from "framer-motion"
-import { useLanguage, type Language } from "@/lib/language-context"
-import { t } from "@/lib/translations"
+import Image from "next/image"
+import { useLanguage } from "@/lib/language-context"
 import type { EmpresaInfo } from "@/lib/server-services"
 
 interface HeroBannerProps {
-  empresa?: EmpresaInfo | null;
+  readonly empresa?: EmpresaInfo | null;
 }
 
 export function HeroBanner({ empresa }: HeroBannerProps) {
@@ -51,10 +50,13 @@ export function HeroBanner({ empresa }: HeroBannerProps) {
         className="relative z-10"
       >
         {logoUrl && (
-          <img
+          <Image
             src={logoUrl}
             alt={empresa?.nombre ?? "Logo"}
+            width={200}
+            height={100}
             className="mx-auto mb-6 h-24 w-auto md:h-32"
+            unoptimized
           />
         )}
       </motion.div>

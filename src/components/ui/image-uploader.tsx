@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Upload, X, Loader2, Image as ImageIcon } from 'lucide-react';
+import { Upload, Loader2 } from 'lucide-react';
 import { uploadImageAction } from '@/core/application/actions/storage.actions';
 
 interface ImageUploaderProps {
-  value: string;
-  onChange: (url: string) => void;
-  label?: string;
-  empresaSlug?: string;
+  readonly value: string;
+  readonly onChange: (url: string) => void;
+  readonly label?: string;
+  readonly empresaSlug?: string;
 }
 
 const MAX_WIDTH = 480;
@@ -161,11 +161,11 @@ export function ImageUploader({
       )}
 
       {value ? (
-        <div className="relative group rounded-lg overflow-hidden border">
+        <div className="relative group rounded-lg overflow-hidden border h-48">
           <img
             src={value}
             alt="Preview"
-            className="w-full h-48 object-cover"
+            className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
             <button
@@ -186,7 +186,10 @@ export function ImageUploader({
         </div>
       ) : (
         <div
+          role="button"
+          tabIndex={0}
           onClick={handleClick}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleClick(); }}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
@@ -195,6 +198,7 @@ export function ImageUploader({
             ${dragOver ? 'border-primary bg-primary/5' : 'border-gray-300 hover:border-gray-400'}
             ${uploading ? 'pointer-events-none opacity-50' : ''}
           `}
+          aria-label="Subir imagen"
         >
           {uploading ? (
             <>
