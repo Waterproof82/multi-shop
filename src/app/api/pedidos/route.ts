@@ -315,27 +315,38 @@ export async function POST(request: Request) {
       .eq('dominio', mainDomain)
       .single();
 
+    console.log('DEBUG: empresa search by mainDomain:', mainDomain, 'result:', empresa, 'error:', empresaError);
+
     // Si no encuentra, buscar por subdomain pedidos
     if (empresaError || !empresa) {
       const subdomainPedidos = 'pedidos';
       const isPedidos = domain.startsWith(`${subdomainPedidos}.`) || domain.includes('-pedidos');
+      console.log('DEBUG: isPedidos:', isPedidos, 'domain:', domain);
+      
       if (isPedidos) {
         // Extraer el dominio principal del subdominio
         const mainDomainFromSubdomain = domain.split('.').slice(1).join('.');
+        console.log('DEBUG: mainDomainFromSubdomain:', mainDomainFromSubdomain);
+        
         const { data: empresaSubdomain } = await supabase
           .from('empresas')
           .select('id, nombre, email_notification, telefono_whatsapp')
           .eq('dominio', mainDomainFromSubdomain)
           .single();
+        console.log('DEBUG: empresaSubdomain:', empresaSubdomain);
+        
         if (empresaSubdomain) empresa = empresaSubdomain;
       }
     }
 
     if (!empresa) {
+      console.log('DEBUG: empresa not found for domain:', domain);
       return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 });
     }
 
     const body = await request.json();
+    console.log('DEBUG: body received:', { items: body.items?.length, total: body.total, nombre: body.nombre });
+    
     const { items, total, nombre, telefono, email } = body as {
       items: CartItem[];
       total: number;
