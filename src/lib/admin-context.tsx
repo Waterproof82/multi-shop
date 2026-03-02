@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, ReactNode } from 'react';
+import { createContext, useContext, useMemo, ReactNode } from 'react';
 
 interface AdminContextType {
   empresaId: string;
@@ -17,20 +17,22 @@ export function useAdmin() {
 }
 
 interface AdminProviderProps {
-  children: ReactNode;
-  empresaId: string;
-  empresaNombre: string;
+  readonly children: ReactNode;
+  readonly empresaId: string;
+  readonly empresaNombre: string;
 }
 
-export function AdminProvider({ children, empresaId, empresaNombre }: AdminProviderProps) {
+export function AdminProvider({ children, empresaId, empresaNombre }: Readonly<AdminProviderProps>) {
   // Generar slug del nombre de empresa
   const empresaSlug = empresaNombre
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '') || empresaId.slice(0, 8);
+    .replaceAll(/[^a-z0-9]+/g, '-')
+    .replaceAll(/^-|-$/g, '') || empresaId.slice(0, 8);
+
+  const value = useMemo(() => ({ empresaId, empresaSlug }), [empresaId, empresaSlug]);
 
   return (
-    <AdminContext.Provider value={{ empresaId, empresaSlug }}>
+    <AdminContext.Provider value={value}>
       {children}
     </AdminContext.Provider>
   );
