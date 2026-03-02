@@ -67,6 +67,15 @@ const emptyForm: ProductoFormData = {
   activo: true,
 };
 
+const SortIndicator = ({ field, currentField, direction }: { field: keyof Producto | 'categoria'; currentField: keyof Producto | 'categoria'; direction: 'asc' | 'desc' }) => {
+  if (field !== currentField) {
+    return <ArrowUpDown className="h-3 w-3 opacity-30" />;
+  }
+  return direction === 'asc' 
+    ? <ArrowUp className="h-3 w-3" /> 
+    : <ArrowDown className="h-3 w-3" />;
+};
+
 export default function ProductosPage() {
   const { empresaSlug } = useAdmin();
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -109,7 +118,7 @@ export default function ProductosPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: { preventDefault: () => void }) => {
     e.preventDefault();
     setSaving(true);
     setError('');
@@ -123,7 +132,7 @@ export default function ProductosPage() {
 
       const payload = {
         ...formData,
-        precio: parseFloat(formData.precio) || 0,
+        precio: Number.parseFloat(formData.precio) || 0,
         categoria_id: formData.categoria_id || null,
       };
 
@@ -147,20 +156,7 @@ export default function ProductosPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('¿Estás seguro de eliminar este producto?')) return;
 
-    try {
-      const res = await fetch(`/api/admin/productos?id=${id}`, {
-        method: 'DELETE',
-      });
-
-      if (!res.ok) throw new Error('Error al eliminar');
-      await fetchData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
-    }
-  };
 
   const openEditModal = (producto: Producto) => {
     setFormData({
@@ -211,6 +207,46 @@ export default function ProductosPage() {
     }
   };
 
+  const handleDeleteProduct = async (id: string) => {
+    if (!confirm('¿Estás seguro de eliminar este producto?')) return;
+    try {
+      const res = await fetch(`/api/admin/productos?id=${id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Error al eliminar');
+      await fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error desconocido');
+    }
+  };
+
+  const getSortValue = (product: Producto, field: keyof Producto | 'categoria'): string | number => {
+    if (field === 'categoria') {
+      return getCategoriaNombre(product.categoria_id);
+    }
+    if (field === 'precio') {
+      return product.precio;
+    }
+    if (field === 'es_especial') {
+      return product.es_especial ? 1 : 0;
+    }
+    if (field === 'activo') {
+      return product.activo ? 1 : 0;
+    }
+    return (product[field as keyof Producto] as string) || '';
+  };
+
+  const compareSortValues = (aVal: string | number, bVal: string | number): number => {
+    if (typeof aVal === 'number' && typeof bVal === 'number') {
+      return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+    }
+    const aStr = String(aVal).toLowerCase();
+    const bStr = String(bVal).toLowerCase();
+    return sortDirection === 'asc' 
+      ? aStr.localeCompare(bStr) 
+      : bStr.localeCompare(aStr);
+  };
+
   const filteredProductos = productos
     .filter((prod) => {
       const term = searchTerm.toLowerCase();
@@ -225,35 +261,9 @@ export default function ProductosPage() {
       );
     })
     .sort((a, b) => {
-      let aVal: string | number = '';
-      let bVal: string | number = '';
-
-      if (sortField === 'categoria') {
-        aVal = getCategoriaNombre(a.categoria_id);
-        bVal = getCategoriaNombre(b.categoria_id);
-      } else if (sortField === 'precio') {
-        aVal = a.precio;
-        bVal = b.precio;
-      } else if (sortField === 'es_especial') {
-        aVal = a.es_especial ? 1 : 0;
-        bVal = b.es_especial ? 1 : 0;
-      } else if (sortField === 'activo') {
-        aVal = a.activo ? 1 : 0;
-        bVal = b.activo ? 1 : 0;
-      } else {
-        aVal = (a[sortField as keyof Producto] as string) || '';
-        bVal = (b[sortField as keyof Producto] as string) || '';
-      }
-
-      if (typeof aVal === 'number' && typeof bVal === 'number') {
-        return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
-      }
-
-      const aStr = String(aVal).toLowerCase();
-      const bStr = String(bVal).toLowerCase();
-      return sortDirection === 'asc' 
-        ? aStr.localeCompare(bStr) 
-        : bStr.localeCompare(aStr);
+      const aVal = getSortValue(a, sortField);
+      const bVal = getSortValue(b, sortField);
+      return compareSortValues(aVal, bVal);
     });
 
   if (loading) {
@@ -319,9 +329,7 @@ export default function ProductosPage() {
                 >
                   <div className="flex items-center gap-1">
                     Nombre (ES)
-                    {sortField === 'titulo_es' ? (
-                      sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
-                    ) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                    <SortIndicator field="titulo_es" currentField={sortField} direction={sortDirection} />
                   </div>
                 </th>
                 <th 
@@ -330,9 +338,7 @@ export default function ProductosPage() {
                 >
                   <div className="flex items-center gap-1">
                     Precio
-                    {sortField === 'precio' ? (
-                      sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
-                    ) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                    <SortIndicator field="precio" currentField={sortField} direction={sortDirection} />
                   </div>
                 </th>
                 <th 
@@ -341,9 +347,7 @@ export default function ProductosPage() {
                 >
                   <div className="flex items-center gap-1">
                     Categoría
-                    {sortField === 'categoria' ? (
-                      sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
-                    ) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                    <SortIndicator field="categoria" currentField={sortField} direction={sortDirection} />
                   </div>
                 </th>
                 <th 
@@ -352,9 +356,7 @@ export default function ProductosPage() {
                 >
                   <div className="flex items-center gap-1">
                     Estado
-                    {sortField === 'activo' ? (
-                      sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
-                    ) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                    <SortIndicator field="activo" currentField={sortField} direction={sortDirection} />
                   </div>
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
@@ -419,7 +421,7 @@ export default function ProductosPage() {
                       <Pencil className="h-4 w-4" />
                     </button>
                     <button
-                      onClick={() => handleDelete(prod.id)}
+                      onClick={() => handleDeleteProduct(prod.id)}
                       className="text-red-600 dark:text-red-400 hover:text-red-80"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -480,7 +482,7 @@ export default function ProductosPage() {
                         <Pencil className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => handleDelete(prod.id)}
+                        onClick={() => handleDeleteProduct(prod.id)}
                         className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -527,10 +529,11 @@ export default function ProductosPage() {
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                  <label htmlFor="titulo_es" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                     Nombre (Español) *
                   </label>
                   <input
+                    id="titulo_es"
                     type="text"
                     required
                     value={formData.titulo_es}
@@ -540,10 +543,11 @@ export default function ProductosPage() {
                 </div>
 
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                  <label htmlFor="descripcion_es" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                     Descripción (Español)
                   </label>
                   <textarea
+                    id="descripcion_es"
                     value={formData.descripcion_es}
                     onChange={(e) => setFormData({ ...formData, descripcion_es: e.target.value })}
                     rows={2}
@@ -552,10 +556,11 @@ export default function ProductosPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                  <label htmlFor="precio" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                     Precio (€) *
                   </label>
                   <input
+                    id="precio"
                     type="number"
                     step="0.01"
                     required
@@ -566,10 +571,11 @@ export default function ProductosPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                  <label htmlFor="categoria_id" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                     Categoría
                   </label>
                   <select
+                    id="categoria_id"
                     value={formData.categoria_id}
                     onChange={(e) => setFormData({ ...formData, categoria_id: e.target.value })}
                     className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
@@ -619,8 +625,9 @@ export default function ProductosPage() {
                 {showTranslations && (
                   <>
                     <div>
-                      <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">Nombre (EN)</label>
+                      <label htmlFor="titulo_en" className="block text-sm text-gray-600 dark:text-gray-300 mb-1">Nombre (EN)</label>
                       <input
+                        id="titulo_en"
                         type="text"
                         value={formData.titulo_en}
                         onChange={(e) => setFormData({ ...formData, titulo_en: e.target.value })}
@@ -628,8 +635,9 @@ export default function ProductosPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">Nombre (FR)</label>
+                      <label htmlFor="titulo_fr" className="block text-sm text-gray-600 dark:text-gray-300 mb-1">Nombre (FR)</label>
                       <input
+                        id="titulo_fr"
                         type="text"
                         value={formData.titulo_fr}
                         onChange={(e) => setFormData({ ...formData, titulo_fr: e.target.value })}
@@ -637,8 +645,9 @@ export default function ProductosPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">Nombre (IT)</label>
+                      <label htmlFor="titulo_it" className="block text-sm text-gray-600 dark:text-gray-300 mb-1">Nombre (IT)</label>
                       <input
+                        id="titulo_it"
                         type="text"
                         value={formData.titulo_it}
                         onChange={(e) => setFormData({ ...formData, titulo_it: e.target.value })}
@@ -646,8 +655,9 @@ export default function ProductosPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">Nombre (DE)</label>
+                      <label htmlFor="titulo_de" className="block text-sm text-gray-600 dark:text-gray-300 mb-1">Nombre (DE)</label>
                       <input
+                        id="titulo_de"
                         type="text"
                         value={formData.titulo_de}
                         onChange={(e) => setFormData({ ...formData, titulo_de: e.target.value })}
@@ -656,8 +666,9 @@ export default function ProductosPage() {
                     </div>
 
                     <div className="col-span-2">
-                      <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">Descripción (EN)</label>
+                      <label htmlFor="descripcion_en" className="block text-sm text-gray-600 dark:text-gray-300 mb-1">Descripción (EN)</label>
                       <textarea
+                        id="descripcion_en"
                         value={formData.descripcion_en || ''}
                         onChange={(e) => setFormData({ ...formData, descripcion_en: e.target.value })}
                         rows={2}
@@ -665,8 +676,9 @@ export default function ProductosPage() {
                       />
                     </div>
                     <div className="col-span-2">
-                      <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">Descripción (FR)</label>
+                      <label htmlFor="descripcion_fr" className="block text-sm text-gray-600 dark:text-gray-300 mb-1">Descripción (FR)</label>
                       <textarea
+                        id="descripcion_fr"
                         value={formData.descripcion_fr || ''}
                         onChange={(e) => setFormData({ ...formData, descripcion_fr: e.target.value })}
                         rows={2}
@@ -674,8 +686,9 @@ export default function ProductosPage() {
                       />
                     </div>
                     <div className="col-span-2">
-                      <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">Descripción (IT)</label>
+                      <label htmlFor="descripcion_it" className="block text-sm text-gray-600 dark:text-gray-300 mb-1">Descripción (IT)</label>
                       <textarea
+                        id="descripcion_it"
                         value={formData.descripcion_it || ''}
                         onChange={(e) => setFormData({ ...formData, descripcion_it: e.target.value })}
                         rows={2}
@@ -683,8 +696,9 @@ export default function ProductosPage() {
                       />
                     </div>
                     <div className="col-span-2">
-                      <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">Descripción (DE)</label>
+                      <label htmlFor="descripcion_de" className="block text-sm text-gray-600 dark:text-gray-300 mb-1">Descripción (DE)</label>
                       <textarea
+                        id="descripcion_de"
                         value={formData.descripcion_de || ''}
                         onChange={(e) => setFormData({ ...formData, descripcion_de: e.target.value })}
                         rows={2}

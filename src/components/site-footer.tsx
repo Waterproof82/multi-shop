@@ -2,11 +2,10 @@
 
 import Image from "next/image"
 import { useLanguage } from "@/lib/language-context"
-import { t } from "@/lib/translations"
 import type { EmpresaInfo } from "@/lib/server-services"
 
 interface SiteFooterProps {
-  empresa?: EmpresaInfo | null;
+  readonly empresa?: EmpresaInfo | null;
 }
 
 export function SiteFooter({ empresa }: SiteFooterProps) {
@@ -38,8 +37,8 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
           )}
           {footer2List ? (
             <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground">
-              {footer2List.map((item, index) => (
-                <span key={index}>{item.trim()}</span>
+              {footer2List.map((item) => (
+                <span key={item.trim()}>{item.trim()}</span>
               ))}
             </div>
           ) : null}

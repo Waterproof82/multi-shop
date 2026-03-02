@@ -5,7 +5,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { v4 as uuidv4 } from "uuid";
 import { getS3Client, getR2Config } from "./s3-client";
 
-const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 export async function getPresignedUploadUrlAction(
@@ -21,7 +21,7 @@ export async function getPresignedUploadUrlAction(
     throw new Error("Configuración de R2 incompleta");
   }
 
-  if (!ALLOWED_MIME_TYPES.includes(fileType)) {
+  if (!ALLOWED_MIME_TYPES.has(fileType)) {
     throw new Error("Tipo de archivo no permitido");
   }
 
@@ -29,7 +29,6 @@ export async function getPresignedUploadUrlAction(
     throw new Error("El archivo excede el tamaño máximo de 5MB");
   }
 
-  const ext = fileName.split(".").pop() || "webp";
   const uuid = uuidv4();
   const date = new Date();
   const year = date.getFullYear();

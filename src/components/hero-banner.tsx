@@ -2,12 +2,11 @@
 
 import { motion } from "framer-motion"
 import Image from "next/image"
-import { useLanguage, type Language } from "@/lib/language-context"
-import { t } from "@/lib/translations"
+import { useLanguage } from "@/lib/language-context"
 import type { EmpresaInfo } from "@/lib/server-services"
 
 interface HeroBannerProps {
-  empresa?: EmpresaInfo | null;
+  readonly empresa?: EmpresaInfo | null;
 }
 
 export function HeroBanner({ empresa }: HeroBannerProps) {
