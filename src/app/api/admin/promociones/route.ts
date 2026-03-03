@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { jwtVerify } from 'jose';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/brevo-email';
+import { deleteImageFromR2 } from '@/core/infrastructure/storage/s3-client';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -100,19 +101,31 @@ export async function POST(request: Request) {
     const numeroEnvios = emails.length;
     console.log('Clientes con promociones:', numeroEnvios, clientesConPromo);
 
+    // Obtener promoción anterior para borrar su imagen
+    const { data: oldPromo } = await supabase
+      .from('promociones')
+      .select('imagen_url')
+      .eq('empresa_id', perfil.empresa_id)
+      .single();
+
+    // Eliminar imagen anterior de R2 si existe
+    if (oldPromo?.imagen_url) {
+      await deleteImageFromR2(oldPromo.imagen_url);
+    }
+
     // Eliminar promociones anteriores de esta empresa
     await supabase
       .from('promociones')
       .delete()
       .eq('empresa_id', perfil.empresa_id);
 
-    // Don't store imagen in DB - just use it for email
     const { data: promo, error } = await supabase
       .from('promociones')
       .insert({
         empresa_id: perfil.empresa_id,
         fecha_hora: new Date().toISOString(),
         texto_promocion,
+        imagen_url: imagen_url || null,
         numero_envios: numeroEnvios,
       })
       .select()

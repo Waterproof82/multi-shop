@@ -1,4 +1,4 @@
-import { S3Client } from "@aws-sdk/client-s3";
+import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
 
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
 const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
@@ -35,4 +35,26 @@ export function getR2Config() {
     bucketName: R2_BUCKET_NAME,
     publicDomain: R2_PUBLIC_DOMAIN,
   };
+}
+
+export async function deleteImageFromR2(imageUrl: string): Promise<boolean> {
+  if (!imageUrl || !R2_BUCKET_NAME) return false;
+  
+  try {
+    // Extract key from URL (remove domain)
+    const key = imageUrl.replace(`${R2_PUBLIC_DOMAIN}/`, '');
+    
+    const client = getS3Client();
+    const command = new DeleteObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: key,
+    });
+    
+    await client.send(command);
+    console.log(`Deleted image from R2: ${key}`);
+    return true;
+  } catch (error) {
+    console.error('Error deleting image from R2:', error);
+    return false;
+  }
 }

@@ -18,6 +18,7 @@ interface Promocion {
   fecha_hora: string;
   texto_promocion: string;
   numero_envios: number;
+  imagen_url: string | null;
   created_at: string;
 }
 
@@ -304,16 +305,27 @@ export default function PromocionesPage() {
           </h2>
           <div className="space-y-3">
             {promociones.slice(0, 1).map((promo) => (
-              <div key={promo.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
-                <div className="flex-1">
-                  <p className="font-medium text-gray-900 dark:text-white">{promo.texto_promocion}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {new Date(promo.fecha_hora).toLocaleString('es-ES')}
-                  </p>
-                </div>
-                <div className="text-right px-4">
-                  <span className="text-2xl font-bold text-primary">{promo.numero_envios}</span>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">clientes</p>
+              <div key={promo.id} className="p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
+                {promo.imagen_url && (
+                  <div className="mb-3">
+                    <img 
+                      src={promo.imagen_url} 
+                      alt="Promoción" 
+                      className="max-h-32 rounded-lg object-contain bg-white"
+                    />
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900 dark:text-white">{promo.texto_promocion}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {new Date(promo.fecha_hora).toLocaleString('es-ES')}
+                    </p>
+                  </div>
+                  <div className="text-right px-4">
+                    <span className="text-2xl font-bold text-primary">{promo.numero_envios}</span>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">clientes</p>
+                  </div>
                 </div>
               </div>
             ))}
