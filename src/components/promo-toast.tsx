@@ -34,6 +34,10 @@ export function PromoToast() {
       setMessage('Error interno. Intenta de nuevo.');
       setType('error');
       setVisible(true);
+    } else if (error) {
+      setMessage(`Error: ${error}`);
+      setType('error');
+      setVisible(true);
     }
 
     if (visible) {
