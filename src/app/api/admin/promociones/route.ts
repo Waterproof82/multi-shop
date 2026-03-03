@@ -188,9 +188,10 @@ export async function POST(request: Request) {
 </html>
         `.trim();
 
-          // Enviar emails individualmente para incluir el link de baja personalizado
+          // Enviar emails individualmente para incluir el link personalizado
           for (const email of emails) {
-            const personalizedHtml = emailHtml.replace('__EMAIL__', encodeURIComponent(email));
+            // Replace ALL occurrences of __EMAIL__ (both links)
+            const personalizedHtml = emailHtml.replaceAll('__EMAIL__', encodeURIComponent(email));
             
             await sendEmail({
               to: [email],
