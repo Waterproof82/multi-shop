@@ -9,7 +9,7 @@ export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   // 1. Rutas de API admin - verificar JWT
-  if (path.startsWith('/api/admin') && path !== '/api/admin/login') {
+  if (path.startsWith('/api/admin') && path !== '/api/admin/login' && !path.includes('/unsubscribe')) {
     const adminToken = request.cookies.get('admin_token')?.value;
 
     if (!adminToken) {

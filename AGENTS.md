@@ -69,6 +69,7 @@ src/
 - **Build**: "Skipping validation of types" es normal en Next.js 16
 - **Promociones**: 
   - `/api/admin/promociones` - GET lista, POST crea y envía emails
+  - `/api/admin/promociones/unsubscribe` - Ruta pública para darse de baja (sin JWT)
   - Imagen se sube a R2 en carpeta `{empresaSlug}/promo-*.webp`
   - Al crear nueva promo, se borra imagen anterior de R2
   - Email incluye logo de empresa (de empresas.logo_url) + imagen promo
