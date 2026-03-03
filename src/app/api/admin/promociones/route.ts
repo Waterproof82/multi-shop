@@ -78,12 +78,12 @@ export async function POST(request: Request) {
 
     const { data: empresa } = await supabase
       .from('empresas')
-      .select('email_notification, nombre')
+      .select('email_notification, nombre, logo_url')
       .eq('id', perfil.empresa_id)
       .single();
 
     const body = await request.json();
-    const { texto_promocion } = body;
+    const { texto_promocion, imagen_base64 } = body;
 
     if (!texto_promocion) {
       return NextResponse.json({ error: 'Falta el texto de la promoción' }, { status: 400 });
@@ -106,6 +106,7 @@ export async function POST(request: Request) {
       .delete()
       .eq('empresa_id', perfil.empresa_id);
 
+    // Don't store imagen in DB - just use it for email
     const { data: promo, error } = await supabase
       .from('promociones')
       .insert({
@@ -128,6 +129,8 @@ export async function POST(request: Request) {
       console.log('BREVO_API_KEY configurado:', !!BREVO_API_KEY);
       
       if (emails && emails.length > 0) {
+        const empresaLogoUrl = empresa?.logo_url || '';
+        
         const emailHtml = `
 <!DOCTYPE html>
 <html>
@@ -137,9 +140,20 @@ export async function POST(request: Request) {
 </head>
 <body style="margin: 0; padding: 20px; background-color: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
   <div style="max-width: 500px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-    <div style="background-color: #1a1a1a; padding: 24px; text-align: center;">
-      <h1 style="margin: 0; color: #ffffff; font-size: 24px;">¡Nueva Promoción!</h1>
+    ${empresaLogoUrl ? `
+    <div style="padding: 24px; text-align: center; background-color: #ffffff;">
+      <img src="${empresaLogoUrl}" alt="Logo" style="max-width: 180px; max-height: 80px; height: auto; display: inline-block;">
     </div>
+    ` : `
+    <div style="background-color: #1a1a1a; padding: 24px; text-align: center;">
+      <h1 style="margin: 0; color: #ffffff; font-size: 24px;">${empresa?.nombre || 'Promociones'}</h1>
+    </div>
+    `}
+    ${imagen_base64 ? `
+    <div style="padding: 0;">
+      <img src="${imagen_base64}" alt="Promoción" style="width: 100%; max-width: 500px; height: auto; display: block;">
+    </div>
+    ` : ''}
     <div style="padding: 24px;">
       <p style="margin: 0 0 16px 0; color: #333333; font-size: 16px; line-height: 1.5;">
         ${texto_promocion}

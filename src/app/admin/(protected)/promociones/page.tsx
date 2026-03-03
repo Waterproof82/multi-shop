@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Users, Mail, FileText, Send, CheckCircle } from 'lucide-react';
+import { Users, Mail, FileText, Send, CheckCircle, Image } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useAdmin } from '@/lib/admin-context';
 
 interface Cliente {
   id: string;
@@ -20,10 +21,13 @@ interface Promocion {
 }
 
 export default function PromocionesPage() {
+  const { empresaId } = useAdmin();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [promociones, setPromociones] = useState<Promocion[]>([]);
   const [savingPromo, setSavingPromo] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   
   const [promoTexto, setPromoTexto] = useState('');
 
@@ -54,16 +58,53 @@ export default function PromocionesPage() {
 
   const clientesConPromociones = clientes.filter(c => c.aceptar_promociones && c.email);
 
+  // Convert file to base64
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('La imagen no puede exceder 5MB');
+        return;
+      }
+      setSelectedImage(file);
+      // Create preview URL
+      const reader = new FileReader();
+      reader.onload = (e) => setPreviewImage(e.target?.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setSelectedImage(null);
+    setPreviewImage(null);
+  };
+
   const handleGuardarPromocion = async () => {
     if (!promoTexto) return;
     
     setSavingPromo(true);
     try {
+      // Convert image to base64 if selected
+      let imagenBase64: string | null = null;
+      if (selectedImage) {
+        imagenBase64 = await fileToBase64(selectedImage);
+      }
+
       const res = await fetch('/api/admin/promociones', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           texto_promocion: promoTexto,
+          imagen_base64: imagenBase64,
         }),
       });
       
@@ -71,6 +112,7 @@ export default function PromocionesPage() {
         const data = await res.json();
         setPromociones(prev => [data.promocion, ...prev]);
         setPromoTexto('');
+        handleRemoveImage();
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 3000);
       }
@@ -125,6 +167,53 @@ export default function PromocionesPage() {
               rows={3}
               className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white resize-none"
             />
+          </div>
+
+          {/* Imagen de la promoción */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Imagen de la promoción (opcional)
+            </label>
+            {previewImage ? (
+              <div className="relative group rounded-lg overflow-hidden border h-48 mb-2">
+                <img
+                  src={previewImage}
+                  alt="Preview"
+                  className="w-full h-full object-contain bg-gray-50"
+                />
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    className="px-3 py-1.5 bg-red-600 text-white rounded-md text-sm hover:bg-red-700"
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-gray-400 transition-colors">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageSelect}
+                  className="hidden"
+                  id="promo-image"
+                />
+                <label htmlFor="promo-image" className="cursor-pointer">
+                  <Image className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                  <span className="text-sm text-gray-500">
+                    Click para seleccionar una imagen
+                  </span>
+                  <p className="text-xs text-gray-400 mt-1">
+                    JPEG, PNG, WEBP (max 5MB)
+                  </p>
+                </label>
+              </div>
+            )}
+            <p className="text-xs text-gray-500 mt-1">
+              Esta imagen se mostrará adjunta en el correo electrónico
+            </p>
           </div>
 
           {/* Vista previa de clientes */}
