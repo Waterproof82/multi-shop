@@ -55,7 +55,19 @@ async function getDomainFromHeaders(): Promise<string> {
   return host.replace(/^www\./, '').toLowerCase().split(':')[0];
 }
 
-function generateOrderEmail(items: CartItem[], total: number, empresaNombre: string, numeroPedido: number, nombre: string, telefono: string, email: string | null, whatsappLink?: string): string {
+interface OrderEmailParams {
+  readonly items: CartItem[];
+  readonly total: number;
+  readonly empresaNombre: string;
+  readonly numeroPedido: number;
+  readonly nombre: string;
+  readonly telefono: string;
+  readonly email: string | null;
+  readonly whatsappLink?: string;
+}
+
+function generateOrderEmail(params: OrderEmailParams): string {
+  const { items, total, empresaNombre, numeroPedido, nombre, telefono, email, whatsappLink } = params;
   const itemsHtml = items.map(ci => {
     const complementPrice = ci.selectedComplements?.reduce((sum, c) => sum + c.price, 0) || 0;
     const itemTotal = (ci.item.price + complementPrice) * ci.quantity;
@@ -281,16 +293,16 @@ async function sendOrderEmail(supabase: any, info: OrderEmailInfo) {
       safeEmail = cliente.email || safeEmail;
     }
   }
-  const html = generateOrderEmail(
-    info.items,
-    info.total,
-    info.empresa.nombre,
-    info.nuevoNumeroPedido,
-    safeNombre,
-    safeTelefono,
-    safeEmail,
-    info.whatsappLink
-  );
+  const html = generateOrderEmail({
+    items: info.items,
+    total: info.total,
+    empresaNombre: info.empresa.nombre,
+    numeroPedido: info.nuevoNumeroPedido,
+    nombre: safeNombre,
+    telefono: safeTelefono,
+    email: safeEmail,
+    whatsappLink: info.whatsappLink
+  });
   await sendEmail({
     to: info.empresa.email_notification,
     subject: `Nuevo pedido #${info.nuevoNumeroPedido} de ${safeNombre} - ${info.total.toFixed(2)}€`,
@@ -305,8 +317,6 @@ export async function POST(request: Request) {
     const supabase = createClient(supabaseUrl, supabaseKey);
     const domain = await getDomainFromHeaders();
     const mainDomain = parseMainDomain(domain);
-    
-    console.log('DEBUG: domain:', domain, 'mainDomain:', mainDomain);
 
     let { data: empresa, error: empresaError } = await supabase
       .from('empresas')
@@ -314,38 +324,30 @@ export async function POST(request: Request) {
       .eq('dominio', mainDomain)
       .single();
 
-    console.log('DEBUG: empresa search by mainDomain:', mainDomain, 'result:', empresa, 'error:', empresaError);
-
     // Si no encuentra, buscar por subdomain pedidos
     if (empresaError || !empresa) {
       const subdomainPedidos = 'pedidos';
       const isPedidos = domain.startsWith(`${subdomainPedidos}.`) || domain.includes('-pedidos');
-      console.log('DEBUG: isPedidos:', isPedidos, 'domain:', domain);
       
       if (isPedidos) {
         // Extraer el dominio principal del subdominio
         const mainDomainFromSubdomain = domain.split('.').slice(1).join('.');
-        console.log('DEBUG: mainDomainFromSubdomain:', mainDomainFromSubdomain);
         
         const { data: empresaSubdomain } = await supabase
           .from('empresas')
           .select('id, nombre, email_notification, telefono_whatsapp')
           .eq('dominio', mainDomainFromSubdomain)
           .single();
-        console.log('DEBUG: empresaSubdomain:', empresaSubdomain);
         
         if (empresaSubdomain) empresa = empresaSubdomain;
       }
     }
 
     if (!empresa) {
-      console.log('DEBUG: empresa not found for domain:', domain);
       return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 });
     }
 
     const body = await request.json();
-    console.log('DEBUG: body received:', { items: body.items?.length, total: body.total, nombre: body.nombre });
-    
     const { items, total, nombre, telefono, email } = body as {
       items: CartItem[];
       total: number;

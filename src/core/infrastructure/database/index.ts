@@ -7,4 +7,4 @@ const supabase = getSupabaseClient();
 
 export const productRepository = new SupabaseProductRepository(supabase);
 export const categoryRepository = new SupabaseCategoryRepository(supabase);
-export const adminRepository = new SupabaseAdminRepository(supabase);
+export const adminRepository = new SupabaseAdminRepository();

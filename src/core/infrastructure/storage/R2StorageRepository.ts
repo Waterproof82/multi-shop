@@ -32,8 +32,8 @@ export class R2StorageRepository implements IStorageRepository {
 
       // 3. Retornar los datos del archivo guardado
       return {
-        key: key!,
-        publicUrl: publicUrl!,
+        key: key || "",
+        publicUrl: publicUrl || "",
       };
 
     } catch (error) {

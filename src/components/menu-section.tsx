@@ -4,7 +4,7 @@ import { useState, memo, useCallback } from "react"
 import { motion } from "framer-motion"
 import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
-import { useLanguage, type Language } from "@/lib/language-context"
+import { useLanguage } from "@/lib/language-context"
 import { t } from "@/lib/translations"
 import { MenuCategoryVM, MenuItemVM, MenuSubcategoryVM } from "@/core/application/dtos/menu-view-model"
 import { QuantitySelectorDialog } from "@/components/quantity-selector-dialog"
@@ -36,7 +36,6 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
 
   const isCategoryWithComplements = category.items.some((item) => item.complements && item.complements.length > 0);
   const translationLang = (['en', 'fr', 'it', 'de'].includes(language) ? language : undefined) as LanguageKey | undefined;
-  const safeLanguage: Language = language || "es";
 
   const displayDescripcion = translationLang && category.descripcionTranslations?.[translationLang]
     ? category.descripcionTranslations[translationLang]

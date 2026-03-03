@@ -22,7 +22,6 @@ interface Promocion {
 export default function PromocionesPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [promociones, setPromociones] = useState<Promocion[]>([]);
-  const [loading, setLoading] = useState(true);
   const [savingPromo, setSavingPromo] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   
@@ -47,7 +46,7 @@ export default function PromocionesPage() {
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {
-        setLoading(false);
+        // Data loaded
       }
     }
     fetchData();
@@ -115,10 +114,11 @@ export default function PromocionesPage() {
         
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label htmlFor="promo_texto" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Mensaje de la promoción
             </label>
             <textarea
+              id="promo_texto"
               placeholder="Ej: ¡20% de descuento en tu próximo pedido! 🍕"
               value={promoTexto}
               onChange={(e) => setPromoTexto(e.target.value)}

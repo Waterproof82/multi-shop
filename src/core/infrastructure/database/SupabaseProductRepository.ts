@@ -4,7 +4,7 @@ import { Product } from "@/core/domain/entities/types";
 import { CreateProductDTO, UpdateProductDTO } from "@/core/application/dtos/product.dto";
 
 export class SupabaseProductRepository implements IProductRepository {
-  constructor(private supabase: SupabaseClient) {}
+  constructor(private readonly supabase: SupabaseClient) {}
 
   private mapToDomain(row: any): Product {
     return {
@@ -13,7 +13,7 @@ export class SupabaseProductRepository implements IProductRepository {
       categoriaId: row.categoria_id,
       titulo: row.titulo_es, // Por ahora ES por defecto
       descripcion: row.descripcion_es,
-      precio: parseFloat(row.precio),
+      precio: Number.parseFloat(row.precio),
       fotoUrl: row.foto_url,
       esEspecial: row.es_especial,
       activo: row.activo,

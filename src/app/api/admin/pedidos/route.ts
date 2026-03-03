@@ -136,8 +136,8 @@ export async function PUT(request: NextRequest) {
     const añoParam = searchParams.get('año');
 
     const now = new Date();
-    const selectedMonth = mesParam !== null ? parseInt(mesParam) : now.getMonth();
-    const selectedYear = añoParam !== null ? parseInt(añoParam) : now.getFullYear();
+    const selectedMonth = mesParam ? Number.parseInt(mesParam) : now.getMonth();
+    const selectedYear = añoParam ? Number.parseInt(añoParam) : now.getFullYear();
 
     const todayStart = new Date(selectedYear, selectedMonth, now.getDate()).toISOString();
     const monthStart = new Date(selectedYear, selectedMonth, 1).toISOString();

@@ -36,6 +36,12 @@ function getSupabaseClient() {
   return createClient(supabaseUrl, supabaseKey);
 }
 
+function getDefinedValues<T extends Record<string, unknown>>(data: T): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(data).filter(([, value]) => value !== undefined)
+  );
+}
+
 function getEmpresaId(request: NextRequest): string | null {
   return request.headers.get('x-empresa-id');
 }
@@ -134,21 +140,7 @@ export async function PUT(request: NextRequest) {
 
   const supabase = getSupabaseClient();
 
-  const updateData: Record<string, unknown> = {};
-  if (parsed.data.nombre_es !== undefined) updateData.nombre_es = parsed.data.nombre_es;
-  if (parsed.data.nombre_en !== undefined) updateData.nombre_en = parsed.data.nombre_en;
-  if (parsed.data.nombre_fr !== undefined) updateData.nombre_fr = parsed.data.nombre_fr;
-  if (parsed.data.nombre_it !== undefined) updateData.nombre_it = parsed.data.nombre_it;
-  if (parsed.data.nombre_de !== undefined) updateData.nombre_de = parsed.data.nombre_de;
-  if (parsed.data.descripcion_es !== undefined) updateData.descripcion_es = parsed.data.descripcion_es;
-  if (parsed.data.descripcion_en !== undefined) updateData.descripcion_en = parsed.data.descripcion_en;
-  if (parsed.data.descripcion_fr !== undefined) updateData.descripcion_fr = parsed.data.descripcion_fr;
-  if (parsed.data.descripcion_it !== undefined) updateData.descripcion_it = parsed.data.descripcion_it;
-  if (parsed.data.descripcion_de !== undefined) updateData.descripcion_de = parsed.data.descripcion_de;
-  if (parsed.data.orden !== undefined) updateData.orden = parsed.data.orden;
-  if (parsed.data.categoria_complemento_de !== undefined) updateData.categoria_complemento_de = parsed.data.categoria_complemento_de;
-  if (parsed.data.complemento_obligatorio !== undefined) updateData.complemento_obligatorio = parsed.data.complemento_obligatorio;
-  if (parsed.data.categoria_padre_id !== undefined) updateData.categoria_padre_id = parsed.data.categoria_padre_id;
+  const updateData = getDefinedValues(parsed.data);
 
   const { data, error } = await supabase
     .from('categorias')

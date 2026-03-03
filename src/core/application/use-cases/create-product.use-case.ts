@@ -1,8 +1,8 @@
-import { IProductRepository } from "@/domain/repositories/IProductRepository";
-import { CreateProductDTO, createProductSchema } from "@/application/dtos/product.dto";
+import { IProductRepository } from "@/core/domain/repositories/IProductRepository";
+import { CreateProductDTO, createProductSchema } from "@/core/application/dtos/product.dto";
 
 export class CreateProductUseCase {
-  constructor(private productRepo: IProductRepository) {}
+  constructor(private readonly productRepo: IProductRepository) {}
 
   async execute(input: CreateProductDTO) {
     // 1. Validar Inputs

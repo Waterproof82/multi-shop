@@ -17,9 +17,9 @@ const createProductBodySchema = z.object({
   descripcion_fr: z.string().optional(),
   descripcion_it: z.string().optional(),
   descripcion_de: z.string().optional(),
-  precio: z.union([z.number(), z.string()]).refine(val => !isNaN(parseFloat(String(val))), {
+  precio: z.union([z.number(), z.string()]).refine(val => !Number.isNaN(Number.parseFloat(String(val))), {
     message: "El precio debe ser un número válido",
-  }).transform(val => parseFloat(String(val))),
+  }).transform(val => Number.parseFloat(String(val))),
   foto_url: z.union([z.string().url(), z.literal("")]).optional().nullable(),
   categoria_id: z.string().uuid().nullable().optional(),
   es_especial: z.boolean().default(false),
@@ -37,6 +37,28 @@ function getSupabaseClient() {
   }
   
   return createClient(supabaseUrl, supabaseKey);
+}
+
+function buildUpdateData(parsedData: z.infer<typeof updateProductBodySchema>): Record<string, unknown> {
+  const updateData: Record<string, unknown> = {};
+  
+  const fields = [
+    'titulo_es', 'titulo_en', 'titulo_fr', 'titulo_it', 'titulo_de',
+    'descripcion_es', 'descripcion_en', 'descripcion_fr', 'descripcion_it', 'descripcion_de',
+    'precio', 'categoria_id', 'es_especial', 'activo'
+  ] as const;
+  
+  for (const field of fields) {
+    if (parsedData[field] !== undefined) {
+      updateData[field] = parsedData[field];
+    }
+  }
+  
+  if (parsedData.foto_url !== undefined) {
+    updateData.foto_url = parsedData.foto_url === "" ? null : parsedData.foto_url;
+  }
+  
+  return updateData;
 }
 
 function getEmpresaId(request: NextRequest): string | null {
@@ -121,21 +143,15 @@ export async function PUT(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const idParam = searchParams.get('id');
 
-  console.log('DEBUG PUT productos - idParam:', idParam);
-
   const idParsed = queryIdSchema.safeParse({ id: idParam });
   if (!idParsed.success) {
-    console.log('DEBUG PUT productos - idParsed error:', idParsed.error);
     return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
   }
 
   const body = await request.json();
-  console.log('DEBUG PUT productos - body:', body);
-  
   const parsed = updateProductBodySchema.safeParse(body);
 
   if (!parsed.success) {
-    console.log('DEBUG PUT productos - parse error:', parsed.error);
     return NextResponse.json(
       { error: parsed.error.errors[0].message },
       { status: 400 }
@@ -143,25 +159,7 @@ export async function PUT(request: NextRequest) {
   }
 
   const supabase = getSupabaseClient();
-
-  const updateData: Record<string, unknown> = {};
-  if (parsed.data.titulo_es !== undefined) updateData.titulo_es = parsed.data.titulo_es;
-  if (parsed.data.titulo_en !== undefined) updateData.titulo_en = parsed.data.titulo_en;
-  if (parsed.data.titulo_fr !== undefined) updateData.titulo_fr = parsed.data.titulo_fr;
-  if (parsed.data.titulo_it !== undefined) updateData.titulo_it = parsed.data.titulo_it;
-  if (parsed.data.titulo_de !== undefined) updateData.titulo_de = parsed.data.titulo_de;
-  if (parsed.data.descripcion_es !== undefined) updateData.descripcion_es = parsed.data.descripcion_es;
-  if (parsed.data.descripcion_en !== undefined) updateData.descripcion_en = parsed.data.descripcion_en;
-  if (parsed.data.descripcion_fr !== undefined) updateData.descripcion_fr = parsed.data.descripcion_fr;
-  if (parsed.data.descripcion_it !== undefined) updateData.descripcion_it = parsed.data.descripcion_it;
-  if (parsed.data.descripcion_de !== undefined) updateData.descripcion_de = parsed.data.descripcion_de;
-  if (parsed.data.precio !== undefined) updateData.precio = parsed.data.precio;
-  if (parsed.data.foto_url !== undefined) {
-    updateData.foto_url = parsed.data.foto_url === "" ? null : parsed.data.foto_url;
-  }
-  if (parsed.data.categoria_id !== undefined) updateData.categoria_id = parsed.data.categoria_id;
-  if (parsed.data.es_especial !== undefined) updateData.es_especial = parsed.data.es_especial;
-  if (parsed.data.activo !== undefined) updateData.activo = parsed.data.activo;
+  const updateData = buildUpdateData(parsed.data);
 
   const { data, error } = await supabase
     .from('productos')

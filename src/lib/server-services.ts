@@ -105,7 +105,8 @@ export async function getEmpresaByDomain(domain: string): Promise<EmpresaInfo | 
       descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de,
       titulo, subtitulo,
       subtitulo2_es, subtitulo2_en, subtitulo2_fr, subtitulo2_it, subtitulo2_de,
-      footer1_es, footer1_en, footer1_fr, footer1_it, footer1_de
+      footer1_es, footer1_en, footer1_fr, footer1_it, footer1_de,
+      footer2_es, footer2_en, footer2_fr, footer2_it, footer2_de
     `)
     .eq("dominio", mainDomain)
     .maybeSingle();
@@ -127,7 +128,9 @@ export async function getEmpresaByDomain(domain: string): Promise<EmpresaInfo | 
           color_accent, color_accent_foreground, color_background, color_foreground,
           descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de,
           titulo, subtitulo,
-          subtitulo2_es, subtitulo2_en, subtitulo2_fr, subtitulo2_it, subtitulo2_de
+          subtitulo2_es, subtitulo2_en, subtitulo2_fr, subtitulo2_it, subtitulo2_de,
+          footer1_es, footer1_en, footer1_fr, footer1_it, footer1_de,
+          footer2_es, footer2_en, footer2_fr, footer2_it, footer2_de
         `)
         .eq("dominio", mainDomain)
         .maybeSingle();

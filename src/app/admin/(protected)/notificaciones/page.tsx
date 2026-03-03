@@ -116,7 +116,9 @@ export default function NotificacionesPage() {
           </div>
 
           <Button onClick={handleSave} disabled={saving}>
-            {saving ? 'Guardando...' : saved ? '¡Guardado!' : 'Guardar'}
+            {saving && 'Guardando...'}
+            {!saving && saved && '¡Guardado!'}
+            {!saving && !saved && 'Guardar'}
           </Button>
         </div>
       </div>

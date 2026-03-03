@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { EmpresaColores } from '@/core/domain/entities/types';
 
 interface ColoresFormProps {
-  coloresIniciales: EmpresaColores | null;
-  empresaId: string;
+  readonly coloresIniciales: EmpresaColores | null;
+  readonly empresaId: string;
 }
 
 type ColorKey = keyof EmpresaColores;
@@ -46,7 +46,7 @@ export function ColoresForm({ coloresIniciales, empresaId }: ColoresFormProps) {
     setSaved(false);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSaving(true);
 
@@ -59,7 +59,7 @@ export function ColoresForm({ coloresIniciales, empresaId }: ColoresFormProps) {
 
       if (res.ok) {
         setSaved(true);
-        window.location.reload();
+        globalThis.location.reload();
       }
     } catch (error) {
       console.error('Error guardando colores:', error);
