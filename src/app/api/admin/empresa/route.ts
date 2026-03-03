@@ -32,13 +32,15 @@ export async function GET(request: NextRequest) {
 
   const { data: empresa } = await supabase
     .from('empresas')
-    .select('email_notification, telefono_whatsapp')
+    .select('email_notification, telefono_whatsapp, nombre, logo_url')
     .eq('id', empresaId)
     .single();
 
   return NextResponse.json({
     email_notification: empresa?.email_notification || '',
     telefono_whatsapp: empresa?.telefono_whatsapp || '',
+    nombre: empresa?.nombre || '',
+    logo_url: empresa?.logo_url || null,
   });
 }
 
