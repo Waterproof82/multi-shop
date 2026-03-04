@@ -45,15 +45,16 @@ export function SiteHeaderClient({ showCart, empresa }: SiteHeaderClientProps) {
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 md:h-20 md:px-6">
         <Link href="/" className="flex items-center gap-2">
           {logoUrl && (
-            <Image
-              src={logoUrl}
-              alt="Mermelada de Tomate"
-              width={100}
-              height={64}
-              className="h-12 w-auto md:h-16"
-              loading="eager"
-              unoptimized
-            />
+            <div className="relative h-12 w-24 md:h-16 md:w-32">
+              <Image
+                src={logoUrl}
+                alt="Mermelada de Tomate"
+                fill
+                className="object-contain"
+                loading="eager"
+                unoptimized
+              />
+            </div>
           )}
         </Link>
         <div className="flex items-center gap-1">

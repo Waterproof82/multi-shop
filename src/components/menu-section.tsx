@@ -204,7 +204,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
           <div className="flex flex-col gap-1 items-end shrink-0">
             {item.highlight && (
               <Badge variant="secondary" className="bg-accent/10 text-accent text-[10px]">
-                Especial
+                {t("especial", safeLanguage)}
               </Badge>
             )}
           </div>

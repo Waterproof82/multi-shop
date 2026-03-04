@@ -44,6 +44,8 @@ export function CartDrawer() {
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const [companyPhone, setCompanyPhone] = useState<string | null>(null)
+  const [orderNumber, setOrderNumber] = useState<number | null>(null)
   const [nombre, setNombre] = useState('')
   const [telefono, setTelefono] = useState('')
   const [email, setEmail] = useState('')
@@ -170,6 +172,8 @@ export function CartDrawer() {
           if (match) {
             const numero = match[1];
             const mensaje = decodeURIComponent(match[2]);
+            setCompanyPhone(data.companyPhone || null);
+            setOrderNumber(data.numeroPedido || null); // <-- Added this line
             setSent(true);
             setTimeout(() => {
               setConfirming(false);
@@ -182,6 +186,12 @@ export function CartDrawer() {
         } else {
           setSent(true);
           setConfirming(false);
+        }
+        if (data.companyPhone) {
+          setCompanyPhone(data.companyPhone);
+        }
+        if (data.numeroPedido) { // <-- Added this block
+          setOrderNumber(data.numeroPedido);
         }
       } else {
         setErrors({ nombre: data.error || t("validationOrderError", language) });
@@ -211,8 +221,13 @@ export function CartDrawer() {
               {t("sendingOrder", language)}
             </DialogTitle>
             <DialogDescription className="text-base">
-              {confirming ? "Procesando tu pedido..." : "Por favor, comprueba que se nos envió el mensaje con tu pedido por WhatsApp"}
+              {confirming ? t("sendingOrder", language) : t("whatsappCheck", language)}
             </DialogDescription>
+            {confirming && companyPhone && (
+              <p className="text-xs text-red-500 mt-2 text-center">
+                {t("whatsappFallback", language)} {companyPhone}
+              </p>
+            )}
           </DialogHeader>
           {!confirming && (
             <>
@@ -220,15 +235,22 @@ export function CartDrawer() {
                 onClick={() => handleWhatsAppClick(false)}
                 className="block w-full text-center bg-[#25D366] text-white py-3 px-4 rounded-full font-semibold hover:bg-[#20BD5A] transition-colors"
               >
-                REENVIAR MENSAJE CON PEDIDO
+                {t("whatsappResend", language)}
               </button>
               <button
                 onClick={() => handleWhatsAppClick(true)}
                 className="block w-full text-center text-[#25D366] text-sm py-2 font-medium hover:underline"
               >
-                ¿No se abrió la app? Abrir WhatsApp Web
+                {t("whatsappWeb", language)}
               </button>
             </>
+          )}
+          {companyPhone && orderNumber && (
+            <div className="bg-black text-white p-3 rounded-lg mt-4 w-full text-center">
+              <p className="text-xs font-medium">
+                * {t("whatsappCantSend", language)} {companyPhone} con pedido #{orderNumber}
+              </p>
+            </div>
           )}
         </DialogContent>
       </Dialog>
@@ -382,7 +404,7 @@ export function CartDrawer() {
                   onClick={() => { closeCart(); handleConfirmOrder(); }}
                   disabled={sending || confirming}
                 >
-                  {sending || confirming ? 'Enviando...' : 'Enviar Pedido'}
+                  {sending || confirming ? t("sending", language) : t("sendOrder", language)}
                 </Button>
                 <Button
                   variant="ghost"

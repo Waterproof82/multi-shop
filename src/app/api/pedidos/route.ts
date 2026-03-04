@@ -377,7 +377,7 @@ export async function POST(request: Request) {
       whatsappLink = `https://wa.me/${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`;
     }
 
-    return NextResponse.json({ success: true, numeroPedido: nuevoNumeroPedido, whatsappLink });
+    return NextResponse.json({ success: true, numeroPedido: nuevoNumeroPedido, whatsappLink, companyPhone: empresa.telefono_whatsapp });
   } catch (error) {
     console.error('Error creating order:', error);
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });
