@@ -16,8 +16,8 @@ const nextConfig = {
     fetches: {
       fullUrl: false,
     },
+    verbose: false,
   },
-  // experimental: {},
 }
 
 export default nextConfig
