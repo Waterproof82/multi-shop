@@ -20,6 +20,10 @@ function getEmpresaId(request: NextRequest): string | null {
 const updateEmpresaSchema = z.object({
   email_notification: z.string().email().optional().or(z.literal('')),
   telefono_whatsapp: z.string().optional(),
+  fb: z.string().url().optional().or(z.literal('')),
+  instagram: z.string().url().optional().or(z.literal('')),
+  url_mapa: z.string().optional(),
+  direccion: z.string().optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -32,7 +36,7 @@ export async function GET(request: NextRequest) {
 
   const { data: empresa } = await supabase
     .from('empresas')
-    .select('email_notification, telefono_whatsapp, nombre, logo_url')
+    .select('email_notification, telefono_whatsapp, nombre, logo_url, fb, instagram, url_mapa, direccion')
     .eq('id', empresaId)
     .single();
 
@@ -41,6 +45,10 @@ export async function GET(request: NextRequest) {
     telefono_whatsapp: empresa?.telefono_whatsapp || '',
     nombre: empresa?.nombre || '',
     logo_url: empresa?.logo_url || null,
+    fb: empresa?.fb || '',
+    instagram: empresa?.instagram || '',
+    url_mapa: empresa?.url_mapa || '',
+    direccion: empresa?.direccion || '',
   });
 }
 
@@ -67,6 +75,10 @@ export async function PUT(request: NextRequest) {
     .update({ 
       email_notification: parsed.data.email_notification || null,
       telefono_whatsapp: parsed.data.telefono_whatsapp || null,
+      fb: parsed.data.fb || null,
+      instagram: parsed.data.instagram || null,
+      url_mapa: parsed.data.url_mapa || null,
+      direccion: parsed.data.direccion || null,
     })
     .eq('id', empresaId);
 

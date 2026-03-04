@@ -146,6 +146,33 @@ NEXT_PUBLIC_R2_DOMAIN=https://tu-dominio.r2.dev
 | `perfiles_admin` | Admin users | FK: `id` → auth.users |
 | `promociones` | Promociones email | FK: `empresa_id` |
 
+### Schema Empresas (campos relevantes para footer)
+
+```sql
+empresas:
+  - id (uuid)
+  - nombre (text)
+  - dominio (text)
+  - logo_url (text)
+  - mostrar_carrito (boolean)
+  - email_notification (text)
+  - telefono_whatsapp (text)
+  - direccion (text)
+  - fb (text)           -- URL Facebook
+  - instagram (text)    -- URL Instagram
+  - url_mapa (text)     -- Iframe embed de Google Maps
+  - descripcion_es, descripcion_en, ...
+```
+
+### SQL: Agregar columnas para footer
+
+```sql
+ALTER TABLE empresas 
+ADD COLUMN IF NOT EXISTS fb TEXT,
+ADD COLUMN IF NOT EXISTS instagram TEXT,
+ADD COLUMN IF NOT EXISTS url_mapa TEXT;
+```
+
 ### Schema Productos (i18n)
 
 ```sql
@@ -206,7 +233,7 @@ if (!empresaId) return 401;
 - `/admin/pedidos` - Ver/administrar pedidos
 - `/admin/clientes` - Ver clientes
 - `/admin/promociones` - Enviar promociones por email
-- `/admin/configuracion` - Colores, email, WhatsApp
+- `/admin/configuracion` - Colores, datos de contacto, redes sociales, mapa
 
 ### Características
 
@@ -242,7 +269,7 @@ if (!empresaId) return 401;
 
 - **Logo empresa**: Se obtiene de `empresas.logo_url`
 - **Imagen promoción**: Se inserta entre header y mensaje
-- **Link unsubscribe**: Personalizado por cliente
+- **Enlaces de Suscripción/Baja**: URLs absolutas con el `dominio` de la empresa. Personalizadas por cliente (email y acción).
 
 ### Limpieza de Imágenes
 
@@ -273,6 +300,33 @@ Esto evita imágenes huérfanas en el bucket.
 ### A05: Security Misconfig
 - Solo variables `NEXT_PUBLIC_*` en cliente
 - Código server-only marcado con `server-only`
+
+---
+
+## Footer del Sitio
+
+El footer se muestra en el menú público con fondo negro y contiene:
+
+| Campo | Fuente | Descripción |
+|-------|--------|-------------|
+| Logo | `empresas.logo_url` | Imagen con fondo transparente |
+| Descripción | `empresas.descripcion_{idioma}` | Texto multiidioma |
+| Facebook | `empresas.fb` | URL completa (ej: https://facebook.com/...) |
+| Instagram | `empresas.instagram` | URL completa (ej: https://instagram.com/...) |
+| Dirección | `empresas.direccion` | Dirección física |
+| WhatsApp | `empresas.telefono_whatsapp` | Link wa.me/... |
+| Email | `empresas.email_notification` | Mailto link |
+| Mapa | `empresas.url_mapa` | Iframe embed de Google Maps |
+
+### Embed del Mapa
+
+Para obtener la URL del mapa:
+1. Ir a Google Maps → buscar la empresa
+2. Click en "Compartir" → "Insertar un mapa"
+3. Copiar solo la URL del `src` del iframe
+4. Pegar en el campo `url_mapa` en configuración
+
+Si no hay `url_mapa` pero hay `dirección`, se muestra un link a Google Maps.
 
 ---
 

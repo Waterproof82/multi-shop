@@ -30,7 +30,7 @@ src/
 
 | Tabla | PK | FK | Notas |
 |-------|----|----|-------|
-| `empresas` | id (uuid) | - | dominio, subdomain_pedidos, colores, logo_url |
+| `empresas` | id (uuid) | - | dominio, subdomain_pedidos, colores, logo_url, fb, instagram, url_mapa, direccion, telefono_whatsapp |
 | `perfiles_admin` | id (uuid) | empresa_id → empresas | → auth.users |
 | `categorias` | id (uuid) | empresa_id → empresas | categoria_padre_id, categoriaComplementoDe |
 | `productos` | id (uuid) | empresa_id, categoria_id → categorias | i18n: titulo_es/en/fr/it/de |
@@ -56,6 +56,7 @@ src/
 - `<Link>` de Next.js para navegación
 
 ## Cosas importantes para el agente
+- **Footer**: Fondo negro, muestra logo, descripción, fb, instagram, dirección, WhatsApp, email y mapa (iframe)
 - **Middleware**: `src/proxy.ts` - autentica JWT para `/api/admin/*`
 - **Imágenes**: Se optimizan en cliente (480x480, WebP, 80%)
 - **R2**: Cliente singleton en `core/infrastructure/storage/s3-client.ts`
@@ -72,7 +73,10 @@ src/
   - `/api/admin/promociones/unsubscribe` - Ruta pública para darse de baja (sin JWT)
   - Imagen se sube a R2 en carpeta `{empresaSlug}/promo-*.webp`
   - Al crear nueva promo, se borra imagen anterior de R2
-  - Email incluye logo de empresa (de empresas.logo_url) + imagen promo
+  - Email incluye logo de empresa (de empresas.logo_url) + imagen promo, y los enlaces de suscripción/baja usan el `dominio` de la empresa para generar las URLs.
+- **Configuración Empresa**: 
+  - `/admin/configuracion` - Datos de contacto (fb, instagram, url_mapa, direccion, telefono_whatsapp, email_notification)
+  - API: `/api/admin/empresa` - GET/PUT con los campos nuevos
 
 ## Comandos
 ```bash

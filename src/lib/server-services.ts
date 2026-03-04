@@ -65,6 +65,12 @@ export interface EmpresaInfo {
     it?: string;
     de?: string;
   } | null;
+  fb: string | null;
+  instagram: string | null;
+  urlMapa: string | null;
+  direccion: string | null;
+  telefono: string | null;
+  emailNotification: string | null;
 }
 
 function mapTranslations(data: any, prefix: string) {
@@ -106,7 +112,9 @@ export async function getEmpresaByDomain(domain: string): Promise<EmpresaInfo | 
       titulo, subtitulo,
       subtitulo2_es, subtitulo2_en, subtitulo2_fr, subtitulo2_it, subtitulo2_de,
       footer1_es, footer1_en, footer1_fr, footer1_it, footer1_de,
-      footer2_es, footer2_en, footer2_fr, footer2_it, footer2_de
+      footer2_es, footer2_en, footer2_fr, footer2_it, footer2_de,
+      fb, instagram, url_mapa,
+      direccion, telefono_whatsapp, email_notification
     `)
     .eq("dominio", mainDomain)
     .maybeSingle();
@@ -130,7 +138,9 @@ export async function getEmpresaByDomain(domain: string): Promise<EmpresaInfo | 
           titulo, subtitulo,
           subtitulo2_es, subtitulo2_en, subtitulo2_fr, subtitulo2_it, subtitulo2_de,
           footer1_es, footer1_en, footer1_fr, footer1_it, footer1_de,
-          footer2_es, footer2_en, footer2_fr, footer2_it, footer2_de
+          footer2_es, footer2_en, footer2_fr, footer2_it, footer2_de,
+          fb, instagram, url_mapa,
+          direccion, telefono_whatsapp, email_notification
         `)
         .eq("dominio", mainDomain)
         .maybeSingle();
@@ -170,6 +180,12 @@ export async function getEmpresaByDomain(domain: string): Promise<EmpresaInfo | 
     subtitulo2: mapTranslations(data, 'subtitulo2'),
     footer1: mapTranslations(data, 'footer1'),
     footer2: mapTranslations(data, 'footer2'),
+    fb: data.fb ?? null,
+    instagram: data.instagram ?? null,
+    urlMapa: data.url_mapa ?? null,
+    direccion: data.direccion ?? null,
+    telefono: data.telefono_whatsapp ?? null,
+    emailNotification: data.email_notification ?? null,
   };
 }
 

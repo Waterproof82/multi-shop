@@ -44,6 +44,8 @@ export function CartDrawer() {
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const [companyPhone, setCompanyPhone] = useState<string | null>(null)
+  const [orderNumber, setOrderNumber] = useState<number | null>(null)
   const [nombre, setNombre] = useState('')
   const [telefono, setTelefono] = useState('')
   const [email, setEmail] = useState('')
@@ -170,6 +172,8 @@ export function CartDrawer() {
           if (match) {
             const numero = match[1];
             const mensaje = decodeURIComponent(match[2]);
+            setCompanyPhone(data.companyPhone || null);
+            setOrderNumber(data.numeroPedido || null); // <-- Added this line
             setSent(true);
             setTimeout(() => {
               setConfirming(false);
@@ -182,6 +186,12 @@ export function CartDrawer() {
         } else {
           setSent(true);
           setConfirming(false);
+        }
+        if (data.companyPhone) {
+          setCompanyPhone(data.companyPhone);
+        }
+        if (data.numeroPedido) { // <-- Added this block
+          setOrderNumber(data.numeroPedido);
         }
       } else {
         setErrors({ nombre: data.error || t("validationOrderError", language) });
@@ -213,6 +223,11 @@ export function CartDrawer() {
             <DialogDescription className="text-base">
               {confirming ? "Procesando tu pedido..." : "Por favor, comprueba que se nos envió el mensaje con tu pedido por WhatsApp"}
             </DialogDescription>
+            {confirming && companyPhone && (
+              <p className="text-xs text-red-500 mt-2 text-center">
+                En caso de no poder realizar el pedido por esta vía, contáctenos al {companyPhone}
+              </p>
+            )}
           </DialogHeader>
           {!confirming && (
             <>
@@ -229,6 +244,13 @@ export function CartDrawer() {
                 ¿No se abrió la app? Abrir WhatsApp Web
               </button>
             </>
+          )}
+          {companyPhone && orderNumber && (
+            <div className="bg-black text-white p-3 rounded-lg mt-4 w-full text-center">
+              <p className="text-xs font-medium">
+                * ¿No consigues enviar el pedido? Mandanos un mensaje al {companyPhone} con pedido #{orderNumber}
+              </p>
+            </div>
           )}
         </DialogContent>
       </Dialog>

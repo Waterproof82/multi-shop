@@ -83,6 +83,10 @@ export async function POST(request: Request) {
       .eq('id', perfil.empresa_id)
       .single();
 
+    if (!empresa) {
+      return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 });
+    }
+
     const body = await request.json();
     const { texto_promocion, imagen_url } = body;
 
