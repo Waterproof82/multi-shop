@@ -1,7 +1,6 @@
 "use client"
 
 import { MapPin, Mail, Globe, MessageCircle } from "lucide-react"
-import Image from 'next/image';
 import { useLanguage, type Language } from "@/lib/language-context"
 import type { EmpresaInfo } from "@/lib/server-services"
 
@@ -16,30 +15,35 @@ const translations = {
     ubicacion: "Ubicación",
     verEnMapa: "Click para ver en Google Maps →",
     direccionNoConfigurada: "Dirección no configurada",
+    redesSociales: "Redes Sociales",
   },
   en: {
     contacto: "Contact",
     ubicacion: "Location",
     verEnMapa: "Click to see on Google Maps →",
     direccionNoConfigurada: "Address not configured",
+    redesSociales: "Social Media",
   },
   fr: {
     contacto: "Contact",
     ubicacion: "Emplacement",
     verEnMapa: "Cliquez pour voir sur Google Maps →",
     direccionNoConfigurada: "Adresse non configurée",
+    redesSociales: "Réseaux Sociaux",
   },
   it: {
     contacto: "Contatti",
     ubicacion: "Posizione",
     verEnMapa: "Clicca per vedere su Google Maps →",
     direccionNoConfigurada: "Indirizzo non configurato",
+    redesSociales: "Social Media",
   },
   de: {
     contacto: "Kontakt",
     ubicacion: "Standort",
     verEnMapa: "Klicken Sie hier für Google Maps →",
     direccionNoConfigurada: "Adresse nicht konfiguriert",
+    redesSociales: "Soziale Medien",
   },
 }
 
@@ -64,19 +68,7 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
           
           {/* Columna 1: Info Empresa */}
           <div className="space-y-4">
-            {empresa.logoUrl ? (
-              <div className="relative h-16 w-auto max-w-[200px]">
-                <Image
-                  src={empresa.logoUrl}
-                  alt={empresa.nombre}
-                  fill
-                  className="object-contain"
-                  loading="eager"
-                />
-              </div>
-            ) : (
-              <h2 className="text-2xl font-bold text-white">{empresa.nombre}</h2>
-            )}
+            <h3 className="text-sm font-semibold text-white uppercase tracking-wider">{t.redesSociales}</h3>
             
             <div className="flex gap-4 pt-2">
                 {empresa.instagram && (
@@ -107,7 +99,7 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
               {empresa.telefono && (
                 <li className="flex items-center gap-3 group">
                   <MessageCircle className="w-5 h-5 text-emerald-400 shrink-0 group-hover:scale-110 transition-transform" />
-                  <a href={`https://wa.me/${empresa.telefono.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="text-sm text-slate-400 group-hover:text-slate-200 transition-colors">
+                  <a href={`https://wa.me/${empresa.telefono.replaceAll(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="text-sm text-slate-400 group-hover:text-slate-200 transition-colors">
                     {empresa.telefono}
                   </a>
                 </li>
