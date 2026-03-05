@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, ReactNode } from "react"
+import { ReactNode } from "react"
 import { MenuCategoryVM } from "@/core/application/dtos/menu-view-model"
 import { HeroBanner } from "@/components/hero-banner"
 import { CategoryNav } from "@/components/category-nav"

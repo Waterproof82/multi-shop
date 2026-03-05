@@ -103,7 +103,6 @@ export async function POST(request: Request) {
 
     const emails = clientesConPromo?.map(c => c.email).filter(Boolean) || [];
     const numeroEnvios = emails.length;
-    console.log('Clientes con promociones:', numeroEnvios, clientesConPromo);
 
     // Obtener promoción anterior para borrar su imagen
     const { data: oldPromo } = await supabase
@@ -141,9 +140,6 @@ export async function POST(request: Request) {
 
     if (BREVO_API_KEY && numeroEnvios > 0) {
       const emails = clientesConPromo?.map(c => c.email).filter(Boolean) as string[];
-      
-      console.log('Enviando a emails:', emails);
-      console.log('BREVO_API_KEY configurado:', !!BREVO_API_KEY);
       
       if (emails && emails.length > 0) {
         const empresaLogoUrl = empresa?.logo_url || '';
@@ -205,8 +201,6 @@ export async function POST(request: Request) {
               senderEmail: empresa?.email_notification || 'a369cb001@smtp-brevo.com',
             });
           }
-          
-          console.log('Promo emails sent successfully via Brevo');
       }
     }
 

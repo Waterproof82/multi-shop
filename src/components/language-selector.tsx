@@ -20,7 +20,6 @@ const languages: { code: Language; label: string; flag: string }[] = [
 
 export function LanguageSelector() {
   const { language, setLanguage } = useLanguage()
-  const currentLang = languages.find((l) => l.code === language)
 
   return (
     <DropdownMenu>

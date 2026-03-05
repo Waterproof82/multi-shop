@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useId, useRef } from "react"
+import { useState, useRef } from "react"
 import { Plus, Minus, Check } from "lucide-react"
 import {
   Dialog,
@@ -37,18 +37,8 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
   const [selectedComplement, setSelectedComplement] = useState<Complement | null>(null)
   const { language } = useLanguage()
   const { addItem } = useCart()
-  const descriptionId = useId()
 
   const complements = item?.complements || [];
-
-  const handleQuantityChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = Number.parseInt(event.target.value, 10)
-    if (!Number.isNaN(value) && value >= 1) {
-      setQuantity(value)
-    } else if (event.target.value === "") {
-      setQuantity(0) // Allow empty input temporarily for typing
-    }
-  }
 
   const handleIncrement = () => {
     setQuantity((prev) => prev + 1)

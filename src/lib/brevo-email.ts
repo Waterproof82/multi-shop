@@ -43,7 +43,6 @@ export async function sendEmail({ to, subject, htmlContent, senderName = 'Pedido
       throw new Error(`Brevo API error: ${response.status}`);
     }
 
-    console.log('Brevo email sent successfully:', result);
     return result;
   } catch (error) {
     console.error('Error sending Brevo email:', error);

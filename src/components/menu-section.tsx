@@ -9,13 +9,6 @@ import { t } from "@/lib/translations"
 import { MenuCategoryVM, MenuItemVM, MenuSubcategoryVM } from "@/core/application/dtos/menu-view-model"
 import { QuantitySelectorDialog } from "@/components/quantity-selector-dialog"
 
-interface Complement {
-  id: string;
-  name: string;
-  price: number;
-  description?: string;
-}
-
 type LanguageKey = 'en' | 'fr' | 'it' | 'de';
 
 interface MenuSectionProps {

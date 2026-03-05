@@ -51,7 +51,6 @@ export async function deleteImageFromR2(imageUrl: string): Promise<boolean> {
     });
     
     await client.send(command);
-    console.log(`Deleted image from R2: ${key}`);
     return true;
   } catch (error) {
     console.error('Error deleting image from R2:', error);
