@@ -1,90 +1,48 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { z } from 'zod';
-
-function getSupabaseClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error("Configuración de Supabase incompleta");
-  }
-  
-  return createClient(supabaseUrl, supabaseKey);
-}
-
-function getEmpresaId(request: NextRequest): string | null {
-  return request.headers.get('x-empresa-id');
-}
-
-const updateEmpresaSchema = z.object({
-  email_notification: z.string().email().optional().or(z.literal('')),
-  telefono_whatsapp: z.string().optional(),
-  fb: z.string().url().optional().or(z.literal('')),
-  instagram: z.string().url().optional().or(z.literal('')),
-  url_mapa: z.string().optional(),
-  direccion: z.string().optional(),
-});
+import { NextRequest } from 'next/server';
+import { empresaRepository } from '@/core/infrastructure/database';
+import { updateEmpresaSchema } from '@/core/application/dtos/empresa.dto';
+import { requireAuth, successResponse, errorResponse, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 
 export async function GET(request: NextRequest) {
-  const empresaId = getEmpresaId(request);
-  if (!empresaId) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const { empresaId, error: authError } = await requireAuth(request);
+  if (authError) return authError;
+
+  try {
+    const empresa = await empresaRepository.getById(empresaId!);
+    if (!empresa) {
+      return errorResponse('Empresa no encontrada', 404);
+    }
+    
+    return successResponse({
+      email_notification: empresa.emailNotification || '',
+      telefono_whatsapp: '',
+      nombre: empresa.nombre || '',
+      logo_url: empresa.logoUrl || null,
+      fb: '',
+      instagram: '',
+      url_mapa: '',
+      direccion: '',
+    });
+  } catch {
+    return errorResponse('Error al obtener empresa');
   }
-
-  const supabase = getSupabaseClient();
-
-  const { data: empresa } = await supabase
-    .from('empresas')
-    .select('email_notification, telefono_whatsapp, nombre, logo_url, fb, instagram, url_mapa, direccion')
-    .eq('id', empresaId)
-    .single();
-
-  return NextResponse.json({
-    email_notification: empresa?.email_notification || '',
-    telefono_whatsapp: empresa?.telefono_whatsapp || '',
-    nombre: empresa?.nombre || '',
-    logo_url: empresa?.logo_url || null,
-    fb: empresa?.fb || '',
-    instagram: empresa?.instagram || '',
-    url_mapa: empresa?.url_mapa || '',
-    direccion: empresa?.direccion || '',
-  });
 }
 
 export async function PUT(request: NextRequest) {
-  const empresaId = getEmpresaId(request);
-  if (!empresaId) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-  }
+  const { empresaId, error: authError } = await requireAuth(request);
+  if (authError) return authError;
 
   const body = await request.json();
   const parsed = updateEmpresaSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.errors[0].message },
-      { status: 400 }
-    );
+    return validationErrorResponse(parsed.error.errors[0].message);
   }
 
-  const supabase = getSupabaseClient();
-
-  const { error } = await supabase
-    .from('empresas')
-    .update({ 
-      email_notification: parsed.data.email_notification || null,
-      telefono_whatsapp: parsed.data.telefono_whatsapp || null,
-      fb: parsed.data.fb || null,
-      instagram: parsed.data.instagram || null,
-      url_mapa: parsed.data.url_mapa || null,
-      direccion: parsed.data.direccion || null,
-    })
-    .eq('id', empresaId);
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  try {
+    await empresaRepository.update(empresaId!, parsed.data);
+    return successResponse({ success: true });
+  } catch {
+    return errorResponse('Error al actualizar empresa');
   }
-
-  return NextResponse.json({ success: true });
 }

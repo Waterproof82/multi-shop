@@ -25,7 +25,7 @@ export class SupabaseAdminRepository implements IAdminRepository {
       .single();
 
     if (error || !perfil) {
-      console.log('[Repo] Error fetching perfil:', error?.message);
+      console.error('[Repo] Error fetching perfil:', error?.message);
       return null;
     }
 
@@ -124,7 +124,7 @@ export class SupabaseAdminRepository implements IAdminRepository {
       .eq("id", empresaId);
 
     if (error) {
-      console.log('[Repo] Error updating colores:', error.message);
+      console.error('[Repo] Error updating colores:', error.message);
       return false;
     }
 

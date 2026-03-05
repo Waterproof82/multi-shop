@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { headers } from 'next/headers';
 import { sendEmail } from '@/lib/brevo-email';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
 
 interface CartItem {
@@ -126,7 +123,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Email service not configured' }, { status: 500 });
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const { getSupabaseClient } = await import('@/core/infrastructure/database/supabase-client');
+    const supabase = getSupabaseClient();
     const domain = await getDomainFromHeaders();
     
     const subdomainPedidos = 'pedidos';

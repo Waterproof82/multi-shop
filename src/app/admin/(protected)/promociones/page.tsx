@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Users, Mail, FileText, Send, CheckCircle, Image, Upload, Loader2 } from 'lucide-react';
+import { Users, Mail, FileText, Send, CheckCircle, Image, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAdmin } from '@/lib/admin-context';
 import { uploadImageAction } from '@/core/application/actions/storage.actions';
@@ -23,7 +23,7 @@ interface Promocion {
 }
 
 export default function PromocionesPage() {
-  const { empresaId, empresaSlug } = useAdmin();
+  const { empresaSlug } = useAdmin();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [promociones, setPromociones] = useState<Promocion[]>([]);
   const [savingPromo, setSavingPromo] = useState(false);

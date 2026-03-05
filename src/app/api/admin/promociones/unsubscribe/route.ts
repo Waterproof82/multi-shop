@@ -1,8 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 // Función helper para obtener base URL
 function getBaseUrl(): string {
@@ -21,7 +17,8 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${getBaseUrl()}/?error=invalid`);
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const { getSupabaseClient } = await import('@/core/infrastructure/database/supabase-client');
+    const supabase = getSupabaseClient();
 
     // Buscar cliente por email y empresa
     const { data: cliente, error: clienteError } = await supabase
@@ -43,7 +40,6 @@ export async function GET(request: Request) {
       .update({ aceptar_promociones: nuevoValor })
       .eq('id', cliente.id);
 
-    // Redirigir con mensaje
     const mensaje = nuevoValor ? 'promo=on' : 'promo=off';
     return NextResponse.redirect(`${getBaseUrl()}/?${mensaje}`);
   } catch (error) {

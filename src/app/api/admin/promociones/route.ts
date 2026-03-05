@@ -1,154 +1,105 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { jwtVerify } from 'jose';
-import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/brevo-email';
 import { deleteImageFromR2 } from '@/core/infrastructure/storage/s3-client';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+import { promocionRepository, adminRepository } from '@/core/infrastructure/database';
 
 const ADMIN_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET!;
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
 
+// Helper to get admin empresaId from JWT cookie
+async function getAdminEmpresaId(): Promise<string | null> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get('admin_token')?.value;
+
+  if (!token) return null;
+
+  try {
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(ADMIN_TOKEN_SECRET));
+    const adminId = payload.adminId as string;
+    const perfil = await adminRepository.findById(adminId);
+    return perfil?.empresaId || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET() {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('admin_token')?.value;
-
-    if (!token) {
+    const empresaId = await getAdminEmpresaId();
+    if (!empresaId) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const { payload } = await jwtVerify(token, new TextEncoder().encode(ADMIN_TOKEN_SECRET));
-    const adminId = payload.adminId as string;
-
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    const { data: perfil } = await supabase
-      .from('perfiles_admin')
-      .select('empresa_id')
-      .eq('id', adminId)
-      .single();
-
-    if (!perfil) {
-      return NextResponse.json({ error: 'Admin no encontrado' }, { status: 404 });
-    }
-
-    const { data: promociones, error } = await supabase
-      .from('promociones')
-      .select('*')
-      .eq('empresa_id', perfil.empresa_id)
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
+    const promociones = await promocionRepository.findAllByTenant(empresaId);
     return NextResponse.json({ promociones });
-  } catch (error) {
-    console.error('Error fetching promociones:', error);
+  } catch {
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('admin_token')?.value;
-
-    if (!token) {
+    const empresaId = await getAdminEmpresaId();
+    if (!empresaId) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const { payload } = await jwtVerify(token, new TextEncoder().encode(ADMIN_TOKEN_SECRET));
-    const adminId = payload.adminId as string;
-
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    const { data: perfil } = await supabase
-      .from('perfiles_admin')
-      .select('empresa_id')
-      .eq('id', adminId)
-      .single();
-
-    if (!perfil) {
-      return NextResponse.json({ error: 'Admin no encontrado' }, { status: 404 });
-    }
+    const { getSupabaseClient } = await import('@/core/infrastructure/database/supabase-client');
+    const supabase = getSupabaseClient();
 
     const { data: empresa } = await supabase
       .from('empresas')
-      .select('email_notification, nombre, logo_url, dominio')
-      .eq('id', perfil.empresa_id)
+      .select('nombre, logo_url, email_notification')
+      .eq('id', empresaId)
       .single();
-
-    if (!empresa) {
-      return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 });
-    }
 
     const body = await request.json();
     const { texto_promocion, imagen_url } = body;
 
     if (!texto_promocion) {
-      return NextResponse.json({ error: 'Falta el texto de la promoción' }, { status: 400 });
+      return NextResponse.json({ error: 'El texto de promoción es requerido' }, { status: 400 });
     }
 
+    // Get clientes with promotions
     const { data: clientesConPromo } = await supabase
       .from('clientes')
       .select('email')
-      .eq('empresa_id', perfil.empresa_id)
+      .eq('empresa_id', empresaId)
       .eq('aceptar_promociones', true)
       .not('email', 'is', null);
 
     const emails = clientesConPromo?.map(c => c.email).filter(Boolean) || [];
     const numeroEnvios = emails.length;
-    console.log('Clientes con promociones:', numeroEnvios, clientesConPromo);
 
-    // Obtener promoción anterior para borrar su imagen
+    // Delete old promo image if exists
     const { data: oldPromo } = await supabase
       .from('promociones')
       .select('imagen_url')
-      .eq('empresa_id', perfil.empresa_id)
+      .eq('empresa_id', empresaId)
       .single();
 
-    // Eliminar imagen anterior de R2 si existe
     if (oldPromo?.imagen_url) {
       await deleteImageFromR2(oldPromo.imagen_url);
     }
 
-    // Eliminar promociones anteriores de esta empresa
-    await supabase
-      .from('promociones')
-      .delete()
-      .eq('empresa_id', perfil.empresa_id);
+    // Delete old promotions
+    await promocionRepository.deleteAllByTenant(empresaId);
 
-    const { data: promo, error } = await supabase
-      .from('promociones')
-      .insert({
-        empresa_id: perfil.empresa_id,
-        fecha_hora: new Date().toISOString(),
-        texto_promocion,
-        imagen_url: imagen_url || null,
-        numero_envios: numeroEnvios,
-      })
-      .select()
-      .single();
+    // Create new promotion
+    const promo = await promocionRepository.create({
+      empresaId,
+      texto_promocion,
+      imagen_url,
+      numero_envios: numeroEnvios,
+    });
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    if (BREVO_API_KEY && numeroEnvios > 0) {
-      const emails = clientesConPromo?.map(c => c.email).filter(Boolean) as string[];
+    // Send emails via Brevo
+    if (BREVO_API_KEY && numeroEnvios > 0 && emails.length > 0) {
+      const empresaLogoUrl = empresa?.logo_url || '';
       
-      console.log('Enviando a emails:', emails);
-      console.log('BREVO_API_KEY configurado:', !!BREVO_API_KEY);
-      
-      if (emails && emails.length > 0) {
-        const empresaLogoUrl = empresa?.logo_url || '';
-        
-        const emailHtml = `
+      const emailHtml = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -156,57 +107,32 @@ export async function POST(request: Request) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body style="margin: 0; padding: 20px; background-color: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-  <div style="max-width: 500px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-    ${empresaLogoUrl ? `
-    <div style="padding: 24px; text-align: center; background-color: #ffffff;">
-      <img src="${empresaLogoUrl}" alt="Logo" style="max-width: 180px; max-height: 80px; height: auto; display: inline-block;">
-    </div>
-    ` : `
-    <div style="background-color: #1a1a1a; padding: 24px; text-align: center;">
-      <h1 style="margin: 0; color: #ffffff; font-size: 24px;">${empresa?.nombre || 'Promociones'}</h1>
-    </div>
-    `}
-    ${imagen_url ? `
-    <div style="padding: 0;">
-      <img src="${imagen_url}" alt="Promoción" style="width: 100%; max-width: 500px; height: auto; display: block;">
-    </div>
-    ` : ''}
-    <div style="padding: 24px;">
-      <p style="margin: 0 0 16px 0; color: #333333; font-size: 16px; line-height: 1.5;">
-        ${texto_promocion}
-      </p>
-      <p style="margin: 0; color: #888888; font-size: 14px;">
-        Muestra este mensaje para canjear la promoción.
-      </p>
-    </div>
-    <div style="background-color: #f9f9f9; padding: 16px; text-align: center;">
-      <p style="margin: 0 0 8px 0; color: #888888; font-size: 12px;">
-        <a href="https://${empresa.dominio}/api/unsubscribe?email=__EMAIL__&empresa=${perfil.empresa_id}&action=baja" style="color: #dc2626; text-decoration: underline;">Dar de baja las promociones</a>
-      </p>
-      <p style="margin: 0; color: #888888; font-size: 12px;">
-        <a href="https://${empresa.dominio}/api/unsubscribe?email=__EMAIL__&empresa=${perfil.empresa_id}&action=alta" style="color: #16a34a; text-decoration: underline;">Volver a recibir promociones</a>
+  <div style="max-width: 500px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow-hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+    ${empresaLogoUrl ? `<img src="${empresaLogoUrl}" alt="${empresa?.nombre || 'Empresa'}" style="width: 100%; max-width: 200px; display: block; margin: 20px auto;">` : ''}
+    <div style="padding: 20px;">
+      <h2 style="margin: 0 0 16px; color: #333; text-align: center;">Nueva promoción disponible</h2>
+      <div style="background-color: #f9f9f9; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+        <p style="margin: 0; color: #555; line-height: 1.6;">${texto_promocion}</p>
+      </div>
+      ${imagen_url ? `<img src="${imagen_url}" alt="Promoción" style="width: 100%; border-radius: 8px; margin-bottom: 16px;">` : ''}
+      <p style="margin: 0; font-size: 12px; color: #999; text-align: center;">
+        <a href="https://${process.env.NEXT_PUBLIC_BASE_URL || 'www.almadearena.es'}/api/unsubscribe?email=__EMAIL__&empresa=${empresaId}&action=baja" style="color: #dc2626; text-decoration: underline;">Dar de baja las promociones</a>
       </p>
     </div>
   </div>
 </body>
-</html>
-        `.trim();
+</html>`;
 
-          // Enviar emails individualmente para incluir el link personalizado
-          for (const email of emails) {
-            // Replace ALL occurrences of __EMAIL__ (both links)
-            const personalizedHtml = emailHtml.replaceAll('__EMAIL__', encodeURIComponent(email));
-            
-            await sendEmail({
-              to: [email],
-              subject: 'Nueva promocion disponible',
-              htmlContent: personalizedHtml,
-              senderName: empresa?.nombre || 'Promociones',
-              senderEmail: empresa?.email_notification || 'a369cb001@smtp-brevo.com',
-            });
-          }
-          
-          console.log('Promo emails sent successfully via Brevo');
+      for (const email of emails) {
+        const personalizedHtml = emailHtml.replace(/__EMAIL__/g, encodeURIComponent(email));
+        
+        await sendEmail({
+          to: [email],
+          subject: 'Nueva promocion disponible',
+          htmlContent: personalizedHtml,
+          senderName: empresa?.nombre || 'Promociones',
+          senderEmail: empresa?.email_notification || 'a369cb001@smtp-brevo.com',
+        });
       }
     }
 

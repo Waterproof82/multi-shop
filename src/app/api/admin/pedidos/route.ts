@@ -1,21 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { NextRequest } from 'next/server';
 import { z } from 'zod';
-
-function getSupabaseClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error("Configuración de Supabase incompleta");
-  }
-  
-  return createClient(supabaseUrl, supabaseKey);
-}
-
-function getEmpresaId(request: NextRequest): string | null {
-  return request.headers.get('x-empresa-id');
-}
+import { pedidoRepository } from '@/core/infrastructure/database';
+import { requireAuth, successResponse, errorResponse, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 
 const pedidoIdSchema = z.object({
   id: z.string().uuid(),
@@ -27,108 +13,61 @@ const updatePedidoSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  const empresaId = getEmpresaId(request);
-  if (!empresaId) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-  }
+  const { empresaId, error: authError } = await requireAuth(request);
+  if (authError) return authError;
 
   try {
-    const supabase = getSupabaseClient();
-
-    const { data: pedidos, error } = await supabase
-      .from('pedidos')
-      .select(`
-        *,
-        clientes:cliente_id (nombre, email, telefono)
-      `)
-      .eq('empresa_id', empresaId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ pedidos });
-  } catch (error) {
-    console.error('Error fetching pedidos:', error);
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
+    const pedidos = await pedidoRepository.findAllByTenant(empresaId!);
+    return successResponse({ pedidos });
+  } catch {
+    return errorResponse('Error al obtener pedidos');
   }
 }
 
 export async function PATCH(request: NextRequest) {
-  const empresaId = getEmpresaId(request);
-  if (!empresaId) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const { empresaId, error: authError } = await requireAuth(request);
+  if (authError) return authError;
+
+  const body = await request.json();
+  const parsed = updatePedidoSchema.safeParse(body);
+
+  if (!parsed.success) {
+    return validationErrorResponse(parsed.error.errors[0].message);
   }
 
   try {
-    const body = await request.json();
-    const parsed = updatePedidoSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.errors[0].message },
-        { status: 400 }
-      );
-    }
-
-    const supabase = getSupabaseClient();
-
-    const { error } = await supabase
-      .from('pedidos')
-      .update({ estado: parsed.data.estado })
-      .eq('id', parsed.data.id)
-      .eq('empresa_id', empresaId);
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error updating pedido:', error);
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
+    await pedidoRepository.updateStatus(parsed.data.id, empresaId!, parsed.data.estado);
+    return successResponse({ success: true });
+  } catch {
+    return errorResponse('Error al actualizar pedido');
   }
 }
 
 export async function DELETE(request: NextRequest) {
-  const empresaId = getEmpresaId(request);
-  if (!empresaId) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const { empresaId, error: authError } = await requireAuth(request);
+  if (authError) return authError;
+
+  const body = await request.json();
+  const parsed = pedidoIdSchema.safeParse({ id: body.id });
+
+  if (!parsed.success) {
+    return validationErrorResponse('ID inválido');
   }
 
   try {
-    const body = await request.json();
-    const parsed = pedidoIdSchema.safeParse({ id: body.id });
-
-    if (!parsed.success) {
-      return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
-    }
-
+    // Note: delete not in repository yet, need to add
+    const { getSupabaseClient } = await import('@/core/infrastructure/database/supabase-client');
     const supabase = getSupabaseClient();
-
-    const { error } = await supabase
-      .from('pedidos')
-      .delete()
-      .eq('id', parsed.data.id)
-      .eq('empresa_id', empresaId);
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error deleting pedido:', error);
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
+    await supabase.from('pedidos').delete().eq('id', parsed.data.id).eq('empresa_id', empresaId);
+    return successResponse({ success: true });
+  } catch {
+    return errorResponse('Error al eliminar pedido');
   }
 }
 
 export async function PUT(request: NextRequest) {
-  const empresaId = getEmpresaId(request);
-  if (!empresaId) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-  }
+  const { empresaId, error: authError } = await requireAuth(request);
+  if (authError) return authError;
 
   try {
     const { searchParams } = new URL(request.url);
@@ -144,23 +83,22 @@ export async function PUT(request: NextRequest) {
     const monthEnd = new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59).toISOString();
     const yearStart = new Date(selectedYear, 0, 1).toISOString();
 
+    const { getSupabaseClient } = await import('@/core/infrastructure/database/supabase-client');
     const supabase = getSupabaseClient();
 
-    const { data: pedidos, error } = await supabase
+    const { data: pedidos } = await supabase
       .from('pedidos')
       .select('*')
       .eq('empresa_id', empresaId);
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    const pedidosFiltrados = pedidos || [];
 
-    const pedidosHoy = pedidos?.filter(p => {
+    const pedidosHoy = pedidosFiltrados.filter(p => {
       const fecha = new Date(p.created_at);
       return fecha >= new Date(todayStart) && fecha <= new Date(monthEnd);
-    }) || [];
-    const pedidosMes = pedidos?.filter(p => new Date(p.created_at) >= new Date(monthStart) && new Date(p.created_at) <= new Date(monthEnd)) || [];
-    const pedidosAno = pedidos?.filter(p => new Date(p.created_at) >= new Date(yearStart)) || [];
+    });
+    const pedidosMes = pedidosFiltrados.filter(p => new Date(p.created_at) >= new Date(monthStart) && new Date(p.created_at) <= new Date(monthEnd));
+    const pedidosAno = pedidosFiltrados.filter(p => new Date(p.created_at) >= new Date(yearStart));
 
     const totalHoy = pedidosHoy.reduce((sum, p) => sum + (p.total || 0), 0);
     const totalMes = pedidosMes.reduce((sum, p) => sum + (p.total || 0), 0);
@@ -202,7 +140,7 @@ export async function PUT(request: NextRequest) {
       .sort((a, b) => b.cantidad - a.cantidad)
       .slice(0, 10);
 
-    return NextResponse.json({
+    return successResponse({
       pedidosHoy: pedidosHoy.length,
       pedidosMes: pedidosMes.length,
       totalHoy,
@@ -212,8 +150,7 @@ export async function PUT(request: NextRequest) {
       topPlatosAno,
       mesSeleccionado: `${selectedMonth}-${selectedYear}`,
     });
-  } catch (error) {
-    console.error('Error fetching statistics:', error);
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
+  } catch {
+    return errorResponse('Error al obtener estadísticas');
   }
 }

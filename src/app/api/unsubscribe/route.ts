@@ -1,8 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export async function GET(request: Request) {
   try {
@@ -11,9 +7,6 @@ export async function GET(request: Request) {
     const empresaId = searchParams.get('empresa');
     const action = searchParams.get('action');
 
-    console.log('Promo request - raw URL:', request.url);
-    console.log('Promo request - params:', { email, empresaId, action });
-
     if (!email || !empresaId) {
       return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://www.almadearena.es'}/?error=invalid`);
     }
@@ -21,15 +14,15 @@ export async function GET(request: Request) {
     // Decode email if it's URL encoded
     try {
       email = decodeURIComponent(email);
-    } catch (e) {
+    } catch {
       // Keep original if decode fails
     }
     
     // Normalizar email: trim, lowercase
     const normalizedEmail = email.trim().toLowerCase();
-    console.log('Promo request - normalized email:', normalizedEmail);
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const { getSupabaseClient } = await import('@/core/infrastructure/database/supabase-client');
+    const supabase = getSupabaseClient();
 
     // Buscar cliente por empresa + email
     let clienteToUpdate = null;
@@ -44,7 +37,6 @@ export async function GET(request: Request) {
     
     if (cliente1) {
       clienteToUpdate = cliente1;
-      console.log('Found with ilike');
     } else {
       // Try exact match
       const { data: cliente2 } = await supabase
@@ -56,21 +48,10 @@ export async function GET(request: Request) {
       
       if (cliente2) {
         clienteToUpdate = cliente2;
-        console.log('Found with exact match');
-      } else {
-        // Try without empresa filter - just to debug
-        const { data: allClientes } = await supabase
-          .from('clientes')
-          .select('id, email, empresa_id, aceptar_promociones')
-          .ilike('email', normalizedEmail)
-          .limit(10);
-        
-        console.log('Search by email only, found:', allClientes);
       }
     }
 
     if (!clienteToUpdate) {
-      console.log('Cliente not found for email:', normalizedEmail, 'empresa:', empresaId);
       return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://www.almadearena.es'}/?error=notfound`);
     }
 
@@ -78,11 +59,10 @@ export async function GET(request: Request) {
     let nuevoValor: boolean;
     
     if (action === 'alta') {
-      nuevoValor = true; // Darse de alta
+      nuevoValor = true;
     } else if (action === 'baja') {
-      nuevoValor = false; // Darse de baja
+      nuevoValor = false;
     } else {
-      // Default: toggle
       nuevoValor = !clienteToUpdate.aceptar_promociones;
     }
 
@@ -91,9 +71,6 @@ export async function GET(request: Request) {
       .update({ aceptar_promociones: nuevoValor })
       .eq('id', clienteToUpdate.id);
 
-    console.log('Updated cliente:', nuevoValor);
-
-    // Redirigir con mensaje
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.almadearena.es';
     const mensaje = nuevoValor ? 'promo=on' : 'promo=off';
     return NextResponse.redirect(`${baseUrl}/?${mensaje}`);

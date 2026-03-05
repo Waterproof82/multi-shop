@@ -2,20 +2,21 @@ export interface Product {
   id: string;
   empresaId: string;
   categoriaId: string | null;
-  titulo: string;
-  descripcion: string | null;
+  titulo_es: string;
+  titulo_en: string | null;
+  titulo_fr: string | null;
+  titulo_it: string | null;
+  titulo_de: string | null;
+  descripcion_es: string | null;
+  descripcion_en: string | null;
+  descripcion_fr: string | null;
+  descripcion_it: string | null;
+  descripcion_de: string | null;
   precio: number;
   fotoUrl: string | null;
   esEspecial: boolean;
   activo: boolean;
   createdAt: Date;
-  // Soporte para i18n
-  translations?: {
-    en?: { titulo: string; descripcion: string | null };
-    fr?: { titulo: string; descripcion: string | null };
-    it?: { titulo: string; descripcion: string | null };
-    de?: { titulo: string; descripcion: string | null };
-  };
 }
 
 export interface Category {

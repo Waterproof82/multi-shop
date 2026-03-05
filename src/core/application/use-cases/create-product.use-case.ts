@@ -1,17 +1,27 @@
 import { IProductRepository } from "@/core/domain/repositories/IProductRepository";
-import { CreateProductDTO, createProductSchema } from "@/core/application/dtos/product.dto";
+import { Product } from "@/core/domain/entities/types";
+import { CreateProductDTO, UpdateProductDTO } from "@/core/application/dtos/product.dto";
 
-export class CreateProductUseCase {
+export class ProductUseCase {
   constructor(private readonly productRepo: IProductRepository) {}
 
-  async execute(input: CreateProductDTO) {
-    // 1. Validar Inputs
-    const validatedData = createProductSchema.parse(input);
+  async getAll(empresaId: string): Promise<Product[]> {
+    return this.productRepo.findAllByTenant(empresaId);
+  }
 
-    // 2. Ejecutar persistencia (Supabase ya maneja RLS, pero validamos tenantId)
-    // El repositorio se encarga de hablar con la DB
-    const newProduct = await this.productRepo.create(validatedData);
+  async getById(id: string): Promise<Product | null> {
+    return this.productRepo.findById(id);
+  }
 
-    return newProduct;
+  async create(data: CreateProductDTO): Promise<Product> {
+    return this.productRepo.create(data);
+  }
+
+  async update(id: string, empresaId: string, data: Partial<UpdateProductDTO>): Promise<Product> {
+    return this.productRepo.update(id, empresaId, data);
+  }
+
+  async delete(id: string, empresaId: string): Promise<void> {
+    return this.productRepo.delete(id, empresaId);
   }
 }

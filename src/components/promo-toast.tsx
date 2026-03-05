@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { X, CheckCircle, AlertCircle } from 'lucide-react';
 
 export function PromoToast() {
   const [visible, setVisible] = useState(false);

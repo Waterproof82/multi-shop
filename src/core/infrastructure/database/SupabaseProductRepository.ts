@@ -11,19 +11,21 @@ export class SupabaseProductRepository implements IProductRepository {
       id: row.id,
       empresaId: row.empresa_id,
       categoriaId: row.categoria_id,
-      titulo: row.titulo_es, // Por ahora ES por defecto
-      descripcion: row.descripcion_es,
+      titulo_es: row.titulo_es,
+      titulo_en: row.titulo_en,
+      titulo_fr: row.titulo_fr,
+      titulo_it: row.titulo_it,
+      titulo_de: row.titulo_de,
+      descripcion_es: row.descripcion_es,
+      descripcion_en: row.descripcion_en,
+      descripcion_fr: row.descripcion_fr,
+      descripcion_it: row.descripcion_it,
+      descripcion_de: row.descripcion_de,
       precio: Number.parseFloat(row.precio),
       fotoUrl: row.foto_url,
       esEspecial: row.es_especial,
       activo: row.activo,
       createdAt: new Date(row.created_at),
-      translations: {
-        en: { titulo: row.titulo_en, descripcion: row.descripcion_en },
-        fr: { titulo: row.titulo_fr, descripcion: row.descripcion_fr },
-        it: { titulo: row.titulo_it, descripcion: row.descripcion_it },
-        de: { titulo: row.titulo_de, descripcion: row.descripcion_de },
-      },
     };
   }
 
@@ -32,12 +34,20 @@ export class SupabaseProductRepository implements IProductRepository {
       .from("productos")
       .insert({
         empresa_id: data.empresaId,
-        categoria_id: data.categoriaId,
-        titulo_es: data.titulo,
-        descripcion_es: data.descripcion,
+        categoria_id: data.categoria_id || null,
+        titulo_es: data.titulo_es,
+        titulo_en: data.titulo_en || null,
+        titulo_fr: data.titulo_fr || null,
+        titulo_it: data.titulo_it || null,
+        titulo_de: data.titulo_de || null,
+        descripcion_es: data.descripcion_es || null,
+        descripcion_en: data.descripcion_en || null,
+        descripcion_fr: data.descripcion_fr || null,
+        descripcion_it: data.descripcion_it || null,
+        descripcion_de: data.descripcion_de || null,
         precio: data.precio,
-        foto_url: data.fotoUrl,
-        es_especial: data.esEspecial,
+        foto_url: data.foto_url || null,
+        es_especial: data.es_especial,
         activo: data.activo,
       })
       .select()
@@ -63,26 +73,37 @@ export class SupabaseProductRepository implements IProductRepository {
       .from("productos")
       .select("*")
       .eq("empresa_id", empresaId)
-      .eq("activo", true); // Solo productos activos
+      .order("created_at", { ascending: false });
 
     if (error) throw new Error(`DB Error: ${error.message}`);
     return data.map((row) => this.mapToDomain(row));
   }
 
-  async update(id: string, data: Partial<UpdateProductDTO>): Promise<Product> {
+  async update(id: string, empresaId: string, data: Partial<UpdateProductDTO>): Promise<Product> {
     const updatePayload: any = {};
-    if (data.categoriaId !== undefined) updatePayload.categoria_id = data.categoriaId;
-    if (data.titulo !== undefined) updatePayload.titulo_es = data.titulo;
-    if (data.descripcion !== undefined) updatePayload.descripcion_es = data.descripcion;
+    
+    // Map DTO fields to DB columns
+    if (data.categoria_id !== undefined) updatePayload.categoria_id = data.categoria_id;
+    if (data.titulo_es !== undefined) updatePayload.titulo_es = data.titulo_es;
+    if (data.titulo_en !== undefined) updatePayload.titulo_en = data.titulo_en;
+    if (data.titulo_fr !== undefined) updatePayload.titulo_fr = data.titulo_fr;
+    if (data.titulo_it !== undefined) updatePayload.titulo_it = data.titulo_it;
+    if (data.titulo_de !== undefined) updatePayload.titulo_de = data.titulo_de;
+    if (data.descripcion_es !== undefined) updatePayload.descripcion_es = data.descripcion_es;
+    if (data.descripcion_en !== undefined) updatePayload.descripcion_en = data.descripcion_en;
+    if (data.descripcion_fr !== undefined) updatePayload.descripcion_fr = data.descripcion_fr;
+    if (data.descripcion_it !== undefined) updatePayload.descripcion_it = data.descripcion_it;
+    if (data.descripcion_de !== undefined) updatePayload.descripcion_de = data.descripcion_de;
     if (data.precio !== undefined) updatePayload.precio = data.precio;
-    if (data.fotoUrl !== undefined) updatePayload.foto_url = data.fotoUrl;
-    if (data.esEspecial !== undefined) updatePayload.es_especial = data.esEspecial;
+    if (data.foto_url !== undefined) updatePayload.foto_url = data.foto_url === "" ? null : data.foto_url;
+    if (data.es_especial !== undefined) updatePayload.es_especial = data.es_especial;
     if (data.activo !== undefined) updatePayload.activo = data.activo;
 
     const { data: updated, error } = await this.supabase
       .from("productos")
       .update(updatePayload)
       .eq("id", id)
+      .eq("empresa_id", empresaId)
       .select()
       .single();
 
@@ -90,11 +111,12 @@ export class SupabaseProductRepository implements IProductRepository {
     return this.mapToDomain(updated);
   }
 
-  async delete(id: string): Promise<void> {
+  async delete(id: string, empresaId: string): Promise<void> {
     const { error } = await this.supabase
       .from("productos")
       .delete()
-      .eq("id", id);
+      .eq("id", id)
+      .eq("empresa_id", empresaId);
 
     if (error) throw new Error(`DB Error: ${error.message}`);
   }

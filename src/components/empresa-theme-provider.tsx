@@ -19,11 +19,6 @@ const darkColors: EmpresaColores = {
   foreground: '#FDFBF7',
 };
 
-function getInitialTheme(): boolean {
-  if (typeof window === 'undefined') return false;
-  return window.matchMedia('(prefers-color-scheme: dark)').matches;
-}
-
 export function EmpresaThemeProvider({ children, colores }: EmpresaThemeProviderProps) {
   const [mounted, setMounted] = useState(false);
   const [isDark, setIsDark] = useState(() => {

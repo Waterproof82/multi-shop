@@ -1,25 +1,25 @@
 import { z } from "zod";
 
+// Schema for API validation (with i18n fields - snake_case)
 export const createCategorySchema = z.object({
-  nombreEs: z.string().min(1, "El nombre en español es requerido"),
-  nombreEn: z.string().optional(),
-  nombreFr: z.string().optional(),
-  nombreIt: z.string().optional(),
-  nombreDe: z.string().optional(),
-  descripcionEs: z.string().optional(),
-  descripcionEn: z.string().optional(),
-  descripcionFr: z.string().optional(),
-  descripcionIt: z.string().optional(),
-  descripcionDe: z.string().optional(),
+  empresaId: z.string().uuid(),
+  nombre_es: z.string().min(1, "El nombre en español es requerido"),
+  nombre_en: z.string().optional(),
+  nombre_fr: z.string().optional(),
+  nombre_it: z.string().optional(),
+  nombre_de: z.string().optional(),
+  descripcion_es: z.string().optional(),
+  descripcion_en: z.string().optional(),
+  descripcion_fr: z.string().optional(),
+  descripcion_it: z.string().optional(),
+  descripcion_de: z.string().optional(),
   orden: z.number().int().default(0),
-  categoriaComplementoDe: z.string().uuid().nullable().optional(),
-  complementoObligatorio: z.boolean().default(false),
-  categoriaPadreId: z.string().uuid().nullable().optional(),
+  categoria_complemento_de: z.string().uuid().nullable().optional(),
+  complemento_obligatorio: z.boolean().default(false),
+  categoria_padre_id: z.string().uuid().nullable().optional(),
 });
 
-export const updateCategorySchema = createCategorySchema.partial().extend({
-  id: z.string().uuid(),
-});
+export const updateCategorySchema = createCategorySchema.partial();
 
 export const categoryIdSchema = z.object({
   id: z.string().uuid(),
