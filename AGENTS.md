@@ -147,6 +147,7 @@ import {
 - ✅ `<Image>` de Next.js para imágenes
 - ✅ `<Link>` de Next.js para navegación
 
+
 ## Cosas importantes para el agente
 
 ### Footer
