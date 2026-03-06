@@ -116,10 +116,10 @@ export async function POST(request: Request) {
       </div>
       ${imagen_url ? `<img src="${imagen_url}" alt="Promoción" style="width: 100%; border-radius: 8px; margin-bottom: 16px;">` : ''}
       <p style="margin: 16px 0 8px; font-size: 12px; color: #999; text-align: center;">
-        <a href="https://${empresa?.dominio || process.env.NEXT_PUBLIC_BASE_URL || 'www.almadearena.es'}/api/admin/promociones/unsubscribe?email=__EMAIL__&empresa=${empresaId}" style="color: #dc2626; text-decoration: underline;">Dar de baja las promociones</a>
+        <a href="https://${empresa?.dominio || process.env.NEXT_PUBLIC_BASE_URL || 'www.almadearena.es'}/api/unsubscribe?email=__EMAIL__&empresa=${empresaId}" style="color: #dc2626; text-decoration: underline;">Dar de baja las promociones</a>
       </p>
       <p style="margin: 0; font-size: 12px; color: #999; text-align: center;">
-        <a href="https://${empresa?.dominio || process.env.NEXT_PUBLIC_BASE_URL || 'www.almadearena.es'}/api/admin/promociones/unsubscribe?email=__EMAIL__&empresa=${empresaId}" style="color: #16a34a; text-decoration: underline;">Volver a dar de alta</a>
+        <a href="https://${empresa?.dominio || process.env.NEXT_PUBLIC_BASE_URL || 'www.almadearena.es'}/api/unsubscribe?email=__EMAIL__&empresa=${empresaId}" style="color: #16a34a; text-decoration: underline;">Volver a dar de alta</a>
       </p>
     </div>
   </div>
