@@ -9,10 +9,12 @@ export function PromoToast() {
   const [type, setType] = useState<'success' | 'error'>('success');
 
   useEffect(() => {
-    // Only run on client
     const params = new URLSearchParams(window.location.search);
     const promoStatus = params.get('promo');
     const error = params.get('error');
+
+    // Solo mostrar si hay parámetros relevantes
+    if (!promoStatus && !error) return;
 
     if (promoStatus === 'on') {
       setMessage('¡Te has dado de alta en las promociones!');
@@ -34,19 +36,16 @@ export function PromoToast() {
       setMessage('Error interno. Intenta de nuevo.');
       setType('error');
       setVisible(true);
-    } else if (error) {
-      setMessage(`Error: ${error}`);
-      setType('error');
-      setVisible(true);
     }
+  }, []);
 
-    if (visible) {
-      // Remove query params after showing
-      const url = new URL(window.location.href);
-      url.search = '';
-      window.history.replaceState({}, '', url);
-    }
-  }, [visible]);
+  const handleClose = () => {
+    setVisible(false);
+    // Limpiar URL después de cerrar
+    const url = new URL(window.location.href);
+    url.search = '';
+    window.history.replaceState({}, '', url.toString());
+  };
 
   if (!visible) return null;
 
@@ -55,13 +54,13 @@ export function PromoToast() {
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/50"
-        onClick={() => setVisible(false)}
+        onClick={handleClose}
       />
       
       {/* Modal */}
       <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-sm w-full p-6 animate-in fade-in zoom-in duration-200">
         <button
-          onClick={() => setVisible(false)}
+          onClick={handleClose}
           className="absolute top-3 right-3 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
         >
           <X className="w-5 h-5 text-gray-500" />
@@ -83,7 +82,7 @@ export function PromoToast() {
           </p>
 
           <button
-            onClick={() => setVisible(false)}
+            onClick={handleClose}
             className="mt-6 px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
           >
             Aceptar
