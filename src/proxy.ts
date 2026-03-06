@@ -8,8 +8,10 @@ export async function proxy(request: NextRequest) {
   const url = request.nextUrl.clone();
   const path = request.nextUrl.pathname;
 
-  // 1. Rutas de API admin - verificar JWT
-  if (path.startsWith('/api/admin') && path !== '/api/admin/login' && !path.includes('/unsubscribe')) {
+  // 1. Rutas públicas que no requieren JWT
+  const isPublicRoute = path === '/api/unsubscribe' || path.startsWith('/api/admin/promociones/unsubscribe');
+  
+  if (path.startsWith('/api/admin') && !isPublicRoute) {
     const adminToken = request.cookies.get('admin_token')?.value;
 
     if (!adminToken) {

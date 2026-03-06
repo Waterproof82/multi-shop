@@ -99,7 +99,11 @@ export async function POST(request: Request) {
     if (BREVO_API_KEY && numeroEnvios > 0 && emails.length > 0) {
       const empresaLogoUrl = empresa?.logo_url || '';
       
-      const emailHtml = `
+      const baseUrl = empresa?.dominio 
+      ? `https://${empresa.dominio}` 
+      : (process.env.NEXT_PUBLIC_BASE_URL || 'https://www.almadearena.es');
+    
+    const emailHtml = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -116,10 +120,10 @@ export async function POST(request: Request) {
       </div>
       ${imagen_url ? `<img src="${imagen_url}" alt="Promoción" style="width: 100%; border-radius: 8px; margin-bottom: 16px;">` : ''}
       <p style="margin: 16px 0 8px; font-size: 12px; color: #999; text-align: center;">
-        <a href="https://${empresa?.dominio || process.env.NEXT_PUBLIC_BASE_URL || 'www.almadearena.es'}/api/unsubscribe?email=__EMAIL__&empresa=${empresaId}" style="color: #dc2626; text-decoration: underline;">Dar de baja las promociones</a>
+        <a href="${baseUrl}/api/unsubscribe?email=__EMAIL__&empresa=${empresaId}" style="color: #dc2626; text-decoration: underline;">Dar de baja las promociones</a>
       </p>
       <p style="margin: 0; font-size: 12px; color: #999; text-align: center;">
-        <a href="https://${empresa?.dominio || process.env.NEXT_PUBLIC_BASE_URL || 'www.almadearena.es'}/api/unsubscribe?email=__EMAIL__&empresa=${empresaId}" style="color: #16a34a; text-decoration: underline;">Volver a dar de alta</a>
+        <a href="${baseUrl}/api/unsubscribe?email=__EMAIL__&empresa=${empresaId}" style="color: #16a34a; text-decoration: underline;">Volver a dar de alta</a>
       </p>
     </div>
   </div>
