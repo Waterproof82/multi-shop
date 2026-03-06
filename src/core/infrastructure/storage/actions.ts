@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 import { getS3Client, getR2Config } from "./s3-client";
 
 const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 export async function getPresignedUploadUrlAction(
   fileName: string,
@@ -26,7 +26,7 @@ export async function getPresignedUploadUrlAction(
   }
 
   if (fileSize > MAX_FILE_SIZE) {
-    throw new Error("El archivo excede el tamaño máximo de 5MB");
+    throw new Error("El archivo excede el tamaño máximo de 10MB");
   }
 
   const uuid = uuidv4();

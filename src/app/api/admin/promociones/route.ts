@@ -101,8 +101,11 @@ export async function POST(request: Request) {
       
       const baseUrl = empresa?.dominio 
       ? `https://${empresa.dominio}` 
-      : (process.env.NEXT_PUBLIC_BASE_URL || 'https://www.almadearena.es');
+      : '';
     
+    if (!baseUrl) {
+      console.warn('No se puede enviar email: empresa sin dominio');
+    } else {
     const emailHtml = `
 <!DOCTYPE html>
 <html>
@@ -141,6 +144,7 @@ export async function POST(request: Request) {
           senderEmail: empresa?.email_notification || 'a369cb001@smtp-brevo.com',
         });
       }
+    }
     }
 
     return NextResponse.json({ promocion: promo });

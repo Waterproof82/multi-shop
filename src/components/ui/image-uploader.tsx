@@ -83,8 +83,8 @@ export function ImageUploader({
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setError('El archivo excede el tamaño máximo de 5MB.');
+    if (file.size > 10 * 1024 * 1024) {
+      setError('El archivo excede el tamaño máximo de 10MB.');
       return;
     }
 
@@ -213,7 +213,7 @@ export function ImageUploader({
               <span className="text-sm text-gray-500 mt-1">
                 Arrastra o click para subir
               </span>
-              <span className="text-xs text-gray-400">JPEG, PNG, WEBP (max 5MB)</span>
+              <span className="text-xs text-gray-400">JPEG, PNG, WEBP (max 10MB)</span>
             </>
           )}
         </button>

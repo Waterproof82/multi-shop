@@ -64,8 +64,8 @@ export default function PromocionesPage() {
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert('La imagen no puede exceder 5MB');
+      if (file.size > 10 * 1024 * 1024) {
+        alert('La imagen no puede exceder 10MB');
         return;
       }
       setSelectedImage(file);
@@ -225,7 +225,7 @@ export default function PromocionesPage() {
                     Click para seleccionar una imagen
                   </span>
                   <p className="text-xs text-gray-400 mt-1">
-                    JPEG, PNG, WEBP (max 5MB)
+                    JPEG, PNG, WEBP (max 10MB)
                   </p>
                 </label>
               </div>
