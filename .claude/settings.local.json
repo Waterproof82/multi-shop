@@ -13,12 +13,13 @@
       "Bash(xargs sh:*)",
       "Bash(python3:*)",
       "Bash(node:*)",
-      "Bash(claude mcp:*)"
+      "Bash(claude mcp:*)",
+      "mcp__playwright__browser_navigate"
     ]
   },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "browser-tools",
     "context7"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }
