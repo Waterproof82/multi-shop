@@ -1,9 +1,6 @@
 import { cookies } from 'next/headers';
-import { jwtVerify } from 'jose';
-import { adminRepository } from '@/core/infrastructure/database';
+import { authAdminUseCase } from '@/core/infrastructure/database';
 import { getMenuUseCase } from '@/lib/server-services';
-
-const ADMIN_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET!;
 
 export default async function AdminDashboard() {
   const cookieStore = await cookies();
@@ -13,15 +10,14 @@ export default async function AdminDashboard() {
     return <div>No autorizado</div>;
   }
 
-  const { payload } = await jwtVerify(token, new TextEncoder().encode(ADMIN_TOKEN_SECRET));
-  const admin = await adminRepository.findById(payload.adminId as string);
+  const admin = await authAdminUseCase.verifyToken(token);
 
   if (!admin) {
-    return <div>Admin no encontrado</div>;
+    return <div>No autorizado</div>;
   }
 
   const menu = await getMenuUseCase.execute(admin.empresaId);
-  
+
   const totalProductos = menu.reduce((sum, cat) => sum + cat.items.length, 0);
   const totalCategorias = menu.length;
   const productosEspeciales = menu.reduce(

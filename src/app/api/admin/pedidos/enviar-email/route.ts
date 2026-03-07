@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server';
-import { headers } from 'next/headers';
+import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { sendEmail } from '@/lib/brevo-email';
-import { empresaRepository } from '@/core/infrastructure/database';
+import { empresaUseCase } from '@/core/infrastructure/database';
+import { requireAuth } from '@/core/infrastructure/api/helpers';
 import { escapeHtml } from '@/lib/html-utils';
 
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
@@ -27,33 +27,9 @@ const enviarEmailSchema = z.object({
   email: z.string().email().optional().or(z.literal('')),
 });
 
-interface CartItem {
-  item: {
-    id: string;
-    name: string;
-    price: number;
-    translations?: Record<string, { name: string }>;
-  };
-  quantity: number;
-  selectedComplements?: { name: string; price: number }[];
-}
+type OrderItem = z.infer<typeof enviarEmailSchema>['items'][number];
 
-function parseMainDomain(domain: string): string {
-  const subdomainPedidos = 'pedidos';
-  const isPedidos = domain.startsWith(subdomainPedidos + '.') || domain.includes('-pedidos');
-  return isPedidos
-    ? domain.replace(/^pedidos\./, '').replace(/-pedidos$/, '')
-    : domain;
-}
-
-async function getDomainFromHeaders(): Promise<string> {
-  const headersList = await headers();
-  const host = headersList.get('host');
-  if (!host) return '';
-  return host.replace(/^www\./, '').toLowerCase().split(':')[0];
-}
-
-function generateOrderEmail(items: CartItem[], total: number, empresaNombre: string, numeroOrden: number, nombre: string, telefono: string, email: string | null): string {
+function generateOrderEmail(items: OrderItem[], total: number, empresaNombre: string, numeroOrden: number, nombre: string, telefono: string, email: string | null): string {
   const itemsHtml = items.map(ci => {
     const complementPrice = ci.selectedComplements?.reduce((sum, c) => sum + c.price, 0) || 0;
     const itemTotal = (ci.item.price + complementPrice) * ci.quantity;
@@ -148,22 +124,22 @@ function generateOrderEmail(items: CartItem[], total: number, empresaNombre: str
   `.trim();
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const { empresaId, error: authError } = await requireAuth(request);
+    if (authError) return authError;
+
     if (!BREVO_API_KEY) {
       return NextResponse.json({ error: 'Email service not configured' }, { status: 500 });
     }
 
-    const domain = await getDomainFromHeaders();
-    const mainDomain = parseMainDomain(domain);
-
-    const empresa = await empresaRepository.findByDomain(mainDomain);
+    const empresa = await empresaUseCase.getById(empresaId!);
 
     if (!empresa) {
       return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 });
     }
 
-    if (!empresa.email_notification) {
+    if (!empresa.emailNotification) {
       return NextResponse.json({ error: 'Email de notificación no configurado' }, { status: 400 });
     }
 
@@ -177,7 +153,7 @@ export async function POST(request: Request) {
     const html = generateOrderEmail(
       items,
       total,
-      empresa.nombre,
+      empresa.nombre || 'Empresa',
       numeroOrden || 1,
       nombre || 'Cliente',
       telefono || 'No proporcionado',
@@ -185,11 +161,11 @@ export async function POST(request: Request) {
     );
 
     await sendEmail({
-      to: empresa.email_notification,
+      to: empresa.emailNotification,
       subject: `Nuevo pedido de ${empresa.nombre} - ${total.toFixed(2)}€`,
       htmlContent: html,
-      senderName: empresa.nombre,
-      senderEmail: empresa.email_notification,
+      senderName: empresa.nombre || 'Empresa',
+      senderEmail: empresa.emailNotification,
     });
 
     return NextResponse.json({ success: true });

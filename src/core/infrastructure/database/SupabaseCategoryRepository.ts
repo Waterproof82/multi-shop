@@ -6,27 +6,27 @@ import { CreateCategoryDTO, UpdateCategoryDTO } from "@/core/application/dtos/ca
 export class SupabaseCategoryRepository implements ICategoryRepository {
   constructor(private readonly supabase: SupabaseClient) {}
 
-  private mapToDomain(row: any): Category {
+  private mapToDomain(row: Record<string, unknown>): Category {
     return {
-      id: row.id,
-      empresaId: row.empresa_id,
-      nombre: row.nombre_es,
-      descripcion: row.descripcion_es || null,
-      orden: row.orden || 0,
-      categoriaComplementoDe: row.categoria_complemento_de || null,
-      complementoObligatorio: row.complemento_obligatorio || false,
-      categoriaPadreId: row.categoria_padre_id || null,
+      id: row.id as string,
+      empresaId: row.empresa_id as string,
+      nombre: row.nombre_es as string | null,
+      descripcion: (row.descripcion_es as string | null) || null,
+      orden: (row.orden as number) || 0,
+      categoriaComplementoDe: (row.categoria_complemento_de as string | null) || null,
+      complementoObligatorio: (row.complemento_obligatorio as boolean) || false,
+      categoriaPadreId: (row.categoria_padre_id as string | null) || null,
       translations: {
-        en: row.nombre_en || undefined,
-        fr: row.nombre_fr || undefined,
-        it: row.nombre_it || undefined,
-        de: row.nombre_de || undefined,
+        en: (row.nombre_en as string | undefined) || undefined,
+        fr: (row.nombre_fr as string | undefined) || undefined,
+        it: (row.nombre_it as string | undefined) || undefined,
+        de: (row.nombre_de as string | undefined) || undefined,
       },
       descripcionTranslations: {
-        en: row.descripcion_en || undefined,
-        fr: row.descripcion_fr || undefined,
-        it: row.descripcion_it || undefined,
-        de: row.descripcion_de || undefined,
+        en: (row.descripcion_en as string | undefined) || undefined,
+        fr: (row.descripcion_fr as string | undefined) || undefined,
+        it: (row.descripcion_it as string | undefined) || undefined,
+        de: (row.descripcion_de as string | undefined) || undefined,
       },
     };
   }
@@ -43,8 +43,7 @@ export class SupabaseCategoryRepository implements ICategoryRepository {
       throw new Error(`DB Error fetching categories: ${error.message}`);
     }
 
-    // Return domain format (camelCase)
-    return data.map((row: any) => this.mapToDomain(row));
+    return data.map((row: Record<string, unknown>) => this.mapToDomain(row));
   }
 
   async create(data: CreateCategoryDTO): Promise<Category> {
@@ -75,8 +74,8 @@ export class SupabaseCategoryRepository implements ICategoryRepository {
   }
 
   async update(id: string, empresaId: string, data: Partial<UpdateCategoryDTO>): Promise<Category> {
-    const updatePayload: any = {};
-    
+    const updatePayload: Record<string, unknown> = {};
+
     if (data.nombre_es !== undefined) updatePayload.nombre_es = data.nombre_es;
     if (data.nombre_en !== undefined) updatePayload.nombre_en = data.nombre_en;
     if (data.nombre_fr !== undefined) updatePayload.nombre_fr = data.nombre_fr;

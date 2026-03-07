@@ -1,18 +1,7 @@
 import { NextResponse } from 'next/server';
-import { headers } from 'next/headers';
 import { z } from 'zod';
 import { empresaRepository, pedidoUseCase } from '@/core/infrastructure/database';
-
-interface CartItem {
-  item: {
-    id: string;
-    name: string;
-    price: number;
-    translations?: Record<string, { name: string }>;
-  };
-  quantity: number;
-  selectedComplements?: { name: string; price: number }[];
-}
+import { parseMainDomain, getDomainFromHeaders } from '@/lib/domain-utils';
 
 const createPedidoSchema = z.object({
   items: z.array(z.object({
@@ -33,41 +22,28 @@ const createPedidoSchema = z.object({
   email: z.string().email().optional().or(z.literal('')),
 });
 
-function generateWhatsAppMessage(items: CartItem[], total: number, nombre: string, numeroPedido: number): string {
+type OrderItem = z.infer<typeof createPedidoSchema>['items'][number];
+
+function generateWhatsAppMessage(items: OrderItem[], total: number, nombre: string, numeroPedido: number): string {
   let mensaje = `*Pedido #${numeroPedido}*\n`;
   mensaje += `*Cliente:* ${nombre}\n\n`;
   mensaje += `*PEDIDO:*\n`;
-  
+
   items.forEach((cartItem, index) => {
     const itemName = cartItem.item.name;
     const quantity = cartItem.quantity;
-    
+
     mensaje += `${index + 1}. ${itemName}`;
     if (cartItem.selectedComplements && cartItem.selectedComplements.length > 0) {
       mensaje += ` (+${cartItem.selectedComplements.map(c => c.name).join(', ')})`;
     }
     mensaje += ` x${quantity}\n`;
   });
-  
+
   mensaje += `\n*TOTAL: ${total.toFixed(2)}€*\n`;
   mensaje += `¿Cuándo puedo pasar a recoger el pedido?`;
-  
+
   return mensaje;
-}
-
-function parseMainDomain(domain: string): string {
-  const subdomainPedidos = 'pedidos';
-  const isPedidos = domain.startsWith(subdomainPedidos + '.') || domain.includes('-pedidos');
-  return isPedidos
-    ? domain.replace(/^pedidos\./, '').replace(/-pedidos$/, '')
-    : domain;
-}
-
-async function getDomainFromHeaders(): Promise<string> {
-  const headersList = await headers();
-  const host = headersList.get('host');
-  if (!host) return '';
-  return host.replace(/^www\./, '').toLowerCase().split(':')[0];
 }
 
 export async function POST(request: Request) {
@@ -105,7 +81,7 @@ export async function POST(request: Request) {
       whatsappLink = `https://wa.me/${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`;
     }
 
-    return NextResponse.json({ success: true, numeroPedido, whatsappLink, companyPhone: empresa.telefono_whatsapp });
+    return NextResponse.json({ success: true, numeroPedido, pedidoId, whatsappLink, companyPhone: empresa.telefono_whatsapp });
   } catch (error) {
     console.error('Error creating order:', error);
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });

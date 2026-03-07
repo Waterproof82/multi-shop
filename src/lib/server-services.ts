@@ -3,6 +3,7 @@ import { getSupabaseAnonClient } from "@/core/infrastructure/database/supabase-c
 import { SupabaseProductRepository } from "@/core/infrastructure/database/SupabaseProductRepository";
 import { SupabaseCategoryRepository } from "@/core/infrastructure/database/SupabaseCategoryRepository";
 import { GetMenuUseCase } from "@/core/application/use-cases/get-menu.use-case";
+import { parseMainDomain } from "@/lib/domain-utils";
 
 // Instanciación de Repositorios
 const supabase = getSupabaseAnonClient();
@@ -69,7 +70,7 @@ export interface EmpresaInfo {
   emailNotification: string | null;
 }
 
-function mapTranslations(data: any, prefix: string) {
+function mapTranslations(data: Record<string, unknown>, prefix: string) {
   return data[`${prefix}_es`] || data[`${prefix}_en`] || data[`${prefix}_fr`] || data[`${prefix}_it`] || data[`${prefix}_de`]
     ? {
         es: data[`${prefix}_es`] || null,
@@ -79,18 +80,6 @@ function mapTranslations(data: any, prefix: string) {
         de: data[`${prefix}_de`] || null,
       }
     : null;
-}
-
-function parseMainDomain(domain: string): string {
-  const domainParts = domain.split('.');
-  if (domainParts.length >= 2) {
-    // Si tiene subdominio (ej: pedidos.localhost o pedidos.dominio.com)
-    const potentialSubdomain = domainParts[0];
-    if (potentialSubdomain === 'pedidos' || potentialSubdomain.endsWith('-pedidos')) {
-      return domainParts.slice(1).join('.');
-    }
-  }
-  return domain;
 }
 
 export async function getEmpresaByDomain(domain: string): Promise<EmpresaInfo | null> {

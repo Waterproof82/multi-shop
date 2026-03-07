@@ -6,26 +6,26 @@ import { CreateProductDTO, UpdateProductDTO } from "@/core/application/dtos/prod
 export class SupabaseProductRepository implements IProductRepository {
   constructor(private readonly supabase: SupabaseClient) {}
 
-  private mapToDomain(row: any): Product {
+  private mapToDomain(row: Record<string, unknown>): Product {
     return {
-      id: row.id,
-      empresaId: row.empresa_id,
-      categoriaId: row.categoria_id,
-      titulo_es: row.titulo_es,
-      titulo_en: row.titulo_en,
-      titulo_fr: row.titulo_fr,
-      titulo_it: row.titulo_it,
-      titulo_de: row.titulo_de,
-      descripcion_es: row.descripcion_es,
-      descripcion_en: row.descripcion_en,
-      descripcion_fr: row.descripcion_fr,
-      descripcion_it: row.descripcion_it,
-      descripcion_de: row.descripcion_de,
-      precio: Number.parseFloat(row.precio),
-      fotoUrl: row.foto_url,
-      esEspecial: row.es_especial,
-      activo: row.activo,
-      createdAt: new Date(row.created_at),
+      id: row.id as string,
+      empresaId: row.empresa_id as string,
+      categoriaId: row.categoria_id as string | null,
+      titulo_es: row.titulo_es as string,
+      titulo_en: row.titulo_en as string | null,
+      titulo_fr: row.titulo_fr as string | null,
+      titulo_it: row.titulo_it as string | null,
+      titulo_de: row.titulo_de as string | null,
+      descripcion_es: row.descripcion_es as string | null,
+      descripcion_en: row.descripcion_en as string | null,
+      descripcion_fr: row.descripcion_fr as string | null,
+      descripcion_it: row.descripcion_it as string | null,
+      descripcion_de: row.descripcion_de as string | null,
+      precio: Number.parseFloat(row.precio as string),
+      fotoUrl: row.foto_url as string | null,
+      esEspecial: row.es_especial as boolean,
+      activo: row.activo as boolean,
+      createdAt: new Date(row.created_at as string),
     };
   }
 
@@ -57,17 +57,6 @@ export class SupabaseProductRepository implements IProductRepository {
     return this.mapToDomain(created);
   }
 
-  async findById(id: string): Promise<Product | null> {
-    const { data, error } = await this.supabase
-      .from("productos")
-      .select("*")
-      .eq("id", id)
-      .single();
-
-    if (error) return null;
-    return this.mapToDomain(data);
-  }
-
   async findAllByTenant(empresaId: string): Promise<Product[]> {
     const { data, error } = await this.supabase
       .from("productos")
@@ -76,13 +65,11 @@ export class SupabaseProductRepository implements IProductRepository {
       .order("created_at", { ascending: false });
 
     if (error) throw new Error(`DB Error: ${error.message}`);
-
-    // Return domain format (camelCase)
-    return data.map((row: any) => this.mapToDomain(row));
+    return data.map((row: Record<string, unknown>) => this.mapToDomain(row));
   }
 
-  private mapUpdateProductPayload(data: Partial<UpdateProductDTO>): any {
-    const updatePayload: any = {};
+  private mapUpdateProductPayload(data: Partial<UpdateProductDTO>): Record<string, unknown> {
+    const updatePayload: Record<string, unknown> = {};
     const fieldsToMap = [
       'categoria_id', 'titulo_es', 'titulo_en', 'titulo_fr', 'titulo_it', 'titulo_de',
       'descripcion_es', 'descripcion_en', 'descripcion_fr', 'descripcion_it', 'descripcion_de',
@@ -95,7 +82,6 @@ export class SupabaseProductRepository implements IProductRepository {
       }
     }
 
-    // Special handling for foto_url as it can be an empty string
     if (data.foto_url !== undefined) {
       updatePayload.foto_url = data.foto_url === "" ? null : data.foto_url;
     }

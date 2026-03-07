@@ -2,9 +2,10 @@ import { NextRequest } from 'next/server';
 import { categoryUseCase } from '@/core/infrastructure/database';
 import { createCategorySchema, updateCategorySchema, categoryIdSchema } from '@/core/application/dtos/category.dto';
 import { requireAuth, successResponse, errorResponse, validationErrorResponse } from '@/core/infrastructure/api/helpers';
+import type { Category } from '@/core/domain/entities/types';
 
 // Transform domain format to admin UI format
-function toAdminCategory(cat: any) {
+function toAdminCategory(cat: Category) {
   return {
     id: cat.id,
     empresa_id: cat.empresaId,
