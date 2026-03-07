@@ -1,20 +1,10 @@
 import { cookies } from 'next/headers';
 import { jwtVerify } from 'jose';
-import { adminRepository } from '@/core/infrastructure/database/SupabaseAdminRepository';
-import { createClient } from '@supabase/supabase-js';
+import { adminRepository, empresaUseCase } from '@/core/infrastructure/database';
 import { ColoresForm } from '@/components/admin/colores-form';
 import { EmpresaDatosForm } from '@/components/admin/empresa-datos-form';
 
 const ADMIN_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET!;
-
-function getSupabaseClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error("Configuración de Supabase incompleta");
-  }
-  return createClient(supabaseUrl, supabaseKey);
-}
 
 export default async function ConfiguracionPage() {
   const cookieStore = await cookies();
@@ -31,20 +21,14 @@ export default async function ConfiguracionPage() {
     return <div>Admin no encontrado</div>;
   }
 
-  // Obtener datos adicionales de la empresa
-  const supabase = getSupabaseClient();
-  const { data: empresaData } = await supabase
-    .from('empresas')
-    .select('email_notification, telefono_whatsapp, fb, instagram, url_mapa, direccion')
-    .eq('id', admin.empresa.id)
-    .single();
+  const empresaData = await empresaUseCase.getById(admin.empresa.id);
 
   const empresaDatos = {
-    email_notification: empresaData?.email_notification || '',
-    telefono_whatsapp: empresaData?.telefono_whatsapp || '',
+    email_notification: empresaData?.emailNotification || '',
+    telefono_whatsapp: empresaData?.telefonoWhatsapp || '',
     fb: empresaData?.fb || '',
     instagram: empresaData?.instagram || '',
-    url_mapa: empresaData?.url_mapa || '',
+    url_mapa: empresaData?.urlMapa || '',
     direccion: empresaData?.direccion || '',
   };
 

@@ -48,17 +48,19 @@ export async function POST(request: NextRequest) {
 ### Clean Architecture
 - **NUNCA** acceder a la DB directamente desde API routes
 - **SIEMPRE** pasar por: Use Case → Repository → Supabase
-- Usar el cliente singleton: `getSupabaseClient()`
+- Usar los singletons: `getSupabaseClient()` (service role) o `getSupabaseAnonClient()` (anon)
 
 ### SOLID - Dependency Inversion
 - Depender de **interfaces** (abstracciones), no de implementaciones
 - **BIEN**: `constructor(private readonly repo: IProductRepository)`
-- **MAL**: `const supabase = createClient(url, key)`
+- **MAL**: `const supabase = createClient(url, key)` fuera de `supabase-client.ts`
+- **BIEN**: repositorios reciben cliente via constructor, instanciados en `database/index.ts`
 
 ### OWASP
 - JWT con cookies **HttpOnly**
-- Zod validation en **TODAS** las API routes
-- Sanitización de inputs
+- Zod validation en **TODAS** las API routes con `safeParse`
+- HTML escapado antes de insertar en emails (`escapeHtml`)
+- Validación de formato hexadecimal `#RRGGBB` para colores
 - No hardcodear secrets
 
 ## Estructura clave
@@ -68,19 +70,19 @@ src/
 ├── app/api/admin/              # Rutas API con Zod validation
 ├── core/
 │   ├── domain/
-│   │   ├── entities/types.ts   # Tipos: Product, Category, Empresa, etc.
-│   │   └── repositories/       # Interfaces: IProductRepository, ICategoryRepository, etc.
+│   │   ├── entities/types.ts   # Tipos: Product, Category, Empresa, EmpresaColores, etc.
+│   │   └── repositories/       # Interfaces: IProductRepository, IAdminRepository, etc.
 │   ├── application/
 │   │   ├── dtos/               # Zod schemas: product.dto.ts, category.dto.ts, etc.
-│   │   └── use-cases/          # Lógica de negocio: ProductUseCase, CategoryUseCase, etc.
+│   │   └── use-cases/          # Lógica de negocio
 │   └── infrastructure/
 │       ├── api/helpers.ts       # requireAuth, successResponse, errorResponse
-│       ├── database/            # Supabase repositorios implementación
-│       │   ├── supabase-client.ts  # Singleton - NO crear nuevos clientes
-│       │   └── index.ts            # Exports de use cases y repositories
+│       ├── database/
+│       │   ├── supabase-client.ts  # DOS singletons: getSupabaseClient() y getSupabaseAnonClient()
+│       │   └── index.ts            # Instanciación e inyección de dependencias
 │       └── storage/s3-client.ts # Singleton R2
 ├── components/ui/              # ImageUploader (optimiza imágenes)
-└── lib/                        # AdminContext, CartContext
+└── lib/                        # AdminContext, CartContext, server-services.ts
 ```
 
 ## Helpers de API (OBLIGATORIOS USAR)
@@ -88,7 +90,7 @@ src/
 ```typescript
 // core/infrastructure/api/helpers.ts
 
-// Autenticación - usar en todas las rutas protegidas
+// Autenticación - usar en TODAS las rutas protegidas /api/admin/*
 const { empresaId, error } = await requireAuth(request);
 if (error) return error;
 
@@ -104,15 +106,16 @@ return validationErrorResponse('msg'); // 400 Bad Request
 
 ```typescript
 // Importar desde core/infrastructure/database
-import { 
-  productUseCase,      // ProductUseCase
-  categoryUseCase,    // CategoryUseCase
-  clienteUseCase,     // ClienteUseCase
-  empresaRepository,  // IEmpresaRepository
-  promocionRepository, // IPromocionRepository
-  pedidoRepository,   // IPedidoRepository
-  pedidoUseCase,     // PedidoUseCase (nuevo)
-  adminRepository,   // IAdminRepository
+import {
+  productUseCase,       // ProductUseCase
+  categoryUseCase,      // CategoryUseCase
+  clienteUseCase,       // ClienteUseCase
+  empresaUseCase,       // EmpresaUseCase
+  pedidoUseCase,        // PedidoUseCase
+  adminRepository,      // IAdminRepository
+  empresaRepository,    // IEmpresaRepository
+  promocionRepository,  // IPromocionRepository
+  pedidoRepository,     // IPedidoRepository
 } from '@/core/infrastructure/database';
 ```
 
@@ -123,7 +126,7 @@ import {
 | **ProductUseCase** | `getAll`, `create`, `update`, `delete` |
 | **CategoryUseCase** | `getAll`, `create`, `update`, `delete` |
 | **ClienteUseCase** | `getAll`, `create`, `update`, `delete`, `togglePromoSubscription` |
-| **EmpresaUseCase** | `getById`, `update` |
+| **EmpresaUseCase** | `getById`, `update`, `updateColores` |
 | **PedidoUseCase** | `create`, `getStats`, `delete` |
 | **AuthAdminUseCase** | `login`, `verifyToken` |
 
@@ -131,10 +134,22 @@ import {
 
 | Repository | Métodos |
 |------------|---------|
+| **IAdminRepository** | `loginWithPassword`, `findById`, `findByEmail`, `getEmpresaByAdminId` |
 | **IClienteRepository** | `findAllByTenant`, `findByEmail`, `findByTelefono`, `create`, `update`, `delete` |
-| **IEmpresaRepository** | `getById`, `findByDomain`, `update` |
+| **IEmpresaRepository** | `getById`, `findByDomain`, `update`, `updateColores` |
 | **IPedidoRepository** | `findAllByTenant`, `findById`, `updateStatus`, `delete`, `create`, `getStats` |
 | **IPromocionRepository** | `findAllByTenant`, `create`, `deleteAllByTenant` |
+
+### Entidad Empresa (domain/entities/types.ts)
+
+```typescript
+interface Empresa {
+  id, nombre, dominio, logoUrl, mostrarCarrito, moneda,
+  emailNotification, urlImage, colores, descripcion,
+  // Campos de contacto (opcionales):
+  fb?, instagram?, urlMapa?, direccion?, telefonoWhatsapp?
+}
+```
 
 ### Formato de Datos: Dominio vs Admin
 
@@ -148,11 +163,28 @@ function toAdminProduct(prod: any) {
     empresa_id: prod.empresaId,
     categoria_id: prod.categoriaId,
     titulo_es: prod.titulo_es,
-    titulo_en: prod.translations?.en || null,
     // ...
   };
 }
 ```
+
+## Supabase - Clientes Singleton
+
+```typescript
+// core/infrastructure/database/supabase-client.ts
+
+// Service Role (para operaciones admin/backend)
+getSupabaseClient()       // usa SUPABASE_SERVICE_ROLE_KEY
+
+// Anon Key (para lectura pública y auth.signInWithPassword)
+getSupabaseAnonClient()   // usa NEXT_PUBLIC_SUPABASE_ANON_KEY
+```
+
+**Reglas:**
+- **NUNCA** llamar `createClient()` fuera de `supabase-client.ts`
+- Los repositorios reciben el cliente via constructor e `index.ts` los instancia
+- `SupabaseAdminRepository` recibe ambos clientes: `(supabase, supabaseAnon)`
+- `lib/supabaseClient.ts` fue eliminado — no recrear
 
 ## Supabase - Estructura de Tablas
 
@@ -170,17 +202,20 @@ function toAdminProduct(prod: any) {
 
 ## Errores Comunes a Evitar
 
-1. **NO usar `createClient` en API routes** - Usar `getSupabaseClient()` singleton
-2. **NO acceder a DB directamente** - Usar siempre Use Cases
-3. **NO usar `telefono` en pedidos** - La columna no existe
-4. **Subdominios** - Buscar por `dominio` principal
-5. **Imágenes R2** - Usar cliente singleton, no crear nuevos clientes
+1. **NO usar `createClient` fuera de `supabase-client.ts`** — usar los singletons
+2. **NO acceder a DB directamente desde rutas o pages** — usar siempre Use Cases → Repositories
+3. **NO usar `telefono` en pedidos** — la columna no existe
+4. **NO insertar inputs de usuario directamente en HTML** — usar `escapeHtml` en emails
+5. **Subdominios** — buscar por `dominio` principal
+6. **Imágenes R2** — usar cliente singleton, no crear nuevos clientes
+7. **Colores** — validar formato `#RRGGBB` con regex
 
 ## Buenas Prácticas (OBLIGATORIAS)
 
-- ✅ Usar `getSupabaseClient()` singleton
-- ✅ Zod validation en **TODAS** las API routes
+- ✅ Usar `getSupabaseClient()` / `getSupabaseAnonClient()` según el caso
+- ✅ Zod `safeParse` en **TODAS** las API routes
 - ✅ Usar helpers: `requireAuth`, `successResponse`, `errorResponse`
+- ✅ Repositorios inyectados via constructor
 - ✅ Labels con `htmlFor` para accessibility
 - ✅ Props `readonly` en interfaces
 - ✅ `<Image>` de Next.js para imágenes
@@ -191,52 +226,80 @@ function toAdminProduct(prod: any) {
 ### Footer
 - Fondo negro, muestra logo, descripción, fb, instagram, dirección, WhatsApp, email y mapa (iframe)
 
+### Panel Admin — Rutas
+- `/admin/login` — Login
+- `/admin` — Dashboard
+- `/admin/productos` — CRUD productos
+- `/admin/categorias` — CRUD categorías
+- `/admin/pedidos` — Pedidos + estadísticas
+- `/admin/clientes` — CRM clientes
+- `/admin/promociones` — Envío masivo por email
+- `/admin/configuracion` — Colores, contacto, redes
+
 ### Middleware / Proxy
 - `src/proxy.ts` - autentica JWT para `/api/admin/*`
+- Inyecta en las rutas protegidas:
+  - `x-empresa-id` — ID del tenant (usar via `requireAuth`)
+  - `x-admin-id` — ID del admin logueado
+  - `x-admin-rol` — Rol del admin
 - Rutas públicas que NO requieren JWT:
-  - `/api/admin/login` - Login de admin
-  - `/api/admin/logout` - Logout de admin
-  - `/api/unsubscribe` - Darse de baja de promociones
-  - `/api/admin/promociones/unsubscribe` - Toggle suscripción promo
+  - `/api/admin/login`
+  - `/api/admin/logout`
+  - `/api/unsubscribe`
+  - `/api/admin/promociones/unsubscribe`
 
 > ⚠️ **IMPORTANTE**: Si agregás nuevas rutas públicas en el admin, agregarlas al proxy en `isPublicRoute`
 
 ### Imágenes
-- Se optimizan en cliente (480x480, WebP, 80%)
+- Se optimizan en cliente antes del upload (480x480, WebP, 80%)
+- Flujo de upload:
+  1. Cliente selecciona imagen y la optimiza
+  2. Llama Server Action para obtener URL prefirmada (60 seg)
+  3. Upload directo del navegador a R2
+  4. URL pública guardada en BBDD
+- Server Actions de storage: `core/application/actions/storage.actions.ts`
 
 ### R2
 - Cliente singleton en `core/infrastructure/storage/s3-client.ts`
   - `getS3Client()` - Obtener cliente
   - `getR2Config()` - Obtener config (bucket, domain)
   - `deleteImageFromR2(url)` - Eliminar imagen del bucket
+- Estructura de carpetas: `{empresa-slug}/{año}/{mes}/{uuid}-{filename}.webp`
 - **R2 CORS**: Necesita configurarse para uploads directos (ejecutar `scripts/setup-r2-cors.ts`)
 
-### Supabase
-- Cliente singleton en `core/infrastructure/database/supabase-client.ts`
-- **NUNCA** crear nuevos clientes con `createClient` en las rutas
-- Todos los repositories deben inyectar el cliente via constructor: `constructor(private readonly supabase: SupabaseClient) {}`
-- **NUNCA** usar `getSupabaseAdmin()` interno - usar siempre el singleton
-
 ### Validation
-- **TODAS** las rutas API usan Zod schemas
+- **TODAS** las rutas API usan Zod schemas con `safeParse`
 - Usar los DTOs en `core/application/dtos/`
+- Colores hex: `z.string().regex(/^#[0-9A-Fa-f]{6}$/)`
 
-### Subdominios
-- `pedidos.dominio.com` activa el carrito
+### Subdominios y Multi-tenant
+
+| Dominio | Comportamiento |
+|---------|----------------|
+| `midominio.com` | Menú sin carrito |
+| `pedidos.midominio.com` | Menú + carrito |
+| `midominio-pedidos.com` | Menú + carrito (alternativa) |
+
+- La empresa se resuelve siempre por el `dominio` principal (sin subdominio)
+- El carrito se activa si el host actual coincide con `subdomain_pedidos` de la empresa
 
 ### Build
 - "Skipping validation of types" es normal en Next.js 16
 
 ### Promociones
-- `/api/admin/promociones` - GET lista, POST crea y envía emails
-- `/api/admin/promociones/unsubscribe` - Ruta pública para darse de baja (sin JWT)
+- `/api/admin/promociones` - GET lista, POST crea y envía emails (usa `requireAuth`)
+- `/api/admin/promociones/unsubscribe` - Ruta pública (sin JWT)
 - Imagen se sube a R2 en carpeta `{empresaSlug}/promo-*.webp`
 - Al crear nueva promo, se borra imagen anterior de R2
-- Email incluye logo de empresa (de empresas.logo_url) + imagen promo, y los enlaces de suscripción/baja usan el `dominio` de la empresa para generar las URLs.
+- `texto_promocion` se escapa con `escapeHtml()` antes de insertar en el email HTML
 
 ### Configuración Empresa
 - `/admin/configuracion` - Datos de contacto (fb, instagram, url_mapa, direccion, telefono_whatsapp, email_notification)
-- API: `/api/admin/empresa` - GET/PUT con los campos nuevos
+- API: `/api/admin/empresa` - GET/PUT
+- API: `/api/admin/update-colores` - POST (colores hex, usa `requireAuth` + `empresaUseCase.updateColores`)
+
+### Deuda Técnica Documentada
+- `src/lib/server-services.ts` → `getEmpresaByDomain` consulta Supabase directamente con anon key para cargar datos públicos de la empresa (colores, textos, footer). Pendiente migrar a `IEmpresaRepository.findByDomainPublic()` cuando se extienda la interfaz.
 
 ## Comandos
 ```bash

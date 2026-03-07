@@ -66,10 +66,10 @@ export function CartDrawer() {
     const esMobile = isMobileDevice();
 
     if (esMobile) {
-      window.location.href = appUrl;
+      globalThis.location.href = appUrl;
       setTimeout(() => {
         if (!document.hasFocus()) return;
-        window.location.href = webUrl;
+        globalThis.location.href = webUrl;
       }, 1500);
       return;
     }
@@ -79,11 +79,11 @@ export function CartDrawer() {
     anchor.style.display = 'none';
     document.body.appendChild(anchor);
     anchor.click();
-    document.body.removeChild(anchor);
+    anchor.remove();
   };
 
   const handleWhatsAppClick = (useWeb: boolean = false) => {
-    const link = (window as any).__whatsappLink;
+    const link = (globalThis as any).__whatsappLink;
     if (!link) return;
     const match = link.match(/wa\.me\/(\d+)\?text=(.+)/);
     if (match) {
@@ -167,7 +167,7 @@ export function CartDrawer() {
         setEmail('');
         
         if (data.whatsappLink) {
-          (window as any).__whatsappLink = data.whatsappLink;
+          (globalThis as any).__whatsappLink = data.whatsappLink;
           const match = data.whatsappLink.match(/wa\.me\/(\d+)\?text=(.+)/);
           if (match) {
             const numero = match[1];

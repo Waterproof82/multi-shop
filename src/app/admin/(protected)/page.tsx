@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { jwtVerify } from 'jose';
-import { adminRepository } from '@/core/infrastructure/database/SupabaseAdminRepository';
+import { adminRepository } from '@/core/infrastructure/database';
 import { getMenuUseCase } from '@/lib/server-services';
 
 const ADMIN_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET!;

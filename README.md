@@ -43,8 +43,9 @@ El proyecto sigue **Clean Architecture** rigurosamente con separación de capas:
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Supabase/R2 (Implementación)                 │
-│  - getSupabaseClient() singleton                               │
-│  - getS3Client() singleton                                     │
+│  - getSupabaseClient() singleton (service role)                │
+│  - getSupabaseAnonClient() singleton (anon key)                │
+│  - getS3Client() singleton (R2)                                │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -139,12 +140,13 @@ const supabase = createClient(url, key);
 
 | Principio | Implementación |
 |-----------|----------------|
-| **Validación** | Zod en todas las API routes |
-| **Autenticación** | JWT con cookies HttpOnly |
-| **Autorización** | Middleware verifica token, pasa empresaId por header |
-| **Input Sanitization** | Zod sanitiza todos los inputs |
+| **Validación** | Zod `safeParse` en todas las API routes |
+| **Autenticación** | JWT con cookies HttpOnly (24h) |
+| **Autorización** | Middleware verifica token, pasa `empresaId` por header |
+| **Input Sanitization** | Zod + `escapeHtml()` antes de insertar en emails |
+| **Colores** | Regex `#RRGGBB` validado en Zod |
 | **Secrets** | Variables de entorno, nunca hardcoded |
-| **XSS** | No hay `dangerouslySetInnerHTML` |
+| **XSS** | No hay `dangerouslySetInnerHTML`; inputs escapados en emails |
 
 ---
 
@@ -274,15 +276,16 @@ npx tsx scripts/setup-r2-cors.ts
 | ProductUseCase | `getAll`, `create`, `update`, `delete` |
 | CategoryUseCase | `getAll`, `create`, `update`, `delete` |
 | ClienteUseCase | `getAll`, `create`, `update`, `delete`, `togglePromoSubscription` |
-| EmpresaUseCase | `getById`, `update` |
+| EmpresaUseCase | `getById`, `update`, `updateColores` |
 | PedidoUseCase | `create`, `getStats`, `delete` |
 | AuthAdminUseCase | `login`, `verifyToken` |
 
 #### Repositories
 | Repository | Métodos |
 |------------|---------|
+| IAdminRepository | `loginWithPassword`, `findById`, `findByEmail`, `getEmpresaByAdminId` |
 | IClienteRepository | `findAllByTenant`, `findByEmail`, `findByTelefono`, `create`, `update`, `delete` |
-| IEmpresaRepository | `getById`, `findByDomain`, `update` |
+| IEmpresaRepository | `getById`, `findByDomain`, `update`, `updateColores` |
 | IPedidoRepository | `findAllByTenant`, `findById`, `updateStatus`, `delete`, `create`, `getStats` |
 | IPromocionRepository | `findAllByTenant`, `create`, `deleteAllByTenant` |
 
@@ -381,9 +384,13 @@ npx supabase db push
 | **Build** | ✅ Compila correctamente |
 | **Lint** | ✅ 0 errores |
 | **Clean Architecture** | ✅ 100% Domain/Application/Infrastructure |
-| **SOLID** | ✅ 100% DIP implementado |
-| **OWASP** | ✅ 95% JWT, Zod, HttpOnly cookies |
+| **SOLID** | ✅ 100% DIP — repositorios inyectados por constructor |
+| **OWASP** | ✅ JWT HttpOnly, Zod safeParse, escapeHtml, hex validation |
 | **Accessibility** | ✅ Labels, keyboard handlers, ARIA roles |
+
+### Deuda Técnica
+
+- `src/lib/server-services.ts` → `getEmpresaByDomain` consulta Supabase directamente para cargar datos públicos completos de la empresa (colores, textos, footer). Pendiente: crear `IEmpresaRepository.findByDomainPublic()` con el tipo completo `EmpresaInfo`.
 
 ---
 

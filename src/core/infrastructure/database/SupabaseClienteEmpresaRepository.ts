@@ -135,11 +135,23 @@ export class SupabaseClienteRepository implements IClienteRepository {
   }
 }
 
+export interface EmpresaColoresDTO {
+  primary: string;
+  primaryForeground: string;
+  secondary: string;
+  secondaryForeground: string;
+  accent: string;
+  accentForeground: string;
+  background: string;
+  foreground: string;
+}
+
 // Empresa Repository
 export interface IEmpresaRepository {
   getById(empresaId: string): Promise<Partial<Empresa> | null>;
   findByDomain(dominio: string): Promise<{ id: string; nombre: string; email_notification: string | null; telefono_whatsapp: string | null } | null>;
   update(empresaId: string, data: UpdateEmpresaDTO): Promise<void>;
+  updateColores(empresaId: string, colores: EmpresaColoresDTO): Promise<boolean>;
 }
 
 export class SupabaseEmpresaRepository implements IEmpresaRepository {
@@ -164,6 +176,11 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
       emailNotification: empresa.email_notification,
       colores: null,
       descripcion: null,
+      fb: empresa.fb ?? null,
+      instagram: empresa.instagram ?? null,
+      urlMapa: empresa.url_mapa ?? null,
+      direccion: empresa.direccion ?? null,
+      telefonoWhatsapp: empresa.telefono_whatsapp ?? null,
     };
   }
 
@@ -197,7 +214,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
     // Try subdomain_pedidos
     const subdomainPedidos = 'pedidos';
     const isPedidos = dominio.startsWith(`${subdomainPedidos}.`) || dominio.includes('-pedidos');
-    
+
     if (isPedidos) {
       const mainDomainFromSubdomain = dominio.split('.').slice(1).join('.');
       const { data: empresaSubdomain } = await this.supabase
@@ -205,10 +222,33 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
         .select('id, nombre, email_notification, telefono_whatsapp')
         .eq('dominio', mainDomainFromSubdomain)
         .single();
-      
+
       return empresaSubdomain || null;
     }
 
     return null;
+  }
+
+  async updateColores(empresaId: string, colores: EmpresaColoresDTO): Promise<boolean> {
+    const { error } = await this.supabase
+      .from('empresas')
+      .update({
+        color_primary: colores.primary,
+        color_primary_foreground: colores.primaryForeground,
+        color_secondary: colores.secondary,
+        color_secondary_foreground: colores.secondaryForeground,
+        color_accent: colores.accent,
+        color_accent_foreground: colores.accentForeground,
+        color_background: colores.background,
+        color_foreground: colores.foreground,
+      })
+      .eq('id', empresaId);
+
+    if (error) {
+      console.error('[Repo] Error updating colores:', error.message);
+      return false;
+    }
+
+    return true;
   }
 }

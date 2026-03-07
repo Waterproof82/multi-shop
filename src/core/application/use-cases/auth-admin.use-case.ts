@@ -1,6 +1,5 @@
 import { SignJWT, jwtVerify } from "jose";
-import { createClient } from "@supabase/supabase-js";
-import { adminRepository } from "@/core/infrastructure/database/SupabaseAdminRepository";
+import { adminRepository } from "@/core/infrastructure/database/index";
 import { LoginDTO, loginSchema } from "../dtos/auth.dto";
 import { AdminWithEmpresa } from "@/core/domain/repositories/IAdminRepository";
 
@@ -13,34 +12,9 @@ export class AuthAdminUseCase {
 
     const { email, password } = data;
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const userId = await adminRepository.loginWithPassword(email, password);
 
-    console.log('[AuthAdminUseCase] Intentando login para:', email);
-
-    // 1. Verificar credenciales con Supabase Auth
-    const { error, data: authData } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      console.error('[AuthAdminUseCase] Error de auth:', error.message);
-      throw new Error("Credenciales inválidas");
-    }
-
-    if (!authData?.user) {
-      console.error('[AuthAdminUseCase] No se recibió user data');
-      throw new Error("Credenciales inválidas");
-    }
-
-    const userId = authData.user.id;
-    console.log('[AuthAdminUseCase] User ID:', userId);
-
-    // 2. Buscar perfil admin
     const admin = await adminRepository.findById(userId);
-    console.log('[AuthAdminUseCase] Admin encontrado:', admin);
 
     if (!admin) {
       throw new Error("Usuario no autorizado como admin");

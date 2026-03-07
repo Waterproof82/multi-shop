@@ -1,9 +1,30 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
+import { z } from 'zod';
 import { sendEmail } from '@/lib/brevo-email';
 import { empresaRepository } from '@/core/infrastructure/database';
 
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
+
+const enviarEmailSchema = z.object({
+  items: z.array(z.object({
+    item: z.object({
+      id: z.string(),
+      name: z.string(),
+      price: z.number(),
+    }),
+    quantity: z.number().min(1),
+    selectedComplements: z.array(z.object({
+      name: z.string(),
+      price: z.number(),
+    })).optional(),
+  })),
+  total: z.number().min(0),
+  numeroOrden: z.number().optional(),
+  nombre: z.string().max(100).optional(),
+  telefono: z.string().max(20).optional(),
+  email: z.string().email().optional().or(z.literal('')),
+});
 
 interface CartItem {
   item: {
@@ -146,14 +167,11 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { items, total, numeroOrden, nombre, telefono, email } = body as { 
-      items: CartItem[]; 
-      total: number;
-      numeroOrden?: number;
-      nombre?: string;
-      telefono?: string;
-      email?: string;
-    };
+    const parsed = enviarEmailSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
+    }
+    const { items, total, numeroOrden, nombre, telefono, email } = parsed.data;
 
     const html = generateOrderEmail(
       items, 

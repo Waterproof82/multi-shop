@@ -1,24 +1,21 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { IAdminRepository, AdminProfile, AdminWithEmpresa } from "@/core/domain/repositories/IAdminRepository";
+import { SupabaseClient } from "@supabase/supabase-js";
+import { IAdminRepository, AdminWithEmpresa } from "@/core/domain/repositories/IAdminRepository";
 import { Empresa } from "@/core/domain/entities/types";
 
-function getSupabaseAdmin(): SupabaseClient {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  
-  return createClient(supabaseUrl, supabaseServiceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-}
-
 export class SupabaseAdminRepository implements IAdminRepository {
+  constructor(
+    private readonly supabase: SupabaseClient,
+    private readonly supabaseAnon: SupabaseClient,
+  ) {}
+
+  async loginWithPassword(email: string, password: string): Promise<string> {
+    const { error, data } = await this.supabaseAnon.auth.signInWithPassword({ email, password });
+    if (error || !data?.user) throw new Error("Credenciales inválidas");
+    return data.user.id;
+  }
+
   async findById(id: string): Promise<AdminWithEmpresa | null> {
-    const supabaseAdmin = getSupabaseAdmin();
-    
-    const { data: perfil, error } = await supabaseAdmin
+    const { data: perfil, error } = await this.supabase
       .from("perfiles_admin")
       .select("*")
       .eq("id", id)
@@ -29,7 +26,7 @@ export class SupabaseAdminRepository implements IAdminRepository {
       return null;
     }
 
-    const { data: empresa } = await supabaseAdmin
+    const { data: empresa } = await this.supabase
       .from("empresas")
       .select("*")
       .eq("id", perfil.empresa_id)
@@ -45,90 +42,6 @@ export class SupabaseAdminRepository implements IAdminRepository {
       email: "",
       empresa: this.mapEmpresa(empresa),
     };
-  }
-
-  async findByEmail(email: string): Promise<AdminProfile | null> {
-    const supabaseAdmin = getSupabaseAdmin();
-    
-    const { data: users, error } = await supabaseAdmin.auth.admin.listUsers();
-
-    if (error || !users) return null;
-
-    const user = users.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
-
-    if (!user) return null;
-
-    const { data: perfil } = await supabaseAdmin
-      .from("perfiles_admin")
-      .select("*")
-      .eq("id", user.id)
-      .single();
-
-    if (!perfil) return null;
-
-    return {
-      id: perfil.id,
-      empresaId: perfil.empresa_id,
-      nombreCompleto: perfil.nombre_completo,
-      rol: perfil.rol,
-      email: user.email || "",
-    };
-  }
-
-  async getEmpresaByAdminId(adminId: string): Promise<Empresa | null> {
-    const supabaseAdmin = getSupabaseAdmin();
-    
-    const { data: perfil, error } = await supabaseAdmin
-      .from("perfiles_admin")
-      .select("empresa_id")
-      .eq("id", adminId)
-      .single();
-
-    if (error || !perfil) return null;
-
-    const { data: empresa } = await supabaseAdmin
-      .from("empresas")
-      .select("*")
-      .eq("id", perfil.empresa_id)
-      .single();
-
-    if (!empresa) return null;
-
-    return this.mapEmpresa(empresa);
-  }
-
-  async updateColores(empresaId: string, colores: {
-    primary: string;
-    primaryForeground: string;
-    secondary: string;
-    secondaryForeground: string;
-    accent: string;
-    accentForeground: string;
-    background: string;
-    foreground: string;
-  }): Promise<boolean> {
-    const supabaseAdmin = getSupabaseAdmin();
-
-    const { error } = await supabaseAdmin
-      .from("empresas")
-      .update({
-        color_primary: colores.primary,
-        color_primary_foreground: colores.primaryForeground,
-        color_secondary: colores.secondary,
-        color_secondary_foreground: colores.secondaryForeground,
-        color_accent: colores.accent,
-        color_accent_foreground: colores.accentForeground,
-        color_background: colores.background,
-        color_foreground: colores.foreground,
-      })
-      .eq("id", empresaId);
-
-    if (error) {
-      console.error('[Repo] Error updating colores:', error.message);
-      return false;
-    }
-
-    return true;
   }
 
   private mapEmpresa(row: any): Empresa {
@@ -166,8 +79,11 @@ export class SupabaseAdminRepository implements IAdminRepository {
       urlImage: row.url_image ?? null,
       descripcion,
       colores,
+      fb: row.fb ?? null,
+      instagram: row.instagram ?? null,
+      urlMapa: row.url_mapa ?? null,
+      direccion: row.direccion ?? null,
+      telefonoWhatsapp: row.telefono_whatsapp ?? null,
     };
   }
 }
-
-export const adminRepository = new SupabaseAdminRepository();

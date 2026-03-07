@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { jwtVerify } from 'jose';
 import { AdminSidebar } from './admin-sidebar';
 import { AdminProvider } from '@/lib/admin-context';
-import { adminRepository } from '@/core/infrastructure/database/SupabaseAdminRepository';
+import { adminRepository } from '@/core/infrastructure/database';
 import { AdminThemeProvider } from '@/components/admin-theme-provider';
 import { EmpresaThemeProvider } from '@/components/empresa-theme-provider';
 
@@ -28,9 +28,9 @@ async function verifyAdminSession() {
 
 export default async function AdminProtectedLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   const session = await verifyAdminSession();
 
   if (!session) {

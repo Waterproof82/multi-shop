@@ -77,4 +77,9 @@ export interface Empresa {
     it?: string;
     de?: string;
   } | null;
+  fb?: string | null;
+  instagram?: string | null;
+  urlMapa?: string | null;
+  direccion?: string | null;
+  telefonoWhatsapp?: string | null;
 }

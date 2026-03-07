@@ -16,10 +16,10 @@ interface MenuPageProps {
   empresa?: EmpresaInfo | null;
 }
 
-export function MenuPage({ menuData, header, showCart = false, empresa }: MenuPageProps) {
+export function MenuPage({ menuData, header, showCart = false, empresa }: Readonly<MenuPageProps>) {
   return (
     <div className="flex min-h-screen flex-col bg-background" suppressHydrationWarning>
-      {typeof header !== 'undefined' ? header : null}
+      {header === undefined ? null : header}
       <main className="flex-1">
         <HeroBanner empresa={empresa} />
         <div className="container mx-auto max-w-6xl px-4 py-8 md:px-6">

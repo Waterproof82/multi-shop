@@ -1,52 +1,39 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { adminRepository } from '@/core/infrastructure/database/SupabaseAdminRepository';
+import { NextRequest } from 'next/server';
 import { z } from 'zod';
+import { empresaUseCase } from '@/core/infrastructure/database';
+import { requireAuth, successResponse, errorResponse, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 
-function getEmpresaId(request: NextRequest): string | null {
-  return request.headers.get('x-empresa-id');
-}
-
-const coloresSchema = z.object({
-  primary: z.string(),
-  primaryForeground: z.string(),
-  secondary: z.string(),
-  secondaryForeground: z.string(),
-  accent: z.string(),
-  accentForeground: z.string(),
-  background: z.string(),
-  foreground: z.string(),
-});
+const hexColor = z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Color debe ser hexadecimal (#RRGGBB)');
 
 const updateColoresSchema = z.object({
-  colores: coloresSchema,
+  colores: z.object({
+    primary: hexColor,
+    primaryForeground: hexColor,
+    secondary: hexColor,
+    secondaryForeground: hexColor,
+    accent: hexColor,
+    accentForeground: hexColor,
+    background: hexColor,
+    foreground: hexColor,
+  }),
 });
 
 export async function POST(request: NextRequest) {
-  const empresaId = getEmpresaId(request);
-  if (!empresaId) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const { empresaId, error: authError } = await requireAuth(request);
+  if (authError) return authError;
+
+  const body = await request.json();
+  const parsed = updateColoresSchema.safeParse(body);
+
+  if (!parsed.success) {
+    return validationErrorResponse(parsed.error.errors[0].message);
   }
 
-  try {
-    const body = await request.json();
-    const parsed = updateColoresSchema.safeParse(body);
+  const success = await empresaUseCase.updateColores(empresaId!, parsed.data.colores);
 
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.errors[0].message },
-        { status: 400 }
-      );
-    }
-
-    const success = await adminRepository.updateColores(empresaId, parsed.data.colores);
-
-    if (!success) {
-      return NextResponse.json({ error: 'Error al guardar' }, { status: 500 });
-    }
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error en update-colores:', error);
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
+  if (!success) {
+    return errorResponse('Error al guardar los colores');
   }
+
+  return successResponse({ success: true });
 }

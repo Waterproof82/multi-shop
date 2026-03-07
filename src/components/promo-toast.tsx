@@ -9,7 +9,7 @@ export function PromoToast() {
   const [type, setType] = useState<'success' | 'error'>('success');
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(globalThis.location.search);
     const promoStatus = params.get('promo');
     const error = params.get('error');
 
@@ -42,9 +42,9 @@ export function PromoToast() {
   const handleClose = () => {
     setVisible(false);
     // Limpiar URL después de cerrar
-    const url = new URL(window.location.href);
+    const url = new URL(globalThis.location.href);
     url.search = '';
-    window.history.replaceState({}, '', url.toString());
+    globalThis.history.replaceState({}, '', url.toString());
   };
 
   if (!visible) return null;
@@ -52,9 +52,11 @@ export function PromoToast() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/50"
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/50 cursor-default"
         onClick={handleClose}
+        aria-label="Cerrar"
       />
       
       {/* Modal */}
