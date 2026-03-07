@@ -28,11 +28,13 @@ export class SupabaseClienteRepository implements IClienteRepository {
       }
     });
 
-    return clientes?.map(c => ({
+    const mapped = clientes?.map(c => ({
       ...c,
-      empresaId: c.empresa_id,
+      empresaId: c.empresa_id as string,
       numero_pedidos: pedidosCount[c.id] || 0,
-    })).sort((a: any, b: any) => b.numero_pedidos - a.numero_pedidos) || [];
+    })) ?? [];
+
+    return mapped.sort((a, b) => b.numero_pedidos - a.numero_pedidos);
   }
 
   async findByEmail(email: string, empresaId: string): Promise<Cliente | null> {
@@ -45,16 +47,8 @@ export class SupabaseClienteRepository implements IClienteRepository {
       .ilike('email', normalizedEmail)
       .single();
 
-    if (cliente) return { ...cliente, empresaId: cliente.empresa_id };
-
-    const { data: clienteExact } = await this.supabase
-      .from('clientes')
-      .select('*')
-      .eq('empresa_id', empresaId)
-      .eq('email', normalizedEmail)
-      .single();
-
-    return clienteExact ? { ...clienteExact, empresaId: clienteExact.empresa_id } : null;
+    if (!cliente) return null;
+    return { ...cliente, empresaId: cliente.empresa_id };
   }
 
   async findByTelefono(telefono: string, empresaId: string): Promise<Cliente | null> {

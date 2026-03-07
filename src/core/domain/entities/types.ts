@@ -95,12 +95,19 @@ export interface Cliente {
   created_at: string;
 }
 
+export interface PedidoComplemento {
+  nombre?: string;
+  name?: string;
+  precio?: number;
+  price?: number;
+}
+
 export interface PedidoItem {
   producto_id?: string;
   nombre: string;
   precio: number;
   cantidad: number;
-  complementos?: string[];
+  complementos?: PedidoComplemento[];
 }
 
 export interface CartItem {

@@ -1,10 +1,7 @@
 import { cookies } from 'next/headers';
-import { jwtVerify } from 'jose';
-import { adminRepository, empresaUseCase } from '@/core/infrastructure/database';
+import { authAdminUseCase, empresaUseCase } from '@/core/infrastructure/database';
 import { ColoresForm } from '@/components/admin/colores-form';
 import { EmpresaDatosForm } from '@/components/admin/empresa-datos-form';
-
-const ADMIN_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET!;
 
 export default async function ConfiguracionPage() {
   const cookieStore = await cookies();
@@ -14,11 +11,10 @@ export default async function ConfiguracionPage() {
     return <div>No autorizado</div>;
   }
 
-  const { payload } = await jwtVerify(token, new TextEncoder().encode(ADMIN_TOKEN_SECRET));
-  const admin = await adminRepository.findById(payload.adminId as string);
+  const admin = await authAdminUseCase.verifyToken(token);
 
   if (!admin) {
-    return <div>Admin no encontrado</div>;
+    return <div>No autorizado</div>;
   }
 
   const empresaData = await empresaUseCase.getById(admin.empresa.id);

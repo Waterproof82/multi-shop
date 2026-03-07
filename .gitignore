@@ -26,6 +26,9 @@ Thumbs.db
 .idea/
 *.swp
 
+# Playwright MCP
+.playwright-mcp/
+
 # Misc
 *.local
 *.sublime-workspace

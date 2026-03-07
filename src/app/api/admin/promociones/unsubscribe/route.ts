@@ -2,31 +2,33 @@ import { NextResponse } from 'next/server';
 import { clienteUseCase } from '@/core/infrastructure/database';
 
 function getBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_BASE_URL ||
-         process.env.NEXT_PUBLIC_SUPABASE_URL?.replace('supabase.co', 'vercel.app') ||
-         'https://www.almadearena.es';
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+  if (!baseUrl) throw new Error('NEXT_PUBLIC_BASE_URL no está configurado');
+  return baseUrl;
 }
 
 export async function GET(request: Request) {
   try {
+    const baseUrl = getBaseUrl();
     const { searchParams } = new URL(request.url);
     const email = searchParams.get('email');
     const empresaId = searchParams.get('empresa');
 
     if (!email || !empresaId) {
-      return NextResponse.redirect(`${getBaseUrl()}/?error=invalid`);
+      return NextResponse.redirect(`${baseUrl}/?error=invalid`);
     }
 
     const nuevoValor = await clienteUseCase.togglePromoSubscription(email, empresaId);
 
     if (nuevoValor === null) {
-      return NextResponse.redirect(`${getBaseUrl()}/?error=notfound`);
+      return NextResponse.redirect(`${baseUrl}/?error=notfound`);
     }
 
     const mensaje = nuevoValor ? 'promo=on' : 'promo=off';
-    return NextResponse.redirect(`${getBaseUrl()}/?${mensaje}`);
+    return NextResponse.redirect(`${baseUrl}/?${mensaje}`);
   } catch (error) {
     console.error('[Unsubscribe] Error:', error);
-    return NextResponse.redirect(`${getBaseUrl()}/?error=internal`);
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || '';
+    return NextResponse.redirect(`${baseUrl}/?error=internal`);
   }
 }

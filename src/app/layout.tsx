@@ -6,27 +6,20 @@ import { Toaster } from "@/components/ui/toaster";
 import { CartProvider } from "@/lib/cart-context";
 import { LanguageProvider } from "@/lib/language-context";
 import { PromoToast } from "@/components/promo-toast";
-import { headers } from "next/headers";
 import { getEmpresaByDomain } from "@/lib/server-services";
+import { getDomainFromHeaders } from "@/lib/domain-utils";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
-const playfair = Playfair_Display({ 
+const playfair = Playfair_Display({
   subsets: ["latin"],
   variable: "--font-playfair",
   display: "swap",
 });
 
-async function getDomainFromHeaders(): Promise<string> {
-  const headersList = await headers();
-  const host = headersList.get('host');
-  if (!host) return '';
-  return host.replace(/^www\./, '').toLowerCase().split(':')[0];
-}
-
 export async function generateMetadata(): Promise<Metadata> {
   const domain = await getDomainFromHeaders();
   const empresa = domain ? await getEmpresaByDomain(domain) : null;
-  
+
   return {
     title: empresa?.nombre || "Mermelada de Tomate",
     description: empresa?.descripcion?.es?.substring(0, 160) || "Carta digital y pedidos",

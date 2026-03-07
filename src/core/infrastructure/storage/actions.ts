@@ -1,6 +1,6 @@
 "use server";
 
-import { PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { v4 as uuidv4 } from "uuid";
 import { getS3Client, getR2Config } from "./s3-client";
@@ -51,27 +51,5 @@ export async function getPresignedUploadUrlAction(
     console.error("[R2] Error generating presigned URL:", error);
     const message = error instanceof Error ? error.message : "Error desconocido";
     throw new Error(`Error interno al generar autorización de subida: ${message}`);
-  }
-}
-
-export async function deleteFileAction(fileKey: string) {
-  const s3Client = getS3Client();
-  const { bucketName } = getR2Config();
-
-  if (!bucketName) {
-    throw new Error("R2_BUCKET_NAME no configurado");
-  }
-
-  const command = new DeleteObjectCommand({
-    Bucket: bucketName,
-    Key: fileKey,
-  });
-
-  try {
-    await s3Client.send(command);
-    return { success: true };
-  } catch (error) {
-    console.error("Error deleting file:", error);
-    throw new Error("No se pudo eliminar el archivo.");
   }
 }

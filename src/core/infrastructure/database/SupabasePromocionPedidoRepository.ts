@@ -62,20 +62,6 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     return data || [];
   }
 
-  async findById(id: string): Promise<Pedido | null> {
-    const { data, error } = await this.supabase
-      .from('pedidos')
-      .select(`
-        *,
-        clientes:cliente_id (nombre, email, telefono)
-      `)
-      .eq('id', id)
-      .single();
-
-    if (error) return null;
-    return data;
-  }
-
   async updateStatus(id: string, empresaId: string, estado: string): Promise<void> {
     const { error } = await this.supabase
       .from('pedidos')
@@ -145,10 +131,12 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     const monthEnd = new Date(año, mes + 1, 0, 23, 59, 59).toISOString();
     const yearStart = new Date(año, 0, 1).toISOString();
 
+    // Filter in SQL to avoid loading all historical data
     const { data: pedidos } = await this.supabase
       .from('pedidos')
       .select('*')
-      .eq('empresa_id', empresaId);
+      .eq('empresa_id', empresaId)
+      .gte('created_at', yearStart);
 
     const pedidosFiltrados = pedidos || [];
 
@@ -157,11 +145,10 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       return fecha >= new Date(todayStart) && fecha <= new Date(monthEnd);
     });
     const pedidosMes = pedidosFiltrados.filter(p => new Date(p.created_at) >= new Date(monthStart) && new Date(p.created_at) <= new Date(monthEnd));
-    const pedidosAno = pedidosFiltrados.filter(p => new Date(p.created_at) >= new Date(yearStart));
 
     const totalHoy = pedidosHoy.reduce((sum, p) => sum + (p.total || 0), 0);
     const totalMes = pedidosMes.reduce((sum, p) => sum + (p.total || 0), 0);
-    const totalAno = pedidosAno.reduce((sum, p) => sum + (p.total || 0), 0);
+    const totalAno = pedidosFiltrados.reduce((sum, p) => sum + (p.total || 0), 0);
 
     const buildTopPlatos = (pedidosList: typeof pedidosFiltrados) => {
       const dishCount: Record<string, { nombre: string; cantidad: number; total: number }> = {};
@@ -187,7 +174,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       totalMes,
       totalAno,
       topPlatos: buildTopPlatos(pedidosMes),
-      topPlatosAno: buildTopPlatos(pedidosAno),
+      topPlatosAno: buildTopPlatos(pedidosFiltrados),
     };
   }
 }

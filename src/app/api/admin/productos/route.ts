@@ -2,9 +2,10 @@ import { NextRequest } from 'next/server';
 import { productUseCase } from '@/core/infrastructure/database';
 import { createProductSchema, updateProductSchema, productIdSchema } from '@/core/application/dtos/product.dto';
 import { requireAuth, successResponse, errorResponse, validationErrorResponse } from '@/core/infrastructure/api/helpers';
+import type { Product } from '@/core/domain/entities/types';
 
 // Transform domain format to admin UI format
-function toAdminProduct(prod: any) {
+function toAdminProduct(prod: Product) {
   return {
     id: prod.id,
     empresa_id: prod.empresaId,
