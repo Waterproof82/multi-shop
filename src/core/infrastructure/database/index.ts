@@ -13,14 +13,18 @@ import { PromocionUseCase } from '@/core/application/use-cases/promocion.use-cas
 import { AuthAdminUseCase } from '@/core/application/use-cases/auth-admin.use-case';
 
 const supabase = getSupabaseClient();
+const supabaseAnon = getSupabaseAnonClient();
 
 const productRepository = new SupabaseProductRepository(supabase);
 const categoryRepository = new SupabaseCategoryRepository(supabase);
-export const adminRepository = new SupabaseAdminRepository(supabase, getSupabaseAnonClient());
+export const adminRepository = new SupabaseAdminRepository(supabase, supabaseAnon);
 const clienteRepository = new SupabaseClienteRepository(supabase);
 export const empresaRepository = new SupabaseEmpresaRepository(supabase);
 const promocionRepository = new SupabasePromocionRepository(supabase);
 const pedidoRepository = new SupabasePedidoRepository(supabase);
+
+// Public repository (anon key) for public-facing pages
+export const empresaPublicRepository = new SupabaseEmpresaRepository(supabaseAnon);
 
 // Use Cases (Clean Architecture - Application Layer)
 export const productUseCase = new ProductUseCase(productRepository);

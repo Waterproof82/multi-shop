@@ -3,9 +3,11 @@ import { getSupabaseAnonClient } from "@/core/infrastructure/database/supabase-c
 import { SupabaseProductRepository } from "@/core/infrastructure/database/SupabaseProductRepository";
 import { SupabaseCategoryRepository } from "@/core/infrastructure/database/SupabaseCategoryRepository";
 import { GetMenuUseCase } from "@/core/application/use-cases/get-menu.use-case";
+import { empresaPublicRepository } from "@/core/infrastructure/database";
 import { parseMainDomain } from "@/lib/domain-utils";
+import type { EmpresaPublic } from "@/core/domain/entities/types";
 
-// Instanciación de Repositorios
+// Instanciación de Repositorios (anon key para lectura pública)
 const supabase = getSupabaseAnonClient();
 const productRepo = new SupabaseProductRepository(supabase);
 const categoryRepo = new SupabaseCategoryRepository(supabase);
@@ -13,169 +15,15 @@ const categoryRepo = new SupabaseCategoryRepository(supabase);
 // Instanciación de Casos de Uso
 export const getMenuUseCase = new GetMenuUseCase(productRepo, categoryRepo);
 
-export interface EmpresaInfo {
-  id: string;
-  nombre: string;
-  dominio: string;
-  mostrarCarrito: boolean;
-  moneda: string;
-  subdomainPedidos: string | null;
-  logoUrl: string | null;
-  urlImage: string | null;
-  colores: {
-    primary: string;
-    primaryForeground: string;
-    secondary: string;
-    secondaryForeground: string;
-    accent: string;
-    accentForeground: string;
-    background: string;
-    foreground: string;
-  } | null;
-  descripcion: {
-    es?: string | null;
-    en?: string | null;
-    fr?: string | null;
-    it?: string | null;
-    de?: string | null;
-  } | null;
-  titulo: string | null;
-  subtitulo: string | null;
-  subtitulo2: {
-    es?: string | null;
-    en?: string | null;
-    fr?: string | null;
-    it?: string | null;
-    de?: string | null;
-  } | null;
-  footer1: {
-    es?: string | null;
-    en?: string | null;
-    fr?: string | null;
-    it?: string | null;
-    de?: string | null;
-  } | null;
-  footer2: {
-    es?: string | null;
-    en?: string | null;
-    fr?: string | null;
-    it?: string | null;
-    de?: string | null;
-  } | null;
-  fb: string | null;
-  instagram: string | null;
-  urlMapa: string | null;
-  direccion: string | null;
-  telefono: string | null;
-  emailNotification: string | null;
-}
-
-function mapTranslations(data: Record<string, unknown>, prefix: string): { es?: string | null; en?: string | null; fr?: string | null; it?: string | null; de?: string | null } | null {
-  const es = (data[`${prefix}_es`] as string | null) ?? null;
-  const en = (data[`${prefix}_en`] as string | null) ?? null;
-  const fr = (data[`${prefix}_fr`] as string | null) ?? null;
-  const it = (data[`${prefix}_it`] as string | null) ?? null;
-  const de = (data[`${prefix}_de`] as string | null) ?? null;
-  return es || en || fr || it || de ? { es, en, fr, it, de } : null;
-}
-
-export async function getEmpresaByDomain(domain: string): Promise<EmpresaInfo | null> {
+export async function getEmpresaByDomain(domain: string): Promise<EmpresaPublic | null> {
   const mainDomain = parseMainDomain(domain);
-  
-  // Buscar primero por dominio exacto
-  let { data, error } = await supabase
-    .from("empresas")
-    .select(`
-      id, nombre, dominio, mostrar_carrito, moneda, subdomain_pedidos, 
-      logo_url, url_image, 
-      color_primary, color_primary_foreground, color_secondary, color_secondary_foreground,
-      color_accent, color_accent_foreground, color_background, color_foreground,
-      descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de,
-      titulo, subtitulo,
-      subtitulo2_es, subtitulo2_en, subtitulo2_fr, subtitulo2_it, subtitulo2_de,
-      footer1_es, footer1_en, footer1_fr, footer1_it, footer1_de,
-      footer2_es, footer2_en, footer2_fr, footer2_it, footer2_de,
-      fb, instagram, url_mapa,
-      direccion, telefono_whatsapp, email_notification
-    `)
-    .eq("dominio", mainDomain)
-    .maybeSingle();
-
-  // Si no encuentra, buscar por subdominio pedidos
-  if (!data) {
-    const subdomainPedidos = 'pedidos';
-    const isPedidos = domain.startsWith(`${subdomainPedidos}.`) || domain.includes('-pedidos');
-    if (isPedidos) {
-      // Extraer el dominio principal del subdominio
-      const mainDomain = extractMainDomain(domain, subdomainPedidos);
-      
-      const { data: subdomainData } = await supabase
-        .from("empresas")
-        .select(`
-          id, nombre, dominio, mostrar_carrito, moneda, subdomain_pedidos, 
-          logo_url, url_image, 
-          color_primary, color_primary_foreground, color_secondary, color_secondary_foreground,
-          color_accent, color_accent_foreground, color_background, color_foreground,
-          descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de,
-          titulo, subtitulo,
-          subtitulo2_es, subtitulo2_en, subtitulo2_fr, subtitulo2_it, subtitulo2_de,
-          footer1_es, footer1_en, footer1_fr, footer1_it, footer1_de,
-          footer2_es, footer2_en, footer2_fr, footer2_it, footer2_de,
-          fb, instagram, url_mapa,
-          direccion, telefono_whatsapp, email_notification
-        `)
-        .eq("dominio", mainDomain)
-        .maybeSingle();
-      
-      if (subdomainData) data = subdomainData;
-    }
-  }
-
-  if (error || !data) return null;
-
-  const colores = data.color_primary
-    ? {
-        primary: data.color_primary,
-        primaryForeground: data.color_primary_foreground,
-        secondary: data.color_secondary,
-        secondaryForeground: data.color_secondary_foreground,
-        accent: data.color_accent,
-        accentForeground: data.color_accent_foreground,
-        background: data.color_background,
-        foreground: data.color_foreground,
-      }
-    : null;
-
-  return {
-    id: data.id,
-    nombre: data.nombre,
-    dominio: data.dominio,
-    mostrarCarrito: data.mostrar_carrito ?? false,
-    moneda: data.moneda ?? "EUR",
-    subdomainPedidos: data.subdomain_pedidos ?? null,
-    logoUrl: data.logo_url ?? null,
-    urlImage: data.url_image ?? null,
-    colores,
-    descripcion: mapTranslations(data, 'descripcion'),
-    titulo: data.titulo ?? null,
-    subtitulo: data.subtitulo ?? null,
-    subtitulo2: mapTranslations(data, 'subtitulo2'),
-    footer1: mapTranslations(data, 'footer1'),
-    footer2: mapTranslations(data, 'footer2'),
-    fb: data.fb ?? null,
-    instagram: data.instagram ?? null,
-    urlMapa: data.url_mapa ?? null,
-    direccion: data.direccion ?? null,
-    telefono: data.telefono_whatsapp ?? null,
-    emailNotification: data.email_notification ?? null,
-  };
+  return empresaPublicRepository.findByDomainPublic(mainDomain);
 }
 
 export function isPedidosSubdomain(currentDomain: string, subdomainConfig: string | null): boolean {
   if (!subdomainConfig) return false;
   const config = subdomainConfig.split('.')[0]; // "pedidos.localhost" -> "pedidos"
   const domainParts = currentDomain.split('.');
-  // Comprobar si el inicio del dominio coincide con la config
   return domainParts[0] === config || currentDomain.startsWith(`${subdomainConfig}.`);
 }
 

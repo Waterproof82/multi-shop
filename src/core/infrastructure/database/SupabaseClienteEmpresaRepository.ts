@@ -1,4 +1,4 @@
-import { Empresa, Cliente, EmpresaColores } from "@/core/domain/entities/types";
+import { Empresa, Cliente, EmpresaColores, EmpresaPublic } from "@/core/domain/entities/types";
 import { IClienteRepository } from "@/core/domain/repositories/IClienteRepository";
 import { IEmpresaRepository } from "@/core/domain/repositories/IEmpresaRepository";
 import { UpdateEmpresaDTO } from "@/core/application/dtos/empresa.dto";
@@ -191,6 +191,92 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
         .single();
 
       return empresaSubdomain || null;
+    }
+
+    return null;
+  }
+
+  private static readonly PUBLIC_SELECT = `
+    id, nombre, dominio, mostrar_carrito, moneda, subdomain_pedidos,
+    logo_url, url_image,
+    color_primary, color_primary_foreground, color_secondary, color_secondary_foreground,
+    color_accent, color_accent_foreground, color_background, color_foreground,
+    descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de,
+    titulo, subtitulo,
+    subtitulo2_es, subtitulo2_en, subtitulo2_fr, subtitulo2_it, subtitulo2_de,
+    footer1_es, footer1_en, footer1_fr, footer1_it, footer1_de,
+    footer2_es, footer2_en, footer2_fr, footer2_it, footer2_de,
+    fb, instagram, url_mapa,
+    direccion, telefono_whatsapp, email_notification
+  `;
+
+  private static mapTranslations(data: Record<string, unknown>, prefix: string): { es?: string | null; en?: string | null; fr?: string | null; it?: string | null; de?: string | null } | null {
+    const es = (data[`${prefix}_es`] as string | null) ?? null;
+    const en = (data[`${prefix}_en`] as string | null) ?? null;
+    const fr = (data[`${prefix}_fr`] as string | null) ?? null;
+    const it = (data[`${prefix}_it`] as string | null) ?? null;
+    const de = (data[`${prefix}_de`] as string | null) ?? null;
+    return es || en || fr || it || de ? { es, en, fr, it, de } : null;
+  }
+
+  private static mapToEmpresaPublic(data: Record<string, unknown>): EmpresaPublic {
+    const colores = data.color_primary
+      ? {
+          primary: data.color_primary as string,
+          primaryForeground: data.color_primary_foreground as string,
+          secondary: data.color_secondary as string,
+          secondaryForeground: data.color_secondary_foreground as string,
+          accent: data.color_accent as string,
+          accentForeground: data.color_accent_foreground as string,
+          background: data.color_background as string,
+          foreground: data.color_foreground as string,
+        }
+      : null;
+
+    return {
+      id: data.id as string,
+      nombre: data.nombre as string,
+      dominio: data.dominio as string,
+      mostrarCarrito: (data.mostrar_carrito as boolean) ?? false,
+      moneda: (data.moneda as string) ?? 'EUR',
+      subdomainPedidos: (data.subdomain_pedidos as string | null) ?? null,
+      logoUrl: (data.logo_url as string | null) ?? null,
+      urlImage: (data.url_image as string | null) ?? null,
+      colores,
+      descripcion: SupabaseEmpresaRepository.mapTranslations(data, 'descripcion'),
+      titulo: (data.titulo as string | null) ?? null,
+      subtitulo: (data.subtitulo as string | null) ?? null,
+      subtitulo2: SupabaseEmpresaRepository.mapTranslations(data, 'subtitulo2'),
+      footer1: SupabaseEmpresaRepository.mapTranslations(data, 'footer1'),
+      footer2: SupabaseEmpresaRepository.mapTranslations(data, 'footer2'),
+      fb: (data.fb as string | null) ?? null,
+      instagram: (data.instagram as string | null) ?? null,
+      urlMapa: (data.url_mapa as string | null) ?? null,
+      direccion: (data.direccion as string | null) ?? null,
+      telefono: (data.telefono_whatsapp as string | null) ?? null,
+      emailNotification: (data.email_notification as string | null) ?? null,
+    };
+  }
+
+  async findByDomainPublic(domain: string): Promise<EmpresaPublic | null> {
+    const { data } = await this.supabase
+      .from('empresas')
+      .select(SupabaseEmpresaRepository.PUBLIC_SELECT)
+      .eq('dominio', domain)
+      .maybeSingle();
+
+    if (data) return SupabaseEmpresaRepository.mapToEmpresaPublic(data as Record<string, unknown>);
+
+    const isPedidos = domain.startsWith('pedidos.') || domain.includes('-pedidos');
+    if (isPedidos) {
+      const mainDomain = domain.split('.').slice(1).join('.');
+      const { data: subdomainData } = await this.supabase
+        .from('empresas')
+        .select(SupabaseEmpresaRepository.PUBLIC_SELECT)
+        .eq('dominio', mainDomain)
+        .maybeSingle();
+
+      if (subdomainData) return SupabaseEmpresaRepository.mapToEmpresaPublic(subdomainData as Record<string, unknown>);
     }
 
     return null;

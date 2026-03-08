@@ -1,11 +1,11 @@
 
 'use server';
 import { SiteHeaderClient } from './site-header-client';
-import type { EmpresaInfo } from "@/lib/server-services";
+import type { EmpresaPublic } from "@/core/domain/entities/types";
 
 interface SiteHeaderWrapperProps {
   showCart?: boolean;
-  empresa?: EmpresaInfo | null;
+  empresa?: EmpresaPublic | null;
 }
 
 export default async function SiteHeaderWrapper(props: Readonly<SiteHeaderWrapperProps>) {

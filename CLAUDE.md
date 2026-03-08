@@ -80,9 +80,9 @@ src/
 ├── app/api/unsubscribe/        # Ruta pública: gestión suscripción promo
 ├── core/
 │   ├── domain/
-│   │   ├── entities/types.ts   # Tipos: Product, Category, Empresa, EmpresaColores,
+│   │   ├── entities/types.ts   # Tipos: Product, Category, Empresa, EmpresaPublic, EmpresaColores,
 │   │   │                       #        Pedido, PedidoItem, PedidoComplemento, CartItem,
-│   │   │                       #        Cliente, Promocion, Tenant
+│   │   │                       #        Cliente, Promocion
 │   │   └── repositories/       # Interfaces: IProductRepository, IAdminRepository,
 │   │                           #             IClienteRepository, IEmpresaRepository,
 │   │                           #             IPedidoRepository, IPromocionRepository,
@@ -108,7 +108,7 @@ src/
 └── lib/
     ├── domain-utils.ts         # parseMainDomain(), getDomainFromHeaders() — usar en lugar de duplicar
     ├── html-utils.ts           # escapeHtml() — usar en emails
-    ├── server-services.ts      # getEmpresaByDomain(), getMenuUseCase (instancia pública con anon key)
+    ├── server-services.ts      # getEmpresaByDomain() (via empresaPublicRepository), getMenuUseCase
     ├── admin-context.tsx        # AdminContext (empresaId, empresaNombre)
     └── cart-context.tsx         # CartContext
 ```
@@ -154,7 +154,8 @@ import {
   promocionUseCase,     // PromocionUseCase
   authAdminUseCase,     // AuthAdminUseCase
   adminRepository,      // IAdminRepository (solo para casos especiales)
-  empresaRepository,    // IEmpresaRepository (solo para findByDomain en rutas públicas)
+  empresaRepository,       // IEmpresaRepository (service role, para rutas admin)
+  empresaPublicRepository, // IEmpresaRepository (anon key, para findByDomainPublic en páginas públicas)
   promocionRepository,  // IPromocionRepository
   pedidoRepository,     // IPedidoRepository
 } from '@/core/infrastructure/database';
@@ -178,7 +179,7 @@ import {
 |------------|---------|
 | **IAdminRepository** | `loginWithPassword`, `findById` |
 | **IClienteRepository** | `findAllByTenant`, `findByEmail`, `findByTelefono`, `create`, `update`, `delete` |
-| **IEmpresaRepository** | `getById`, `findByDomain`, `update`, `updateColores` |
+| **IEmpresaRepository** | `getById`, `findByDomain`, `findByDomainPublic`, `update`, `updateColores` |
 | **IPedidoRepository** | `findAllByTenant`, `updateStatus`, `delete`, `create`, `getStats` |
 | **IPromocionRepository** | `findAllByTenant`, `create`, `deleteAllByTenant` |
 | **ICategoryRepository** | `findAllByTenant`, `create`, `update`, `delete` |
@@ -408,8 +409,6 @@ if (!admin) redirect('/admin/login');
 - API: `/api/admin/empresa` — GET/PUT
 - API: `/api/admin/update-colores` — POST (colores hex, usa `requireAuth` + `empresaUseCase.updateColores`)
 
-### Deuda Técnica Documentada
-- `src/lib/server-services.ts` → `getEmpresaByDomain` consulta Supabase directamente con anon key para cargar datos públicos de la empresa (colores, textos, footer). Pendiente migrar a `IEmpresaRepository.findByDomainPublic()` cuando se extienda la interfaz.
 
 ## Comandos
 ```bash

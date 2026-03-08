@@ -3,10 +3,10 @@
 import { motion } from "framer-motion"
 import Image from "next/image"
 import { useLanguage } from "@/lib/language-context"
-import type { EmpresaInfo } from "@/lib/server-services"
+import type { EmpresaPublic } from "@/core/domain/entities/types"
 
 interface HeroBannerProps {
-  readonly empresa?: EmpresaInfo | null;
+  readonly empresa?: EmpresaPublic | null;
 }
 
 export function HeroBanner({ empresa }: HeroBannerProps) {

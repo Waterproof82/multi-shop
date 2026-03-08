@@ -2,10 +2,10 @@
 
 import { MapPin, Mail, Globe, MessageCircle } from "lucide-react"
 import { useLanguage, type Language } from "@/lib/language-context"
-import type { EmpresaInfo } from "@/lib/server-services"
+import type { EmpresaPublic } from "@/core/domain/entities/types"
 
 interface SiteFooterProps {
-  readonly empresa?: EmpresaInfo | null;
+  readonly empresa?: EmpresaPublic | null;
 }
 
 // Traducciones del footer
