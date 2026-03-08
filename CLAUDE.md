@@ -64,12 +64,15 @@ export async function POST(request: NextRequest) {
 - **MAL**: usar `any` como tipo — usar `Record<string, unknown>` con casts explícitos o tipos de dominio
 
 ### OWASP
-- JWT con cookies **HttpOnly**
+- JWT con cookies **HttpOnly**, `Secure` (prod), `SameSite: lax`
 - Zod validation en **TODAS** las API routes con `safeParse`
 - HTML escapado antes de insertar en emails (`escapeHtml` de `lib/html-utils.ts`)
 - Validación de formato hexadecimal `#RRGGBB` para colores
-- No hardcodear secrets
+- Validación de teléfono con regex: `/^\+?[0-9\s\-()]+$/`
+- No hardcodear secrets ni URLs de fallback
+- Security headers: CSP, HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy (en `next.config.mjs`)
 - **TODAS** las rutas bajo `/api/admin/*` deben llamar `requireAuth` (el proxy inyecta `x-empresa-id`)
+- Rutas públicas con redirects: derivar `baseUrl` del request (`new URL(request.url)`), **NUNCA** de env vars
 
 ## Estructura clave
 
@@ -90,8 +93,6 @@ src/
 │   ├── application/
 │   │   ├── dtos/               # Zod schemas: product.dto.ts, category.dto.ts,
 │   │   │                       #              cliente.dto.ts, empresa.dto.ts, auth.dto.ts
-│   │   ├── actions/
-│   │   │   └── storage.actions.ts  # Server Action: uploadImageAction
 │   │   ├── use-cases/          # Lógica de negocio
 │   │   └── mappers/            # Transformación dominio → view model (MenuMapper)
 │   └── infrastructure/
@@ -102,9 +103,10 @@ src/
 │       │   ├── supabase-client.ts  # DOS singletons: getSupabaseClient() y getSupabaseAnonClient()
 │       │   └── index.ts            # Instanciación e inyección de dependencias (exporta use cases y repos)
 │       └── storage/
-│           ├── s3-client.ts        # Singleton R2: getS3Client(), getR2Config(), deleteImageFromR2()
-│           └── actions.ts          # Server Action: getPresignedUploadUrlAction
-├── components/ui/              # ImageUploader (optimiza imágenes)
+│           └── s3-client.ts        # Singleton R2: getS3Client(), getR2Config(), deleteImageFromR2()
+├── components/
+│   ├── ui/                     # ImageUploader, Button, Dialog, Sheet, Toast, etc.
+│   └── promo-notification.tsx  # Banner notificación unsubscribe/subscribe (lee query params)
 └── lib/
     ├── domain-utils.ts         # parseMainDomain(), getDomainFromHeaders() — usar en lugar de duplicar
     ├── html-utils.ts           # escapeHtml() — usar en emails
@@ -153,13 +155,39 @@ import {
   pedidoUseCase,        // PedidoUseCase
   promocionUseCase,     // PromocionUseCase
   authAdminUseCase,     // AuthAdminUseCase
-  adminRepository,      // IAdminRepository (solo para casos especiales)
   empresaRepository,       // IEmpresaRepository (service role, para rutas admin)
   empresaPublicRepository, // IEmpresaRepository (anon key, para findByDomainPublic en páginas públicas)
-  promocionRepository,  // IPromocionRepository
-  pedidoRepository,     // IPedidoRepository
 } from '@/core/infrastructure/database';
 ```
+
+### Constantes de Dominio
+
+```typescript
+// core/domain/constants/empresa-defaults.ts
+import { DEFAULT_EMPRESA_COLORES } from '@/core/domain/constants/empresa-defaults';
+import { DEFAULT_PEDIDOS_SUBDOMAIN } from '@/core/domain/constants/empresa-defaults';
+
+// core/domain/constants/pedido.ts
+import { PEDIDO_ESTADOS, PEDIDO_ESTADO_LABELS, PEDIDO_ESTADO_COLORS } from '@/core/domain/constants/pedido';
+```
+
+### Tipos de Datos en Domain Repositories
+
+Las interfaces de repositorios definen sus propios tipos de datos de entrada (no importan DTOs de Application):
+
+```typescript
+// core/domain/repositories/IProductRepository.ts
+export interface CreateProductData { empresaId: string; titulo_es: string; ... }
+export interface UpdateProductData extends Partial<CreateProductData> { id: string; }
+
+// core/domain/repositories/ICategoryRepository.ts
+export interface CreateCategoryData { empresaId: string; nombre_es: string; ... }
+
+// core/domain/repositories/IEmpresaRepository.ts
+export interface UpdateEmpresaData { email_notification?: string; ... }
+```
+
+Los DTOs de Zod (Application layer) son estructuralmente compatibles con estos tipos.
 
 ### Métodos de Use Cases
 
