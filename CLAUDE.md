@@ -445,7 +445,4 @@ if (!admin) redirect('/admin/login');
 pnpm dev    # Desarrollo
 pnpm build  # Build
 pnpm lint   # Lint
-
-# Scripts útiles
-npx tsx scripts/setup-r2-cors.ts  # Configurar CORS en R2
 ```
