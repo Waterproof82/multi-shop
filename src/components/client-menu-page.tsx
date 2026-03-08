@@ -7,6 +7,7 @@ import { CategoryNav } from "@/components/category-nav"
 import { MenuSection } from "@/components/menu-section"
 import { SiteFooter } from "@/components/site-footer"
 import { CartDrawer } from "@/components/cart-drawer"
+import { PromoNotification } from "@/components/promo-notification"
 import type { EmpresaPublic } from "@/core/domain/entities/types"
 
 interface MenuPageProps {
@@ -20,6 +21,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa }: Readon
   return (
     <div className="flex min-h-screen flex-col bg-background" suppressHydrationWarning>
       {header === undefined ? null : header}
+      <PromoNotification />
       <main className="flex-1">
         <HeroBanner empresa={empresa} />
         <div className="container mx-auto max-w-6xl px-4 py-8 md:px-6">
