@@ -24,7 +24,16 @@
       "Bash(curl:*)",
       "Bash(grep:*)",
       "Bash(lsof:*)",
-      "Bash(pnpm dev:*)"
+      "Bash(pnpm dev:*)",
+      "Bash(taskkill:*)",
+      "Bash(for f in \"src/components/admin/colores-form.tsx\" \"src/components/admin/empresa-apariencia-form.tsx\" \"src/components/admin/empresa-datos-form.tsx\" \"src/components/cart-drawer.tsx\" \"src/components/category-nav.tsx\" \"src/components/empresa-theme-provider.tsx\" \"src/components/menu-section.tsx\" \"src/components/promo-toast.tsx\" \"src/components/quantity-selector-dialog.tsx\" \"src/components/site-header-client.tsx\" \"src/components/ui/image-uploader.tsx\")",
+      "Bash(do echo \"=== $f ===\")",
+      "Read(//c/Users/PC/Desktop/mermelada_tomate/**)",
+      "Bash(done)",
+      "Bash(xargs cat:*)",
+      "Bash(pnpm remove:*)",
+      "Bash(npx next:*)",
+      "Bash(cat:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

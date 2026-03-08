@@ -1,7 +1,7 @@
 import { Empresa, Cliente, EmpresaColores, EmpresaPublic } from "@/core/domain/entities/types";
+import { DEFAULT_PEDIDOS_SUBDOMAIN } from "@/core/domain/constants/empresa-defaults";
 import { IClienteRepository } from "@/core/domain/repositories/IClienteRepository";
-import { IEmpresaRepository } from "@/core/domain/repositories/IEmpresaRepository";
-import { UpdateEmpresaDTO } from "@/core/application/dtos/empresa.dto";
+import { IEmpresaRepository, UpdateEmpresaData } from "@/core/domain/repositories/IEmpresaRepository";
 import { SupabaseClient } from "@supabase/supabase-js";
 
 export class SupabaseClienteRepository implements IClienteRepository {
@@ -147,7 +147,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
     };
   }
 
-  async update(empresaId: string, data: UpdateEmpresaDTO): Promise<void> {
+  async update(empresaId: string, data: UpdateEmpresaData): Promise<void> {
     const updatePayload: Record<string, unknown> = {};
     if (data.email_notification !== undefined) updatePayload.email_notification = data.email_notification || null;
     if (data.telefono_whatsapp !== undefined) updatePayload.telefono_whatsapp = data.telefono_whatsapp || null;
@@ -179,8 +179,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
 
     if (empresa) return empresa;
 
-    const subdomainPedidos = 'pedidos';
-    const isPedidos = dominio.startsWith(`${subdomainPedidos}.`) || dominio.includes('-pedidos');
+    const isPedidos = dominio.startsWith(`${DEFAULT_PEDIDOS_SUBDOMAIN}.`) || dominio.includes('-pedidos');
 
     if (isPedidos) {
       const mainDomainFromSubdomain = dominio.split('.').slice(1).join('.');
@@ -267,7 +266,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
 
     if (data) return SupabaseEmpresaRepository.mapToEmpresaPublic(data as Record<string, unknown>);
 
-    const isPedidos = domain.startsWith('pedidos.') || domain.includes('-pedidos');
+    const isPedidos = domain.startsWith(`${DEFAULT_PEDIDOS_SUBDOMAIN}.`) || domain.includes('-pedidos');
     if (isPedidos) {
       const mainDomain = domain.split('.').slice(1).join('.');
       const { data: subdomainData } = await this.supabase

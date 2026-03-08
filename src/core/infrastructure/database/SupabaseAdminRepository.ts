@@ -1,6 +1,7 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { IAdminRepository, AdminWithEmpresa } from "@/core/domain/repositories/IAdminRepository";
 import { Empresa } from "@/core/domain/entities/types";
+import { DEFAULT_EMPRESA_COLORES } from "@/core/domain/constants/empresa-defaults";
 
 export class SupabaseAdminRepository implements IAdminRepository {
   constructor(
@@ -58,14 +59,14 @@ export class SupabaseAdminRepository implements IAdminRepository {
 
     const colores = row.color_primary
       ? {
-          primary: (row.color_primary as string) || '#008C45',
-          primaryForeground: (row.color_primary_foreground as string) || '#FFFFFF',
-          secondary: (row.color_secondary as string) || '#F7E7CE',
-          secondaryForeground: (row.color_secondary_foreground as string) || '#3C2415',
-          accent: (row.color_accent as string) || '#CF0921',
-          accentForeground: (row.color_accent_foreground as string) || '#FFFFFF',
-          background: (row.color_background as string) || '#FDFBF7',
-          foreground: (row.color_foreground as string) || '#1A1612',
+          primary: (row.color_primary as string) || DEFAULT_EMPRESA_COLORES.primary,
+          primaryForeground: (row.color_primary_foreground as string) || DEFAULT_EMPRESA_COLORES.primaryForeground,
+          secondary: (row.color_secondary as string) || DEFAULT_EMPRESA_COLORES.secondary,
+          secondaryForeground: (row.color_secondary_foreground as string) || DEFAULT_EMPRESA_COLORES.secondaryForeground,
+          accent: (row.color_accent as string) || DEFAULT_EMPRESA_COLORES.accent,
+          accentForeground: (row.color_accent_foreground as string) || DEFAULT_EMPRESA_COLORES.accentForeground,
+          background: (row.color_background as string) || DEFAULT_EMPRESA_COLORES.background,
+          foreground: (row.color_foreground as string) || DEFAULT_EMPRESA_COLORES.foreground,
         }
       : null;
 

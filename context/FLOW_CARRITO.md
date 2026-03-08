@@ -1,67 +1,89 @@
 # Documentación del Flujo de Acceso al Carrito
 
-Este documento describe el mecanismo de seguridad implementado para ocultar y mostrar la funcionalidad del carrito de compras mediante **tokens JWT** y **cookies HttpOnly**.
+Este documento describe el mecanismo para mostrar u ocultar la funcionalidad del carrito de compras basado en **subdominios**.
 
-## 🎯 Objetivo
-El carrito de compras y los botones de "Añadir" deben estar ocultos para el público general. Solo los usuarios con un enlace de acceso válido pueden interactuar con las funciones de compra.
+## Objetivo
+El carrito de compras y los botones de "Añadir" solo se muestran cuando el usuario accede desde el subdominio de pedidos configurado para la empresa.
 
-## 🔄 Flujo Completo
+## Flujo Completo
 
-### 1. Generación del Enlace Seguro
-El administrador genera un enlace que contiene un token JWT firmado.
-- **Script:** `scripts/generate-token.ts`
-- **Expiración del Token:** 2 horas (configurable).
-- **Formato URL:** `https://tudominio.com/?access=TOKEN_JWT`
+### 1. Detección por Subdominio (mecanismo principal)
 
-### 2. Interceptación (Middleware)
-Cuando el usuario accede al enlace, el archivo `src/middleware.ts` intercepta la petición antes de que cargue la página.
+En `src/app/page.tsx`, el servidor determina si mostrar el carrito:
 
-1.  **Detección:** Busca el parámetro `?access=...` en la URL.
-2.  **Sanitización:** Limpia el token de caracteres extraños (ej. paréntesis al final) para evitar errores de copiado.
-3.  **Verificación:** Valida la firma del token usando `ACCESS_TOKEN_SECRET`.
-4.  **Acción (Éxito):**
-    *   Crea una cookie llamada `cart_authorized` con valor `true`.
-    *   **Configuración Cookie:** `HttpOnly`, `Secure` (prod), `SameSite=Lax`, Duración 15 minutos.
-    *   Redirige a la misma URL **sin** el parámetro `access` (URL limpia).
-5.  **Acción (Fallo):**
-    *   Redirige a la URL limpia sin crear la cookie.
+```typescript
+const subdomainConfig = empresa?.subdomainPedidos ?? 'pedidos';
+const isPedidos = isPedidosSubdomain(fullDomain, subdomainConfig);
+const mostrarCarritoEmpresa = empresa?.mostrarCarrito ?? false;
+const showCart = isPedidos || mostrarCarritoEmpresa;
+```
+
+**Lógica:**
+- Si el usuario visita `pedidos.midominio.com` (o el subdominio configurado) → `showCart = true`
+- O si la empresa tiene `mostrar_carrito = true` en la DB → `showCart = true`
+- En caso contrario → `showCart = false`
+
+### 2. Resolución de Empresa
+
+| Dominio | Comportamiento |
+|---------|----------------|
+| `midominio.com` | Menú sin carrito |
+| `pedidos.midominio.com` | Menú + carrito |
+| `midominio-pedidos.com` | Menú + carrito (alternativa) |
+
+- La empresa se resuelve siempre por el `dominio` principal (sin subdominio)
+- Se usa `parseMainDomain(domain)` de `lib/domain-utils.ts` para extraer el dominio principal
+- El carrito se activa si el host actual coincide con `subdomain_pedidos` de la empresa
 
 ### 3. Renderizado del Servidor (SSR)
+
 En `src/app/page.tsx`:
-1.  El servidor lee las cookies entrantes.
-2.  Verifica si existe `cart_authorized === 'true'`.
-3.  Pasa una prop `showCart={true/false}` al componente cliente `MenuPage`.
+1. El servidor obtiene el dominio completo del request
+2. Extrae el dominio principal y busca la empresa en Supabase (via `getEmpresaByDomain`)
+3. Compara el dominio completo con `subdomain_pedidos` de la empresa
+4. Pasa la prop `showCart={true/false}` al componente cliente `MenuPage`
 
 ### 4. Interfaz de Usuario (Cliente)
-En `src/components/menu-section.tsx` y `client-menu-page.tsx`:
+
+En los componentes del menú:
 - **Si `showCart` es false:**
-    - El botón flotante del carrito no se renderiza.
-    - Los botones "Añadir al carrito" en cada producto están ocultos.
-    - La interacción (clic) con las tarjetas de producto está deshabilitada.
+  - El botón flotante del carrito no se renderiza
+  - Los botones "Añadir al carrito" en cada producto están ocultos
+  - La interacción de compra está deshabilitada
 - **Si `showCart` es true:**
-    - Se muestra la interfaz de compra completa.
+  - Se muestra la interfaz de compra completa
 
----
+### 5. Cart Context (estado cliente)
 
-## 🛠️ Configuración Técnica
+En `src/lib/cart-context.tsx`:
+- El carrito es estado React puro (no requiere autenticación)
+- Se muestra/oculta basado en la prop `showCart` del servidor
 
-### Variables de Entorno (.env.local)
-```bash
-# Clave secreta para firmar y verificar tokens
-ACCESS_TOKEN_SECRET="TuClaveSuperSecreta..."
+## Configuración
+
+### Variables relevantes en la DB (tabla `empresas`)
+
+| Columna | Descripción |
+|---------|-------------|
+| `dominio` | Dominio principal de la empresa |
+| `subdomain_pedidos` | Subdominio que activa el carrito (ej: `pedidos.midominio.com`) |
+| `mostrar_carrito` | Flag para mostrar carrito en el dominio principal |
+
+### Utilidades de dominio
+
+```typescript
+// lib/domain-utils.ts
+import { parseMainDomain, getDomainFromHeaders } from '@/lib/domain-utils';
+
+const domain = await getDomainFromHeaders();   // extrae host del request
+const mainDomain = parseMainDomain(domain);    // elimina subdominio pedidos
 ```
 
-### Comandos Útiles
+## Legacy: Token JWT de Acceso
 
-**Generar un nuevo token de acceso:**
-```bash
-npx tsx scripts/generate-token.ts
-```
+El proxy (`src/proxy.ts`) aún soporta un flujo legacy con tokens JWT:
+- URL: `https://tudominio.com/?access=TOKEN_JWT`
+- Establece cookie `access_token` (HttpOnly, 15 min)
+- Script: `scripts/generate-token.ts`
 
-**Limpiar acceso (Pruebas):**
-Para "cerrar sesión" o probar el estado sin carrito, abre las herramientas de desarrollador del navegador (F12) -> Application -> Cookies y elimina `cart_authorized`.
-
-## 🔒 Seguridad
-- **HttpOnly:** La cookie no puede ser leída ni modificada por JavaScript del lado del cliente (protección XSS).
-- **Secure:** En producción, la cookie solo se envía sobre HTTPS.
-- **JWT:** Garantiza que el acceso no ha sido falsificado sin conocer la clave secreta del servidor.
+Este flujo **ya no controla la visibilidad del carrito** — el subdominio es el mecanismo activo.

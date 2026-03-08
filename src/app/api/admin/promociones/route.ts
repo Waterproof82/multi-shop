@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
             subject: 'Nueva promocion disponible',
             htmlContent: personalizedHtml,
             senderName: empresa.nombre || 'Promociones',
-            senderEmail: empresa.emailNotification || 'a369cb001@smtp-brevo.com',
+            senderEmail: empresa.emailNotification || process.env.BREVO_DEFAULT_SENDER_EMAIL || 'noreply@example.com',
           });
         }
       }

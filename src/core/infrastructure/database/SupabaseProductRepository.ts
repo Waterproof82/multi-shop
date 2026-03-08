@@ -1,7 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
-import { IProductRepository } from "@/core/domain/repositories/IProductRepository";
+import { IProductRepository, CreateProductData, UpdateProductData } from "@/core/domain/repositories/IProductRepository";
 import { Product } from "@/core/domain/entities/types";
-import { CreateProductDTO, UpdateProductDTO } from "@/core/application/dtos/product.dto";
 
 export class SupabaseProductRepository implements IProductRepository {
   constructor(private readonly supabase: SupabaseClient) {}
@@ -29,7 +28,7 @@ export class SupabaseProductRepository implements IProductRepository {
     };
   }
 
-  async create(data: CreateProductDTO): Promise<Product> {
+  async create(data: CreateProductData): Promise<Product> {
     const { data: created, error } = await this.supabase
       .from("productos")
       .insert({
@@ -68,7 +67,7 @@ export class SupabaseProductRepository implements IProductRepository {
     return data.map((row: Record<string, unknown>) => this.mapToDomain(row));
   }
 
-  private mapUpdateProductPayload(data: Partial<UpdateProductDTO>): Record<string, unknown> {
+  private mapUpdateProductPayload(data: Partial<UpdateProductData>): Record<string, unknown> {
     const updatePayload: Record<string, unknown> = {};
     const fieldsToMap = [
       'categoria_id', 'titulo_es', 'titulo_en', 'titulo_fr', 'titulo_it', 'titulo_de',
@@ -77,8 +76,8 @@ export class SupabaseProductRepository implements IProductRepository {
     ];
 
     for (const field of fieldsToMap) {
-      if (data[field as keyof UpdateProductDTO] !== undefined) {
-        updatePayload[field] = data[field as keyof UpdateProductDTO];
+      if (data[field as keyof UpdateProductData] !== undefined) {
+        updatePayload[field] = data[field as keyof UpdateProductData];
       }
     }
 
@@ -89,7 +88,7 @@ export class SupabaseProductRepository implements IProductRepository {
     return updatePayload;
   }
 
-  async update(id: string, empresaId: string, data: Partial<UpdateProductDTO>): Promise<Product> {
+  async update(id: string, empresaId: string, data: Partial<UpdateProductData>): Promise<Product> {
     const updatePayload = this.mapUpdateProductPayload(data);
 
     const { data: updated, error } = await this.supabase

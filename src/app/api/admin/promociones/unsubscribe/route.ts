@@ -26,7 +26,8 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${baseUrl}/?error=invalid`);
     }
 
-    const nuevoValor = await clienteUseCase.togglePromoSubscription(email, empresaId);
+    const normalizedEmail = decodeURIComponent(email).trim().toLowerCase();
+    const nuevoValor = await clienteUseCase.togglePromoSubscription(normalizedEmail, empresaId);
 
     if (nuevoValor === null) {
       return NextResponse.redirect(`${baseUrl}/?error=notfound`);

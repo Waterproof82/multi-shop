@@ -1,7 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
-import { ICategoryRepository } from "@/core/domain/repositories/ICategoryRepository";
+import { ICategoryRepository, CreateCategoryData, UpdateCategoryData } from "@/core/domain/repositories/ICategoryRepository";
 import { Category } from "@/core/domain/entities/types";
-import { CreateCategoryDTO, UpdateCategoryDTO } from "@/core/application/dtos/category.dto";
 
 export class SupabaseCategoryRepository implements ICategoryRepository {
   constructor(private readonly supabase: SupabaseClient) {}
@@ -46,7 +45,7 @@ export class SupabaseCategoryRepository implements ICategoryRepository {
     return data.map((row: Record<string, unknown>) => this.mapToDomain(row));
   }
 
-  async create(data: CreateCategoryDTO): Promise<Category> {
+  async create(data: CreateCategoryData): Promise<Category> {
     const { data: created, error } = await this.supabase
       .from("categorias")
       .insert({
@@ -73,7 +72,7 @@ export class SupabaseCategoryRepository implements ICategoryRepository {
     return this.mapToDomain(created);
   }
 
-  async update(id: string, empresaId: string, data: Partial<UpdateCategoryDTO>): Promise<Category> {
+  async update(id: string, empresaId: string, data: Partial<UpdateCategoryData>): Promise<Category> {
     const updatePayload: Record<string, unknown> = {};
 
     if (data.nombre_es !== undefined) updatePayload.nombre_es = data.nombre_es;

@@ -17,7 +17,7 @@ const supabaseAnon = getSupabaseAnonClient();
 
 const productRepository = new SupabaseProductRepository(supabase);
 const categoryRepository = new SupabaseCategoryRepository(supabase);
-export const adminRepository = new SupabaseAdminRepository(supabase, supabaseAnon);
+const adminRepository = new SupabaseAdminRepository(supabase, supabaseAnon);
 const clienteRepository = new SupabaseClienteRepository(supabase);
 export const empresaRepository = new SupabaseEmpresaRepository(supabase);
 const promocionRepository = new SupabasePromocionRepository(supabase);

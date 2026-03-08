@@ -1,4 +1,4 @@
-# Mermelada de Tomate — Carta Digital Multi-idioma
+# Carta Digital Multi-idioma
 
 Plataforma multi-tenant de menú digital con sistema de pedidos online, panel de administración y envío de promociones por email.
 
@@ -14,7 +14,7 @@ Plataforma multi-tenant de menú digital con sistema de pedidos online, panel de
 | Tailwind CSS | 4.x | Estilos |
 | AWS SDK v3 | ^3.994 | Cliente S3/R2 |
 | Zod | 3.25.x | Validación schemas |
-| jose | 6.x | JWT (sign + verify) |
+| JWT | 6.x | JWT (sign + verify) |
 | Brevo | — | Envío de emails |
 
 ---

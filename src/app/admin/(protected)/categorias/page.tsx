@@ -467,7 +467,7 @@ export default function CategoriasPage() {
                     type="text"
                     value={formData.nombre_fr}
                     onChange={(e) => setFormData({ ...formData, nombre_fr: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-ui focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                   />
                 </div>
                 <div>
