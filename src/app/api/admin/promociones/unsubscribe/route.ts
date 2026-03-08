@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { clienteUseCase } from '@/core/infrastructure/database';
+
+const emailSchema = z.string().email();
+const uuidSchema = z.string().uuid();
 
 function getBaseUrl(): string {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
@@ -14,7 +18,7 @@ export async function GET(request: Request) {
     const email = searchParams.get('email');
     const empresaId = searchParams.get('empresa');
 
-    if (!email || !empresaId) {
+    if (!email || !empresaId || !emailSchema.safeParse(email).success || !uuidSchema.safeParse(empresaId).success) {
       return NextResponse.redirect(`${baseUrl}/?error=invalid`);
     }
 

@@ -58,9 +58,6 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
 
   if (!empresa) return null
 
-  // Obtener descripción en el idioma actual o fallback a español
-
-
   return (
     <footer className="w-full bg-black text-slate-200 mt-20 border-t border-slate-800" suppressHydrationWarning>
       <div className="max-w-7xl mx-auto px-6 py-12">

@@ -14,13 +14,13 @@ import { AuthAdminUseCase } from '@/core/application/use-cases/auth-admin.use-ca
 
 const supabase = getSupabaseClient();
 
-export const productRepository = new SupabaseProductRepository(supabase);
-export const categoryRepository = new SupabaseCategoryRepository(supabase);
+const productRepository = new SupabaseProductRepository(supabase);
+const categoryRepository = new SupabaseCategoryRepository(supabase);
 export const adminRepository = new SupabaseAdminRepository(supabase, getSupabaseAnonClient());
-export const clienteRepository = new SupabaseClienteRepository(supabase);
+const clienteRepository = new SupabaseClienteRepository(supabase);
 export const empresaRepository = new SupabaseEmpresaRepository(supabase);
-export const promocionRepository = new SupabasePromocionRepository(supabase);
-export const pedidoRepository = new SupabasePedidoRepository(supabase);
+const promocionRepository = new SupabasePromocionRepository(supabase);
+const pedidoRepository = new SupabasePedidoRepository(supabase);
 
 // Use Cases (Clean Architecture - Application Layer)
 export const productUseCase = new ProductUseCase(productRepository);

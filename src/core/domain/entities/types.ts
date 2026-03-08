@@ -42,13 +42,6 @@ export interface Category {
   };
 }
 
-export interface Tenant {
-  id: string;
-  nombre: string;
-  dominio: string;
-  logoUrl: string | null;
-}
-
 export interface EmpresaColores {
   primary: string;
   primaryForeground: string;

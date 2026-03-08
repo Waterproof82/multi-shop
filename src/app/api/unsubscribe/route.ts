@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { clienteUseCase } from '@/core/infrastructure/database';
+
+const emailSchema = z.string().email();
+const uuidSchema = z.string().uuid();
 
 export async function GET(request: Request) {
   try {
@@ -8,7 +12,7 @@ export async function GET(request: Request) {
     const empresaId = searchParams.get('empresa');
     const action = searchParams.get('action') as 'alta' | 'baja' | null;
 
-    if (!email || !empresaId) {
+    if (!email || !empresaId || !emailSchema.safeParse(email).success || !uuidSchema.safeParse(empresaId).success) {
       return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://www.almadearena.es'}/?error=invalid`);
     }
 
