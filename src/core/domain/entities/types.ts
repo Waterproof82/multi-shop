@@ -42,13 +42,6 @@ export interface Category {
   };
 }
 
-export interface Tenant {
-  id: string;
-  nombre: string;
-  dominio: string;
-  logoUrl: string | null;
-}
-
 export interface EmpresaColores {
   primary: string;
   primaryForeground: string;
@@ -83,6 +76,38 @@ export interface Empresa {
   urlMapa?: string | null;
   direccion?: string | null;
   telefonoWhatsapp?: string | null;
+}
+
+interface TranslatableText {
+  es?: string | null;
+  en?: string | null;
+  fr?: string | null;
+  it?: string | null;
+  de?: string | null;
+}
+
+export interface EmpresaPublic {
+  id: string;
+  nombre: string;
+  dominio: string;
+  mostrarCarrito: boolean;
+  moneda: string;
+  subdomainPedidos: string | null;
+  logoUrl: string | null;
+  urlImage: string | null;
+  colores: EmpresaColores | null;
+  descripcion: TranslatableText | null;
+  titulo: string | null;
+  subtitulo: string | null;
+  subtitulo2: TranslatableText | null;
+  footer1: TranslatableText | null;
+  footer2: TranslatableText | null;
+  fb: string | null;
+  instagram: string | null;
+  urlMapa: string | null;
+  direccion: string | null;
+  telefono: string | null;
+  emailNotification: string | null;
 }
 
 export interface Cliente {

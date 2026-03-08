@@ -2,10 +2,10 @@
 
 import { MapPin, Mail, Globe, MessageCircle } from "lucide-react"
 import { useLanguage, type Language } from "@/lib/language-context"
-import type { EmpresaInfo } from "@/lib/server-services"
+import type { EmpresaPublic } from "@/core/domain/entities/types"
 
 interface SiteFooterProps {
-  readonly empresa?: EmpresaInfo | null;
+  readonly empresa?: EmpresaPublic | null;
 }
 
 // Traducciones del footer
@@ -57,9 +57,6 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
   const t = getTranslation(language)
 
   if (!empresa) return null
-
-  // Obtener descripción en el idioma actual o fallback a español
-
 
   return (
     <footer className="w-full bg-black text-slate-200 mt-20 border-t border-slate-800" suppressHydrationWarning>

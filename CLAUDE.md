@@ -5,7 +5,7 @@
 When writing code that uses any external library, always use context7 to get current documentation before generating code.
 
 ## Stack
-Next.js 16 + React 19 + TypeScript + Supabase + Tailwind CSS v4 + Cloudflare R2
+Next.js 16 + React 19 + TypeScript + Supabase + Tailwind CSS v4 + Cloudflare R2 + Upstash Redis (rate limiting)
 
 **Nota:** Next.js 16 usa Turbopack por defecto en desarrollo.
 
@@ -20,7 +20,7 @@ API Routes → Use Cases → Repositories → Supabase/R2
 | Capa | Ubicación | Responsabilidad |
 |------|-----------|-----------------|
 | **Domain** | `core/domain/` | Entidades, interfaces de repositorios |
-| **Application** | `core/application/` | DTOs (Zod), Use Cases |
+| **Application** | `core/application/` | DTOs (Zod), Use Cases, Mappers |
 | **Infrastructure** | `core/infrastructure/` | Implementaciones de repositories |
 
 ### Flujo obligatorio
@@ -80,9 +80,9 @@ src/
 ├── app/api/unsubscribe/        # Ruta pública: gestión suscripción promo
 ├── core/
 │   ├── domain/
-│   │   ├── entities/types.ts   # Tipos: Product, Category, Empresa, EmpresaColores,
+│   │   ├── entities/types.ts   # Tipos: Product, Category, Empresa, EmpresaPublic, EmpresaColores,
 │   │   │                       #        Pedido, PedidoItem, PedidoComplemento, CartItem,
-│   │   │                       #        Cliente, Promocion, Tenant
+│   │   │                       #        Cliente, Promocion
 │   │   └── repositories/       # Interfaces: IProductRepository, IAdminRepository,
 │   │                           #             IClienteRepository, IEmpresaRepository,
 │   │                           #             IPedidoRepository, IPromocionRepository,
@@ -92,9 +92,12 @@ src/
 │   │   │                       #              cliente.dto.ts, empresa.dto.ts, auth.dto.ts
 │   │   ├── actions/
 │   │   │   └── storage.actions.ts  # Server Action: uploadImageAction
-│   │   └── use-cases/          # Lógica de negocio
+│   │   ├── use-cases/          # Lógica de negocio
+│   │   └── mappers/            # Transformación dominio → view model (MenuMapper)
 │   └── infrastructure/
-│       ├── api/helpers.ts       # requireAuth, successResponse, errorResponse, validationErrorResponse
+│       ├── api/
+│       │   ├── helpers.ts       # requireAuth, successResponse, errorResponse, validationErrorResponse
+│       │   └── rate-limit.ts    # rateLimitLogin, rateLimitPublic (Upstash Redis)
 │       ├── database/
 │       │   ├── supabase-client.ts  # DOS singletons: getSupabaseClient() y getSupabaseAnonClient()
 │       │   └── index.ts            # Instanciación e inyección de dependencias (exporta use cases y repos)
@@ -105,7 +108,7 @@ src/
 └── lib/
     ├── domain-utils.ts         # parseMainDomain(), getDomainFromHeaders() — usar en lugar de duplicar
     ├── html-utils.ts           # escapeHtml() — usar en emails
-    ├── server-services.ts      # getEmpresaByDomain(), getMenuUseCase (instancia pública con anon key)
+    ├── server-services.ts      # getEmpresaByDomain() (via empresaPublicRepository), getMenuUseCase
     ├── admin-context.tsx        # AdminContext (empresaId, empresaNombre)
     └── cart-context.tsx         # CartContext
 ```
@@ -151,7 +154,8 @@ import {
   promocionUseCase,     // PromocionUseCase
   authAdminUseCase,     // AuthAdminUseCase
   adminRepository,      // IAdminRepository (solo para casos especiales)
-  empresaRepository,    // IEmpresaRepository (solo para findByDomain en rutas públicas)
+  empresaRepository,       // IEmpresaRepository (service role, para rutas admin)
+  empresaPublicRepository, // IEmpresaRepository (anon key, para findByDomainPublic en páginas públicas)
   promocionRepository,  // IPromocionRepository
   pedidoRepository,     // IPedidoRepository
 } from '@/core/infrastructure/database';
@@ -175,7 +179,7 @@ import {
 |------------|---------|
 | **IAdminRepository** | `loginWithPassword`, `findById` |
 | **IClienteRepository** | `findAllByTenant`, `findByEmail`, `findByTelefono`, `create`, `update`, `delete` |
-| **IEmpresaRepository** | `getById`, `findByDomain`, `update`, `updateColores` |
+| **IEmpresaRepository** | `getById`, `findByDomain`, `findByDomainPublic`, `update`, `updateColores` |
 | **IPedidoRepository** | `findAllByTenant`, `updateStatus`, `delete`, `create`, `getStats` |
 | **IPromocionRepository** | `findAllByTenant`, `create`, `deleteAllByTenant` |
 | **ICategoryRepository** | `findAllByTenant`, `create`, `update`, `delete` |
@@ -360,6 +364,14 @@ if (!admin) redirect('/admin/login');
 - **Fix checksums R2**: AWS SDK v3 añade CRC32 por defecto; R2 no los soporta → `requestChecksumCalculation: "WHEN_REQUIRED"` y `responseChecksumValidation: "WHEN_REQUIRED"` en el S3Client
 - **R2 CORS**: solo necesario para uploads directos desde el browser (no aplica al flujo actual server-side)
 
+### Rate Limiting (Upstash Redis)
+- **Archivo**: `core/infrastructure/api/rate-limit.ts`
+- **Login**: 5 intentos / 15 min por IP (`rateLimitLogin`)
+- **Rutas públicas**: 20 requests / min por IP (`rateLimitPublic`)
+- **Env vars**: `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`
+- **Graceful degradation**: Si no hay Redis configurado, no limita (desarrollo local sin Redis funciona)
+- **Rutas protegidas**: `/api/admin/login`, `/api/pedidos`, `/api/unsubscribe`, `/api/admin/promociones/unsubscribe`
+
 ### Validation
 - **TODAS** las rutas API usan Zod schemas con `safeParse`
 - Usar los DTOs en `core/application/dtos/`
@@ -397,8 +409,6 @@ if (!admin) redirect('/admin/login');
 - API: `/api/admin/empresa` — GET/PUT
 - API: `/api/admin/update-colores` — POST (colores hex, usa `requireAuth` + `empresaUseCase.updateColores`)
 
-### Deuda Técnica Documentada
-- `src/lib/server-services.ts` → `getEmpresaByDomain` consulta Supabase directamente con anon key para cargar datos públicos de la empresa (colores, textos, footer). Pendiente migrar a `IEmpresaRepository.findByDomainPublic()` cuando se extienda la interfaz.
 
 ## Comandos
 ```bash

@@ -8,11 +8,11 @@ import { LanguageSelector } from "@/components/language-selector";
 import { t } from "@/lib/translations";
 import { useEffect, useState, useRef } from "react";
 import { useCart } from "@/lib/cart-context";
-import type { EmpresaInfo } from "@/lib/server-services";
+import type { EmpresaPublic } from "@/core/domain/entities/types";
 
 interface SiteHeaderClientProps {
   readonly showCart: boolean;
-  readonly empresa?: EmpresaInfo | null;
+  readonly empresa?: EmpresaPublic | null;
 }
 
 export function SiteHeaderClient({ showCart, empresa }: SiteHeaderClientProps) {

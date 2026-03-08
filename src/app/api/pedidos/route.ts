@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { empresaRepository, pedidoUseCase } from '@/core/infrastructure/database';
 import { parseMainDomain, getDomainFromHeaders } from '@/lib/domain-utils';
+import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 
 const createPedidoSchema = z.object({
   items: z.array(z.object({
@@ -48,6 +49,9 @@ function generateWhatsAppMessage(items: OrderItem[], total: number, nombre: stri
 
 export async function POST(request: Request) {
   try {
+    const rateLimited = await rateLimitPublic(request);
+    if (rateLimited) return rateLimited;
+
     const domain = await getDomainFromHeaders();
     const mainDomain = parseMainDomain(domain);
 

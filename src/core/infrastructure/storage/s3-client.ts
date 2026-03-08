@@ -2,12 +2,6 @@ import { S3Client, DeleteObjectCommand, PutObjectCommand } from "@aws-sdk/client
 import { NodeHttpHandler } from "@smithy/node-http-handler";
 import https from "node:https";
 
-// En desarrollo, el antivirus puede interceptar HTTPS y causar errores SSL.
-// NODE_TLS_REJECT_UNAUTHORIZED=0 desactiva la verificación globalmente en dev.
-if (process.env.NODE_ENV !== 'production') {
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-}
-
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
 const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
 const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;

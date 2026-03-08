@@ -7,13 +7,13 @@ import { CategoryNav } from "@/components/category-nav"
 import { MenuSection } from "@/components/menu-section"
 import { SiteFooter } from "@/components/site-footer"
 import { CartDrawer } from "@/components/cart-drawer"
-import type { EmpresaInfo } from "@/lib/server-services"
+import type { EmpresaPublic } from "@/core/domain/entities/types"
 
 interface MenuPageProps {
   menuData: MenuCategoryVM[];
   header?: ReactNode;
   showCart?: boolean;
-  empresa?: EmpresaInfo | null;
+  empresa?: EmpresaPublic | null;
 }
 
 export function MenuPage({ menuData, header, showCart = false, empresa }: Readonly<MenuPageProps>) {

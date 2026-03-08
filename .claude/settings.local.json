@@ -21,7 +21,10 @@
       "Bash(pnpm add:*)",
       "mcp__supabase__execute_sql",
       "mcp__supabase__apply_migration",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(grep:*)",
+      "Bash(lsof:*)",
+      "Bash(pnpm dev:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

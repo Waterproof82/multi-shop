@@ -3,7 +3,6 @@
 import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-// Removed unused import 'Label'
 import {
   Sheet,
   SheetContent,
@@ -83,7 +82,7 @@ export function CartDrawer() {
   };
 
   const handleWhatsAppClick = (useWeb: boolean = false) => {
-    const link = (globalThis as any).__whatsappLink;
+    const link = (globalThis as Record<string, unknown>).__whatsappLink as string | undefined;
     if (!link) return;
     const match = link.match(/wa\.me\/(\d+)\?text=(.+)/);
     if (match) {
@@ -167,7 +166,7 @@ export function CartDrawer() {
         setEmail('');
         
         if (data.whatsappLink) {
-          (globalThis as any).__whatsappLink = data.whatsappLink;
+          (globalThis as Record<string, unknown>).__whatsappLink = data.whatsappLink;
           const match = data.whatsappLink.match(/wa\.me\/(\d+)\?text=(.+)/);
           if (match) {
             const numero = match[1];

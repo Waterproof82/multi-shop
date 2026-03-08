@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { pedidoUseCase } from '@/core/infrastructure/database';
 import { requireAuth, successResponse, errorResponse, validationErrorResponse } from '@/core/infrastructure/api/helpers';
+import { PEDIDO_ESTADOS } from '@/core/domain/constants/pedido';
 
 const pedidoIdSchema = z.object({
   id: z.string().uuid(),
@@ -9,7 +10,7 @@ const pedidoIdSchema = z.object({
 
 const updatePedidoSchema = z.object({
   id: z.string().uuid(),
-  estado: z.enum(['pendiente', 'aceptado', 'preparando', 'enviado', 'entregado', 'cancelado']),
+  estado: z.enum(PEDIDO_ESTADOS),
 });
 
 export async function GET(request: NextRequest) {

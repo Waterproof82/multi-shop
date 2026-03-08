@@ -3,9 +3,13 @@ import { cookies } from 'next/headers';
 import { authAdminUseCase } from '@/core/infrastructure/database';
 import { loginSchema } from '@/core/application/dtos/auth.dto';
 import { successResponse, errorResponse, validationErrorResponse } from '@/core/infrastructure/api/helpers';
+import { rateLimitLogin } from '@/core/infrastructure/api/rate-limit';
 
 export async function POST(request: NextRequest) {
   try {
+    const rateLimited = await rateLimitLogin(request);
+    if (rateLimited) return rateLimited;
+
     const body = await request.json();
 
     const parsed = loginSchema.safeParse(body);
