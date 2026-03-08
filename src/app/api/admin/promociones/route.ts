@@ -37,10 +37,10 @@ function buildEmailHtml(params: {
       </div>
       ${imagen_url ? `<img src="${imagen_url}" alt="Promoción" style="width: 100%; border-radius: 8px; margin-bottom: 16px;">` : ''}
       <p style="margin: 16px 0 8px; font-size: 12px; color: #999; text-align: center;">
-        <a href="${baseUrl}/api/unsubscribe?email=__EMAIL__&empresa=${empresaId}" style="color: #dc2626; text-decoration: underline;">Dar de baja las promociones</a>
+        <a href="${baseUrl}/api/unsubscribe?email=__EMAIL__&empresa=${empresaId}&action=baja" style="color: #dc2626; text-decoration: underline;">Dar de baja las promociones</a>
       </p>
       <p style="margin: 0; font-size: 12px; color: #999; text-align: center;">
-        <a href="${baseUrl}/api/unsubscribe?email=__EMAIL__&empresa=${empresaId}" style="color: #16a34a; text-decoration: underline;">Volver a dar de alta</a>
+        <a href="${baseUrl}/api/unsubscribe?email=__EMAIL__&empresa=${empresaId}&action=alta" style="color: #16a34a; text-decoration: underline;">Volver a dar de alta</a>
       </p>
     </div>
   </div>
