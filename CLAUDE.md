@@ -439,6 +439,19 @@ if (!admin) redirect('/admin/login');
 - API: `/api/admin/empresa` — GET/PUT
 - API: `/api/admin/update-colores` — POST (colores hex, usa `requireAuth` + `empresaUseCase.updateColores`)
 
+### Logo y Favicon
+- **Campo**: `logo_url` en tabla `empresas` (gestionado desde `/admin/configuracion` → sección "Apariencia")
+- **Favicon dinámico**: Se genera automáticamente desde `logo_url` en `app/layout.tsx`
+- **Caching**: `getEmpresaByDomain` usa `unstable_cache` con TTL de 5 minutos
+- **Tipos soportados**: WebP, PNG, JPG, SVG (detección automática por extensión)
+- **Plataformas**:
+  - Chrome/Firefox/Edge: icon 32x32, 16x16
+  - Safari: apple-touch-icon 180x180
+  - Android Chrome: android-chrome 192x192, 512x512
+  - PWA: manifest.json dinámico en `/manifest.json`
+- **Fallback**: Si no hay logo, usa `/favicon.ico`
+- **PWA**: El manifest usa `theme_color` y `background_color` desde los colores de la empresa
+
 
 ## Comandos
 ```bash
