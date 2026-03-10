@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Languages, ChevronDown, ChevronRight } from 'lucide-react';
 import { ImageUploader } from '@/components/ui/image-uploader';
+import type { UpdateEmpresaDTO } from '@/core/application/dtos/empresa.dto';
 
 const IDIOMAS = [
   { key: 'es', label: 'Español' },
@@ -14,6 +15,7 @@ const IDIOMAS = [
 
 interface EmpresaAparienciaFormProps {
   readonly initialData: {
+    logo_url: string | null;
     url_image: string | null;
     descripcion_es: string;
     descripcion_en: string;
@@ -24,7 +26,7 @@ interface EmpresaAparienciaFormProps {
   readonly empresaSlug: string;
 }
 
-async function saveEmpresa(data: Record<string, unknown>) {
+async function saveEmpresa(data: Partial<UpdateEmpresaDTO>) {
   const res = await fetch('/api/admin/empresa', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -38,6 +40,7 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [savingImage, setSavingImage] = useState(false);
+  const [savingLogo, setSavingLogo] = useState(false);
   const [showTranslations, setShowTranslations] = useState(false);
 
   useEffect(() => {
@@ -58,6 +61,20 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
     }
   };
 
+  const handleLogoChange = async (url: string) => {
+    const newUrl = url || null;
+    setFormData((prev) => ({ ...prev, logo_url: newUrl }));
+    setSaved(false);
+    setSavingLogo(true);
+    try {
+      await saveEmpresa({ logo_url: newUrl });
+    } catch (error) {
+      console.error('Error guardando logo:', error);
+    } finally {
+      setSavingLogo(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSaving(true);
@@ -73,6 +90,25 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Logo de la empresa */}
+      <div>
+        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Logo de la empresa
+          {savingLogo && <span className="ml-2 text-xs text-gray-400">Guardando...</span>}
+        </p>
+        <ImageUploader
+          value={formData.logo_url ?? ''}
+          onChange={handleLogoChange}
+          label=""
+          empresaSlug={empresaSlug}
+          previewClassName="relative group rounded-lg overflow-hidden border"
+          previewStyle={{ aspectRatio: '1/1', maxWidth: '200px' }}
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          Se mostrará en el header y footer del menú. Recomendado: 512×512px (cuadrado).
+        </p>
+      </div>
+
       {/* Imagen de fondo */}
       <div>
         <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

@@ -30,6 +30,7 @@ export default async function ConfiguracionPage() {
   };
 
   const empresaApariencia = {
+    logo_url: empresaData?.logoUrl || null,
     url_image: empresaData?.urlImage || null,
     descripcion_es: empresaData?.descripcion?.es || '',
     descripcion_en: empresaData?.descripcion?.en || '',

@@ -155,6 +155,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
     if (data.instagram !== undefined) updatePayload.instagram = data.instagram || null;
     if (data.url_mapa !== undefined) updatePayload.url_mapa = data.url_mapa || null;
     if (data.direccion !== undefined) updatePayload.direccion = data.direccion || null;
+    if (data.logo_url !== undefined) updatePayload.logo_url = data.logo_url || null;
     if (data.url_image !== undefined) updatePayload.url_image = data.url_image || null;
     if (data.descripcion_es !== undefined) updatePayload.descripcion_es = data.descripcion_es || null;
     if (data.descripcion_en !== undefined) updatePayload.descripcion_en = data.descripcion_en || null;

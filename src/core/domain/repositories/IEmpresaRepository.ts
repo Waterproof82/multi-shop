@@ -7,6 +7,7 @@ export interface UpdateEmpresaData {
   instagram?: string;
   url_mapa?: string;
   direccion?: string;
+  logo_url?: string | null;
   url_image?: string | null;
   descripcion_es?: string;
   descripcion_en?: string;
