@@ -1,20 +1,8 @@
 import { cookies } from 'next/headers';
-import { jwtVerify } from 'jose';
-import { adminRepository } from '@/core/infrastructure/database/SupabaseAdminRepository';
-import { createClient } from '@supabase/supabase-js';
+import { authAdminUseCase, empresaUseCase } from '@/core/infrastructure/database';
 import { ColoresForm } from '@/components/admin/colores-form';
 import { EmpresaDatosForm } from '@/components/admin/empresa-datos-form';
-
-const ADMIN_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET!;
-
-function getSupabaseClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error("Configuración de Supabase incompleta");
-  }
-  return createClient(supabaseUrl, supabaseKey);
-}
+import { EmpresaAparienciaForm } from '@/components/admin/empresa-apariencia-form';
 
 export default async function ConfiguracionPage() {
   const cookieStore = await cookies();
@@ -24,29 +12,33 @@ export default async function ConfiguracionPage() {
     return <div>No autorizado</div>;
   }
 
-  const { payload } = await jwtVerify(token, new TextEncoder().encode(ADMIN_TOKEN_SECRET));
-  const admin = await adminRepository.findById(payload.adminId as string);
+  const admin = await authAdminUseCase.verifyToken(token);
 
   if (!admin) {
-    return <div>Admin no encontrado</div>;
+    return <div>No autorizado</div>;
   }
 
-  // Obtener datos adicionales de la empresa
-  const supabase = getSupabaseClient();
-  const { data: empresaData } = await supabase
-    .from('empresas')
-    .select('email_notification, telefono_whatsapp, fb, instagram, url_mapa, direccion')
-    .eq('id', admin.empresa.id)
-    .single();
+  const empresaData = await empresaUseCase.getById(admin.empresa.id);
 
   const empresaDatos = {
-    email_notification: empresaData?.email_notification || '',
-    telefono_whatsapp: empresaData?.telefono_whatsapp || '',
+    email_notification: empresaData?.emailNotification || '',
+    telefono_whatsapp: empresaData?.telefonoWhatsapp || '',
     fb: empresaData?.fb || '',
     instagram: empresaData?.instagram || '',
-    url_mapa: empresaData?.url_mapa || '',
+    url_mapa: empresaData?.urlMapa || '',
     direccion: empresaData?.direccion || '',
   };
+
+  const empresaApariencia = {
+    url_image: empresaData?.urlImage || null,
+    descripcion_es: empresaData?.descripcion?.es || '',
+    descripcion_en: empresaData?.descripcion?.en || '',
+    descripcion_fr: empresaData?.descripcion?.fr || '',
+    descripcion_it: empresaData?.descripcion?.it || '',
+    descripcion_de: empresaData?.descripcion?.de || '',
+  };
+
+  const empresaSlug = empresaData?.dominio || admin.empresa.id;
 
   return (
     <div className="pt-20 lg:pt-0 px-6 lg:px-8">
@@ -66,6 +58,17 @@ export default async function ConfiguracionPage() {
           Esta información se mostrará en el pie de página de tu menú digital.
         </p>
         <EmpresaDatosForm initialData={empresaDatos} />
+      </div>
+
+      {/* Apariencia */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-6 mb-6">
+        <h2 className="text-lg font-semibold mb-6 dark:text-white">
+          Apariencia del menú
+        </h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+          Imagen de fondo del banner y descripción del restaurante en cada idioma.
+        </p>
+        <EmpresaAparienciaForm initialData={empresaApariencia} empresaSlug={empresaSlug} />
       </div>
 
       {/* Colores */}

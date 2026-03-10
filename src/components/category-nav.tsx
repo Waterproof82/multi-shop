@@ -63,7 +63,7 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
       isManualScrolling.current = true
       setActiveId(id)
 
-      const offset = window.innerWidth >= 768 ? 140 : 140
+      const offset = 140
       const elementPosition = el.getBoundingClientRect().top + window.scrollY
       const offsetPosition = elementPosition - offset
 
@@ -102,7 +102,7 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
                 : "text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
             )}
           >
-            {(language !== "es" && cat.translations?.[language]) || cat.label}
+            {(language !== "es" && cat.translations?.[language]?.name) || cat.label}
           </button>
         ))}
       </div>

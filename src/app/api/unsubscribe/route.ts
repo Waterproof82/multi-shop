@@ -1,14 +1,30 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { clienteUseCase } from '@/core/infrastructure/database';
+import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
+
+const emailSchema = z.string().email();
+const uuidSchema = z.string().uuid();
+
+function getBaseUrl(request: Request): string {
+  const url = new URL(request.url);
+  return `${url.protocol}//${url.host}`;
+}
 
 export async function GET(request: Request) {
+  const baseUrl = getBaseUrl(request);
+
   try {
+    const rateLimited = await rateLimitPublic(request);
+    if (rateLimited) return rateLimited;
+
     const { searchParams } = new URL(request.url);
     let email = searchParams.get('email');
     const empresaId = searchParams.get('empresa');
-    const action = searchParams.get('action');
+    const action = searchParams.get('action') as 'alta' | 'baja' | null;
 
-    if (!email || !empresaId) {
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://www.almadearena.es'}/?error=invalid`);
+    if (!email || !empresaId || !emailSchema.safeParse(email).success || !uuidSchema.safeParse(empresaId).success) {
+      return NextResponse.redirect(`${baseUrl}/?error=invalid`);
     }
 
     // Decode email if it's URL encoded
@@ -17,65 +33,20 @@ export async function GET(request: Request) {
     } catch {
       // Keep original if decode fails
     }
-    
+
     // Normalizar email: trim, lowercase
     const normalizedEmail = email.trim().toLowerCase();
 
-    const { getSupabaseClient } = await import('@/core/infrastructure/database/supabase-client');
-    const supabase = getSupabaseClient();
+    const nuevoValor = await clienteUseCase.togglePromoSubscription(normalizedEmail, empresaId, action ?? undefined);
 
-    // Buscar cliente por empresa + email
-    let clienteToUpdate = null;
-    
-    // Try case insensitive with normalized email
-    const { data: cliente1 } = await supabase
-      .from('clientes')
-      .select('*')
-      .eq('empresa_id', empresaId)
-      .ilike('email', normalizedEmail)
-      .single();
-    
-    if (cliente1) {
-      clienteToUpdate = cliente1;
-    } else {
-      // Try exact match
-      const { data: cliente2 } = await supabase
-        .from('clientes')
-        .select('*')
-        .eq('empresa_id', empresaId)
-        .eq('email', normalizedEmail)
-        .single();
-      
-      if (cliente2) {
-        clienteToUpdate = cliente2;
-      }
+    if (nuevoValor === null) {
+      return NextResponse.redirect(`${baseUrl}/?error=notfound`);
     }
 
-    if (!clienteToUpdate) {
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://www.almadearena.es'}/?error=notfound`);
-    }
-
-    // Determinar nuevo valor según acción
-    let nuevoValor: boolean;
-    
-    if (action === 'alta') {
-      nuevoValor = true;
-    } else if (action === 'baja') {
-      nuevoValor = false;
-    } else {
-      nuevoValor = !clienteToUpdate.aceptar_promociones;
-    }
-
-    await supabase
-      .from('clientes')
-      .update({ aceptar_promociones: nuevoValor })
-      .eq('id', clienteToUpdate.id);
-
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.almadearena.es';
     const mensaje = nuevoValor ? 'promo=on' : 'promo=off';
     return NextResponse.redirect(`${baseUrl}/?${mensaje}`);
   } catch (error) {
     console.error('Promo error:', error);
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://www.almadearena.es'}/?error=internal`);
+    return NextResponse.redirect(`${baseUrl}/?error=internal`);
   }
 }

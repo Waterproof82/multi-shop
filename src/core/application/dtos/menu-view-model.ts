@@ -23,13 +23,13 @@ export interface MenuItemVM {
 
 export interface MenuSubcategoryVM {
   id: string;
-  nombre: string;
+  nombre: string | null;
   descripcion?: string;
   translations?: {
-    en?: string;
-    fr?: string;
-    it?: string;
-    de?: string;
+    en?: { name: string; description?: string };
+    fr?: { name: string; description?: string };
+    it?: { name: string; description?: string };
+    de?: { name: string; description?: string };
   };
   descripcionTranslations?: {
     en?: string;
@@ -46,10 +46,10 @@ export interface MenuCategoryVM {
   descripcion?: string;
   items: MenuItemVM[];
   translations?: {
-    en?: string;
-    fr?: string;
-    it?: string;
-    de?: string;
+    en?: { name: string; description?: string };
+    fr?: { name: string; description?: string };
+    it?: { name: string; description?: string };
+    de?: { name: string; description?: string };
   };
   descripcionTranslations?: {
     en?: string;

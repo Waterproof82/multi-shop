@@ -1,40 +1,47 @@
-import { NextResponse } from 'next/server';
-import { headers } from 'next/headers';
+import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { sendEmail } from '@/lib/brevo-email';
+import { empresaUseCase } from '@/core/infrastructure/database';
+import { requireAuth } from '@/core/infrastructure/api/helpers';
+import { escapeHtml } from '@/lib/html-utils';
 
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
 
-interface CartItem {
-  item: {
-    id: string;
-    name: string;
-    price: number;
-    translations?: Record<string, { name: string }>;
-  };
-  quantity: number;
-  selectedComplements?: { name: string; price: number }[];
-}
+const enviarEmailSchema = z.object({
+  items: z.array(z.object({
+    item: z.object({
+      id: z.string(),
+      name: z.string(),
+      price: z.number(),
+    }),
+    quantity: z.number().min(1),
+    selectedComplements: z.array(z.object({
+      name: z.string(),
+      price: z.number(),
+    })).optional(),
+  })),
+  total: z.number().min(0),
+  numeroOrden: z.number().optional(),
+  nombre: z.string().max(100).optional(),
+  telefono: z.string().max(20).optional(),
+  email: z.string().email().optional().or(z.literal('')),
+});
 
-async function getDomainFromHeaders(): Promise<string> {
-  const headersList = await headers();
-  const host = headersList.get('host');
-  if (!host) return '';
-  return host.replace(/^www\./, '').toLowerCase().split(':')[0];
-}
+type OrderItem = z.infer<typeof enviarEmailSchema>['items'][number];
 
-function generateOrderEmail(items: CartItem[], total: number, empresaNombre: string, numeroOrden: number, nombre: string, telefono: string, email: string | null): string {
+function generateOrderEmail(items: OrderItem[], total: number, empresaNombre: string, numeroOrden: number, nombre: string, telefono: string, email: string | null): string {
   const itemsHtml = items.map(ci => {
     const complementPrice = ci.selectedComplements?.reduce((sum, c) => sum + c.price, 0) || 0;
     const itemTotal = (ci.item.price + complementPrice) * ci.quantity;
-    
-    const complementsHtml = ci.selectedComplements?.map(c => 
-      `<li style="margin-left: 20px; color: #666;">+ ${c.name} (${c.price.toFixed(2)}€)</li>`
+
+    const complementsHtml = ci.selectedComplements?.map(c =>
+      `<li style="margin-left: 20px; color: #666;">+ ${escapeHtml(c.name)} (${c.price.toFixed(2)}€)</li>`
     ).join('') || '';
 
     return `
       <tr style="border-bottom: 1px solid #eee;">
         <td style="padding: 12px 8px;">
-          <strong>${ci.item.name}</strong>
+          <strong>${escapeHtml(ci.item.name)}</strong>
           ${complementsHtml ? `<ul style="margin: 4px 0 0 0; padding: 0;">${complementsHtml}</ul>` : ''}
         </td>
         <td style="padding: 12px 8px; text-align: center;">${ci.quantity}</td>
@@ -57,7 +64,7 @@ function generateOrderEmail(items: CartItem[], total: number, empresaNombre: str
         <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
           <tr style="background-color: #1a1a1a;">
             <td style="padding: 24px; text-align: center;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">${empresaNombre}</h1>
+              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">${escapeHtml(empresaNombre)}</h1>
               <p style="margin: 8px 0 0 0; color: #888; font-size: 14px;">Nuevo Pedido #${numeroOrden}</p>
             </td>
           </tr>
@@ -66,9 +73,9 @@ function generateOrderEmail(items: CartItem[], total: number, empresaNombre: str
               <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9f9f9; border-radius: 8px; margin-bottom: 20px;">
                 <tr>
                   <td style="padding: 16px;">
-                    <p style="margin: 0; color: #333; font-size: 14px;"><strong>Cliente:</strong> ${nombre}</p>
-                    <p style="margin: 8px 0 0 0; color: #333; font-size: 14px;"><strong>Teléfono:</strong> ${telefono}</p>
-                    ${email ? `<p style="margin: 8px 0 0 0; color: #333; font-size: 14px;"><strong>Email:</strong> ${email}</p>` : ''}
+                    <p style="margin: 0; color: #333; font-size: 14px;"><strong>Cliente:</strong> ${escapeHtml(nombre)}</p>
+                    <p style="margin: 8px 0 0 0; color: #333; font-size: 14px;"><strong>Teléfono:</strong> ${escapeHtml(telefono)}</p>
+                    ${email ? `<p style="margin: 8px 0 0 0; color: #333; font-size: 14px;"><strong>Email:</strong> ${escapeHtml(email)}</p>` : ''}
                   </td>
                 </tr>
               </table>
@@ -104,7 +111,7 @@ function generateOrderEmail(items: CartItem[], total: number, empresaNombre: str
           <tr style="background-color: #f9f9f9;">
             <td style="padding: 20px; text-align: center;">
               <p style="margin: 0; color: #888; font-size: 12px;">
-                Pedido generado automáticamente desde ${empresaNombre}
+                Pedido generado automáticamente desde ${escapeHtml(empresaNombre)}
               </p>
             </td>
           </tr>
@@ -117,60 +124,36 @@ function generateOrderEmail(items: CartItem[], total: number, empresaNombre: str
   `.trim();
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const { empresaId, error: authError } = await requireAuth(request);
+    if (authError) return authError;
+
     if (!BREVO_API_KEY) {
       return NextResponse.json({ error: 'Email service not configured' }, { status: 500 });
     }
 
-    const { getSupabaseClient } = await import('@/core/infrastructure/database/supabase-client');
-    const supabase = getSupabaseClient();
-    const domain = await getDomainFromHeaders();
-    
-    const subdomainPedidos = 'pedidos';
-    const isPedidos = domain.startsWith(subdomainPedidos + '.') || domain.includes('-pedidos');
-    const mainDomain = isPedidos 
-      ? domain.replace(/^pedidos\./, '').replace(/-pedidos$/, '')
-      : domain;
-
-    let { data: empresa } = await supabase
-      .from('empresas')
-      .select('email_notification, email, nombre')
-      .eq('dominio', mainDomain)
-      .single();
-
-    // Si no encuentra, buscar por subdomain_pedidos
-    if (!empresa && isPedidos) {
-      const { data: empresaSubdomain } = await supabase
-        .from('empresas')
-        .select('email_notification, email, nombre')
-        .eq('subdomain_pedidos', true)
-        .single();
-      if (empresaSubdomain) empresa = empresaSubdomain;
-    }
+    const empresa = await empresaUseCase.getById(empresaId!);
 
     if (!empresa) {
       return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 });
     }
 
-    if (!empresa.email_notification) {
+    if (!empresa.emailNotification) {
       return NextResponse.json({ error: 'Email de notificación no configurado' }, { status: 400 });
     }
 
     const body = await request.json();
-    const { items, total, numeroOrden, nombre, telefono, email } = body as { 
-      items: CartItem[]; 
-      total: number;
-      numeroOrden?: number;
-      nombre?: string;
-      telefono?: string;
-      email?: string;
-    };
+    const parsed = enviarEmailSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
+    }
+    const { items, total, numeroOrden, nombre, telefono, email } = parsed.data;
 
     const html = generateOrderEmail(
-      items, 
-      total, 
-      empresa.nombre, 
+      items,
+      total,
+      empresa.nombre || 'Empresa',
       numeroOrden || 1,
       nombre || 'Cliente',
       telefono || 'No proporcionado',
@@ -178,11 +161,11 @@ export async function POST(request: Request) {
     );
 
     await sendEmail({
-      to: empresa.email_notification,
+      to: empresa.emailNotification,
       subject: `Nuevo pedido de ${empresa.nombre} - ${total.toFixed(2)}€`,
       htmlContent: html,
-      senderName: empresa.nombre,
-      senderEmail: empresa.email_notification,
+      senderName: empresa.nombre || 'Empresa',
+      senderEmail: empresa.emailNotification,
     });
 
     return NextResponse.json({ success: true });

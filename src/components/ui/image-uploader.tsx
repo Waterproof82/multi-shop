@@ -3,13 +3,14 @@
 import { useState, useRef } from 'react';
 import Image from 'next/image';
 import { Upload, Loader2 } from 'lucide-react';
-import { uploadImageAction } from '@/core/application/actions/storage.actions';
 
 interface ImageUploaderProps {
   readonly value: string;
   readonly onChange: (url: string) => void;
   readonly label?: string;
   readonly empresaSlug?: string;
+  readonly previewClassName?: string;
+  readonly previewStyle?: React.CSSProperties;
 }
 
 const MAX_WIDTH = 480;
@@ -64,11 +65,13 @@ async function optimizeImage(file: File): Promise<{ file: File; type: string }> 
   });
 }
 
-export function ImageUploader({ 
-  value, 
-  onChange, 
+export function ImageUploader({
+  value,
+  onChange,
   label = 'Imagen',
-  empresaSlug = 'default'
+  empresaSlug = 'default',
+  previewClassName = 'relative group rounded-lg overflow-hidden border h-48',
+  previewStyle,
 }: ImageUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
@@ -83,8 +86,8 @@ export function ImageUploader({
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setError('El archivo excede el tamaño máximo de 5MB.');
+    if (file.size > 10 * 1024 * 1024) {
+      setError('El archivo excede el tamaño máximo de 10MB.');
       return;
     }
 
@@ -93,25 +96,25 @@ export function ImageUploader({
 
     try {
       const optimized = await optimizeImage(file);
-      
-      const result = await uploadImageAction(
-        optimized.file.name, 
-        optimized.type, 
-        optimized.file.size, 
-        empresaSlug
-      );
-      
-      const uploadResponse = await fetch(result.url, {
-        method: 'PUT',
-        body: optimized.file,
-        headers: { 'Content-Type': optimized.type },
+
+      const formData = new FormData();
+      formData.append('file', optimized.file);
+
+      const response = await fetch('/api/admin/upload-image', {
+        method: 'POST',
+        body: formData,
       });
 
-      if (!uploadResponse.ok) {
-        throw new Error('Error al subir imagen');
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({})) as { error?: string };
+        throw new Error(data.error ?? 'Error al subir imagen');
       }
 
-      onChange(result.publicUrl);
+      const data = await response.json() as { publicUrl?: string };
+      const publicUrl = data.publicUrl;
+      if (!publicUrl) throw new Error('No se recibió la URL de la imagen');
+
+      onChange(publicUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al subir imagen');
     } finally {
@@ -162,7 +165,7 @@ export function ImageUploader({
       )}
 
       {value ? (
-        <div className="relative group rounded-lg overflow-hidden border h-48">
+        <div className={previewClassName} style={previewStyle}>
           <Image
             src={value}
             alt="Preview"
@@ -213,7 +216,7 @@ export function ImageUploader({
               <span className="text-sm text-gray-500 mt-1">
                 Arrastra o click para subir
               </span>
-              <span className="text-xs text-gray-400">JPEG, PNG, WEBP (max 5MB)</span>
+              <span className="text-xs text-gray-400">JPEG, PNG, WEBP (max 10MB)</span>
             </>
           )}
         </button>

@@ -1,0 +1,32 @@
+multi-shop/
+├── CLAUDE.md              # Instrucciones de comportamiento para el agente
+├── README.md
+├── docs/
+│   └── context/
+│       ├── structure.txt  # Este archivo
+│       ├── context.md     # Resumen del proyecto
+│       ├── progress.md    # Log de progreso
+│       ├── bbdd.md        # Schema de base de datos
+│       └── FLOW_CARRITO.md
+├── scripts/
+├── src/
+│   ├── app/
+│   │   ├── admin/         # Panel (/admin, /admin/productos, etc.)
+│   │   ├── api/          # Rutas API (/api/admin/*, /api/pedidos)
+│   │   ├── page.tsx      # Página pública del menú
+│   │   └── layout.tsx
+│   ├── components/
+│   │   ├── ui/           # Componentes base (Button, Dialog, etc.)
+│   │   ├── admin/        # Componentes del panel admin
+│   │   └── *.tsx         # Componentes del menú/cliente
+│   ├── core/             # Clean Architecture
+│   │   ├── application/  # DTOs, Use Cases, Mappers
+│   │   ├── domain/       # Entidades, interfaces de repositorios
+│   │   └── infrastructure/  # Implementaciones (Supabase, R2, helpers)
+│   ├── hooks/
+│   ├── lib/              # Utilidades (utils, contexts, emails)
+│   ├── proxy.ts          # Middleware de autenticación
+│   └── styles/
+├── supabase/
+│   └── migrations/
+└── package.json

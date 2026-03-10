@@ -38,7 +38,7 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
     <section id={category.id} className="scroll-mt-32">
       <div className="mb-6 flex items-center gap-4">
         <h2 className="font-serif text-2xl font-bold text-foreground md:text-3xl">
-          {(translationLang && category.translations?.[translationLang]) || category.label}
+          {(translationLang && category.translations?.[translationLang]?.name) || category.label}
         </h2>
         <div className="h-px flex-1 bg-border" />
       </div>
@@ -117,7 +117,7 @@ const SubcategorySection = memo(function SubcategorySection(props: Readonly<{
     <div className="space-y-4">
       <h3 className="font-serif text-xl font-semibold text-foreground flex items-center gap-2">
         <span className="w-2 h-2 rounded-full bg-primary/50" />
-        {(translationLang && subcategory.translations?.[translationLang]) || subcategory.nombre}
+        {(translationLang && subcategory.translations?.[translationLang]?.name) || subcategory.nombre}
       </h3>
       {displayDescripcion && (
         <p className="text-sm text-muted-foreground italic border-l-2 border-primary/30 pl-3">

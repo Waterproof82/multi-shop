@@ -1,49 +1,42 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { clienteUseCase } from '@/core/infrastructure/database';
+import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 
-// Función helper para obtener base URL
-function getBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_BASE_URL || 
-         process.env.NEXT_PUBLIC_SUPABASE_URL?.replace('supabase.co', 'vercel.app') ||
-         'https://www.almadearena.es';
+const emailSchema = z.string().email();
+const uuidSchema = z.string().uuid();
+
+function getBaseUrl(request: Request): string {
+  const url = new URL(request.url);
+  return `${url.protocol}//${url.host}`;
 }
 
 export async function GET(request: Request) {
+  const baseUrl = getBaseUrl(request);
+
   try {
+    const rateLimited = await rateLimitPublic(request);
+    if (rateLimited) return rateLimited;
+
     const { searchParams } = new URL(request.url);
     const email = searchParams.get('email');
     const empresaId = searchParams.get('empresa');
 
-    if (!email || !empresaId) {
-      return NextResponse.redirect(`${getBaseUrl()}/?error=invalid`);
+    if (!email || !empresaId || !emailSchema.safeParse(email).success || !uuidSchema.safeParse(empresaId).success) {
+      return NextResponse.redirect(`${baseUrl}/?error=invalid`);
     }
 
-    const { getSupabaseClient } = await import('@/core/infrastructure/database/supabase-client');
-    const supabase = getSupabaseClient();
+    const normalizedEmail = decodeURIComponent(email).trim().toLowerCase();
+    const nuevoValor = await clienteUseCase.togglePromoSubscription(normalizedEmail, empresaId);
 
-    // Buscar cliente por email y empresa
-    const { data: cliente, error: clienteError } = await supabase
-      .from('clientes')
-      .select('*')
-      .eq('empresa_id', empresaId)
-      .eq('email', email)
-      .single();
-
-    if (clienteError || !cliente) {
-      return NextResponse.redirect(`${getBaseUrl()}/?error=notfound`);
+    if (nuevoValor === null) {
+      return NextResponse.redirect(`${baseUrl}/?error=notfound`);
     }
-
-    // Toggle: cambiar valor de aceptar_promociones
-    const nuevoValor = !cliente.aceptar_promociones;
-
-    await supabase
-      .from('clientes')
-      .update({ aceptar_promociones: nuevoValor })
-      .eq('id', cliente.id);
 
     const mensaje = nuevoValor ? 'promo=on' : 'promo=off';
-    return NextResponse.redirect(`${getBaseUrl()}/?${mensaje}`);
+    return NextResponse.redirect(`${baseUrl}/?${mensaje}`);
   } catch (error) {
-    console.error('Error:', error);
-    return NextResponse.redirect(`${getBaseUrl()}/?error=internal`);
+    console.error('[Unsubscribe] Error:', error);
+    return NextResponse.redirect(`${baseUrl}/?error=internal`);
   }
 }

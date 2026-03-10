@@ -7,6 +7,12 @@ export const updateEmpresaSchema = z.object({
   instagram: z.string().url().optional().or(z.literal('')),
   url_mapa: z.string().optional(),
   direccion: z.string().optional(),
+  url_image: z.string().url().optional().or(z.literal('')).or(z.null()),
+  descripcion_es: z.string().optional(),
+  descripcion_en: z.string().optional(),
+  descripcion_fr: z.string().optional(),
+  descripcion_it: z.string().optional(),
+  descripcion_de: z.string().optional(),
 });
 
 export type UpdateEmpresaDTO = z.infer<typeof updateEmpresaSchema>;

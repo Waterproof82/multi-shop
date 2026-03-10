@@ -1,13 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Reusable helper to get empresaId from headers
-export function getEmpresaId(request: NextRequest): string | null {
-  return request.headers.get('x-empresa-id');
-}
-
 // Auth middleware helper
 export async function requireAuth(request: NextRequest): Promise<{ empresaId: string | null; error: NextResponse | null }> {
-  const empresaId = getEmpresaId(request);
+  const empresaId = request.headers.get('x-empresa-id');
   if (!empresaId) {
     return { 
       empresaId: null, 

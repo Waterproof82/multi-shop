@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { pedidoRepository } from '@/core/infrastructure/database';
+import { pedidoUseCase } from '@/core/infrastructure/database';
 import { requireAuth, successResponse, errorResponse, validationErrorResponse } from '@/core/infrastructure/api/helpers';
+import { PEDIDO_ESTADOS } from '@/core/domain/constants/pedido';
 
 const pedidoIdSchema = z.object({
   id: z.string().uuid(),
@@ -9,7 +10,7 @@ const pedidoIdSchema = z.object({
 
 const updatePedidoSchema = z.object({
   id: z.string().uuid(),
-  estado: z.enum(['pendiente', 'aceptado', 'preparando', 'enviado', 'entregado', 'cancelado']),
+  estado: z.enum(PEDIDO_ESTADOS),
 });
 
 export async function GET(request: NextRequest) {
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const pedidos = await pedidoRepository.findAllByTenant(empresaId!);
+    const pedidos = await pedidoUseCase.getAll(empresaId!);
     return successResponse({ pedidos });
   } catch {
     return errorResponse('Error al obtener pedidos');
@@ -36,7 +37,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   try {
-    await pedidoRepository.updateStatus(parsed.data.id, empresaId!, parsed.data.estado);
+    await pedidoUseCase.updateStatus(parsed.data.id, empresaId!, parsed.data.estado);
     return successResponse({ success: true });
   } catch {
     return errorResponse('Error al actualizar pedido');
@@ -55,10 +56,7 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
-    // Note: delete not in repository yet, need to add
-    const { getSupabaseClient } = await import('@/core/infrastructure/database/supabase-client');
-    const supabase = getSupabaseClient();
-    await supabase.from('pedidos').delete().eq('id', parsed.data.id).eq('empresa_id', empresaId);
+    await pedidoUseCase.delete(parsed.data.id, empresaId!);
     return successResponse({ success: true });
   } catch {
     return errorResponse('Error al eliminar pedido');
@@ -78,76 +76,10 @@ export async function PUT(request: NextRequest) {
     const selectedMonth = mesParam ? Number.parseInt(mesParam) : now.getMonth();
     const selectedYear = añoParam ? Number.parseInt(añoParam) : now.getFullYear();
 
-    const todayStart = new Date(selectedYear, selectedMonth, now.getDate()).toISOString();
-    const monthStart = new Date(selectedYear, selectedMonth, 1).toISOString();
-    const monthEnd = new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59).toISOString();
-    const yearStart = new Date(selectedYear, 0, 1).toISOString();
-
-    const { getSupabaseClient } = await import('@/core/infrastructure/database/supabase-client');
-    const supabase = getSupabaseClient();
-
-    const { data: pedidos } = await supabase
-      .from('pedidos')
-      .select('*')
-      .eq('empresa_id', empresaId);
-
-    const pedidosFiltrados = pedidos || [];
-
-    const pedidosHoy = pedidosFiltrados.filter(p => {
-      const fecha = new Date(p.created_at);
-      return fecha >= new Date(todayStart) && fecha <= new Date(monthEnd);
-    });
-    const pedidosMes = pedidosFiltrados.filter(p => new Date(p.created_at) >= new Date(monthStart) && new Date(p.created_at) <= new Date(monthEnd));
-    const pedidosAno = pedidosFiltrados.filter(p => new Date(p.created_at) >= new Date(yearStart));
-
-    const totalHoy = pedidosHoy.reduce((sum, p) => sum + (p.total || 0), 0);
-    const totalMes = pedidosMes.reduce((sum, p) => sum + (p.total || 0), 0);
-    const totalAno = pedidosAno.reduce((sum, p) => sum + (p.total || 0), 0);
-
-    const dishCount: Record<string, { nombre: string; cantidad: number; total: number }> = {};
-    pedidosMes.forEach(pedido => {
-      if (pedido.detalle_pedido) {
-        pedido.detalle_pedido.forEach((item: Record<string, unknown>) => {
-          const key = String(item.nombre);
-          if (!dishCount[key]) {
-            dishCount[key] = { nombre: key, cantidad: 0, total: 0 };
-          }
-          dishCount[key].cantidad += Number(item.cantidad) || 1;
-          dishCount[key].total += (Number(item.precio) * (Number(item.cantidad) || 1));
-        });
-      }
-    });
-
-    const topPlatos = Object.values(dishCount)
-      .sort((a, b) => b.cantidad - a.cantidad)
-      .slice(0, 10);
-
-    const dishCountAno: Record<string, { nombre: string; cantidad: number; total: number }> = {};
-    pedidosAno.forEach(pedido => {
-      if (pedido.detalle_pedido) {
-        pedido.detalle_pedido.forEach((item: Record<string, unknown>) => {
-          const key = String(item.nombre);
-          if (!dishCountAno[key]) {
-            dishCountAno[key] = { nombre: key, cantidad: 0, total: 0 };
-          }
-          dishCountAno[key].cantidad += Number(item.cantidad) || 1;
-          dishCountAno[key].total += (Number(item.precio) * (Number(item.cantidad) || 1));
-        });
-      }
-    });
-
-    const topPlatosAno = Object.values(dishCountAno)
-      .sort((a, b) => b.cantidad - a.cantidad)
-      .slice(0, 10);
+    const stats = await pedidoUseCase.getStats(empresaId!, selectedMonth, selectedYear);
 
     return successResponse({
-      pedidosHoy: pedidosHoy.length,
-      pedidosMes: pedidosMes.length,
-      totalHoy,
-      totalMes,
-      totalAno,
-      topPlatos,
-      topPlatosAno,
+      ...stats,
       mesSeleccionado: `${selectedMonth}-${selectedYear}`,
     });
   } catch {

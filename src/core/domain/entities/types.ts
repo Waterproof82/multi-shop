@@ -22,7 +22,7 @@ export interface Product {
 export interface Category {
   id: string;
   empresaId: string;
-  nombre: string;
+  nombre: string | null;
   descripcion: string | null;
   orden: number;
   categoriaComplementoDe: string | null;
@@ -42,13 +42,6 @@ export interface Category {
   };
 }
 
-export interface Tenant {
-  id: string;
-  nombre: string;
-  dominio: string;
-  logoUrl: string | null;
-}
-
 export interface EmpresaColores {
   primary: string;
   primaryForeground: string;
@@ -64,6 +57,7 @@ export interface Empresa {
   id: string;
   nombre: string;
   dominio: string;
+  slug: string | null;
   logoUrl: string | null;
   mostrarCarrito: boolean;
   moneda: string;
@@ -71,10 +65,110 @@ export interface Empresa {
   urlImage: string | null;
   colores: EmpresaColores | null;
   descripcion: {
-    es?: string;
-    en?: string;
-    fr?: string;
-    it?: string;
-    de?: string;
+    es?: string | null;
+    en?: string | null;
+    fr?: string | null;
+    it?: string | null;
+    de?: string | null;
   } | null;
+  fb?: string | null;
+  instagram?: string | null;
+  urlMapa?: string | null;
+  direccion?: string | null;
+  telefonoWhatsapp?: string | null;
+}
+
+interface TranslatableText {
+  es?: string | null;
+  en?: string | null;
+  fr?: string | null;
+  it?: string | null;
+  de?: string | null;
+}
+
+export interface EmpresaPublic {
+  id: string;
+  nombre: string;
+  dominio: string;
+  mostrarCarrito: boolean;
+  moneda: string;
+  subdomainPedidos: string | null;
+  logoUrl: string | null;
+  urlImage: string | null;
+  colores: EmpresaColores | null;
+  descripcion: TranslatableText | null;
+  titulo: string | null;
+  subtitulo: string | null;
+  subtitulo2: TranslatableText | null;
+  footer1: TranslatableText | null;
+  footer2: TranslatableText | null;
+  fb: string | null;
+  instagram: string | null;
+  urlMapa: string | null;
+  direccion: string | null;
+  telefono: string | null;
+  emailNotification: string | null;
+}
+
+export interface Cliente {
+  id: string;
+  empresaId: string;
+  nombre: string | null;
+  email: string | null;
+  telefono: string | null;
+  direccion: string | null;
+  aceptar_promociones: boolean | null;
+  created_at: string;
+}
+
+export interface PedidoComplemento {
+  nombre?: string;
+  name?: string;
+  precio?: number;
+  price?: number;
+}
+
+export interface PedidoItem {
+  producto_id?: string;
+  nombre: string;
+  precio: number;
+  cantidad: number;
+  complementos?: PedidoComplemento[];
+}
+
+export interface CartItem {
+  item?: {
+    id: string;
+    name: string;
+    price: number;
+  };
+  quantity: number;
+  selectedComplements?: { name: string; price: number }[];
+}
+
+export interface Pedido {
+  id: string;
+  empresa_id: string;
+  cliente_id: string | null;
+  numero_pedido: number;
+  detalle_pedido: PedidoItem[];
+  total: number;
+  moneda: string | null;
+  estado: string;
+  created_at: string;
+  clientes?: {
+    nombre: string;
+    email: string;
+    telefono: string;
+  };
+}
+
+export interface Promocion {
+  id: string;
+  empresa_id: string;
+  fecha_hora: string;
+  texto_promocion: string;
+  numero_envios: number;
+  imagen_url: string | null;
+  created_at: string;
 }

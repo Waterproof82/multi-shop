@@ -1,6 +1,6 @@
-import { IEmpresaRepository } from "@/core/infrastructure/database/SupabaseClienteEmpresaRepository";
+import { IEmpresaRepository } from "@/core/domain/repositories/IEmpresaRepository";
 import { UpdateEmpresaDTO } from "@/core/application/dtos/empresa.dto";
-import { Empresa } from "@/core/domain/entities/types";
+import { Empresa, EmpresaColores } from "@/core/domain/entities/types";
 
 export class EmpresaUseCase {
   constructor(private readonly empresaRepo: IEmpresaRepository) {}
@@ -11,5 +11,9 @@ export class EmpresaUseCase {
 
   async update(empresaId: string, data: UpdateEmpresaDTO): Promise<void> {
     return this.empresaRepo.update(empresaId, data);
+  }
+
+  async updateColores(empresaId: string, colores: EmpresaColores): Promise<boolean> {
+    return this.empresaRepo.updateColores(empresaId, colores);
   }
 }

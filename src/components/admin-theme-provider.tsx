@@ -2,7 +2,7 @@
 
 import { ThemeProvider } from '@/components/theme-provider';
 
-export function AdminThemeProvider({ children }: { children: React.ReactNode }) {
+export function AdminThemeProvider({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <ThemeProvider
       attribute="class"

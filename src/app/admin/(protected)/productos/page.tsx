@@ -134,6 +134,16 @@ export default function ProductosPage() {
         ...formData,
         precio: Number.parseFloat(formData.precio) || 0,
         categoria_id: formData.categoria_id || null,
+        titulo_en: formData.titulo_en || null,
+        titulo_fr: formData.titulo_fr || null,
+        titulo_it: formData.titulo_it || null,
+        titulo_de: formData.titulo_de || null,
+        descripcion_es: formData.descripcion_es || null,
+        descripcion_en: formData.descripcion_en || null,
+        descripcion_fr: formData.descripcion_fr || null,
+        descripcion_it: formData.descripcion_it || null,
+        descripcion_de: formData.descripcion_de || null,
+        foto_url: formData.foto_url || null,
       };
 
       const res = await fetch(url, {
@@ -587,14 +597,27 @@ export default function ProductosPage() {
                       
                       return parents.map(parent => {
                         const childCats = children.filter(c => c.categoria_padre_id === parent.id);
-                        return (
-                          <optgroup key={parent.id} label={parent.nombre_es}>
-                            {childCats.map(sub => (
-                              <option key={sub.id} value={sub.id}>
-                                └─ {sub.nombre_es}
+                        // Si tiene subcategorías, usar optgroup
+                        if (childCats.length > 0) {
+                          return (
+                            <optgroup key={parent.id} label={parent.nombre_es}>
+                              {/* También añadir la categoría padre como opción */}
+                              <option key={`${parent.id}-self`} value={parent.id}>
+                                {parent.nombre_es} (principal)
                               </option>
-                            ))}
-                          </optgroup>
+                              {childCats.map(sub => (
+                                <option key={sub.id} value={sub.id}>
+                                  └─ {sub.nombre_es}
+                                </option>
+                              ))}
+                            </optgroup>
+                          );
+                        }
+                        // Si no tiene subcategorías, mostrar directamente
+                        return (
+                          <option key={parent.id} value={parent.id}>
+                            {parent.nombre_es}
+                          </option>
                         );
                       });
                     })()}

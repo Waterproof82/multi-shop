@@ -9,10 +9,6 @@ export class ProductUseCase {
     return this.productRepo.findAllByTenant(empresaId);
   }
 
-  async getById(id: string): Promise<Product | null> {
-    return this.productRepo.findById(id);
-  }
-
   async create(data: CreateProductDTO): Promise<Product> {
     return this.productRepo.create(data);
   }

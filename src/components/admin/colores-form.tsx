@@ -84,17 +84,21 @@ export function ColoresForm({ coloresIniciales, empresaId }: ColoresFormProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {colorKeys.map((key) => (
           <div key={key} className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label htmlFor={`color-text-${key}`} className="text-sm font-medium text-gray-700 dark:text-gray-300">
               {LABELS[key]}
             </label>
             <div className="flex gap-2">
               <input
+                id={`color-picker-${key}`}
+                name={`color-picker-${key}`}
                 type="color"
                 value={colores[key]}
                 onChange={(e) => handleChange(key, e.target.value)}
                 className="w-12 h-10 rounded cursor-pointer border-0"
               />
               <input
+                id={`color-text-${key}`}
+                name={`color-text-${key}`}
                 type="text"
                 value={colores[key]}
                 onChange={(e) => handleChange(key, e.target.value)}

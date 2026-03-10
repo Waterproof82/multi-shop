@@ -3,7 +3,6 @@
 import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-// Removed unused import 'Label'
 import {
   Sheet,
   SheetContent,
@@ -51,52 +50,15 @@ export function CartDrawer() {
   const [email, setEmail] = useState('')
   const [errors, setErrors] = useState<{ nombre?: string; telefono?: string }>({})
 
-  const isMobileDevice = () => {
-    const userAgent = navigator.userAgent;
-    const isTouchDevice = navigator.maxTouchPoints > 0;
-    const isAndroid = /Android/i.test(userAgent);
-    const isIOS = /iPhone|iPad|iPod/i.test(userAgent);
-    return isTouchDevice || isAndroid || isIOS;
-  };
-
   const abrirWhatsApp = (numero: string, mensaje: string) => {
     const textoEncoded = encodeURIComponent(mensaje);
-    const appUrl = `whatsapp://send?phone=${numero}&text=${textoEncoded}`;
-    const webUrl = `https://wa.me/${numero}?text=${textoEncoded}`;
-    const esMobile = isMobileDevice();
-
-    if (esMobile) {
-      window.location.href = appUrl;
-      setTimeout(() => {
-        if (!document.hasFocus()) return;
-        window.location.href = webUrl;
-      }, 1500);
-      return;
-    }
-
-    const anchor = document.createElement('a');
-    anchor.href = appUrl;
-    anchor.style.display = 'none';
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
+    const url = `https://wa.me/${numero}?text=${textoEncoded}`;
+    globalThis.location.href = url;
   };
 
-  const handleWhatsAppClick = (useWeb: boolean = false) => {
-    const link = (window as any).__whatsappLink;
-    if (!link) return;
-    const match = link.match(/wa\.me\/(\d+)\?text=(.+)/);
-    if (match) {
-      const numero = match[1];
-      const mensaje = decodeURIComponent(match[2]);
-      const textoEncoded = encodeURIComponent(mensaje);
-      
-      if (useWeb) {
-        window.open(`https://wa.me/${numero}?text=${textoEncoded}`, '_blank');
-      } else {
-        abrirWhatsApp(numero, mensaje);
-      }
-    }
+  const getWhatsAppUrl = (): string | null => {
+    const link = (globalThis as Record<string, unknown>).__whatsappLink as string | undefined;
+    return link || null;
   };
 
   const validateName = (name: string): string | undefined => {
@@ -167,7 +129,7 @@ export function CartDrawer() {
         setEmail('');
         
         if (data.whatsappLink) {
-          (window as any).__whatsappLink = data.whatsappLink;
+          (globalThis as Record<string, unknown>).__whatsappLink = data.whatsappLink;
           const match = data.whatsappLink.match(/wa\.me\/(\d+)\?text=(.+)/);
           if (match) {
             const numero = match[1];
@@ -229,20 +191,23 @@ export function CartDrawer() {
               </p>
             )}
           </DialogHeader>
-          {!confirming && (
+          {!confirming && getWhatsAppUrl() && (
             <>
-              <button
-                onClick={() => handleWhatsAppClick(false)}
+              <a
+                href={getWhatsAppUrl()!}
+                rel="noopener noreferrer"
                 className="block w-full text-center bg-[#25D366] text-white py-3 px-4 rounded-full font-semibold hover:bg-[#20BD5A] transition-colors"
               >
                 {t("whatsappResend", language)}
-              </button>
-              <button
-                onClick={() => handleWhatsAppClick(true)}
+              </a>
+              <a
+                href={getWhatsAppUrl()!}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="block w-full text-center text-[#25D366] text-sm py-2 font-medium hover:underline"
               >
                 {t("whatsappWeb", language)}
-              </button>
+              </a>
             </>
           )}
           {companyPhone && orderNumber && (

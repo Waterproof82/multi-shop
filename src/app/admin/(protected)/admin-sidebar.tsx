@@ -4,7 +4,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, Utensils, Tags, LogOut, Menu, X, ShoppingCart, BarChart3, Users, Megaphone, Settings } from 'lucide-react';
-// Removed unused import 'useTheme'
 
 interface NavItem {
   href: string;
@@ -24,10 +23,10 @@ const navItems: NavItem[] = [
 ];
 
 interface AdminSidebarProps {
-  session: any;
+  empresaId?: string;
 }
 
-export function AdminSidebar({ session }: Readonly<AdminSidebarProps>) {
+export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
 
@@ -72,7 +71,7 @@ export function AdminSidebar({ session }: Readonly<AdminSidebarProps>) {
               Administración
             </h1>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              {session?.empresaId ? 'Empresa conectada' : 'Panel'}
+              {empresaId ? 'Empresa conectada' : 'Panel'}
             </p>
           </div>
 

@@ -1,35 +1,34 @@
 import { SupabaseClient } from "@supabase/supabase-js";
-import { IProductRepository } from "@/core/domain/repositories/IProductRepository";
+import { IProductRepository, CreateProductData, UpdateProductData } from "@/core/domain/repositories/IProductRepository";
 import { Product } from "@/core/domain/entities/types";
-import { CreateProductDTO, UpdateProductDTO } from "@/core/application/dtos/product.dto";
 
 export class SupabaseProductRepository implements IProductRepository {
   constructor(private readonly supabase: SupabaseClient) {}
 
-  private mapToDomain(row: any): Product {
+  private mapToDomain(row: Record<string, unknown>): Product {
     return {
-      id: row.id,
-      empresaId: row.empresa_id,
-      categoriaId: row.categoria_id,
-      titulo_es: row.titulo_es,
-      titulo_en: row.titulo_en,
-      titulo_fr: row.titulo_fr,
-      titulo_it: row.titulo_it,
-      titulo_de: row.titulo_de,
-      descripcion_es: row.descripcion_es,
-      descripcion_en: row.descripcion_en,
-      descripcion_fr: row.descripcion_fr,
-      descripcion_it: row.descripcion_it,
-      descripcion_de: row.descripcion_de,
-      precio: Number.parseFloat(row.precio),
-      fotoUrl: row.foto_url,
-      esEspecial: row.es_especial,
-      activo: row.activo,
-      createdAt: new Date(row.created_at),
+      id: row.id as string,
+      empresaId: row.empresa_id as string,
+      categoriaId: row.categoria_id as string | null,
+      titulo_es: row.titulo_es as string,
+      titulo_en: row.titulo_en as string | null,
+      titulo_fr: row.titulo_fr as string | null,
+      titulo_it: row.titulo_it as string | null,
+      titulo_de: row.titulo_de as string | null,
+      descripcion_es: row.descripcion_es as string | null,
+      descripcion_en: row.descripcion_en as string | null,
+      descripcion_fr: row.descripcion_fr as string | null,
+      descripcion_it: row.descripcion_it as string | null,
+      descripcion_de: row.descripcion_de as string | null,
+      precio: Number.parseFloat(row.precio as string),
+      fotoUrl: row.foto_url as string | null,
+      esEspecial: row.es_especial as boolean,
+      activo: row.activo as boolean,
+      createdAt: new Date(row.created_at as string),
     };
   }
 
-  async create(data: CreateProductDTO): Promise<Product> {
+  async create(data: CreateProductData): Promise<Product> {
     const { data: created, error } = await this.supabase
       .from("productos")
       .insert({
@@ -57,17 +56,6 @@ export class SupabaseProductRepository implements IProductRepository {
     return this.mapToDomain(created);
   }
 
-  async findById(id: string): Promise<Product | null> {
-    const { data, error } = await this.supabase
-      .from("productos")
-      .select("*")
-      .eq("id", id)
-      .single();
-
-    if (error) return null;
-    return this.mapToDomain(data);
-  }
-
   async findAllByTenant(empresaId: string): Promise<Product[]> {
     const { data, error } = await this.supabase
       .from("productos")
@@ -76,28 +64,32 @@ export class SupabaseProductRepository implements IProductRepository {
       .order("created_at", { ascending: false });
 
     if (error) throw new Error(`DB Error: ${error.message}`);
-    return data.map((row) => this.mapToDomain(row));
+    return data.map((row: Record<string, unknown>) => this.mapToDomain(row));
   }
 
-  async update(id: string, empresaId: string, data: Partial<UpdateProductDTO>): Promise<Product> {
-    const updatePayload: any = {};
-    
-    // Map DTO fields to DB columns
-    if (data.categoria_id !== undefined) updatePayload.categoria_id = data.categoria_id;
-    if (data.titulo_es !== undefined) updatePayload.titulo_es = data.titulo_es;
-    if (data.titulo_en !== undefined) updatePayload.titulo_en = data.titulo_en;
-    if (data.titulo_fr !== undefined) updatePayload.titulo_fr = data.titulo_fr;
-    if (data.titulo_it !== undefined) updatePayload.titulo_it = data.titulo_it;
-    if (data.titulo_de !== undefined) updatePayload.titulo_de = data.titulo_de;
-    if (data.descripcion_es !== undefined) updatePayload.descripcion_es = data.descripcion_es;
-    if (data.descripcion_en !== undefined) updatePayload.descripcion_en = data.descripcion_en;
-    if (data.descripcion_fr !== undefined) updatePayload.descripcion_fr = data.descripcion_fr;
-    if (data.descripcion_it !== undefined) updatePayload.descripcion_it = data.descripcion_it;
-    if (data.descripcion_de !== undefined) updatePayload.descripcion_de = data.descripcion_de;
-    if (data.precio !== undefined) updatePayload.precio = data.precio;
-    if (data.foto_url !== undefined) updatePayload.foto_url = data.foto_url === "" ? null : data.foto_url;
-    if (data.es_especial !== undefined) updatePayload.es_especial = data.es_especial;
-    if (data.activo !== undefined) updatePayload.activo = data.activo;
+  private mapUpdateProductPayload(data: Partial<UpdateProductData>): Record<string, unknown> {
+    const updatePayload: Record<string, unknown> = {};
+    const fieldsToMap = [
+      'categoria_id', 'titulo_es', 'titulo_en', 'titulo_fr', 'titulo_it', 'titulo_de',
+      'descripcion_es', 'descripcion_en', 'descripcion_fr', 'descripcion_it', 'descripcion_de',
+      'precio', 'es_especial', 'activo'
+    ];
+
+    for (const field of fieldsToMap) {
+      if (data[field as keyof UpdateProductData] !== undefined) {
+        updatePayload[field] = data[field as keyof UpdateProductData];
+      }
+    }
+
+    if (data.foto_url !== undefined) {
+      updatePayload.foto_url = data.foto_url === "" ? null : data.foto_url;
+    }
+
+    return updatePayload;
+  }
+
+  async update(id: string, empresaId: string, data: Partial<UpdateProductData>): Promise<Product> {
+    const updatePayload = this.mapUpdateProductPayload(data);
 
     const { data: updated, error } = await this.supabase
       .from("productos")

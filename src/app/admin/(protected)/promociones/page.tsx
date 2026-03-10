@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Users, Mail, FileText, Send, CheckCircle, Image, Loader2 } from 'lucide-react';
+import Image from 'next/image';
+import { Users, Mail, FileText, Send, CheckCircle, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useAdmin } from '@/lib/admin-context';
-import { uploadImageAction } from '@/core/application/actions/storage.actions';
 
 interface Cliente {
   id: string;
@@ -23,7 +22,6 @@ interface Promocion {
 }
 
 export default function PromocionesPage() {
-  const { empresaSlug } = useAdmin();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [promociones, setPromociones] = useState<Promocion[]>([]);
   const [savingPromo, setSavingPromo] = useState(false);
@@ -64,8 +62,8 @@ export default function PromocionesPage() {
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert('La imagen no puede exceder 5MB');
+      if (file.size > 10 * 1024 * 1024) {
+        alert('La imagen no puede exceder 10MB');
         return;
       }
       setSelectedImage(file);
@@ -91,27 +89,19 @@ export default function PromocionesPage() {
       if (selectedImage) {
         setUploadingImage(true);
         try {
-          // Get upload URL from server
-          const fileName = `promo-${Date.now()}-${selectedImage.name}`;
-          const result = await uploadImageAction(
-            fileName,
-            selectedImage.type,
-            selectedImage.size,
-            empresaSlug
-          );
-          
-          // Upload to R2
-          const uploadRes = await fetch(result.url, {
-            method: 'PUT',
-            body: selectedImage,
-            headers: { 'Content-Type': selectedImage.type },
+          const formData = new FormData();
+          formData.append('file', selectedImage);
+          const uploadRes = await fetch('/api/admin/upload-image', {
+            method: 'POST',
+            body: formData,
           });
-          
           if (!uploadRes.ok) {
-            throw new Error('Error uploading image');
+            const data = await uploadRes.json().catch(() => ({})) as { error?: string };
+            throw new Error(data.error ?? 'Error al subir imagen');
           }
-          
-          imagenUrl = result.publicUrl;
+          const data = await uploadRes.json() as { publicUrl?: string };
+          if (!data.publicUrl) throw new Error('No se recibió la URL de la imagen');
+          imagenUrl = data.publicUrl;
         } finally {
           setUploadingImage(false);
         }
@@ -190,15 +180,17 @@ export default function PromocionesPage() {
 
           {/* Imagen de la promoción */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label htmlFor="promo-image" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Imagen de la promoción (opcional)
             </label>
             {previewImage ? (
               <div className="relative group rounded-lg overflow-hidden border h-48 mb-2">
-                <img
+                <Image
                   src={previewImage}
-                  alt="Preview"
-                  className="w-full h-full object-contain bg-gray-50"
+                  alt="Vista previa de la promoción"
+                  fill
+                  style={{objectFit:"contain"}}
+                  className="bg-gray-50"
                 />
                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <button
@@ -220,12 +212,12 @@ export default function PromocionesPage() {
                   id="promo-image"
                 />
                 <label htmlFor="promo-image" className="cursor-pointer">
-                  <Image className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                  <ImageIcon className="w-8 h-8 text-gray-400 mx-auto mb-2" />
                   <span className="text-sm text-gray-500">
                     Click para seleccionar una imagen
                   </span>
                   <p className="text-xs text-gray-400 mt-1">
-                    JPEG, PNG, WEBP (max 5MB)
+                    JPEG, PNG, WEBP (max 10MB)
                   </p>
                 </label>
               </div>
@@ -308,9 +300,11 @@ export default function PromocionesPage() {
               <div key={promo.id} className="p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
                 {promo.imagen_url && (
                   <div className="mb-3">
-                    <img 
+                    <Image 
                       src={promo.imagen_url} 
-                      alt="Promoción" 
+                      alt="Imagen de promoción" 
+                      width={128}
+                      height={128}
                       className="max-h-32 rounded-lg object-contain bg-white"
                     />
                   </div>

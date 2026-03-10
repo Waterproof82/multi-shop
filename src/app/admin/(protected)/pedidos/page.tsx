@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, Fragment } from 'react';
-// Removed unused import 'useAdmin'
 import { Search, ChevronDown, ChevronUp, Check, Clock, Trash2 } from 'lucide-react';
+import type { PedidoItem, PedidoComplemento } from '@/core/domain/entities/types';
+import { PEDIDO_ESTADOS, PEDIDO_ESTADO_LABELS, PEDIDO_ESTADO_COLORS, type PedidoEstado } from '@/core/domain/constants/pedido';
 
 interface Cliente {
   nombre: string | null;
@@ -17,13 +18,12 @@ interface Pedido {
   clientes: Cliente | null;
   total: number;
   moneda: string;
-  detalle_pedido: any[];
+  detalle_pedido: PedidoItem[];
   estado: string;
   created_at: string;
 }
 
 export default function PedidosPage() {
-  // Removed unused empresaId assignment
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -77,18 +77,19 @@ export default function PedidosPage() {
   };
 
   const getEstadoBadge = (estado: string, pedidoId: string) => {
-    const isListo = estado === 'listo';
+    const estadoIndex = PEDIDO_ESTADOS.indexOf(estado as PedidoEstado);
+    const isPendiente = estadoIndex <= 0;
+    const siguienteEstado = isPendiente ? 'aceptado' : 'pendiente';
+
     return (
       <button
-        onClick={(e) => { e.stopPropagation(); updateEstado(pedidoId, isListo ? 'pendiente' : 'listo'); }}
+        onClick={(e) => { e.stopPropagation(); updateEstado(pedidoId, siguienteEstado); }}
         className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-          isListo 
-            ? 'bg-green-100 text-green-800 hover:bg-green-200' 
-            : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
+          PEDIDO_ESTADO_COLORS[estado as PedidoEstado] || 'bg-gray-100 text-gray-800 hover:bg-gray-200'
         }`}
       >
-        {isListo ? <Check className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-        {isListo ? 'Listo' : 'Pendiente'}
+        {estado === 'pendiente' || estado === 'cancelado' ? <Clock className="w-3 h-3" /> : <Check className="w-3 h-3" />}
+        {PEDIDO_ESTADO_LABELS[estado as PedidoEstado] || estado}
       </button>
     );
   };
@@ -253,8 +254,8 @@ export default function PedidosPage() {
                           <div className="max-w-2xl">
                             <h4 className="font-medium mb-2 dark:text-white">Detalles del pedido:</h4>
                             <ul className="space-y-2 text-sm dark:text-gray-300">
-                              {pedido.detalle_pedido?.map((item: any) => {
-                                const complementoTotal = item.complementos?.reduce((sum: number, comp: any) => sum + (comp.precio || comp.price || 0), 0) || 0;
+                              {pedido.detalle_pedido?.map((item: PedidoItem) => {
+                                const complementoTotal = item.complementos?.reduce((sum: number, comp: PedidoComplemento) => sum + (comp.precio || comp.price || 0), 0) || 0;
                                 const itemTotal = (item.precio * item.cantidad) + (complementoTotal * item.cantidad);
                                 return (
                                   <li key={item.nombre + '-' + item.cantidad} className="flex flex-col">
@@ -264,7 +265,7 @@ export default function PedidosPage() {
                                     </div>
                                     {item.complementos && item.complementos.length > 0 && (
                                       <ul className="ml-4 mt-1 text-xs text-gray-500">
-                                        {item.complementos.map((comp: any) => (
+                                        {item.complementos.map((comp: PedidoComplemento) => (
                                           <li key={comp.nombre || comp.name}>+ {comp.nombre || comp.name} ({(comp.precio || comp.price || 0).toFixed(2)}€)</li>
                                         ))}
                                       </ul>

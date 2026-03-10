@@ -1,18 +1,17 @@
 "use client";
 
 import { ShoppingCart } from "lucide-react";
-import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { LanguageSelector } from "@/components/language-selector";
 import { t } from "@/lib/translations";
 import { useEffect, useState, useRef } from "react";
 import { useCart } from "@/lib/cart-context";
-import type { EmpresaInfo } from "@/lib/server-services";
+import type { EmpresaPublic } from "@/core/domain/entities/types";
 
 interface SiteHeaderClientProps {
   readonly showCart: boolean;
-  readonly empresa?: EmpresaInfo | null;
+  readonly empresa?: EmpresaPublic | null;
 }
 
 export function SiteHeaderClient({ showCart, empresa }: SiteHeaderClientProps) {
@@ -40,15 +39,24 @@ export function SiteHeaderClient({ showCart, empresa }: SiteHeaderClientProps) {
 
   const logoUrl = empresa?.logoUrl ?? null;
 
+  const scrollToFirstCategory = () => {
+    const firstSection = document.querySelector("section[id]");
+    if (firstSection) {
+      const offset = 140;
+      const top = firstSection.getBoundingClientRect().top + window.scrollY - offset;
+      window.scrollTo({ top, behavior: "smooth" });
+    }
+  };
+
   return (
     <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 md:h-20 md:px-6">
-        <Link href="/" className="flex items-center gap-2">
+        <button type="button" onClick={scrollToFirstCategory} className="flex items-center gap-2 cursor-pointer">
           {logoUrl && (
             <div className="relative h-12 w-24 md:h-16 md:w-32">
               <Image
                 src={logoUrl}
-                alt="Mermelada de Tomate"
+                alt={empresa?.nombre ?? "Logo"}
                 fill
                 className="object-contain"
                 loading="eager"
@@ -56,7 +64,7 @@ export function SiteHeaderClient({ showCart, empresa }: SiteHeaderClientProps) {
               />
             </div>
           )}
-        </Link>
+        </button>
         <div className="flex items-center gap-1">
           <LanguageSelector />
           {showCart ? (

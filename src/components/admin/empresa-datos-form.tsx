@@ -54,11 +54,13 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Email de notificaciones */}
         <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+          <label htmlFor="email_notification" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
             <Mail className="w-4 h-4" />
             Email de notificaciones
           </label>
           <input
+            id="email_notification"
+            name="email_notification"
             type="email"
             value={formData.email_notification}
             onChange={(e) => handleChange('email_notification', e.target.value)}
@@ -70,11 +72,13 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
 
         {/* WhatsApp */}
         <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+          <label htmlFor="telefono_whatsapp" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
             <Phone className="w-4 h-4" />
             WhatsApp
           </label>
           <input
+            id="telefono_whatsapp"
+            name="telefono_whatsapp"
             type="text"
             value={formData.telefono_whatsapp}
             onChange={(e) => handleChange('telefono_whatsapp', e.target.value)}
@@ -86,11 +90,13 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
 
         {/* Dirección */}
         <div className="flex flex-col gap-2 md:col-span-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+          <label htmlFor="direccion" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
             <MapPin className="w-4 h-4" />
             Dirección
           </label>
           <input
+            id="direccion"
+            name="direccion"
             type="text"
             value={formData.direccion}
             onChange={(e) => handleChange('direccion', e.target.value)}
@@ -101,11 +107,13 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
 
         {/* Facebook */}
         <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+          <label htmlFor="fb" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
             <Facebook className="w-4 h-4" />
             Facebook
           </label>
           <input
+            id="fb"
+            name="fb"
             type="url"
             value={formData.fb}
             onChange={(e) => handleChange('fb', e.target.value)}
@@ -116,11 +124,13 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
 
         {/* Instagram */}
         <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+          <label htmlFor="instagram" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
             <Instagram className="w-4 h-4" />
             Instagram
           </label>
           <input
+            id="instagram"
+            name="instagram"
             type="url"
             value={formData.instagram}
             onChange={(e) => handleChange('instagram', e.target.value)}
@@ -131,11 +141,13 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
 
         {/* URL del Mapa */}
         <div className="flex flex-col gap-2 md:col-span-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+          <label htmlFor="url_mapa" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
             <LinkIcon className="w-4 h-4" />
             Embed del mapa (iframe)
           </label>
           <input
+            id="url_mapa"
+            name="url_mapa"
             type="url"
             value={formData.url_mapa}
             onChange={(e) => handleChange('url_mapa', e.target.value)}

@@ -31,6 +31,13 @@ Thumbs.db
 
 # Claude Code
 .claude/settings.local.json
+# Playwright MCP
+.playwright-mcp/
+
+# MCP tool files (may contain secrets)
+.mcp.json
+network-requests.json
+*.network-requests.json
 
 # Misc
 *.local

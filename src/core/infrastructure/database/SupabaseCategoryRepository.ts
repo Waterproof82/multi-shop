@@ -1,32 +1,31 @@
 import { SupabaseClient } from "@supabase/supabase-js";
-import { ICategoryRepository } from "@/core/domain/repositories/ICategoryRepository";
+import { ICategoryRepository, CreateCategoryData, UpdateCategoryData } from "@/core/domain/repositories/ICategoryRepository";
 import { Category } from "@/core/domain/entities/types";
-import { CreateCategoryDTO, UpdateCategoryDTO } from "@/core/application/dtos/category.dto";
 
 export class SupabaseCategoryRepository implements ICategoryRepository {
   constructor(private readonly supabase: SupabaseClient) {}
 
-  private mapToDomain(row: any): Category {
+  private mapToDomain(row: Record<string, unknown>): Category {
     return {
-      id: row.id,
-      empresaId: row.empresa_id,
-      nombre: row.nombre_es,
-      descripcion: row.descripcion_es || null,
-      orden: row.orden || 0,
-      categoriaComplementoDe: row.categoria_complemento_de || null,
-      complementoObligatorio: row.complemento_obligatorio || false,
-      categoriaPadreId: row.categoria_padre_id || null,
+      id: row.id as string,
+      empresaId: row.empresa_id as string,
+      nombre: row.nombre_es as string | null,
+      descripcion: (row.descripcion_es as string | null) || null,
+      orden: (row.orden as number) || 0,
+      categoriaComplementoDe: (row.categoria_complemento_de as string | null) || null,
+      complementoObligatorio: (row.complemento_obligatorio as boolean) || false,
+      categoriaPadreId: (row.categoria_padre_id as string | null) || null,
       translations: {
-        en: row.nombre_en,
-        fr: row.nombre_fr,
-        it: row.nombre_it,
-        de: row.nombre_de,
+        en: (row.nombre_en as string | undefined) || undefined,
+        fr: (row.nombre_fr as string | undefined) || undefined,
+        it: (row.nombre_it as string | undefined) || undefined,
+        de: (row.nombre_de as string | undefined) || undefined,
       },
       descripcionTranslations: {
-        en: row.descripcion_en,
-        fr: row.descripcion_fr,
-        it: row.descripcion_it,
-        de: row.descripcion_de,
+        en: (row.descripcion_en as string | undefined) || undefined,
+        fr: (row.descripcion_fr as string | undefined) || undefined,
+        it: (row.descripcion_it as string | undefined) || undefined,
+        de: (row.descripcion_de as string | undefined) || undefined,
       },
     };
   }
@@ -36,14 +35,17 @@ export class SupabaseCategoryRepository implements ICategoryRepository {
       .from("categorias")
       .select("*")
       .eq("empresa_id", empresaId)
-      .order("orden", { ascending: true });
+      .order("created_at", { ascending: false });
 
-    if (error) throw new Error(`DB Error fetching categories: ${error.message}`);
+    if (error) {
+      console.error('[CategoryRepo] Error fetching categories:', error.message);
+      throw new Error(`DB Error fetching categories: ${error.message}`);
+    }
 
-    return data.map((row: any) => this.mapToDomain(row));
+    return data.map((row: Record<string, unknown>) => this.mapToDomain(row));
   }
 
-  async create(data: CreateCategoryDTO): Promise<Category> {
+  async create(data: CreateCategoryData): Promise<Category> {
     const { data: created, error } = await this.supabase
       .from("categorias")
       .insert({
@@ -70,9 +72,9 @@ export class SupabaseCategoryRepository implements ICategoryRepository {
     return this.mapToDomain(created);
   }
 
-  async update(id: string, empresaId: string, data: Partial<UpdateCategoryDTO>): Promise<Category> {
-    const updatePayload: any = {};
-    
+  async update(id: string, empresaId: string, data: Partial<UpdateCategoryData>): Promise<Category> {
+    const updatePayload: Record<string, unknown> = {};
+
     if (data.nombre_es !== undefined) updatePayload.nombre_es = data.nombre_es;
     if (data.nombre_en !== undefined) updatePayload.nombre_en = data.nombre_en;
     if (data.nombre_fr !== undefined) updatePayload.nombre_fr = data.nombre_fr;

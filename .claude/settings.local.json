@@ -1,0 +1,47 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm lint:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm run:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git status:*)",
+      "mcp__ide__getDiagnostics",
+      "mcp__context7__*",
+      "Bash(xargs sh:*)",
+      "Bash(python3:*)",
+      "Bash(node:*)",
+      "Bash(claude mcp:*)",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_evaluate",
+      "mcp__supabase__list_tables",
+      "Bash(pnpm add:*)",
+      "mcp__supabase__execute_sql",
+      "mcp__supabase__apply_migration",
+      "Bash(curl:*)",
+      "Bash(grep:*)",
+      "Bash(lsof:*)",
+      "Bash(pnpm dev:*)",
+      "Bash(taskkill:*)",
+      "Bash(for f in \"src/components/admin/colores-form.tsx\" \"src/components/admin/empresa-apariencia-form.tsx\" \"src/components/admin/empresa-datos-form.tsx\" \"src/components/cart-drawer.tsx\" \"src/components/category-nav.tsx\" \"src/components/empresa-theme-provider.tsx\" \"src/components/menu-section.tsx\" \"src/components/promo-toast.tsx\" \"src/components/quantity-selector-dialog.tsx\" \"src/components/site-header-client.tsx\" \"src/components/ui/image-uploader.tsx\")",
+      "Bash(do echo \"=== $f ===\")",
+      "Read(//c/Users/PC/Desktop/mermelada_tomate/**)",
+      "Bash(done)",
+      "Bash(xargs cat:*)",
+      "Bash(pnpm remove:*)",
+      "Bash(npx next:*)",
+      "Bash(cat:*)",
+      "Bash(git:*)",
+      "Bash(npx tsc:*)",
+      "Bash(grep -n \"Readonly<\" src/components/**/*.tsx | head -20)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "browser-tools",
+    "context7"
+  ]
+}

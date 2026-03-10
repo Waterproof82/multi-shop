@@ -13,7 +13,6 @@ export interface AdminWithEmpresa extends AdminProfile {
 }
 
 export interface IAdminRepository {
+  loginWithPassword(email: string, password: string): Promise<string>;
   findById(id: string): Promise<AdminWithEmpresa | null>;
-  findByEmail(email: string): Promise<AdminProfile | null>;
-  getEmpresaByAdminId(adminId: string): Promise<Empresa | null>;
 }
