@@ -35,7 +35,8 @@
       "Bash(npx next:*)",
       "Bash(cat:*)",
       "Bash(git:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(grep -n \"Readonly<\" src/components/**/*.tsx | head -20)"
     ]
   },
   "enableAllProjectMcpServers": true,
