@@ -26,6 +26,12 @@ Thumbs.db
 .idea/
 *.swp
 
+# MCP
+.mcp.json
+
+# Claude Code
+.claude/settings.local.json
+
 # Misc
 *.local
 *.sublime-workspace
