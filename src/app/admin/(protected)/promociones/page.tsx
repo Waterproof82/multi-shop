@@ -97,6 +97,10 @@ export default function PromocionesPage() {
           });
           if (!uploadRes.ok) {
             const data = await uploadRes.json().catch(() => ({})) as { error?: string };
+            // Handle 413 specifically - file too large for proxy
+            if (uploadRes.status === 413) {
+              throw new Error('La imagen es demasiado grande. Máximo 10MB.');
+            }
             throw new Error(data.error ?? 'Error al subir imagen');
           }
           const data = await uploadRes.json() as { publicUrl?: string };

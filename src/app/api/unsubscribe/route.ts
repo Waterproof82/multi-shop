@@ -37,25 +37,19 @@ export async function GET(request: Request) {
     // Normalizar email: trim, lowercase
     const normalizedEmail = email.trim().toLowerCase();
 
-    console.log('[UNSUBSCRIBE] email:', normalizedEmail, 'empresaId:', empresaId, 'action:', action);
-
     const nuevoValor = await clienteUseCase.togglePromoSubscription(normalizedEmail, empresaId, action ?? undefined);
-
-    console.log('[UNSUBSCRIBE] nuevoValor result:', nuevoValor);
 
     if (!nuevoValor.success) {
       return NextResponse.redirect(`${baseUrl}/?error=internal`);
     }
 
     const nuevoValorData = nuevoValor.data;
-    console.log('[UNSUBSCRIBE] nuevoValor data:', nuevoValorData);
 
     if (nuevoValorData === null) {
       return NextResponse.redirect(`${baseUrl}/?error=notfound`);
     }
 
     const mensaje = nuevoValorData ? 'promo=on' : 'promo=off';
-    console.log('[UNSUBSCRIBE] mensaje:', mensaje);
     return NextResponse.redirect(`${baseUrl}/?${mensaje}`);
   } catch (error) {
     console.error('Promo error:', error);

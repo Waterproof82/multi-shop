@@ -13,8 +13,6 @@ export function PromoToast() {
     const promoStatus = params.get('promo');
     const error = params.get('error');
 
-    console.log('[PROMO-TOAST] promoStatus:', promoStatus, 'error:', error);
-
     // Solo mostrar si hay parámetros relevantes
     if (!promoStatus && !error) return;
 

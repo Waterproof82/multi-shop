@@ -71,7 +71,6 @@ export class ClienteUseCase {
   }
 
   async togglePromoSubscription(email: string, empresaId: string, action?: 'alta' | 'baja'): Promise<Result<boolean | null>> {
-    console.log('[togglePromoSubscription] email:', email, 'empresaId:', empresaId, 'action:', action);
     try {
       const clienteResult = await this.clienteRepo.findByEmail(email, empresaId);
       if (!clienteResult.success) {
