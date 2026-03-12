@@ -1,5 +1,4 @@
 import "server-only"; // Asegura que esto nunca llegue al cliente
-import { unstable_cache } from "next/cache";
 import { getSupabaseAnonClient } from "@/core/infrastructure/database/supabase-client";
 import { SupabaseProductRepository } from "@/core/infrastructure/database/SupabaseProductRepository";
 import { SupabaseCategoryRepository } from "@/core/infrastructure/database/SupabaseCategoryRepository";
@@ -16,7 +15,8 @@ const categoryRepo = new SupabaseCategoryRepository(supabase);
 // Instanciación de Casos de Uso
 export const getMenuUseCase = new GetMenuUseCase(productRepo, categoryRepo);
 
-const getEmpresaByDomainRaw = async (domain: string): Promise<EmpresaPublic | null> => {
+// NO cachear empresa - los cambios deben verse inmediatamente
+export async function getEmpresaByDomain(domain: string): Promise<EmpresaPublic | null> {
   const mainDomain = parseMainDomain(domain);
   const result = await empresaPublicRepository.findByDomainPublic(mainDomain);
   if (!result.success) {
@@ -24,13 +24,7 @@ const getEmpresaByDomainRaw = async (domain: string): Promise<EmpresaPublic | nu
     return null;
   }
   return result.data;
-};
-
-export const getEmpresaByDomain = unstable_cache(
-  getEmpresaByDomainRaw,
-  ['empresa-by-domain'],
-  { revalidate: 300 }
-);
+}
 
 export function isPedidosSubdomain(currentDomain: string, subdomainConfig: string | null): boolean {
   if (!subdomainConfig) return false;

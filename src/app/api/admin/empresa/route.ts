@@ -1,5 +1,4 @@
 import { NextRequest } from 'next/server';
-import { revalidateTag } from 'next/cache';
 import { empresaUseCase } from '@/core/infrastructure/database';
 import { updateEmpresaSchema } from '@/core/application/dtos/empresa.dto';
 import { requireAuth, handleResult, errorResponse, validationErrorResponse } from '@/core/infrastructure/api/helpers';
@@ -56,9 +55,6 @@ export async function PUT(request: NextRequest) {
   if (!result.success) {
     return handleResult(result);
   }
-  
-  // Invalidar cache de empresa para que los cambios se reflejen inmediatamente
-  revalidateTag('empresa-by-domain');
   
   return handleResult({ success: true, data: { success: true } });
 }
