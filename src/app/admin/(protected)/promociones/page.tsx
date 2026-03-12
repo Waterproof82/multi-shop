@@ -21,6 +21,59 @@ interface Promocion {
   created_at: string;
 }
 
+// Optimizar imagen antes de subir (reduce a 480x480, WebP, 80% calidad)
+const MAX_WIDTH = 480;
+const MAX_HEIGHT = 480;
+const QUALITY = 0.8;
+
+async function optimizeImage(file: File): Promise<{ file: File; type: string }> {
+  return new Promise((resolve, reject) => {
+    const img = document.createElement('img');
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+
+      if (width > MAX_WIDTH) {
+        height = (height * MAX_WIDTH) / width;
+        width = MAX_WIDTH;
+      }
+      if (height > MAX_HEIGHT) {
+        width = (width * MAX_HEIGHT) / height;
+        height = MAX_HEIGHT;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('No se pudo crear el contexto de canvas'));
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error('Error al comprimir imagen'));
+            return;
+          }
+          const optimizedFile = new File([blob], file.name, {
+            type: 'image/webp',
+          });
+          resolve({ file: optimizedFile, type: 'image/webp' });
+        },
+        'image/webp',
+        QUALITY
+      );
+    };
+    img.onerror = () => reject(new Error('Error al cargar imagen'));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 export default function PromocionesPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [promociones, setPromociones] = useState<Promocion[]>([]);
@@ -62,9 +115,9 @@ export default function PromocionesPage() {
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // El archivo se optimizará antes de subir, pero advertimos si es muy grande
       if (file.size > 10 * 1024 * 1024) {
-        alert('La imagen no puede exceder 10MB');
-        return;
+        alert('La imagen se optimizará automáticamente antes de subir.');
       }
       setSelectedImage(file);
       // Create preview URL
@@ -84,13 +137,16 @@ export default function PromocionesPage() {
     
     setSavingPromo(true);
     try {
-      // Upload image to R2 if selected
+      // Upload image to R2 if selected (optimizada)
       let imagenUrl: string | null = null;
       if (selectedImage) {
         setUploadingImage(true);
         try {
+          // Optimizar imagen antes de subir
+          const optimized = await optimizeImage(selectedImage);
+          
           const formData = new FormData();
-          formData.append('file', selectedImage);
+          formData.append('file', optimized.file);
           const uploadRes = await fetch('/api/admin/upload-image', {
             method: 'POST',
             body: formData,
