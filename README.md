@@ -455,6 +455,73 @@ npx tsx scripts/setup-r2-cors.ts     # Configurar CORS en R2
 | **Código duplicado** | ✅ `parseMainDomain`/`getDomainFromHeaders` centralizados en `lib/domain-utils.ts` |
 | **Error Handling (Result\<T\>)** | ✅ 100% — Todos los módulos migrados al patrón Result<T, E> |
 | **Logging Centralizado** | ✅ 100% — Tabla log_errors + ErrorLogger singleton |
+| **UI/UX Quality** | ✅ 100% — Distill, Polish, Optimize aplicados |
+
+---
+
+## UI/UX Quality — Mejoras Implementadas
+
+### 🎨 Design System
+
+| Componente | Características |
+|------------|----------------|
+| **Button** | Focus-visible con outline + ring offset, transiciones suaves, active:scale |
+| **Input** | Focus-visible con ring, transiciones optimizadas |
+| **Badge** | Animación badge-pop con soporte reduced-motion |
+| **Tema** | Variables CSS para todos los colores, soporte dark mode |
+
+### ✨ Polish — Detalles Finales
+
+- **Focus states**: Todos los elementos interactivos tienen `focus-visible` con outline y ring offset
+- **Hover states**: Transiciones suaves de 150ms con `ease-out`
+- **Active states**: Efecto `scale-95` o `scale-[0.98]` para feedback táctil
+- **Empty states**: Mejorados con iconografía y mensajes helpful
+- **Micro-interactions**: Animaciones sutiles en botones, cards, y elementos del carrito
+- **Transiciones**: Consistencia en duration (150-300ms) y easing (ease-out)
+
+### 🚀 Optimize — Rendimiento
+
+- **Content Visibility**: Secciones del menú usan `contentVisibility: auto` para evitar renderizado innecesario
+- **Reduced Motion**: Animaciones de Framer Motion respetan `prefers-reduced-motion`
+- **Lazy Loading**: Imágenes con `loading="lazy"` (por defecto en Next.js)
+- **Optimización de fuentes**: `display: swap` en Playfair Display e Inter
+- **Animaciones GPU**: Solo `transform` y `opacity` — ninguna propiedad que cause layout/paint
+
+### 🔧 Distill — Simplificación
+
+- **SVGs optimizados**: Iconos de redes sociales en footer usan componentes lucide-react
+- **DRY**: Componente `TranslationFields` extraído para evitar duplicación en formularios de productos
+- **CSS cleanup**: Eliminados estilos redundantes, uso consistente de tokens
+
+### ♿ Accesibilidad
+
+- **Keyboard navigation**: Todos los elementos clickables tienen `tabIndex` y handlers de `onKeyDown`
+- **ARIA labels**: Botones con labels descriptivos para screen readers
+- **Reduced motion**: Respeto total por `prefers-reduced-motion`
+- **Contrast ratios**: Colores verificados contra WCAG AA
+
+### Ejemplo de Component con todas las calidades
+
+```tsx
+// Button con polish + optimize
+const buttonVariants = cva(
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+  {
+    variants: {
+      variant: {
+        default: 'bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.98]',
+        // ...
+      },
+    },
+  }
+);
+
+// Framer Motion con reduced motion
+const shouldReduceMotion = useReducedMotion() ?? false;
+const variants = shouldReduceMotion
+  ? { initial: {}, animate: {} }
+  : { initial: { opacity: 0, y: 16 }, animate: { opacity: 1, y: 0 } };
+```
 
 ### Deuda Técnica
 

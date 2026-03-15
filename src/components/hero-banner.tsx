@@ -1,6 +1,6 @@
 "use client"
 
-import { motion } from "framer-motion"
+import { motion, useReducedMotion } from "framer-motion"
 import Image from "next/image"
 import { useLanguage } from "@/lib/language-context"
 import type { EmpresaPublic } from "@/core/domain/entities/types"
@@ -11,6 +11,7 @@ interface HeroBannerProps {
 
 export function HeroBanner({ empresa }: HeroBannerProps) {
   const { language } = useLanguage()
+  const shouldReduceMotion = useReducedMotion() ?? false
   
   const logoUrl = empresa?.logoUrl ?? null
   const urlImage = empresa?.urlImage ?? null
@@ -22,6 +23,14 @@ export function HeroBanner({ empresa }: HeroBannerProps) {
 
   const showTitulo = titulo !== null && titulo !== ""
   const showSubtitulo = subtitulo !== null && subtitulo !== ""
+
+  const titleVariants = shouldReduceMotion
+    ? { initial: {}, animate: {} }
+    : { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 } };
+
+  const descVariants = shouldReduceMotion
+    ? { initial: {}, animate: {} }
+    : { initial: { opacity: 0 }, animate: { opacity: 1 } };
 
   return (
     <div className="relative flex flex-col items-center justify-center overflow-hidden bg-primary px-4 py-16 text-center md:py-24">
@@ -44,9 +53,8 @@ export function HeroBanner({ empresa }: HeroBannerProps) {
       </div>
 
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
+        variants={titleVariants}
+        transition={{ duration: shouldReduceMotion ? 0 : 0.6 }}
         className="relative z-10"
       >
         {logoUrl && (
@@ -62,9 +70,8 @@ export function HeroBanner({ empresa }: HeroBannerProps) {
       </motion.div>
 
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.2 }}
+        variants={titleVariants}
+        transition={{ duration: shouldReduceMotion ? 0 : 0.6, delay: shouldReduceMotion ? 0 : 0.2 }}
         className="relative z-10"
       >
         {showTitulo && (
@@ -79,9 +86,8 @@ export function HeroBanner({ empresa }: HeroBannerProps) {
         )}
         {descripcion && (
           <motion.p 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
+            variants={descVariants}
+            transition={{ duration: shouldReduceMotion ? 0 : 0.6, delay: shouldReduceMotion ? 0 : 0.4 }}
             className="mt-4 max-w-lg mx-auto text-sm md:text-base text-primary-foreground/90 leading-relaxed"
           >
             {descripcion}
@@ -91,9 +97,8 @@ export function HeroBanner({ empresa }: HeroBannerProps) {
 
       {subtitulo2 && (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.5 }}
+          variants={descVariants}
+          transition={{ duration: shouldReduceMotion ? 0 : 0.6, delay: shouldReduceMotion ? 0 : 0.5 }}
           className="relative z-10 mt-6 flex items-center gap-3"
         >
           <div className="h-px w-12 bg-primary-foreground/40" />

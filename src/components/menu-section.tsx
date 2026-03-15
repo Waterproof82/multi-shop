@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, memo, useCallback } from "react"
-import { motion } from "framer-motion"
+import { motion, useReducedMotion } from "framer-motion"
 import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
 import { useLanguage } from "@/lib/language-context"
@@ -21,6 +21,14 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
   const { language } = useLanguage();
   const [selectedItem, setSelectedItem] = useState<MenuItemVM | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const shouldReduceMotion = useReducedMotion() ?? false;
+
+  const itemVariants = shouldReduceMotion
+    ? { initial: {}, whileInView: {} }
+    : {
+        initial: { opacity: 0, y: 16 },
+        whileInView: { opacity: 1, y: 0 },
+      };
 
   const handleItemClick = useCallback((item: MenuItemVM) => {
     setSelectedItem(item);
@@ -35,7 +43,7 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
     : category.descripcion;
 
   return (
-    <section id={category.id} className="scroll-mt-32">
+    <section id={category.id} className="scroll-mt-32" style={{ contentVisibility: 'auto' }}>
       <div className="mb-5 flex items-center gap-4">
         <h2 className="font-serif text-2xl font-semibold text-foreground md:text-3xl tracking-tight">
           {(translationLang && category.translations?.[translationLang]?.name) || category.label}
@@ -64,6 +72,7 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
               translationLang={translationLang}
               onItemClick={handleItemClick}
               showCart={showCart}
+              shouldReduceMotion={shouldReduceMotion}
             />
           ))}
         </div>
@@ -72,10 +81,9 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
           {category.items.map((item, index) => (
             <motion.div
               key={item.id}
-              initial={{ opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
+              variants={itemVariants}
               viewport={{ once: true, margin: "-40px" }}
-              transition={{ duration: 0.35, delay: Math.min(index * 0.06, 0.3) }}
+              transition={{ duration: shouldReduceMotion ? 0 : 0.35, delay: shouldReduceMotion ? 0 : Math.min(index * 0.06, 0.3) }}
               className="h-full"
             >
               <MenuItemCard
@@ -103,8 +111,16 @@ const SubcategorySection = memo(function SubcategorySection(props: Readonly<{
   translationLang: LanguageKey | undefined;
   onItemClick: (item: MenuItemVM) => void;
   showCart?: boolean;
+  shouldReduceMotion?: boolean;
 }>) {
-  const { subcategory, translationLang, onItemClick, showCart } = props;
+  const { subcategory, translationLang, onItemClick, showCart, shouldReduceMotion = false } = props;
+
+  const subVariants = shouldReduceMotion
+    ? { initial: {}, whileInView: {} }
+    : {
+        initial: { opacity: 0, y: 16 },
+        whileInView: { opacity: 1, y: 0 },
+      };
 
   const displayDescripcion = translationLang && subcategory.descripcionTranslations?.[translationLang]
     ? subcategory.descripcionTranslations[translationLang]
@@ -125,10 +141,9 @@ const SubcategorySection = memo(function SubcategorySection(props: Readonly<{
         {subcategory.products.map((item, index) => (
           <motion.div
             key={item.id}
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            variants={subVariants}
             viewport={{ once: true, margin: "-40px" }}
-            transition={{ duration: 0.35, delay: Math.min(index * 0.06, 0.3) }}
+            transition={{ duration: shouldReduceMotion ? 0 : 0.35, delay: shouldReduceMotion ? 0 : Math.min(index * 0.06, 0.3) }}
             className="h-full"
           >
             <MenuItemCard
