@@ -43,7 +43,7 @@ $HOME/
 
 # PAI / Claude Code local
 PAI-SETUP.md
-.claude/settings.local.json
+.claude/
 
 # Lock files
 package-lock.json
