@@ -83,6 +83,7 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
     <nav
       ref={navRef}
       className="sticky top-16 z-40 -mx-4 overflow-x-auto border-b border-border bg-background/95 px-4 backdrop-blur-sm md:top-20 [-webkit-overflow-scrolling:touch]"
+      style={{ scrollMarginTop: '4rem' }}
       aria-label="Categorias del menu"
     >
       <div className="flex gap-1 py-2">

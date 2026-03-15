@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { BarChart3, ShoppingCart, Euro, TrendingUp, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BarChart3, ShoppingCart, Euro, TrendingUp, TrendingDown, Users, Calendar, ArrowUpRight, ArrowDownRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, LineChart, Line } from 'recharts';
 
 interface Stats {
   pedidosHoy: number;
@@ -13,6 +13,13 @@ interface Stats {
   totalAno: number;
   topPlatos: { nombre: string; cantidad: number; total: number }[];
   topPlatosAno: { nombre: string; cantidad: number; total: number }[];
+  pedidosPorDia: { dia: number; pedidos: number; ingresos: number }[];
+  clientesNuevos: number;
+  clientesRecurrentes: number;
+  ticketMedio: number;
+  ticketMedioAnterior: number;
+  pedidosAnterior: number;
+  ingresosAnterior: number;
   mesSeleccionado: string;
 }
 
@@ -20,7 +27,7 @@ const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', '
 
 const CHART_COLORS = ['#F97316', '#3B82F6', '#10B981', '#8B5CF6', '#EC4899', '#14B8A6', '#F43F5E', '#84CC16'] as const;
 
-export default function EstadisticasContent({ mountKey }: Readonly<{ mountKey: number }>) {
+export default function EstadisticasPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState({ mes: new Date().getMonth(), año: new Date().getFullYear() });
@@ -114,7 +121,7 @@ export default function EstadisticasContent({ mountKey }: Readonly<{ mountKey: n
           { icon: TrendingUp, label: 'Ventas año', value: `${(stats?.totalAno || 0).toFixed(2)}€`, iconClass: 'bg-secondary', iconColor: 'text-secondary-foreground' },
         ].map((kpi, i) => (
           <motion.div
-            key={`kpi-${i}-${mountKey}`}
+            key={`kpi-${i}`}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: i * 0.05 }}
@@ -133,9 +140,117 @@ export default function EstadisticasContent({ mountKey }: Readonly<{ mountKey: n
         ))}
       </div>
 
+      {/* Comparison Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.2 }}
+          className="bg-card rounded-lg border border-border p-4"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm text-muted-foreground">Ticket medio</p>
+            <Euro className="w-4 h-4 text-muted-foreground" />
+          </div>
+          <p className="text-2xl font-bold text-foreground">{(stats?.ticketMedio || 0).toFixed(2)}€</p>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.25 }}
+          className="bg-card rounded-lg border border-border p-4"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm text-muted-foreground">vs mes anterior</p>
+            {stats && stats.pedidosAnterior > 0 ? (
+              stats.pedidosMes >= stats.pedidosAnterior ? (
+                <ArrowUpRight className="w-4 h-4 text-green-500" />
+              ) : (
+                <ArrowDownRight className="w-4 h-4 text-red-500" />
+              )
+            ) : null}
+          </div>
+          {stats && stats.pedidosAnterior > 0 ? (
+            <p className={`text-2xl font-bold ${stats.pedidosMes >= stats.pedidosAnterior ? 'text-green-600' : 'text-red-600'}`}>
+              {((stats.pedidosMes - stats.pedidosAnterior) / stats.pedidosAnterior * 100).toFixed(1)}%
+            </p>
+          ) : (
+            <p className="text-2xl font-bold text-muted-foreground">--</p>
+          )}
+          <p className="text-xs text-muted-foreground mt-1">
+            {stats?.pedidosAnterior || 0} pedidos el mes pasado
+          </p>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.3 }}
+          className="bg-card rounded-lg border border-border p-4"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm text-muted-foreground">Clientes</p>
+            <Users className="w-4 h-4 text-muted-foreground" />
+          </div>
+          <p className="text-2xl font-bold text-foreground">{(stats?.clientesNuevos || 0) + (stats?.clientesRecurrentes || 0)}</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {(stats?.clientesNuevos || 0)} nuevos, {(stats?.clientesRecurrentes || 0)} recurrentes
+          </p>
+        </motion.div>
+      </div>
+
+      {/* Daily Orders Chart */}
+      {stats?.pedidosPorDia && stats.pedidosPorDia.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.35 }}
+          className="bg-card rounded-lg border border-border p-6 mb-6"
+        >
+          <h2 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
+            <Calendar className="w-5 h-5" />
+            Pedidos por día ({meses[mesActual]})
+          </h2>
+          <div className="h-48">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={stats.pedidosPorDia}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis 
+                  dataKey="dia" 
+                  tick={{ fontSize: 12 }}
+                  tickFormatter={(value) => `${value}`}
+                />
+                <YAxis tick={{ fontSize: 12 }} />
+                <Tooltip 
+                  contentStyle={{
+                    backgroundColor: 'var(--card)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                    color: 'var(--foreground)'
+                  }}
+                  formatter={(value: number, name: string) => [
+                    name === 'pedidos' ? `${value} pedidos` : `${value.toFixed(2)}€`,
+                    name === 'pedidos' ? 'Pedidos' : 'Ingresos'
+                  ]}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="pedidos" 
+                  stroke="#F97316" 
+                  strokeWidth={2}
+                  dot={{ fill: '#F97316', r: 3 }}
+                  activeDot={{ r: 5 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </motion.div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <motion.div
-          key={`chart-bar-${mountKey}`}
+          key="chart-bar"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.25 }}
@@ -186,7 +301,7 @@ export default function EstadisticasContent({ mountKey }: Readonly<{ mountKey: n
         </motion.div>
 
         <motion.div
-          key={`chart-pie-${mountKey}`}
+          key="chart-pie"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.3 }}
@@ -201,7 +316,7 @@ export default function EstadisticasContent({ mountKey }: Readonly<{ mountKey: n
             <>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <PieChart key={`pie-${mountKey}`}>
+                  <PieChart key="pie-chart">
                     <Pie
                       data={stats.topPlatos.slice(0, 8)}
                       cx="50%"

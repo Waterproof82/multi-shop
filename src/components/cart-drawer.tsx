@@ -241,13 +241,22 @@ export function CartDrawer() {
         )}
 
         {items.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 text-muted-foreground">
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 text-muted-foreground">
             <div className="relative">
               <ShoppingBag className="size-12 opacity-20" />
               <span className="absolute inset-0 flex items-center justify-center text-2xl opacity-30">+</span>
             </div>
             <p className="text-base font-medium text-foreground">{t("emptyCart", language)}</p>
             <p className="text-sm text-center max-w-[200px]">{t("addDishesToStart", language)}</p>
+            <button
+              onClick={() => {
+                closeCart();
+                document.getElementById('menu')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="mt-2 px-6 py-2 bg-primary text-primary-foreground rounded-full font-medium hover:bg-primary/90 transition-colors"
+            >
+              {t("viewMenu", language) || "Ver menú"}
+            </button>
           </div>
         ) : (
           <>

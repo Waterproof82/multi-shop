@@ -23,6 +23,13 @@ export interface PedidoStats {
   totalAno: number;
   topPlatos: { nombre: string; cantidad: number; total: number }[];
   topPlatosAno: { nombre: string; cantidad: number; total: number }[];
+  pedidosPorDia: { dia: number; pedidos: number; ingresos: number }[];
+  clientesNuevos: number;
+  clientesRecurrentes: number;
+  ticketMedio: number;
+  ticketMedioAnterior: number;
+  pedidosAnterior: number;
+  ingresosAnterior: number;
 }
 
 export class PedidoUseCase {

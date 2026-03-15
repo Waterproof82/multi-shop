@@ -1,7 +1,10 @@
 import { cookies } from 'next/headers';
-import { authAdminUseCase } from '@/core/infrastructure/database';
+import { authAdminUseCase, pedidoUseCase } from '@/core/infrastructure/database';
 import { getMenuUseCase } from '@/lib/server-services';
+import Link from 'next/link';
+import { ShoppingBag, Users, Package, TrendingUp, ArrowRight, Clock } from 'lucide-react';
 import type { MenuCategoryVM } from '@/core/application/dtos/menu-view-model';
+import { PEDIDO_ESTADO_LABELS } from '@/core/domain/constants/pedido';
 
 export default async function AdminDashboard() {
   const cookieStore = await cookies();
@@ -17,7 +20,11 @@ export default async function AdminDashboard() {
     return <div>No autorizado</div>;
   }
 
-  const menuResult = await getMenuUseCase.execute(admin.empresaId);
+  const [menuResult, pedidosResult, statsResult] = await Promise.all([
+    getMenuUseCase.execute(admin.empresaId),
+    pedidoUseCase.getAll(admin.empresaId),
+    pedidoUseCase.getStats(admin.empresaId, new Date().getMonth() + 1, new Date().getFullYear()),
+  ]);
   
   // Handle error case
   if (menuResult.error || !menuResult.data) {
@@ -44,6 +51,28 @@ export default async function AdminDashboard() {
     0
   );
 
+  const pedidos = pedidosResult.success ? pedidosResult.data || [] : [];
+  const stats = statsResult.success ? statsResult.data : null;
+  
+  // Get recent orders (last 5)
+  const recentOrders = [...pedidos]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 5);
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount);
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('es-ES', { 
+      day: '2-digit', 
+      month: '2-digit', 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  };
+
   return (
     <div className="pt-20 lg:pt-0 px-6 lg:px-8">
       <h1 className="text-2xl font-bold text-foreground mb-2">
@@ -53,32 +82,139 @@ export default async function AdminDashboard() {
         Gestionando: <strong>{admin.empresa.nombre}</strong>
       </p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6 mb-6 lg:mb-8">
-        <div className="bg-card p-4 lg:p-6 rounded-lg shadow-sm border border-border">
-          <p className="text-sm text-muted-foreground">Categorías</p>
-          <p className="text-2xl lg:text-3xl font-semibold text-foreground">{totalCategorias}</p>
-        </div>
-        <div className="bg-card p-4 lg:p-6 rounded-lg shadow-sm border border-border">
-          <p className="text-sm text-muted-foreground">Productos</p>
-          <p className="text-2xl lg:text-3xl font-semibold text-foreground">{totalProductos}</p>
-        </div>
-        <div className="bg-card p-4 lg:p-6 rounded-lg shadow-sm border border-border">
-          <p className="text-sm text-muted-foreground">Productos Especiales</p>
-          <p className="text-2xl lg:text-3xl font-semibold text-foreground">{productosEspeciales}</p>
-        </div>
+      {/* Quick Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <Link href="/admin/pedidos" className="bg-card p-4 lg:p-5 rounded-lg border border-border hover:border-primary/30 transition-colors group">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <ShoppingBag className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Hoy</p>
+              <p className="text-xl font-semibold text-foreground">{stats?.pedidosHoy || 0}</p>
+            </div>
+          </div>
+        </Link>
+        
+        <Link href="/admin/pedidos" className="bg-card p-4 lg:p-5 rounded-lg border border-border hover:border-primary/30 transition-colors group">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
+              <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Este mes</p>
+              <p className="text-xl font-semibold text-foreground">{formatCurrency(stats?.totalMes || 0)}</p>
+            </div>
+          </div>
+        </Link>
+        
+        <Link href="/admin/productos" className="bg-card p-4 lg:p-5 rounded-lg border border-border hover:border-primary/30 transition-colors group">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+              <Package className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Productos</p>
+              <p className="text-xl font-semibold text-foreground">{totalProductos}</p>
+            </div>
+          </div>
+        </Link>
+        
+        <Link href="/admin/clientes" className="bg-card p-4 lg:p-5 rounded-lg border border-border hover:border-primary/30 transition-colors group">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
+              <Users className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Especiales</p>
+              <p className="text-xl font-semibold text-foreground">{productosEspeciales}</p>
+            </div>
+          </div>
+        </Link>
       </div>
 
-      <div className="bg-card rounded-lg shadow-sm border border-border p-4 lg:p-6">
+      {/* Quick Actions */}
+      <div className="flex flex-wrap gap-3 mb-6">
+        <Link 
+          href="/admin/productos" 
+          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"
+        >
+          <Package className="w-4 h-4" />
+          Nuevo producto
+        </Link>
+        <Link 
+          href="/admin/pedidos" 
+          className="inline-flex items-center gap-2 px-4 py-2 bg-card border border-border text-foreground rounded-lg hover:bg-muted transition-colors text-sm font-medium"
+        >
+          <ShoppingBag className="w-4 h-4" />
+          Ver pedidos
+        </Link>
+      </div>
+
+      {/* Recent Orders */}
+      <div className="bg-card rounded-lg border border-border overflow-hidden mb-6">
+        <div className="flex items-center justify-between p-4 border-b border-border">
+          <h2 className="font-semibold text-foreground flex items-center gap-2">
+            <Clock className="w-4 h-4 text-muted-foreground" />
+            Últimos pedidos
+          </h2>
+          <Link href="/admin/pedidos" className="text-sm text-primary hover:underline flex items-center gap-1">
+            Ver todos <ArrowRight className="w-3 h-3" />
+          </Link>
+        </div>
+        
+        {recentOrders.length > 0 ? (
+          <div className="divide-y divide-border">
+            {recentOrders.map((pedido) => (
+              <div key={pedido.id} className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium text-foreground">#{pedido.numero_pedido}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      pedido.estado === 'completado' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                      pedido.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                      'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
+                    }`}>
+                      {PEDIDO_ESTADO_LABELS[pedido.estado as keyof typeof PEDIDO_ESTADO_LABELS] || pedido.estado}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground truncate">{pedido.clientes?.nombre || 'Cliente'} • {pedido.clientes?.telefono || 'Sin teléfono'}</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-semibold text-foreground">{formatCurrency(pedido.total)}</p>
+                  <p className="text-xs text-muted-foreground">{formatDate(pedido.created_at)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="p-8 text-center text-muted-foreground">
+            <ShoppingBag className="w-8 h-8 mx-auto mb-2 opacity-50" />
+            <p>No hay pedidos todavía</p>
+          </div>
+        )}
+      </div>
+
+      {/* Menu Preview */}
+      <div className="bg-card rounded-lg border border-border p-4 lg:p-6">
         <h2 className="text-lg font-semibold mb-4 text-foreground">Vista Previa del Menú</h2>
-        <div className="space-y-4">
-          {menu.map((categoria) => (
-            <div key={categoria.id} className="border-b border-border pb-4 last:border-0">
-              <h3 className="font-semibold text-foreground">{categoria.label}</h3>
-              <p className="text-sm text-muted-foreground">{categoria.items.length} productos</p>
+        <div className="space-y-3">
+          {menu.slice(0, 5).map((categoria) => (
+            <div key={categoria.id} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
+              <div>
+                <h3 className="font-medium text-foreground">{categoria.label}</h3>
+                <p className="text-sm text-muted-foreground">{categoria.items.length} productos</p>
+              </div>
+              <ArrowRight className="w-4 h-4 text-muted-foreground" />
             </div>
           ))}
+          {menu.length > 5 && (
+            <Link href="/admin/categorias" className="block text-center text-sm text-primary hover:underline pt-2">
+              Ver todas las categorías ({menu.length})
+            </Link>
+          )}
           {menu.length === 0 && (
-            <p className="text-muted-foreground text-center py-8">
+            <p className="text-muted-foreground text-center py-4">
               No hay categorías configuradas
             </p>
           )}
