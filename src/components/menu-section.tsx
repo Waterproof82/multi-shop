@@ -164,7 +164,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
 
   return (
     <div
-      className={`group flex h-full flex-col overflow-hidden rounded-lg bg-card border transition-shadow hover:shadow-elegant ${
+      className={`group flex h-full flex-col overflow-hidden rounded-lg bg-card border transition-all duration-200 hover:shadow-elegant hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${
         showCart ? "cursor-pointer" : ""
       } ${
         item.highlight ? "border-primary/25 ring-1 ring-primary/10" : "border-border"
@@ -218,7 +218,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
           {showCart && (
             <button
               type="button"
-              className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-3.5 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 rounded-md px-3.5 py-1.5 text-sm font-medium focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring transition-all duration-150"
               onClick={(e) => {
                 e.stopPropagation();
                 onItemClick(item);

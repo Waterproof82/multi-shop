@@ -67,6 +67,8 @@ const emptyForm: ProductoFormData = {
   activo: true,
 };
 
+const LANGUAGES = ['en', 'fr', 'it', 'de'] as const;
+
 const SortIndicator = ({ field, currentField, direction }: { field: keyof Producto | 'categoria'; currentField: keyof Producto | 'categoria'; direction: 'asc' | 'desc' }) => {
   if (field !== currentField) {
     return <ArrowUpDown className="h-3 w-3 opacity-30" />;
@@ -74,6 +76,43 @@ const SortIndicator = ({ field, currentField, direction }: { field: keyof Produc
   return direction === 'asc' 
     ? <ArrowUp className="h-3 w-3" /> 
     : <ArrowDown className="h-3 w-3" />;
+};
+
+const TranslationFields = ({ formData, onChange, show }: { 
+  formData: ProductoFormData; 
+  onChange: (data: ProductoFormData) => void;
+  show: boolean;
+}) => {
+  if (!show) return null;
+  
+  return (
+    <>
+      {LANGUAGES.map(lang => (
+        <div key={lang} className="grid grid-cols-2 gap-4">
+          <div>
+            <label htmlFor={`titulo_${lang}`} className="block text-sm text-muted-foreground mb-1">Nombre ({lang.toUpperCase()})</label>
+            <input
+              id={`titulo_${lang}`}
+              type="text"
+              value={formData[`titulo_${lang}` as keyof ProductoFormData] as string}
+              onChange={(e) => onChange({ ...formData, [`titulo_${lang}`]: e.target.value })}
+              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
+            />
+          </div>
+          <div className="col-span-2">
+            <label htmlFor={`descripcion_${lang}`} className="block text-sm text-muted-foreground mb-1">Descripción ({lang.toUpperCase()})</label>
+            <textarea
+              id={`descripcion_${lang}`}
+              value={formData[`descripcion_${lang}` as keyof ProductoFormData] as string}
+              onChange={(e) => onChange({ ...formData, [`descripcion_${lang}`]: e.target.value })}
+              rows={2}
+              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
+            />
+          </div>
+        </div>
+      ))}
+    </>
+  );
 };
 
 export default function ProductosPage() {
@@ -647,89 +686,11 @@ export default function ProductosPage() {
                 </div>
 
                 {showTranslations && (
-                  <>
-                    <div>
-                      <label htmlFor="titulo_en" className="block text-sm text-muted-foreground mb-1">Nombre (EN)</label>
-                      <input
-                        id="titulo_en"
-                        type="text"
-                        value={formData.titulo_en}
-                        onChange={(e) => setFormData({ ...formData, titulo_en: e.target.value })}
-                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="titulo_fr" className="block text-sm text-muted-foreground mb-1">Nombre (FR)</label>
-                      <input
-                        id="titulo_fr"
-                        type="text"
-                        value={formData.titulo_fr}
-                        onChange={(e) => setFormData({ ...formData, titulo_fr: e.target.value })}
-                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="titulo_it" className="block text-sm text-muted-foreground mb-1">Nombre (IT)</label>
-                      <input
-                        id="titulo_it"
-                        type="text"
-                        value={formData.titulo_it}
-                        onChange={(e) => setFormData({ ...formData, titulo_it: e.target.value })}
-                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="titulo_de" className="block text-sm text-muted-foreground mb-1">Nombre (DE)</label>
-                      <input
-                        id="titulo_de"
-                        type="text"
-                        value={formData.titulo_de}
-                        onChange={(e) => setFormData({ ...formData, titulo_de: e.target.value })}
-                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
-                      />
-                    </div>
-
-                    <div className="col-span-2">
-                      <label htmlFor="descripcion_en" className="block text-sm text-muted-foreground mb-1">Descripción (EN)</label>
-                      <textarea
-                        id="descripcion_en"
-                        value={formData.descripcion_en || ''}
-                        onChange={(e) => setFormData({ ...formData, descripcion_en: e.target.value })}
-                        rows={2}
-                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label htmlFor="descripcion_fr" className="block text-sm text-muted-foreground mb-1">Descripción (FR)</label>
-                      <textarea
-                        id="descripcion_fr"
-                        value={formData.descripcion_fr || ''}
-                        onChange={(e) => setFormData({ ...formData, descripcion_fr: e.target.value })}
-                        rows={2}
-                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label htmlFor="descripcion_it" className="block text-sm text-muted-foreground mb-1">Descripción (IT)</label>
-                      <textarea
-                        id="descripcion_it"
-                        value={formData.descripcion_it || ''}
-                        onChange={(e) => setFormData({ ...formData, descripcion_it: e.target.value })}
-                        rows={2}
-                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label htmlFor="descripcion_de" className="block text-sm text-muted-foreground mb-1">Descripción (DE)</label>
-                      <textarea
-                        id="descripcion_de"
-                        value={formData.descripcion_de || ''}
-                        onChange={(e) => setFormData({ ...formData, descripcion_de: e.target.value })}
-                        rows={2}
-                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
-                      />
-                    </div>
-                  </>
+                  <TranslationFields
+                    formData={formData}
+                    onChange={setFormData}
+                    show={showTranslations}
+                  />
                 )}
 
                 <div className="col-span-2 flex gap-6 mt-4">

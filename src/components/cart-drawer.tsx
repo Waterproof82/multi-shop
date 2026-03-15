@@ -242,9 +242,12 @@ export function CartDrawer() {
 
         {items.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-muted-foreground">
-            <ShoppingBag className="size-12 opacity-30" />
-            <p className="text-lg">{t("emptyCart", language)}</p>
-            <p className="text-sm">{t("addDishesToStart", language)}</p>
+            <div className="relative">
+              <ShoppingBag className="size-12 opacity-20" />
+              <span className="absolute inset-0 flex items-center justify-center text-2xl opacity-30">+</span>
+            </div>
+            <p className="text-base font-medium text-foreground">{t("emptyCart", language)}</p>
+            <p className="text-sm text-center max-w-[200px]">{t("addDishesToStart", language)}</p>
           </div>
         ) : (
           <>
@@ -274,7 +277,7 @@ export function CartDrawer() {
                         <Button
                           variant="outline"
                           size="icon"
-                          className="size-7 bg-transparent"
+                          className="size-7 bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => updateQuantity(itemKey, ci.quantity - 1)}
                           aria-label={t("reduceQuantity", language)}
                         >
@@ -284,7 +287,7 @@ export function CartDrawer() {
                         <Button
                           variant="outline"
                           size="icon"
-                          className="size-7 bg-transparent"
+                          className="size-7 bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => updateQuantity(itemKey, ci.quantity + 1)}
                           aria-label={t("increaseQuantity", language)}
                         >
@@ -293,7 +296,7 @@ export function CartDrawer() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="size-7 text-destructive hover:text-destructive"
+                          className="size-7 text-destructive hover:text-destructive hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => removeItem(itemKey)}
                           aria-label={`${t("remove", language)} ${(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}`}
                         >
