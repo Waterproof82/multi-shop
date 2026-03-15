@@ -1,9 +1,28 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { authAdminUseCase } from '@/core/infrastructure/database';
 import { loginSchema } from '@/core/application/dtos/auth.dto';
 import { successResponse, validationErrorResponse, handleResult } from '@/core/infrastructure/api/helpers';
 import { rateLimitLogin } from '@/core/infrastructure/api/rate-limit';
+import { generateCsrfToken, signCsrfToken } from '@/lib/csrf';
+
+export async function GET() {
+  const token = generateCsrfToken();
+  const signature = signCsrfToken(token);
+  const cookieValue = `${token}:${signature}`;
+
+  const response = NextResponse.json({ csrfToken: token });
+  
+  response.cookies.set('csrf_token', cookieValue, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 3600,
+    path: '/',
+  });
+
+  return response;
+}
 
 export async function POST(request: NextRequest) {
   const rateLimited = await rateLimitLogin(request);
@@ -19,11 +38,10 @@ export async function POST(request: NextRequest) {
   const result = await authAdminUseCase.login(parsed.data);
   
   if (!result.success) {
-    // Auth errors return 401
     if (result.error.code === 'AUTH_LOGIN_ERROR' || 
         result.error.code === 'ADMIN_NOT_AUTHORIZED' ||
         result.error.code === 'AUTH_NO_USER') {
-      return handleResult(result, 401);
+      return NextResponse.json({ error: result.error.message }, { status: 401 });
     }
     return handleResult(result);
   }
