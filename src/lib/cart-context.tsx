@@ -85,9 +85,14 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
           : ci
       );
       setTimeout(() => {
-        setItems(prev => prev.filter((ci) => getItemKey(ci.item, ci.selectedComplements) !== itemKey));
+        setItems(prev => {
+          const filtered = prev.filter((ci) => getItemKey(ci.item, ci.selectedComplements) !== itemKey);
+          if (filtered.length === 0) {
+            setLastAddedItem(null);
+          }
+          return filtered;
+        });
       }, 200);
-      if (next.length === 0) setLastAddedItem(null);
       return next;
     })
   }, [])
@@ -101,9 +106,14 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
             : ci
         );
         setTimeout(() => {
-          setItems(prev => prev.filter((ci) => getItemKey(ci.item, ci.selectedComplements) !== itemKey));
+          setItems(prev => {
+            const filtered = prev.filter((ci) => getItemKey(ci.item, ci.selectedComplements) !== itemKey);
+            if (filtered.length === 0) {
+              setLastAddedItem(null);
+            }
+            return filtered;
+          });
         }, 200);
-        if (next.length === 0) setLastAddedItem(null);
         return next;
       })
     } else {

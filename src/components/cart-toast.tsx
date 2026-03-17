@@ -14,7 +14,7 @@ export function CartToast() {
   const [itemName, setItemName] = useState('');
 
   useEffect(() => {
-    if (!lastAddedItem) {
+    if (!lastAddedItem || lastAddedItem.quantity <= 0) {
       if (visible && !exiting) {
         setExiting(true);
         const timer = setTimeout(() => {
