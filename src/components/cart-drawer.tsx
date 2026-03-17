@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useCallback, useEffect, useRef } from "react"
-import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, Check } from "lucide-react"
+import { useState, useCallback, useRef } from "react"
+import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -89,57 +89,24 @@ export function CartDrawer() {
   const [email, setEmail] = useState('')
   const [errors, setErrors] = useState<{ nombre?: string; telefono?: string }>({})
 
-  const isMobile = (): boolean => {
-    if (typeof navigator === 'undefined') return false;
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  };
-
-const abrirWhatsApp = (numero: string, mensaje: string) => {
-  // 1. Limpieza de número y asegurar prefijo internacional (ej. 34 para España)
-  let numeroLimpio = numero.replace(/\D/g, '');
+  const abrirWhatsApp = (numero: string, mensaje: string) => {
+  let numeroLimpio = numero.replaceAll(/\D/g, '');
   if (numeroLimpio.length === 9) {
     numeroLimpio = '34' + numeroLimpio;
   }
 
   const textoEncoded = encodeURIComponent(mensaje);
-  const ua = navigator.userAgent;
-
-  // 2. Detección de plataforma
+  const ua = typeof navigator === 'undefined' ? '' : navigator.userAgent;
   const isAndroid = /Android/i.test(ua);
   const isIOS = /iPhone|iPad|iPod/i.test(ua);
 
-  // 3. Lógica según plataforma
-  if (isAndroid) {
-    /**
-     * ANDROID: 
-     * 'wa.me' funciona como un "Intent". Chrome detecta el enlace y 
-     * abre la app directamente si está instalada.
-     */
-    window.location.href = `https://wa.me/${numeroLimpio}?text=${textoEncoded}`;
-    
-  } else if (isIOS) {
-    /**
-     * iOS (iPhone/iPad): 
-     * Safari gestiona muy bien los "Universal Links". 
-     * Si 'wa.me' diera problemas en versiones antiguas, se podría usar 'whatsapp://send?phone=',
-     * pero 'wa.me' es el estándar actual recomendado por Apple y WhatsApp.
-     */
-    window.location.href = `https://wa.me/${numeroLimpio}?text=${textoEncoded}`;
-
+  if (isAndroid || isIOS) {
+    globalThis.location.href = `https://wa.me/${numeroLimpio}?text=${textoEncoded}`;
   } else {
-    /**
-     * ESCRITORIO (Windows/Mac/Linux):
-     * Aquí usamos tu método estrella. El "/send/?" con el slash final es el que
-     * evita que el mensaje se pierda cuando la aplicación de escritorio está cerrada (Cold Start).
-     */
     const urlApi = `https://api.whatsapp.com/send/?phone=${numeroLimpio}&text=${textoEncoded}`;
-    
-    // Abrimos en pestaña nueva para que, si no tiene la app, se quede en la web de WhatsApp
-    const nuevaPestana = window.open(urlApi, '_blank', 'noopener,noreferrer');
-    
-    // Fallback por si el navegador bloquea el popup
+    const nuevaPestana = globalThis.open(urlApi, '_blank', 'noopener,noreferrer');
     if (!nuevaPestana) {
-      window.location.assign(urlApi);
+      globalThis.location.assign(urlApi);
     }
   }
 };
@@ -149,26 +116,26 @@ const abrirWhatsApp = (numero: string, mensaje: string) => {
     return link || null;
   };
 
-  const validateName = (name: string): string | undefined => {
-    const trimmed = name.trim();
-    if (!trimmed) return t("validationNameRequired", language);
-    if (trimmed.length < 2) return t("validationNameMin", language);
-    if (trimmed.length > 100) return t("validationNameMax", language);
-    if (!/^[a-zA-ZÀ-ÿ\s'-]+$/u.test(trimmed)) return t("validationNameFormat", language);
-    return undefined;
-  };
-
-  const validatePhone = (phone: string): string | undefined => {
-    const trimmed = phone.trim();
-    if (!trimmed) return t("validationPhoneRequired", language);
-    const digitsOnly = trimmed.replaceAll(/\D/g, '');
-    if (digitsOnly.length < 9) return t("validationPhoneMin", language);
-    if (digitsOnly.length > 15) return t("validationPhoneMax", language);
-    return undefined;
-  };
-
   const handleConfirmOrder = useCallback(async () => {
     setErrors({});
+    
+    const validateName = (name: string): string | undefined => {
+      const trimmed = name.trim();
+      if (!trimmed) return t("validationNameRequired", language);
+      if (trimmed.length < 2) return t("validationNameMin", language);
+      if (trimmed.length > 100) return t("validationNameMax", language);
+      if (!/^[a-zA-ZÀ-ÿ\s'-]+$/u.test(trimmed)) return t("validationNameFormat", language);
+      return undefined;
+    };
+
+    const validatePhone = (phone: string): string | undefined => {
+      const trimmed = phone.trim();
+      if (!trimmed) return t("validationPhoneRequired", language);
+      const digitsOnly = trimmed.replaceAll(/\D/g, '');
+      if (digitsOnly.length < 9) return t("validationPhoneMin", language);
+      if (digitsOnly.length > 15) return t("validationPhoneMax", language);
+      return undefined;
+    };
     
     const nombreError = validateName(nombre);
     const telefonoError = validatePhone(telefono);
@@ -356,13 +323,16 @@ const abrirWhatsApp = (numero: string, mensaje: string) => {
                   const itemKey = getItemKey(ci.item, ci.selectedComplements);
                   const complementPrice = ci.selectedComplements?.reduce((sum, c) => sum + c.price, 0) || 0;
                   const totalItemPrice = ci.item.price + complementPrice;
+                  let itemAnimationClass = '';
+                  if (ci.justAdded) {
+                    itemAnimationClass = 'animate-cart-item-add';
+                  } else if (ci.justRemoved) {
+                    itemAnimationClass = 'animate-cart-item-remove';
+                  }
                   return (
                     <li 
                       key={itemKey} 
-                      className={`flex items-center gap-3 rounded-lg bg-card p-3 ${
-                        ci.justAdded ? 'animate-cart-item-add' : 
-                        ci.justRemoved ? 'animate-cart-item-remove' : ''
-                      }`}
+                      className={`flex items-center gap-3 rounded-lg bg-card p-3 ${itemAnimationClass}`}
                     >
                       <div className="flex-1">
                         <p className="font-semibold text-card-foreground">
