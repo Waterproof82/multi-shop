@@ -26,10 +26,11 @@ export default function ClientesPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    const controller = new AbortController();
     async function fetchClientes() {
       try {
         setError(null);
-        const res = await fetch('/api/admin/clientes');
+        const res = await fetch('/api/admin/clientes', { signal: controller.signal });
         if (res.ok) {
           const data = await res.json();
           setClientes(data.clientes || []);
@@ -37,6 +38,7 @@ export default function ClientesPage() {
           setError('Error al cargar clientes. Por favor, inténtalo de nuevo.');
         }
       } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
         console.error('Error fetching clientes:', error);
         setError('Error de conexión. Verifica tu conexión a internet.');
       } finally {
@@ -44,6 +46,7 @@ export default function ClientesPage() {
       }
     }
     fetchClientes();
+    return () => controller.abort();
   }, []);
 
   const filteredClientes = clientes.filter(c =>
@@ -359,8 +362,8 @@ export default function ClientesPage() {
 
       {/* Modal de edición */}
       {editingCliente && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-lg border shadow-lg w-full max-w-md">
+        <div className="fixed inset-0 bg-overlay flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-lg border shadow-elegant-lg w-full max-w-md">
             <div className="flex items-center justify-between p-4 border-b">
               <h2 className="text-lg font-semibold">Editar Cliente</h2>
               <button
@@ -438,8 +441,8 @@ export default function ClientesPage() {
 
       {/* Modal de creación */}
       {creatingCliente && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-lg border shadow-lg w-full max-w-md">
+        <div className="fixed inset-0 bg-overlay flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-lg border shadow-elegant-lg w-full max-w-md">
             <div className="flex items-center justify-between p-4 border-b">
               <h2 className="text-lg font-semibold">Nuevo Cliente</h2>
               <button

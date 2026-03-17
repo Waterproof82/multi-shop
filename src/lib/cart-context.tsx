@@ -14,6 +14,8 @@ export interface CartItem {
   item: MenuItemVM
   quantity: number
   selectedComplements?: Complement[]
+  justAdded?: boolean
+  justRemoved?: boolean
 }
 
 function getItemKey(item: MenuItemVM, complements?: Complement[]): string {
@@ -71,13 +73,20 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
           index === existingIndex ? { ...ci, quantity: ci.quantity + quantity } : ci
         )
       }
-      return [...prev, { item, quantity, selectedComplements }]
+      return [...prev, { item, quantity, selectedComplements, justAdded: true }]
     })
   }, [])
 
   const removeItem = useCallback((itemKey: string) => {
     setItems((prev) => {
-      const next = prev.filter((ci) => getItemKey(ci.item, ci.selectedComplements) !== itemKey);
+      const next = prev.map(ci => 
+        getItemKey(ci.item, ci.selectedComplements) === itemKey 
+          ? { ...ci, justRemoved: true }
+          : ci
+      );
+      setTimeout(() => {
+        setItems(prev => prev.filter((ci) => getItemKey(ci.item, ci.selectedComplements) !== itemKey));
+      }, 200);
       if (next.length === 0) setLastAddedItem(null);
       return next;
     })
@@ -86,13 +95,25 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
   const updateQuantity = useCallback((itemKey: string, quantity: number) => {
     if (quantity <= 0) {
       setItems((prev) => {
-        const next = prev.filter((ci) => getItemKey(ci.item, ci.selectedComplements) !== itemKey);
+        const next = prev.map(ci => 
+          getItemKey(ci.item, ci.selectedComplements) === itemKey 
+            ? { ...ci, justRemoved: true }
+            : ci
+        );
+        setTimeout(() => {
+          setItems(prev => prev.filter((ci) => getItemKey(ci.item, ci.selectedComplements) !== itemKey));
+        }, 200);
         if (next.length === 0) setLastAddedItem(null);
         return next;
       })
     } else {
       setItems((prev) =>
-        prev.map((ci) => (getItemKey(ci.item, ci.selectedComplements) === itemKey ? { ...ci, quantity } : ci))
+        prev.map((ci) => {
+          if (getItemKey(ci.item, ci.selectedComplements) === itemKey) {
+            return { ...ci, quantity, justAdded: false };
+          }
+          return ci;
+        })
       )
     }
   }, [])

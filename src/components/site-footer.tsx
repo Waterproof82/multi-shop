@@ -58,14 +58,14 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
             <ul className="flex gap-4 pt-1">
               {empresa.instagram && (
                 <li>
-                  <a href={empresa.instagram} target="_blank" rel="noopener noreferrer" className="text-background/50 hover:text-background transition-colors" aria-label="Instagram">
+                  <a href={empresa.instagram} target="_blank" rel="noopener noreferrer" className="text-background/70 hover:text-background transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm" aria-label="Instagram">
                     <Instagram className="w-5 h-5" />
                   </a>
                 </li>
               )}
               {empresa.fb && (
                 <li>
-                  <a href={empresa.fb} target="_blank" rel="noopener noreferrer" className="text-background/50 hover:text-background transition-colors" aria-label="Facebook">
+                  <a href={empresa.fb} target="_blank" rel="noopener noreferrer" className="text-background/70 hover:text-background transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm" aria-label="Facebook">
                     <Facebook className="w-5 h-5" />
                   </a>
                 </li>
@@ -80,13 +80,13 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
               {empresa.direccion && (
                 <li className="flex items-start gap-3">
                   <MapPin className="w-4 h-4 text-background/40 shrink-0 mt-0.5" />
-                  <span className="text-sm text-background/60">{empresa.direccion}</span>
+                  <span className="text-sm text-background/75">{empresa.direccion}</span>
                 </li>
               )}
               {empresa.telefono && (
                 <li className="flex items-center gap-3">
                   <MessageCircle className="w-4 h-4 text-background/40 shrink-0" />
-                  <a href={`https://wa.me/${empresa.telefono.replaceAll(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="text-sm text-background/60 hover:text-background transition-colors">
+                  <a href={`https://wa.me/${empresa.telefono.replaceAll(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="text-sm text-background/75 hover:text-background transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm">
                     {empresa.telefono}
                   </a>
                 </li>
@@ -94,14 +94,14 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
               {empresa.emailNotification && (
                 <li className="flex items-center gap-3">
                   <Mail className="w-4 h-4 text-background/40 shrink-0" />
-                  <a href={`mailto:${empresa.emailNotification}`} className="text-sm text-background/60 hover:text-background transition-colors">
+                  <a href={`mailto:${empresa.emailNotification}`} className="text-sm text-background/75 hover:text-background transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm">
                     {empresa.emailNotification}
                   </a>
                 </li>
               )}
               <li className="flex items-center gap-3">
                 <Globe className="w-4 h-4 text-background/40 shrink-0" />
-                <span className="text-sm text-background/60">{empresa.dominio}</span>
+                <span className="text-sm text-background/75">{empresa.dominio}</span>
               </li>
             </ul>
           </div>
@@ -130,7 +130,7 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
           <p>© {currentYear} {empresa.nombre}</p>
           <a
             href="/admin/login"
-            className="text-background/20 hover:text-background/60 transition-colors"
+            className="text-background/20 hover:text-background/75 transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm"
           >
             Admin
           </a>

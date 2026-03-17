@@ -253,7 +253,7 @@ export default function CategoriasPage() {
         </div>
       )}
 
-      <div className="bg-card rounded-lg shadow-sm border border-border overflow-hidden">
+      <div className="bg-card rounded-lg shadow-elegant border border-border overflow-hidden">
         {/* Desktop table */}
         <div className="hidden md:block overflow-x-auto">
           <table className="min-w-full divide-y divide-border">
@@ -419,8 +419,8 @@ export default function CategoriasPage() {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-lg shadow-lg w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-overlay flex items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-lg shadow-elegant-lg w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center p-6 border-b border-border">
               <h2 className="text-xl font-semibold text-foreground">
                 {editingId ? 'Editar Categoría' : 'Nueva Categoría'}

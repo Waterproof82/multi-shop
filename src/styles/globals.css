@@ -46,6 +46,36 @@
 
   --shadow-elegant: 0 4px 20px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
   --shadow-elegant-lg: 0 8px 30px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
+
+  --color-overlay: var(--overlay);
+
+  --color-chart-orange: var(--chart-orange);
+  --color-chart-blue: var(--chart-blue);
+  --color-chart-green: var(--chart-green);
+  --color-chart-purple: var(--chart-purple);
+  --color-chart-pink: var(--chart-pink);
+  --color-chart-teal: var(--chart-teal);
+  --color-chart-rose: var(--chart-rose);
+  --color-chart-lime: var(--chart-lime);
+
+  --color-status-pending-bg: var(--status-pending-bg);
+  --color-status-pending-text: var(--status-pending-text);
+  --color-status-pending-hover: var(--status-pending-hover);
+  --color-status-accepted-bg: var(--status-accepted-bg);
+  --color-status-accepted-text: var(--status-accepted-text);
+  --color-status-accepted-hover: var(--status-accepted-hover);
+  --color-status-preparing-bg: var(--status-preparing-bg);
+  --color-status-preparing-text: var(--status-preparing-text);
+  --color-status-preparing-hover: var(--status-preparing-hover);
+  --color-status-sent-bg: var(--status-sent-bg);
+  --color-status-sent-text: var(--status-sent-text);
+  --color-status-sent-hover: var(--status-sent-hover);
+  --color-status-delivered-bg: var(--status-delivered-bg);
+  --color-status-delivered-text: var(--status-delivered-text);
+  --color-status-delivered-hover: var(--status-delivered-hover);
+  --color-status-cancelled-bg: var(--status-cancelled-bg);
+  --color-status-cancelled-text: var(--status-cancelled-text);
+  --color-status-cancelled-hover: var(--status-cancelled-hover);
 }
 
 :root {
@@ -87,6 +117,33 @@
   --sidebar-ring: #18181B;
   --whatsapp: #25D366;
   --whatsapp-hover: #20BD5A;
+  --overlay: rgba(0, 0, 0, 0.5);
+  --chart-orange: #F97316;
+  --chart-blue: #3B82F6;
+  --chart-green: #10B981;
+  --chart-purple: #8B5CF6;
+  --chart-pink: #EC4899;
+  --chart-teal: #14B8A6;
+  --chart-rose: #F43F5E;
+  --chart-lime: #84CC16;
+  --status-pending-bg: #FEF3C7;
+  --status-pending-text: #92400E;
+  --status-pending-hover: #FDE68A;
+  --status-accepted-bg: #DBEAFE;
+  --status-accepted-text: #1E40AF;
+  --status-accepted-hover: #BFDBFE;
+  --status-preparing-bg: #EDE9FE;
+  --status-preparing-text: #5B21B6;
+  --status-preparing-hover: #DDD6FE;
+  --status-sent-bg: #FFEDD5;
+  --status-sent-text: #9A3412;
+  --status-sent-hover: #FED7AA;
+  --status-delivered-bg: #D1FAE5;
+  --status-delivered-text: #065F46;
+  --status-delivered-hover: #A7F3D0;
+  --status-cancelled-bg: #FEE2E2;
+  --status-cancelled-text: #991B1B;
+  --status-cancelled-hover: #FECACA;
 }
 
 .dark {
@@ -124,6 +181,33 @@
   --sidebar-ring: #D4D4D8;
   --whatsapp: #25D366;
   --whatsapp-hover: #20BD5A;
+  --overlay: rgba(0, 0, 0, 0.5);
+  --chart-orange: #F97316;
+  --chart-blue: #3B82F6;
+  --chart-green: #10B981;
+  --chart-purple: #A78BFA;
+  --chart-pink: #F472B6;
+  --chart-teal: #2DD4BF;
+  --chart-rose: #FB7185;
+  --chart-lime: #A3E635;
+  --status-pending-bg: #433314;
+  --status-pending-text: #FDE68A;
+  --status-pending-hover: #524118;
+  --status-accepted-bg: #172554;
+  --status-accepted-text: #93C5FD;
+  --status-accepted-hover: #1E3A5F;
+  --status-preparing-bg: #2E1065;
+  --status-preparing-text: #C4B5FD;
+  --status-preparing-hover: #3B1A7A;
+  --status-sent-bg: #431407;
+  --status-sent-text: #FDBA74;
+  --status-sent-hover: #54200D;
+  --status-delivered-bg: #064E3B;
+  --status-delivered-text: #6EE7B7;
+  --status-delivered-hover: #065F46;
+  --status-cancelled-bg: #450A0A;
+  --status-cancelled-text: #FCA5A5;
+  --status-cancelled-hover: #5C1010;
 }
 
 @keyframes badge-pop {
@@ -142,9 +226,211 @@
   animation: badge-pop 0.3s ease-out;
 }
 
+@keyframes cart-item-add {
+  0% {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  60% {
+    opacity: 1;
+    transform: translateX(2px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes cart-item-remove {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
+@keyframes quantity-pulse {
+  0%, 100% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: var(--primary);
+  }
+}
+
+@keyframes complement-select {
+  0% {
+    transform: scale(0.95);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes button-press {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes toast-slide-in {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toast-slide-out {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+}
+
+@keyframes check-draw {
+  0% {
+    stroke-dashoffset: 24;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes price-update {
+  0% {
+    transform: translateY(-4px);
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+.animate-cart-item-add {
+  animation: cart-item-add 0.35s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+.animate-cart-item-remove {
+  animation: cart-item-remove 0.2s cubic-bezier(0.7, 0, 0.84, 0) forwards;
+}
+
+.animate-quantity-pulse {
+  animation: quantity-pulse 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.animate-complement-select {
+  animation: complement-select 0.25s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+.animate-button-press {
+  animation: button-press 0.15s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.animate-toast-in {
+  animation: toast-slide-in 0.35s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+.animate-toast-out {
+  animation: toast-slide-out 0.2s cubic-bezier(0.7, 0, 0.84, 0) forwards;
+}
+
+.animate-price-update {
+  animation: price-update 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+@keyframes empty-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.animate-empty-float {
+  animation: empty-float 3s ease-in-out infinite;
+}
+
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  background-color: var(--primary);
+  opacity: 0.3;
+  transform: scale(0);
+  animation: ripple 0.5s linear;
+  pointer-events: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-badge-pop {
     animation: none;
+  }
+  .animate-cart-item-add {
+    animation: none;
+    opacity: 1;
+  }
+  .animate-cart-item-remove {
+    animation: none;
+    opacity: 0;
+  }
+  .animate-quantity-pulse {
+    animation: none;
+  }
+  .animate-complement-select {
+    animation: none;
+  }
+  .animate-button-press {
+    animation: none;
+  }
+  .animate-toast-in {
+    animation: none;
+  }
+  .animate-toast-out {
+    animation: none;
+  }
+  .animate-price-update {
+    animation: none;
+  }
+  .animate-empty-float {
+    animation: none;
+  }
+  .ripple {
+    display: none;
+  }
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }
 

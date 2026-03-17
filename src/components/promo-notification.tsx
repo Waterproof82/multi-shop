@@ -46,7 +46,7 @@ function PromoNotificationInner() {
     : "bg-destructive text-destructive-foreground";
 
   return (
-    <div className={`fixed top-20 left-1/2 z-[100] -translate-x-1/2 ${colorClasses} px-6 py-3 rounded-lg shadow-lg text-sm font-medium max-w-md text-center`}>
+    <div className={`fixed top-20 left-1/2 z-[100] -translate-x-1/2 ${colorClasses} px-6 py-3 rounded-lg shadow-elegant-lg text-sm font-medium max-w-md text-center`}>
       {notification.text}
     </div>
   );

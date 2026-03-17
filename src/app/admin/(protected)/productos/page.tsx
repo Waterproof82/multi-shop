@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { Plus, Pencil, Trash2, Loader2, Image as ImageIcon, Search, ArrowUpDown, ArrowUp, ArrowDown, Languages, ChevronDown, ChevronRight } from 'lucide-react';
 import { ImageUploader } from '@/components/ui/image-uploader';
@@ -311,7 +311,7 @@ export default function ProductosPage() {
       : bStr.localeCompare(aStr);
   };
 
-  const filteredProductos = productos
+  const filteredProductos = useMemo(() => productos
     .filter((prod) => {
       const term = searchTerm.toLowerCase();
       return (
@@ -328,7 +328,7 @@ export default function ProductosPage() {
       const aVal = getSortValue(a, sortField);
       const bVal = getSortValue(b, sortField);
       return compareSortValues(aVal, bVal);
-    });
+    }), [productos, searchTerm, sortField, sortDirection, categorias]);
 
   if (loading) {
     return (
@@ -354,7 +354,7 @@ export default function ProductosPage() {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               aria-label="Buscar productos"
-              className="pl-10 pr-4 py-2 border rounded-lg w-64 focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
+              className="pl-10 pr-4 py-2 border rounded-lg w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
             />
           </div>
           <button
@@ -379,7 +379,7 @@ export default function ProductosPage() {
         </div>
       )}
 
-      <div className="bg-card rounded-lg shadow-sm border border-border overflow-hidden">
+      <div className="bg-card rounded-lg shadow-elegant border border-border overflow-hidden">
         {/* Desktop table */}
         <div className="hidden md:block overflow-x-auto">
           <table className="min-w-full divide-y divide-border">
@@ -602,6 +602,7 @@ export default function ProductosPage() {
                     id="titulo_es"
                     type="text"
                     required
+                    aria-required="true"
                     value={formData.titulo_es}
                     onChange={(e) => setFormData({ ...formData, titulo_es: e.target.value })}
                     className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
@@ -630,6 +631,7 @@ export default function ProductosPage() {
                     type="number"
                     step="0.01"
                     required
+                    aria-required="true"
                     value={formData.precio}
                     onChange={(e) => setFormData({ ...formData, precio: e.target.value })}
                     className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"

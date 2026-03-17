@@ -1,6 +1,7 @@
 "use client"
 
-import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail } from "lucide-react"
+import { useState, useCallback, useEffect, useRef } from "react"
+import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -17,8 +18,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog"
-import { useState } from "react"
-
 import { useCart, type Complement } from "@/lib/cart-context"
 import { useLanguage } from "@/lib/language-context"
 import { t } from "@/lib/translations"
@@ -27,6 +26,46 @@ import type { MenuItemVM } from "@/core/application/dtos/menu-view-model"
 function getItemKey(item: MenuItemVM, complements?: Complement[]): string {
   const complementIds = complements?.map(c => c.id).sort().join(',') || '';
   return `${item.id}-${complementIds}`;
+}
+
+function RippleButton({ children, onClick, className, disabled, variant = "default", size = "default", ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "default" | "outline" | "ghost"; size?: "default" | "icon" }) {
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  const createRipple = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const button = event.currentTarget;
+    const rect = button.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const ripple = document.createElement("span");
+    ripple.className = "ripple";
+    ripple.style.left = `${x}px`;
+    ripple.style.top = `${y}px`;
+    const existingRipple = button.querySelector(".ripple");
+    if (existingRipple) existingRipple.remove();
+    button.appendChild(ripple);
+    setTimeout(() => ripple.remove(), 500);
+  }
+
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!disabled) {
+      createRipple(e);
+      onClick?.(e);
+    }
+  }
+
+  return (
+    <Button
+      ref={buttonRef}
+      variant={variant}
+      size={size}
+      className={`relative overflow-hidden ${className}`}
+      disabled={disabled}
+      onClick={handleClick}
+      {...props}
+    >
+      {children}
+    </Button>
+  );
 }
 
 export function CartDrawer() {
@@ -79,7 +118,7 @@ export function CartDrawer() {
     return undefined;
   };
 
-  const handleConfirmOrder = async () => {
+  const handleConfirmOrder = useCallback(async () => {
     setErrors({});
     
     const nombreError = validateName(nombre);
@@ -165,7 +204,7 @@ export function CartDrawer() {
     } finally {
       setSending(false);
     }
-  };
+  }, [nombre, telefono, email, items, totalPrice, language, closeCart]);
 
   return (
     <>
@@ -197,7 +236,7 @@ export function CartDrawer() {
               <a
                 href={getWhatsAppUrl()!}
                 rel="noopener noreferrer"
-                className="block w-full text-center bg-whatsapp text-white py-3 px-4 rounded-full font-semibold hover:bg-whatsapp-hover transition-colors"
+                className="block w-full text-center bg-whatsapp text-primary-foreground py-3 px-4 rounded-full font-semibold hover:bg-whatsapp-hover transition-colors duration-150"
               >
                 {t("whatsappResend", language)}
               </a>
@@ -243,7 +282,7 @@ export function CartDrawer() {
 
         {items.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 text-muted-foreground">
-            <div className="relative">
+            <div className="relative animate-empty-float">
               <ShoppingBag className="size-12 opacity-20" />
               <span className="absolute inset-0 flex items-center justify-center text-2xl opacity-30">+</span>
             </div>
@@ -268,7 +307,13 @@ export function CartDrawer() {
                   const complementPrice = ci.selectedComplements?.reduce((sum, c) => sum + c.price, 0) || 0;
                   const totalItemPrice = ci.item.price + complementPrice;
                   return (
-                    <li key={itemKey} className="flex items-center gap-3 rounded-lg bg-card p-3">
+                    <li 
+                      key={itemKey} 
+                      className={`flex items-center gap-3 rounded-lg bg-card p-3 ${
+                        ci.justAdded ? 'animate-cart-item-add' : 
+                        ci.justRemoved ? 'animate-cart-item-remove' : ''
+                      }`}
+                    >
                       <div className="flex-1">
                         <p className="font-semibold text-card-foreground">
                           {(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}
@@ -284,7 +329,7 @@ export function CartDrawer() {
                       </div>
 
                       <div className="flex items-center gap-1 md:gap-2">
-                        <Button
+                        <RippleButton
                           variant="outline"
                           size="icon"
                           className="md:size-7 size-10 bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -292,9 +337,11 @@ export function CartDrawer() {
                           aria-label={t("reduceQuantity", language)}
                         >
                           <Minus className="md:size-3 size-4" />
-                        </Button>
-                        <span className="w-6 md:w-6 text-center font-semibold text-foreground">{ci.quantity}</span>
-                        <Button
+                        </RippleButton>
+                        <span className="w-6 md:w-6 text-center font-semibold text-foreground animate-quantity-pulse" key={ci.quantity}>
+                          {ci.quantity}
+                        </span>
+                        <RippleButton
                           variant="outline"
                           size="icon"
                           className="md:size-7 size-10 bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -302,8 +349,8 @@ export function CartDrawer() {
                           aria-label={t("increaseQuantity", language)}
                         >
                           <Plus className="md:size-3 size-4" />
-                        </Button>
-                        <Button
+                        </RippleButton>
+                        <RippleButton
                           variant="ghost"
                           size="icon"
                           className="md:size-7 size-10 text-destructive hover:text-destructive hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -311,7 +358,7 @@ export function CartDrawer() {
                           aria-label={`${t("remove", language)} ${(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}`}
                         >
                           <Trash2 className="md:size-3 size-4" />
-                        </Button>
+                        </RippleButton>
                       </div>
                     </li>
                   );
@@ -373,14 +420,14 @@ export function CartDrawer() {
 
               <div className="mb-4 flex items-center justify-between px-2">
                 <span className="text-lg font-semibold text-foreground">{t("total", language)}</span>
-                <span className="text-2xl font-bold text-foreground tabular-nums">
+                <span className="text-2xl font-bold text-foreground tabular-nums animate-price-update" key={totalPrice}>
                   {totalPrice.toFixed(2).replace(".", ",") + "€"}
                 </span>
               </div>
 
               <div className="flex flex-col gap-2 px-1">
                 <Button 
-                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full py-3 text-lg font-semibold shadow-md transition-colors duration-200"
+                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full py-3 text-lg font-semibold shadow-elegant transition-colors duration-150"
                   size="lg"
                   onClick={handleConfirmOrder}
                   disabled={sending || confirming}
