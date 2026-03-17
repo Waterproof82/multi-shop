@@ -1,4 +1,4 @@
-import { Product } from "../entities/types";
+import { Product, Result } from "../entities/types";
 
 export interface CreateProductData {
   empresaId: string;
@@ -24,8 +24,8 @@ export interface UpdateProductData extends Partial<CreateProductData> {
 }
 
 export interface IProductRepository {
-  create(data: CreateProductData): Promise<Product>;
-  findAllByTenant(empresaId: string): Promise<Product[]>;
-  update(id: string, empresaId: string, data: Partial<UpdateProductData>): Promise<Product>;
-  delete(id: string, empresaId: string): Promise<void>;
+  create(data: CreateProductData): Promise<Result<Product>>;
+  findAllByTenant(empresaId: string): Promise<Result<Product[]>>;
+  update(id: string, empresaId: string, data: Partial<UpdateProductData>): Promise<Result<Product>>;
+  delete(id: string, empresaId: string): Promise<Result<void>>;
 }

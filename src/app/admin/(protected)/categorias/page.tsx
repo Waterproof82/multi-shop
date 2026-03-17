@@ -222,23 +222,24 @@ export default function CategoriasPage() {
     <div className="pt-20 lg:pt-0 px-6 lg:px-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-serif font-bold text-gray-900 dark:text-white">Categorías</h1>
-          <p className="text-gray-600 dark:text-gray-400">Gestiona las categorías del menú</p>
+          <h1 className="text-2xl font-bold text-foreground">Categorías</h1>
+          <p className="text-muted-foreground">Gestiona las categorías del menú</p>
         </div>
         <div className="flex items-center gap-4 w-full sm:w-auto">
           <div className="relative flex-1 sm:flex-initial">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type="text"
               placeholder="Buscar..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 border rounded-lg w-full sm:w-48 focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+              aria-label="Buscar categorías"
+              className="pl-10 pr-4 py-2 border rounded-lg w-full sm:w-48 focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
             />
           </div>
           <button
             onClick={openCreateModal}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
           >
             <Plus className="h-4 w-4" />
             <span className="sm:hidden">Nueva</span>
@@ -247,19 +248,19 @@ export default function CategoriasPage() {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-md">
+        <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 text-destructive rounded-md">
           {error}
         </div>
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 overflow-hidden">
+      <div className="bg-card rounded-lg shadow-sm border border-border overflow-hidden">
         {/* Desktop table */}
         <div className="hidden md:block overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-700">
+          <table className="min-w-full divide-y divide-border">
+            <thead className="bg-muted">
               <tr>
                 <th 
-                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                  className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:bg-muted"
                   onClick={() => handleSort('orden')}
                 >
                     <div className="flex items-center gap-1">
@@ -271,7 +272,7 @@ export default function CategoriasPage() {
                     </div>
                 </th>
                 <th 
-                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                  className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:bg-muted"
                   onClick={() => handleSort('nombre_es')}
                 >
                     <div className="flex items-center gap-1">
@@ -282,43 +283,43 @@ export default function CategoriasPage() {
                       {sortField !== 'nombre_es' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                     </div>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                   Tipo
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                   Subcategorías
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                   Complemento de
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">
                   Acciones
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+            <tbody className="bg-card divide-y divide-border">
               {filteredCategorias.map((cat) => (
-                <tr key={cat.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                <tr key={cat.id} className="hover:bg-muted/50">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-foreground">
                     {cat.orden}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-foreground">
                     {cat.nombre_es}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm">
                     {cat.categoria_padre_id ? (
                       <div className="flex flex-col gap-1">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-xs font-medium">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground text-xs font-medium">
                           Subcategoría
                         </span>
                         {cat.parentName && (
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                          <span className="text-xs text-muted-foreground">
                             → {cat.parentName}
                           </span>
                         )}
                       </div>
                     ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 text-xs font-medium">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-foreground text-xs font-medium">
                         Principal
                       </span>
                     )}
@@ -333,10 +334,10 @@ export default function CategoriasPage() {
                         Sí
                       </span>
                     ) : (
-                      <span className="text-gray-400">—</span>
+                      <span className="text-muted-foreground">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
                     {cat.categoria_complemento_de 
                       ? categorias.find(c => c.id === cat.categoria_complemento_de)?.nombre_es || '—'
                       : '—'}
@@ -350,7 +351,7 @@ export default function CategoriasPage() {
                     </button>
                     <button
                       onClick={() => handleDelete(cat.id)}
-                      className="text-red-600 hover:text-red-80"
+                      className="text-destructive hover:text-destructive/80"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -359,7 +360,7 @@ export default function CategoriasPage() {
               ))}
               {filteredCategorias.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">
                     {searchTerm ? 'No se encontraron categorías.' : 'No hay categorías. Crea la primera.'}
                   </td>
                 </tr>
@@ -369,16 +370,16 @@ export default function CategoriasPage() {
         </div>
 
         {/* Mobile cards */}
-        <div className="md:hidden divide-y divide-gray-200 dark:divide-gray-700">
+        <div className="md:hidden divide-y divide-border">
           {filteredCategorias.map((cat) => (
-            <div key={cat.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700">
+            <div key={cat.id} className="p-4 hover:bg-muted/50">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-400 dark:text-gray-500">#{cat.orden}</span>
-                    <p className="font-medium text-gray-900 dark:text-gray-100">{cat.nombre_es}</p>
+                    <span className="text-xs text-muted-foreground">#{cat.orden}</span>
+                    <p className="font-medium text-foreground">{cat.nombre_es}</p>
                     {cat.categoria_padre_id && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-[10px] font-medium">
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-secondary text-secondary-foreground text-[10px] font-medium">
                         Sub
                       </span>
                     )}
@@ -388,7 +389,7 @@ export default function CategoriasPage() {
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     {cat.categoria_padre_id && cat.parentName ? `Subcategoría de ${cat.parentName}` : ''}
                   </p>
                 </div>
@@ -401,7 +402,7 @@ export default function CategoriasPage() {
                   </button>
                   <button
                     onClick={() => handleDelete(cat.id)}
-                    className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                    className="p-1.5 text-destructive hover:bg-destructive/10 rounded"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -410,7 +411,7 @@ export default function CategoriasPage() {
             </div>
           ))}
           {filteredCategorias.length === 0 && (
-            <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+            <div className="p-8 text-center text-muted-foreground">
               {searchTerm ? 'No se encontraron categorías.' : 'No hay categorías. Crea la primera.'}
             </div>
           )}
@@ -419,19 +420,19 @@ export default function CategoriasPage() {
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center p-6 border-b dark:border-gray-700">
-              <h2 className="text-xl font-semibold dark:text-white">
+          <div className="bg-card rounded-lg shadow-lg w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center p-6 border-b border-border">
+              <h2 className="text-xl font-semibold text-foreground">
                 {editingId ? 'Editar Categoría' : 'Nueva Categoría'}
               </h2>
-              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+              <button onClick={closeModal} className="text-muted-foreground hover:text-foreground">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
-                <label htmlFor="nombre_es" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                <label htmlFor="nombre_es" className="block text-sm font-medium text-foreground mb-1">
                   Nombre (Español) *
                 </label>
                 <input
@@ -440,14 +441,14 @@ export default function CategoriasPage() {
                   required
                   value={formData.nombre_es}
                   onChange={(e) => setFormData({ ...formData, nombre_es: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
                 />
               </div>
 
               {showTranslations && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="nombre_en" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                    <label htmlFor="nombre_en" className="block text-sm font-medium text-foreground mb-1">
                       Nombre (Inglés)
                     </label>
                     <input
@@ -455,11 +456,11 @@ export default function CategoriasPage() {
                       type="text"
                       value={formData.nombre_en}
                       onChange={(e) => setFormData({ ...formData, nombre_en: e.target.value })}
-                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
                     />
                   </div>
                 <div>
-                  <label htmlFor="nombre_fr" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                  <label htmlFor="nombre_fr" className="block text-sm font-medium text-foreground mb-1">
                     Nombre (Francés)
                   </label>
                   <input
@@ -467,11 +468,11 @@ export default function CategoriasPage() {
                     type="text"
                     value={formData.nombre_fr}
                     onChange={(e) => setFormData({ ...formData, nombre_fr: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
                   />
                 </div>
                 <div>
-                  <label htmlFor="nombre_it" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                  <label htmlFor="nombre_it" className="block text-sm font-medium text-foreground mb-1">
                     Nombre (Italiano)
                   </label>
                   <input
@@ -479,11 +480,11 @@ export default function CategoriasPage() {
                     type="text"
                     value={formData.nombre_it}
                     onChange={(e) => setFormData({ ...formData, nombre_it: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
                   />
                 </div>
                 <div>
-                  <label htmlFor="nombre_de" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                  <label htmlFor="nombre_de" className="block text-sm font-medium text-foreground mb-1">
                     Nombre (Alemán)
                   </label>
                   <input
@@ -491,14 +492,14 @@ export default function CategoriasPage() {
                     type="text"
                     value={formData.nombre_de}
                     onChange={(e) => setFormData({ ...formData, nombre_de: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
                   />
                 </div>
               </div>
               )}
 
               <div>
-                <label htmlFor="descripcion_es" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                <label htmlFor="descripcion_es" className="block text-sm font-medium text-foreground mb-1">
                   Descripción (Español)
                 </label>
                 <textarea
@@ -507,14 +508,14 @@ export default function CategoriasPage() {
                   onChange={(e) => setFormData({ ...formData, descripcion_es: e.target.value })}
                   rows={2}
                   placeholder="Texto que se mostrará encima de los productos..."
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
                 />
               </div>
 
               {showTranslations && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="descripcion_en" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                    <label htmlFor="descripcion_en" className="block text-sm font-medium text-foreground mb-1">
                       Descripción (Inglés)
                     </label>
                   <textarea
@@ -522,11 +523,11 @@ export default function CategoriasPage() {
                     value={formData.descripcion_en}
                     onChange={(e) => setFormData({ ...formData, descripcion_en: e.target.value })}
                     rows={2}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
                   />
                 </div>
                 <div>
-                  <label htmlFor="descripcion_fr" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                  <label htmlFor="descripcion_fr" className="block text-sm font-medium text-foreground mb-1">
                     Descripción (Francés)
                   </label>
                   <textarea
@@ -534,11 +535,11 @@ export default function CategoriasPage() {
                     value={formData.descripcion_fr}
                     onChange={(e) => setFormData({ ...formData, descripcion_fr: e.target.value })}
                     rows={2}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
                   />
                 </div>
                 <div>
-                  <label htmlFor="descripcion_it" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                  <label htmlFor="descripcion_it" className="block text-sm font-medium text-foreground mb-1">
                     Descripción (Italiano)
                   </label>
                   <textarea
@@ -546,11 +547,11 @@ export default function CategoriasPage() {
                     value={formData.descripcion_it}
                     onChange={(e) => setFormData({ ...formData, descripcion_it: e.target.value })}
                     rows={2}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
                   />
                 </div>
                 <div>
-                  <label htmlFor="descripcion_de" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                  <label htmlFor="descripcion_de" className="block text-sm font-medium text-foreground mb-1">
                     Descripción (Alemán)
                   </label>
                   <textarea
@@ -558,14 +559,14 @@ export default function CategoriasPage() {
                     value={formData.descripcion_de}
                     onChange={(e) => setFormData({ ...formData, descripcion_de: e.target.value })}
                     rows={2}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
                   />
                 </div>
               </div>
               )}
 
               <div>
-                <label htmlFor="orden" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                <label htmlFor="orden" className="block text-sm font-medium text-foreground mb-1">
                   Orden
                 </label>
                 <input
@@ -573,19 +574,19 @@ export default function CategoriasPage() {
                   type="number"
                   value={formData.orden}
                   onChange={(e) => setFormData({ ...formData, orden: Number.parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
                 />
               </div>
 
               <div>
-                <label htmlFor="categoria_padre_id" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                <label htmlFor="categoria_padre_id" className="block text-sm font-medium text-foreground mb-1">
                   Categoría Padre (para subcategorías)
                 </label>
                 <select
                   id="categoria_padre_id"
                   value={formData.categoria_padre_id || ''}
                   onChange={(e) => setFormData({ ...formData, categoria_padre_id: e.target.value || null })}
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
                 >
                   <option value="">Ninguna (categoría principal)</option>
                   {categorias
@@ -596,20 +597,20 @@ export default function CategoriasPage() {
                       </option>
                     ))}
                 </select>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   Selecciona una categoría padre para crear una subcategoría.
                 </p>
               </div>
 
               <div>
-                <label htmlFor="categoria_complemento_de" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                <label htmlFor="categoria_complemento_de" className="block text-sm font-medium text-foreground mb-1">
                   Complemento de categoría
                 </label>
                 <select
                   id="categoria_complemento_de"
                   value={formData.categoria_complemento_de || ''}
                   onChange={(e) => setFormData({ ...formData, categoria_complemento_de: e.target.value || null })}
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
                 >
                   <option value="">Ninguna (categoría principal)</option>
                   {categorias
@@ -620,7 +621,7 @@ export default function CategoriasPage() {
                       </option>
                     ))}
                 </select>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   Los productos de esta categoría aparecerán como complemento al añadir productos de la categoría seleccionada.
                 </p>
               </div>
@@ -632,9 +633,9 @@ export default function CategoriasPage() {
                     id="complemento_obligatorio"
                     checked={formData.complemento_obligatorio}
                     onChange={(e) => setFormData({ ...formData, complemento_obligatorio: e.target.checked })}
-                    className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
                   />
-                  <label htmlFor="complemento_obligatorio" className="text-sm text-gray-700 dark:text-gray-200">
+                  <label htmlFor="complemento_obligatorio" className="text-sm text-foreground">
                     Seleccionar complemento obligatorio
                   </label>
                 </div>
@@ -644,7 +645,7 @@ export default function CategoriasPage() {
                 <button
                   type="button"
                   onClick={() => setShowTranslations(!showTranslations)}
-                  className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-primary dark:hover:text-primary"
+                  className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary dark:hover:text-primary"
                 >
                   {showTranslations ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                   <Languages className="h-4 w-4" />
@@ -656,14 +657,14 @@ export default function CategoriasPage() {
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="px-4 py-2 border rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+                  className="px-4 py-2 border rounded-md hover:bg-muted/50 border-border text-foreground"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50"
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
                 >
                   {saving ? (
                     <>

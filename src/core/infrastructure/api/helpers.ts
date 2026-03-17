@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Result } from '@/core/domain/entities/types';
 
 // Auth middleware helper
 export async function requireAuth(request: NextRequest): Promise<{ empresaId: string | null; error: NextResponse | null }> {
@@ -23,4 +24,24 @@ export function errorResponse(message: string, status = 500): NextResponse {
 
 export function validationErrorResponse(errors: string): NextResponse {
   return NextResponse.json({ error: errors }, { status: 400 });
+}
+
+// Result handling helpers
+export function handleResult<T>(result: Result<T>): NextResponse {
+  if (result.success) {
+    return successResponse(result.data);
+  }
+  return errorResponse(result.error.message);
+}
+
+export function handleResultWithStatus<T>(result: Result<T>, successStatus = 200): NextResponse {
+  if (result.success) {
+    return successResponse(result.data, successStatus);
+  }
+  return errorResponse(result.error.message);
+}
+
+// Helper to get empresaId from request headers
+export function getEmpresaIdFromRequest(request: NextRequest): string | null {
+  return request.headers.get('x-empresa-id');
 }

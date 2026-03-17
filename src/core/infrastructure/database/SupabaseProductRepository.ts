@@ -1,6 +1,7 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { IProductRepository, CreateProductData, UpdateProductData } from "@/core/domain/repositories/IProductRepository";
-import { Product } from "@/core/domain/entities/types";
+import { Product, Result } from "@/core/domain/entities/types";
+import { logger } from "../logging/logger";
 
 export class SupabaseProductRepository implements IProductRepository {
   constructor(private readonly supabase: SupabaseClient) {}
@@ -28,43 +29,93 @@ export class SupabaseProductRepository implements IProductRepository {
     };
   }
 
-  async create(data: CreateProductData): Promise<Product> {
-    const { data: created, error } = await this.supabase
-      .from("productos")
-      .insert({
-        empresa_id: data.empresaId,
-        categoria_id: data.categoria_id || null,
-        titulo_es: data.titulo_es,
-        titulo_en: data.titulo_en || null,
-        titulo_fr: data.titulo_fr || null,
-        titulo_it: data.titulo_it || null,
-        titulo_de: data.titulo_de || null,
-        descripcion_es: data.descripcion_es || null,
-        descripcion_en: data.descripcion_en || null,
-        descripcion_fr: data.descripcion_fr || null,
-        descripcion_it: data.descripcion_it || null,
-        descripcion_de: data.descripcion_de || null,
-        precio: data.precio,
-        foto_url: data.foto_url || null,
-        es_especial: data.es_especial,
-        activo: data.activo,
-      })
-      .select()
-      .single();
+  async create(data: CreateProductData): Promise<Result<Product>> {
+    try {
+      const { data: created, error } = await this.supabase
+        .from("productos")
+        .insert({
+          empresa_id: data.empresaId,
+          categoria_id: data.categoria_id || null,
+          titulo_es: data.titulo_es,
+          titulo_en: data.titulo_en || null,
+          titulo_fr: data.titulo_fr || null,
+          titulo_it: data.titulo_it || null,
+          titulo_de: data.titulo_de || null,
+          descripcion_es: data.descripcion_es || null,
+          descripcion_en: data.descripcion_en || null,
+          descripcion_fr: data.descripcion_fr || null,
+          descripcion_it: data.descripcion_it || null,
+          descripcion_de: data.descripcion_de || null,
+          precio: data.precio,
+          foto_url: data.foto_url || null,
+          es_especial: data.es_especial,
+          activo: data.activo,
+        })
+        .select()
+        .single();
 
-    if (error) throw new Error(`DB Error: ${error.message}`);
-    return this.mapToDomain(created);
+      if (error) {
+        await logger.logAndReturnError(
+          'DB_INSERT_ERROR',
+          error.message,
+          'repository',
+          'SupabaseProductRepository.create',
+          { empresaId: data.empresaId, details: { code: error.code, hint: error.hint } }
+        );
+        return { 
+          success: false, 
+          error: { 
+            code: 'DB_ERROR', 
+            message: 'Error al crear producto', 
+            module: 'repository', 
+            method: 'create' 
+          } 
+        };
+      }
+
+      return { success: true, data: this.mapToDomain(created) };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseProductRepository.create', {
+        empresaId: data.empresaId,
+      });
+      return { success: false, error: appError };
+    }
   }
 
-  async findAllByTenant(empresaId: string): Promise<Product[]> {
-    const { data, error } = await this.supabase
-      .from("productos")
-      .select("*")
-      .eq("empresa_id", empresaId)
-      .order("created_at", { ascending: false });
+  async findAllByTenant(empresaId: string): Promise<Result<Product[]>> {
+    try {
+      const { data, error } = await this.supabase
+        .from("productos")
+        .select("*")
+        .eq("empresa_id", empresaId)
+        .order("created_at", { ascending: false });
 
-    if (error) throw new Error(`DB Error: ${error.message}`);
-    return data.map((row: Record<string, unknown>) => this.mapToDomain(row));
+      if (error) {
+        await logger.logAndReturnError(
+          'DB_SELECT_ERROR',
+          error.message,
+          'repository',
+          'SupabaseProductRepository.findAllByTenant',
+          { empresaId, details: { code: error.code, hint: error.hint } }
+        );
+        return { 
+          success: false, 
+          error: { 
+            code: 'DB_ERROR', 
+            message: 'Error al obtener productos', 
+            module: 'repository', 
+            method: 'findAllByTenant' 
+          } 
+        };
+      }
+
+      return { success: true, data: data.map((row: Record<string, unknown>) => this.mapToDomain(row)) };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseProductRepository.findAllByTenant', {
+        empresaId,
+      });
+      return { success: false, error: appError };
+    }
   }
 
   private mapUpdateProductPayload(data: Partial<UpdateProductData>): Record<string, unknown> {
@@ -88,28 +139,79 @@ export class SupabaseProductRepository implements IProductRepository {
     return updatePayload;
   }
 
-  async update(id: string, empresaId: string, data: Partial<UpdateProductData>): Promise<Product> {
-    const updatePayload = this.mapUpdateProductPayload(data);
+  async update(id: string, empresaId: string, data: Partial<UpdateProductData>): Promise<Result<Product>> {
+    try {
+      const updatePayload = this.mapUpdateProductPayload(data);
 
-    const { data: updated, error } = await this.supabase
-      .from("productos")
-      .update(updatePayload)
-      .eq("id", id)
-      .eq("empresa_id", empresaId)
-      .select()
-      .single();
+      const { data: updated, error } = await this.supabase
+        .from("productos")
+        .update(updatePayload)
+        .eq("id", id)
+        .eq("empresa_id", empresaId)
+        .select()
+        .single();
 
-    if (error) throw new Error(`DB Error: ${error.message}`);
-    return this.mapToDomain(updated);
+      if (error) {
+        await logger.logAndReturnError(
+          'DB_UPDATE_ERROR',
+          error.message,
+          'repository',
+          'SupabaseProductRepository.update',
+          { empresaId, details: { code: error.code, hint: error.hint, productId: id } }
+        );
+        return { 
+          success: false, 
+          error: { 
+            code: 'DB_ERROR', 
+            message: 'Error al actualizar producto', 
+            module: 'repository', 
+            method: 'update' 
+          } 
+        };
+      }
+
+      return { success: true, data: this.mapToDomain(updated) };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseProductRepository.update', {
+        empresaId,
+      });
+      return { success: false, error: appError };
+    }
   }
 
-  async delete(id: string, empresaId: string): Promise<void> {
-    const { error } = await this.supabase
-      .from("productos")
-      .delete()
-      .eq("id", id)
-      .eq("empresa_id", empresaId);
+  async delete(id: string, empresaId: string): Promise<Result<void>> {
+    try {
+      const { error } = await this.supabase
+        .from("productos")
+        .delete()
+        .eq("id", id)
+        .eq("empresa_id", empresaId);
 
-    if (error) throw new Error(`DB Error: ${error.message}`);
+      if (error) {
+        await logger.logAndReturnError(
+          'DB_DELETE_ERROR',
+          error.message,
+          'repository',
+          'SupabaseProductRepository.delete',
+          { empresaId, details: { code: error.code, hint: error.hint, productId: id } }
+        );
+        return { 
+          success: false, 
+          error: { 
+            code: 'DB_ERROR', 
+            message: 'Error al eliminar producto', 
+            module: 'repository', 
+            method: 'delete' 
+          } 
+        };
+      }
+
+      return { success: true, data: undefined };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseProductRepository.delete', {
+        empresaId,
+      });
+      return { success: false, error: appError };
+    }
   }
 }

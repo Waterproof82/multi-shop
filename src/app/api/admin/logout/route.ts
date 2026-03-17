@@ -1,10 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   const cookieStore = await cookies();
   cookieStore.delete('admin_token');
 
-  const baseUrl = request.nextUrl.origin;
-  return NextResponse.redirect(new URL('/admin/login', baseUrl));
+  return NextResponse.json({ success: true });
 }

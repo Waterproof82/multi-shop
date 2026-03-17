@@ -1,4 +1,4 @@
-import { Empresa } from "../entities/types";
+import { Empresa, Result } from "../entities/types";
 
 export interface AdminProfile {
   id: string;
@@ -13,6 +13,6 @@ export interface AdminWithEmpresa extends AdminProfile {
 }
 
 export interface IAdminRepository {
-  loginWithPassword(email: string, password: string): Promise<string>;
-  findById(id: string): Promise<AdminWithEmpresa | null>;
+  loginWithPassword(email: string, password: string): Promise<Result<string>>;
+  findById(id: string): Promise<Result<AdminWithEmpresa | null>>;
 }

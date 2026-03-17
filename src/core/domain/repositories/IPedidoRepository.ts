@@ -1,11 +1,11 @@
-import { Pedido, CartItem } from "../entities/types";
+import { Pedido, CartItem, Result } from "../entities/types";
 
 export interface IPedidoRepository {
-  findAllByTenant(empresaId: string): Promise<Pedido[]>;
-  updateStatus(id: string, empresaId: string, estado: string): Promise<void>;
-  delete(id: string, empresaId: string): Promise<void>;
-  create(empresaId: string, clienteId: string | null, items: CartItem[], total: number): Promise<{ id: string; numero_pedido: number }>;
-  getStats(empresaId: string, mes: number, año: number): Promise<{
+  findAllByTenant(empresaId: string): Promise<Result<Pedido[]>>;
+  updateStatus(id: string, empresaId: string, estado: string): Promise<Result<void>>;
+  delete(id: string, empresaId: string): Promise<Result<void>>;
+  create(empresaId: string, clienteId: string | null, items: CartItem[], total: number): Promise<Result<{ id: string; numero_pedido: number }>>;
+  getStats(empresaId: string, mes: number, año: number): Promise<Result<{
     pedidosHoy: number;
     pedidosMes: number;
     totalHoy: number;
@@ -13,5 +13,12 @@ export interface IPedidoRepository {
     totalAno: number;
     topPlatos: { nombre: string; cantidad: number; total: number }[];
     topPlatosAno: { nombre: string; cantidad: number; total: number }[];
-  }>;
+    pedidosPorDia: { dia: number; pedidos: number; ingresos: number }[];
+    clientesNuevos: number;
+    clientesRecurrentes: number;
+    ticketMedio: number;
+    ticketMedioAnterior: number;
+    pedidosAnterior: number;
+    ingresosAnterior: number;
+  }>>;
 }

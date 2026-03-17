@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { empresaUseCase } from '@/core/infrastructure/database';
-import { requireAuth, successResponse, errorResponse, validationErrorResponse } from '@/core/infrastructure/api/helpers';
+import { requireAuth, handleResult, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 import type { EmpresaColores } from '@/core/domain/entities/types';
 
 const hexColor = z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Color debe ser hexadecimal (#RRGGBB)');
@@ -30,11 +30,11 @@ export async function POST(request: NextRequest) {
     return validationErrorResponse(parsed.error.errors[0].message);
   }
 
-  const success = await empresaUseCase.updateColores(empresaId!, parsed.data.colores as EmpresaColores);
-
-  if (!success) {
-    return errorResponse('Error al guardar los colores');
+  const result = await empresaUseCase.updateColores(empresaId!, parsed.data.colores as EmpresaColores);
+  
+  if (!result.success) {
+    return handleResult(result);
   }
-
-  return successResponse({ success: true });
+  
+  return handleResult({ success: true, data: { success: true } });
 }

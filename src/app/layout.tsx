@@ -16,13 +16,38 @@ const playfair = Playfair_Display({
   display: "swap",
 });
 
+function getMimeType(url: string): string {
+  if (!url || url === '/favicon.ico') return 'image/x-icon';
+  if (url.endsWith('.png')) return 'image/png';
+  if (url.endsWith('.jpg') || url.endsWith('.jpeg')) return 'image/jpeg';
+  if (url.endsWith('.svg')) return 'image/svg+xml';
+  return 'image/webp';
+}
+
 export async function generateMetadata(): Promise<Metadata> {
   const domain = await getDomainFromHeaders();
   const empresa = domain ? await getEmpresaByDomain(domain) : null;
 
+  const faviconUrl = empresa?.logoUrl || '/favicon.ico';
+  const mimeType = getMimeType(faviconUrl);
+  const isDefaultFavicon = faviconUrl === '/favicon.ico';
+
   return {
     title: empresa?.nombre || "Mermelada de Tomate",
     description: empresa?.descripcion?.es?.substring(0, 160) || "Carta digital y pedidos",
+    icons: isDefaultFavicon
+      ? { icon: [{ url: '/favicon.ico', type: 'image/x-icon' }] }
+      : {
+          icon: [
+            { url: faviconUrl, type: mimeType, sizes: '32x32' },
+            { url: faviconUrl, type: mimeType, sizes: '16x16' },
+          ],
+          apple: [{ url: faviconUrl, type: mimeType, sizes: '180x180' }],
+          other: [
+            { url: faviconUrl, type: mimeType, sizes: '192x192', rel: 'android-chrome' },
+            { url: faviconUrl, type: mimeType, sizes: '512x512', rel: 'android-chrome' },
+          ],
+        },
   };
 }
 

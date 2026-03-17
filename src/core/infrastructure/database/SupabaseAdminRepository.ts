@@ -1,7 +1,8 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { IAdminRepository, AdminWithEmpresa } from "@/core/domain/repositories/IAdminRepository";
-import { Empresa } from "@/core/domain/entities/types";
+import { Empresa, Result } from "@/core/domain/entities/types";
 import { DEFAULT_EMPRESA_COLORES } from "@/core/domain/constants/empresa-defaults";
+import { logger } from "@/core/infrastructure/logging/logger";
 
 export class SupabaseAdminRepository implements IAdminRepository {
   constructor(
@@ -9,40 +10,112 @@ export class SupabaseAdminRepository implements IAdminRepository {
     private readonly supabaseAnon: SupabaseClient,
   ) {}
 
-  async loginWithPassword(email: string, password: string): Promise<string> {
-    const { error, data } = await this.supabaseAnon.auth.signInWithPassword({ email, password });
-    if (error || !data?.user) throw new Error("Credenciales inválidas");
-    return data.user.id;
+  async loginWithPassword(email: string, password: string): Promise<Result<string>> {
+    try {
+      const { error, data } = await this.supabaseAnon.auth.signInWithPassword({ email, password });
+      
+      if (error) {
+        await logger.logAndReturnError(
+          'AUTH_LOGIN_ERROR',
+          error.message,
+          'repository',
+          'SupabaseAdminRepository.loginWithPassword',
+          { details: { email, code: error.code, status: error.status } }
+        );
+        return { 
+          success: false, 
+          error: { 
+            code: 'AUTH_LOGIN_ERROR', 
+            message: 'Credenciales inválidas', 
+            module: 'repository', 
+            method: 'loginWithPassword' 
+          } 
+        };
+      }
+      
+      if (!data?.user) {
+        return { 
+          success: false, 
+          error: { 
+            code: 'AUTH_NO_USER', 
+            message: 'Usuario no encontrado', 
+            module: 'repository', 
+            method: 'loginWithPassword' 
+          } 
+        };
+      }
+      
+      return { success: true, data: data.user.id };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseAdminRepository.loginWithPassword', { details: { email } });
+      return { success: false, error: appError };
+    }
   }
 
-  async findById(id: string): Promise<AdminWithEmpresa | null> {
-    const { data: perfil, error } = await this.supabase
-      .from("perfiles_admin")
-      .select("*")
-      .eq("id", id)
-      .single();
+  async findById(id: string): Promise<Result<AdminWithEmpresa | null>> {
+    try {
+      const { data: perfil, error } = await this.supabase
+        .from("perfiles_admin")
+        .select("*")
+        .eq("id", id)
+        .single();
 
-    if (error || !perfil) {
-      console.error('[Repo] Error fetching perfil:', error?.message);
-      return null;
+      if (error) {
+        await logger.logAndReturnError(
+          'DB_SELECT_ERROR',
+          error.message,
+          'repository',
+          'SupabaseAdminRepository.findById',
+          { details: { id, code: error.code } }
+        );
+        return { 
+          success: false, 
+          error: { 
+            code: 'DB_ERROR', 
+            message: 'Error al obtener perfil de admin', 
+            module: 'repository', 
+            method: 'findById' 
+          } 
+        };
+      }
+
+      if (!perfil) {
+        return { success: true, data: null };
+      }
+
+      const { data: empresa } = await this.supabase
+        .from("empresas")
+        .select("*")
+        .eq("id", perfil.empresa_id)
+        .single();
+
+      if (!empresa) {
+        return { 
+          success: false, 
+          error: { 
+            code: 'EMPRESA_NOT_FOUND', 
+            message: 'Empresa no encontrada para el admin', 
+            module: 'repository', 
+            method: 'findById' 
+          } 
+        };
+      }
+
+      return {
+        success: true,
+        data: {
+          id: perfil.id,
+          empresaId: perfil.empresa_id,
+          nombreCompleto: perfil.nombre_completo,
+          rol: perfil.rol,
+          email: "",
+          empresa: this.mapEmpresa(empresa),
+        },
+      };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseAdminRepository.findById', { details: { id } });
+      return { success: false, error: appError };
     }
-
-    const { data: empresa } = await this.supabase
-      .from("empresas")
-      .select("*")
-      .eq("id", perfil.empresa_id)
-      .single();
-
-    if (!empresa) return null;
-
-    return {
-      id: perfil.id,
-      empresaId: perfil.empresa_id,
-      nombreCompleto: perfil.nombre_completo,
-      rol: perfil.rol,
-      email: "",
-      empresa: this.mapEmpresa(empresa),
-    };
   }
 
   private mapEmpresa(row: Record<string, unknown>): Empresa {

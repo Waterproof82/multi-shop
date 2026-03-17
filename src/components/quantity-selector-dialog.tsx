@@ -101,32 +101,34 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
               <Label className="text-sm font-medium">
                 {item.requiresComplement ? t("complementsRequired", language) : t("complementsOptional", language)}
               </Label>
-              <div className="space-y-2">
+              <div className="space-y-2" role="radiogroup" aria-label={item.requiresComplement ? t("complementsRequired", language) : t("complementsOptional", language)}>
                 {complements.map((complement) => {
                   const isSelected = selectedComplement?.id === complement.id;
                   return (
                     <button
                       key={complement.id}
                       type="button"
+                      role="radio"
+                      aria-checked={isSelected}
                       onClick={() => toggleComplement(complement)}
                       className={`w-full flex items-center justify-between p-3 rounded-lg border transition-colors ${
-                        isSelected 
-                          ? 'border-primary bg-primary/10' 
-                          : 'border-gray-200 hover:border-gray-300 dark:border-gray-600'
+                        isSelected
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border hover:border-border/80'
                       }`}
                     >
                       <div className="flex items-center gap-3">
                         <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
                           isSelected 
                             ? 'bg-primary border-primary dark:bg-primary dark:border-primary' 
-                            : 'border-gray-300 dark:border-gray-600'
+                            : 'border-muted-foreground/30'
                         }`}>
-                          {isSelected && <Check className="w-2.5 h-2.5 text-white" />}
+                          {isSelected && <Check className="w-2.5 h-2.5 text-primary-foreground" />}
                         </div>
                         <div className="text-left">
                           <p className="font-medium text-sm">{complement.name}</p>
                           {complement.description && (
-                            <p className="text-xs text-gray-500">{complement.description}</p>
+                            <p className="text-xs text-muted-foreground">{complement.description}</p>
                           )}
                         </div>
                       </div>
@@ -150,7 +152,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
               <Button
                 variant="outline"
                 size="icon"
-                className="h-10 w-10"
+                className="h-11 w-11 md:h-10 md:w-10"
                 onClick={handleDecrement}
                 disabled={quantity <= 1}
               >
@@ -163,8 +165,10 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
                 className="mx-1 h-10 w-12 flex items-center justify-center text-center text-lg font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 readOnly
                 tabIndex={-1}
+                aria-live="polite"
+                aria-label={t("quantity", language)}
               />
-              <Button variant="outline" size="icon" className="h-10 w-10" onClick={handleIncrement}>
+              <Button variant="outline" size="icon" className="h-11 w-11 md:h-10 md:w-10" onClick={handleIncrement}>
                 <Plus className="h-4 w-4" />
               </Button>
             </div>

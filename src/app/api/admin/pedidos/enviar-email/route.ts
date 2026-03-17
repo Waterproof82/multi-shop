@@ -133,7 +133,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email service not configured' }, { status: 500 });
     }
 
-    const empresa = await empresaUseCase.getById(empresaId!);
+    const empresaResult = await empresaUseCase.getById(empresaId!);
+
+    if (!empresaResult.success) {
+      return NextResponse.json({ error: empresaResult.error.message }, { status: 500 });
+    }
+
+    const empresa = empresaResult.data;
 
     if (!empresa) {
       return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 });

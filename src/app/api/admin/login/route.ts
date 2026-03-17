@@ -1,44 +1,69 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { authAdminUseCase } from '@/core/infrastructure/database';
 import { loginSchema } from '@/core/application/dtos/auth.dto';
-import { successResponse, errorResponse, validationErrorResponse } from '@/core/infrastructure/api/helpers';
+import { successResponse, validationErrorResponse, handleResult } from '@/core/infrastructure/api/helpers';
 import { rateLimitLogin } from '@/core/infrastructure/api/rate-limit';
+import { generateCsrfToken, signCsrfToken } from '@/lib/csrf';
+
+export async function GET() {
+  const token = generateCsrfToken();
+  const signature = signCsrfToken(token);
+  const cookieValue = `${token}:${signature}`;
+
+  const response = NextResponse.json({ csrfToken: token });
+  
+  response.cookies.set('csrf_token', cookieValue, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 3600,
+    path: '/',
+  });
+
+  return response;
+}
 
 export async function POST(request: NextRequest) {
-  try {
-    const rateLimited = await rateLimitLogin(request);
-    if (rateLimited) return rateLimited;
+  const rateLimited = await rateLimitLogin(request);
+  if (rateLimited) return rateLimited;
 
-    const body = await request.json();
+  const body = await request.json();
 
-    const parsed = loginSchema.safeParse(body);
-    if (!parsed.success) {
-      return validationErrorResponse(parsed.error.errors[0].message);
-    }
-
-    const { token, admin } = await authAdminUseCase.login(parsed.data);
-
-    const cookieStore = await cookies();
-
-    cookieStore.set('admin_token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24,
-      path: '/',
-    });
-
-    return successResponse({
-      success: true,
-      admin: {
-        id: admin.id,
-        nombre: admin.nombreCompleto,
-        empresa: admin.empresa.nombre,
-      },
-    });
-  } catch (error) {
-    console.error('[API /admin/login] Error:', error);
-    return errorResponse(error instanceof Error ? error.message : 'Error interno del servidor', 401);
+  const parsed = loginSchema.safeParse(body);
+  if (!parsed.success) {
+    return validationErrorResponse(parsed.error.errors[0].message);
   }
+
+  const result = await authAdminUseCase.login(parsed.data);
+  
+  if (!result.success) {
+    if (result.error.code === 'AUTH_LOGIN_ERROR' || 
+        result.error.code === 'ADMIN_NOT_AUTHORIZED' ||
+        result.error.code === 'AUTH_NO_USER') {
+      return NextResponse.json({ error: result.error.message }, { status: 401 });
+    }
+    return handleResult(result);
+  }
+
+  const { token, admin } = result.data;
+
+  const cookieStore = await cookies();
+
+  cookieStore.set('admin_token', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 60 * 60 * 24,
+    path: '/',
+  });
+
+  return successResponse({
+    success: true,
+    admin: {
+      id: admin.id,
+      nombre: admin.nombreCompleto,
+      empresa: admin.empresa.nombre,
+    },
+  });
 }

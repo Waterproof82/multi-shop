@@ -25,10 +25,10 @@ export default async function Home() {
 
   if (!empresa && empresaId === undefined) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FDFBF7]">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center p-8">
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">Dominio no configurado</h1>
-          <p className="text-gray-600">Esta web no está asociada a ninguna empresa.</p>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Dominio no configurado</h1>
+          <p className="text-muted-foreground">Esta web no está asociada a ninguna empresa.</p>
         </div>
       </div>
     );
@@ -40,7 +40,12 @@ export default async function Home() {
   let menuData: MenuCategoryVM[] = [];
 
   try {
-    menuData = await getMenuUseCase.execute(empresaId!);
+    const menuResult = await getMenuUseCase.execute(empresaId!);
+    if (menuResult.data) {
+      menuData = menuResult.data;
+    } else if (menuResult.error) {
+      console.error("Error fetching menu from Supabase:", menuResult.error);
+    }
   } catch (error) {
     console.error("Error fetching menu from Supabase:", error);
   }

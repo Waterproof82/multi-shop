@@ -23,7 +23,11 @@ export async function POST(request: NextRequest) {
   }
 
   // Derivar el slug desde la DB — nunca del cliente (OWASP: confianza en datos de servidor)
-  const empresa = await empresaUseCase.getById(empresaId);
+  const empresaResult = await empresaUseCase.getById(empresaId);
+  if (!empresaResult.success) {
+    return errorResponse('Error al obtener datos de empresa');
+  }
+  const empresa = empresaResult.data;
   const empresaSlug = empresa?.slug ?? empresa?.dominio ?? empresaId!;
 
   let formData: FormData;

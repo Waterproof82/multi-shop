@@ -123,6 +123,7 @@ export function CartDrawer() {
       const data = await res.json();
       
       if (res.ok) {
+        closeCart();
         setConfirming(true);
         setNombre('');
         setTelefono('');
@@ -160,7 +161,7 @@ export function CartDrawer() {
       }
     } catch (err) {
       console.error('Error:', err);
-      setErrors({ nombre: t("validationOrderError", language) });
+      setErrors({ nombre: t("connectionError", language) });
     } finally {
       setSending(false);
     }
@@ -178,7 +179,7 @@ export function CartDrawer() {
       }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-green-600">
+            <DialogTitle className="flex items-center gap-2 text-primary">
               <span className="text-2xl">✓</span>
               {t("sendingOrder", language)}
             </DialogTitle>
@@ -186,7 +187,7 @@ export function CartDrawer() {
               {confirming ? t("sendingOrder", language) : t("whatsappCheck", language)}
             </DialogDescription>
             {confirming && companyPhone && (
-              <p className="text-xs text-red-500 mt-2 text-center">
+              <p className="text-xs text-destructive mt-2 text-center">
                 {t("whatsappFallback", language)} {companyPhone}
               </p>
             )}
@@ -196,7 +197,7 @@ export function CartDrawer() {
               <a
                 href={getWhatsAppUrl()!}
                 rel="noopener noreferrer"
-                className="block w-full text-center bg-[#25D366] text-white py-3 px-4 rounded-full font-semibold hover:bg-[#20BD5A] transition-colors"
+                className="block w-full text-center bg-whatsapp text-white py-3 px-4 rounded-full font-semibold hover:bg-whatsapp-hover transition-colors"
               >
                 {t("whatsappResend", language)}
               </a>
@@ -204,16 +205,16 @@ export function CartDrawer() {
                 href={getWhatsAppUrl()!}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block w-full text-center text-[#25D366] text-sm py-2 font-medium hover:underline"
+                className="block w-full text-center text-whatsapp text-sm py-2 font-medium hover:underline"
               >
                 {t("whatsappWeb", language)}
               </a>
             </>
           )}
           {companyPhone && orderNumber && (
-            <div className="bg-black text-white p-3 rounded-lg mt-4 w-full text-center">
+            <div className="bg-foreground text-background p-3 rounded-lg mt-4 w-full text-center">
               <p className="text-xs font-medium">
-                * {t("whatsappCantSend", language)} {companyPhone} con pedido #{orderNumber}
+                * {t("whatsappCantSend", language)} {companyPhone} {t("withOrderNumber", language)} #{orderNumber}
               </p>
             </div>
           )}
@@ -223,7 +224,7 @@ export function CartDrawer() {
       <Sheet open={isCartOpen} onOpenChange={closeCart}>
       <SheetContent className="flex w-full flex-col sm:max-w-md bg-background">
         <SheetHeader>
-          <SheetTitle className="flex items-center gap-2 font-serif text-foreground">
+          <SheetTitle className="flex items-center gap-2 text-foreground">
             <ShoppingBag className="size-5" />
             {t("yourOrder", language)}
           </SheetTitle>
@@ -233,29 +234,41 @@ export function CartDrawer() {
         </SheetHeader>
 
         {items.length > 0 && (
-          <div className="mx-1 mb-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
-            <p className="text-sm text-amber-800 font-medium">
+          <div className="mx-1 mb-3 rounded-lg bg-secondary border border-border px-3 py-2">
+            <p className="text-sm text-secondary-foreground font-medium">
               {t("noPaymentRequired", language)}
             </p>
           </div>
         )}
 
         {items.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 text-muted-foreground">
-            <ShoppingBag className="size-12 opacity-30" />
-            <p className="text-lg">{t("emptyCart", language)}</p>
-            <p className="text-sm">{t("addDishesToStart", language)}</p>
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 text-muted-foreground">
+            <div className="relative">
+              <ShoppingBag className="size-12 opacity-20" />
+              <span className="absolute inset-0 flex items-center justify-center text-2xl opacity-30">+</span>
+            </div>
+            <p className="text-base font-medium text-foreground">{t("emptyCart", language)}</p>
+            <p className="text-sm text-center max-w-[200px]">{t("addDishesToStart", language)}</p>
+            <button
+              onClick={() => {
+                closeCart();
+                document.getElementById('menu')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="mt-2 px-6 py-2 bg-primary text-primary-foreground rounded-full font-medium hover:bg-primary/90 transition-colors"
+            >
+              {t("viewMenu", language)}
+            </button>
           </div>
         ) : (
           <>
             <div className="flex-1 overflow-y-auto">
-              <div className="flex flex-col gap-3 py-4">
+              <ul className="flex flex-col gap-3 py-4">
                 {items.map((ci) => {
                   const itemKey = getItemKey(ci.item, ci.selectedComplements);
                   const complementPrice = ci.selectedComplements?.reduce((sum, c) => sum + c.price, 0) || 0;
                   const totalItemPrice = ci.item.price + complementPrice;
                   return (
-                    <div key={itemKey} className="flex items-center gap-3 rounded-lg bg-card p-3">
+                    <li key={itemKey} className="flex items-center gap-3 rounded-lg bg-card p-3">
                       <div className="flex-1">
                         <p className="font-semibold text-card-foreground">
                           {(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}
@@ -270,43 +283,43 @@ export function CartDrawer() {
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 md:gap-2">
                         <Button
                           variant="outline"
                           size="icon"
-                          className="size-7 bg-transparent"
+                          className="md:size-7 size-10 bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => updateQuantity(itemKey, ci.quantity - 1)}
                           aria-label={t("reduceQuantity", language)}
                         >
-                          <Minus className="size-3" />
+                          <Minus className="md:size-3 size-4" />
                         </Button>
-                        <span className="w-6 text-center font-semibold text-foreground">{ci.quantity}</span>
+                        <span className="w-6 md:w-6 text-center font-semibold text-foreground">{ci.quantity}</span>
                         <Button
                           variant="outline"
                           size="icon"
-                          className="size-7 bg-transparent"
+                          className="md:size-7 size-10 bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => updateQuantity(itemKey, ci.quantity + 1)}
                           aria-label={t("increaseQuantity", language)}
                         >
-                          <Plus className="size-3" />
+                          <Plus className="md:size-3 size-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="size-7 text-destructive hover:text-destructive"
+                          className="md:size-7 size-10 text-destructive hover:text-destructive hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => removeItem(itemKey)}
                           aria-label={`${t("remove", language)} ${(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}`}
                         >
-                          <Trash2 className="size-3" />
+                          <Trash2 className="md:size-3 size-4" />
                         </Button>
                       </div>
-                    </div>
+                    </li>
                   );
                 })}
-              </div>
+              </ul>
             </div>
 
-            <div className="border-t border-border pt-4 pb-6 px-2 bg-background/80 shadow-[0_-2px_16px_0_rgba(0,0,0,0.04)] rounded-b-xl">
+            <div className="border-t border-border pt-4 pb-6 px-2 bg-background/80 shadow-elegant rounded-b-xl">
               <div className="space-y-3 mb-4">
                 <div>
                   <div className="flex items-center gap-2">
@@ -316,12 +329,13 @@ export function CartDrawer() {
                       placeholder={t("placeholderName", language)}
                       value={nombre}
                       onChange={(e) => { setNombre(e.target.value); setErrors(prev => ({ ...prev, nombre: undefined })); }}
-                      className={`h-9 ${errors.nombre ? 'border-red-500' : ''}`}
+                      className={`h-9 ${errors.nombre ? 'border-destructive' : ''}`}
                       maxLength={100}
                       autoComplete="name"
+                      aria-label={t("placeholderName", language)}
                     />
                   </div>
-                  {errors.nombre && <p className="text-xs text-red-500 mt-1 ml-6">{errors.nombre}</p>}
+                  {errors.nombre && <p className="text-xs text-destructive mt-1 ml-6">{errors.nombre}</p>}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
@@ -331,12 +345,13 @@ export function CartDrawer() {
                       placeholder={t("placeholderPhone", language)}
                       value={telefono}
                       onChange={(e) => { const val = e.target.value.replaceAll(/\D/g, '').slice(0, 15); setTelefono(val); setErrors(prev => ({ ...prev, telefono: undefined })); }}
-                      className={`h-9 ${errors.telefono ? 'border-red-500' : ''}`}
+                      className={`h-9 ${errors.telefono ? 'border-destructive' : ''}`}
                       maxLength={15}
                       autoComplete="tel"
+                      aria-label={t("placeholderPhone", language)}
                     />
                   </div>
-                  {errors.telefono && <p className="text-xs text-red-500 mt-1 ml-6">{errors.telefono}</p>}
+                  {errors.telefono && <p className="text-xs text-destructive mt-1 ml-6">{errors.telefono}</p>}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
@@ -349,24 +364,25 @@ export function CartDrawer() {
                       className="h-9"
                       maxLength={100}
                       autoComplete="email"
+                      aria-label={t("placeholderEmail", language)}
                     />
                   </div>
-                  <p className="text-xs mt-1 ml-6 bg-gradient-to-r from-orange-500 via-pink-500 to-purple-500 bg-clip-text text-transparent font-medium">{t("promoMessage", language)}</p>
+                  <p className="text-xs mt-1 ml-6 text-muted-foreground">{t("promoMessage", language)}</p>
                 </div>
               </div>
 
               <div className="mb-4 flex items-center justify-between px-2">
                 <span className="text-lg font-semibold text-foreground">{t("total", language)}</span>
-                <span className="font-serif text-2xl font-bold text-foreground">
+                <span className="text-2xl font-bold text-foreground tabular-nums">
                   {totalPrice.toFixed(2).replace(".", ",") + "€"}
                 </span>
               </div>
 
               <div className="flex flex-col gap-2 px-1">
                 <Button 
-                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full py-3 text-lg font-semibold shadow-md transition-all duration-200"
+                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full py-3 text-lg font-semibold shadow-md transition-colors duration-200"
                   size="lg"
-                  onClick={() => { closeCart(); handleConfirmOrder(); }}
+                  onClick={handleConfirmOrder}
                   disabled={sending || confirming}
                 >
                   {sending || confirming ? t("sending", language) : t("sendOrder", language)}
@@ -374,7 +390,7 @@ export function CartDrawer() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-muted-foreground rounded-full py-2 font-medium hover:bg-muted/40 transition-all duration-200"
+                  className="text-muted-foreground rounded-full py-2 font-medium hover:bg-muted/40 transition-colors duration-200"
                   onClick={clearCart}
                 >
                   {t("clearCart", language)}

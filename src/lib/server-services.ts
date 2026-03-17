@@ -15,9 +15,15 @@ const categoryRepo = new SupabaseCategoryRepository(supabase);
 // Instanciación de Casos de Uso
 export const getMenuUseCase = new GetMenuUseCase(productRepo, categoryRepo);
 
+// NO cachear empresa - los cambios deben verse inmediatamente
 export async function getEmpresaByDomain(domain: string): Promise<EmpresaPublic | null> {
   const mainDomain = parseMainDomain(domain);
-  return empresaPublicRepository.findByDomainPublic(mainDomain);
+  const result = await empresaPublicRepository.findByDomainPublic(mainDomain);
+  if (!result.success) {
+    console.error('[getEmpresaByDomain] Error:', result.error.message);
+    return null;
+  }
+  return result.data;
 }
 
 export function isPedidosSubdomain(currentDomain: string, subdomainConfig: string | null): boolean {

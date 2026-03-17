@@ -43,6 +43,13 @@ network-requests.json
 *.local
 *.sublime-workspace
 *.sublime-project
+*.stackdump
+$HOME/
+
+# PAI / Claude Code / OpenCode local
+PAI-SETUP.md
+.claude/
+.opencode/
 
 # Lock files
 package-lock.json

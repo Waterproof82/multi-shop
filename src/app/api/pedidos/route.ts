@@ -55,7 +55,11 @@ export async function POST(request: Request) {
     const domain = await getDomainFromHeaders();
     const mainDomain = parseMainDomain(domain);
 
-    const empresa = await empresaRepository.findByDomain(mainDomain);
+    const empresaResult = await empresaRepository.findByDomain(mainDomain);
+    if (!empresaResult.success) {
+      return NextResponse.json({ error: 'Error al buscar empresa' }, { status: 500 });
+    }
+    const empresa = empresaResult.data;
 
     if (!empresa) {
       return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 });
@@ -70,13 +74,19 @@ export async function POST(request: Request) {
 
     const { items, total, nombre, telefono, email } = parsed.data;
 
-    const { id: pedidoId, numero_pedido: numeroPedido } = await pedidoUseCase.create(empresa.id, {
+    const pedidoResult = await pedidoUseCase.create(empresa.id, {
       items,
       total,
       nombre,
       telefono,
       email: email || undefined,
     });
+
+    if (!pedidoResult.success) {
+      return NextResponse.json({ error: pedidoResult.error.message }, { status: 500 });
+    }
+
+    const { id: pedidoId, numero_pedido: numeroPedido } = pedidoResult.data;
 
     let whatsappLink: string | undefined;
     if (empresa.telefono_whatsapp) {

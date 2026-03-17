@@ -1,4 +1,4 @@
-import { Category } from "../entities/types";
+import { Category, Result } from "../entities/types";
 
 export interface CreateCategoryData {
   empresaId: string;
@@ -21,8 +21,8 @@ export interface CreateCategoryData {
 export interface UpdateCategoryData extends Partial<CreateCategoryData> {}
 
 export interface ICategoryRepository {
-  findAllByTenant(empresaId: string): Promise<Category[]>;
-  create(data: CreateCategoryData): Promise<Category>;
-  update(id: string, empresaId: string, data: Partial<UpdateCategoryData>): Promise<Category>;
-  delete(id: string, empresaId: string): Promise<void>;
+  findAllByTenant(empresaId: string): Promise<Result<Category[]>>;
+  create(data: CreateCategoryData): Promise<Result<Category>>;
+  update(id: string, empresaId: string, data: Partial<UpdateCategoryData>): Promise<Result<Category>>;
+  delete(id: string, empresaId: string): Promise<Result<void>>;
 }

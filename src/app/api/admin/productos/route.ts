@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { productUseCase } from '@/core/infrastructure/database';
 import { createProductSchema, updateProductSchema, productIdSchema } from '@/core/application/dtos/product.dto';
-import { requireAuth, successResponse, errorResponse, validationErrorResponse } from '@/core/infrastructure/api/helpers';
+import { requireAuth, handleResult, handleResultWithStatus, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 import type { Product } from '@/core/domain/entities/types';
 
 // Transform domain format to admin UI format
@@ -31,14 +31,15 @@ export async function GET(request: NextRequest) {
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
 
-  try {
-    const products = await productUseCase.getAll(empresaId!);
-    // Transform to admin UI format
-    const adminProducts = products.map(toAdminProduct);
-    return successResponse(adminProducts);
-  } catch {
-    return errorResponse('Error al obtener productos');
+  const result = await productUseCase.getAll(empresaId!);
+  
+  if (!result.success) {
+    return handleResult(result);
   }
+  
+  // Transform to admin UI format
+  const adminProducts = result.data.map(toAdminProduct);
+  return handleResult({ success: true, data: adminProducts });
 }
 
 export async function POST(request: NextRequest) {
@@ -52,12 +53,13 @@ export async function POST(request: NextRequest) {
     return validationErrorResponse(parsed.error.errors[0].message);
   }
 
-  try {
-    const product = await productUseCase.create(parsed.data);
-    return successResponse(toAdminProduct(product), 201);
-  } catch {
-    return errorResponse('Error al crear producto');
+  const result = await productUseCase.create(parsed.data);
+  
+  if (!result.success) {
+    return handleResult(result);
   }
+  
+  return handleResultWithStatus({ success: true, data: toAdminProduct(result.data) }, 201);
 }
 
 export async function PUT(request: NextRequest) {
@@ -83,12 +85,13 @@ export async function PUT(request: NextRequest) {
     return validationErrorResponse(parsed.error.errors[0].message);
   }
 
-  try {
-    const product = await productUseCase.update(idParsed.data.id, empresaId!, parsed.data);
-    return successResponse(toAdminProduct(product));
-  } catch {
-    return errorResponse('Error al actualizar producto');
+  const result = await productUseCase.update(idParsed.data.id, empresaId!, parsed.data);
+  
+  if (!result.success) {
+    return handleResult(result);
   }
+  
+  return handleResult({ success: true, data: toAdminProduct(result.data) });
 }
 
 export async function DELETE(request: NextRequest) {
@@ -103,10 +106,11 @@ export async function DELETE(request: NextRequest) {
     return validationErrorResponse('ID inválido');
   }
 
-  try {
-    await productUseCase.delete(idParsed.data.id, empresaId!);
-    return successResponse({ success: true });
-  } catch {
-    return errorResponse('Error al eliminar producto');
+  const result = await productUseCase.delete(idParsed.data.id, empresaId!);
+  
+  if (!result.success) {
+    return handleResult(result);
   }
+  
+  return handleResult({ success: true, data: { success: true } });
 }

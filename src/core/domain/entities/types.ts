@@ -172,3 +172,27 @@ export interface Promocion {
   imagen_url: string | null;
   created_at: string;
 }
+
+// ============================================
+// ERROR HANDLING - Result Type Pattern
+// ============================================
+
+export type ErrorSeverity = 'error' | 'warning' | 'critical';
+
+export type ErrorModule = 'repository' | 'use-case' | 'api' | 'middleware';
+
+export interface AppError {
+  code: string;
+  message: string;
+  details?: Record<string, unknown>;
+  module: ErrorModule;
+  method?: string;
+  severity?: ErrorSeverity;
+}
+
+export type Result<T, E = AppError> =
+  | { success: true; data: T }
+  | { success: false; error: E };
+
+// Helper type para funciones que pueden retornar error sin detalles
+export type SimpleResult<T> = Result<T, { code: string; message: string; module: ErrorModule; method?: string }>;

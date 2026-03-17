@@ -13,7 +13,6 @@ export function PromoToast() {
     const promoStatus = params.get('promo');
     const error = params.get('error');
 
-    // Solo mostrar si hay parámetros relevantes
     if (!promoStatus && !error) return;
 
     if (promoStatus === 'on') {
@@ -41,7 +40,6 @@ export function PromoToast() {
 
   const handleClose = () => {
     setVisible(false);
-    // Limpiar URL después de cerrar
     const url = new URL(globalThis.location.href);
     url.search = '';
     globalThis.history.replaceState({}, '', url.toString());
@@ -51,41 +49,39 @@ export function PromoToast() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
       <button
         type="button"
-        className="absolute inset-0 bg-black/50 cursor-default"
+        className="absolute inset-0 bg-foreground/50 cursor-default"
         onClick={handleClose}
         aria-label="Cerrar"
       />
-      
-      {/* Modal */}
-      <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-sm w-full p-6 animate-in fade-in zoom-in duration-200">
+
+      <div className="relative bg-card text-card-foreground rounded-lg shadow-lg max-w-sm w-full p-6 animate-in fade-in zoom-in duration-200">
         <button
           onClick={handleClose}
-          className="absolute top-3 right-3 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          className="absolute top-3 right-3 p-1 rounded-full hover:bg-muted transition-colors"
         >
-          <X className="w-5 h-5 text-gray-500" />
+          <X className="w-5 h-5 text-muted-foreground" />
         </button>
 
         <div className="text-center">
           {type === 'success' ? (
-            <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+            <CheckCircle className="w-12 h-12 text-primary mx-auto mb-4" />
           ) : (
-            <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+            <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
           )}
-          
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+
+          <h3 className="text-lg font-semibold text-foreground mb-2">
             {type === 'success' ? '¡Listo!' : 'Error'}
           </h3>
-          
-          <p className="text-gray-600 dark:text-gray-300">
+
+          <p className="text-muted-foreground">
             {message}
           </p>
 
           <button
             onClick={handleClose}
-            className="mt-6 px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+            className="mt-6 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
           >
             Aceptar
           </button>

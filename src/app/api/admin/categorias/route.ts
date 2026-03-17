@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { categoryUseCase } from '@/core/infrastructure/database';
 import { createCategorySchema, updateCategorySchema, categoryIdSchema } from '@/core/application/dtos/category.dto';
-import { requireAuth, successResponse, errorResponse, validationErrorResponse } from '@/core/infrastructure/api/helpers';
+import { requireAuth, handleResult, handleResultWithStatus, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 import type { Category } from '@/core/domain/entities/types';
 
 // Transform domain format to admin UI format
@@ -30,15 +30,15 @@ export async function GET(request: NextRequest) {
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
 
-  try {
-    const categories = await categoryUseCase.getAll(empresaId!);
-    // Transform to admin UI format
-    const adminCategories = categories.map(toAdminCategory);
-    return successResponse(adminCategories);
-  } catch (error) {
-    console.error('[API /admin/categorias] Error:', error);
-    return errorResponse('Error al obtener categorías');
+  const result = await categoryUseCase.getAll(empresaId!);
+  
+  if (!result.success) {
+    return handleResult(result);
   }
+  
+  // Transform to admin UI format
+  const adminCategories = result.data.map(toAdminCategory);
+  return handleResult({ success: true, data: adminCategories });
 }
 
 export async function POST(request: NextRequest) {
@@ -52,12 +52,13 @@ export async function POST(request: NextRequest) {
     return validationErrorResponse(parsed.error.errors[0].message);
   }
 
-  try {
-    const category = await categoryUseCase.create(parsed.data);
-    return successResponse(toAdminCategory(category), 201);
-  } catch {
-    return errorResponse('Error al crear categoría');
+  const result = await categoryUseCase.create(parsed.data);
+  
+  if (!result.success) {
+    return handleResult(result);
   }
+  
+  return handleResultWithStatus({ success: true, data: toAdminCategory(result.data) }, 201);
 }
 
 export async function PUT(request: NextRequest) {
@@ -80,12 +81,13 @@ export async function PUT(request: NextRequest) {
     return validationErrorResponse(parsed.error.errors[0].message);
   }
 
-  try {
-    const category = await categoryUseCase.update(idParsed.data.id, empresaId!, parsed.data);
-    return successResponse(toAdminCategory(category));
-  } catch {
-    return errorResponse('Error al actualizar categoría');
+  const result = await categoryUseCase.update(idParsed.data.id, empresaId!, parsed.data);
+  
+  if (!result.success) {
+    return handleResult(result);
   }
+  
+  return handleResult({ success: true, data: toAdminCategory(result.data) });
 }
 
 export async function DELETE(request: NextRequest) {
@@ -100,10 +102,11 @@ export async function DELETE(request: NextRequest) {
     return validationErrorResponse('ID inválido');
   }
 
-  try {
-    await categoryUseCase.delete(idParsed.data.id, empresaId!);
-    return successResponse({ success: true });
-  } catch {
-    return errorResponse('Error al eliminar categoría');
+  const result = await categoryUseCase.delete(idParsed.data.id, empresaId!);
+  
+  if (!result.success) {
+    return handleResult(result);
   }
+  
+  return handleResult({ success: true, data: { success: true } });
 }

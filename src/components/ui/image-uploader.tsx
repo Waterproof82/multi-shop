@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import Image from 'next/image';
-import { Upload, Loader2 } from 'lucide-react';
+import { Upload, Loader2, Pencil, Trash2 } from 'lucide-react';
 
 interface ImageUploaderProps {
   readonly value: string;
@@ -159,7 +159,7 @@ export function ImageUploader({
   return (
     <div className="space-y-2">
       {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-foreground mb-1">
           {label}
         </label>
       )}
@@ -173,20 +173,38 @@ export function ImageUploader({
             className="object-cover"
             unoptimized
           />
-          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+          <div className="absolute inset-0 bg-black/50 opacity-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
             <button
               type="button"
               onClick={handleClick}
-              className="px-3 py-1.5 bg-white text-gray-900 rounded-md text-sm hover:bg-gray-100"
+              className="px-3 py-1.5 bg-card text-card-foreground rounded-md text-sm hover:bg-muted"
             >
               Cambiar
             </button>
             <button
               type="button"
               onClick={handleRemove}
-              className="px-3 py-1.5 bg-red-600 text-white rounded-md text-sm hover:bg-red-700"
+              className="px-3 py-1.5 bg-destructive text-destructive-foreground rounded-md text-sm hover:bg-destructive/90"
             >
               Eliminar
+            </button>
+          </div>
+          <div className="md:hidden absolute bottom-2 right-2 flex gap-2">
+            <button
+              type="button"
+              onClick={handleClick}
+              className="p-2 bg-card/90 backdrop-blur-sm rounded-full shadow-md"
+              aria-label="Cambiar imagen"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={handleRemove}
+              className="p-2 bg-destructive/90 backdrop-blur-sm rounded-full shadow-md"
+              aria-label="Eliminar imagen"
+            >
+              <Trash2 className="w-4 h-4 text-white" />
             </button>
           </div>
         </div>
@@ -200,7 +218,7 @@ export function ImageUploader({
           disabled={uploading}
           className={`
             border-2 border-dashed rounded-lg h-32 flex flex-col items-center justify-center cursor-pointer transition-colors
-            ${dragOver ? 'border-primary bg-primary/5' : 'border-gray-300 hover:border-gray-400'}
+            ${dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/40'}
             ${uploading ? 'pointer-events-none opacity-50' : ''}
           `}
           aria-label="Subir imagen"
@@ -208,15 +226,15 @@ export function ImageUploader({
           {uploading ? (
             <>
               <Loader2 className="h-8 w-8 text-primary animate-spin" />
-              <span className="text-sm text-gray-500 mt-1">Subiendo...</span>
+              <span className="text-sm text-muted-foreground mt-1">Subiendo...</span>
             </>
           ) : (
             <>
-              <Upload className="h-8 w-8 text-gray-400" />
-              <span className="text-sm text-gray-500 mt-1">
+              <Upload className="h-8 w-8 text-muted-foreground/50" />
+              <span className="text-sm text-muted-foreground mt-1">
                 Arrastra o click para subir
               </span>
-              <span className="text-xs text-gray-400">JPEG, PNG, WEBP (max 10MB)</span>
+              <span className="text-xs text-muted-foreground/50">JPEG, PNG, WEBP (max 10MB)</span>
             </>
           )}
         </button>
@@ -231,7 +249,7 @@ export function ImageUploader({
       />
 
       {error && (
-        <p className="text-sm text-red-600">{error}</p>
+        <p className="text-sm text-destructive">{error}</p>
       )}
     </div>
   );

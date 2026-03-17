@@ -1,6 +1,7 @@
 import { IPedidoRepository } from "@/core/domain/repositories/IPedidoRepository";
 import { IClienteRepository } from "@/core/domain/repositories/IClienteRepository";
-import { Pedido } from "@/core/domain/entities/types";
+import { Pedido, Result } from "@/core/domain/entities/types";
+import { logger } from "@/core/infrastructure/logging/logger";
 
 export interface CreatePedidoDTO {
   items: {
@@ -22,6 +23,13 @@ export interface PedidoStats {
   totalAno: number;
   topPlatos: { nombre: string; cantidad: number; total: number }[];
   topPlatosAno: { nombre: string; cantidad: number; total: number }[];
+  pedidosPorDia: { dia: number; pedidos: number; ingresos: number }[];
+  clientesNuevos: number;
+  clientesRecurrentes: number;
+  ticketMedio: number;
+  ticketMedioAnterior: number;
+  pedidosAnterior: number;
+  ingresosAnterior: number;
 }
 
 export class PedidoUseCase {
@@ -30,43 +38,99 @@ export class PedidoUseCase {
     private readonly clienteRepo: IClienteRepository
   ) {}
 
-  async getAll(empresaId: string): Promise<Pedido[]> {
-    return this.pedidoRepo.findAllByTenant(empresaId);
-  }
-
-  async updateStatus(id: string, empresaId: string, estado: string): Promise<void> {
-    return this.pedidoRepo.updateStatus(id, empresaId, estado);
-  }
-
-  async create(empresaId: string, data: CreatePedidoDTO): Promise<{ id: string; numero_pedido: number }> {
-    const existingCliente = await this.clienteRepo.findByTelefono(data.telefono, empresaId);
-
-    let clienteId: string | null = null;
-
-    if (existingCliente) {
-      await this.clienteRepo.update(existingCliente.id, empresaId, {
-        nombre: data.nombre,
-        email: data.email || null,
-      });
-      clienteId = existingCliente.id;
-    } else {
-      const newCliente = await this.clienteRepo.create({
-        empresaId,
-        nombre: data.nombre,
-        telefono: data.telefono,
-        email: data.email || null,
-      });
-      clienteId = newCliente.id;
+  async getAll(empresaId: string): Promise<Result<Pedido[]>> {
+    try {
+      const result = await this.pedidoRepo.findAllByTenant(empresaId);
+      if (!result.success) {
+        return { success: false, error: { ...result.error, method: 'PedidoUseCase.getAll' } };
+      }
+      return { success: true, data: result.data };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'use-case', 'PedidoUseCase.getAll', { empresaId });
+      return { success: false, error: appError };
     }
-
-    return this.pedidoRepo.create(empresaId, clienteId, data.items, data.total);
   }
 
-  async getStats(empresaId: string, mes: number, año: number): Promise<PedidoStats> {
-    return this.pedidoRepo.getStats(empresaId, mes, año);
+  async updateStatus(id: string, empresaId: string, estado: string): Promise<Result<void>> {
+    try {
+      const result = await this.pedidoRepo.updateStatus(id, empresaId, estado);
+      if (!result.success) {
+        return { success: false, error: { ...result.error, method: 'PedidoUseCase.updateStatus' } };
+      }
+      return { success: true, data: undefined };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'use-case', 'PedidoUseCase.updateStatus', { empresaId });
+      return { success: false, error: appError };
+    }
   }
 
-  async delete(id: string, empresaId: string): Promise<void> {
-    return this.pedidoRepo.delete(id, empresaId);
+  async create(empresaId: string, data: CreatePedidoDTO): Promise<Result<{ id: string; numero_pedido: number }>> {
+    try {
+      const clienteResult = await this.clienteRepo.findByTelefono(data.telefono, empresaId);
+      if (!clienteResult.success) {
+        return { success: false, error: clienteResult.error };
+      }
+
+      let clienteId: string | null = null;
+      const existingCliente = clienteResult.data;
+
+      if (existingCliente) {
+        const updateResult = await this.clienteRepo.update(existingCliente.id, empresaId, {
+          nombre: data.nombre,
+          email: data.email || null,
+        });
+        if (!updateResult.success) {
+          return { success: false, error: updateResult.error };
+        }
+        clienteId = existingCliente.id;
+      } else {
+        const createResult = await this.clienteRepo.create({
+          empresaId,
+          nombre: data.nombre,
+          telefono: data.telefono,
+          email: data.email || null,
+        });
+        if (!createResult.success) {
+          return { success: false, error: createResult.error };
+        }
+        clienteId = createResult.data.id;
+      }
+
+      const pedidoResult = await this.pedidoRepo.create(empresaId, clienteId, data.items, data.total);
+      if (!pedidoResult.success) {
+        return { success: false, error: pedidoResult.error };
+      }
+
+      return { success: true, data: pedidoResult.data };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'use-case', 'PedidoUseCase.create', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
+  async getStats(empresaId: string, mes: number, año: number): Promise<Result<PedidoStats>> {
+    try {
+      const result = await this.pedidoRepo.getStats(empresaId, mes, año);
+      if (!result.success) {
+        return { success: false, error: { ...result.error, method: 'PedidoUseCase.getStats' } };
+      }
+      return { success: true, data: result.data };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'use-case', 'PedidoUseCase.getStats', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
+  async delete(id: string, empresaId: string): Promise<Result<void>> {
+    try {
+      const result = await this.pedidoRepo.delete(id, empresaId);
+      if (!result.success) {
+        return { success: false, error: { ...result.error, method: 'PedidoUseCase.delete' } };
+      }
+      return { success: true, data: undefined };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'use-case', 'PedidoUseCase.delete', { empresaId });
+      return { success: false, error: appError };
+    }
   }
 }

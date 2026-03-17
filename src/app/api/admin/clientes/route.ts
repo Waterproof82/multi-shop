@@ -1,18 +1,19 @@
 import { NextRequest } from 'next/server';
 import { clienteUseCase } from '@/core/infrastructure/database';
 import { createClienteSchema, updateClienteSchema, clienteIdSchema } from '@/core/application/dtos/cliente.dto';
-import { requireAuth, successResponse, errorResponse, validationErrorResponse } from '@/core/infrastructure/api/helpers';
+import { requireAuth, handleResult, handleResultWithStatus, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 
 export async function GET(request: NextRequest) {
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
 
-  try {
-    const clientes = await clienteUseCase.getAll(empresaId!);
-    return successResponse({ clientes });
-  } catch {
-    return errorResponse('Error al obtener clientes');
+  const result = await clienteUseCase.getAll(empresaId!);
+  
+  if (!result.success) {
+    return handleResult(result);
   }
+  
+  return handleResult({ success: true, data: { clientes: result.data } });
 }
 
 export async function POST(request: NextRequest) {
@@ -30,12 +31,13 @@ export async function POST(request: NextRequest) {
     return validationErrorResponse('Al menos un campo es requerido');
   }
 
-  try {
-    const cliente = await clienteUseCase.create(parsed.data);
-    return successResponse({ cliente }, 201);
-  } catch {
-    return errorResponse('Error al crear cliente');
+  const result = await clienteUseCase.create(parsed.data);
+  
+  if (!result.success) {
+    return handleResult(result);
   }
+  
+  return handleResultWithStatus({ success: true, data: { cliente: result.data } }, 201);
 }
 
 export async function PATCH(request: NextRequest) {
@@ -49,13 +51,14 @@ export async function PATCH(request: NextRequest) {
     return validationErrorResponse(parsed.error.errors[0].message);
   }
 
-  try {
-    const { id, ...updateData } = parsed.data;
-    await clienteUseCase.update(id, empresaId!, updateData);
-    return successResponse({ success: true });
-  } catch {
-    return errorResponse('Error al actualizar cliente');
+  const { id, ...updateData } = parsed.data;
+  const result = await clienteUseCase.update(id, empresaId!, updateData);
+  
+  if (!result.success) {
+    return handleResult(result);
   }
+  
+  return handleResult({ success: true, data: { success: true } });
 }
 
 export async function DELETE(request: NextRequest) {
@@ -69,10 +72,11 @@ export async function DELETE(request: NextRequest) {
     return validationErrorResponse('ID inválido');
   }
 
-  try {
-    await clienteUseCase.delete(parsed.data.id, empresaId!);
-    return successResponse({ success: true });
-  } catch {
-    return errorResponse('Error al eliminar cliente');
+  const result = await clienteUseCase.delete(parsed.data.id, empresaId!);
+  
+  if (!result.success) {
+    return handleResult(result);
   }
+  
+  return handleResult({ success: true, data: { success: true } });
 }

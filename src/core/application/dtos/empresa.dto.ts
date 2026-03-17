@@ -7,6 +7,7 @@ export const updateEmpresaSchema = z.object({
   instagram: z.string().url().optional().or(z.literal('')),
   url_mapa: z.string().optional(),
   direccion: z.string().optional(),
+  logo_url: z.string().url().optional().or(z.literal('')).or(z.null()),
   url_image: z.string().url().optional().or(z.literal('')).or(z.null()),
   descripcion_es: z.string().optional(),
   descripcion_en: z.string().optional(),

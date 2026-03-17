@@ -39,11 +39,17 @@ export async function GET(request: Request) {
 
     const nuevoValor = await clienteUseCase.togglePromoSubscription(normalizedEmail, empresaId, action ?? undefined);
 
-    if (nuevoValor === null) {
+    if (!nuevoValor.success) {
+      return NextResponse.redirect(`${baseUrl}/?error=internal`);
+    }
+
+    const nuevoValorData = nuevoValor.data;
+
+    if (nuevoValorData === null) {
       return NextResponse.redirect(`${baseUrl}/?error=notfound`);
     }
 
-    const mensaje = nuevoValor ? 'promo=on' : 'promo=off';
+    const mensaje = nuevoValorData ? 'promo=on' : 'promo=off';
     return NextResponse.redirect(`${baseUrl}/?${mensaje}`);
   } catch (error) {
     console.error('Promo error:', error);

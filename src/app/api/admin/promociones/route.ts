@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { sendEmail } from '@/lib/brevo-email';
 import { deleteImageFromR2 } from '@/core/infrastructure/storage/s3-client';
 import { promocionUseCase, empresaUseCase } from '@/core/infrastructure/database';
-import { requireAuth, errorResponse } from '@/core/infrastructure/api/helpers';
+import { requireAuth, errorResponse, handleResult } from '@/core/infrastructure/api/helpers';
 import { escapeHtml } from '@/lib/html-utils';
 
 const createPromocionSchema = z.object({
@@ -52,12 +52,11 @@ export async function GET(request: NextRequest) {
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
 
-  try {
-    const promociones = await promocionUseCase.getAll(empresaId!);
-    return NextResponse.json({ promociones });
-  } catch {
-    return errorResponse('Error interno');
+  const result = await promocionUseCase.getAll(empresaId!);
+  if (!result.success) {
+    return handleResult(result);
   }
+  return NextResponse.json({ promociones: result.data });
 }
 
 export async function POST(request: NextRequest) {
@@ -65,7 +64,11 @@ export async function POST(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const empresa = await empresaUseCase.getById(empresaId!);
+    const empresaResult = await empresaUseCase.getById(empresaId!);
+    if (!empresaResult.success) {
+      return NextResponse.json({ error: empresaResult.error.message }, { status: 500 });
+    }
+    const empresa = empresaResult.data;
 
     const body = await request.json();
     const parsed = createPromocionSchema.safeParse(body);
@@ -75,11 +78,17 @@ export async function POST(request: NextRequest) {
 
     const { texto_promocion, imagen_url } = parsed.data;
 
-    const { promo, oldImageUrl, emailTargets } = await promocionUseCase.create(
+    const createResult = await promocionUseCase.create(
       empresaId!,
       texto_promocion,
       imagen_url,
     );
+
+    if (!createResult.success) {
+      return NextResponse.json({ error: createResult.error.message }, { status: 500 });
+    }
+
+    const { promo, oldImageUrl, emailTargets } = createResult.data;
 
     if (oldImageUrl) {
       await deleteImageFromR2(oldImageUrl);
