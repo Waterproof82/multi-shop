@@ -59,7 +59,7 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="max-w-md w-full p-8 bg-card rounded-lg shadow-lg">
+      <div className="max-w-md w-full p-8 bg-card rounded-lg shadow-elegant-lg border border-border">
         <div className="text-center mb-8">
           {empresaNombre ? (
             <h1 className="text-2xl font-semibold text-foreground">
@@ -94,7 +94,7 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
               required
               aria-invalid={!!error}
               aria-describedby={error ? "login-error" : undefined}
-              className="mt-1 block w-full px-3 py-2 bg-card border border-border rounded-md shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-primary text-foreground"
+              className="mt-1 block w-full px-3 py-2 bg-transparent border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:border-ring text-foreground transition-all duration-150 ease-out"
               placeholder="admin@tuempresa.com"
             />
           </div>
@@ -111,7 +111,7 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
               required
               aria-invalid={!!error}
               aria-describedby={error ? "login-error" : undefined}
-              className="mt-1 block w-full px-3 py-2 bg-card border border-border rounded-md shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-primary text-foreground"
+              className="mt-1 block w-full px-3 py-2 bg-transparent border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:border-ring text-foreground transition-all duration-150 ease-out"
               placeholder="••••••••"
             />
           </div>
@@ -119,7 +119,7 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring disabled:opacity-50"
+            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring disabled:opacity-50 transition-all duration-150 ease-out active:scale-[0.98]"
           >
             {loading ? (
               <>

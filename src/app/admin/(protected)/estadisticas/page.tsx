@@ -25,29 +25,50 @@ interface Stats {
 
 const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
-const CHART_COLORS = ['#F97316', '#3B82F6', '#10B981', '#8B5CF6', '#EC4899', '#14B8A6', '#F43F5E', '#84CC16'] as const;
+function getChartColors(): string[] {
+  if (typeof window === 'undefined') return ['#F97316', '#3B82F6', '#10B981', '#8B5CF6', '#EC4899', '#14B8A6', '#F43F5E', '#84CC16'];
+  const style = getComputedStyle(document.documentElement);
+  return [
+    style.getPropertyValue('--chart-orange').trim() || '#F97316',
+    style.getPropertyValue('--chart-blue').trim() || '#3B82F6',
+    style.getPropertyValue('--chart-green').trim() || '#10B981',
+    style.getPropertyValue('--chart-purple').trim() || '#8B5CF6',
+    style.getPropertyValue('--chart-pink').trim() || '#EC4899',
+    style.getPropertyValue('--chart-teal').trim() || '#14B8A6',
+    style.getPropertyValue('--chart-rose').trim() || '#F43F5E',
+    style.getPropertyValue('--chart-lime').trim() || '#84CC16',
+  ];
+}
 
 export default function EstadisticasPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState({ mes: new Date().getMonth(), año: new Date().getFullYear() });
+  const [chartColors, setChartColors] = useState<string[]>([]);
 
   useEffect(() => {
+    setChartColors(getChartColors());
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
     async function fetchStats() {
       setLoading(true);
       try {
-        const res = await fetch(`/api/admin/pedidos?mes=${selectedMonth.mes}&año=${selectedMonth.año}`, { method: 'PUT' });
+        const res = await fetch(`/api/admin/pedidos?mes=${selectedMonth.mes}&año=${selectedMonth.año}`, { method: 'PUT', signal: controller.signal });
         if (res.ok) {
           const data = await res.json();
           setStats(data);
         }
       } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
         console.error('Error fetching stats:', error);
       } finally {
         setLoading(false);
       }
     }
     fetchStats();
+    return () => controller.abort();
   }, [selectedMonth]);
 
   const cambiarMes = (delta: number) => {
@@ -125,7 +146,7 @@ export default function EstadisticasPage() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: i * 0.05 }}
-            className="bg-card rounded-lg shadow-sm border border-border p-6"
+            className="bg-card rounded-lg shadow-elegant border border-border p-6"
           >
             <div className="flex items-center gap-3">
               <div className={`p-2 ${kpi.iconClass} rounded-lg`}>
@@ -234,12 +255,12 @@ export default function EstadisticasPage() {
                     name === 'pedidos' ? 'Pedidos' : 'Ingresos'
                   ]}
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="pedidos" 
-                  stroke="#F97316" 
+                <Line
+                  type="monotone"
+                  dataKey="pedidos"
+                  stroke={chartColors[0] || '#F97316'}
                   strokeWidth={2}
-                  dot={{ fill: '#F97316', r: 3 }}
+                  dot={{ fill: chartColors[0] || '#F97316', r: 3 }}
                   activeDot={{ r: 5 }}
                 />
               </LineChart>
@@ -254,7 +275,7 @@ export default function EstadisticasPage() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.25 }}
-          className="bg-card rounded-lg shadow-sm border border-border p-6"
+          className="bg-card rounded-lg shadow-elegant border border-border p-6"
         >
           <h2 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
             <ShoppingCart className="w-5 h-5" />
@@ -286,7 +307,7 @@ export default function EstadisticasPage() {
                     {stats.topPlatos.slice(0, 8).map((plato, index) => (
                       <Cell 
                         key={`${plato.nombre}-bar`} 
-                        fill={CHART_COLORS[index % CHART_COLORS.length]} 
+                        fill={chartColors[index % chartColors.length]} 
                       />
                     ))}
                   </Bar>
@@ -305,7 +326,7 @@ export default function EstadisticasPage() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.3 }}
-          className="bg-card rounded-lg shadow-sm border border-border p-6"
+          className="bg-card rounded-lg shadow-elegant border border-border p-6"
         >
           <h2 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
             <Euro className="w-5 h-5" />
@@ -331,7 +352,7 @@ export default function EstadisticasPage() {
                       {stats.topPlatos.slice(0, 8).map((plato, index) => (
                         <Cell 
                           key={`${plato.nombre}-pie`} 
-                          fill={CHART_COLORS[index % CHART_COLORS.length]} 
+                          fill={chartColors[index % chartColors.length]} 
                         />
                       ))}
                     </Pie>
@@ -352,7 +373,7 @@ export default function EstadisticasPage() {
                   <div key={plato.nombre} className="flex items-center gap-2 text-sm">
                     <div 
                       className="w-3 h-3 rounded-full" 
-                      style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
+                      style={{ backgroundColor: chartColors[index % chartColors.length] }}
                     />
                     <span className="truncate text-muted-foreground">{plato.nombre}</span>
                   </div>

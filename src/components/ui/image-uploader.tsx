@@ -173,7 +173,7 @@ export function ImageUploader({
             className="object-cover"
             unoptimized
           />
-          <div className="absolute inset-0 bg-black/50 opacity-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
+          <div className="absolute inset-0 bg-overlay opacity-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
             <button
               type="button"
               onClick={handleClick}
@@ -193,7 +193,7 @@ export function ImageUploader({
             <button
               type="button"
               onClick={handleClick}
-              className="p-2 bg-card/90 backdrop-blur-sm rounded-full shadow-md"
+              className="p-3 bg-card/90 backdrop-blur-sm rounded-full shadow-elegant"
               aria-label="Cambiar imagen"
             >
               <Pencil className="w-4 h-4" />
@@ -201,10 +201,10 @@ export function ImageUploader({
             <button
               type="button"
               onClick={handleRemove}
-              className="p-2 bg-destructive/90 backdrop-blur-sm rounded-full shadow-md"
+              className="p-3 bg-destructive/90 backdrop-blur-sm rounded-full shadow-elegant"
               aria-label="Eliminar imagen"
             >
-              <Trash2 className="w-4 h-4 text-white" />
+              <Trash2 className="w-4 h-4 text-destructive-foreground" />
             </button>
           </div>
         </div>

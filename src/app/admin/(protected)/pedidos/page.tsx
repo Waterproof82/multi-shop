@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
 import { Search, ChevronDown, ChevronUp, Check, Clock, Trash2 } from 'lucide-react';
 import type { PedidoItem, PedidoComplemento } from '@/core/domain/entities/types';
 import { PEDIDO_ESTADOS, PEDIDO_ESTADO_LABELS, PEDIDO_ESTADO_COLORS, type PedidoEstado } from '@/core/domain/constants/pedido';
@@ -40,24 +40,27 @@ export default function PedidosPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; id: string | null; numero: number | null }>({ show: false, id: null, numero: null });
 
   useEffect(() => {
+    const controller = new AbortController();
     async function fetchPedidos() {
       try {
-        const res = await fetch('/api/admin/pedidos');
+        const res = await fetch('/api/admin/pedidos', { signal: controller.signal });
         if (res.ok) {
           const data = await res.json();
           setPedidos(data.pedidos || []);
         }
       } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
         console.error('Error fetching pedidos:', error);
       } finally {
         setLoading(false);
       }
     }
     fetchPedidos();
+    return () => controller.abort();
   }, []);
 
-  const filteredPedidos = pedidos
-    .filter(p => 
+  const filteredPedidos = useMemo(() => pedidos
+    .filter(p =>
       p.numero_pedido.toString().includes(searchTerm) ||
       p.clientes?.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.clientes?.telefono?.includes(searchTerm) ||
@@ -72,16 +75,16 @@ export default function PedidosPage() {
       if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
       if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
       return 0;
-    });
+    }), [pedidos, searchTerm, sortField, sortDirection]);
 
-  const handleSort = (field: keyof Pedido) => {
+  const handleSort = useCallback((field: keyof Pedido) => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
       setSortField(field);
       setSortDirection('desc');
     }
-  };
+  }, [sortField, sortDirection]);
 
   const getEstadoBadge = (estado: string, pedidoId: string) => {
     const estadoIndex = PEDIDO_ESTADOS.indexOf(estado as PedidoEstado);
@@ -105,7 +108,7 @@ export default function PedidosPage() {
     setExpandedPedido(expandedPedido === id ? null : id);
   };
 
-  const updateEstado = async (id: string, nuevoEstado: string) => {
+  const updateEstado = useCallback(async (id: string, nuevoEstado: string) => {
     try {
       const res = await fetch('/api/admin/pedidos', {
         method: 'PATCH',
@@ -113,17 +116,16 @@ export default function PedidosPage() {
         body: JSON.stringify({ id, estado: nuevoEstado }),
       });
       if (res.ok) {
-        setPedidos(pedidos.map(p => p.id === id ? { ...p, estado: nuevoEstado } : p));
+        setPedidos(prev => prev.map(p => p.id === id ? { ...p, estado: nuevoEstado } : p));
       }
     } catch (error) {
       console.error('Error updating estado:', error);
     }
-  };
+  }, []);
 
-  const deletePedido = async (id: string) => {
-    const orderNum = pedidos.find(p => p.id === id)?.numero_pedido ?? null;
+  const deletePedido = useCallback((id: string, orderNum: number | null) => {
     setDeleteConfirm({ show: true, id, numero: orderNum });
-  };
+  }, []);
 
   const confirmDelete = async () => {
     if (!deleteConfirm.id) return;
@@ -160,7 +162,7 @@ export default function PedidosPage() {
         Gestiona los pedidos de tus clientes
       </p>
 
-      <div className="bg-card rounded-lg shadow-sm border border-border">
+      <div className="bg-card rounded-lg shadow-elegant border border-border">
         <div className="p-4 border-b border-border">
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -255,7 +257,7 @@ export default function PedidosPage() {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <button
-                          onClick={(e) => { e.stopPropagation(); deletePedido(pedido.id); }}
+                          onClick={(e) => { e.stopPropagation(); deletePedido(pedido.id, pedido.numero_pedido); }}
                           className="p-2.5 text-destructive hover:bg-destructive/10 rounded"
                           aria-label="Eliminar pedido"
                         >

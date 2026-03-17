@@ -208,6 +208,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
       }`}
       role={showCart ? "button" : undefined}
       tabIndex={showCart ? 0 : undefined}
+      aria-label={showCart ? `${t("addToCart", safeLanguage)}: ${displayName}` : undefined}
       onKeyDown={showCart ? (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();

@@ -54,7 +54,7 @@ export default async function ConfiguracionPage() {
       </p>
 
       {/* Datos de la empresa */}
-      <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-6">
+      <div className="bg-card rounded-lg shadow-elegant border border-border p-6 mb-6">
         <h2 className="text-lg font-semibold mb-6 text-foreground">
           Datos de contacto y redes
         </h2>
@@ -65,7 +65,7 @@ export default async function ConfiguracionPage() {
       </div>
 
       {/* Apariencia */}
-      <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-6">
+      <div className="bg-card rounded-lg shadow-elegant border border-border p-6 mb-6">
         <h2 className="text-lg font-semibold mb-6 text-foreground">
           Apariencia del menú
         </h2>
@@ -76,7 +76,7 @@ export default async function ConfiguracionPage() {
       </div>
 
       {/* Colores */}
-      <div className="bg-card rounded-lg shadow-sm border border-border p-6">
+      <div className="bg-card rounded-lg shadow-elegant border border-border p-6">
         <h2 className="text-lg font-semibold mb-6 text-foreground">
           Colores del tema
         </h2>

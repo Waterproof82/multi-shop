@@ -11,10 +11,10 @@ export const PEDIDO_ESTADO_LABELS: Record<PedidoEstado, string> = {
 };
 
 export const PEDIDO_ESTADO_COLORS: Record<PedidoEstado, string> = {
-  pendiente: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200',
-  aceptado: 'bg-blue-100 text-blue-800 hover:bg-blue-200',
-  preparando: 'bg-purple-100 text-purple-800 hover:bg-purple-200',
-  enviado: 'bg-orange-100 text-orange-800 hover:bg-orange-200',
-  entregado: 'bg-green-100 text-green-800 hover:bg-green-200',
-  cancelado: 'bg-red-100 text-red-800 hover:bg-red-200',
+  pendiente: 'bg-status-pending-bg text-status-pending-text hover:bg-status-pending-hover',
+  aceptado: 'bg-status-accepted-bg text-status-accepted-text hover:bg-status-accepted-hover',
+  preparando: 'bg-status-preparing-bg text-status-preparing-text hover:bg-status-preparing-hover',
+  enviado: 'bg-status-sent-bg text-status-sent-text hover:bg-status-sent-hover',
+  entregado: 'bg-status-delivered-bg text-status-delivered-text hover:bg-status-delivered-hover',
+  cancelado: 'bg-status-cancelled-bg text-status-cancelled-text hover:bg-status-cancelled-hover',
 };

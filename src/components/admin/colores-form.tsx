@@ -76,7 +76,7 @@ export function ColoresForm({ coloresIniciales, empresaId }: ColoresFormProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {colorKeys.map((key) => (
           <div key={key} className="flex flex-col gap-2">
-            <label htmlFor={`color-text-${key}`} className="text-sm font-medium text-foreground">
+            <label htmlFor={`color-picker-${key}`} className="text-sm font-medium text-foreground">
               {LABELS[key]}
             </label>
             <div className="flex gap-2">

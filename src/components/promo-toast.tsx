@@ -51,15 +51,16 @@ export function PromoToast() {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <button
         type="button"
-        className="absolute inset-0 bg-foreground/50 cursor-default"
+        className="absolute inset-0 bg-overlay cursor-default"
         onClick={handleClose}
         aria-label="Cerrar"
       />
 
-      <div className="relative bg-card text-card-foreground rounded-lg shadow-lg max-w-sm w-full p-6 animate-in fade-in zoom-in duration-200">
+      <div className="relative bg-card text-card-foreground rounded-lg shadow-elegant-lg max-w-sm w-full p-6 animate-in fade-in zoom-in duration-200">
         <button
           onClick={handleClose}
-          className="absolute top-3 right-3 p-1 rounded-full hover:bg-muted transition-colors"
+          className="absolute top-3 right-3 p-1 rounded-full hover:bg-muted transition-colors duration-150"
+          aria-label="Cerrar"
         >
           <X className="w-5 h-5 text-muted-foreground" />
         </button>

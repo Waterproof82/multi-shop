@@ -217,7 +217,7 @@ export default function PromocionesPage() {
       </div>
 
       {/* Sección crear promoción */}
-      <div className="bg-card rounded-lg border shadow-sm p-6">
+      <div className="bg-card rounded-lg border shadow-elegant p-6">
         <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
           <Send className="w-5 h-5" />
           Nueva Promoción
@@ -249,10 +249,9 @@ export default function PromocionesPage() {
                   src={previewImage}
                   alt="Vista previa de la promoción"
                   fill
-                  style={{objectFit:"contain"}}
-                  className="bg-muted"
+                  className="object-contain bg-muted"
                 />
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <div className="absolute inset-0 bg-overlay opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <button
                     type="button"
                     onClick={handleRemoveImage}
@@ -350,7 +349,7 @@ export default function PromocionesPage() {
 
       {/* Historial de promociones */}
       {promociones.length > 0 ? (
-        <div className="bg-card rounded-lg border shadow-sm p-6">
+        <div className="bg-card rounded-lg border shadow-elegant p-6">
           <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
             <FileText className="w-5 h-5" />
             Última Promoción
@@ -386,7 +385,7 @@ export default function PromocionesPage() {
           </div>
         </div>
       ) : (
-        <div className="bg-card rounded-lg border p-12 shadow-sm text-center">
+        <div className="bg-card rounded-lg border p-12 shadow-elegant text-center">
           <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <p className="text-muted-foreground">No hay promociones guardadas</p>
         </div>

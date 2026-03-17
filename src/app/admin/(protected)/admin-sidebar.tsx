@@ -46,7 +46,7 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
         </h1>
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="p-2 rounded-lg hover:bg-muted"
+          className="p-2 rounded-lg hover:bg-muted transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           aria-label={isOpen ? 'Cerrar menú' : 'Abrir menú'}
           aria-expanded={isOpen}
         >
@@ -58,7 +58,7 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
       {isOpen && (
         <button
           type="button"
-          className="lg:hidden fixed inset-0 bg-black/50 z-40"
+          className="lg:hidden fixed inset-0 bg-overlay z-40"
           aria-label="Cerrar menú"
           onClick={closeMenu}
         />
@@ -94,7 +94,7 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
                       onClick={closeMenu}
                       aria-current={isActive ? 'page' : undefined}
                       className={`
-                        flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors
+                        flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
                         ${isActive
                           ? 'bg-primary text-primary-foreground font-medium'
                           : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -113,7 +113,7 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
           <div className="p-3 border-t border-border space-y-1">
             <a
               href="/"
-              className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground w-full rounded-lg transition-colors"
+              className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground w-full rounded-lg transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <ExternalLink className="h-4 w-4" />
               Ver tienda
@@ -121,7 +121,7 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
             <button
               type="button"
               onClick={handleLogout}
-              className="flex items-center gap-3 px-3 py-2.5 text-sm text-destructive hover:bg-destructive/10 w-full rounded-lg transition-colors"
+              className="flex items-center gap-3 px-3 py-2.5 text-sm text-destructive hover:bg-destructive/10 w-full rounded-lg transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <LogOut className="h-4 w-4" />
               Cerrar Sesión
