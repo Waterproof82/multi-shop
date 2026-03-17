@@ -55,7 +55,7 @@ export class AuthAdminUseCase {
         'Usuario no autorizado como admin',
         'use-case',
         'AuthAdminUseCase.login',
-        { email }
+        { details: { email } }
       );
       return {
         success: false,
@@ -81,7 +81,7 @@ export class AuthAdminUseCase {
 
       return { success: true, data: { token, admin: adminResult.data } };
     } catch (e) {
-      const appError = await logger.logFromCatch(e, 'use-case', 'AuthAdminUseCase.login', { email });
+      const appError = await logger.logFromCatch(e, 'use-case', 'AuthAdminUseCase.login', { details: { email } });
       return { success: false, error: appError };
     }
   }
@@ -99,11 +99,11 @@ export class AuthAdminUseCase {
       if (!result.success) {
         // Log but return null (soft failure - token might be invalid)
         await logger.logError({
-          code: 'TOKEN_VERIFY_FAILED',
-          message: result.error.message,
-          module: 'use-case',
-          method: 'AuthAdminUseCase.verifyToken',
-          details: { adminId },
+          codigo: 'TOKEN_VERIFY_FAILED',
+          mensaje: result.error.message,
+          modulo: 'use-case',
+          metodo: 'AuthAdminUseCase.verifyToken',
+          metadata: { adminId },
         });
         return null;
       }

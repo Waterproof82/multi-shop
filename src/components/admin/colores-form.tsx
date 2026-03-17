@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { EmpresaColores } from '@/core/domain/entities/types';
+import { DEFAULT_EMPRESA_COLORES } from '@/core/domain/constants/empresa-defaults';
 
 interface ColoresFormProps {
   readonly coloresIniciales: EmpresaColores | null;
@@ -22,16 +23,7 @@ const LABELS: Record<ColorKey, string> = {
 };
 
 export function ColoresForm({ coloresIniciales, empresaId }: ColoresFormProps) {
-  const [colores, setColores] = useState<EmpresaColores>({
-    primary: '#008C45',
-    primaryForeground: '#FFFFFF',
-    secondary: '#F7E7CE',
-    secondaryForeground: '#3C2415',
-    accent: '#CF0921',
-    accentForeground: '#FFFFFF',
-    background: '#FDFBF7',
-    foreground: '#1A1612',
-  });
+  const [colores, setColores] = useState<EmpresaColores>({ ...DEFAULT_EMPRESA_COLORES });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -84,7 +76,7 @@ export function ColoresForm({ coloresIniciales, empresaId }: ColoresFormProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {colorKeys.map((key) => (
           <div key={key} className="flex flex-col gap-2">
-            <label htmlFor={`color-text-${key}`} className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label htmlFor={`color-text-${key}`} className="text-sm font-medium text-foreground">
               {LABELS[key]}
             </label>
             <div className="flex gap-2">
@@ -102,7 +94,7 @@ export function ColoresForm({ coloresIniciales, empresaId }: ColoresFormProps) {
                 type="text"
                 value={colores[key]}
                 onChange={(e) => handleChange(key, e.target.value)}
-                className="flex-1 px-3 py-2 border rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-white text-sm font-mono"
+                className="flex-1 px-3 py-2 border rounded-md bg-card border-border text-foreground text-sm font-mono"
               />
             </div>
           </div>
@@ -118,12 +110,12 @@ export function ColoresForm({ coloresIniciales, empresaId }: ColoresFormProps) {
           {saving ? 'Guardando...' : 'Guardar colores'}
         </button>
         {saved && (
-          <span className="text-green-600 text-sm">¡Colores guardados correctamente!</span>
+          <span className="text-primary text-sm">¡Colores guardados correctamente!</span>
         )}
       </div>
 
-      <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-        <h4 className="font-medium mb-3 dark:text-white">Vista previa</h4>
+      <div className="mt-6 p-4 bg-muted rounded-lg">
+        <h4 className="font-medium mb-3 text-foreground">Vista previa</h4>
         <div
           className="p-4 rounded-lg border"
           style={{

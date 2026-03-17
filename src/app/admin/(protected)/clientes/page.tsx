@@ -18,6 +18,7 @@ interface Cliente {
 export default function ClientesPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingCliente, setEditingCliente] = useState<Cliente | null>(null);
   const [creatingCliente, setCreatingCliente] = useState(false);
@@ -27,13 +28,17 @@ export default function ClientesPage() {
   useEffect(() => {
     async function fetchClientes() {
       try {
+        setError(null);
         const res = await fetch('/api/admin/clientes');
         if (res.ok) {
           const data = await res.json();
           setClientes(data.clientes || []);
+        } else {
+          setError('Error al cargar clientes. Por favor, inténtalo de nuevo.');
         }
       } catch (error) {
         console.error('Error fetching clientes:', error);
+        setError('Error de conexión. Verifica tu conexión a internet.');
       } finally {
         setLoading(false);
       }
@@ -183,26 +188,26 @@ export default function ClientesPage() {
   return (
     <div className="p-6 space-y-6">
       {/* Header con contador */}
-      <div className="bg-gradient-to-r from-primary to-primary/80 rounded-xl p-6 shadow-lg">
+      <div className="bg-primary rounded-lg p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-white">Clientes</h1>
-              <p className="text-white/80 text-sm mt-1">Gestiona tus clientes</p>
+              <h1 className="text-2xl font-semibold text-primary-foreground">Clientes</h1>
+              <p className="text-primary-foreground/80 text-sm mt-1">Gestiona tus clientes</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
             <Button 
               onClick={openCreateModal}
-              className="bg-white text-primary hover:bg-white/90 font-semibold"
+              className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 font-semibold"
             >
               <Plus className="w-4 h-4 mr-2" />
               Nuevo Cliente
             </Button>
-            <div className="bg-white/20 rounded-lg px-6 py-4 text-center">
-              <Users className="w-8 h-8 text-white mx-auto mb-1" />
-              <span className="text-3xl font-bold text-white">{clientes.length}</span>
-              <p className="text-white/80 text-xs">Total clientes</p>
+            <div className="bg-primary-foreground/20 rounded-lg px-6 py-4 text-center">
+              <Users className="w-8 h-8 text-primary-foreground mx-auto mb-1" />
+              <span className="text-2xl font-semibold text-primary-foreground">{clientes.length}</span>
+              <p className="text-primary-foreground/80 text-xs">Total clientes</p>
             </div>
           </div>
         </div>
@@ -211,13 +216,14 @@ export default function ClientesPage() {
       {/* Buscador */}
       <div className="mb-4">
         <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             type="text"
             placeholder="Buscar clientes..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            aria-label="Buscar clientes"
+            className="w-full pl-10 pr-4 py-2 border rounded-lg bg-card border-border text-foreground"
           />
         </div>
       </div>
@@ -226,9 +232,28 @@ export default function ClientesPage() {
       {loading && (
         <div className="text-center py-8 text-muted-foreground">Cargando...</div>
       )}
-      {!loading && filteredClientes.length === 0 && (
-        <div className="text-center py-8 text-muted-foreground">
-          {searchTerm ? 'No se encontraron clientes' : 'No hay clientes registrados'}
+      {error && (
+        <div className="mb-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+          <p className="text-destructive text-sm font-medium">{error}</p>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="mt-2"
+            onClick={() => window.location.reload()}
+          >
+            Reintentar
+          </Button>
+        </div>
+      )}
+      {!loading && !error && filteredClientes.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+          <Users className="w-12 h-12 opacity-30 mb-3" />
+          <p className="text-base font-medium text-foreground">
+            {searchTerm ? 'No se encontraron clientes' : 'No hay clientes registrados'}
+          </p>
+          <p className="text-sm mt-1">
+            {searchTerm ? 'Prueba con otros términos de búsqueda' : 'Los clientes aparecerán aquí cuando realicen pedidos'}
+          </p>
         </div>
       )}
       {!loading && filteredClientes.length > 0 && (
@@ -252,32 +277,32 @@ export default function ClientesPage() {
                   <tr key={cliente.id} className="hover:bg-muted/30">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <User className="size-4 text-muted-foreground" />
-                        <span className="font-medium text-foreground">
+                        <User className="size-4 text-muted-foreground shrink-0" />
+                        <span className="font-medium text-foreground truncate max-w-[150px]">
                           {cliente.nombre || '-'}
                         </span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <Mail className="size-4 text-muted-foreground" />
-                        <span className="text-foreground">
+                        <Mail className="size-4 text-muted-foreground shrink-0" />
+                        <span className="text-foreground truncate max-w-[180px]">
                           {cliente.email || '-'}
                         </span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <Phone className="size-4 text-muted-foreground" />
-                        <span className="text-foreground">
+                        <Phone className="size-4 text-muted-foreground shrink-0" />
+                        <span className="text-foreground truncate max-w-[120px]">
                           {cliente.telefono || '-'}
                         </span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <MapPin className="size-4 text-muted-foreground" />
-                        <span className="text-foreground">
+                        <MapPin className="size-4 text-muted-foreground shrink-0" />
+                        <span className="text-foreground truncate max-w-[150px]">
                           {cliente.direccion || '-'}
                         </span>
                       </div>
@@ -295,11 +320,11 @@ export default function ClientesPage() {
                         <button
                           onClick={() => handleTogglePromociones(cliente)}
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            cliente.aceptar_promociones ? 'bg-green-600' : 'bg-gray-300 dark:bg-gray-600'
+                            cliente.aceptar_promociones ? 'bg-primary' : 'bg-muted'
                           }`}
                         >
                           <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            className={`inline-block h-4 w-4 transform rounded-full bg-primary-foreground transition-transform ${
                               cliente.aceptar_promociones ? 'translate-x-6' : 'translate-x-1'
                             }`}
                           />
@@ -318,7 +343,7 @@ export default function ClientesPage() {
                     <td className="px-4 py-3">
                       <button
                         onClick={() => handleDeleteCliente(cliente.id)}
-                        className="p-2 hover:bg-muted rounded-lg transition-colors text-red-500 hover:text-red-600"
+                        className="p-2 hover:bg-muted rounded-lg transition-colors text-destructive hover:text-destructive/80"
                         title="Eliminar"
                       >
                         <Trash2 className="size-4" />
@@ -335,7 +360,7 @@ export default function ClientesPage() {
       {/* Modal de edición */}
       {editingCliente && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-xl border shadow-xl w-full max-w-md">
+          <div className="bg-background rounded-lg border shadow-lg w-full max-w-md">
             <div className="flex items-center justify-between p-4 border-b">
               <h2 className="text-lg font-semibold">Editar Cliente</h2>
               <button
@@ -356,7 +381,7 @@ export default function ClientesPage() {
                   value={editForm.nombre}
                   onChange={(e) => setEditForm(prev => ({ ...prev, nombre: e.target.value }))}
                   placeholder="Nombre del cliente"
-                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  className="w-full px-3 py-2 border rounded-lg bg-card border-border text-foreground"
                 />
               </div>
               <div>
@@ -369,7 +394,7 @@ export default function ClientesPage() {
                   value={editForm.email}
                   onChange={(e) => setEditForm(prev => ({ ...prev, email: e.target.value }))}
                   placeholder="email@ejemplo.com"
-                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  className="w-full px-3 py-2 border rounded-lg bg-card border-border text-foreground"
                 />
               </div>
               <div>
@@ -382,7 +407,7 @@ export default function ClientesPage() {
                   value={editForm.telefono}
                   onChange={(e) => setEditForm(prev => ({ ...prev, telefono: e.target.value }))}
                   placeholder="Teléfono"
-                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  className="w-full px-3 py-2 border rounded-lg bg-card border-border text-foreground"
                 />
               </div>
               <div>
@@ -395,7 +420,7 @@ export default function ClientesPage() {
                   value={editForm.direccion}
                   onChange={(e) => setEditForm(prev => ({ ...prev, direccion: e.target.value }))}
                   placeholder="Dirección del cliente"
-                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  className="w-full px-3 py-2 border rounded-lg bg-card border-border text-foreground"
                 />
               </div>
             </div>
@@ -414,7 +439,7 @@ export default function ClientesPage() {
       {/* Modal de creación */}
       {creatingCliente && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-xl border shadow-xl w-full max-w-md">
+          <div className="bg-background rounded-lg border shadow-lg w-full max-w-md">
             <div className="flex items-center justify-between p-4 border-b">
               <h2 className="text-lg font-semibold">Nuevo Cliente</h2>
               <button
@@ -435,7 +460,7 @@ export default function ClientesPage() {
                   value={editForm.nombre}
                   onChange={(e) => setEditForm(prev => ({ ...prev, nombre: e.target.value }))}
                   placeholder="Nombre del cliente"
-                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  className="w-full px-3 py-2 border rounded-lg bg-card border-border text-foreground"
                 />
               </div>
               <div>
@@ -448,7 +473,7 @@ export default function ClientesPage() {
                   value={editForm.email}
                   onChange={(e) => setEditForm(prev => ({ ...prev, email: e.target.value }))}
                   placeholder="email@ejemplo.com"
-                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  className="w-full px-3 py-2 border rounded-lg bg-card border-border text-foreground"
                 />
               </div>
               <div>
@@ -461,7 +486,7 @@ export default function ClientesPage() {
                   value={editForm.telefono}
                   onChange={(e) => setEditForm(prev => ({ ...prev, telefono: e.target.value }))}
                   placeholder="Teléfono"
-                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  className="w-full px-3 py-2 border rounded-lg bg-card border-border text-foreground"
                 />
               </div>
               <div>
@@ -474,7 +499,7 @@ export default function ClientesPage() {
                   value={editForm.direccion}
                   onChange={(e) => setEditForm(prev => ({ ...prev, direccion: e.target.value }))}
                   placeholder="Dirección del cliente"
-                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  className="w-full px-3 py-2 border rounded-lg bg-card border-border text-foreground"
                 />
               </div>
             </div>

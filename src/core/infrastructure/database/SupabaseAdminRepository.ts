@@ -20,7 +20,7 @@ export class SupabaseAdminRepository implements IAdminRepository {
           error.message,
           'repository',
           'SupabaseAdminRepository.loginWithPassword',
-          { email, details: { code: error.code, status: error.status } }
+          { details: { email, code: error.code, status: error.status } }
         );
         return { 
           success: false, 
@@ -47,7 +47,7 @@ export class SupabaseAdminRepository implements IAdminRepository {
       
       return { success: true, data: data.user.id };
     } catch (e) {
-      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseAdminRepository.loginWithPassword', { email });
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseAdminRepository.loginWithPassword', { details: { email } });
       return { success: false, error: appError };
     }
   }
@@ -66,7 +66,7 @@ export class SupabaseAdminRepository implements IAdminRepository {
           error.message,
           'repository',
           'SupabaseAdminRepository.findById',
-          { id, details: { code: error.code } }
+          { details: { id, code: error.code } }
         );
         return { 
           success: false, 
@@ -113,7 +113,7 @@ export class SupabaseAdminRepository implements IAdminRepository {
         },
       };
     } catch (e) {
-      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseAdminRepository.findById', { id });
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseAdminRepository.findById', { details: { id } });
       return { success: false, error: appError };
     }
   }

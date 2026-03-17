@@ -54,7 +54,7 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Email de notificaciones */}
         <div className="flex flex-col gap-2">
-          <label htmlFor="email_notification" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+          <label htmlFor="email_notification" className="text-sm font-medium text-foreground flex items-center gap-2">
             <Mail className="w-4 h-4" />
             Email de notificaciones
           </label>
@@ -65,14 +65,14 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
             value={formData.email_notification}
             onChange={(e) => handleChange('email_notification', e.target.value)}
             placeholder="pedidos@tuempresa.com"
-            className="px-3 py-2 border rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-white text-sm"
+            className="px-3 py-2 border rounded-md bg-card border-border text-foreground text-sm"
           />
-          <span className="text-xs text-gray-500">Recibirás los pedidos nuevos en este email</span>
+          <span className="text-xs text-muted-foreground">Recibirás los pedidos nuevos en este email</span>
         </div>
 
         {/* WhatsApp */}
         <div className="flex flex-col gap-2">
-          <label htmlFor="telefono_whatsapp" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+          <label htmlFor="telefono_whatsapp" className="text-sm font-medium text-foreground flex items-center gap-2">
             <Phone className="w-4 h-4" />
             WhatsApp
           </label>
@@ -83,14 +83,14 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
             value={formData.telefono_whatsapp}
             onChange={(e) => handleChange('telefono_whatsapp', e.target.value)}
             placeholder="+5491112345678"
-            className="px-3 py-2 border rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-white text-sm"
+            className="px-3 py-2 border rounded-md bg-card border-border text-foreground text-sm"
           />
-          <span className="text-xs text-gray-500">Número con código de país sin espacios</span>
+          <span className="text-xs text-muted-foreground">Número con código de país sin espacios</span>
         </div>
 
         {/* Dirección */}
         <div className="flex flex-col gap-2 md:col-span-2">
-          <label htmlFor="direccion" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+          <label htmlFor="direccion" className="text-sm font-medium text-foreground flex items-center gap-2">
             <MapPin className="w-4 h-4" />
             Dirección
           </label>
@@ -101,13 +101,13 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
             value={formData.direccion}
             onChange={(e) => handleChange('direccion', e.target.value)}
             placeholder="Av. Example 123, Ciudad"
-            className="px-3 py-2 border rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-white text-sm"
+            className="px-3 py-2 border rounded-md bg-card border-border text-foreground text-sm"
           />
         </div>
 
         {/* Facebook */}
         <div className="flex flex-col gap-2">
-          <label htmlFor="fb" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+          <label htmlFor="fb" className="text-sm font-medium text-foreground flex items-center gap-2">
             <Facebook className="w-4 h-4" />
             Facebook
           </label>
@@ -118,13 +118,13 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
             value={formData.fb}
             onChange={(e) => handleChange('fb', e.target.value)}
             placeholder="https://facebook.com/tuempresa"
-            className="px-3 py-2 border rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-white text-sm"
+            className="px-3 py-2 border rounded-md bg-card border-border text-foreground text-sm"
           />
         </div>
 
         {/* Instagram */}
         <div className="flex flex-col gap-2">
-          <label htmlFor="instagram" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+          <label htmlFor="instagram" className="text-sm font-medium text-foreground flex items-center gap-2">
             <Instagram className="w-4 h-4" />
             Instagram
           </label>
@@ -135,13 +135,13 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
             value={formData.instagram}
             onChange={(e) => handleChange('instagram', e.target.value)}
             placeholder="https://instagram.com/tuempresa"
-            className="px-3 py-2 border rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-white text-sm"
+            className="px-3 py-2 border rounded-md bg-card border-border text-foreground text-sm"
           />
         </div>
 
         {/* URL del Mapa */}
         <div className="flex flex-col gap-2 md:col-span-2">
-          <label htmlFor="url_mapa" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+          <label htmlFor="url_mapa" className="text-sm font-medium text-foreground flex items-center gap-2">
             <LinkIcon className="w-4 h-4" />
             Embed del mapa (iframe)
           </label>
@@ -152,9 +152,9 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
             value={formData.url_mapa}
             onChange={(e) => handleChange('url_mapa', e.target.value)}
             placeholder="https://www.google.com/maps/embed?pb=..."
-            className="px-3 py-2 border rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-white text-sm"
+            className="px-3 py-2 border rounded-md bg-card border-border text-foreground text-sm"
           />
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-muted-foreground">
             Ir a Google Maps → Compartir → Insertar mapa → Copiar HTML → Pegar solo la URL del src
           </span>
         </div>
@@ -169,7 +169,7 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
           {saving ? 'Guardando...' : 'Guardar datos'}
         </button>
         {saved && (
-          <span className="text-green-600 text-sm">¡Datos guardados correctamente!</span>
+          <span className="text-primary text-sm">¡Datos guardados correctamente!</span>
         )}
       </div>
     </form>

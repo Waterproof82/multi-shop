@@ -7,6 +7,7 @@ import { CategoryNav } from "@/components/category-nav"
 import { MenuSection } from "@/components/menu-section"
 import { SiteFooter } from "@/components/site-footer"
 import { CartDrawer } from "@/components/cart-drawer"
+import { CartToast } from "@/components/cart-toast"
 import { PromoNotification } from "@/components/promo-notification"
 import type { EmpresaPublic } from "@/core/domain/entities/types"
 
@@ -28,7 +29,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa }: Readon
           {menuData.length > 0 ? (
             <>
               <CategoryNav categories={menuData} />
-              <div className="mt-10 space-y-16 md:space-y-24">
+              <div className="mt-8 space-y-12 md:space-y-16">
                 {menuData.map((category) => (
                   <MenuSection key={category.id} category={category} showCart={showCart} />
                 ))}
@@ -43,6 +44,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa }: Readon
       </main>
       <SiteFooter empresa={empresa} />
       <CartDrawer />
+      {showCart && <CartToast />}
     </div>
   );
 }

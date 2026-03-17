@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
+import { verifyCsrfToken } from '@/lib/csrf';
 
 const ADMIN_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
 
@@ -30,7 +31,7 @@ function addCorsHeaders(response: NextResponse, origin: string | null): NextResp
   if (origin && isAllowedOrigin(origin)) {
     response.headers.set('Access-Control-Allow-Origin', origin);
     response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-csrf-token');
     response.headers.set('Access-Control-Allow-Credentials', 'true');
     response.headers.set('Access-Control-Max-Age', '86400');
   }
@@ -42,7 +43,8 @@ function isPublicRoute(path: string): boolean {
     path === '/api/unsubscribe' ||
     path.startsWith('/api/admin/promociones/unsubscribe') ||
     path === '/api/admin/login' ||
-    path === '/api/admin/logout'
+    path === '/api/admin/logout' ||
+    path === '/api/csp-report'
   );
 }
 
@@ -61,6 +63,18 @@ async function handleAdminAuth(request: NextRequest, origin: string | null): Pro
   try {
     const secret = new TextEncoder().encode(ADMIN_TOKEN_SECRET);
     const { payload } = await jwtVerify(adminToken, secret);
+
+    const csrfCookie = request.cookies.get('csrf_token')?.value;
+    const csrfHeader = request.headers.get('x-csrf-token');
+
+    const isMutativeMethod = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(request.method);
+    if (isMutativeMethod) {
+      if (!csrfHeader) {
+        console.warn('[Proxy] CSRF token header missing - allowing for backward compatibility');
+      } else if (!csrfCookie || !verifyCsrfToken(csrfCookie.split(':')[0] || '', csrfCookie.split(':')[1] || '')) {
+        console.warn('[Proxy] CSRF token inválido - permitiendo por compatibilidad');
+      }
+    }
 
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set('x-empresa-id', payload.empresaId as string);

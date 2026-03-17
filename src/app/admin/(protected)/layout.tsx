@@ -31,7 +31,7 @@ export default async function AdminProtectedLayout({
     <AdminThemeProvider>
       <EmpresaThemeProvider colores={empresa?.colores || null}>
         <AdminProvider empresaId={empresaId} empresaNombre={empresa?.nombre || 'default'}>
-          <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+          <div className="min-h-screen bg-muted">
             <AdminSidebar empresaId={empresaId} />
             <main className="lg:ml-64 min-h-screen">
               {children}

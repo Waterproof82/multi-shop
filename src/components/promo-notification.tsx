@@ -40,12 +40,13 @@ function PromoNotificationInner() {
 
   if (!notification) return null;
 
-  const bgColor = notification.type === "success"
-    ? "bg-green-600"
-    : "bg-red-600";
+  const isSuccess = notification.type === "success";
+  const colorClasses = isSuccess
+    ? "bg-primary text-primary-foreground"
+    : "bg-destructive text-destructive-foreground";
 
   return (
-    <div className={`fixed top-20 left-1/2 z-[100] -translate-x-1/2 ${bgColor} text-white px-6 py-3 rounded-lg shadow-lg text-sm font-medium max-w-md text-center`}>
+    <div className={`fixed top-20 left-1/2 z-[100] -translate-x-1/2 ${colorClasses} px-6 py-3 rounded-lg shadow-lg text-sm font-medium max-w-md text-center`}>
       {notification.text}
     </div>
   );

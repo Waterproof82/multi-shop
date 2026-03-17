@@ -21,11 +21,14 @@ const languages: { code: Language; label: string; flag: string }[] = [
 export function LanguageSelector() {
   const { language, setLanguage } = useLanguage()
 
+  const currentLang = languages.find(l => l.code === language) || languages[0]
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Select language" id="language-selector-trigger">
-          <Languages className="size-5" />
+        <Button variant="ghost" size="sm" className="gap-2 px-2" aria-label="Select language" id="language-selector-trigger">
+          <Languages className="size-4" />
+          <span className="text-xs font-medium uppercase">{currentLang.code}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-40">

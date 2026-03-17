@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Utensils, Tags, LogOut, Menu, X, ShoppingCart, BarChart3, Users, Megaphone, Settings } from 'lucide-react';
+import { LayoutDashboard, Utensils, Tags, LogOut, Menu, X, ShoppingCart, BarChart3, Users, Megaphone, Settings, ExternalLink } from 'lucide-react';
 
 interface NavItem {
   href: string;
@@ -32,18 +32,25 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
 
   const closeMenu = () => setIsOpen(false);
 
+  const handleLogout = async () => {
+    await fetch('/api/admin/logout', { method: 'POST' });
+    window.location.href = '/';
+  };
+
   return (
     <>
-      {/* Mobile header - solo visible en mobile */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white dark:bg-gray-800 shadow-sm z-30 flex items-center justify-between px-4">
-        <h1 className="text-lg font-serif font-bold text-primary dark:text-white">
+      {/* Mobile header */}
+      <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-card border-b border-border z-30 flex items-center justify-between px-4">
+        <h1 className="text-lg font-semibold text-foreground">
           Administración
         </h1>
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+          className="p-2 rounded-lg hover:bg-muted"
+          aria-label={isOpen ? 'Cerrar menú' : 'Abrir menú'}
+          aria-expanded={isOpen}
         >
-          {isOpen ? <X className="h-6 w-6 dark:text-white" /> : <Menu className="h-6 w-6 dark:text-white" />}
+          {isOpen ? <X className="h-5 w-5 text-foreground" /> : <Menu className="h-5 w-5 text-foreground" />}
         </button>
       </header>
 
@@ -59,24 +66,24 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
 
       {/* Sidebar */}
       <aside className={`
-        fixed top-0 h-full w-64 bg-white dark:bg-gray-800 shadow-lg z-40
+        fixed top-0 h-full w-64 bg-card border-r border-border z-40
         transform transition-transform duration-200 ease-in-out
         lg:translate-x-0
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="h-full flex flex-col">
-          {/* Desktop logo */}
-          <div className="hidden lg:block p-6 border-b dark:border-gray-700">
-            <h1 className="text-xl font-serif font-bold text-primary dark:text-white">
+          {/* Desktop header */}
+          <div className="hidden lg:block p-6 border-b border-border">
+            <h1 className="text-lg font-semibold text-foreground">
               Administración
             </h1>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               {empresaId ? 'Empresa conectada' : 'Panel'}
             </p>
           </div>
 
-          <nav className="flex-1 p-4 overflow-y-auto">
-            <ul className="space-y-2">
+          <nav className="flex-1 p-3 overflow-y-auto">
+            <ul className="space-y-1">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = pathname === item.href;
@@ -85,15 +92,16 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
                     <Link
                       href={item.href}
                       onClick={closeMenu}
+                      aria-current={isActive ? 'page' : undefined}
                       className={`
-                        flex items-center gap-3 px-4 py-3 rounded-lg transition-colors
-                        ${isActive 
-                          ? 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-foreground font-medium' 
-                          : 'text-gray-700 dark:text-gray-200 hover:bg-primary/10 hover:text-primary dark:hover:bg-gray-700'
+                        flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors
+                        ${isActive
+                          ? 'bg-primary text-primary-foreground font-medium'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                         }
                       `}
                     >
-                      <Icon className="h-5 w-5" />
+                      <Icon className="h-4 w-4" />
                       {item.label}
                     </Link>
                   </li>
@@ -102,16 +110,22 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
             </ul>
           </nav>
 
-          <div className="p-4 border-t dark:border-gray-700">
-            <form action="/api/admin/logout" method="POST">
-              <button
-                type="submit"
-                className="flex items-center gap-3 px-4 py-3 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 w-full rounded-lg transition-colors"
-              >
-                <LogOut className="h-5 w-5" />
-                Cerrar Sesión
-              </button>
-            </form>
+          <div className="p-3 border-t border-border space-y-1">
+            <a
+              href="/"
+              className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground w-full rounded-lg transition-colors"
+            >
+              <ExternalLink className="h-4 w-4" />
+              Ver tienda
+            </a>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="flex items-center gap-3 px-3 py-2.5 text-sm text-destructive hover:bg-destructive/10 w-full rounded-lg transition-colors"
+            >
+              <LogOut className="h-4 w-4" />
+              Cerrar Sesión
+            </button>
           </div>
         </div>
       </aside>

@@ -25,10 +25,10 @@ export default async function Home() {
 
   if (!empresa && empresaId === undefined) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FDFBF7]">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center p-8">
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">Dominio no configurado</h1>
-          <p className="text-gray-600">Esta web no está asociada a ninguna empresa.</p>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Dominio no configurado</h1>
+          <p className="text-muted-foreground">Esta web no está asociada a ninguna empresa.</p>
         </div>
       </div>
     );

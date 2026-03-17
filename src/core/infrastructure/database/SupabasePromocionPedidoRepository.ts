@@ -226,6 +226,13 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     totalAno: number;
     topPlatos: { nombre: string; cantidad: number; total: number }[];
     topPlatosAno: { nombre: string; cantidad: number; total: number }[];
+    pedidosPorDia: { dia: number; pedidos: number; ingresos: number }[];
+    clientesNuevos: number;
+    clientesRecurrentes: number;
+    ticketMedio: number;
+    ticketMedioAnterior: number;
+    pedidosAnterior: number;
+    ingresosAnterior: number;
   }>> {
     try {
       const now = new Date();
@@ -234,9 +241,15 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       const monthEnd = new Date(año, mes + 1, 0, 23, 59, 59).toISOString();
       const yearStart = new Date(año, 0, 1).toISOString();
 
+      // Previous month calculations
+      const mesAnterior = mes === 0 ? 11 : mes - 1;
+      const añoAnterior = mes === 0 ? año - 1 : año;
+      const mesAnteriorStart = new Date(añoAnterior, mesAnterior, 1).toISOString();
+      const mesAnteriorEnd = new Date(añoAnterior, mesAnterior + 1, 0, 23, 59, 59).toISOString();
+
       const { data: pedidos, error } = await this.supabase
         .from('pedidos')
-        .select('*')
+        .select('*, clientes!inner(*)')
         .eq('empresa_id', empresaId)
         .gte('created_at', yearStart);
 
@@ -258,10 +271,46 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         return fecha >= new Date(todayStart) && fecha <= new Date(monthEnd);
       });
       const pedidosMes = pedidosFiltrados.filter(p => new Date(p.created_at) >= new Date(monthStart) && new Date(p.created_at) <= new Date(monthEnd));
+      const pedidosAnterior = pedidosFiltrados.filter(p => {
+        const fecha = new Date(p.created_at);
+        return fecha >= new Date(mesAnteriorStart) && fecha <= new Date(mesAnteriorEnd);
+      });
 
       const totalHoy = pedidosHoy.reduce((sum, p) => sum + (p.total || 0), 0);
       const totalMes = pedidosMes.reduce((sum, p) => sum + (p.total || 0), 0);
       const totalAno = pedidosFiltrados.reduce((sum, p) => sum + (p.total || 0), 0);
+      const ingresosAnterior = pedidosAnterior.reduce((sum, p) => sum + (p.total || 0), 0);
+
+      // Build pedidos por dia
+      const pedidosPorDiaMap: Record<number, { pedidos: number; ingresos: number }> = {};
+      const daysInMonth = new Date(año, mes + 1, 0).getDate();
+      for (let d = 1; d <= daysInMonth; d++) {
+        pedidosPorDiaMap[d] = { pedidos: 0, ingresos: 0 };
+      }
+      pedidosMes.forEach(p => {
+        const dia = new Date(p.created_at).getDate();
+        if (pedidosPorDiaMap[dia]) {
+          pedidosPorDiaMap[dia].pedidos++;
+          pedidosPorDiaMap[dia].ingresos += p.total || 0;
+        }
+      });
+      const pedidosPorDia = Object.entries(pedidosPorDiaMap).map(([dia, data]) => ({
+        dia: parseInt(dia),
+        pedidos: data.pedidos,
+        ingresos: data.ingresos
+      }));
+
+      // Client stats - track unique clients
+      const clientesSet = new Set<string>();
+      pedidosMes.forEach(p => {
+        if (p.cliente_id) clientesSet.add(p.cliente_id);
+      });
+      const clientesNuevos = clientesSet.size;
+      const clientesRecurrentes = 0; // Would need historical data to calculate
+
+      // Ticket medio
+      const ticketMedio = pedidosMes.length > 0 ? totalMes / pedidosMes.length : 0;
+      const ticketMedioAnterior = pedidosAnterior.length > 0 ? ingresosAnterior / pedidosAnterior.length : 0;
 
       const buildTopPlatos = (pedidosList: typeof pedidosFiltrados) => {
         const dishCount: Record<string, { nombre: string; cantidad: number; total: number }> = {};
@@ -290,6 +339,13 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           totalAno,
           topPlatos: buildTopPlatos(pedidosMes),
           topPlatosAno: buildTopPlatos(pedidosFiltrados),
+          pedidosPorDia,
+          clientesNuevos,
+          clientesRecurrentes,
+          ticketMedio,
+          ticketMedioAnterior,
+          pedidosAnterior: pedidosAnterior.length,
+          ingresosAnterior,
         }
       };
     } catch (e) {

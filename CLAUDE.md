@@ -302,3 +302,30 @@ pnpm dev    # Desarrollo (Turbopack)
 pnpm build  # Build (ignorar "Skipping validation of types" — normal en Next.js 16)
 pnpm lint   # Lint
 ```
+
+## Design Context
+
+### Users
+- **Dueños de restaurantes/tiendas**: Gestionan menú, pedidos, clientes y configuración desde el panel admin. Necesitan una interfaz clara, profesional y eficiente.
+- **Clientes finales**: Ven el menú digital y hacen pedidos principalmente desde móvil. Necesitan una experiencia rápida, intuitiva y atractiva.
+- Ambos perfiles son igual de importantes. El diseño debe funcionar excelente para admin y público.
+
+### Brand Personality
+- **Profesional, confiable, premium**
+- Tono: Serio pero accesible. Transmite calidad y confianza como un SaaS de gama alta.
+- La interfaz debe sentirse como una herramienta profesional, no como un proyecto amateur.
+
+### Aesthetic Direction
+- **Paleta neutra y adaptable**: Base neutra (grises, blancos cálidos, negros suaves) que cada empresa personaliza desde admin > configuración con sus propios colores de marca.
+- No forzar una temática visual específica (ej: italiana) — la plataforma es genérica y multi-tenant.
+- Anti-referencias: Interfaces recargadas, colores chillones por defecto, diseños que parezcan plantillas genéricas.
+- Referencias: Apps SaaS premium (Linear, Stripe, Vercel) para admin. Apps de delivery limpias (estilo carta digital moderna) para público.
+- Tipografía: Inter para cuerpo, Playfair Display para acentos en headings del menú público (aporta elegancia sin dominar). Admin usa solo Inter.
+- Light mode como default. Dark mode en admin.
+
+### Design Principles
+1. **Neutral by default, branded by choice** — La base es neutra y elegante. Los colores de marca del tenant se aplican solo en puntos estratégicos (botones primarios, acentos, header). Nunca hardcodear colores de marca en componentes.
+2. **Mobile-first, always** — El 80%+ de clientes finales usa móvil. Cada decisión de diseño se valida primero en 375px.
+3. **Clarity over decoration** — Preferir whitespace y jerarquía tipográfica clara sobre ornamentos. Si un elemento no ayuda al usuario a completar su tarea, eliminarlo.
+4. **Consistent token usage** — SIEMPRE usar CSS variables/tokens del design system. Nunca hardcodear colores (`bg-black`, `text-blue-400`, etc.). Los componentes deben respetar el tema del tenant.
+5. **Accessible by default (WCAG AA)** — Contraste mínimo 4.5:1, navegación por teclado, aria-labels en elementos interactivos, soporte para reduced-motion.
