@@ -83,14 +83,18 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
                   <span className="text-sm text-background/75">{empresa.direccion}</span>
                 </li>
               )}
-              {empresa.telefono && (
+              {empresa.telefono && (() => {
+                const telefonoLimpio = empresa.telefono.replaceAll(/\D/g, '');
+                const telefonoConPrefijo = telefonoLimpio.startsWith('34') ? telefonoLimpio : `34${telefonoLimpio}`;
+                return (
                 <li className="flex items-center gap-3">
                   <MessageCircle className="w-4 h-4 text-background/40 shrink-0" />
-                  <a href={`https://wa.me/${empresa.telefono.replaceAll(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="text-sm text-background/75 hover:text-background transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm">
+                  <a href={`https://wa.me/${telefonoConPrefijo}`} target="_blank" rel="noopener noreferrer" className="text-sm text-background/75 hover:text-background transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm">
                     {empresa.telefono}
                   </a>
                 </li>
-              )}
+                );
+              })()}
               {empresa.emailNotification && (
                 <li className="flex items-center gap-3">
                   <Mail className="w-4 h-4 text-background/40 shrink-0" />

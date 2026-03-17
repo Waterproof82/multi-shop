@@ -3,6 +3,16 @@ import { UpdateEmpresaDTO } from "@/core/application/dtos/empresa.dto";
 import { Empresa, EmpresaColores, Result } from "@/core/domain/entities/types";
 import { logger } from "@/core/infrastructure/logging/logger";
 
+function normalizeSpanishPhone(phone: string | undefined): string | undefined {
+  if (!phone) return phone;
+  const cleaned = phone.replaceAll(/\D/g, '');
+  if (cleaned.startsWith('34')) return phone;
+  if (cleaned.startsWith('6') || cleaned.startsWith('7') || cleaned.startsWith('9')) {
+    return `34${cleaned}`;
+  }
+  return phone;
+}
+
 export class EmpresaUseCase {
   constructor(private readonly empresaRepo: IEmpresaRepository) {}
 
@@ -21,6 +31,9 @@ export class EmpresaUseCase {
 
   async update(empresaId: string, data: UpdateEmpresaDTO): Promise<Result<void>> {
     try {
+      if (data.telefono_whatsapp !== undefined) {
+        data.telefono_whatsapp = normalizeSpanishPhone(data.telefono_whatsapp);
+      }
       const result = await this.empresaRepo.update(empresaId, data);
       if (!result.success) {
         return { success: false, error: { ...result.error, method: 'EmpresaUseCase.update' } };

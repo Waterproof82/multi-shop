@@ -91,8 +91,9 @@ export async function POST(request: Request) {
     let whatsappLink: string | undefined;
     if (empresa.telefono_whatsapp) {
       const telefonoLimpio = empresa.telefono_whatsapp.replaceAll(/\D/g, '');
+      const telefonoConPrefijo = telefonoLimpio.startsWith('34') ? telefonoLimpio : `34${telefonoLimpio}`;
       const mensaje = generateWhatsAppMessage(items, total, nombre, numeroPedido);
-      whatsappLink = `https://wa.me/${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`;
+      whatsappLink = `https://wa.me/${telefonoConPrefijo}?text=${encodeURIComponent(mensaje)}`;
     }
 
     return NextResponse.json({ success: true, numeroPedido, pedidoId, whatsappLink, companyPhone: empresa.telefono_whatsapp });

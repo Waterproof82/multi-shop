@@ -89,11 +89,60 @@ export function CartDrawer() {
   const [email, setEmail] = useState('')
   const [errors, setErrors] = useState<{ nombre?: string; telefono?: string }>({})
 
-  const abrirWhatsApp = (numero: string, mensaje: string) => {
-    const textoEncoded = encodeURIComponent(mensaje);
-    const url = `https://wa.me/${numero}?text=${textoEncoded}`;
-    globalThis.location.href = url;
+  const isMobile = (): boolean => {
+    if (typeof navigator === 'undefined') return false;
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   };
+
+const abrirWhatsApp = (numero: string, mensaje: string) => {
+  // 1. Limpieza de número y asegurar prefijo internacional (ej. 34 para España)
+  let numeroLimpio = numero.replace(/\D/g, '');
+  if (numeroLimpio.length === 9) {
+    numeroLimpio = '34' + numeroLimpio;
+  }
+
+  const textoEncoded = encodeURIComponent(mensaje);
+  const ua = navigator.userAgent;
+
+  // 2. Detección de plataforma
+  const isAndroid = /Android/i.test(ua);
+  const isIOS = /iPhone|iPad|iPod/i.test(ua);
+
+  // 3. Lógica según plataforma
+  if (isAndroid) {
+    /**
+     * ANDROID: 
+     * 'wa.me' funciona como un "Intent". Chrome detecta el enlace y 
+     * abre la app directamente si está instalada.
+     */
+    window.location.href = `https://wa.me/${numeroLimpio}?text=${textoEncoded}`;
+    
+  } else if (isIOS) {
+    /**
+     * iOS (iPhone/iPad): 
+     * Safari gestiona muy bien los "Universal Links". 
+     * Si 'wa.me' diera problemas en versiones antiguas, se podría usar 'whatsapp://send?phone=',
+     * pero 'wa.me' es el estándar actual recomendado por Apple y WhatsApp.
+     */
+    window.location.href = `https://wa.me/${numeroLimpio}?text=${textoEncoded}`;
+
+  } else {
+    /**
+     * ESCRITORIO (Windows/Mac/Linux):
+     * Aquí usamos tu método estrella. El "/send/?" con el slash final es el que
+     * evita que el mensaje se pierda cuando la aplicación de escritorio está cerrada (Cold Start).
+     */
+    const urlApi = `https://api.whatsapp.com/send/?phone=${numeroLimpio}&text=${textoEncoded}`;
+    
+    // Abrimos en pestaña nueva para que, si no tiene la app, se quede en la web de WhatsApp
+    const nuevaPestana = window.open(urlApi, '_blank', 'noopener,noreferrer');
+    
+    // Fallback por si el navegador bloquea el popup
+    if (!nuevaPestana) {
+      window.location.assign(urlApi);
+    }
+  }
+};
 
   const getWhatsAppUrl = (): string | null => {
     const link = (globalThis as Record<string, unknown>).__whatsappLink as string | undefined;
@@ -235,6 +284,7 @@ export function CartDrawer() {
             <>
               <a
                 href={getWhatsAppUrl()!}
+                target="_blank"
                 rel="noopener noreferrer"
                 className="block w-full text-center bg-whatsapp text-primary-foreground py-3 px-4 rounded-full font-semibold hover:bg-whatsapp-hover transition-colors duration-150"
               >
