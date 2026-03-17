@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useCallback, useEffect, useRef } from "react"
-import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, Check } from "lucide-react"
+import { useState, useCallback, useRef } from "react"
+import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -90,36 +90,52 @@ export function CartDrawer() {
   const [errors, setErrors] = useState<{ nombre?: string; telefono?: string }>({})
 
   const abrirWhatsApp = (numero: string, mensaje: string) => {
-    const textoEncoded = encodeURIComponent(mensaje);
-    const url = `https://wa.me/${numero}?text=${textoEncoded}`;
-    globalThis.location.href = url;
-  };
+  let numeroLimpio = numero.replaceAll(/\D/g, '');
+  if (numeroLimpio.length === 9) {
+    numeroLimpio = '34' + numeroLimpio;
+  }
+
+  const textoEncoded = encodeURIComponent(mensaje);
+  const ua = typeof navigator === 'undefined' ? '' : navigator.userAgent;
+  const isAndroid = /Android/i.test(ua);
+  const isIOS = /iPhone|iPad|iPod/i.test(ua);
+
+  if (isAndroid || isIOS) {
+    globalThis.location.href = `https://wa.me/${numeroLimpio}?text=${textoEncoded}`;
+  } else {
+    const urlApi = `https://api.whatsapp.com/send/?phone=${numeroLimpio}&text=${textoEncoded}`;
+    const nuevaPestana = globalThis.open(urlApi, '_blank', 'noopener,noreferrer');
+    if (!nuevaPestana) {
+      globalThis.location.assign(urlApi);
+    }
+  }
+};
 
   const getWhatsAppUrl = (): string | null => {
     const link = (globalThis as Record<string, unknown>).__whatsappLink as string | undefined;
     return link || null;
   };
 
-  const validateName = (name: string): string | undefined => {
-    const trimmed = name.trim();
-    if (!trimmed) return t("validationNameRequired", language);
-    if (trimmed.length < 2) return t("validationNameMin", language);
-    if (trimmed.length > 100) return t("validationNameMax", language);
-    if (!/^[a-zA-ZÀ-ÿ\s'-]+$/u.test(trimmed)) return t("validationNameFormat", language);
-    return undefined;
-  };
-
-  const validatePhone = (phone: string): string | undefined => {
-    const trimmed = phone.trim();
-    if (!trimmed) return t("validationPhoneRequired", language);
-    const digitsOnly = trimmed.replaceAll(/\D/g, '');
-    if (digitsOnly.length < 9) return t("validationPhoneMin", language);
-    if (digitsOnly.length > 15) return t("validationPhoneMax", language);
-    return undefined;
-  };
-
   const handleConfirmOrder = useCallback(async () => {
     setErrors({});
+    
+    const validateName = (name: string): string | undefined => {
+      const trimmed = name.trim();
+      if (!trimmed) return t("validationNameRequired", language);
+      if (trimmed.length < 2) return t("validationNameMin", language);
+      if (trimmed.length > 100) return t("validationNameMax", language);
+      if (!/^[a-zA-ZÀ-ÿ\s'-]+$/u.test(trimmed)) return t("validationNameFormat", language);
+      return undefined;
+    };
+
+    const validatePhone = (phone: string): string | undefined => {
+      const trimmed = phone.trim();
+      if (!trimmed) return t("validationPhoneRequired", language);
+      const digitsOnly = trimmed.replaceAll(/\D/g, '');
+      if (digitsOnly.length < 9) return t("validationPhoneMin", language);
+      if (digitsOnly.length > 15) return t("validationPhoneMax", language);
+      return undefined;
+    };
     
     const nombreError = validateName(nombre);
     const telefonoError = validatePhone(telefono);
@@ -235,6 +251,7 @@ export function CartDrawer() {
             <>
               <a
                 href={getWhatsAppUrl()!}
+                target="_blank"
                 rel="noopener noreferrer"
                 className="block w-full text-center bg-whatsapp text-primary-foreground py-3 px-4 rounded-full font-semibold hover:bg-whatsapp-hover transition-colors duration-150"
               >
@@ -306,13 +323,16 @@ export function CartDrawer() {
                   const itemKey = getItemKey(ci.item, ci.selectedComplements);
                   const complementPrice = ci.selectedComplements?.reduce((sum, c) => sum + c.price, 0) || 0;
                   const totalItemPrice = ci.item.price + complementPrice;
+                  let itemAnimationClass = '';
+                  if (ci.justAdded) {
+                    itemAnimationClass = 'animate-cart-item-add';
+                  } else if (ci.justRemoved) {
+                    itemAnimationClass = 'animate-cart-item-remove';
+                  }
                   return (
                     <li 
                       key={itemKey} 
-                      className={`flex items-center gap-3 rounded-lg bg-card p-3 ${
-                        ci.justAdded ? 'animate-cart-item-add' : 
-                        ci.justRemoved ? 'animate-cart-item-remove' : ''
-                      }`}
+                      className={`flex items-center gap-3 rounded-lg bg-card p-3 ${itemAnimationClass}`}
                     >
                       <div className="flex-1">
                         <p className="font-semibold text-card-foreground">
