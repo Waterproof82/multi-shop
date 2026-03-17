@@ -4,7 +4,8 @@ import { getMenuUseCase } from '@/lib/server-services';
 import Link from 'next/link';
 import { ShoppingBag, Users, Package, TrendingUp, ArrowRight, Clock } from 'lucide-react';
 import type { MenuCategoryVM } from '@/core/application/dtos/menu-view-model';
-import { PEDIDO_ESTADO_LABELS } from '@/core/domain/constants/pedido';
+import { PEDIDO_ESTADO_LABELS, PEDIDO_ESTADO_COLORS } from '@/core/domain/constants/pedido';
+import type { PedidoEstado } from '@/core/domain/constants/pedido';
 
 export default async function AdminDashboard() {
   const cookieStore = await cookies();
@@ -98,8 +99,8 @@ export default async function AdminDashboard() {
         
         <Link href="/admin/pedidos" className="bg-card p-4 lg:p-5 rounded-lg border border-border hover:border-primary/30 transition-colors group">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
+            <div className="w-10 h-10 rounded-lg bg-chart-2/10 flex items-center justify-center">
+              <TrendingUp className="w-5 h-5 text-chart-2" />
             </div>
             <div>
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Este mes</p>
@@ -110,8 +111,8 @@ export default async function AdminDashboard() {
         
         <Link href="/admin/productos" className="bg-card p-4 lg:p-5 rounded-lg border border-border hover:border-primary/30 transition-colors group">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-              <Package className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            <div className="w-10 h-10 rounded-lg bg-chart-4/10 flex items-center justify-center">
+              <Package className="w-5 h-5 text-chart-4" />
             </div>
             <div>
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Productos</p>
@@ -122,8 +123,8 @@ export default async function AdminDashboard() {
         
         <Link href="/admin/clientes" className="bg-card p-4 lg:p-5 rounded-lg border border-border hover:border-primary/30 transition-colors group">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-              <Users className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+            <div className="w-10 h-10 rounded-lg bg-chart-5/10 flex items-center justify-center">
+              <Users className="w-5 h-5 text-chart-5" />
             </div>
             <div>
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Especiales</p>
@@ -171,9 +172,7 @@ export default async function AdminDashboard() {
                   <div className="flex items-center gap-3">
                     <span className="font-medium text-foreground">#{pedido.numero_pedido}</span>
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      pedido.estado === 'completado' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                      pedido.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                      'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
+                      PEDIDO_ESTADO_COLORS[pedido.estado as PedidoEstado] || 'bg-muted text-muted-foreground'
                     }`}>
                       {PEDIDO_ESTADO_LABELS[pedido.estado as keyof typeof PEDIDO_ESTADO_LABELS] || pedido.estado}
                     </span>

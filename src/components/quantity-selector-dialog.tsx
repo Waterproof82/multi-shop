@@ -164,6 +164,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
                 value={quantity}
                 className="mx-1 h-10 w-12 flex items-center justify-center text-center text-lg font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 readOnly
+                tabIndex={-1}
                 aria-live="polite"
                 aria-label={t("quantity", language)}
               />

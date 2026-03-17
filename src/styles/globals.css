@@ -34,6 +34,8 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-whatsapp: var(--whatsapp);
+  --color-whatsapp-hover: var(--whatsapp-hover);
 
   --font-serif: var(--font-playfair), 'Playfair Display', Georgia, serif;
   --font-sans: var(--font-inter), 'Inter', system-ui, sans-serif;
@@ -83,6 +85,8 @@
   --sidebar-accent-foreground: #18181B;
   --sidebar-border: #E4E4E7;
   --sidebar-ring: #18181B;
+  --whatsapp: #25D366;
+  --whatsapp-hover: #20BD5A;
 }
 
 .dark {
@@ -118,6 +122,8 @@
   --sidebar-accent-foreground: #FAFAFA;
   --sidebar-border: #27272A;
   --sidebar-ring: #D4D4D8;
+  --whatsapp: #25D366;
+  --whatsapp-hover: #20BD5A;
 }
 
 @keyframes badge-pop {

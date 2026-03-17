@@ -123,6 +123,7 @@ export function CartDrawer() {
       const data = await res.json();
       
       if (res.ok) {
+        closeCart();
         setConfirming(true);
         setNombre('');
         setTelefono('');
@@ -160,7 +161,7 @@ export function CartDrawer() {
       }
     } catch (err) {
       console.error('Error:', err);
-      setErrors({ nombre: "Error de conexión. Por favor, inténtalo de nuevo." });
+      setErrors({ nombre: t("connectionError", language) });
     } finally {
       setSending(false);
     }
@@ -196,7 +197,7 @@ export function CartDrawer() {
               <a
                 href={getWhatsAppUrl()!}
                 rel="noopener noreferrer"
-                className="block w-full text-center bg-[#25D366] text-white py-3 px-4 rounded-full font-semibold hover:bg-[#20BD5A] transition-colors"
+                className="block w-full text-center bg-whatsapp text-white py-3 px-4 rounded-full font-semibold hover:bg-whatsapp-hover transition-colors"
               >
                 {t("whatsappResend", language)}
               </a>
@@ -204,7 +205,7 @@ export function CartDrawer() {
                 href={getWhatsAppUrl()!}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block w-full text-center text-[#25D366] text-sm py-2 font-medium hover:underline"
+                className="block w-full text-center text-whatsapp text-sm py-2 font-medium hover:underline"
               >
                 {t("whatsappWeb", language)}
               </a>
@@ -213,7 +214,7 @@ export function CartDrawer() {
           {companyPhone && orderNumber && (
             <div className="bg-foreground text-background p-3 rounded-lg mt-4 w-full text-center">
               <p className="text-xs font-medium">
-                * {t("whatsappCantSend", language)} {companyPhone} con pedido #{orderNumber}
+                * {t("whatsappCantSend", language)} {companyPhone} {t("withOrderNumber", language)} #{orderNumber}
               </p>
             </div>
           )}
@@ -255,7 +256,7 @@ export function CartDrawer() {
               }}
               className="mt-2 px-6 py-2 bg-primary text-primary-foreground rounded-full font-medium hover:bg-primary/90 transition-colors"
             >
-              {t("viewMenu", language) || "Ver menú"}
+              {t("viewMenu", language)}
             </button>
           </div>
         ) : (
@@ -331,6 +332,7 @@ export function CartDrawer() {
                       className={`h-9 ${errors.nombre ? 'border-destructive' : ''}`}
                       maxLength={100}
                       autoComplete="name"
+                      aria-label={t("placeholderName", language)}
                     />
                   </div>
                   {errors.nombre && <p className="text-xs text-destructive mt-1 ml-6">{errors.nombre}</p>}
@@ -346,6 +348,7 @@ export function CartDrawer() {
                       className={`h-9 ${errors.telefono ? 'border-destructive' : ''}`}
                       maxLength={15}
                       autoComplete="tel"
+                      aria-label={t("placeholderPhone", language)}
                     />
                   </div>
                   {errors.telefono && <p className="text-xs text-destructive mt-1 ml-6">{errors.telefono}</p>}
@@ -361,6 +364,7 @@ export function CartDrawer() {
                       className="h-9"
                       maxLength={100}
                       autoComplete="email"
+                      aria-label={t("placeholderEmail", language)}
                     />
                   </div>
                   <p className="text-xs mt-1 ml-6 text-muted-foreground">{t("promoMessage", language)}</p>
@@ -378,7 +382,7 @@ export function CartDrawer() {
                 <Button 
                   className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full py-3 text-lg font-semibold shadow-md transition-colors duration-200"
                   size="lg"
-                  onClick={() => { closeCart(); handleConfirmOrder(); }}
+                  onClick={handleConfirmOrder}
                   disabled={sending || confirming}
                 >
                   {sending || confirming ? t("sending", language) : t("sendOrder", language)}

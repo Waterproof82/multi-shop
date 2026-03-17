@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Utensils, Tags, LogOut, Menu, X, ShoppingCart, BarChart3, Users, Megaphone, Settings } from 'lucide-react';
+import { LayoutDashboard, Utensils, Tags, LogOut, Menu, X, ShoppingCart, BarChart3, Users, Megaphone, Settings, ExternalLink } from 'lucide-react';
 
 interface NavItem {
   href: string;
@@ -32,6 +32,11 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
 
   const closeMenu = () => setIsOpen(false);
 
+  const handleLogout = async () => {
+    await fetch('/api/admin/logout', { method: 'POST' });
+    window.location.href = '/';
+  };
+
   return (
     <>
       {/* Mobile header */}
@@ -42,6 +47,8 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="p-2 rounded-lg hover:bg-muted"
+          aria-label={isOpen ? 'Cerrar menú' : 'Abrir menú'}
+          aria-expanded={isOpen}
         >
           {isOpen ? <X className="h-5 w-5 text-foreground" /> : <Menu className="h-5 w-5 text-foreground" />}
         </button>
@@ -85,6 +92,7 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
                     <Link
                       href={item.href}
                       onClick={closeMenu}
+                      aria-current={isActive ? 'page' : undefined}
                       className={`
                         flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors
                         ${isActive
@@ -102,16 +110,22 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
             </ul>
           </nav>
 
-          <div className="p-3 border-t border-border">
-            <form action="/api/admin/logout" method="POST">
-              <button
-                type="submit"
-                className="flex items-center gap-3 px-3 py-2.5 text-sm text-destructive hover:bg-destructive/10 w-full rounded-lg transition-colors"
-              >
-                <LogOut className="h-4 w-4" />
-                Cerrar Sesión
-              </button>
-            </form>
+          <div className="p-3 border-t border-border space-y-1">
+            <a
+              href="/"
+              className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground w-full rounded-lg transition-colors"
+            >
+              <ExternalLink className="h-4 w-4" />
+              Ver tienda
+            </a>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="flex items-center gap-3 px-3 py-2.5 text-sm text-destructive hover:bg-destructive/10 w-full rounded-lg transition-colors"
+            >
+              <LogOut className="h-4 w-4" />
+              Cerrar Sesión
+            </button>
           </div>
         </div>
       </aside>

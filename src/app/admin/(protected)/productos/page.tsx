@@ -2,9 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Plus, Pencil, Trash2, X, Loader2, Image as ImageIcon, Search, ArrowUpDown, ArrowUp, ArrowDown, Languages, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Image as ImageIcon, Search, ArrowUpDown, ArrowUp, ArrowDown, Languages, ChevronDown, ChevronRight } from 'lucide-react';
 import { ImageUploader } from '@/components/ui/image-uploader';
 import { useAdmin } from '@/lib/admin-context';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 
 interface Categoria {
   id: string;
@@ -129,6 +136,7 @@ export default function ProductosPage() {
   const [sortField, setSortField] = useState<keyof Producto | 'categoria'>('titulo_es');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [showTranslations, setShowTranslations] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; id: string | null; nombre: string | null }>({ show: false, id: null, nombre: null });
 
   useEffect(() => {
     fetchData();
@@ -256,16 +264,23 @@ export default function ProductosPage() {
     }
   };
 
-  const handleDeleteProduct = async (id: string) => {
-    if (!confirm('¿Estás seguro de eliminar este producto?')) return;
+  const handleDeleteProduct = (id: string) => {
+    const prod = productos.find(p => p.id === id);
+    setDeleteConfirm({ show: true, id, nombre: prod?.titulo_es ?? null });
+  };
+
+  const confirmDeleteProduct = async () => {
+    if (!deleteConfirm.id) return;
     try {
-      const res = await fetch(`/api/admin/productos?id=${id}`, {
+      const res = await fetch(`/api/admin/productos?id=${deleteConfirm.id}`, {
         method: 'DELETE',
       });
       if (!res.ok) throw new Error('Error al eliminar');
       await fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
+    } finally {
+      setDeleteConfirm({ show: false, id: null, nombre: null });
     }
   };
 
@@ -467,12 +482,14 @@ export default function ProductosPage() {
                     <button
                       onClick={() => openEditModal(prod)}
                       className="text-primary hover:text-primary/80 mr-3"
+                      aria-label={`Editar ${prod.titulo_es}`}
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => handleDeleteProduct(prod.id)}
                       className="text-destructive hover:text-destructive/80"
+                      aria-label={`Eliminar ${prod.titulo_es}`}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -528,12 +545,14 @@ export default function ProductosPage() {
                       <button
                         onClick={() => openEditModal(prod)}
                         className="p-1.5 text-primary hover:bg-primary/10 dark:hover:bg-primary/20 rounded"
+                        aria-label={`Editar ${prod.titulo_es}`}
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => handleDeleteProduct(prod.id)}
                         className="p-1.5 text-destructive hover:bg-destructive/10 rounded"
+                        aria-label={`Eliminar ${prod.titulo_es}`}
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -564,19 +583,16 @@ export default function ProductosPage() {
         </div>
       </div>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center p-6 border-b border-border">
-              <h2 className="text-xl font-semibold text-foreground">
-                {editingId ? 'Editar Producto' : 'Nuevo Producto'}
-              </h2>
-              <button onClick={closeModal} className="text-muted-foreground hover:text-foreground">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+      <Dialog open={isModalOpen} onOpenChange={(open) => { if (!open) closeModal(); }}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingId ? 'Editar Producto' : 'Nuevo Producto'}</DialogTitle>
+            <DialogDescription>
+              {editingId ? 'Modifica los datos del producto.' : 'Rellena los datos para crear un producto.'}
+            </DialogDescription>
+          </DialogHeader>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label htmlFor="titulo_es" className="block text-sm font-medium text-foreground mb-1">
@@ -634,14 +650,12 @@ export default function ProductosPage() {
                     {(() => {
                       const parents = categorias.filter(c => !c.categoria_padre_id);
                       const children = categorias.filter(c => c.categoria_padre_id);
-                      
+
                       return parents.map(parent => {
                         const childCats = children.filter(c => c.categoria_padre_id === parent.id);
-                        // Si tiene subcategorías, usar optgroup
                         if (childCats.length > 0) {
                           return (
                             <optgroup key={parent.id} label={parent.nombre_es}>
-                              {/* También añadir la categoría padre como opción */}
                               <option key={`${parent.id}-self`} value={parent.id}>
                                 {parent.nombre_es} (principal)
                               </option>
@@ -653,7 +667,6 @@ export default function ProductosPage() {
                             </optgroup>
                           );
                         }
-                        // Si no tiene subcategorías, mostrar directamente
                         return (
                           <option key={parent.id} value={parent.id}>
                             {parent.nombre_es}
@@ -739,9 +752,38 @@ export default function ProductosPage() {
                 </button>
               </div>
             </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteConfirm.show} onOpenChange={(open) => { if (!open) setDeleteConfirm({ show: false, id: null, nombre: null }); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              <div className="p-2 bg-destructive/10 rounded-full">
+                <Trash2 className="w-5 h-5 text-destructive" />
+              </div>
+              Eliminar producto
+            </DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de que quieres eliminar <strong>{deleteConfirm.nombre}</strong>? Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-3 justify-end">
+            <button
+              onClick={() => setDeleteConfirm({ show: false, id: null, nombre: null })}
+              className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={confirmDeleteProduct}
+              className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg"
+            >
+              Eliminar
+            </button>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

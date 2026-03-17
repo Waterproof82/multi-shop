@@ -23,11 +23,18 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const shouldReduceMotion = useReducedMotion() ?? false;
 
-  const itemVariants = shouldReduceMotion
-    ? { initial: {}, whileInView: {} }
+  const containerVariants = shouldReduceMotion
+    ? { hidden: {}, visible: {} }
     : {
-        initial: { opacity: 0, y: 16 },
-        whileInView: { opacity: 1, y: 0 },
+        hidden: {},
+        visible: { transition: { staggerChildren: 0.06, delayChildren: 0 } },
+      };
+
+  const itemVariants = shouldReduceMotion
+    ? { hidden: {}, visible: {} }
+    : {
+        hidden: { opacity: 0, y: 16 },
+        visible: { opacity: 1, y: 0, transition: { duration: 0.35 } },
       };
 
   const handleItemClick = useCallback((item: MenuItemVM) => {
@@ -43,7 +50,7 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
     : category.descripcion;
 
   return (
-    <section id={category.id} className="scroll-mt-32" style={{ scrollMarginTop: '8rem' }}>
+    <section id={category.id} className="scroll-mt-32">
       <div className="mb-5 flex items-center gap-4">
         <h2 className="font-serif text-2xl font-semibold text-foreground md:text-3xl tracking-tight">
           {(translationLang && category.translations?.[translationLang]?.name) || category.label}
@@ -59,7 +66,7 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
 
       {isCategoryWithComplements && category.complementoDeId && (
         <p className="mb-4 text-sm text-muted-foreground">
-          Selecciona los complementos opcionales al añadir productos.
+          {t("selectOptionalComplements", language)}
         </p>
       )}
 
@@ -77,13 +84,17 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
           ))}
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {category.items.map((item, index) => (
+        <motion.div
+          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-40px" }}
+        >
+          {category.items.map((item) => (
             <motion.div
               key={item.id}
               variants={itemVariants}
-              viewport={{ once: true, margin: "-40px" }}
-              transition={{ duration: shouldReduceMotion ? 0 : 0.35, delay: shouldReduceMotion ? 0 : Math.min(index * 0.06, 0.3) }}
               className="h-full"
             >
               <MenuItemCard
@@ -94,7 +105,7 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
               />
             </motion.div>
           ))}
-        </div>
+        </motion.div>
       )}
 
       <QuantitySelectorDialog
@@ -115,11 +126,18 @@ const SubcategorySection = memo(function SubcategorySection(props: Readonly<{
 }>) {
   const { subcategory, translationLang, onItemClick, showCart, shouldReduceMotion = false } = props;
 
-  const subVariants = shouldReduceMotion
-    ? { initial: {}, whileInView: {} }
+  const subContainerVariants = shouldReduceMotion
+    ? { hidden: {}, visible: {} }
     : {
-        initial: { opacity: 0, y: 16 },
-        whileInView: { opacity: 1, y: 0 },
+        hidden: {},
+        visible: { transition: { staggerChildren: 0.06 } },
+      };
+
+  const subVariants = shouldReduceMotion
+    ? { hidden: {}, visible: {} }
+    : {
+        hidden: { opacity: 0, y: 16 },
+        visible: { opacity: 1, y: 0, transition: { duration: 0.35 } },
       };
 
   const displayDescripcion = translationLang && subcategory.descripcionTranslations?.[translationLang]
@@ -137,13 +155,17 @@ const SubcategorySection = memo(function SubcategorySection(props: Readonly<{
           {displayDescripcion}
         </p>
       )}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {subcategory.products.map((item, index) => (
+      <motion.div
+        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+        variants={subContainerVariants}
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, margin: "-40px" }}
+      >
+        {subcategory.products.map((item) => (
           <motion.div
             key={item.id}
             variants={subVariants}
-            viewport={{ once: true, margin: "-40px" }}
-            transition={{ duration: shouldReduceMotion ? 0 : 0.35, delay: shouldReduceMotion ? 0 : Math.min(index * 0.06, 0.3) }}
             className="h-full"
           >
             <MenuItemCard
@@ -154,7 +176,7 @@ const SubcategorySection = memo(function SubcategorySection(props: Readonly<{
             />
           </motion.div>
         ))}
-      </div>
+      </motion.div>
     </div>
   );
 })

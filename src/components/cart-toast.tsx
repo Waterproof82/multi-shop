@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { ShoppingBag, X } from 'lucide-react';
 import { useCart } from '@/lib/cart-context';
 import { useLanguage } from '@/lib/language-context';
+import { t } from '@/lib/translations';
 
 export function CartToast() {
   const { lastAddedItem, totalItems, totalPrice, isCartOpen, openCart } = useCart();
@@ -12,10 +13,14 @@ export function CartToast() {
   const [itemName, setItemName] = useState('');
 
   useEffect(() => {
-    if (lastAddedItem && !isCartOpen) {
+    if (!lastAddedItem) {
+      setVisible(false);
+      return;
+    }
+    if (!isCartOpen) {
       setItemName(lastAddedItem.name);
       setVisible(true);
-      
+
       const timer = setTimeout(() => {
         setVisible(false);
       }, 3000);
@@ -39,13 +44,13 @@ export function CartToast() {
               <ShoppingBag className="w-4 h-4 text-primary-foreground" />
             </div>
             <span className="text-sm font-medium text-foreground">
-              {lastAddedItem?.quantity}x añadido{lastAddedItem && lastAddedItem.quantity > 1 ? 's' : ''}
+              {lastAddedItem?.quantity}x {lastAddedItem && lastAddedItem.quantity > 1 ? t("itemsAdded", language) : t("itemAdded", language)}
             </span>
           </div>
           <button
             onClick={handleClose}
             className="p-1 hover:bg-muted rounded-full transition-colors"
-            aria-label="Cerrar"
+            aria-label={t("close", language)}
           >
             <X className="w-4 h-4 text-muted-foreground" />
           </button>
@@ -66,7 +71,7 @@ export function CartToast() {
               }}
               className="text-xs font-medium text-primary hover:underline"
             >
-              Ver carrito →
+              {t("viewCart", language)} →
             </button>
           </div>
         </div>

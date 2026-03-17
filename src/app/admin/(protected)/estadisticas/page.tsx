@@ -165,14 +165,14 @@ export default function EstadisticasPage() {
             <p className="text-sm text-muted-foreground">vs mes anterior</p>
             {stats && stats.pedidosAnterior > 0 ? (
               stats.pedidosMes >= stats.pedidosAnterior ? (
-                <ArrowUpRight className="w-4 h-4 text-green-500" />
+                <ArrowUpRight className="w-4 h-4 text-primary" />
               ) : (
-                <ArrowDownRight className="w-4 h-4 text-red-500" />
+                <ArrowDownRight className="w-4 h-4 text-destructive" />
               )
             ) : null}
           </div>
           {stats && stats.pedidosAnterior > 0 ? (
-            <p className={`text-2xl font-bold ${stats.pedidosMes >= stats.pedidosAnterior ? 'text-green-600' : 'text-red-600'}`}>
+            <p className={`text-2xl font-bold ${stats.pedidosMes >= stats.pedidosAnterior ? 'text-primary' : 'text-destructive'}`}>
               {((stats.pedidosMes - stats.pedidosAnterior) / stats.pedidosAnterior * 100).toFixed(1)}%
             </p>
           ) : (

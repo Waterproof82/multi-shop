@@ -53,11 +53,19 @@ export function EmpresaThemeProvider({ children, colores }: EmpresaThemeProvider
       '--ring': brandColors.primary,
     };
 
+    const appliedProps: string[] = [];
     for (const [prop, value] of Object.entries(tokenMap)) {
       if (!isValidHex(value)) continue;
       root.style.setProperty(prop, value);
       root.style.setProperty(`--color-${prop.slice(2)}`, value);
+      appliedProps.push(prop, `--color-${prop.slice(2)}`);
     }
+
+    return () => {
+      for (const prop of appliedProps) {
+        root.style.removeProperty(prop);
+      }
+    };
   }, [brandColors, mounted]);
 
   return <>{children}</>;

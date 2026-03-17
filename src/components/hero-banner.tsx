@@ -43,7 +43,7 @@ export function HeroBanner({ empresa }: HeroBannerProps) {
             backgroundPosition: 'center',
           }}
         >
-          <div className="absolute inset-0 bg-black/60" />
+          <div className="absolute inset-0 bg-black/70" />
         </div>
       )}
       <div className="absolute inset-0 opacity-10 z-0">

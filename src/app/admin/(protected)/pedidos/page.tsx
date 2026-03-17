@@ -4,6 +4,13 @@ import { useState, useEffect, Fragment } from 'react';
 import { Search, ChevronDown, ChevronUp, Check, Clock, Trash2 } from 'lucide-react';
 import type { PedidoItem, PedidoComplemento } from '@/core/domain/entities/types';
 import { PEDIDO_ESTADOS, PEDIDO_ESTADO_LABELS, PEDIDO_ESTADO_COLORS, type PedidoEstado } from '@/core/domain/constants/pedido';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 
 interface Cliente {
   nombre: string | null;
@@ -172,7 +179,7 @@ export default function PedidosPage() {
           <table className="w-full">
             <thead className="bg-muted">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'numero_pedido' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
                   <button onClick={() => handleSort('numero_pedido')} className="flex items-center gap-1">
                     #
                     {sortField === 'numero_pedido' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
@@ -184,19 +191,19 @@ export default function PedidosPage() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Teléfono
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'total' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
                   <button onClick={() => handleSort('total')} className="flex items-center gap-1">
                     Total
                     {sortField === 'total' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'estado' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
                   <button onClick={() => handleSort('estado')} className="flex items-center gap-1">
                     Estado
                     {sortField === 'estado' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'created_at' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
                   <button onClick={() => handleSort('created_at')} className="flex items-center gap-1">
                     Fecha
                     {sortField === 'created_at' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
@@ -217,17 +224,24 @@ export default function PedidosPage() {
               ) : (
                 filteredPedidos.map((pedido) => (
                   <Fragment key={pedido.id}>
-                    <tr className="hover:bg-muted/50">
-                      <td className="px-4 py-3 whitespace-nowrap font-medium text-foreground" onClick={() => toggleExpand(pedido.id)}>
+                    <tr
+                      className="hover:bg-muted/50 cursor-pointer"
+                      role="button"
+                      tabIndex={0}
+                      aria-expanded={expandedPedido === pedido.id}
+                      onClick={() => toggleExpand(pedido.id)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExpand(pedido.id); } }}
+                    >
+                      <td className="px-4 py-3 whitespace-nowrap font-medium text-foreground">
                         #{pedido.numero_pedido}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground" onClick={() => toggleExpand(pedido.id)}>
+                      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                         {pedido.clientes?.nombre || '-'}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground" onClick={() => toggleExpand(pedido.id)}>
+                      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                         {pedido.clientes?.telefono || '-'}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap font-medium text-foreground" onClick={() => toggleExpand(pedido.id)}>
+                      <td className="px-4 py-3 whitespace-nowrap font-medium text-foreground">
                         {pedido.total.toFixed(2)} {pedido.moneda || '€'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
@@ -287,35 +301,35 @@ export default function PedidosPage() {
         </div>
       </div>
 
-      {deleteConfirm.show && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-card rounded-lg shadow-lg p-6 max-w-sm mx-4">
-            <div className="flex items-center gap-3 mb-4">
+      <Dialog open={deleteConfirm.show} onOpenChange={(open) => { if (!open) setDeleteConfirm({ show: false, id: null, numero: null }); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
               <div className="p-2 bg-destructive/10 rounded-full">
                 <Trash2 className="w-5 h-5 text-destructive" />
               </div>
-              <h3 className="text-lg font-semibold text-foreground">Eliminar pedido</h3>
-            </div>
-            <p className="text-muted-foreground mb-6">
+              Eliminar pedido
+            </DialogTitle>
+            <DialogDescription>
               ¿Estás seguro de que quieres eliminar el pedido <strong>#{deleteConfirm.numero}</strong>? Esta acción no se puede deshacer.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setDeleteConfirm({ show: false, id: null, numero: null })}
-                className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmDelete}
-                className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg"
-              >
-                Eliminar
-              </button>
-            </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-3 justify-end">
+            <button
+              onClick={() => setDeleteConfirm({ show: false, id: null, numero: null })}
+              className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={confirmDelete}
+              className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg"
+            >
+              Eliminar
+            </button>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

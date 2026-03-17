@@ -76,12 +76,20 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
   }, [])
 
   const removeItem = useCallback((itemKey: string) => {
-    setItems((prev) => prev.filter((ci) => getItemKey(ci.item, ci.selectedComplements) !== itemKey))
+    setItems((prev) => {
+      const next = prev.filter((ci) => getItemKey(ci.item, ci.selectedComplements) !== itemKey);
+      if (next.length === 0) setLastAddedItem(null);
+      return next;
+    })
   }, [])
 
   const updateQuantity = useCallback((itemKey: string, quantity: number) => {
     if (quantity <= 0) {
-      setItems((prev) => prev.filter((ci) => getItemKey(ci.item, ci.selectedComplements) !== itemKey))
+      setItems((prev) => {
+        const next = prev.filter((ci) => getItemKey(ci.item, ci.selectedComplements) !== itemKey);
+        if (next.length === 0) setLastAddedItem(null);
+        return next;
+      })
     } else {
       setItems((prev) =>
         prev.map((ci) => (getItemKey(ci.item, ci.selectedComplements) === itemKey ? { ...ci, quantity } : ci))
@@ -89,7 +97,7 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
     }
   }, [])
 
-  const clearCart = useCallback(() => setItems([]), [])
+  const clearCart = useCallback(() => { setItems([]); setLastAddedItem(null); }, [])
 
   const totalItems = items.reduce((sum, ci) => sum + ci.quantity, 0)
   const totalPrice = items.reduce((sum, ci) => {
