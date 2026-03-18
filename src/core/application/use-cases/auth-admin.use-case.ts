@@ -115,7 +115,7 @@ export class AuthAdminUseCase {
         e instanceof Error ? e.message : 'Token verification failed',
         'use-case',
         'AuthAdminUseCase.verifyToken',
-        { metadata: { hasToken: !!token } }
+        { details: { hasToken: !!token } }
       );
       return null;
     }

@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { Users, Mail, FileText, Send, CheckCircle, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { fetchWithCsrf, getCsrfToken } from '@/lib/csrf-client';
 
 interface Cliente {
   id: string;
@@ -148,8 +149,10 @@ export default function PromocionesPage() {
           
           const formData = new FormData();
           formData.append('file', optimized.file);
+          const csrfToken = getCsrfToken();
           const uploadRes = await fetch('/api/admin/upload-image', {
             method: 'POST',
+            headers: csrfToken ? { 'x-csrf-token': csrfToken } : {},
             body: formData,
           });
           if (!uploadRes.ok) {
@@ -168,9 +171,8 @@ export default function PromocionesPage() {
         }
       }
 
-      const res = await fetch('/api/admin/promociones', {
+      const res = await fetchWithCsrf('/api/admin/promociones', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           texto_promocion: promoTexto,
           imagen_url: imagenUrl,

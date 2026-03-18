@@ -5,6 +5,7 @@ import { Languages, ChevronDown, ChevronRight } from 'lucide-react';
 import { ImageUploader } from '@/components/ui/image-uploader';
 import { Textarea } from '@/components/ui/textarea';
 import type { UpdateEmpresaDTO } from '@/core/application/dtos/empresa.dto';
+import { fetchWithCsrf } from '@/lib/csrf-client';
 
 const IDIOMAS = [
   { key: 'es', label: 'Español' },
@@ -28,9 +29,8 @@ interface EmpresaAparienciaFormProps {
 }
 
 async function saveEmpresa(data: Partial<UpdateEmpresaDTO>) {
-  const res = await fetch('/api/admin/empresa', {
+  const res = await fetchWithCsrf('/api/admin/empresa', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
   return res.ok;

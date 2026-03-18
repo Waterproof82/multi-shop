@@ -6,6 +6,7 @@ import { Plus, Pencil, Trash2, Loader2, Image as ImageIcon, Search, ArrowUpDown,
 import { Input } from '@/components/ui/input';
 import { useAdmin } from '@/lib/admin-context';
 import { ProductFormDialog, DeleteConfirmDialog } from '@/components/admin/product-form-dialog';
+import { fetchWithCsrf } from '@/lib/csrf-client';
 import type { ProductoFormData } from '@/components/admin/product-form-dialog';
 
 interface Categoria {
@@ -131,9 +132,8 @@ export default function ProductosPage() {
         foto_url: formData.foto_url || null,
       };
 
-      const res = await fetch(url, {
+      const res = await fetchWithCsrf(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
@@ -215,7 +215,7 @@ export default function ProductosPage() {
   const confirmDeleteProduct = async () => {
     if (!deleteConfirm.id) return;
     try {
-      const res = await fetch(`/api/admin/productos?id=${deleteConfirm.id}`, {
+      const res = await fetchWithCsrf(`/api/admin/productos?id=${deleteConfirm.id}`, {
         method: 'DELETE',
       });
       if (!res.ok) throw new Error('Error al eliminar');

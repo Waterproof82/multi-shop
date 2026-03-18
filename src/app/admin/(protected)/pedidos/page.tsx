@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { fetchWithCsrf } from '@/lib/csrf-client';
 
 interface Cliente {
   nombre: string | null;
@@ -111,9 +112,8 @@ export default function PedidosPage() {
 
   const updateEstado = useCallback(async (id: string, nuevoEstado: string) => {
     try {
-      const res = await fetch('/api/admin/pedidos', {
+      const res = await fetchWithCsrf('/api/admin/pedidos', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, estado: nuevoEstado }),
       });
       if (res.ok) {
@@ -131,9 +131,8 @@ export default function PedidosPage() {
   const confirmDelete = async () => {
     if (!deleteConfirm.id) return;
     try {
-      const res = await fetch('/api/admin/pedidos', {
+      const res = await fetchWithCsrf('/api/admin/pedidos', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: deleteConfirm.id }),
       });
       if (res.ok) {

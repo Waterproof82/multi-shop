@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { fetchWithCsrf } from '@/lib/csrf-client';
 
 interface Category {
   id: string;
@@ -108,9 +109,8 @@ export default function CategoriasPage() {
       
       const method = editingId ? 'PUT' : 'POST';
 
-      const res = await fetch(url, {
+      const res = await fetchWithCsrf(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       });
 
@@ -132,7 +132,7 @@ export default function CategoriasPage() {
     if (!confirm('¿Estás seguro de eliminar esta categoría?')) return;
 
     try {
-      const res = await fetch(`/api/admin/categorias?id=${id}`, {
+      const res = await fetchWithCsrf(`/api/admin/categorias?id=${id}`, {
         method: 'DELETE',
       });
 
@@ -249,7 +249,7 @@ export default function CategoriasPage() {
           </div>
           <button
             onClick={openCreateModal}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring transition-colors duration-150"
           >
             <Plus className="h-4 w-4" />
             <span className="sm:hidden">Nueva</span>
@@ -355,13 +355,15 @@ export default function CategoriasPage() {
                   <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
                     <button
                       onClick={() => openEditModal(cat)}
-                      className="text-primary hover:text-primary/80 mr-3"
+                      aria-label={`Editar ${cat.nombre_es}`}
+                      className="text-primary hover:text-primary/80 mr-3 rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => handleDelete(cat.id)}
-                      className="text-destructive hover:text-destructive/80"
+                      aria-label={`Eliminar ${cat.nombre_es}`}
+                      className="text-destructive hover:text-destructive/80 rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -406,13 +408,15 @@ export default function CategoriasPage() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => openEditModal(cat)}
-                    className="p-1.5 text-primary hover:bg-primary/10 dark:hover:bg-primary/20 rounded"
+                    aria-label={`Editar ${cat.nombre_es}`}
+                    className="p-1.5 text-primary hover:bg-primary/10 dark:hover:bg-primary/20 rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                   >
                     <Pencil className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => handleDelete(cat.id)}
-                    className="p-1.5 text-destructive hover:bg-destructive/10 rounded"
+                    aria-label={`Eliminar ${cat.nombre_es}`}
+                    className="p-1.5 text-destructive hover:bg-destructive/10 rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>

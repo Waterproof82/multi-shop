@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { EmpresaColores } from '@/core/domain/entities/types';
 import { DEFAULT_EMPRESA_COLORES } from '@/core/domain/constants/empresa-defaults';
+import { fetchWithCsrf } from '@/lib/csrf-client';
 
 interface ColoresFormProps {
   readonly coloresIniciales: EmpresaColores | null;
@@ -43,9 +44,8 @@ export function ColoresForm({ coloresIniciales, empresaId }: ColoresFormProps) {
     setSaving(true);
 
     try {
-      const res = await fetch('/api/admin/update-colores', {
+      const res = await fetchWithCsrf('/api/admin/update-colores', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ empresaId, colores }),
       });
 

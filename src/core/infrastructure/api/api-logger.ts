@@ -9,8 +9,8 @@ export async function logApiError(
   await logger.logAndReturnError(
     'API_ERROR',
     `${context}: ${message}`,
-    'api-route',
+    'api',
     method || 'unknown',
-    { context }
+    { details: { context } }
   );
 }

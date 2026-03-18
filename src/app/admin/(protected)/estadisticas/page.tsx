@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { BarChart3, ShoppingCart, Euro, TrendingUp, TrendingDown, Users, Calendar, ArrowUpRight, ArrowDownRight, ChevronLeft, ChevronRight } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, LineChart, Line } from 'recharts';
+import { fetchWithCsrf } from '@/lib/csrf-client';
 
 interface Stats {
   pedidosHoy: number;
@@ -54,6 +55,10 @@ export default function EstadisticasPage() {
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState({ mes: new Date().getMonth(), año: new Date().getFullYear() });
   const [chartColors, setChartColors] = useState<string[]>([]);
+  const shouldReduceMotion = useReducedMotion() ?? false;
+  const motionProps = shouldReduceMotion
+    ? { initial: {}, animate: {} }
+    : { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } };
 
   useEffect(() => {
     setChartColors(getChartColors());
@@ -64,7 +69,7 @@ export default function EstadisticasPage() {
     async function fetchStats() {
       setLoading(true);
       try {
-        const res = await fetch(`/api/admin/pedidos?mes=${selectedMonth.mes}&año=${selectedMonth.año}`, { method: 'PUT', signal: controller.signal });
+        const res = await fetchWithCsrf(`/api/admin/pedidos?mes=${selectedMonth.mes}&año=${selectedMonth.año}`, { method: 'PUT', signal: controller.signal });
         if (res.ok) {
           const data = await res.json();
           setStats(data);
@@ -152,9 +157,8 @@ export default function EstadisticasPage() {
         ].map((kpi, i) => (
           <motion.div
             key={`kpi-${i}`}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: i * 0.05 }}
+            {...motionProps}
+            transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: i * 0.05 }}
             className="bg-card rounded-lg shadow-elegant border border-border p-6"
           >
             <div className="flex items-center gap-3">
@@ -173,9 +177,8 @@ export default function EstadisticasPage() {
       {/* Comparison Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.2 }}
+          {...motionProps}
+          transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.2 }}
           className="bg-card rounded-lg border border-border p-4"
         >
           <div className="flex items-center justify-between mb-2">
@@ -186,9 +189,8 @@ export default function EstadisticasPage() {
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.25 }}
+          {...motionProps}
+          transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.25 }}
           className="bg-card rounded-lg border border-border p-4"
         >
           <div className="flex items-center justify-between mb-2">
@@ -214,9 +216,8 @@ export default function EstadisticasPage() {
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.3 }}
+          {...motionProps}
+          transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.3 }}
           className="bg-card rounded-lg border border-border p-4"
         >
           <div className="flex items-center justify-between mb-2">
@@ -233,9 +234,8 @@ export default function EstadisticasPage() {
       {/* Daily Orders Chart */}
       {stats?.pedidosPorDia && stats.pedidosPorDia.length > 0 && (
         <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.35 }}
+          {...motionProps}
+          transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.35 }}
           className="bg-card rounded-lg border border-border p-6 mb-6"
         >
           <h2 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
@@ -281,9 +281,8 @@ export default function EstadisticasPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <motion.div
           key="chart-bar"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.25 }}
+          {...motionProps}
+          transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.25 }}
           className="bg-card rounded-lg shadow-elegant border border-border p-6"
         >
           <h2 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
@@ -332,9 +331,8 @@ export default function EstadisticasPage() {
 
         <motion.div
           key="chart-pie"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.3 }}
+          {...motionProps}
+          transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.3 }}
           className="bg-card rounded-lg shadow-elegant border border-border p-6"
         >
           <h2 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">

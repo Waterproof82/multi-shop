@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Search, Mail, Phone, User, Users, Pencil, X, Plus, MapPin, Trash2 } from 'lucide-react';
+import { Search, Mail, Phone, User, Users, Pencil, Plus, MapPin, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -11,6 +11,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { fetchWithCsrf } from '@/lib/csrf-client';
 
 interface Cliente {
   id: string;
@@ -67,9 +68,8 @@ export default function ClientesPage() {
     const newValue = !cliente.aceptar_promociones;
     
     try {
-      const res = await fetch('/api/admin/clientes', {
+      const res = await fetchWithCsrf('/api/admin/clientes', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: cliente.id,
           aceptar_promociones: newValue,
@@ -116,9 +116,8 @@ export default function ClientesPage() {
     
     setSaving(true);
     try {
-      const res = await fetch('/api/admin/clientes', {
+      const res = await fetchWithCsrf('/api/admin/clientes', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: editingCliente.id,
           nombre: editForm.nombre || null,
@@ -152,9 +151,8 @@ export default function ClientesPage() {
     
     setSaving(true);
     try {
-      const res = await fetch('/api/admin/clientes', {
+      const res = await fetchWithCsrf('/api/admin/clientes', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           nombre: editForm.nombre || null,
           email: editForm.email || null,
@@ -180,9 +178,8 @@ export default function ClientesPage() {
     
     setSaving(true);
     try {
-      const res = await fetch('/api/admin/clientes', {
+      const res = await fetchWithCsrf('/api/admin/clientes', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
       });
       
@@ -250,7 +247,7 @@ export default function ClientesPage() {
             variant="outline" 
             size="sm" 
             className="mt-2"
-            onClick={() => window.location.reload()}
+            onClick={() => globalThis.location.reload()}
           >
             Reintentar
           </Button>

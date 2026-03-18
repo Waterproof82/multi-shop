@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, Utensils, Tags, LogOut, Menu, X, ShoppingCart, BarChart3, Users, Megaphone, Settings, ExternalLink } from 'lucide-react';
+import { fetchWithCsrf } from '@/lib/csrf-client';
 
 interface NavItem {
   href: string;
@@ -33,7 +34,7 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
   const closeMenu = () => setIsOpen(false);
 
   const handleLogout = async () => {
-    await fetch('/api/admin/logout', { method: 'POST' });
+    await fetchWithCsrf('/api/admin/logout', { method: 'POST' });
     window.location.href = '/';
   };
 

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { saveCsrfToken } from '@/lib/csrf-client';
 
 interface LoginFormProps {
   readonly empresaNombre: string | null;
@@ -24,6 +25,7 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
       .then(data => {
         if (data.csrfToken) {
           setCsrfToken(data.csrfToken);
+          saveCsrfToken(data.csrfToken);
         }
       })
       .catch(console.error);

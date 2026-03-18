@@ -11,7 +11,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog"
-import { useLanguage } from "@/lib/language-context"
+import { useLanguage, type Language } from "@/lib/language-context"
 import { t } from "@/lib/translations"
 import { MenuCategoryVM, MenuItemVM, MenuSubcategoryVM } from "@/core/application/dtos/menu-view-model"
 import { QuantitySelectorDialog } from "@/components/quantity-selector-dialog"
@@ -74,7 +74,7 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
     : category.descripcion;
 
   return (
-    <section id={category.id} className="scroll-mt-32">
+    <section id={category.id} className="scroll-mt-32" style={{ contentVisibility: priority ? 'visible' : 'auto', containIntrinsicSize: 'auto 500px' }}>
       <div className="mb-5 flex items-center gap-4 overflow-hidden">
         <h2 className="font-serif text-2xl font-semibold text-foreground md:text-3xl tracking-tight truncate shrink min-w-0">
           {(translationLang && category.translations?.[translationLang]?.name) || category.label}
@@ -227,6 +227,52 @@ const SubcategorySection = memo(function SubcategorySection(props: Readonly<{
   );
 })
 
+function getTranslatedField(
+  language: LanguageKey | undefined,
+  translations: MenuItemVM['translations'],
+  field: 'name' | 'description',
+  fallback: string,
+): string {
+  if (language && translations?.[language]?.[field]) return translations[language][field];
+  return fallback;
+}
+
+function getCardAriaLabel(showCart: boolean | undefined, safeLanguage: Language, displayName: string): string {
+  if (showCart) return `${t("addToCart", safeLanguage)}: ${displayName}`;
+  return `${t("viewOptions", safeLanguage)}: ${displayName}`;
+}
+
+function CardMedia({ item, displayName, priority, onError }: Readonly<{
+  item: MenuItemVM;
+  displayName: string;
+  priority: boolean;
+  onError: () => void;
+}>) {
+  if (item.image?.endsWith(".mp4")) {
+    return (
+      <video
+        src={item.image}
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 md:group-hover:scale-105 will-change-transform"
+        onError={onError}
+      />
+    );
+  }
+  return (
+    <img
+      src={item.image!}
+      alt={displayName}
+      className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 md:group-hover:scale-105 will-change-transform"
+      loading={priority ? "eager" : "lazy"}
+      decoding="async"
+      onError={onError}
+    />
+  );
+}
+
 const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
   item: MenuItemVM;
   language: LanguageKey | undefined;
@@ -242,14 +288,10 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
   const safeLanguage = appLanguage || "es";
   const [imageError, setImageError] = useState(false);
   const hasComplements = item.complements && item.complements.length > 0;
-  const isClickable = showCart || (!showCart && hasComplements);
+  const isClickable = showCart || hasComplements;
 
-  const displayName = language && item.translations?.[language]?.name
-    ? item.translations[language].name
-    : item.name;
-  const displayDescription = language && item.translations?.[language]?.description
-    ? item.translations[language].description
-    : item.description;
+  const displayName = getTranslatedField(language, item.translations, 'name', item.name);
+  const displayDescription = getTranslatedField(language, item.translations, 'description', item.description ?? '');
 
   const complementLabel = getComplementCategoryDisplay(language, complementCategoryName, complementCategoryTranslations)
     || t("complementsAvailable", safeLanguage);
@@ -266,49 +308,32 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      handleClick();
-    }
-  };
+  const borderClass = item.highlight ? "border-primary/25 ring-1 ring-primary/10" : "border-border";
 
   return (
     <div
-      className={`group flex h-full flex-col overflow-hidden rounded-lg bg-card border transition-[box-shadow,transform,border-color] duration-200 hover:shadow-elegant hover:-translate-y-0.5 ${
-        isClickable ? "cursor-pointer" : ""
-      } ${
-        item.highlight ? "border-primary/25 ring-1 ring-primary/10" : "border-border"
-      }`}
-      role={isClickable ? "button" : undefined}
-      tabIndex={isClickable ? 0 : undefined}
-      aria-label={isClickable ? (showCart ? `${t("addToCart", safeLanguage)}: ${displayName}` : `${t("viewOptions", safeLanguage)}: ${displayName}`) : undefined}
-      onKeyDown={isClickable ? handleKeyDown : undefined}
+      className={`group relative flex h-full flex-col overflow-hidden rounded-lg bg-card border transition-[box-shadow,transform,border-color] duration-200 ${
+        isClickable ? "hover:shadow-elegant hover:-translate-y-0.5 cursor-pointer" : ""
+      } ${borderClass}`}
       onClick={isClickable ? handleClick : undefined}
-      style={{ outlineColor: 'var(--ring)', outlineWidth: '2px', outlineOffset: '2px' }}
     >
+      {isClickable && (
+        <button
+          type="button"
+          aria-label={getCardAriaLabel(showCart, safeLanguage, displayName)}
+          className="absolute inset-0 z-10 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring rounded-lg"
+          onClick={handleClick}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleClick();
+            }
+          }}
+        />
+      )}
       {item.image && !imageError && (
         <div className="relative aspect-[16/10] w-full overflow-hidden">
-          {item.image.endsWith(".mp4") ? (
-            <video
-              src={item.image}
-              autoPlay
-              loop
-              muted
-              playsInline
-              className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 md:group-hover:scale-105 will-change-transform"
-              onError={() => setImageError(true)}
-            />
-          ) : (
-            <img
-              src={item.image}
-              alt={displayName}
-              className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 md:group-hover:scale-105 will-change-transform"
-              loading={priority ? "eager" : "lazy"}
-              decoding="async"
-              onError={() => setImageError(true)}
-            />
-          )}
+          <CardMedia item={item} displayName={displayName} priority={priority} onError={() => setImageError(true)} />
         </div>
       )}
       <div className="flex flex-1 flex-col p-4">
@@ -334,7 +359,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
           {showCart && (
             <button
               type="button"
-              className="bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 rounded-md px-3.5 py-2 text-sm font-medium focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring transition-all duration-150 min-h-[44px] shrink-0 whitespace-nowrap"
+              className="relative z-20 bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 rounded-md px-3.5 py-2 text-sm font-medium focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring transition-all duration-150 min-h-[44px] shrink-0 whitespace-nowrap"
               onClick={(e) => {
                 e.stopPropagation();
                 onItemClick(item);
