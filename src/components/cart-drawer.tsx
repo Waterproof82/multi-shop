@@ -100,9 +100,8 @@ export function CartDrawer() {
     const urlWaMe = `https://wa.me/${numeroLimpio}?text=${textoEncoded}`;
     
     const nuevaPestana = globalThis.open(urlWaMe, '_blank', 'noopener,noreferrer');
-    if (!nuevaPestana || nuevaPestana.closed) {
-      console.log('[WhatsApp] Popup bloqueado, intentando location.href');
-      globalThis.location.href = urlWaMe;
+    if (!nuevaPestana) {
+      console.log('[WhatsApp] Popup potencialmente bloqueado');
     }
   };
 
@@ -190,7 +189,9 @@ export function CartDrawer() {
             setSent(true);
             
             const maxAttempts = 5;
+            const retryDelay = 3000;
             let attempts = 0;
+            let retryInterval: ReturnType<typeof setInterval> | null = null;
             
             const tryOpenWhatsApp = () => {
               attempts++;
@@ -198,21 +199,27 @@ export function CartDrawer() {
               abrirWhatsApp(numero, mensaje);
             };
             
+            const stopRetries = () => {
+              if (retryInterval) {
+                clearInterval(retryInterval);
+                retryInterval = null;
+              }
+              setConfirming(false);
+            };
+            
             tryOpenWhatsApp();
             
-            const retryInterval = setInterval(() => {
+            retryInterval = setInterval(() => {
               if (attempts >= maxAttempts) {
-                clearInterval(retryInterval);
-                setConfirming(false);
+                stopRetries();
               } else {
                 tryOpenWhatsApp();
               }
-            }, 5000);
+            }, retryDelay);
             
             setTimeout(() => {
-              clearInterval(retryInterval);
-              setConfirming(false);
-            }, maxAttempts * 5000 + 1000);
+              stopRetries();
+            }, retryDelay * maxAttempts + 500);
           } else {
             setSent(true);
             setConfirming(false);
