@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Instagram, Facebook, MapPin, Phone, Mail, Link as LinkIcon } from 'lucide-react';
+import { fetchWithCsrf } from '@/lib/csrf-client';
 
 interface EmpresaDatosFormProps {
   readonly initialData: {
@@ -33,9 +34,8 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
     setSaving(true);
 
     try {
-      const res = await fetch('/api/admin/empresa', {
+      const res = await fetchWithCsrf('/api/admin/empresa', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       });
 

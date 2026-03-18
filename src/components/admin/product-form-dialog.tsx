@@ -1,0 +1,340 @@
+'use client';
+
+import { useState } from 'react';
+import { Loader2, ChevronDown, ChevronRight, Languages } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { ImageUploader } from '@/components/ui/image-uploader';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+
+interface Categoria {
+  id: string;
+  nombre_es: string;
+  categoria_padre_id: string | null;
+}
+
+interface ProductoFormData {
+  titulo_es: string;
+  titulo_en: string;
+  titulo_fr: string;
+  titulo_it: string;
+  titulo_de: string;
+  descripcion_es: string;
+  descripcion_en: string;
+  descripcion_fr: string;
+  descripcion_it: string;
+  descripcion_de: string;
+  precio: string;
+  foto_url: string;
+  categoria_id: string;
+  es_especial: boolean;
+  activo: boolean;
+}
+
+interface TranslationFieldsProps {
+  formData: ProductoFormData;
+  onChange: (data: ProductoFormData) => void;
+  show: boolean;
+}
+
+function TranslationFields({ formData, onChange, show }: TranslationFieldsProps) {
+  if (!show) return null;
+
+  const languages = [
+    { key: 'en' as const, label: 'Inglés' },
+    { key: 'fr' as const, label: 'Francés' },
+    { key: 'it' as const, label: 'Italiano' },
+    { key: 'de' as const, label: 'Alemán' },
+  ];
+
+  return (
+    <>
+      {languages.map(({ key, label }) => (
+        <div key={key} className="col-span-2 grid grid-cols-2 gap-4">
+          <div>
+            <label htmlFor={`titulo_${key}`} className="block text-sm text-muted-foreground mb-1">
+              Nombre ({key.toUpperCase()})
+            </label>
+            <Input
+              id={`titulo_${key}`}
+              type="text"
+              value={formData[`titulo_${key}` as keyof ProductoFormData] as string}
+              onChange={(e) => onChange({ ...formData, [`titulo_${key}`]: e.target.value })}
+            />
+          </div>
+          <div>
+            <label htmlFor={`descripcion_${key}`} className="block text-sm text-muted-foreground mb-1">
+              Descripción ({key.toUpperCase()})
+            </label>
+            <Textarea
+              id={`descripcion_${key}`}
+              value={formData[`descripcion_${key}` as keyof ProductoFormData] as string}
+              onChange={(e) => onChange({ ...formData, [`descripcion_${key}`]: e.target.value })}
+              rows={2}
+            />
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
+interface ProductFormDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  editingId: string | null;
+  formData: ProductoFormData;
+  onFormChange: (data: ProductoFormData) => void;
+  categorias: Categoria[];
+  showTranslations: boolean;
+  onToggleTranslations: () => void;
+  saving: boolean;
+  onSubmit: (e: React.FormEvent) => void;
+  empresaSlug: string;
+}
+
+export function ProductFormDialog({
+  open,
+  onOpenChange,
+  editingId,
+  formData,
+  onFormChange,
+  categorias,
+  showTranslations,
+  onToggleTranslations,
+  saving,
+  onSubmit,
+  empresaSlug,
+}: ProductFormDialogProps) {
+  const handleClose = () => onOpenChange(false);
+
+  const handleSelectChange = (value: string) => {
+    onFormChange({ ...formData, categoria_id: value });
+  };
+
+  const parents = categorias.filter(c => !c.categoria_padre_id);
+  const children = categorias.filter(c => c.categoria_padre_id);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{editingId ? 'Editar Producto' : 'Nuevo Producto'}</DialogTitle>
+          <DialogDescription>
+            {editingId ? 'Modifica los datos del producto.' : 'Rellena los datos para crear un producto.'}
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <label htmlFor="titulo_es" className="block text-sm font-medium text-foreground mb-1">
+                Nombre (Español) *
+              </label>
+              <Input
+                id="titulo_es"
+                type="text"
+                required
+                aria-required="true"
+                value={formData.titulo_es}
+                onChange={(e) => onFormChange({ ...formData, titulo_es: e.target.value })}
+              />
+            </div>
+
+            <div className="col-span-2">
+              <label htmlFor="descripcion_es" className="block text-sm font-medium text-foreground mb-1">
+                Descripción (Español)
+              </label>
+              <Textarea
+                id="descripcion_es"
+                value={formData.descripcion_es}
+                onChange={(e) => onFormChange({ ...formData, descripcion_es: e.target.value })}
+                rows={2}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="precio" className="block text-sm font-medium text-foreground mb-1">
+                Precio (€) *
+              </label>
+              <Input
+                id="precio"
+                type="number"
+                step="0.01"
+                required
+                aria-required="true"
+                value={formData.precio}
+                onChange={(e) => onFormChange({ ...formData, precio: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="categoria_id" className="block text-sm font-medium text-foreground mb-1">
+                Categoría
+              </label>
+              <select
+                id="categoria_id"
+                value={formData.categoria_id}
+                onChange={(e) => handleSelectChange(e.target.value)}
+                className="w-full px-3 py-2 rounded-md border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background transition-colors cursor-pointer"
+                aria-label="Categoría del producto"
+              >
+                <option value="">Sin categoría</option>
+                {parents.map(parent => {
+                  const childCats = children.filter(c => c.categoria_padre_id === parent.id);
+                  if (childCats.length > 0) {
+                    return (
+                      <optgroup key={parent.id} label={parent.nombre_es}>
+                        <option key={`${parent.id}-self`} value={parent.id}>
+                          {parent.nombre_es} (principal)
+                        </option>
+                        {childCats.map(sub => (
+                          <option key={sub.id} value={sub.id}>
+                            └─ {sub.nombre_es}
+                          </option>
+                        ))}
+                      </optgroup>
+                    );
+                  }
+                  return (
+                    <option key={parent.id} value={parent.id}>
+                      {parent.nombre_es}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            <div className="col-span-2">
+              <ImageUploader
+                value={formData.foto_url}
+                onChange={(url) => onFormChange({ ...formData, foto_url: url })}
+                label="Imagen del producto"
+                empresaSlug={empresaSlug}
+              />
+            </div>
+
+            <div className="col-span-2">
+              <button
+                type="button"
+                onClick={onToggleTranslations}
+                className="flex items-center gap-2 text-sm font-medium text-foreground mt-4 hover:text-primary dark:hover:text-primary"
+              >
+                {showTranslations ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                <Languages className="h-4 w-4" />
+                Traducciones ({showTranslations ? 'ocultar' : 'mostrar'})
+              </button>
+            </div>
+
+            <TranslationFields
+              formData={formData}
+              onChange={onFormChange}
+              show={showTranslations}
+            />
+
+            <div className="col-span-2 flex gap-6 mt-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.es_especial}
+                  onChange={(e) => onFormChange({ ...formData, es_especial: e.target.checked })}
+                  className="w-4 h-4 rounded border-border text-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background cursor-pointer accent-primary"
+                />
+                <span className="text-sm text-foreground">Producto especial</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.activo}
+                  onChange={(e) => onFormChange({ ...formData, activo: e.target.checked })}
+                  className="w-4 h-4 rounded border-border text-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background cursor-pointer accent-primary"
+                />
+                <span className="text-sm text-foreground">Activo</span>
+              </label>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="px-4 py-2 border rounded-md hover:bg-muted/50 border-border text-foreground"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
+                  Guardando...
+                </>
+              ) : (
+                'Guardar'
+              )}
+            </button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface DeleteConfirmDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  productName: string | null;
+  onConfirm: () => void;
+}
+
+export function DeleteConfirmDialog({
+  open,
+  onOpenChange,
+  productName,
+  onConfirm,
+}: DeleteConfirmDialogProps) {
+  const handleClose = () => onOpenChange(false);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-3">
+            <div className="p-2 bg-destructive/10 rounded-full">
+              <Loader2 className="w-5 h-5 text-destructive" />
+            </div>
+            Eliminar producto
+          </DialogTitle>
+          <DialogDescription>
+            ¿Estás seguro de que quieres eliminar <strong>{productName}</strong>? Esta acción no se puede deshacer.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex gap-3 justify-end">
+          <button
+            onClick={handleClose}
+            className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg"
+          >
+            Eliminar
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export type { ProductoFormData };

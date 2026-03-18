@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { saveCsrfToken } from '@/lib/csrf-client';
 
 interface LoginFormProps {
   readonly empresaNombre: string | null;
@@ -23,6 +25,7 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
       .then(data => {
         if (data.csrfToken) {
           setCsrfToken(data.csrfToken);
+          saveCsrfToken(data.csrfToken);
         }
       })
       .catch(console.error);
@@ -86,7 +89,7 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
             <label htmlFor="email" className="block text-sm font-medium text-foreground">
               Email
             </label>
-            <input
+            <Input
               id="email"
               type="email"
               value={email}
@@ -94,8 +97,8 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
               required
               aria-invalid={!!error}
               aria-describedby={error ? "login-error" : undefined}
-              className="mt-1 block w-full px-3 py-2 bg-transparent border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:border-ring text-foreground transition-all duration-150 ease-out"
               placeholder="admin@tuempresa.com"
+              className="mt-1"
             />
           </div>
 
@@ -103,7 +106,7 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
             <label htmlFor="password" className="block text-sm font-medium text-foreground">
               Contraseña
             </label>
-            <input
+            <Input
               id="password"
               type="password"
               value={password}
@@ -111,8 +114,8 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
               required
               aria-invalid={!!error}
               aria-describedby={error ? "login-error" : undefined}
-              className="mt-1 block w-full px-3 py-2 bg-transparent border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:border-ring text-foreground transition-all duration-150 ease-out"
               placeholder="••••••••"
+              className="mt-1"
             />
           </div>
 

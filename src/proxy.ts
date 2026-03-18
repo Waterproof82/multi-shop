@@ -56,7 +56,6 @@ async function handleAdminAuth(request: NextRequest, origin: string | null): Pro
   }
 
   if (!ADMIN_TOKEN_SECRET) {
-    console.error('[Proxy] ACCESS_TOKEN_SECRET no configurado');
     return addCorsHeaders(NextResponse.json({ error: 'Error de configuración del servidor' }, { status: 500 }), origin);
   }
 
@@ -69,10 +68,19 @@ async function handleAdminAuth(request: NextRequest, origin: string | null): Pro
 
     const isMutativeMethod = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(request.method);
     if (isMutativeMethod) {
-      if (!csrfHeader) {
-        console.warn('[Proxy] CSRF token header missing - allowing for backward compatibility');
-      } else if (!csrfCookie || !verifyCsrfToken(csrfCookie.split(':')[0] || '', csrfCookie.split(':')[1] || '')) {
-        console.warn('[Proxy] CSRF token inválido - permitiendo por compatibilidad');
+      if (!csrfHeader || !csrfCookie) {
+        return addCorsHeaders(NextResponse.json(
+          { error: 'CSRF token required' },
+          { status: 403 }
+        ), origin);
+      }
+
+      const [token, signature] = csrfCookie.split(':');
+      if (!token || !signature || !verifyCsrfToken(token, signature) || csrfHeader !== token) {
+        return addCorsHeaders(NextResponse.json(
+          { error: 'CSRF token inválido' },
+          { status: 403 }
+        ), origin);
       }
     }
 

@@ -4,6 +4,8 @@ import { sendEmail } from '@/lib/brevo-email';
 import { deleteImageFromR2 } from '@/core/infrastructure/storage/s3-client';
 import { promocionUseCase, empresaUseCase } from '@/core/infrastructure/database';
 import { requireAuth, errorResponse, handleResult } from '@/core/infrastructure/api/helpers';
+import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
+import { logApiError } from '@/core/infrastructure/api/api-logger';
 import { escapeHtml } from '@/lib/html-utils';
 
 const createPromocionSchema = z.object({
@@ -49,6 +51,9 @@ function buildEmailHtml(params: {
 }
 
 export async function GET(request: NextRequest) {
+  const rateLimited = await rateLimitAdmin(request);
+  if (rateLimited) return rateLimited;
+
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
 
@@ -124,7 +129,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ promocion: promo });
   } catch (error) {
-    console.error('Error creating promocion:', error);
+    await logApiError('Create promocion', error, 'POST');
     return errorResponse('Error interno');
   }
 }

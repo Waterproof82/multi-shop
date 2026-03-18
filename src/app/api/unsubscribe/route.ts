@@ -51,8 +51,7 @@ export async function GET(request: Request) {
 
     const mensaje = nuevoValorData ? 'promo=on' : 'promo=off';
     return NextResponse.redirect(`${baseUrl}/?${mensaje}`);
-  } catch (error) {
-    console.error('Promo error:', error);
+  } catch {
     return NextResponse.redirect(`${baseUrl}/?error=internal`);
   }
 }

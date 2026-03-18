@@ -24,13 +24,13 @@ export default async function AdminDashboard() {
   const [menuResult, pedidosResult, statsResult] = await Promise.all([
     getMenuUseCase.execute(admin.empresaId),
     pedidoUseCase.getAll(admin.empresaId),
-    pedidoUseCase.getStats(admin.empresaId, new Date().getMonth() + 1, new Date().getFullYear()),
+    pedidoUseCase.getStats(admin.empresaId, new Date().getMonth(), new Date().getFullYear()),
   ]);
   
   // Handle error case
   if (menuResult.error || !menuResult.data) {
     return (
-      <div className="pt-20 lg:pt-0 px-6 lg:px-8">
+      <div className="pt-16 lg:pt-0 px-6 lg:px-8">
         <h1 className="text-2xl font-bold text-foreground mb-2">
           Dashboard
         </h1>
@@ -75,67 +75,41 @@ export default async function AdminDashboard() {
   };
 
   return (
-    <div className="pt-20 lg:pt-0 px-6 lg:px-8">
-      <h1 className="text-2xl font-bold text-foreground mb-2">
-        Dashboard
-      </h1>
-      <p className="text-muted-foreground mb-6">
-        Gestionando: <strong>{admin.empresa.nombre}</strong>
-      </p>
-
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Link href="/admin/pedidos" className="bg-card p-4 lg:p-5 rounded-lg border border-border hover:border-primary/30 transition-colors group">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <ShoppingBag className="w-5 h-5 text-primary" />
+    <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
+      {/* Header con stats */}
+      <div className="bg-primary rounded-lg p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">Dashboard</h1>
+            <p className="text-primary-foreground/80 text-sm mt-1">{admin.empresa.nombre}</p>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
+              <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
+              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{stats?.pedidosHoy || 0}</span>
+              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Pedidos hoy</p>
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Hoy</p>
-              <p className="text-xl font-semibold text-foreground">{stats?.pedidosHoy || 0}</p>
+            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
+              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
+              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{formatCurrency(stats?.totalMes || 0)}</span>
+              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Ventas mes</p>
+            </div>
+            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
+              <Package className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
+              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{totalProductos}</span>
+              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Productos</p>
+            </div>
+            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
+              <Users className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
+              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{productosEspeciales}</span>
+              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Destacados</p>
             </div>
           </div>
-        </Link>
-        
-        <Link href="/admin/pedidos" className="bg-card p-4 lg:p-5 rounded-lg border border-border hover:border-primary/30 transition-colors group">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-chart-2/10 flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-chart-2" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Este mes</p>
-              <p className="text-xl font-semibold text-foreground">{formatCurrency(stats?.totalMes || 0)}</p>
-            </div>
-          </div>
-        </Link>
-        
-        <Link href="/admin/productos" className="bg-card p-4 lg:p-5 rounded-lg border border-border hover:border-primary/30 transition-colors group">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-chart-4/10 flex items-center justify-center">
-              <Package className="w-5 h-5 text-chart-4" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Productos</p>
-              <p className="text-xl font-semibold text-foreground">{totalProductos}</p>
-            </div>
-          </div>
-        </Link>
-        
-        <Link href="/admin/clientes" className="bg-card p-4 lg:p-5 rounded-lg border border-border hover:border-primary/30 transition-colors group">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-chart-5/10 flex items-center justify-center">
-              <Users className="w-5 h-5 text-chart-5" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Especiales</p>
-              <p className="text-xl font-semibold text-foreground">{productosEspeciales}</p>
-            </div>
-          </div>
-        </Link>
+        </div>
       </div>
 
       {/* Quick Actions */}
-      <div className="flex flex-wrap gap-3 mb-6">
+      <div className="flex flex-wrap gap-3">
         <Link 
           href="/admin/productos" 
           className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"

@@ -73,7 +73,7 @@ export function SiteHeaderClient({ showCart, empresa }: SiteHeaderClientProps) {
             <Button
               variant="ghost"
               size="icon"
-              className="relative"
+              className="relative min-h-[44px] min-w-[44px]"
               onClick={handleOpenCart}
               aria-label={t("openCart", language)}
             >
@@ -81,7 +81,7 @@ export function SiteHeaderClient({ showCart, empresa }: SiteHeaderClientProps) {
               {totalItems > 0 && (
                 <span
                   key={totalItems}
-                  className={`absolute -top-1.5 -right-1.5 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-destructive px-1 text-xs font-bold text-destructive-foreground ${animate ? 'animate-badge-pop' : ''}`}
+                  className={`absolute -top-1 -right-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-destructive px-1 text-xs font-bold text-destructive-foreground ${animate ? 'animate-badge-pop' : ''}`}
                 >
                   {totalItems}
                 </span>

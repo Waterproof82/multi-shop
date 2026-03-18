@@ -1,3 +1,18 @@
+type TranslationEntry = { name: string; description?: string };
+
+export interface ComplementVM {
+  id: string;
+  name: string;
+  price: number;
+  description?: string;
+  translations?: {
+    en?: TranslationEntry;
+    fr?: TranslationEntry;
+    it?: TranslationEntry;
+    de?: TranslationEntry;
+  };
+}
+
 export interface MenuItemVM {
   id: string;
   name: string;
@@ -7,17 +22,12 @@ export interface MenuItemVM {
   image?: string;
   highlight?: boolean;
   translations?: {
-    en?: { name: string; description?: string };
-    fr?: { name: string; description?: string };
-    it?: { name: string; description?: string };
-    de?: { name: string; description?: string };
+    en?: TranslationEntry;
+    fr?: TranslationEntry;
+    it?: TranslationEntry;
+    de?: TranslationEntry;
   };
-  complements?: {
-    id: string;
-    name: string;
-    price: number;
-    description?: string;
-  }[];
+  complements?: ComplementVM[];
   requiresComplement?: boolean;
 }
 
@@ -26,10 +36,10 @@ export interface MenuSubcategoryVM {
   nombre: string | null;
   descripcion?: string;
   translations?: {
-    en?: { name: string; description?: string };
-    fr?: { name: string; description?: string };
-    it?: { name: string; description?: string };
-    de?: { name: string; description?: string };
+    en?: TranslationEntry;
+    fr?: TranslationEntry;
+    it?: TranslationEntry;
+    de?: TranslationEntry;
   };
   descripcionTranslations?: {
     en?: string;
@@ -46,10 +56,10 @@ export interface MenuCategoryVM {
   descripcion?: string;
   items: MenuItemVM[];
   translations?: {
-    en?: { name: string; description?: string };
-    fr?: { name: string; description?: string };
-    it?: { name: string; description?: string };
-    de?: { name: string; description?: string };
+    en?: TranslationEntry;
+    fr?: TranslationEntry;
+    it?: TranslationEntry;
+    de?: TranslationEntry;
   };
   descripcionTranslations?: {
     en?: string;
@@ -58,5 +68,12 @@ export interface MenuCategoryVM {
     de?: string;
   };
   complementoDeId?: string;
+  complementCategoryName?: string;
+  complementCategoryTranslations?: {
+    en?: string;
+    fr?: string;
+    it?: string;
+    de?: string;
+  };
   subcategories?: MenuSubcategoryVM[];
 }

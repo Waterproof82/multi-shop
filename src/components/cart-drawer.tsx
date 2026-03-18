@@ -28,7 +28,7 @@ function getItemKey(item: MenuItemVM, complements?: Complement[]): string {
   return `${item.id}-${complementIds}`;
 }
 
-function RippleButton({ children, onClick, className, disabled, variant = "default", size = "default", ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "default" | "outline" | "ghost"; size?: "default" | "icon" }) {
+function RippleButton({ children, onClick, className, disabled, variant = "default", size = "default", 'aria-label': ariaLabel, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "default" | "outline" | "ghost"; size?: "default" | "icon" }) {
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   const createRipple = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -61,6 +61,7 @@ function RippleButton({ children, onClick, className, disabled, variant = "defau
       className={`relative overflow-hidden ${className}`}
       disabled={disabled}
       onClick={handleClick}
+      aria-label={ariaLabel}
       {...props}
     >
       {children}
@@ -100,13 +101,15 @@ export function CartDrawer() {
   const isAndroid = /Android/i.test(ua);
   const isIOS = /iPhone|iPad|iPod/i.test(ua);
 
+  const urlWaMe = `https://wa.me/${numeroLimpio}?text=${textoEncoded}`;
+  
   if (isAndroid || isIOS) {
-    globalThis.location.href = `https://wa.me/${numeroLimpio}?text=${textoEncoded}`;
+    globalThis.open(urlWaMe, '_blank', 'noopener,noreferrer');
   } else {
     const urlApi = `https://api.whatsapp.com/send/?phone=${numeroLimpio}&text=${textoEncoded}`;
     const nuevaPestana = globalThis.open(urlApi, '_blank', 'noopener,noreferrer');
     if (!nuevaPestana) {
-      globalThis.location.assign(urlApi);
+      globalThis.open(urlApi, '_blank', 'noopener,noreferrer');
     }
   }
 };
@@ -310,7 +313,7 @@ export function CartDrawer() {
                 closeCart();
                 document.getElementById('menu')?.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="mt-2 px-6 py-2 bg-primary text-primary-foreground rounded-full font-medium hover:bg-primary/90 transition-colors"
+              className="mt-2 px-6 py-3 bg-primary text-primary-foreground rounded-full font-medium hover:bg-primary/90 transition-colors min-h-[44px]"
             >
               {t("viewMenu", language)}
             </button>
@@ -352,11 +355,11 @@ export function CartDrawer() {
                         <RippleButton
                           variant="outline"
                           size="icon"
-                          className="md:size-7 size-10 bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="min-h-[44px] min-w-[44px] md:min-h-7 md:min-w-7 bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => updateQuantity(itemKey, ci.quantity - 1)}
                           aria-label={t("reduceQuantity", language)}
                         >
-                          <Minus className="md:size-3 size-4" />
+                          <Minus className="size-4" />
                         </RippleButton>
                         <span className="w-6 md:w-6 text-center font-semibold text-foreground animate-quantity-pulse" key={ci.quantity}>
                           {ci.quantity}
@@ -364,20 +367,20 @@ export function CartDrawer() {
                         <RippleButton
                           variant="outline"
                           size="icon"
-                          className="md:size-7 size-10 bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="min-h-[44px] min-w-[44px] md:min-h-7 md:min-w-7 bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => updateQuantity(itemKey, ci.quantity + 1)}
                           aria-label={t("increaseQuantity", language)}
                         >
-                          <Plus className="md:size-3 size-4" />
+                          <Plus className="size-4" />
                         </RippleButton>
                         <RippleButton
                           variant="ghost"
                           size="icon"
-                          className="md:size-7 size-10 text-destructive hover:text-destructive hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="min-h-[44px] min-w-[44px] md:min-h-7 md:min-w-7 text-destructive hover:text-destructive hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => removeItem(itemKey)}
                           aria-label={`${t("remove", language)} ${(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}`}
                         >
-                          <Trash2 className="md:size-3 size-4" />
+                          <Trash2 className="size-4" />
                         </RippleButton>
                       </div>
                     </li>
@@ -400,9 +403,11 @@ export function CartDrawer() {
                       maxLength={100}
                       autoComplete="name"
                       aria-label={t("placeholderName", language)}
+                      aria-describedby={errors.nombre ? "nombre-error" : undefined}
+                      aria-invalid={!!errors.nombre}
                     />
                   </div>
-                  {errors.nombre && <p className="text-xs text-destructive mt-1 ml-6">{errors.nombre}</p>}
+                  {errors.nombre && <p id="nombre-error" role="alert" className="text-xs text-destructive mt-1 ml-6">{errors.nombre}</p>}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
@@ -416,9 +421,11 @@ export function CartDrawer() {
                       maxLength={15}
                       autoComplete="tel"
                       aria-label={t("placeholderPhone", language)}
+                      aria-describedby={errors.telefono ? "telefono-error" : undefined}
+                      aria-invalid={!!errors.telefono}
                     />
                   </div>
-                  {errors.telefono && <p className="text-xs text-destructive mt-1 ml-6">{errors.telefono}</p>}
+                  {errors.telefono && <p id="telefono-error" role="alert" className="text-xs text-destructive mt-1 ml-6">{errors.telefono}</p>}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">

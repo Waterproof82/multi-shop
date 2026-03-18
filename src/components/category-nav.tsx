@@ -83,30 +83,32 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
   return (
     <nav
       ref={navRef}
-      className="sticky top-16 z-40 -mx-4 overflow-x-auto border-b border-border bg-background/95 px-4 backdrop-blur-sm md:top-20 [-webkit-overflow-scrolling:touch]"
+      className="sticky top-16 z-40 w-full overflow-x-auto border-b border-border bg-background/95 backdrop-blur-sm md:top-20 [-webkit-overflow-scrolling:touch]"
       style={{ scrollMarginTop: '4rem' }}
       aria-label={t("menuCategories", language)}
     >
-      <div className="flex gap-1 py-2">
-        {categories.map((cat) => (
-          <button
-            key={cat.id}
-            data-id={cat.id}
-            type="button"
-            onClick={() => {
-              setActiveId(cat.id)
-              scrollTo(cat.id)
-            }}
-            className={cn(
-              "whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-              activeId === cat.id
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
-            )}
-          >
-            {(language !== "es" && cat.translations?.[language]?.name) || cat.label}
-          </button>
-        ))}
+      <div className="mx-auto max-w-6xl px-4 md:px-6">
+        <div className="flex gap-1 py-2">
+          {categories.map((cat) => (
+            <button
+              key={cat.id}
+              data-id={cat.id}
+              type="button"
+              onClick={() => {
+                setActiveId(cat.id)
+                scrollTo(cat.id)
+              }}
+              className={cn(
+                "whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px]",
+                activeId === cat.id
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
+              )}
+            >
+              {(language !== "es" && cat.translations?.[language]?.name) || cat.label}
+            </button>
+          ))}
+        </div>
       </div>
     </nav>
   )

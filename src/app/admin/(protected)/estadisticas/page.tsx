@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { BarChart3, ShoppingCart, Euro, TrendingUp, TrendingDown, Users, Calendar, ArrowUpRight, ArrowDownRight, ChevronLeft, ChevronRight } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, LineChart, Line } from 'recharts';
+import { fetchWithCsrf } from '@/lib/csrf-client';
 
 interface Stats {
   pedidosHoy: number;
@@ -26,17 +27,26 @@ interface Stats {
 const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
 function getChartColors(): string[] {
-  if (typeof window === 'undefined') return ['#F97316', '#3B82F6', '#10B981', '#8B5CF6', '#EC4899', '#14B8A6', '#F43F5E', '#84CC16'];
+  if (typeof window === 'undefined') return [
+    'hsl(var(--chart-orange))',
+    'hsl(var(--chart-blue))',
+    'hsl(var(--chart-green))',
+    'hsl(var(--chart-purple))',
+    'hsl(var(--chart-pink))',
+    'hsl(var(--chart-teal))',
+    'hsl(var(--chart-rose))',
+    'hsl(var(--chart-lime))',
+  ];
   const style = getComputedStyle(document.documentElement);
   return [
-    style.getPropertyValue('--chart-orange').trim() || '#F97316',
-    style.getPropertyValue('--chart-blue').trim() || '#3B82F6',
-    style.getPropertyValue('--chart-green').trim() || '#10B981',
-    style.getPropertyValue('--chart-purple').trim() || '#8B5CF6',
-    style.getPropertyValue('--chart-pink').trim() || '#EC4899',
-    style.getPropertyValue('--chart-teal').trim() || '#14B8A6',
-    style.getPropertyValue('--chart-rose').trim() || '#F43F5E',
-    style.getPropertyValue('--chart-lime').trim() || '#84CC16',
+    style.getPropertyValue('--color-chart-orange').trim() || 'hsl(var(--chart-orange))',
+    style.getPropertyValue('--color-chart-blue').trim() || 'hsl(var(--chart-blue))',
+    style.getPropertyValue('--color-chart-green').trim() || 'hsl(var(--chart-green))',
+    style.getPropertyValue('--color-chart-purple').trim() || 'hsl(var(--chart-purple))',
+    style.getPropertyValue('--color-chart-pink').trim() || 'hsl(var(--chart-pink))',
+    style.getPropertyValue('--color-chart-teal').trim() || 'hsl(var(--chart-teal))',
+    style.getPropertyValue('--color-chart-rose').trim() || 'hsl(var(--chart-rose))',
+    style.getPropertyValue('--color-chart-lime').trim() || 'hsl(var(--chart-lime))',
   ];
 }
 
@@ -45,6 +55,10 @@ export default function EstadisticasPage() {
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState({ mes: new Date().getMonth(), año: new Date().getFullYear() });
   const [chartColors, setChartColors] = useState<string[]>([]);
+  const shouldReduceMotion = useReducedMotion() ?? false;
+  const motionProps = shouldReduceMotion
+    ? { initial: {}, animate: {} }
+    : { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } };
 
   useEffect(() => {
     setChartColors(getChartColors());
@@ -55,7 +69,7 @@ export default function EstadisticasPage() {
     async function fetchStats() {
       setLoading(true);
       try {
-        const res = await fetch(`/api/admin/pedidos?mes=${selectedMonth.mes}&año=${selectedMonth.año}`, { method: 'PUT', signal: controller.signal });
+        const res = await fetchWithCsrf(`/api/admin/pedidos?mes=${selectedMonth.mes}&año=${selectedMonth.año}`, { method: 'PUT', signal: controller.signal });
         if (res.ok) {
           const data = await res.json();
           setStats(data);
@@ -94,42 +108,41 @@ export default function EstadisticasPage() {
 
   if (loading) {
     return (
-      <div className="pt-20 lg:pt-0 px-6 lg:px-8 flex items-center justify-center min-h-[50vh]">
+      <div className="pt-16 lg:pt-0 px-6 lg:px-8 flex items-center justify-center min-h-[50vh]">
         <div className="text-muted-foreground">Cargando...</div>
       </div>
     );
   }
 
   return (
-    <div className="pt-20 lg:pt-0 px-6 lg:px-8">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground mb-1">
-            Estadísticas
-          </h1>
-          <p className="text-muted-foreground">
-            Resumen de pedidos y facturación
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => cambiarMes(-1)}
-            className="p-2 rounded-lg bg-card border border-border hover:bg-muted/50 transition-colors"
-          >
-            <ChevronLeft className="w-5 h-5 text-muted-foreground" />
-          </button>
-          <div className="px-4 py-2 bg-card rounded-lg border border-border min-w-[160px] text-center">
-            <span className="font-medium text-foreground">
-              {meses[mesActual]} {añoActual}
-            </span>
+    <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
+      {/* Header con stats */}
+      <div className="bg-primary rounded-lg p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">Estadísticas</h1>
+            <p className="text-primary-foreground/80 text-sm mt-1">Resumen de pedidos y facturación</p>
           </div>
-          <button
-            onClick={() => cambiarMes(1)}
-            disabled={esMesActual}
-            className="p-2 rounded-lg bg-card border border-border hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <ChevronRight className="w-5 h-5 text-muted-foreground" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => cambiarMes(-1)}
+              className="p-2 rounded-lg bg-primary-foreground/20 hover:bg-primary-foreground/30 transition-colors"
+            >
+              <ChevronLeft className="w-5 h-5 text-primary-foreground" />
+            </button>
+            <div className="px-4 py-2 bg-primary-foreground/20 rounded-lg min-w-[140px] text-center">
+              <span className="font-medium text-primary-foreground">
+                {meses[mesActual]} {añoActual}
+              </span>
+            </div>
+            <button
+              onClick={() => cambiarMes(1)}
+              disabled={esMesActual}
+              className="p-2 rounded-lg bg-primary-foreground/20 hover:bg-primary-foreground/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ChevronRight className="w-5 h-5 text-primary-foreground" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -143,9 +156,8 @@ export default function EstadisticasPage() {
         ].map((kpi, i) => (
           <motion.div
             key={`kpi-${i}`}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: i * 0.05 }}
+            {...motionProps}
+            transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: i * 0.05 }}
             className="bg-card rounded-lg shadow-elegant border border-border p-6"
           >
             <div className="flex items-center gap-3">
@@ -164,9 +176,8 @@ export default function EstadisticasPage() {
       {/* Comparison Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.2 }}
+          {...motionProps}
+          transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.2 }}
           className="bg-card rounded-lg border border-border p-4"
         >
           <div className="flex items-center justify-between mb-2">
@@ -177,9 +188,8 @@ export default function EstadisticasPage() {
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.25 }}
+          {...motionProps}
+          transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.25 }}
           className="bg-card rounded-lg border border-border p-4"
         >
           <div className="flex items-center justify-between mb-2">
@@ -205,9 +215,8 @@ export default function EstadisticasPage() {
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.3 }}
+          {...motionProps}
+          transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.3 }}
           className="bg-card rounded-lg border border-border p-4"
         >
           <div className="flex items-center justify-between mb-2">
@@ -224,9 +233,8 @@ export default function EstadisticasPage() {
       {/* Daily Orders Chart */}
       {stats?.pedidosPorDia && stats.pedidosPorDia.length > 0 && (
         <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.35 }}
+          {...motionProps}
+          transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.35 }}
           className="bg-card rounded-lg border border-border p-6 mb-6"
         >
           <h2 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
@@ -258,9 +266,9 @@ export default function EstadisticasPage() {
                 <Line
                   type="monotone"
                   dataKey="pedidos"
-                  stroke={chartColors[0] || '#F97316'}
+                  stroke={chartColors[0] || 'hsl(var(--chart-orange))'}
                   strokeWidth={2}
-                  dot={{ fill: chartColors[0] || '#F97316', r: 3 }}
+                  dot={{ fill: chartColors[0] || 'hsl(var(--chart-orange))', r: 3 }}
                   activeDot={{ r: 5 }}
                 />
               </LineChart>
@@ -272,9 +280,8 @@ export default function EstadisticasPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <motion.div
           key="chart-bar"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.25 }}
+          {...motionProps}
+          transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.25 }}
           className="bg-card rounded-lg shadow-elegant border border-border p-6"
         >
           <h2 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
@@ -323,9 +330,8 @@ export default function EstadisticasPage() {
 
         <motion.div
           key="chart-pie"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.3 }}
+          {...motionProps}
+          transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.3 }}
           className="bg-card rounded-lg shadow-elegant border border-border p-6"
         >
           <h2 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">

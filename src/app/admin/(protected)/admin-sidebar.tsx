@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, Utensils, Tags, LogOut, Menu, X, ShoppingCart, BarChart3, Users, Megaphone, Settings, ExternalLink } from 'lucide-react';
+import { fetchWithCsrf } from '@/lib/csrf-client';
 
 interface NavItem {
   href: string;
@@ -33,7 +34,7 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
   const closeMenu = () => setIsOpen(false);
 
   const handleLogout = async () => {
-    await fetch('/api/admin/logout', { method: 'POST' });
+    await fetchWithCsrf('/api/admin/logout', { method: 'POST' });
     window.location.href = '/';
   };
 
@@ -111,13 +112,13 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
           </nav>
 
           <div className="p-3 border-t border-border space-y-1">
-            <a
+            <Link
               href="/"
               className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground w-full rounded-lg transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <ExternalLink className="h-4 w-4" />
               Ver tienda
-            </a>
+            </Link>
             <button
               type="button"
               onClick={handleLogout}

@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import Image from 'next/image';
 import { Upload, Loader2, Pencil, Trash2 } from 'lucide-react';
+import { getCsrfToken } from '@/lib/csrf-client';
 
 interface ImageUploaderProps {
   readonly value: string;
@@ -100,8 +101,10 @@ export function ImageUploader({
       const formData = new FormData();
       formData.append('file', optimized.file);
 
+      const csrfToken = getCsrfToken();
       const response = await fetch('/api/admin/upload-image', {
         method: 'POST',
+        headers: csrfToken ? { 'x-csrf-token': csrfToken } : {},
         body: formData,
       });
 

@@ -1,8 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Search, Mail, Phone, User, Users, Pencil, X, Plus, MapPin, Trash2 } from 'lucide-react';
+import { Search, Mail, Phone, User, Users, Pencil, Plus, MapPin, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { fetchWithCsrf } from '@/lib/csrf-client';
 
 interface Cliente {
   id: string;
@@ -59,9 +68,8 @@ export default function ClientesPage() {
     const newValue = !cliente.aceptar_promociones;
     
     try {
-      const res = await fetch('/api/admin/clientes', {
+      const res = await fetchWithCsrf('/api/admin/clientes', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: cliente.id,
           aceptar_promociones: newValue,
@@ -108,9 +116,8 @@ export default function ClientesPage() {
     
     setSaving(true);
     try {
-      const res = await fetch('/api/admin/clientes', {
+      const res = await fetchWithCsrf('/api/admin/clientes', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: editingCliente.id,
           nombre: editForm.nombre || null,
@@ -144,9 +151,8 @@ export default function ClientesPage() {
     
     setSaving(true);
     try {
-      const res = await fetch('/api/admin/clientes', {
+      const res = await fetchWithCsrf('/api/admin/clientes', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           nombre: editForm.nombre || null,
           email: editForm.email || null,
@@ -172,9 +178,8 @@ export default function ClientesPage() {
     
     setSaving(true);
     try {
-      const res = await fetch('/api/admin/clientes', {
+      const res = await fetchWithCsrf('/api/admin/clientes', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
       });
       
@@ -189,29 +194,30 @@ export default function ClientesPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
       {/* Header con contador */}
-      <div className="bg-primary rounded-lg p-6">
-        <div className="flex items-center justify-between">
+      <div className="bg-primary rounded-lg p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-4">
             <div>
-              <h1 className="text-2xl font-semibold text-primary-foreground">Clientes</h1>
+              <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">Clientes</h1>
               <p className="text-primary-foreground/80 text-sm mt-1">Gestiona tus clientes</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <Button 
-              onClick={openCreateModal}
-              className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 font-semibold"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Nuevo Cliente
-            </Button>
-            <div className="bg-primary-foreground/20 rounded-lg px-6 py-4 text-center">
-              <Users className="w-8 h-8 text-primary-foreground mx-auto mb-1" />
-              <span className="text-2xl font-semibold text-primary-foreground">{clientes.length}</span>
+            <div className="bg-primary-foreground/20 rounded-lg px-4 py-3 text-center">
+              <Users className="w-6 h-6 sm:w-8 sm:h-8 text-primary-foreground mx-auto mb-1" />
+              <span className="text-xl sm:text-2xl font-semibold text-primary-foreground">{clientes.length}</span>
               <p className="text-primary-foreground/80 text-xs">Total clientes</p>
             </div>
+            <Button 
+              onClick={openCreateModal}
+              className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 font-semibold shrink-0"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              <span className="hidden sm:inline">Nuevo Cliente</span>
+              <span className="sm:hidden">Nuevo</span>
+            </Button>
           </div>
         </div>
       </div>
@@ -220,13 +226,13 @@ export default function ClientesPage() {
       <div className="mb-4">
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input
+          <Input
             type="text"
             placeholder="Buscar clientes..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             aria-label="Buscar clientes"
-            className="w-full pl-10 pr-4 py-2 border rounded-lg bg-card border-border text-foreground"
+            className="pl-10"
           />
         </div>
       </div>
@@ -242,7 +248,7 @@ export default function ClientesPage() {
             variant="outline" 
             size="sm" 
             className="mt-2"
-            onClick={() => window.location.reload()}
+            onClick={() => globalThis.location.reload()}
           >
             Reintentar
           </Button>
@@ -361,162 +367,144 @@ export default function ClientesPage() {
       )}
 
       {/* Modal de edición */}
-      {editingCliente && (
-        <div className="fixed inset-0 bg-overlay flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-lg border shadow-elegant-lg w-full max-w-md">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="text-lg font-semibold">Editar Cliente</h2>
-              <button
-                onClick={closeEditModal}
-                className="p-1 hover:bg-muted rounded"
-              >
-                <X className="size-5" />
-              </button>
+      <Dialog open={!!editingCliente} onOpenChange={(open) => { if (!open) closeEditModal(); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Cliente</DialogTitle>
+            <DialogDescription>
+              Modifica los datos del cliente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="edit_nombre" className="block text-sm font-medium text-foreground mb-1">
+                Nombre
+              </label>
+              <Input
+                id="edit_nombre"
+                type="text"
+                value={editForm.nombre}
+                onChange={(e) => setEditForm(prev => ({ ...prev, nombre: e.target.value }))}
+                placeholder="Nombre del cliente"
+              />
             </div>
-            <div className="p-4 space-y-4">
-              <div>
-                <label htmlFor="edit_nombre" className="block text-sm font-medium text-muted-foreground mb-1">
-                  Nombre
-                </label>
-                <input
-                  id="edit_nombre"
-                  type="text"
-                  value={editForm.nombre}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, nombre: e.target.value }))}
-                  placeholder="Nombre del cliente"
-                  className="w-full px-3 py-2 border rounded-lg bg-card border-border text-foreground"
-                />
-              </div>
-              <div>
-                <label htmlFor="edit_email" className="block text-sm font-medium text-muted-foreground mb-1">
-                  Email
-                </label>
-                <input
-                  id="edit_email"
-                  type="email"
-                  value={editForm.email}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, email: e.target.value }))}
-                  placeholder="email@ejemplo.com"
-                  className="w-full px-3 py-2 border rounded-lg bg-card border-border text-foreground"
-                />
-              </div>
-              <div>
-                <label htmlFor="edit_telefono" className="block text-sm font-medium text-muted-foreground mb-1">
-                  Teléfono
-                </label>
-                <input
-                  id="edit_telefono"
-                  type="tel"
-                  value={editForm.telefono}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, telefono: e.target.value }))}
-                  placeholder="Teléfono"
-                  className="w-full px-3 py-2 border rounded-lg bg-card border-border text-foreground"
-                />
-              </div>
-              <div>
-                <label htmlFor="edit_direccion" className="block text-sm font-medium text-muted-foreground mb-1">
-                  Dirección <span className="text-muted-foreground font-normal">(opcional)</span>
-                </label>
-                <input
-                  id="edit_direccion"
-                  type="text"
-                  value={editForm.direccion}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, direccion: e.target.value }))}
-                  placeholder="Dirección del cliente"
-                  className="w-full px-3 py-2 border rounded-lg bg-card border-border text-foreground"
-                />
-              </div>
+            <div>
+              <label htmlFor="edit_email" className="block text-sm font-medium text-foreground mb-1">
+                Email
+              </label>
+              <Input
+                id="edit_email"
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm(prev => ({ ...prev, email: e.target.value }))}
+                placeholder="email@ejemplo.com"
+              />
             </div>
-            <div className="flex justify-end gap-2 p-4 border-t">
-              <Button variant="outline" onClick={closeEditModal}>
-                Cancelar
-              </Button>
-              <Button onClick={handleSaveEdit} disabled={saving}>
-                {saving ? 'Guardando...' : 'Guardar'}
-              </Button>
+            <div>
+              <label htmlFor="edit_telefono" className="block text-sm font-medium text-foreground mb-1">
+                Teléfono
+              </label>
+              <Input
+                id="edit_telefono"
+                type="tel"
+                value={editForm.telefono}
+                onChange={(e) => setEditForm(prev => ({ ...prev, telefono: e.target.value }))}
+                placeholder="Teléfono"
+              />
+            </div>
+            <div>
+              <label htmlFor="edit_direccion" className="block text-sm font-medium text-foreground mb-1">
+                Dirección <span className="text-muted-foreground font-normal">(opcional)</span>
+              </label>
+              <Input
+                id="edit_direccion"
+                type="text"
+                value={editForm.direccion}
+                onChange={(e) => setEditForm(prev => ({ ...prev, direccion: e.target.value }))}
+                placeholder="Dirección del cliente"
+              />
             </div>
           </div>
-        </div>
-      )}
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="outline" onClick={closeEditModal}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={saving}>
+              {saving ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de creación */}
-      {creatingCliente && (
-        <div className="fixed inset-0 bg-overlay flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-lg border shadow-elegant-lg w-full max-w-md">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="text-lg font-semibold">Nuevo Cliente</h2>
-              <button
-                onClick={closeCreateModal}
-                className="p-1 hover:bg-muted rounded"
-              >
-                <X className="size-5" />
-              </button>
+      <Dialog open={creatingCliente} onOpenChange={(open) => { if (!open) closeCreateModal(); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nuevo Cliente</DialogTitle>
+            <DialogDescription>
+              Crea un nuevo cliente en el sistema.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="create_nombre" className="block text-sm font-medium text-foreground mb-1">
+                Nombre
+              </label>
+              <Input
+                id="create_nombre"
+                type="text"
+                value={editForm.nombre}
+                onChange={(e) => setEditForm(prev => ({ ...prev, nombre: e.target.value }))}
+                placeholder="Nombre del cliente"
+              />
             </div>
-            <div className="p-4 space-y-4">
-              <div>
-                <label htmlFor="create_nombre" className="block text-sm font-medium text-muted-foreground mb-1">
-                  Nombre
-                </label>
-                <input
-                  id="create_nombre"
-                  type="text"
-                  value={editForm.nombre}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, nombre: e.target.value }))}
-                  placeholder="Nombre del cliente"
-                  className="w-full px-3 py-2 border rounded-lg bg-card border-border text-foreground"
-                />
-              </div>
-              <div>
-                <label htmlFor="create_email" className="block text-sm font-medium text-muted-foreground mb-1">
-                  Email
-                </label>
-                <input
-                  id="create_email"
-                  type="email"
-                  value={editForm.email}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, email: e.target.value }))}
-                  placeholder="email@ejemplo.com"
-                  className="w-full px-3 py-2 border rounded-lg bg-card border-border text-foreground"
-                />
-              </div>
-              <div>
-                <label htmlFor="create_telefono" className="block text-sm font-medium text-muted-foreground mb-1">
-                  Teléfono
-                </label>
-                <input
-                  id="create_telefono"
-                  type="tel"
-                  value={editForm.telefono}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, telefono: e.target.value }))}
-                  placeholder="Teléfono"
-                  className="w-full px-3 py-2 border rounded-lg bg-card border-border text-foreground"
-                />
-              </div>
-              <div>
-                <label htmlFor="create_direccion" className="block text-sm font-medium text-muted-foreground mb-1">
-                  Dirección <span className="text-muted-foreground font-normal">(opcional)</span>
-                </label>
-                <input
-                  id="create_direccion"
-                  type="text"
-                  value={editForm.direccion}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, direccion: e.target.value }))}
-                  placeholder="Dirección del cliente"
-                  className="w-full px-3 py-2 border rounded-lg bg-card border-border text-foreground"
-                />
-              </div>
+            <div>
+              <label htmlFor="create_email" className="block text-sm font-medium text-foreground mb-1">
+                Email
+              </label>
+              <Input
+                id="create_email"
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm(prev => ({ ...prev, email: e.target.value }))}
+                placeholder="email@ejemplo.com"
+              />
             </div>
-            <div className="flex justify-end gap-2 p-4 border-t">
-              <Button variant="outline" onClick={closeCreateModal}>
-                Cancelar
-              </Button>
-              <Button onClick={handleCreateCliente} disabled={saving || (!editForm.nombre && !editForm.email && !editForm.telefono)}>
-                {saving ? 'Creando...' : 'Crear Cliente'}
-              </Button>
+            <div>
+              <label htmlFor="create_telefono" className="block text-sm font-medium text-foreground mb-1">
+                Teléfono
+              </label>
+              <Input
+                id="create_telefono"
+                type="tel"
+                value={editForm.telefono}
+                onChange={(e) => setEditForm(prev => ({ ...prev, telefono: e.target.value }))}
+                placeholder="Teléfono"
+              />
+            </div>
+            <div>
+              <label htmlFor="create_direccion" className="block text-sm font-medium text-foreground mb-1">
+                Dirección <span className="text-muted-foreground font-normal">(opcional)</span>
+              </label>
+              <Input
+                id="create_direccion"
+                type="text"
+                value={editForm.direccion}
+                onChange={(e) => setEditForm(prev => ({ ...prev, direccion: e.target.value }))}
+                placeholder="Dirección del cliente"
+              />
             </div>
           </div>
-        </div>
-      )}
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="outline" onClick={closeCreateModal}>
+              Cancelar
+            </Button>
+            <Button onClick={handleCreateCliente} disabled={saving || (!editForm.nombre && !editForm.email && !editForm.telefono)}>
+              {saving ? 'Creando...' : 'Crear Cliente'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

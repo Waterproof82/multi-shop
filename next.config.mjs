@@ -31,7 +31,7 @@ const nextConfig = {
           { key: 'X-Powered-By', value: '' },
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' https://imagenes.almadearena.es https://*.supabase.co data: blob:; font-src 'self'; connect-src 'self' https://*.supabase.co https://api.brevo.com https://*.upstash.io; frame-src 'self' https://www.google.com https://maps.google.com; object-src 'none'; base-uri 'self'; form-action 'self';",
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https://imagenes.almadearena.es https://*.supabase.co data: blob:; media-src 'self' https://imagenes.almadearena.es; font-src 'self'; connect-src 'self' https://*.supabase.co https://api.brevo.com https://*.upstash.io; frame-src 'self' https://www.google.com https://maps.google.com; object-src 'none'; base-uri 'self'; form-action 'self';",
           },
         ],
       },

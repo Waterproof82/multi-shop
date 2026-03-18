@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Users, Mail, FileText, Send, CheckCircle, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { fetchWithCsrf, getCsrfToken } from '@/lib/csrf-client';
 
 interface Cliente {
   id: string;
@@ -147,8 +149,10 @@ export default function PromocionesPage() {
           
           const formData = new FormData();
           formData.append('file', optimized.file);
+          const csrfToken = getCsrfToken();
           const uploadRes = await fetch('/api/admin/upload-image', {
             method: 'POST',
+            headers: csrfToken ? { 'x-csrf-token': csrfToken } : {},
             body: formData,
           });
           if (!uploadRes.ok) {
@@ -167,9 +171,8 @@ export default function PromocionesPage() {
         }
       }
 
-      const res = await fetch('/api/admin/promociones', {
+      const res = await fetchWithCsrf('/api/admin/promociones', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           texto_promocion: promoTexto,
           imagen_url: imagenUrl,
@@ -193,7 +196,7 @@ export default function PromocionesPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
       {/* Header con contador */}
       <div className="bg-primary rounded-lg p-6">
         <div className="flex items-center justify-between">
@@ -209,7 +212,7 @@ export default function PromocionesPage() {
             </div>
             <div className="bg-primary-foreground/20 rounded-lg px-4 py-3 text-center">
               <Mail className="w-6 h-6 text-primary-foreground mx-auto mb-1" />
-              <span className="text-2xl font-semibold text-primary-foreground">{clientesConPromociones.length}</span>
+              <span className="text-2xl font-semibold text-primary-foreground" aria-live="polite">{clientesConPromociones.length}</span>
               <p className="text-primary-foreground/80 text-xs">Para enviar</p>
             </div>
           </div>
@@ -228,13 +231,12 @@ export default function PromocionesPage() {
             <label htmlFor="promo_texto" className="block text-sm font-medium text-foreground mb-1">
               Mensaje de la promoción
             </label>
-            <textarea
+            <Textarea
               id="promo_texto"
-              placeholder="Ej: ¡20% de descuento en tu próximo pedido! 🍕"
+              placeholder="Ej: ¡20% de descuento en tu próximo pedido!"
               value={promoTexto}
               onChange={(e) => setPromoTexto(e.target.value)}
               rows={3}
-              className="w-full px-3 py-2 border border-border rounded-lg bg-card text-foreground resize-none"
             />
           </div>
 
@@ -312,7 +314,7 @@ export default function PromocionesPage() {
                 )}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground mt-2">
+              <p className="text-sm text-muted-foreground mt-2" role="status" aria-live="polite">
                 No hay clientes con promociones activadas
               </p>
             )}
@@ -320,12 +322,12 @@ export default function PromocionesPage() {
 
           <div className="flex justify-end">
             {showSuccess ? (
-              <div className="flex items-center gap-2 text-primary">
+              <div className="flex items-center gap-2 text-primary" role="status" aria-live="polite">
                 <CheckCircle className="w-5 h-5" />
                 <span className="font-medium">Promoción guardada correctamente</span>
               </div>
             ) : (
-              <Button 
+              <Button
                 onClick={handleGuardarPromocion}
                 disabled={!promoTexto || savingPromo || clientesConPromociones.length === 0}
                 className="bg-primary hover:bg-primary/90"
@@ -345,51 +347,51 @@ export default function PromocionesPage() {
             )}
           </div>
         </div>
-      </div>
 
-      {/* Historial de promociones */}
-      {promociones.length > 0 ? (
-        <div className="bg-card rounded-lg border shadow-elegant p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-            <FileText className="w-5 h-5" />
-            Última Promoción
-          </h2>
-          <div className="space-y-3">
-            {promociones.slice(0, 1).map((promo) => (
-              <div key={promo.id} className="p-4 bg-muted rounded-lg">
-                {promo.imagen_url && (
-                  <div className="mb-3">
-                    <Image 
-                      src={promo.imagen_url} 
-                      alt="Imagen de promoción" 
-                      width={128}
-                      height={128}
-                      className="max-h-32 rounded-lg object-contain bg-card"
-                    />
-                  </div>
-                )}
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="font-medium text-foreground">{promo.texto_promocion}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {new Date(promo.fecha_hora).toLocaleString('es-ES')}
-                    </p>
-                  </div>
-                  <div className="text-right px-4">
-                    <span className="text-2xl font-bold text-primary">{promo.numero_envios}</span>
-                    <p className="text-xs text-muted-foreground">clientes</p>
+        {/* Historial de promociones */}
+        {promociones.length > 0 ? (
+          <div className="bg-card rounded-lg border shadow-elegant p-6">
+            <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              Última Promoción
+            </h2>
+            <div className="space-y-3">
+              {promociones.slice(0, 1).map((promo) => (
+                <div key={promo.id} className="p-4 bg-muted rounded-lg">
+                  {promo.imagen_url && (
+                    <div className="mb-3">
+                      <Image
+                        src={promo.imagen_url}
+                        alt="Imagen de promoción"
+                        width={128}
+                        height={128}
+                        className="max-h-32 rounded-lg object-contain bg-card"
+                      />
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <p className="font-medium text-foreground">{promo.texto_promocion}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(promo.fecha_hora).toLocaleString('es-ES')}
+                      </p>
+                    </div>
+                    <div className="text-right px-4">
+                      <span className="text-2xl font-bold text-primary">{promo.numero_envios}</span>
+                      <p className="text-xs text-muted-foreground">clientes</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      ) : (
-        <div className="bg-card rounded-lg border p-12 shadow-elegant text-center">
-          <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <p className="text-muted-foreground">No hay promociones guardadas</p>
-        </div>
-      )}
+        ) : (
+          <div className="bg-card rounded-lg border p-12 shadow-elegant text-center" role="status" aria-live="polite">
+            <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">No hay promociones guardadas</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { sendEmail } from '@/lib/brevo-email';
 import { empresaUseCase } from '@/core/infrastructure/database';
 import { requireAuth } from '@/core/infrastructure/api/helpers';
+import { logApiError } from '@/core/infrastructure/api/api-logger';
 import { escapeHtml } from '@/lib/html-utils';
 
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
@@ -176,7 +177,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error sending order email:', error);
+    await logApiError('Send order email', error, 'POST');
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });
   }
 }

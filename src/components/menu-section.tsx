@@ -2,25 +2,44 @@
 
 import { useState, memo, useCallback } from "react"
 import { motion, useReducedMotion } from "framer-motion"
-import Image from "next/image"
+import { ChevronRight } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { useLanguage } from "@/lib/language-context"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
+import { useLanguage, type Language } from "@/lib/language-context"
 import { t } from "@/lib/translations"
 import { MenuCategoryVM, MenuItemVM, MenuSubcategoryVM } from "@/core/application/dtos/menu-view-model"
 import { QuantitySelectorDialog } from "@/components/quantity-selector-dialog"
 
 type LanguageKey = 'en' | 'fr' | 'it' | 'de';
 
+function getComplementCategoryDisplay(
+  lang: LanguageKey | undefined,
+  name?: string,
+  translations?: MenuCategoryVM['complementCategoryTranslations'],
+): string | undefined {
+  if (lang && translations?.[lang]) return translations[lang];
+  return name;
+}
+
 interface MenuSectionProps {
   category: MenuCategoryVM
   showCart?: boolean
+  priority?: boolean
 }
 
 export const MenuSection = memo(function MenuSection(props: Readonly<MenuSectionProps>) {
-  const { category, showCart } = props;
+  const { category, showCart, priority = false } = props;
   const { language } = useLanguage();
   const [selectedItem, setSelectedItem] = useState<MenuItemVM | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [detailItem, setDetailItem] = useState<MenuItemVM | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const shouldReduceMotion = useReducedMotion() ?? false;
 
   const containerVariants = shouldReduceMotion
@@ -42,6 +61,11 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
     setIsDialogOpen(true);
   }, []);
 
+  const handleDetailClick = useCallback((item: MenuItemVM) => {
+    setDetailItem(item);
+    setIsDetailOpen(true);
+  }, []);
+
   const isCategoryWithComplements = category.items.some((item) => item.complements && item.complements.length > 0);
   const translationLang = (['en', 'fr', 'it', 'de'].includes(language) ? language : undefined) as LanguageKey | undefined;
 
@@ -50,12 +74,12 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
     : category.descripcion;
 
   return (
-    <section id={category.id} className="scroll-mt-32">
-      <div className="mb-5 flex items-center gap-4">
-        <h2 className="font-serif text-2xl font-semibold text-foreground md:text-3xl tracking-tight">
+    <section id={category.id} className="scroll-mt-32" style={{ contentVisibility: priority ? 'visible' : 'auto', containIntrinsicSize: 'auto 500px' }}>
+      <div className="mb-5 flex items-center gap-4 overflow-hidden">
+        <h2 className="font-serif text-2xl font-semibold text-foreground md:text-3xl tracking-tight truncate shrink min-w-0">
           {(translationLang && category.translations?.[translationLang]?.name) || category.label}
         </h2>
-        <div className="h-px flex-1 bg-border" />
+        <div className="h-px flex-1 bg-border shrink-0" />
       </div>
 
       {displayDescripcion && (
@@ -78,8 +102,11 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
               subcategory={subcat}
               translationLang={translationLang}
               onItemClick={handleItemClick}
+              onDetailClick={handleDetailClick}
               showCart={showCart}
               shouldReduceMotion={shouldReduceMotion}
+              complementCategoryName={category.complementCategoryName}
+              complementCategoryTranslations={category.complementCategoryTranslations}
             />
           ))}
         </div>
@@ -91,17 +118,21 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
           whileInView="visible"
           viewport={{ once: true, margin: "-40px" }}
         >
-          {category.items.map((item) => (
+          {category.items.map((item, index) => (
             <motion.div
               key={item.id}
               variants={itemVariants}
-              className="h-full"
+              className="h-full min-w-0"
             >
               <MenuItemCard
                 item={item}
                 language={translationLang}
                 onItemClick={handleItemClick}
+                onDetailClick={handleDetailClick}
                 showCart={showCart}
+                priority={priority && index < 3}
+                complementCategoryName={category.complementCategoryName}
+                complementCategoryTranslations={category.complementCategoryTranslations}
               />
             </motion.div>
           ))}
@@ -113,6 +144,15 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
       />
+
+      <ItemDetailDialog
+        item={detailItem}
+        open={isDetailOpen}
+        onOpenChange={setIsDetailOpen}
+        language={translationLang}
+        complementCategoryName={category.complementCategoryName}
+        complementCategoryTranslations={category.complementCategoryTranslations}
+      />
     </section>
   );
 })
@@ -121,10 +161,13 @@ const SubcategorySection = memo(function SubcategorySection(props: Readonly<{
   subcategory: MenuSubcategoryVM;
   translationLang: LanguageKey | undefined;
   onItemClick: (item: MenuItemVM) => void;
+  onDetailClick: (item: MenuItemVM) => void;
   showCart?: boolean;
   shouldReduceMotion?: boolean;
+  complementCategoryName?: string;
+  complementCategoryTranslations?: MenuCategoryVM['complementCategoryTranslations'];
 }>) {
-  const { subcategory, translationLang, onItemClick, showCart, shouldReduceMotion = false } = props;
+  const { subcategory, translationLang, onItemClick, onDetailClick, showCart, shouldReduceMotion = false, complementCategoryName, complementCategoryTranslations } = props;
 
   const subContainerVariants = shouldReduceMotion
     ? { hidden: {}, visible: {} }
@@ -146,9 +189,9 @@ const SubcategorySection = memo(function SubcategorySection(props: Readonly<{
 
   return (
     <div className="space-y-3">
-      <h3 className="font-serif text-lg font-semibold text-foreground flex items-center gap-2">
-        <span className="w-1.5 h-1.5 rounded-full bg-primary/50" />
-        {(translationLang && subcategory.translations?.[translationLang]?.name) || subcategory.nombre}
+      <h3 className="font-serif text-lg font-semibold text-foreground flex items-center gap-2 min-w-0">
+        <span className="w-1.5 h-1.5 rounded-full bg-primary/50 shrink-0" />
+        <span className="min-w-0 break-words">{(translationLang && subcategory.translations?.[translationLang]?.name) || subcategory.nombre}</span>
       </h3>
       {displayDescripcion && (
         <p className="text-sm text-muted-foreground border-l-2 border-primary/20 pl-3">
@@ -166,13 +209,16 @@ const SubcategorySection = memo(function SubcategorySection(props: Readonly<{
           <motion.div
             key={item.id}
             variants={subVariants}
-            className="h-full"
+            className="h-full min-w-0"
           >
             <MenuItemCard
               item={item}
               language={translationLang}
               onItemClick={onItemClick}
+              onDetailClick={onDetailClick}
               showCart={showCart}
+              complementCategoryName={complementCategoryName}
+              complementCategoryTranslations={complementCategoryTranslations}
             />
           </motion.div>
         ))}
@@ -181,56 +227,113 @@ const SubcategorySection = memo(function SubcategorySection(props: Readonly<{
   );
 })
 
+function getTranslatedField(
+  language: LanguageKey | undefined,
+  translations: MenuItemVM['translations'],
+  field: 'name' | 'description',
+  fallback: string,
+): string {
+  if (language && translations?.[language]?.[field]) return translations[language][field];
+  return fallback;
+}
+
+function getCardAriaLabel(showCart: boolean | undefined, safeLanguage: Language, displayName: string): string {
+  if (showCart) return `${t("addToCart", safeLanguage)}: ${displayName}`;
+  return `${t("viewOptions", safeLanguage)}: ${displayName}`;
+}
+
+function CardMedia({ item, displayName, priority, onError }: Readonly<{
+  item: MenuItemVM;
+  displayName: string;
+  priority: boolean;
+  onError: () => void;
+}>) {
+  if (item.image?.endsWith(".mp4")) {
+    return (
+      <video
+        src={item.image}
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 md:group-hover:scale-105 will-change-transform"
+        onError={onError}
+      />
+    );
+  }
+  return (
+    <img
+      src={item.image!}
+      alt={displayName}
+      className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 md:group-hover:scale-105 will-change-transform"
+      loading={priority ? "eager" : "lazy"}
+      decoding="async"
+      onError={onError}
+    />
+  );
+}
+
 const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
   item: MenuItemVM;
   language: LanguageKey | undefined;
   onItemClick: (item: MenuItemVM) => void;
+  onDetailClick: (item: MenuItemVM) => void;
   showCart?: boolean;
+  priority?: boolean;
+  complementCategoryName?: string;
+  complementCategoryTranslations?: MenuCategoryVM['complementCategoryTranslations'];
 }>) {
-  const { item, language, onItemClick, showCart } = props;
+  const { item, language, onItemClick, onDetailClick, showCart, priority = false, complementCategoryName, complementCategoryTranslations } = props;
   const { language: appLanguage } = useLanguage();
   const safeLanguage = appLanguage || "es";
   const [imageError, setImageError] = useState(false);
+  const hasComplements = item.complements && item.complements.length > 0;
+  const isClickable = showCart || hasComplements;
 
-  const displayName = language && item.translations?.[language]?.name
-    ? item.translations[language].name
-    : item.name;
-  const displayDescription = language && item.translations?.[language]?.description
-    ? item.translations[language].description
-    : item.description;
+  const displayName = getTranslatedField(language, item.translations, 'name', item.name);
+  const displayDescription = getTranslatedField(language, item.translations, 'description', item.description ?? '');
+
+  const complementLabel = getComplementCategoryDisplay(language, complementCategoryName, complementCategoryTranslations)
+    || t("complementsAvailable", safeLanguage);
+
+  const minComplementPrice = hasComplements
+    ? Math.min(...item.complements!.map((c) => c.price))
+    : 0;
+
+  const handleClick = () => {
+    if (showCart) {
+      onItemClick(item);
+    } else if (hasComplements) {
+      onDetailClick(item);
+    }
+  };
+
+  const borderClass = item.highlight ? "border-primary/25 ring-1 ring-primary/10" : "border-border";
 
   return (
     <div
-      className={`group flex h-full flex-col overflow-hidden rounded-lg bg-card border transition-all duration-200 hover:shadow-elegant hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${
-        showCart ? "cursor-pointer" : ""
-      } ${
-        item.highlight ? "border-primary/25 ring-1 ring-primary/10" : "border-border"
-      }`}
-      role={showCart ? "button" : undefined}
-      tabIndex={showCart ? 0 : undefined}
-      aria-label={showCart ? `${t("addToCart", safeLanguage)}: ${displayName}` : undefined}
-      onKeyDown={showCart ? (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onItemClick(item);
-        }
-      } : undefined}
-      onClick={showCart ? () => onItemClick(item) : undefined}
+      className={`group relative flex h-full flex-col overflow-hidden rounded-lg bg-card border transition-[box-shadow,transform,border-color] duration-200 ${
+        isClickable ? "hover:shadow-elegant hover:-translate-y-0.5 cursor-pointer" : ""
+      } ${borderClass}`}
+      onClick={isClickable ? handleClick : undefined}
     >
+      {isClickable && (
+        <button
+          type="button"
+          aria-label={getCardAriaLabel(showCart, safeLanguage, displayName)}
+          className="absolute inset-0 z-10 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring rounded-lg"
+          onClick={handleClick}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleClick();
+            }
+          }}
+        />
+      )}
       {item.image && !imageError && (
         <div className="relative aspect-[16/10] w-full overflow-hidden">
-          <Image
-            key={item.id}
-            src={item.image}
-            alt={displayName}
-            fill
-            unoptimized
-            className="object-cover transition-transform duration-300 md:group-hover:scale-105"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            loading="lazy"
-            onError={() => setImageError(true)}
-            suppressHydrationWarning
-          />
+          <CardMedia item={item} displayName={displayName} priority={priority} onError={() => setImageError(true)} />
         </div>
       )}
       <div className="flex flex-1 flex-col p-4">
@@ -256,7 +359,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
           {showCart && (
             <button
               type="button"
-              className="bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 rounded-md px-3.5 py-1.5 text-sm font-medium focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring transition-all duration-150"
+              className="relative z-20 bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 rounded-md px-3.5 py-2 text-sm font-medium focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring transition-all duration-150 min-h-[44px] shrink-0 whitespace-nowrap"
               onClick={(e) => {
                 e.stopPropagation();
                 onItemClick(item);
@@ -267,7 +370,90 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
             </button>
           )}
         </div>
+        {!showCart && hasComplements && (
+          <div className="flex items-center justify-between gap-2 mt-3 p-2.5 rounded-md bg-muted/50 group-hover:bg-muted transition-colors duration-200">
+            <span className="text-sm text-muted-foreground min-w-0">
+              <span className="break-words">{complementLabel}</span>
+              {minComplementPrice > 0 && (
+                <span className="ml-1.5 text-foreground/70 font-medium whitespace-nowrap">
+                  {t("from", safeLanguage)} +{minComplementPrice.toFixed(2).replace(".", ",")}€
+                </span>
+              )}
+            </span>
+            <ChevronRight className="w-4 h-4 text-primary shrink-0 transition-colors duration-200" />
+          </div>
+        )}
       </div>
     </div>
   );
 })
+
+/* ─── Complements Detail Dialog (non-cart mode) ─── */
+
+function ItemDetailDialog(props: Readonly<{
+  item: MenuItemVM | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  language: LanguageKey | undefined;
+  complementCategoryName?: string;
+  complementCategoryTranslations?: MenuCategoryVM['complementCategoryTranslations'];
+}>) {
+  const { item, open, onOpenChange, language, complementCategoryName, complementCategoryTranslations } = props;
+  const { language: appLanguage } = useLanguage();
+  const safeLanguage = appLanguage || "es";
+
+  if (!item) return null;
+
+  const complements = item.complements || [];
+  const title = getComplementCategoryDisplay(language, complementCategoryName, complementCategoryTranslations)
+    || t("complementsAvailable", safeLanguage);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
+      <DialogContent
+        className="sm:max-w-[425px] flex flex-col max-h-[calc(100dvh-2rem)]"
+        onPointerDownOutside={() => onOpenChange(false)}
+        onEscapeKeyDown={() => onOpenChange(false)}
+      >
+        <DialogHeader className="shrink-0">
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>
+            {complements.length} {complements.length === 1
+              ? t("optionSingular", safeLanguage)
+              : t("optionPlural", safeLanguage)}
+          </DialogDescription>
+        </DialogHeader>
+
+        {complements.length > 0 && (
+          <div className="flex-1 overflow-y-auto min-h-0 -mx-6 px-6 space-y-2">
+            {complements.map((comp) => {
+              const compName = language && comp.translations?.[language]?.name
+                ? comp.translations[language].name
+                : comp.name;
+              const compDesc = language && comp.translations?.[language]?.description
+                ? comp.translations[language].description
+                : comp.description;
+
+              return (
+                <div
+                  key={comp.id}
+                  className="flex items-center justify-between p-3 rounded-lg border border-border"
+                >
+                  <div className="text-left min-w-0">
+                    <p className="font-medium text-sm">{compName}</p>
+                    {compDesc && (
+                      <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{compDesc}</p>
+                    )}
+                  </div>
+                  <span className="font-semibold text-sm shrink-0 ml-3">
+                    +{comp.price.toFixed(2).replace(".", ",")}€
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}

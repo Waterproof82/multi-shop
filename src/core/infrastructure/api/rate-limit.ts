@@ -54,6 +54,25 @@ function getPublicLimiter(): Ratelimit | null {
   return publicLimiter;
 }
 
+/**
+ * Rate limiter para rutas admin: 60 requests por minuto por IP.
+ */
+let adminLimiter: Ratelimit | null = null;
+
+function getAdminLimiter(): Ratelimit | null {
+  if (adminLimiter) return adminLimiter;
+
+  const client = getRedis();
+  if (!client) return null;
+
+  adminLimiter = new Ratelimit({
+    redis: client,
+    limiter: Ratelimit.slidingWindow(60, "1 m"),
+    prefix: "ratelimit:admin",
+  });
+  return adminLimiter;
+}
+
 function getClientIp(request: Request): string {
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) {
@@ -103,6 +122,34 @@ export async function rateLimitPublic(request: Request): Promise<NextResponse | 
   if (!success) {
     return NextResponse.json(
       { error: "Demasiadas solicitudes. Inténtalo de nuevo más tarde." },
+      {
+        status: 429,
+        headers: {
+          "X-RateLimit-Limit": limit.toString(),
+          "X-RateLimit-Remaining": remaining.toString(),
+          "X-RateLimit-Reset": reset.toString(),
+          "Retry-After": Math.ceil((reset - Date.now()) / 1000).toString(),
+        },
+      }
+    );
+  }
+
+  return null;
+}
+
+/**
+ * Aplica rate limiting a rutas admin. Devuelve NextResponse 429 si se excede, o null si pasa.
+ */
+export async function rateLimitAdmin(request: Request): Promise<NextResponse | null> {
+  const limiter = getAdminLimiter();
+  if (!limiter) return null;
+
+  const ip = getClientIp(request);
+  const { success, limit, remaining, reset } = await limiter.limit(ip);
+
+  if (!success) {
+    return NextResponse.json(
+      { error: "Demasiadas solicitudes al panel de administración. Inténtalo de nuevo más tarde." },
       {
         status: 429,
         headers: {
