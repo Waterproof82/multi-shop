@@ -30,8 +30,8 @@ export function MenuPage({ menuData, header, showCart = false, empresa }: Readon
             <>
               <CategoryNav categories={menuData} />
               <div className="mt-8 space-y-12 md:space-y-16">
-                {menuData.map((category) => (
-                  <MenuSection key={category.id} category={category} showCart={showCart} />
+                {menuData.map((category, index) => (
+                  <MenuSection key={category.id} category={category} showCart={showCart} priority={index === 0} />
                 ))}
               </div>
             </>

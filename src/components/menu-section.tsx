@@ -14,10 +14,11 @@ type LanguageKey = 'en' | 'fr' | 'it' | 'de';
 interface MenuSectionProps {
   category: MenuCategoryVM
   showCart?: boolean
+  priority?: boolean
 }
 
 export const MenuSection = memo(function MenuSection(props: Readonly<MenuSectionProps>) {
-  const { category, showCart } = props;
+  const { category, showCart, priority = false } = props;
   const { language } = useLanguage();
   const [selectedItem, setSelectedItem] = useState<MenuItemVM | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -91,7 +92,7 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
           whileInView="visible"
           viewport={{ once: true, margin: "-40px" }}
         >
-          {category.items.map((item) => (
+          {category.items.map((item, index) => (
             <motion.div
               key={item.id}
               variants={itemVariants}
@@ -102,6 +103,7 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
                 language={translationLang}
                 onItemClick={handleItemClick}
                 showCart={showCart}
+                priority={priority && index < 3}
               />
             </motion.div>
           ))}
@@ -186,8 +188,9 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
   language: LanguageKey | undefined;
   onItemClick: (item: MenuItemVM) => void;
   showCart?: boolean;
+  priority?: boolean;
 }>) {
-  const { item, language, onItemClick, showCart } = props;
+  const { item, language, onItemClick, showCart, priority = false } = props;
   const { language: appLanguage } = useLanguage();
   const safeLanguage = appLanguage || "es";
   const [imageError, setImageError] = useState(false);
@@ -219,18 +222,31 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
     >
       {item.image && !imageError && (
         <div className="relative aspect-[16/10] w-full overflow-hidden">
-          <Image
-            key={item.id}
-            src={item.image}
-            alt={displayName}
-            fill
-            unoptimized
-            className="object-cover transition-transform duration-300 md:group-hover:scale-105"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            loading="lazy"
-            onError={() => setImageError(true)}
-            suppressHydrationWarning
-          />
+          {item.image.endsWith(".mp4") ? (
+            <video
+              src={item.image}
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 md:group-hover:scale-105"
+              onError={() => setImageError(true)}
+            />
+          ) : (
+            <Image
+              key={item.id}
+              src={item.image}
+              alt={displayName}
+              fill
+              unoptimized
+              className="object-cover transition-transform duration-300 md:group-hover:scale-105"
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              loading={priority ? "eager" : "lazy"}
+              priority={priority}
+              onError={() => setImageError(true)}
+              suppressHydrationWarning
+            />
+          )}
         </div>
       )}
       <div className="flex flex-1 flex-col p-4">
@@ -256,7 +272,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
           {showCart && (
             <button
               type="button"
-              className="bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 rounded-md px-3.5 py-1.5 text-sm font-medium focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring transition-all duration-150"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 rounded-md px-3.5 py-2 text-sm font-medium focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring transition-all duration-150 min-h-[44px]"
               onClick={(e) => {
                 e.stopPropagation();
                 onItemClick(item);

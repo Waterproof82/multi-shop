@@ -121,7 +121,7 @@ export default async function AdminDashboard() {
           </div>
         </Link>
         
-        <Link href="/admin/clientes" className="bg-card p-4 lg:p-5 rounded-lg border border-border hover:border-primary/30 transition-colors group">
+        <Link href="/admin/productos" className="bg-card p-4 lg:p-5 rounded-lg border border-border hover:border-primary/30 transition-colors group">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-chart-5/10 flex items-center justify-center">
               <Users className="w-5 h-5 text-chart-5" />

@@ -310,7 +310,7 @@ export function CartDrawer() {
                 closeCart();
                 document.getElementById('menu')?.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="mt-2 px-6 py-2 bg-primary text-primary-foreground rounded-full font-medium hover:bg-primary/90 transition-colors"
+              className="mt-2 px-6 py-3 bg-primary text-primary-foreground rounded-full font-medium hover:bg-primary/90 transition-colors min-h-[44px]"
             >
               {t("viewMenu", language)}
             </button>
@@ -352,11 +352,11 @@ export function CartDrawer() {
                         <RippleButton
                           variant="outline"
                           size="icon"
-                          className="md:size-7 size-10 bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="size-11 md:size-7 bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => updateQuantity(itemKey, ci.quantity - 1)}
                           aria-label={t("reduceQuantity", language)}
                         >
-                          <Minus className="md:size-3 size-4" />
+                          <Minus className="size-4" />
                         </RippleButton>
                         <span className="w-6 md:w-6 text-center font-semibold text-foreground animate-quantity-pulse" key={ci.quantity}>
                           {ci.quantity}
@@ -364,20 +364,20 @@ export function CartDrawer() {
                         <RippleButton
                           variant="outline"
                           size="icon"
-                          className="md:size-7 size-10 bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="size-11 md:size-7 bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => updateQuantity(itemKey, ci.quantity + 1)}
                           aria-label={t("increaseQuantity", language)}
                         >
-                          <Plus className="md:size-3 size-4" />
+                          <Plus className="size-4" />
                         </RippleButton>
                         <RippleButton
                           variant="ghost"
                           size="icon"
-                          className="md:size-7 size-10 text-destructive hover:text-destructive hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="size-11 md:size-7 text-destructive hover:text-destructive hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => removeItem(itemKey)}
                           aria-label={`${t("remove", language)} ${(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}`}
                         >
-                          <Trash2 className="md:size-3 size-4" />
+                          <Trash2 className="size-4" />
                         </RippleButton>
                       </div>
                     </li>
