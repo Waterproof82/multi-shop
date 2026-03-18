@@ -109,8 +109,14 @@ export class AuthAdminUseCase {
       }
       
       return result.data;
-    } catch {
-      // Invalid token or expired - return null (soft failure)
+    } catch (e) {
+      await logger.logAndReturnError(
+        'TOKEN_VERIFY_FAILED',
+        e instanceof Error ? e.message : 'Token verification failed',
+        'use-case',
+        'AuthAdminUseCase.verifyToken',
+        { metadata: { hasToken: !!token } }
+      );
       return null;
     }
   }

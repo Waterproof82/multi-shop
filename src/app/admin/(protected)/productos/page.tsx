@@ -2,18 +2,11 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
-import { Plus, Pencil, Trash2, Loader2, Image as ImageIcon, Search, ArrowUpDown, ArrowUp, ArrowDown, Languages, ChevronDown, ChevronRight } from 'lucide-react';
-import { ImageUploader } from '@/components/ui/image-uploader';
+import { Plus, Pencil, Trash2, Loader2, Image as ImageIcon, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { useAdmin } from '@/lib/admin-context';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
+import { ProductFormDialog, DeleteConfirmDialog } from '@/components/admin/product-form-dialog';
+import type { ProductoFormData } from '@/components/admin/product-form-dialog';
 
 interface Categoria {
   id: string;
@@ -40,24 +33,6 @@ interface Producto {
   activo: boolean;
 }
 
-interface ProductoFormData {
-  titulo_es: string;
-  titulo_en: string;
-  titulo_fr: string;
-  titulo_it: string;
-  titulo_de: string;
-  descripcion_es: string;
-  descripcion_en: string;
-  descripcion_fr: string;
-  descripcion_it: string;
-  descripcion_de: string;
-  precio: string;
-  foto_url: string;
-  categoria_id: string;
-  es_especial: boolean;
-  activo: boolean;
-}
-
 const emptyForm: ProductoFormData = {
   titulo_es: '',
   titulo_en: '',
@@ -76,8 +51,6 @@ const emptyForm: ProductoFormData = {
   activo: true,
 };
 
-const LANGUAGES = ['en', 'fr', 'it', 'de'] as const;
-
 const SortIndicator = ({ field, currentField, direction }: { field: keyof Producto | 'categoria'; currentField: keyof Producto | 'categoria'; direction: 'asc' | 'desc' }) => {
   if (field !== currentField) {
     return <ArrowUpDown className="h-3 w-3 opacity-30" />;
@@ -85,41 +58,6 @@ const SortIndicator = ({ field, currentField, direction }: { field: keyof Produc
   return direction === 'asc' 
     ? <ArrowUp className="h-3 w-3" /> 
     : <ArrowDown className="h-3 w-3" />;
-};
-
-const TranslationFields = ({ formData, onChange, show }: { 
-  formData: ProductoFormData; 
-  onChange: (data: ProductoFormData) => void;
-  show: boolean;
-}) => {
-  if (!show) return null;
-  
-  return (
-    <>
-      {LANGUAGES.map(lang => (
-        <div key={lang} className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor={`titulo_${lang}`} className="block text-sm text-muted-foreground mb-1">Nombre ({lang.toUpperCase()})</label>
-            <Input
-              id={`titulo_${lang}`}
-              type="text"
-              value={formData[`titulo_${lang}` as keyof ProductoFormData] as string}
-              onChange={(e) => onChange({ ...formData, [`titulo_${lang}`]: e.target.value })}
-            />
-          </div>
-          <div className="col-span-2">
-            <label htmlFor={`descripcion_${lang}`} className="block text-sm text-muted-foreground mb-1">Descripción ({lang.toUpperCase()})</label>
-            <Textarea
-              id={`descripcion_${lang}`}
-              value={formData[`descripcion_${lang}` as keyof ProductoFormData] as string}
-              onChange={(e) => onChange({ ...formData, [`descripcion_${lang}`]: e.target.value })}
-              rows={2}
-            />
-          </div>
-        </div>
-      ))}
-    </>
-  );
 };
 
 export default function ProductosPage() {
@@ -589,207 +527,26 @@ export default function ProductosPage() {
         </div>
       </div>
 
-      <Dialog open={isModalOpen} onOpenChange={(open) => { if (!open) closeModal(); }}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingId ? 'Editar Producto' : 'Nuevo Producto'}</DialogTitle>
-            <DialogDescription>
-              {editingId ? 'Modifica los datos del producto.' : 'Rellena los datos para crear un producto.'}
-            </DialogDescription>
-          </DialogHeader>
+      <ProductFormDialog
+        open={isModalOpen}
+        onOpenChange={(open) => { if (!open) closeModal(); }}
+        editingId={editingId}
+        formData={formData}
+        onFormChange={setFormData}
+        categorias={categorias}
+        showTranslations={showTranslations}
+        onToggleTranslations={() => setShowTranslations(!showTranslations)}
+        saving={saving}
+        onSubmit={handleSubmit}
+        empresaSlug={empresaSlug}
+      />
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <label htmlFor="titulo_es" className="block text-sm font-medium text-foreground mb-1">
-                    Nombre (Español) *
-                  </label>
-                  <Input
-                    id="titulo_es"
-                    type="text"
-                    required
-                    aria-required="true"
-                    value={formData.titulo_es}
-                    onChange={(e) => setFormData({ ...formData, titulo_es: e.target.value })}
-                  />
-                </div>
-
-                <div className="col-span-2">
-                  <label htmlFor="descripcion_es" className="block text-sm font-medium text-foreground mb-1">
-                    Descripción (Español)
-                  </label>
-                  <Textarea
-                    id="descripcion_es"
-                    value={formData.descripcion_es}
-                    onChange={(e) => setFormData({ ...formData, descripcion_es: e.target.value })}
-                    rows={2}
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="precio" className="block text-sm font-medium text-foreground mb-1">
-                    Precio (€) *
-                  </label>
-                  <Input
-                    id="precio"
-                    type="number"
-                    step="0.01"
-                    required
-                    aria-required="true"
-                    value={formData.precio}
-                    onChange={(e) => setFormData({ ...formData, precio: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="categoria_id" className="block text-sm font-medium text-foreground mb-1">
-                    Categoría
-                  </label>
-                  <select
-                    id="categoria_id"
-                    value={formData.categoria_id}
-                    onChange={(e) => setFormData({ ...formData, categoria_id: e.target.value })}
-                    className="w-full px-3 py-2 rounded-md border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background transition-colors cursor-pointer"
-                    aria-label="Categoría del producto"
-                  >
-                    <option value="">Sin categoría</option>
-                    {(() => {
-                      const parents = categorias.filter(c => !c.categoria_padre_id);
-                      const children = categorias.filter(c => c.categoria_padre_id);
-
-                      return parents.map(parent => {
-                        const childCats = children.filter(c => c.categoria_padre_id === parent.id);
-                        if (childCats.length > 0) {
-                          return (
-                            <optgroup key={parent.id} label={parent.nombre_es}>
-                              <option key={`${parent.id}-self`} value={parent.id}>
-                                {parent.nombre_es} (principal)
-                              </option>
-                              {childCats.map(sub => (
-                                <option key={sub.id} value={sub.id}>
-                                  └─ {sub.nombre_es}
-                                </option>
-                              ))}
-                            </optgroup>
-                          );
-                        }
-                        return (
-                          <option key={parent.id} value={parent.id}>
-                            {parent.nombre_es}
-                          </option>
-                        );
-                      });
-                    })()}
-                  </select>
-                </div>
-
-                <div className="col-span-2">
-                  <ImageUploader
-                    value={formData.foto_url}
-                    onChange={(url) => setFormData({ ...formData, foto_url: url })}
-                    label="Imagen del producto"
-                    empresaSlug={empresaSlug}
-                  />
-                </div>
-
-                <div className="col-span-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowTranslations(!showTranslations)}
-                    className="flex items-center gap-2 text-sm font-medium text-foreground mt-4 hover:text-primary dark:hover:text-primary"
-                  >
-                    {showTranslations ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                    <Languages className="h-4 w-4" />
-                    Traducciones ({showTranslations ? 'ocultar' : 'mostrar'})
-                  </button>
-                </div>
-
-                {showTranslations && (
-                  <TranslationFields
-                    formData={formData}
-                    onChange={setFormData}
-                    show={showTranslations}
-                  />
-                )}
-
-                <div className="col-span-2 flex gap-6 mt-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.es_especial}
-                      onChange={(e) => setFormData({ ...formData, es_especial: e.target.checked })}
-                      className="w-4 h-4 rounded border-border text-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background cursor-pointer accent-primary"
-                    />
-                    <span className="text-sm text-foreground">Producto especial</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.activo}
-                      onChange={(e) => setFormData({ ...formData, activo: e.target.checked })}
-                      className="w-4 h-4 rounded border-border text-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background cursor-pointer accent-primary"
-                    />
-                    <span className="text-sm text-foreground">Activo</span>
-                  </label>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="px-4 py-2 border rounded-md hover:bg-muted/50 border-border text-foreground"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
-                >
-                  {saving ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
-                      Guardando...
-                    </>
-                  ) : (
-                    'Guardar'
-                  )}
-                </button>
-              </div>
-            </form>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={deleteConfirm.show} onOpenChange={(open) => { if (!open) setDeleteConfirm({ show: false, id: null, nombre: null }); }}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-3">
-              <div className="p-2 bg-destructive/10 rounded-full">
-                <Trash2 className="w-5 h-5 text-destructive" />
-              </div>
-              Eliminar producto
-            </DialogTitle>
-            <DialogDescription>
-              ¿Estás seguro de que quieres eliminar <strong>{deleteConfirm.nombre}</strong>? Esta acción no se puede deshacer.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex gap-3 justify-end">
-            <button
-              onClick={() => setDeleteConfirm({ show: false, id: null, nombre: null })}
-              className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={confirmDeleteProduct}
-              className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg"
-            >
-              Eliminar
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <DeleteConfirmDialog
+        open={deleteConfirm.show}
+        onOpenChange={(open) => { if (!open) setDeleteConfirm({ show: false, id: null, nombre: null }); }}
+        productName={deleteConfirm.nombre}
+        onConfirm={confirmDeleteProduct}
+      />
     </div>
   );
 }

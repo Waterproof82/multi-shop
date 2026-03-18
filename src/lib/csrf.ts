@@ -1,7 +1,12 @@
 import { cookies } from 'next/headers';
 import { randomBytes, createHmac } from 'crypto';
 
-const CSRF_SECRET = process.env.ACCESS_TOKEN_SECRET || 'fallback-secret-change-me';
+const CSRF_SECRET = process.env.ACCESS_TOKEN_SECRET;
+
+if (!CSRF_SECRET && process.env.NODE_ENV === 'production') {
+  throw new Error('ACCESS_TOKEN_SECRET environment variable is required in production');
+}
+
 const CSRF_COOKIE_NAME = 'csrf_token';
 const CSRF_HEADER_NAME = 'x-csrf-token';
 
@@ -10,6 +15,9 @@ export function generateCsrfToken(): string {
 }
 
 export function signCsrfToken(token: string): string {
+  if (!CSRF_SECRET) {
+    throw new Error('CSRF secret not configured');
+  }
   return createHmac('sha256', CSRF_SECRET).update(token).digest('hex');
 }
 

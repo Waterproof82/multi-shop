@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { requireAuth, successResponse, errorResponse } from '@/core/infrastructure/api/helpers';
 import { getR2Config, uploadToR2 } from '@/core/infrastructure/storage/s3-client';
 import { empresaUseCase } from '@/core/infrastructure/database';
+import { logApiError } from '@/core/infrastructure/api/api-logger';
 
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const MIME_TO_EXT: Record<string, string> = {
@@ -67,8 +68,7 @@ export async function POST(request: NextRequest) {
     const publicUrl = `${publicDomain}/${key}`;
     return successResponse({ publicUrl });
   } catch (error) {
-    // OWASP: log interno con detalle, mensaje genérico al cliente
-    console.error('[upload-image] Error:', error instanceof Error ? error.message : error);
+    await logApiError('Upload image', error, 'POST');
     return errorResponse('Error al procesar la imagen', 500);
   }
 }

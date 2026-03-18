@@ -98,7 +98,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, numeroPedido, pedidoId, whatsappLink, companyPhone: empresa.telefono_whatsapp });
   } catch (error) {
-    console.error('Error creating order:', error);
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });
   }
 }

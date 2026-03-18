@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { pedidoUseCase } from '@/core/infrastructure/database';
 import { requireAuth, successResponse, validationErrorResponse, handleResult } from '@/core/infrastructure/api/helpers';
+import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import { PEDIDO_ESTADOS } from '@/core/domain/constants/pedido';
 
 const pedidoIdSchema = z.object({
@@ -14,6 +15,9 @@ const updatePedidoSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
+  const rateLimited = await rateLimitAdmin(request);
+  if (rateLimited) return rateLimited;
+
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
 
@@ -61,6 +65,9 @@ export async function DELETE(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const rateLimited = await rateLimitAdmin(request);
+  if (rateLimited) return rateLimited;
+
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
 
