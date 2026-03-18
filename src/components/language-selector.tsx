@@ -24,7 +24,7 @@ export function LanguageSelector() {
   const currentLang = languages.find(l => l.code === language) || languages[0]
 
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="sm" className="gap-2 px-2" aria-label="Select language" id="language-selector-trigger">
           <Languages className="size-4" />

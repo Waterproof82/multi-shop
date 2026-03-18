@@ -1,5 +1,5 @@
 import type { Product, Category } from "@/core/domain/entities/types";
-import type { MenuItemVM, MenuSubcategoryVM, MenuCategoryVM } from "@/core/application/dtos/menu-view-model";
+import type { MenuItemVM, MenuSubcategoryVM, MenuCategoryVM, ComplementVM } from "@/core/application/dtos/menu-view-model";
 
 type TranslationMap = MenuItemVM["translations"];
 type DescriptionTranslationMap = MenuCategoryVM["descripcionTranslations"];
@@ -28,6 +28,16 @@ function mapProductTranslations(p: Product): TranslationMap {
     fr: p.titulo_fr ? { name: p.titulo_fr, description: p.descripcion_fr || undefined } : undefined,
     it: p.titulo_it ? { name: p.titulo_it, description: p.descripcion_it || undefined } : undefined,
     de: p.titulo_de ? { name: p.titulo_de, description: p.descripcion_de || undefined } : undefined,
+  };
+}
+
+function mapComplementProduct(c: Product): ComplementVM {
+  return {
+    id: c.id,
+    name: c.titulo_es,
+    price: c.precio,
+    description: c.descripcion_es || undefined,
+    translations: mapProductTranslations(c),
   };
 }
 
@@ -68,6 +78,8 @@ export class MenuMapper {
     requiresComplement: boolean,
     categoriesById: Map<string, Category>,
     products: Product[],
+    complementCategoryName?: string,
+    complementCategoryTranslations?: Category['translations'],
   ): MenuCategoryVM {
     const parentProducts = allProducts.filter((p) => p.categoriaId === parentCat.id && p.activo);
     const subcategoryProducts = childSubcategories.flatMap((subCat) =>
@@ -81,6 +93,13 @@ export class MenuMapper {
       descripcion: parentCat.descripcion || undefined,
       translations: mapCategoryTranslations(parentCat),
       descripcionTranslations: mapDescriptionTranslations(parentCat),
+      complementCategoryName: complementCategoryName || undefined,
+      complementCategoryTranslations: complementCategoryTranslations ? {
+        en: complementCategoryTranslations.en || undefined,
+        fr: complementCategoryTranslations.fr || undefined,
+        it: complementCategoryTranslations.it || undefined,
+        de: complementCategoryTranslations.de || undefined,
+      } : undefined,
       subcategories: childSubcategories.length > 0
         ? childSubcategories.map((subCat) => MenuMapper.toSubcategoryVM(subCat, products))
         : undefined,
@@ -92,12 +111,7 @@ export class MenuMapper {
         return {
           ...item,
           complements: categoryComplements.length > 0
-            ? categoryComplements.map((c) => ({
-                id: c.id,
-                name: c.titulo_es,
-                price: c.precio,
-                description: c.descripcion_es || undefined,
-              }))
+            ? categoryComplements.map(mapComplementProduct)
             : undefined,
           requiresComplement: requiresComplement || undefined,
         };
