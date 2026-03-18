@@ -194,29 +194,30 @@ export default function ClientesPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
       {/* Header con contador */}
-      <div className="bg-primary rounded-lg p-6">
-        <div className="flex items-center justify-between">
+      <div className="bg-primary rounded-lg p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-4">
             <div>
-              <h1 className="text-2xl font-semibold text-primary-foreground">Clientes</h1>
+              <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">Clientes</h1>
               <p className="text-primary-foreground/80 text-sm mt-1">Gestiona tus clientes</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <Button 
-              onClick={openCreateModal}
-              className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 font-semibold"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Nuevo Cliente
-            </Button>
-            <div className="bg-primary-foreground/20 rounded-lg px-6 py-4 text-center">
-              <Users className="w-8 h-8 text-primary-foreground mx-auto mb-1" />
-              <span className="text-2xl font-semibold text-primary-foreground">{clientes.length}</span>
+            <div className="bg-primary-foreground/20 rounded-lg px-4 py-3 text-center">
+              <Users className="w-6 h-6 sm:w-8 sm:h-8 text-primary-foreground mx-auto mb-1" />
+              <span className="text-xl sm:text-2xl font-semibold text-primary-foreground">{clientes.length}</span>
               <p className="text-primary-foreground/80 text-xs">Total clientes</p>
             </div>
+            <Button 
+              onClick={openCreateModal}
+              className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 font-semibold shrink-0"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              <span className="hidden sm:inline">Nuevo Cliente</span>
+              <span className="sm:hidden">Nuevo</span>
+            </Button>
           </div>
         </div>
       </div>

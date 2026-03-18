@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Pencil, Trash2, X, Loader2, Search, ArrowUpDown, ArrowUp, ArrowDown, Languages, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Loader2, Search, ArrowUpDown, ArrowUp, ArrowDown, Languages, ChevronDown, ChevronRight, Tags, FolderTree } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -228,33 +228,52 @@ export default function CategoriasPage() {
     );
   }
 
+  const subcategoriasCount = categorias.filter(cat => cat.categoria_padre_id !== null).length;
+
   return (
-    <div className="pt-20 lg:pt-0 px-6 lg:px-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Categorías</h1>
-          <p className="text-muted-foreground">Gestiona las categorías del menú</p>
-        </div>
-        <div className="flex items-center gap-4 w-full sm:w-auto">
-          <div className="relative flex-1 sm:flex-initial">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Buscar..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              aria-label="Buscar categorías"
-              className="pl-10 w-full sm:w-48"
-            />
+    <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
+      {/* Header con stats */}
+      <div className="bg-primary rounded-lg p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">Categorías</h1>
+            <p className="text-primary-foreground/80 text-sm mt-1">Gestiona las categorías del menú</p>
           </div>
-          <button
-            onClick={openCreateModal}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring transition-colors duration-150"
-          >
-            <Plus className="h-4 w-4" />
-            <span className="sm:hidden">Nueva</span>
-          </button>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
+              <Tags className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
+              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{categorias.filter(c => !c.categoria_padre_id).length}</span>
+              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Categorías</p>
+            </div>
+            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
+              <FolderTree className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
+              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{subcategoriasCount}</span>
+              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Subcategorías</p>
+            </div>
+          </div>
         </div>
+      </div>
+
+      {/* Buscador y acciones */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="relative flex-1 w-full sm:max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Buscar categorías..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            aria-label="Buscar categorías"
+            className="pl-10 w-full"
+          />
+        </div>
+        <button
+          onClick={openCreateModal}
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring transition-colors duration-150 w-full sm:w-auto justify-center"
+        >
+          <Plus className="h-4 w-4" />
+          <span>Nueva categoría</span>
+        </button>
       </div>
 
       {error && (

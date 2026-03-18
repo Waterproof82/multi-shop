@@ -196,7 +196,7 @@ export default function PromocionesPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
       {/* Header con contador */}
       <div className="bg-primary rounded-lg p-6">
         <div className="flex items-center justify-between">

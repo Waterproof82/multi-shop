@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
-import { Search, ChevronDown, ChevronUp, Check, Clock, Trash2 } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, Check, Clock, Trash2, ShoppingCart, Calendar } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import type { PedidoItem, PedidoComplemento } from '@/core/domain/entities/types';
 import { PEDIDO_ESTADOS, PEDIDO_ESTADO_LABELS, PEDIDO_ESTADO_COLORS, type PedidoEstado } from '@/core/domain/constants/pedido';
@@ -145,23 +145,67 @@ export default function PedidosPage() {
     }
   };
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount);
+  };
+
+  const stats = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    
+    const pedidosHoy = pedidos.filter(p => new Date(p.created_at) >= today);
+    const pedidosMes = pedidos.filter(p => new Date(p.created_at) >= monthStart);
+    
+    return {
+      pedidosHoy: pedidosHoy.length,
+      totalHoy: pedidosHoy.reduce((sum, p) => sum + p.total, 0),
+      pedidosMes: pedidosMes.length,
+      totalMes: pedidosMes.reduce((sum, p) => sum + p.total, 0),
+    };
+  }, [pedidos]);
+
   if (loading) {
     return (
-      <div className="pt-20 lg:pt-0 px-6 lg:px-8 flex items-center justify-center min-h-[50vh]">
+      <div className="pt-16 lg:pt-0 px-6 lg:px-8 flex items-center justify-center min-h-[50vh]">
         <div className="text-muted-foreground">Cargando...</div>
       </div>
     );
   }
 
   return (
-    <div className="pt-20 lg:pt-0 px-6 lg:px-8">
-      <h1 className="text-2xl font-bold text-foreground mb-2">
-        Pedidos
-      </h1>
-      <p className="text-muted-foreground mb-6">
-        Gestiona los pedidos de tus clientes
-      </p>
+    <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
+      {/* Header con stats */}
+      <div className="bg-primary rounded-lg p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">Pedidos</h1>
+            <p className="text-primary-foreground/80 text-sm mt-1">Gestiona los pedidos de tus clientes</p>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
+              <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
+              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{stats.pedidosHoy}</span>
+              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Hoy</p>
+            </div>
+            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
+              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{formatCurrency(stats.totalHoy)}</span>
+              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Ventas hoy</p>
+            </div>
+            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
+              <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
+              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{stats.pedidosMes}</span>
+              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Este mes</p>
+            </div>
+            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
+              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{formatCurrency(stats.totalMes)}</span>
+              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Ventas mes</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
+      {/* Buscador */}
       <div className="bg-card rounded-lg shadow-elegant border border-border">
         <div className="p-4 border-b border-border">
           <div className="relative max-w-md">

@@ -101,13 +101,15 @@ export function CartDrawer() {
   const isAndroid = /Android/i.test(ua);
   const isIOS = /iPhone|iPad|iPod/i.test(ua);
 
+  const urlWaMe = `https://wa.me/${numeroLimpio}?text=${textoEncoded}`;
+  
   if (isAndroid || isIOS) {
-    globalThis.location.href = `https://wa.me/${numeroLimpio}?text=${textoEncoded}`;
+    globalThis.open(urlWaMe, '_blank', 'noopener,noreferrer');
   } else {
     const urlApi = `https://api.whatsapp.com/send/?phone=${numeroLimpio}&text=${textoEncoded}`;
     const nuevaPestana = globalThis.open(urlApi, '_blank', 'noopener,noreferrer');
     if (!nuevaPestana) {
-      globalThis.location.assign(urlApi);
+      globalThis.open(urlApi, '_blank', 'noopener,noreferrer');
     }
   }
 };

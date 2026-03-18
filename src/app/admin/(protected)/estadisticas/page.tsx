@@ -108,42 +108,41 @@ export default function EstadisticasPage() {
 
   if (loading) {
     return (
-      <div className="pt-20 lg:pt-0 px-6 lg:px-8 flex items-center justify-center min-h-[50vh]">
+      <div className="pt-16 lg:pt-0 px-6 lg:px-8 flex items-center justify-center min-h-[50vh]">
         <div className="text-muted-foreground">Cargando...</div>
       </div>
     );
   }
 
   return (
-    <div className="pt-20 lg:pt-0 px-6 lg:px-8">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground mb-1">
-            Estadísticas
-          </h1>
-          <p className="text-muted-foreground">
-            Resumen de pedidos y facturación
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => cambiarMes(-1)}
-            className="p-2 rounded-lg bg-card border border-border hover:bg-muted/50 transition-colors"
-          >
-            <ChevronLeft className="w-5 h-5 text-muted-foreground" />
-          </button>
-          <div className="px-4 py-2 bg-card rounded-lg border border-border min-w-[160px] text-center">
-            <span className="font-medium text-foreground">
-              {meses[mesActual]} {añoActual}
-            </span>
+    <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
+      {/* Header con stats */}
+      <div className="bg-primary rounded-lg p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">Estadísticas</h1>
+            <p className="text-primary-foreground/80 text-sm mt-1">Resumen de pedidos y facturación</p>
           </div>
-          <button
-            onClick={() => cambiarMes(1)}
-            disabled={esMesActual}
-            className="p-2 rounded-lg bg-card border border-border hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <ChevronRight className="w-5 h-5 text-muted-foreground" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => cambiarMes(-1)}
+              className="p-2 rounded-lg bg-primary-foreground/20 hover:bg-primary-foreground/30 transition-colors"
+            >
+              <ChevronLeft className="w-5 h-5 text-primary-foreground" />
+            </button>
+            <div className="px-4 py-2 bg-primary-foreground/20 rounded-lg min-w-[140px] text-center">
+              <span className="font-medium text-primary-foreground">
+                {meses[mesActual]} {añoActual}
+              </span>
+            </div>
+            <button
+              onClick={() => cambiarMes(1)}
+              disabled={esMesActual}
+              className="p-2 rounded-lg bg-primary-foreground/20 hover:bg-primary-foreground/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ChevronRight className="w-5 h-5 text-primary-foreground" />
+            </button>
+          </div>
         </div>
       </div>
 
