@@ -14,7 +14,7 @@ Plataforma multi-tenant de menú digital con sistema de pedidos online, panel de
 | Tailwind CSS | 4.x | Estilos |
 | AWS SDK v3 | ^3.994 | Cliente S3/R2 |
 | Zod | 3.25.x | Validación schemas |
-| JWT | 6.x | JWT (sign + verify) |
+| jose | ^6.1.3 | JWT (sign + verify) |
 | Brevo | — | Envío de emails |
 
 ---
@@ -79,6 +79,7 @@ src/
 │       │   ├── categorias/          # CRUD categorías
 │       │   ├── pedidos/             # GET/PATCH/DELETE + PUT (stats)
 │       │   │   └── enviar-email/    # POST — email de confirmación al admin
+│       │   ├── upload-image/        # POST — upload de imágenes a R2
 │       │   ├── clientes/            # CRUD clientes
 │       │   ├── empresa/             # GET/PUT datos empresa
 │       │   ├── update-colores/      # POST colores del tema
@@ -174,7 +175,7 @@ const supabase = createClient(url, key); // fuera de supabase-client.ts
 
 | Principio | Implementación |
 |-----------|----------------|
-| **Autenticación** | JWT HS256 en cookie HttpOnly (24h) |
+| **JWT** | HS256 con `jose` | HttpOnly cookie, 24h expiry |
 | **Autorización** | Proxy middleware valida JWT, inyecta `x-empresa-id` |
 | **Validación de entrada** | Zod `safeParse` en **todas** las API routes |
 | **Sanitización HTML** | `escapeHtml()` en todos los templates de email |

@@ -91,25 +91,20 @@ export function CartDrawer() {
   const [errors, setErrors] = useState<{ nombre?: string; telefono?: string }>({})
 
   const abrirWhatsApp = (numero: string, mensaje: string) => {
-  let numeroLimpio = numero.replaceAll(/\D/g, '');
-  if (numeroLimpio.length === 9) {
-    numeroLimpio = '34' + numeroLimpio;
-  }
-
-  const textoEncoded = encodeURIComponent(mensaje);
-  const ua = typeof navigator === 'undefined' ? '' : navigator.userAgent;
-  const isMobile = /Android|iPhone|iPad|iPod/i.test(ua);
-
-  if (isMobile) {
-    globalThis.location.href = `https://wa.me/${numeroLimpio}?text=${textoEncoded}`;
-  } else {
+    let numeroLimpio = numero.replaceAll(/\D/g, '');
+    if (numeroLimpio.length === 9) {
+      numeroLimpio = '34' + numeroLimpio;
+    }
+  
+    const textoEncoded = encodeURIComponent(mensaje);
     const urlWaMe = `https://wa.me/${numeroLimpio}?text=${textoEncoded}`;
+    
     const nuevaPestana = globalThis.open(urlWaMe, '_blank', 'noopener,noreferrer');
-    if (!nuevaPestana) {
+    if (!nuevaPestana || nuevaPestana.closed) {
+      console.log('[WhatsApp] Popup bloqueado, intentando location.href');
       globalThis.location.href = urlWaMe;
     }
-  }
-};
+  };
 
   const getWhatsAppUrl = (): string | null => {
     const link = (globalThis as Record<string, unknown>).__whatsappLink as string | undefined;
