@@ -2,7 +2,6 @@
 
 import { useState, memo, useCallback } from "react"
 import { motion, useReducedMotion } from "framer-motion"
-import Image from "next/image"
 import { ChevronRight } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -76,11 +75,11 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
 
   return (
     <section id={category.id} className="scroll-mt-32">
-      <div className="mb-5 flex items-center gap-4">
-        <h2 className="font-serif text-2xl font-semibold text-foreground md:text-3xl tracking-tight">
+      <div className="mb-5 flex items-center gap-4 overflow-hidden">
+        <h2 className="font-serif text-2xl font-semibold text-foreground md:text-3xl tracking-tight truncate shrink min-w-0">
           {(translationLang && category.translations?.[translationLang]?.name) || category.label}
         </h2>
-        <div className="h-px flex-1 bg-border" />
+        <div className="h-px flex-1 bg-border shrink-0" />
       </div>
 
       {displayDescripcion && (
@@ -123,7 +122,7 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
             <motion.div
               key={item.id}
               variants={itemVariants}
-              className="h-full"
+              className="h-full min-w-0"
             >
               <MenuItemCard
                 item={item}
@@ -190,9 +189,9 @@ const SubcategorySection = memo(function SubcategorySection(props: Readonly<{
 
   return (
     <div className="space-y-3">
-      <h3 className="font-serif text-lg font-semibold text-foreground flex items-center gap-2">
-        <span className="w-1.5 h-1.5 rounded-full bg-primary/50" />
-        {(translationLang && subcategory.translations?.[translationLang]?.name) || subcategory.nombre}
+      <h3 className="font-serif text-lg font-semibold text-foreground flex items-center gap-2 min-w-0">
+        <span className="w-1.5 h-1.5 rounded-full bg-primary/50 shrink-0" />
+        <span className="min-w-0 break-words">{(translationLang && subcategory.translations?.[translationLang]?.name) || subcategory.nombre}</span>
       </h3>
       {displayDescripcion && (
         <p className="text-sm text-muted-foreground border-l-2 border-primary/20 pl-3">
@@ -210,7 +209,7 @@ const SubcategorySection = memo(function SubcategorySection(props: Readonly<{
           <motion.div
             key={item.id}
             variants={subVariants}
-            className="h-full"
+            className="h-full min-w-0"
           >
             <MenuItemCard
               item={item}
@@ -276,7 +275,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
 
   return (
     <div
-      className={`group flex h-full flex-col overflow-hidden rounded-lg bg-card border transition-all duration-200 hover:shadow-elegant hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${
+      className={`group flex h-full flex-col overflow-hidden rounded-lg bg-card border transition-[box-shadow,transform,border-color] duration-200 hover:shadow-elegant hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${
         isClickable ? "cursor-pointer" : ""
       } ${
         item.highlight ? "border-primary/25 ring-1 ring-primary/10" : "border-border"
@@ -300,18 +299,13 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
               onError={() => setImageError(true)}
             />
           ) : (
-            <Image
-              key={item.id}
+            <img
               src={item.image}
               alt={displayName}
-              fill
-              unoptimized
-              className="object-cover transition-transform duration-300 md:group-hover:scale-105"
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 md:group-hover:scale-105"
               loading={priority ? "eager" : "lazy"}
-              priority={priority}
+              decoding="async"
               onError={() => setImageError(true)}
-              suppressHydrationWarning
             />
           )}
         </div>
@@ -339,7 +333,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
           {showCart && (
             <button
               type="button"
-              className="bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 rounded-md px-3.5 py-2 text-sm font-medium focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring transition-all duration-150 min-h-[44px]"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 rounded-md px-3.5 py-2 text-sm font-medium focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring transition-all duration-150 min-h-[44px] shrink-0 whitespace-nowrap"
               onClick={(e) => {
                 e.stopPropagation();
                 onItemClick(item);
@@ -351,16 +345,16 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
           )}
         </div>
         {!showCart && hasComplements && (
-          <div className="flex items-center justify-between mt-3 p-2.5 rounded-md bg-muted/50 group-hover:bg-muted transition-colors duration-200">
-            <span className="text-sm text-muted-foreground">
-              {complementLabel}
+          <div className="flex items-center justify-between gap-2 mt-3 p-2.5 rounded-md bg-muted/50 group-hover:bg-muted transition-colors duration-200">
+            <span className="text-sm text-muted-foreground min-w-0">
+              <span className="break-words">{complementLabel}</span>
               {minComplementPrice > 0 && (
-                <span className="ml-1.5 text-foreground/70 font-medium">
+                <span className="ml-1.5 text-foreground/70 font-medium whitespace-nowrap">
                   {t("from", safeLanguage)} +{minComplementPrice.toFixed(2).replace(".", ",")}€
                 </span>
               )}
             </span>
-            <ChevronRight className="w-4 h-4 text-primary transition-colors duration-200" />
+            <ChevronRight className="w-4 h-4 text-primary shrink-0 transition-colors duration-200" />
           </div>
         )}
       </div>

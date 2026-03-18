@@ -25,22 +25,24 @@ export function MenuPage({ menuData, header, showCart = false, empresa }: Readon
       <PromoNotification />
       <main className="flex-1">
         <HeroBanner empresa={empresa} />
-        <div className="container mx-auto max-w-6xl px-4 py-8 md:px-6">
-          {menuData.length > 0 ? (
-            <>
-              <CategoryNav categories={menuData} />
-              <div className="mt-8 space-y-12 md:space-y-16">
+        {menuData.length > 0 ? (
+          <>
+            <CategoryNav categories={menuData} />
+            <div className="container mx-auto max-w-6xl px-4 py-8 md:px-6">
+              <div className="space-y-12 md:space-y-16">
                 {menuData.map((category, index) => (
                   <MenuSection key={category.id} category={category} showCart={showCart} priority={index === 0} />
                 ))}
               </div>
-            </>
-          ) : (
+            </div>
+          </>
+        ) : (
+          <div className="container mx-auto max-w-6xl px-4 py-8 md:px-6">
             <div className="text-center py-20">
               <p className="text-xl text-muted-foreground">Menú no disponible en este momento.</p>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </main>
       <SiteFooter empresa={empresa} />
       <CartDrawer />
