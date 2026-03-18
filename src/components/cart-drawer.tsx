@@ -95,14 +95,9 @@ export function CartDrawer() {
     if (numeroLimpio.length === 9) {
       numeroLimpio = '34' + numeroLimpio;
     }
-  
     const textoEncoded = encodeURIComponent(mensaje);
     const urlWaMe = `https://wa.me/${numeroLimpio}?text=${textoEncoded}`;
-    
-    const nuevaPestana = globalThis.open(urlWaMe, '_blank', 'noopener,noreferrer');
-    if (!nuevaPestana) {
-      console.log('[WhatsApp] Popup potencialmente bloqueado');
-    }
+    globalThis.open(urlWaMe, '_blank', 'noopener,noreferrer');
   };
 
   const getWhatsAppUrl = (): string | null => {
@@ -189,7 +184,7 @@ export function CartDrawer() {
             setSent(true);
             
             const maxAttempts = 5;
-            const retryDelay = 3000;
+            const retryDelay = 5000;
             let attempts = 0;
             let retryInterval: ReturnType<typeof setInterval> | null = null;
             
