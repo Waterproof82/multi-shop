@@ -275,7 +275,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
 
   return (
     <div
-      className={`group flex h-full flex-col overflow-hidden rounded-lg bg-card border transition-[box-shadow,transform,border-color] duration-200 hover:shadow-elegant hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${
+      className={`group flex h-full flex-col overflow-hidden rounded-lg bg-card border transition-[box-shadow,transform,border-color] duration-200 hover:shadow-elegant hover:-translate-y-0.5 ${
         isClickable ? "cursor-pointer" : ""
       } ${
         item.highlight ? "border-primary/25 ring-1 ring-primary/10" : "border-border"
@@ -285,6 +285,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
       aria-label={isClickable ? (showCart ? `${t("addToCart", safeLanguage)}: ${displayName}` : `${t("viewOptions", safeLanguage)}: ${displayName}`) : undefined}
       onKeyDown={isClickable ? handleKeyDown : undefined}
       onClick={isClickable ? handleClick : undefined}
+      style={{ outlineColor: 'var(--ring)', outlineWidth: '2px', outlineOffset: '2px' }}
     >
       {item.image && !imageError && (
         <div className="relative aspect-[16/10] w-full overflow-hidden">
@@ -295,14 +296,14 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
               loop
               muted
               playsInline
-              className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 md:group-hover:scale-105"
+              className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 md:group-hover:scale-105 will-change-transform"
               onError={() => setImageError(true)}
             />
           ) : (
             <img
               src={item.image}
               alt={displayName}
-              className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 md:group-hover:scale-105"
+              className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 md:group-hover:scale-105 will-change-transform"
               loading={priority ? "eager" : "lazy"}
               decoding="async"
               onError={() => setImageError(true)}

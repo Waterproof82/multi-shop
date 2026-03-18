@@ -24,7 +24,7 @@ interface QuantitySelectorDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-function RippleButton({ children, onClick, className, disabled, variant = "default", size = "default", ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "default" | "outline"; size?: "default" | "icon" }) {
+function RippleButton({ children, onClick, className, disabled, variant = "default", size = "default", 'aria-label': ariaLabel, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "default" | "outline"; size?: "default" | "icon" }) {
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   const createRipple = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -57,6 +57,7 @@ function RippleButton({ children, onClick, className, disabled, variant = "defau
       className={`relative overflow-hidden ${className}`}
       disabled={disabled}
       onClick={handleClick}
+      aria-label={ariaLabel}
       {...props}
     >
       {children}

@@ -2,6 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { Plus, Pencil, Trash2, X, Loader2, Search, ArrowUpDown, ArrowUp, ArrowDown, Languages, ChevronDown, ChevronRight } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 
 interface Category {
   id: string;
@@ -228,13 +238,13 @@ export default function CategoriasPage() {
         <div className="flex items-center gap-4 w-full sm:w-auto">
           <div className="relative flex-1 sm:flex-initial">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input
+            <Input
               type="text"
               placeholder="Buscar..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               aria-label="Buscar categorías"
-              className="pl-10 pr-4 py-2 border rounded-lg w-full sm:w-48 focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
+              className="pl-10 w-full sm:w-48"
             />
           </div>
           <button
@@ -418,268 +428,249 @@ export default function CategoriasPage() {
         </div>
       </div>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-overlay flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-lg shadow-elegant-lg w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center p-6 border-b border-border">
-              <h2 className="text-xl font-semibold text-foreground">
-                {editingId ? 'Editar Categoría' : 'Nueva Categoría'}
-              </h2>
-              <button onClick={closeModal} className="text-muted-foreground hover:text-foreground">
-                <X className="h-5 w-5" />
-              </button>
+      <Dialog open={isModalOpen} onOpenChange={(open) => { if (!open) closeModal(); }}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingId ? 'Editar Categoría' : 'Nueva Categoría'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingId ? 'Modifica los datos de la categoría.' : 'Rellena los datos para crear una categoría.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label htmlFor="nombre_es" className="block text-sm font-medium text-foreground mb-1">
+                Nombre (Español) *
+              </label>
+              <Input
+                id="nombre_es"
+                type="text"
+                required
+                value={formData.nombre_es}
+                onChange={(e) => setFormData({ ...formData, nombre_es: e.target.value })}
+              />
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label htmlFor="nombre_es" className="block text-sm font-medium text-foreground mb-1">
-                  Nombre (Español) *
-                </label>
-                <input
-                  id="nombre_es"
-                  type="text"
-                  required
-                  value={formData.nombre_es}
-                  onChange={(e) => setFormData({ ...formData, nombre_es: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
-                />
-              </div>
-
-              {showTranslations && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="nombre_en" className="block text-sm font-medium text-foreground mb-1">
-                      Nombre (Inglés)
-                    </label>
-                    <input
-                      id="nombre_en"
-                      type="text"
-                      value={formData.nombre_en}
-                      onChange={(e) => setFormData({ ...formData, nombre_en: e.target.value })}
-                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
-                    />
-                  </div>
+            {showTranslations && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="nombre_en" className="block text-sm font-medium text-foreground mb-1">
+                    Nombre (Inglés)
+                  </label>
+                  <Input
+                    id="nombre_en"
+                    type="text"
+                    value={formData.nombre_en}
+                    onChange={(e) => setFormData({ ...formData, nombre_en: e.target.value })}
+                  />
+                </div>
                 <div>
                   <label htmlFor="nombre_fr" className="block text-sm font-medium text-foreground mb-1">
                     Nombre (Francés)
                   </label>
-                  <input
+                  <Input
                     id="nombre_fr"
                     type="text"
                     value={formData.nombre_fr}
                     onChange={(e) => setFormData({ ...formData, nombre_fr: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
                   />
                 </div>
                 <div>
                   <label htmlFor="nombre_it" className="block text-sm font-medium text-foreground mb-1">
                     Nombre (Italiano)
                   </label>
-                  <input
+                  <Input
                     id="nombre_it"
                     type="text"
                     value={formData.nombre_it}
                     onChange={(e) => setFormData({ ...formData, nombre_it: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
                   />
                 </div>
                 <div>
                   <label htmlFor="nombre_de" className="block text-sm font-medium text-foreground mb-1">
                     Nombre (Alemán)
                   </label>
-                  <input
+                  <Input
                     id="nombre_de"
                     type="text"
                     value={formData.nombre_de}
                     onChange={(e) => setFormData({ ...formData, nombre_de: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
                   />
                 </div>
               </div>
-              )}
+            )}
 
-              <div>
-                <label htmlFor="descripcion_es" className="block text-sm font-medium text-foreground mb-1">
-                  Descripción (Español)
-                </label>
-                <textarea
-                  id="descripcion_es"
-                  value={formData.descripcion_es}
-                  onChange={(e) => setFormData({ ...formData, descripcion_es: e.target.value })}
-                  rows={2}
-                  placeholder="Texto que se mostrará encima de los productos..."
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
-                />
-              </div>
+            <div>
+              <label htmlFor="descripcion_es" className="block text-sm font-medium text-foreground mb-1">
+                Descripción (Español)
+              </label>
+              <Textarea
+                id="descripcion_es"
+                value={formData.descripcion_es}
+                onChange={(e) => setFormData({ ...formData, descripcion_es: e.target.value })}
+                rows={2}
+                placeholder="Texto que se mostrará encima de los productos..."
+              />
+            </div>
 
-              {showTranslations && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="descripcion_en" className="block text-sm font-medium text-foreground mb-1">
-                      Descripción (Inglés)
-                    </label>
-                  <textarea
+            {showTranslations && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="descripcion_en" className="block text-sm font-medium text-foreground mb-1">
+                    Descripción (Inglés)
+                  </label>
+                  <Textarea
                     id="descripcion_en"
                     value={formData.descripcion_en}
                     onChange={(e) => setFormData({ ...formData, descripcion_en: e.target.value })}
                     rows={2}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
                   />
                 </div>
                 <div>
                   <label htmlFor="descripcion_fr" className="block text-sm font-medium text-foreground mb-1">
                     Descripción (Francés)
                   </label>
-                  <textarea
+                  <Textarea
                     id="descripcion_fr"
                     value={formData.descripcion_fr}
                     onChange={(e) => setFormData({ ...formData, descripcion_fr: e.target.value })}
                     rows={2}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
                   />
                 </div>
                 <div>
                   <label htmlFor="descripcion_it" className="block text-sm font-medium text-foreground mb-1">
                     Descripción (Italiano)
                   </label>
-                  <textarea
+                  <Textarea
                     id="descripcion_it"
                     value={formData.descripcion_it}
                     onChange={(e) => setFormData({ ...formData, descripcion_it: e.target.value })}
                     rows={2}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
                   />
                 </div>
                 <div>
                   <label htmlFor="descripcion_de" className="block text-sm font-medium text-foreground mb-1">
                     Descripción (Alemán)
                   </label>
-                  <textarea
+                  <Textarea
                     id="descripcion_de"
                     value={formData.descripcion_de}
                     onChange={(e) => setFormData({ ...formData, descripcion_de: e.target.value })}
                     rows={2}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
                   />
                 </div>
               </div>
-              )}
+            )}
 
-              <div>
-                <label htmlFor="orden" className="block text-sm font-medium text-foreground mb-1">
-                  Orden
-                </label>
+            <div>
+              <label htmlFor="orden" className="block text-sm font-medium text-foreground mb-1">
+                Orden
+              </label>
+              <Input
+                id="orden"
+                type="number"
+                value={formData.orden}
+                onChange={(e) => setFormData({ ...formData, orden: Number.parseInt(e.target.value) || 0 })}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="categoria_padre_id" className="block text-sm font-medium text-foreground mb-1">
+                Categoría Padre (para subcategorías)
+              </label>
+              <select
+                id="categoria_padre_id"
+                value={formData.categoria_padre_id || ''}
+                onChange={(e) => setFormData({ ...formData, categoria_padre_id: e.target.value || null })}
+                className="w-full px-3 py-2 rounded-md border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background transition-colors cursor-pointer"
+                aria-label="Categoría padre"
+              >
+                <option value="">Ninguna (categoría principal)</option>
+                {categorias
+                  .filter((c) => !c.categoria_padre_id && c.id !== editingId)
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nombre_es}
+                    </option>
+                  ))}
+              </select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Selecciona una categoría padre para crear una subcategoría.
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="categoria_complemento_de" className="block text-sm font-medium text-foreground mb-1">
+                Complemento de categoría
+              </label>
+              <select
+                id="categoria_complemento_de"
+                value={formData.categoria_complemento_de || ''}
+                onChange={(e) => setFormData({ ...formData, categoria_complemento_de: e.target.value || null })}
+                className="w-full px-3 py-2 rounded-md border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background transition-colors cursor-pointer"
+                aria-label="Complemento de categoría"
+              >
+                <option value="">Ninguna (categoría principal)</option>
+                {categorias
+                  .filter((c) => c.id !== editingId)
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nombre_es}
+                    </option>
+                  ))}
+              </select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Los productos de esta categoría aparecerán como complemento al añadir productos de la categoría seleccionada.
+              </p>
+            </div>
+
+            {formData.categoria_complemento_de && (
+              <div className="flex items-center gap-2">
                 <input
-                  id="orden"
-                  type="number"
-                  value={formData.orden}
-                  onChange={(e) => setFormData({ ...formData, orden: Number.parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
+                  type="checkbox"
+                  id="complemento_obligatorio"
+                  checked={formData.complemento_obligatorio}
+                  onChange={(e) => setFormData({ ...formData, complemento_obligatorio: e.target.checked })}
+                  className="w-4 h-4 rounded border-border text-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background cursor-pointer accent-primary"
                 />
-              </div>
-
-              <div>
-                <label htmlFor="categoria_padre_id" className="block text-sm font-medium text-foreground mb-1">
-                  Categoría Padre (para subcategorías)
+                <label htmlFor="complemento_obligatorio" className="text-sm text-foreground cursor-pointer">
+                  Seleccionar complemento obligatorio
                 </label>
-                <select
-                  id="categoria_padre_id"
-                  value={formData.categoria_padre_id || ''}
-                  onChange={(e) => setFormData({ ...formData, categoria_padre_id: e.target.value || null })}
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
-                >
-                  <option value="">Ninguna (categoría principal)</option>
-                  {categorias
-                    .filter((c) => !c.categoria_padre_id && c.id !== editingId)
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.nombre_es}
-                      </option>
-                    ))}
-                </select>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Selecciona una categoría padre para crear una subcategoría.
-                </p>
               </div>
+            )}
 
-              <div>
-                <label htmlFor="categoria_complemento_de" className="block text-sm font-medium text-foreground mb-1">
-                  Complemento de categoría
-                </label>
-                <select
-                  id="categoria_complemento_de"
-                  value={formData.categoria_complemento_de || ''}
-                  onChange={(e) => setFormData({ ...formData, categoria_complemento_de: e.target.value || null })}
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
-                >
-                  <option value="">Ninguna (categoría principal)</option>
-                  {categorias
-                    .filter((c) => c.id !== editingId)
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.nombre_es}
-                      </option>
-                    ))}
-                </select>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Los productos de esta categoría aparecerán como complemento al añadir productos de la categoría seleccionada.
-                </p>
-              </div>
+            <div className="col-span-2">
+              <button
+                type="button"
+                onClick={() => setShowTranslations(!showTranslations)}
+                className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary dark:hover:text-primary"
+              >
+                {showTranslations ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                <Languages className="h-4 w-4" />
+                Traducciones ({showTranslations ? 'ocultar' : 'mostrar'})
+              </button>
+            </div>
 
-              {formData.categoria_complemento_de && (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="complemento_obligatorio"
-                    checked={formData.complemento_obligatorio}
-                    onChange={(e) => setFormData({ ...formData, complemento_obligatorio: e.target.checked })}
-                    className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
-                  />
-                  <label htmlFor="complemento_obligatorio" className="text-sm text-foreground">
-                    Seleccionar complemento obligatorio
-                  </label>
-                </div>
-              )}
-
-              <div className="col-span-2">
-                <button
-                  type="button"
-                  onClick={() => setShowTranslations(!showTranslations)}
-                  className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary dark:hover:text-primary"
-                >
-                  {showTranslations ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                  <Languages className="h-4 w-4" />
-                  Traducciones ({showTranslations ? 'ocultar' : 'mostrar'})
-                </button>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 col-span-2">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="px-4 py-2 border rounded-md hover:bg-muted/50 border-border text-foreground"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
-                >
-                  {saving ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
-                      Guardando...
-                    </>
-                  ) : (
-                    'Guardar'
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            <div className="flex justify-end gap-3 pt-4 col-span-2">
+              <Button variant="outline" type="button" onClick={closeModal}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Guardando...
+                  </>
+                ) : (
+                  'Guardar'
+                )}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

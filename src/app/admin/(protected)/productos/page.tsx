@@ -4,6 +4,8 @@ import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { Plus, Pencil, Trash2, Loader2, Image as ImageIcon, Search, ArrowUpDown, ArrowUp, ArrowDown, Languages, ChevronDown, ChevronRight } from 'lucide-react';
 import { ImageUploader } from '@/components/ui/image-uploader';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { useAdmin } from '@/lib/admin-context';
 import {
   Dialog,
@@ -98,22 +100,20 @@ const TranslationFields = ({ formData, onChange, show }: {
         <div key={lang} className="grid grid-cols-2 gap-4">
           <div>
             <label htmlFor={`titulo_${lang}`} className="block text-sm text-muted-foreground mb-1">Nombre ({lang.toUpperCase()})</label>
-            <input
+            <Input
               id={`titulo_${lang}`}
               type="text"
               value={formData[`titulo_${lang}` as keyof ProductoFormData] as string}
               onChange={(e) => onChange({ ...formData, [`titulo_${lang}`]: e.target.value })}
-              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
             />
           </div>
           <div className="col-span-2">
             <label htmlFor={`descripcion_${lang}`} className="block text-sm text-muted-foreground mb-1">Descripción ({lang.toUpperCase()})</label>
-            <textarea
+            <Textarea
               id={`descripcion_${lang}`}
               value={formData[`descripcion_${lang}` as keyof ProductoFormData] as string}
               onChange={(e) => onChange({ ...formData, [`descripcion_${lang}`]: e.target.value })}
               rows={2}
-              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
             />
           </div>
         </div>
@@ -255,6 +255,11 @@ export default function ProductosPage() {
     return cat ? cat.nombre_es : '—';
   };
 
+  const getAriaSortValue = (field: keyof Producto | 'categoria'): 'ascending' | 'descending' | 'none' => {
+    if (sortField !== field) return 'none';
+    return sortDirection === 'asc' ? 'ascending' : 'descending';
+  };
+
   const handleSort = (field: keyof Producto | 'categoria') => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -328,7 +333,8 @@ export default function ProductosPage() {
       const aVal = getSortValue(a, sortField);
       const bVal = getSortValue(b, sortField);
       return compareSortValues(aVal, bVal);
-    }), [productos, searchTerm, sortField, sortDirection, categorias]);
+    }), // eslint-disable-next-line react-hooks/exhaustive-deps -- Helper functions defined inline, stable references
+    [productos, searchTerm, sortField, sortDirection, categorias]);
 
   if (loading) {
     return (
@@ -348,13 +354,13 @@ export default function ProductosPage() {
         <div className="flex items-center gap-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input
+            <Input
               type="text"
               placeholder="Buscar productos..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               aria-label="Buscar productos"
-              className="pl-10 pr-4 py-2 border rounded-lg w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
+              className="pl-10 w-full sm:w-64"
             />
           </div>
           <button
@@ -385,46 +391,46 @@ export default function ProductosPage() {
           <table className="min-w-full divide-y divide-border">
             <thead className="bg-muted">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                   Imagen
                 </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:bg-muted"
-                  onClick={() => handleSort('titulo_es')}
-                >
-                  <div className="flex items-center gap-1">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase" aria-sort={getAriaSortValue('titulo_es')}>
+                  <button 
+                    className="flex items-center gap-1 hover:bg-muted"
+                    onClick={() => handleSort('titulo_es')}
+                  >
                     Nombre (ES)
                     <SortIndicator field="titulo_es" currentField={sortField} direction={sortDirection} />
-                  </div>
+                  </button>
                 </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:bg-muted"
-                  onClick={() => handleSort('precio')}
-                >
-                  <div className="flex items-center gap-1">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase" aria-sort={getAriaSortValue('precio')}>
+                  <button 
+                    className="flex items-center gap-1 hover:bg-muted"
+                    onClick={() => handleSort('precio')}
+                  >
                     Precio
                     <SortIndicator field="precio" currentField={sortField} direction={sortDirection} />
-                  </div>
+                  </button>
                 </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:bg-muted"
-                  onClick={() => handleSort('categoria')}
-                >
-                  <div className="flex items-center gap-1">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase" aria-sort={getAriaSortValue('categoria')}>
+                  <button 
+                    className="flex items-center gap-1 hover:bg-muted"
+                    onClick={() => handleSort('categoria')}
+                  >
                     Categoría
                     <SortIndicator field="categoria" currentField={sortField} direction={sortDirection} />
-                  </div>
+                  </button>
                 </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:bg-muted"
-                  onClick={() => handleSort('activo')}
-                >
-                  <div className="flex items-center gap-1">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase" aria-sort={getAriaSortValue('activo')}>
+                  <button 
+                    className="flex items-center gap-1 hover:bg-muted"
+                    onClick={() => handleSort('activo')}
+                  >
                     Estado
                     <SortIndicator field="activo" currentField={sortField} direction={sortDirection} />
-                  </div>
+                  </button>
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">
+                <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">
                   Acciones
                 </th>
               </tr>
@@ -498,7 +504,7 @@ export default function ProductosPage() {
               ))}
               {filteredProductos.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">
+                  <td colSpan={6} aria-live="polite" className="px-6 py-8 text-center text-muted-foreground">
                     {searchTerm ? 'No se encontraron productos con ese criterio.' : 'No hay productos. Crea el primero.'}
                   </td>
                 </tr>
@@ -598,14 +604,13 @@ export default function ProductosPage() {
                   <label htmlFor="titulo_es" className="block text-sm font-medium text-foreground mb-1">
                     Nombre (Español) *
                   </label>
-                  <input
+                  <Input
                     id="titulo_es"
                     type="text"
                     required
                     aria-required="true"
                     value={formData.titulo_es}
                     onChange={(e) => setFormData({ ...formData, titulo_es: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
                   />
                 </div>
 
@@ -613,12 +618,11 @@ export default function ProductosPage() {
                   <label htmlFor="descripcion_es" className="block text-sm font-medium text-foreground mb-1">
                     Descripción (Español)
                   </label>
-                  <textarea
+                  <Textarea
                     id="descripcion_es"
                     value={formData.descripcion_es}
                     onChange={(e) => setFormData({ ...formData, descripcion_es: e.target.value })}
                     rows={2}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
                   />
                 </div>
 
@@ -626,7 +630,7 @@ export default function ProductosPage() {
                   <label htmlFor="precio" className="block text-sm font-medium text-foreground mb-1">
                     Precio (€) *
                   </label>
-                  <input
+                  <Input
                     id="precio"
                     type="number"
                     step="0.01"
@@ -634,7 +638,6 @@ export default function ProductosPage() {
                     aria-required="true"
                     value={formData.precio}
                     onChange={(e) => setFormData({ ...formData, precio: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
                   />
                 </div>
 
@@ -646,7 +649,8 @@ export default function ProductosPage() {
                     id="categoria_id"
                     value={formData.categoria_id}
                     onChange={(e) => setFormData({ ...formData, categoria_id: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
+                    className="w-full px-3 py-2 rounded-md border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background transition-colors cursor-pointer"
+                    aria-label="Categoría del producto"
                   >
                     <option value="">Sin categoría</option>
                     {(() => {
@@ -709,21 +713,21 @@ export default function ProductosPage() {
                 )}
 
                 <div className="col-span-2 flex gap-6 mt-4">
-                  <label className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={formData.es_especial}
                       onChange={(e) => setFormData({ ...formData, es_especial: e.target.checked })}
-                      className="rounded border-border"
+                      className="w-4 h-4 rounded border-border text-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background cursor-pointer accent-primary"
                     />
                     <span className="text-sm text-foreground">Producto especial</span>
                   </label>
-                  <label className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={formData.activo}
                       onChange={(e) => setFormData({ ...formData, activo: e.target.checked })}
-                      className="rounded border-border"
+                      className="w-4 h-4 rounded border-border text-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background cursor-pointer accent-primary"
                     />
                     <span className="text-sm text-foreground">Activo</span>
                   </label>

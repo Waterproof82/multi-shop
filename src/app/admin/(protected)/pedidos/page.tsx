@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
 import { Search, ChevronDown, ChevronUp, Check, Clock, Trash2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import type { PedidoItem, PedidoComplemento } from '@/core/domain/entities/types';
 import { PEDIDO_ESTADOS, PEDIDO_ESTADO_LABELS, PEDIDO_ESTADO_COLORS, type PedidoEstado } from '@/core/domain/constants/pedido';
 import {
@@ -166,13 +167,13 @@ export default function PedidosPage() {
         <div className="p-4 border-b border-border">
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input
+            <Input
               type="text"
               placeholder="Buscar por número, cliente o teléfono..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               aria-label="Buscar pedidos"
-              className="w-full pl-10 pr-4 py-2 border rounded-lg bg-card border-border text-foreground"
+              className="pl-10"
             />
           </div>
         </div>
@@ -181,37 +182,49 @@ export default function PedidosPage() {
           <table className="w-full">
             <thead className="bg-muted">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'numero_pedido' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
-                  <button onClick={() => handleSort('numero_pedido')} className="flex items-center gap-1">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'numero_pedido' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                  <button 
+                    onClick={() => handleSort('numero_pedido')} 
+                    className="flex items-center gap-1"
+                  >
                     #
                     {sortField === 'numero_pedido' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Cliente
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Teléfono
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'total' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
-                  <button onClick={() => handleSort('total')} className="flex items-center gap-1">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'total' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                  <button 
+                    onClick={() => handleSort('total')} 
+                    className="flex items-center gap-1"
+                  >
                     Total
                     {sortField === 'total' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'estado' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
-                  <button onClick={() => handleSort('estado')} className="flex items-center gap-1">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'estado' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                  <button 
+                    onClick={() => handleSort('estado')} 
+                    className="flex items-center gap-1"
+                  >
                     Estado
                     {sortField === 'estado' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'created_at' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
-                  <button onClick={() => handleSort('created_at')} className="flex items-center gap-1">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'created_at' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                  <button 
+                    onClick={() => handleSort('created_at')} 
+                    className="flex items-center gap-1"
+                  >
                     Fecha
                     {sortField === 'created_at' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Acciones
                 </th>
               </tr>
@@ -219,8 +232,8 @@ export default function PedidosPage() {
             <tbody className="divide-y divide-border">
               {filteredPedidos.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
-                    No hay pedidos
+                  <td colSpan={7} aria-live="polite" className="px-4 py-8 text-center text-muted-foreground">
+                    {searchTerm ? 'No se encontraron pedidos con ese criterio.' : 'No hay pedidos.'}
                   </td>
                 </tr>
               ) : (

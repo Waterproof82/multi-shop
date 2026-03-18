@@ -111,13 +111,13 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
           </nav>
 
           <div className="p-3 border-t border-border space-y-1">
-            <a
+            <Link
               href="/"
               className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground w-full rounded-lg transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <ExternalLink className="h-4 w-4" />
               Ver tienda
-            </a>
+            </Link>
             <button
               type="button"
               onClick={handleLogout}

@@ -40,6 +40,7 @@ export function CartToast() {
 
       return () => clearTimeout(timer);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Animation state managed internally, shouldn't trigger re-run
   }, [lastAddedItem, isCartOpen]);
 
   const handleClose = useCallback(() => {

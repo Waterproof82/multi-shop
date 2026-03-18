@@ -26,17 +26,26 @@ interface Stats {
 const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
 function getChartColors(): string[] {
-  if (typeof window === 'undefined') return ['#F97316', '#3B82F6', '#10B981', '#8B5CF6', '#EC4899', '#14B8A6', '#F43F5E', '#84CC16'];
+  if (typeof window === 'undefined') return [
+    'hsl(var(--chart-orange))',
+    'hsl(var(--chart-blue))',
+    'hsl(var(--chart-green))',
+    'hsl(var(--chart-purple))',
+    'hsl(var(--chart-pink))',
+    'hsl(var(--chart-teal))',
+    'hsl(var(--chart-rose))',
+    'hsl(var(--chart-lime))',
+  ];
   const style = getComputedStyle(document.documentElement);
   return [
-    style.getPropertyValue('--chart-orange').trim() || '#F97316',
-    style.getPropertyValue('--chart-blue').trim() || '#3B82F6',
-    style.getPropertyValue('--chart-green').trim() || '#10B981',
-    style.getPropertyValue('--chart-purple').trim() || '#8B5CF6',
-    style.getPropertyValue('--chart-pink').trim() || '#EC4899',
-    style.getPropertyValue('--chart-teal').trim() || '#14B8A6',
-    style.getPropertyValue('--chart-rose').trim() || '#F43F5E',
-    style.getPropertyValue('--chart-lime').trim() || '#84CC16',
+    style.getPropertyValue('--color-chart-orange').trim() || 'hsl(var(--chart-orange))',
+    style.getPropertyValue('--color-chart-blue').trim() || 'hsl(var(--chart-blue))',
+    style.getPropertyValue('--color-chart-green').trim() || 'hsl(var(--chart-green))',
+    style.getPropertyValue('--color-chart-purple').trim() || 'hsl(var(--chart-purple))',
+    style.getPropertyValue('--color-chart-pink').trim() || 'hsl(var(--chart-pink))',
+    style.getPropertyValue('--color-chart-teal').trim() || 'hsl(var(--chart-teal))',
+    style.getPropertyValue('--color-chart-rose').trim() || 'hsl(var(--chart-rose))',
+    style.getPropertyValue('--color-chart-lime').trim() || 'hsl(var(--chart-lime))',
   ];
 }
 
@@ -258,9 +267,9 @@ export default function EstadisticasPage() {
                 <Line
                   type="monotone"
                   dataKey="pedidos"
-                  stroke={chartColors[0] || '#F97316'}
+                  stroke={chartColors[0] || 'hsl(var(--chart-orange))'}
                   strokeWidth={2}
-                  dot={{ fill: chartColors[0] || '#F97316', r: 3 }}
+                  dot={{ fill: chartColors[0] || 'hsl(var(--chart-orange))', r: 3 }}
                   activeDot={{ r: 5 }}
                 />
               </LineChart>

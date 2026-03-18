@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Languages, ChevronDown, ChevronRight } from 'lucide-react';
 import { ImageUploader } from '@/components/ui/image-uploader';
+import { Textarea } from '@/components/ui/textarea';
 import type { UpdateEmpresaDTO } from '@/core/application/dtos/empresa.dto';
 
 const IDIOMAS = [
@@ -140,13 +141,12 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
           >
             Español
           </label>
-          <textarea
+          <Textarea
             id="descripcion_es"
             rows={3}
             value={formData.descripcion_es}
             onChange={(e) => { setSaved(false); setFormData((prev) => ({ ...prev, descripcion_es: e.target.value })); }}
             placeholder="Descripción en Español..."
-            className="px-3 py-2 border rounded-md bg-card border-border text-foreground text-sm resize-y min-h-[72px]"
           />
         </div>
       </div>
@@ -175,13 +175,12 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
                   >
                     {label}
                   </label>
-                  <textarea
+                  <Textarea
                     id={`descripcion_${key}`}
                     rows={3}
                     value={(formData[field] as string) || ''}
                     onChange={(e) => { setSaved(false); setFormData((prev) => ({ ...prev, [field]: e.target.value })); }}
                     placeholder={`Descripción en ${label}...`}
-                    className="px-3 py-2 border rounded-md bg-card border-border text-foreground text-sm resize-y min-h-[72px]"
                   />
                 </div>
               );

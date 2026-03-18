@@ -28,7 +28,7 @@ function getItemKey(item: MenuItemVM, complements?: Complement[]): string {
   return `${item.id}-${complementIds}`;
 }
 
-function RippleButton({ children, onClick, className, disabled, variant = "default", size = "default", ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "default" | "outline" | "ghost"; size?: "default" | "icon" }) {
+function RippleButton({ children, onClick, className, disabled, variant = "default", size = "default", 'aria-label': ariaLabel, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "default" | "outline" | "ghost"; size?: "default" | "icon" }) {
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   const createRipple = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -61,6 +61,7 @@ function RippleButton({ children, onClick, className, disabled, variant = "defau
       className={`relative overflow-hidden ${className}`}
       disabled={disabled}
       onClick={handleClick}
+      aria-label={ariaLabel}
       {...props}
     >
       {children}
@@ -352,7 +353,7 @@ export function CartDrawer() {
                         <RippleButton
                           variant="outline"
                           size="icon"
-                          className="size-11 md:size-7 bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="min-h-[44px] min-w-[44px] md:min-h-7 md:min-w-7 bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => updateQuantity(itemKey, ci.quantity - 1)}
                           aria-label={t("reduceQuantity", language)}
                         >
@@ -364,7 +365,7 @@ export function CartDrawer() {
                         <RippleButton
                           variant="outline"
                           size="icon"
-                          className="size-11 md:size-7 bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="min-h-[44px] min-w-[44px] md:min-h-7 md:min-w-7 bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => updateQuantity(itemKey, ci.quantity + 1)}
                           aria-label={t("increaseQuantity", language)}
                         >
@@ -373,7 +374,7 @@ export function CartDrawer() {
                         <RippleButton
                           variant="ghost"
                           size="icon"
-                          className="size-11 md:size-7 text-destructive hover:text-destructive hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="min-h-[44px] min-w-[44px] md:min-h-7 md:min-w-7 text-destructive hover:text-destructive hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => removeItem(itemKey)}
                           aria-label={`${t("remove", language)} ${(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}`}
                         >
@@ -400,9 +401,11 @@ export function CartDrawer() {
                       maxLength={100}
                       autoComplete="name"
                       aria-label={t("placeholderName", language)}
+                      aria-describedby={errors.nombre ? "nombre-error" : undefined}
+                      aria-invalid={!!errors.nombre}
                     />
                   </div>
-                  {errors.nombre && <p className="text-xs text-destructive mt-1 ml-6">{errors.nombre}</p>}
+                  {errors.nombre && <p id="nombre-error" role="alert" className="text-xs text-destructive mt-1 ml-6">{errors.nombre}</p>}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
@@ -416,9 +419,11 @@ export function CartDrawer() {
                       maxLength={15}
                       autoComplete="tel"
                       aria-label={t("placeholderPhone", language)}
+                      aria-describedby={errors.telefono ? "telefono-error" : undefined}
+                      aria-invalid={!!errors.telefono}
                     />
                   </div>
-                  {errors.telefono && <p className="text-xs text-destructive mt-1 ml-6">{errors.telefono}</p>}
+                  {errors.telefono && <p id="telefono-error" role="alert" className="text-xs text-destructive mt-1 ml-6">{errors.telefono}</p>}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
