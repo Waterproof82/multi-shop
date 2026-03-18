@@ -98,18 +98,15 @@ export function CartDrawer() {
 
   const textoEncoded = encodeURIComponent(mensaje);
   const ua = typeof navigator === 'undefined' ? '' : navigator.userAgent;
-  const isAndroid = /Android/i.test(ua);
-  const isIOS = /iPhone|iPad|iPod/i.test(ua);
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(ua);
 
-  const urlWaMe = `https://wa.me/${numeroLimpio}?text=${textoEncoded}`;
-  
-  if (isAndroid || isIOS) {
-    globalThis.open(urlWaMe, '_blank', 'noopener,noreferrer');
+  if (isMobile) {
+    globalThis.location.href = `https://wa.me/${numeroLimpio}?text=${textoEncoded}`;
   } else {
-    const urlApi = `https://api.whatsapp.com/send/?phone=${numeroLimpio}&text=${textoEncoded}`;
-    const nuevaPestana = globalThis.open(urlApi, '_blank', 'noopener,noreferrer');
+    const urlWaMe = `https://wa.me/${numeroLimpio}?text=${textoEncoded}`;
+    const nuevaPestana = globalThis.open(urlWaMe, '_blank', 'noopener,noreferrer');
     if (!nuevaPestana) {
-      globalThis.open(urlApi, '_blank', 'noopener,noreferrer');
+      globalThis.location.href = urlWaMe;
     }
   }
 };
@@ -179,13 +176,15 @@ export function CartDrawer() {
       });
       
       const data = await res.json();
+      console.log('[Pedido] Respuesta API:', { success: res.ok, numeroPedido: data.numeroPedido, hasWhatsappLink: !!data.whatsappLink });
       
       if (res.ok) {
         closeCart();
-        setConfirming(true);
         setNombre('');
         setTelefono('');
         setEmail('');
+        setOrderNumber(data.numeroPedido || null);
+        setCompanyPhone(data.companyPhone || null);
         
         if (data.whatsappLink) {
           (globalThis as Record<string, unknown>).__whatsappLink = data.whatsappLink;
@@ -193,13 +192,32 @@ export function CartDrawer() {
           if (match) {
             const numero = match[1];
             const mensaje = decodeURIComponent(match[2]);
-            setCompanyPhone(data.companyPhone || null);
-            setOrderNumber(data.numeroPedido || null); // <-- Added this line
             setSent(true);
-            setTimeout(() => {
-              setConfirming(false);
+            
+            const maxAttempts = 5;
+            let attempts = 0;
+            
+            const tryOpenWhatsApp = () => {
+              attempts++;
+              console.log(`[WhatsApp] Intento ${attempts}/${maxAttempts}`);
               abrirWhatsApp(numero, mensaje);
-            }, 100);
+            };
+            
+            tryOpenWhatsApp();
+            
+            const retryInterval = setInterval(() => {
+              if (attempts >= maxAttempts) {
+                clearInterval(retryInterval);
+                setConfirming(false);
+              } else {
+                tryOpenWhatsApp();
+              }
+            }, 5000);
+            
+            setTimeout(() => {
+              clearInterval(retryInterval);
+              setConfirming(false);
+            }, maxAttempts * 5000 + 1000);
           } else {
             setSent(true);
             setConfirming(false);
@@ -207,12 +225,6 @@ export function CartDrawer() {
         } else {
           setSent(true);
           setConfirming(false);
-        }
-        if (data.companyPhone) {
-          setCompanyPhone(data.companyPhone);
-        }
-        if (data.numeroPedido) { // <-- Added this block
-          setOrderNumber(data.numeroPedido);
         }
       } else {
         setErrors({ nombre: data.error || t("validationOrderError", language) });
