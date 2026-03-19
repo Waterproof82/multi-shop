@@ -6,7 +6,7 @@ import type { MenuCategoryVM } from "@/core/application/dtos/menu-view-model"
 import { useLanguage } from "@/lib/language-context"
 import { t } from "@/lib/translations"
 
-const SCROLL_OFFSET_PX = 160;
+const SCROLL_OFFSET_PX = 180;
 const INTERSECTION_ROOT_MARGIN_TOP = "-100px";
 const INTERSECTION_ROOT_MARGIN_BOTTOM = "-70%";
 
@@ -69,23 +69,29 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
       setActiveId(id)
 
       const performScroll = () => {
-        const rect = el.getBoundingClientRect()
-        const scrollTop = window.scrollY
-        const offsetTop = rect.top + scrollTop
-        const targetScroll = offsetTop - SCROLL_OFFSET_PX
-
-        window.scrollTo({
-          top: targetScroll,
+        el.scrollIntoView({
           behavior: "smooth",
+          block: "start",
         })
       }
 
-      requestAnimationFrame(performScroll)
+      if (el.getBoundingClientRect().height === 0) {
+        const observer = new MutationObserver(() => {
+          if (el.getBoundingClientRect().height > 0) {
+            observer.disconnect()
+            requestAnimationFrame(performScroll)
+          }
+        })
+        observer.observe(el, { attributes: true, childList: true, subtree: true })
+        setTimeout(() => observer.disconnect(), 2000)
+      } else {
+        requestAnimationFrame(performScroll)
+      }
 
       if (timeoutRef.current) clearTimeout(timeoutRef.current)
       timeoutRef.current = setTimeout(() => {
         isManualScrolling.current = false
-      }, 1500)
+      }, 2000)
     }
   }
 
