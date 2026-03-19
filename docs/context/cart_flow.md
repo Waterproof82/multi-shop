@@ -59,8 +59,10 @@ const showCart = isPedidos || mostrarCarritoEmpresa;
 ├─────────────────────────────────────────────────┤
 │  1. Guardar pedido en BD (SIEMPRE primero)      │
 │  2. Generar WhatsApp link con prefijo 34        │
-│  3. Intentar abrir hasta 5 veces (5s interval) │
-│  4. Fallback: enlace manual guardado              │
+│  3. Detectar plataforma (mobile vs desktop)     │
+│  4. Mobile: wa.me (app nativa)                  │
+│  5. Desktop: web.whatsapp.com/send (navegador)  │
+│  6. Fallback: enlace manual en diálogo          │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -135,69 +137,54 @@ const [orderNumber, setOrderNumber] = useState<number | null>(null)
 const [companyPhone, setCompanyPhone] = useState<string | null>(null)
 ```
 
-### Opening Logic
+### Opening Logic — Estrategia por plataforma
 
 ```typescript
-// Detection
 const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-// Mobile: Direct redirect
+// Genera ambas URLs desde teléfono + mensaje
+const buildWhatsAppUrls = (numero, mensaje) => ({
+  waMeUrl: `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`,
+  webUrl: `https://web.whatsapp.com/send?phone=${numero}&text=${encodeURIComponent(mensaje)}`,
+});
+
+// Mobile: wa.me → redirect directo a app nativa
 if (isMobile) {
-  globalThis.location.href = `https://wa.me/${numeroLimpio}?text=${textoEncoded}`;
-} 
-// Desktop: Try popup, fallback to redirect
+  globalThis.location.href = waMeUrl;
+}
+// Desktop: wa.me → intenta abrir app nativa via window.open
 else {
-  const urlWaMe = `https://wa.me/${numeroLimpio}?text=${textoEncoded}`;
-  const nuevaPestana = globalThis.open(urlWaMe, '_blank', 'noopener,noreferrer');
-  if (!nuevaPestana) {
-    globalThis.location.href = urlWaMe;
-  }
+  globalThis.open(waMeUrl, '_blank', 'noopener,noreferrer');
 }
 ```
 
-### Retry Strategy
+**Estrategia "intenta app, fallback a web":**
+- Se usa `wa.me` siempre como primer intento (respeta la app instalada del usuario)
+- Si la app Desktop está abierta → funciona perfecto, mensaje se pre-rellena
+- Si la app tarda en arrancar (cold start) y el mensaje se pierde → el diálogo muestra
+  un botón "Abrir en WhatsApp Web" que usa `web.whatsapp.com/send` como fallback seguro
+- El usuario decide cuál usar, no lo forzamos
 
-El pedido se guarda PRIMERO, luego se intenta abrir WhatsApp con reintentos:
-
-```typescript
-const maxAttempts = 5;
-let attempts = 0;
-
-const tryOpenWhatsApp = () => {
-  attempts++;
-  console.log(`[WhatsApp] Intento ${attempts}/${maxAttempts}`);
-  abrirWhatsApp(numero, mensaje);
-};
-
-// Reintentos cada 5 segundos
-const retryInterval = setInterval(() => {
-  if (attempts >= maxAttempts) {
-    clearInterval(retryInterval);
-    setConfirming(false);
-  } else {
-    tryOpenWhatsApp();
-  }
-}, 5000);
-
-// Cleanup después de maxAttempts * 5s
-setTimeout(() => {
-  clearInterval(retryInterval);
-  setConfirming(false);
-}, maxAttempts * 5000 + 1000);
-```
+| Formato | Desktop | Mobile |
+|---------|---------|--------|
+| `wa.me` | Intenta app nativa (primer intento) | Abre app directamente |
+| `web.whatsapp.com/send` | Siempre abre en navegador (fallback) | No usado |
 
 ### Manual Fallback
 
-Siempre se guarda el enlace de WhatsApp para uso manual:
+Se guarda el enlace wa.me original. Para desktop se ofrece un fallback web:
 
 ```typescript
 (globalThis as Record<string, unknown>).__whatsappLink = data.whatsappLink;
 
-const getWhatsAppUrl = (): string | null => {
-  const link = (globalThis as Record<string, unknown>).__whatsappLink as string | undefined;
-  return link || null;
-};
+// getWhatsAppUrl() → devuelve wa.me (link universal, intenta app nativa)
+// getWhatsAppWebUrl() → convierte a web.whatsapp.com/send (fallback navegador, solo desktop)
 ```
+
+En el diálogo de confirmación:
+- **Botón principal "Reenviar"**: usa `wa.me` (reintenta la app nativa)
+- **Botón "Abrir en WhatsApp Web"**: solo visible en desktop, usa `web.whatsapp.com/send` como
+  fallback si la app nativa no captó el mensaje por cold start
 
 ## Database Schema
 
@@ -228,12 +215,11 @@ numero_pedidos      INTEGER DEFAULT 0
 
 1. **User fills form** (nombre, telefono, email opcional)
 2. **Click "Enviar pedido"** → `handleConfirmOrder()`
-3. **POST /api/pedidos** → Guardar en BD, generar WhatsApp link
+3. **POST /api/pedidos** → Guardar en BD, generar WhatsApp link (wa.me)
 4. **Response received** → Guardar `numeroPedido`, `whatsappLink`
-5. **Show success dialog** → `setSent(true)`
-6. **Start WhatsApp retries** → 5 attempts, 5s interval
+5. **Open WhatsApp** → Móvil: `wa.me` (redirect), Desktop: `web.whatsapp.com/send` (nueva pestaña)
+6. **Show success dialog** → `setSent(true)` con botones de fallback
 7. **User confirms** → Dialog closes, cart clears
-8. **If failed** → Manual link available in dialog
 
 ## Key Files
 
@@ -248,19 +234,20 @@ numero_pedidos      INTEGER DEFAULT 0
 
 1. **Order first, WhatsApp second**: El pedido se guarda en la BD ANTES de intentar abrir WhatsApp
 2. **Phone prefix**: Siempre añade `34` (España) si el número no tiene prefijo internacional
-3. **Retry on cold start**: WhatsApp Desktop puede tardar 10+ segundos en abrirse si está cerrado
-4. **Manual fallback**: El enlace siempre está guardado para uso manual si los reintentos fallan
-5. **No blocking**: `window.open()` con popup blocker fallback a `location.href`
+3. **wa.me first, web fallback**: Siempre intenta `wa.me` (respeta app instalada). En desktop, el diálogo ofrece `web.whatsapp.com/send` como fallback si la app no captó el mensaje
+4. **No retries**: Sin reintentos automáticos. El usuario decide reenviar si necesita
+5. **Manual fallback**: El enlace siempre está disponible en el diálogo de confirmación
+6. **No blocking**: `window.open()` en desktop, `location.href` en móvil
 
 ## Testing Checklist
 
 - [ ] Pedido se guarda en BD aunque WhatsApp falle
 - [ ] Número de pedido se muestra en el diálogo
-- [ ] WhatsApp abre en móvil (iOS/Android)
-- [ ] WhatsApp abre en desktop (primera vez, app cerrada)
-- [ ] WhatsApp abre en desktop (app ya abierta)
-- [ ] Reintentos funcionan (ver logs en consola)
-- [ ] Enlace manual funciona si todo falla
+- [ ] WhatsApp abre en móvil (iOS/Android) via wa.me → app nativa
+- [ ] wa.me intenta abrir app nativa en desktop
+- [ ] Botón "Reenviar por WhatsApp" usa wa.me (reintenta app)
+- [ ] Botón "WhatsApp Web" solo visible en desktop, abre web.whatsapp.com/send
+- [ ] Enlace manual funciona si la apertura automática falla
 
 ---
 

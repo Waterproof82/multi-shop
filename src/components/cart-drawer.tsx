@@ -90,19 +90,41 @@ export function CartDrawer() {
   const [email, setEmail] = useState('')
   const [errors, setErrors] = useState<{ nombre?: string; telefono?: string }>({})
 
-  const abrirWhatsApp = (numero: string, mensaje: string) => {
+  const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  const buildWhatsAppUrls = (numero: string, mensaje: string) => {
     let numeroLimpio = numero.replaceAll(/\D/g, '');
     if (numeroLimpio.length === 9) {
       numeroLimpio = '34' + numeroLimpio;
     }
     const textoEncoded = encodeURIComponent(mensaje);
-    const urlWaMe = `https://wa.me/${numeroLimpio}?text=${textoEncoded}`;
-    globalThis.open(urlWaMe, '_blank', 'noopener,noreferrer');
+    return {
+      waMeUrl: `https://wa.me/${numeroLimpio}?text=${textoEncoded}`,
+      webUrl: `https://web.whatsapp.com/send?phone=${numeroLimpio}&text=${textoEncoded}`,
+    };
   };
+
+  const abrirWhatsApp = useCallback((numero: string, mensaje: string) => {
+    const { waMeUrl } = buildWhatsAppUrls(numero, mensaje);
+
+    if (isMobile) {
+      globalThis.location.href = waMeUrl;
+    } else {
+      globalThis.open(waMeUrl, '_blank', 'noopener,noreferrer');
+    }
+  }, [isMobile]);
 
   const getWhatsAppUrl = (): string | null => {
     const link = (globalThis as Record<string, unknown>).__whatsappLink as string | undefined;
     return link || null;
+  };
+
+  const getWhatsAppWebUrl = (): string | null => {
+    const link = (globalThis as Record<string, unknown>).__whatsappLink as string | undefined;
+    if (!link) return null;
+    const match = link.match(/wa\.me\/(\d+)\?text=(.+)/);
+    if (!match) return link;
+    return `https://web.whatsapp.com/send?phone=${match[1]}&text=${match[2]}`;
   };
 
   const handleConfirmOrder = useCallback(async () => {
@@ -181,48 +203,11 @@ export function CartDrawer() {
           if (match) {
             const numero = match[1];
             const mensaje = decodeURIComponent(match[2]);
-            setSent(true);
-            
-            const maxAttempts = 5;
-            const retryDelay = 5000;
-            let attempts = 0;
-            let retryInterval: ReturnType<typeof setInterval> | null = null;
-            
-            const tryOpenWhatsApp = () => {
-              attempts++;
-              console.log(`[WhatsApp] Intento ${attempts}/${maxAttempts}`);
-              abrirWhatsApp(numero, mensaje);
-            };
-            
-            const stopRetries = () => {
-              if (retryInterval) {
-                clearInterval(retryInterval);
-                retryInterval = null;
-              }
-              setConfirming(false);
-            };
-            
-            tryOpenWhatsApp();
-            
-            retryInterval = setInterval(() => {
-              if (attempts >= maxAttempts) {
-                stopRetries();
-              } else {
-                tryOpenWhatsApp();
-              }
-            }, retryDelay);
-            
-            setTimeout(() => {
-              stopRetries();
-            }, retryDelay * maxAttempts + 500);
-          } else {
-            setSent(true);
-            setConfirming(false);
+            abrirWhatsApp(numero, mensaje);
           }
-        } else {
-          setSent(true);
-          setConfirming(false);
         }
+        setSent(true);
+        setConfirming(false);
       } else {
         setErrors({ nombre: data.error || t("validationOrderError", language) });
       }
@@ -232,7 +217,7 @@ export function CartDrawer() {
     } finally {
       setSending(false);
     }
-  }, [nombre, telefono, email, items, totalPrice, language, closeCart]);
+  }, [nombre, telefono, email, items, totalPrice, language, closeCart, abrirWhatsApp]);
 
   return (
     <>
@@ -269,14 +254,16 @@ export function CartDrawer() {
               >
                 {t("whatsappResend", language)}
               </a>
-              <a
-                href={getWhatsAppUrl()!}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block w-full text-center text-whatsapp text-sm py-2 font-medium hover:underline"
-              >
-                {t("whatsappWeb", language)}
-              </a>
+              {!isMobile && (
+                <a
+                  href={getWhatsAppWebUrl()!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full text-center text-whatsapp text-sm py-2 font-medium hover:underline"
+                >
+                  {t("whatsappWeb", language)}
+                </a>
+              )}
             </>
           )}
           {companyPhone && orderNumber && (
