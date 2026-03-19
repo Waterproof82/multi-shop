@@ -18,9 +18,17 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { useCart, type Complement } from "@/lib/cart-context"
 import { useLanguage } from "@/lib/language-context"
 import { t } from "@/lib/translations"
+import { COUNTRY_CODES, DEFAULT_COUNTRY_CODE } from "@/core/domain/constants/country-codes"
 import type { MenuItemVM } from "@/core/application/dtos/menu-view-model"
 
 function getItemKey(item: MenuItemVM, complements?: Complement[]): string {
@@ -90,16 +98,14 @@ export function CartDrawer() {
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [nombre, setNombre] = useState('')
   const [telefono, setTelefono] = useState('')
+  const [countryCode, setCountryCode] = useState(DEFAULT_COUNTRY_CODE)
   const [email, setEmail] = useState('')
   const [errors, setErrors] = useState<{ nombre?: string; telefono?: string }>({})
 
   const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
   const buildWhatsAppUrls = (numero: string, mensaje: string) => {
-    let numeroLimpio = numero.replaceAll(/\D/g, '');
-    if (numeroLimpio.length === 9) {
-      numeroLimpio = '34' + numeroLimpio;
-    }
+    const numeroLimpio = numero.replaceAll(/\D/g, '');
     const textoEncoded = encodeURIComponent(mensaje);
     return {
       waMeUrl: `https://wa.me/${numeroLimpio}?text=${textoEncoded}`,
@@ -212,7 +218,9 @@ export function CartDrawer() {
     }
 
     const sanitizedNombre = nombre.trim().slice(0, 100);
-    const sanitizedTelefono = telefono.replaceAll(/\D/g, '').slice(0, 15);
+    const selectedCountry = COUNTRY_CODES.find(c => c.code === countryCode);
+    const dialCode = selectedCountry?.dialCode || '34';
+    const sanitizedTelefono = dialCode + telefono.replaceAll(/\D/g, '').slice(0, 15);
     const sanitizedEmail = email.trim().toLowerCase().slice(0, 100);
 
     setSending(true);
@@ -272,7 +280,7 @@ export function CartDrawer() {
     } finally {
       setSending(false);
     }
-  }, [nombre, telefono, email, items, totalPrice, language, closeCart, abrirWhatsApp]);
+  }, [nombre, telefono, countryCode, email, items, totalPrice, language, closeCart, abrirWhatsApp]);
 
   return (
     <>
@@ -347,11 +355,17 @@ export function CartDrawer() {
               )}
             </>
           )}
-          {companyPhone && orderNumber && (
-            <div className="bg-foreground text-background p-3 rounded-lg mt-4 w-full text-center">
-              <p className="text-xs font-medium">
-                * {t("whatsappCantSend", language)} {companyPhone} {t("withOrderNumber", language)} #{orderNumber}
+          {companyPhone && (
+            <div className="bg-foreground text-background p-4 rounded-lg mt-4 w-full text-center">
+              <p className="text-sm font-medium">
+                {t("whatsappCantSend", language)}
               </p>
+              <a
+                href={`tel:${companyPhone.replace(/\D/g, '')}`}
+                className="block text-2xl font-bold mt-2 tracking-wide hover:opacity-80 transition-opacity"
+              >
+                {companyPhone.replace(/\D/g, '').replace(/^34/, '')}
+              </a>
             </div>
           )}
         </DialogContent>
@@ -488,19 +502,36 @@ export function CartDrawer() {
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <Phone className="size-4 text-muted-foreground" />
-                    <Input
-                      type="tel"
-                      placeholder={t("placeholderPhone", language)}
-                      value={telefono}
-                      onChange={(e) => { const val = e.target.value.replaceAll(/\D/g, '').slice(0, 15); setTelefono(val); setErrors(prev => ({ ...prev, telefono: undefined })); }}
-                      className={`h-9 ${errors.telefono ? 'border-destructive' : ''}`}
-                      maxLength={15}
-                      autoComplete="tel"
-                      aria-label={t("placeholderPhone", language)}
-                      aria-describedby={errors.telefono ? "telefono-error" : undefined}
-                      aria-invalid={!!errors.telefono}
-                    />
+                    <Phone className="size-4 text-muted-foreground shrink-0" />
+                    <div className="flex gap-1 flex-1">
+                      <Select value={countryCode} onValueChange={setCountryCode}>
+                        <SelectTrigger className="h-9 w-[100px] shrink-0 text-xs px-2" aria-label={t("countryCode", language)}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {COUNTRY_CODES.map((cc) => (
+                            <SelectItem key={cc.code} value={cc.code}>
+                              <span className="flex items-center gap-1.5">
+                                <span>{cc.flag}</span>
+                                <span>+{cc.dialCode}</span>
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        type="tel"
+                        placeholder={t("phonePlaceholder", language)}
+                        value={telefono}
+                        onChange={(e) => { const val = e.target.value.replaceAll(/\D/g, '').slice(0, 15); setTelefono(val); setErrors(prev => ({ ...prev, telefono: undefined })); }}
+                        className={`h-9 flex-1 ${errors.telefono ? 'border-destructive' : ''}`}
+                        maxLength={15}
+                        autoComplete="tel-national"
+                        aria-label={t("placeholderPhone", language)}
+                        aria-describedby={errors.telefono ? "telefono-error" : undefined}
+                        aria-invalid={!!errors.telefono}
+                      />
+                    </div>
                   </div>
                   {errors.telefono && <p id="telefono-error" role="alert" className="text-xs text-destructive mt-1 ml-6">{errors.telefono}</p>}
                 </div>
