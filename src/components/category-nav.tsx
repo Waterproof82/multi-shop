@@ -6,10 +6,9 @@ import type { MenuCategoryVM } from "@/core/application/dtos/menu-view-model"
 import { useLanguage } from "@/lib/language-context"
 import { t } from "@/lib/translations"
 
-const SCROLL_OFFSET_PX = 140;
+const SCROLL_OFFSET_PX = 160;
 const INTERSECTION_ROOT_MARGIN_TOP = "-100px";
 const INTERSECTION_ROOT_MARGIN_BOTTOM = "-70%";
-const MANUAL_SCROLL_RESET_MS = 1000;
 
 interface CategoryNavProps {
   categories: MenuCategoryVM[]
@@ -69,18 +68,24 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
       isManualScrolling.current = true
       setActiveId(id)
 
-      const elementPosition = el.getBoundingClientRect().top + window.scrollY
-      const offsetPosition = elementPosition - SCROLL_OFFSET_PX
+      const performScroll = () => {
+        const rect = el.getBoundingClientRect()
+        const scrollTop = window.scrollY
+        const offsetTop = rect.top + scrollTop
+        const targetScroll = offsetTop - SCROLL_OFFSET_PX
 
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: "smooth",
-      })
+        window.scrollTo({
+          top: targetScroll,
+          behavior: "smooth",
+        })
+      }
+
+      requestAnimationFrame(performScroll)
 
       if (timeoutRef.current) clearTimeout(timeoutRef.current)
       timeoutRef.current = setTimeout(() => {
         isManualScrolling.current = false
-      }, MANUAL_SCROLL_RESET_MS)
+      }, 1500)
     }
   }
 
