@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { categoryUseCase } from '@/core/infrastructure/database';
 import { createCategorySchema, updateCategorySchema, categoryIdSchema } from '@/core/application/dtos/category.dto';
 import { requireAuth, handleResult, handleResultWithStatus, validationErrorResponse } from '@/core/infrastructure/api/helpers';
+import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import type { Category } from '@/core/domain/entities/types';
 
 // Transform domain format to admin UI format
@@ -27,6 +28,9 @@ function toAdminCategory(cat: Category) {
 }
 
 export async function GET(request: NextRequest) {
+  const rateLimited = await rateLimitAdmin(request);
+  if (rateLimited) return rateLimited;
+
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
 

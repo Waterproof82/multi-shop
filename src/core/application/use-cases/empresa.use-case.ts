@@ -3,6 +3,18 @@ import { UpdateEmpresaDTO } from "@/core/application/dtos/empresa.dto";
 import { Empresa, EmpresaColores, Result } from "@/core/domain/entities/types";
 import { logger } from "@/core/infrastructure/logging/logger";
 
+function normalizePhone(phone: string | undefined): string | undefined {
+  if (!phone) return phone;
+  const cleaned = phone.replaceAll(/\D/g, '');
+  // If it already has a plausible international prefix (10+ digits), keep as-is
+  if (cleaned.length >= 10) return cleaned;
+  // Legacy Spanish numbers without prefix (9 digits starting with 6/7/9)
+  if (cleaned.length === 9 && /^[679]/.test(cleaned)) {
+    return `34${cleaned}`;
+  }
+  return cleaned;
+}
+
 export class EmpresaUseCase {
   constructor(private readonly empresaRepo: IEmpresaRepository) {}
 
@@ -21,6 +33,9 @@ export class EmpresaUseCase {
 
   async update(empresaId: string, data: UpdateEmpresaDTO): Promise<Result<void>> {
     try {
+      if (data.telefono_whatsapp !== undefined) {
+        data.telefono_whatsapp = normalizePhone(data.telefono_whatsapp);
+      }
       const result = await this.empresaRepo.update(empresaId, data);
       if (!result.success) {
         return { success: false, error: { ...result.error, method: 'EmpresaUseCase.update' } };

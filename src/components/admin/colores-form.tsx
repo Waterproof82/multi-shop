@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { EmpresaColores } from '@/core/domain/entities/types';
 import { DEFAULT_EMPRESA_COLORES } from '@/core/domain/constants/empresa-defaults';
+import { fetchWithCsrf } from '@/lib/csrf-client';
 
 interface ColoresFormProps {
   readonly coloresIniciales: EmpresaColores | null;
@@ -43,9 +44,8 @@ export function ColoresForm({ coloresIniciales, empresaId }: ColoresFormProps) {
     setSaving(true);
 
     try {
-      const res = await fetch('/api/admin/update-colores', {
+      const res = await fetchWithCsrf('/api/admin/update-colores', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ empresaId, colores }),
       });
 
@@ -76,7 +76,7 @@ export function ColoresForm({ coloresIniciales, empresaId }: ColoresFormProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {colorKeys.map((key) => (
           <div key={key} className="flex flex-col gap-2">
-            <label htmlFor={`color-text-${key}`} className="text-sm font-medium text-foreground">
+            <label htmlFor={`color-picker-${key}`} className="text-sm font-medium text-foreground">
               {LABELS[key]}
             </label>
             <div className="flex gap-2">

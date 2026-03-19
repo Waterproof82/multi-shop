@@ -19,7 +19,7 @@ const createPedidoSchema = z.object({
   })),
   total: z.number().min(0),
   nombre: z.string().min(2).max(100),
-  telefono: z.string().min(9).max(15).regex(/^\+?[0-9\s\-()]+$/, 'Formato de teléfono no válido'),
+  telefono: z.string().min(10).max(18).regex(/^[0-9]+$/, 'Formato de teléfono no válido'),
   email: z.string().email().optional().or(z.literal('')),
 });
 
@@ -97,7 +97,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, numeroPedido, pedidoId, whatsappLink, companyPhone: empresa.telefono_whatsapp });
   } catch (error) {
-    console.error('Error creating order:', error);
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });
   }
 }

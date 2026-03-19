@@ -1,17 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
-import { Plus, Pencil, Trash2, Loader2, Image as ImageIcon, Search, ArrowUpDown, ArrowUp, ArrowDown, Languages, ChevronDown, ChevronRight } from 'lucide-react';
-import { ImageUploader } from '@/components/ui/image-uploader';
+import { Plus, Pencil, Trash2, Loader2, Image as ImageIcon, Search, ArrowUpDown, ArrowUp, ArrowDown, Utensils, Star } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { useAdmin } from '@/lib/admin-context';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
+import { ProductFormDialog, DeleteConfirmDialog } from '@/components/admin/product-form-dialog';
+import { fetchWithCsrf } from '@/lib/csrf-client';
+import type { ProductoFormData } from '@/components/admin/product-form-dialog';
 
 interface Categoria {
   id: string;
@@ -38,24 +34,6 @@ interface Producto {
   activo: boolean;
 }
 
-interface ProductoFormData {
-  titulo_es: string;
-  titulo_en: string;
-  titulo_fr: string;
-  titulo_it: string;
-  titulo_de: string;
-  descripcion_es: string;
-  descripcion_en: string;
-  descripcion_fr: string;
-  descripcion_it: string;
-  descripcion_de: string;
-  precio: string;
-  foto_url: string;
-  categoria_id: string;
-  es_especial: boolean;
-  activo: boolean;
-}
-
 const emptyForm: ProductoFormData = {
   titulo_es: '',
   titulo_en: '',
@@ -74,8 +52,6 @@ const emptyForm: ProductoFormData = {
   activo: true,
 };
 
-const LANGUAGES = ['en', 'fr', 'it', 'de'] as const;
-
 const SortIndicator = ({ field, currentField, direction }: { field: keyof Producto | 'categoria'; currentField: keyof Producto | 'categoria'; direction: 'asc' | 'desc' }) => {
   if (field !== currentField) {
     return <ArrowUpDown className="h-3 w-3 opacity-30" />;
@@ -83,43 +59,6 @@ const SortIndicator = ({ field, currentField, direction }: { field: keyof Produc
   return direction === 'asc' 
     ? <ArrowUp className="h-3 w-3" /> 
     : <ArrowDown className="h-3 w-3" />;
-};
-
-const TranslationFields = ({ formData, onChange, show }: { 
-  formData: ProductoFormData; 
-  onChange: (data: ProductoFormData) => void;
-  show: boolean;
-}) => {
-  if (!show) return null;
-  
-  return (
-    <>
-      {LANGUAGES.map(lang => (
-        <div key={lang} className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor={`titulo_${lang}`} className="block text-sm text-muted-foreground mb-1">Nombre ({lang.toUpperCase()})</label>
-            <input
-              id={`titulo_${lang}`}
-              type="text"
-              value={formData[`titulo_${lang}` as keyof ProductoFormData] as string}
-              onChange={(e) => onChange({ ...formData, [`titulo_${lang}`]: e.target.value })}
-              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
-            />
-          </div>
-          <div className="col-span-2">
-            <label htmlFor={`descripcion_${lang}`} className="block text-sm text-muted-foreground mb-1">Descripción ({lang.toUpperCase()})</label>
-            <textarea
-              id={`descripcion_${lang}`}
-              value={formData[`descripcion_${lang}` as keyof ProductoFormData] as string}
-              onChange={(e) => onChange({ ...formData, [`descripcion_${lang}`]: e.target.value })}
-              rows={2}
-              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
-            />
-          </div>
-        </div>
-      ))}
-    </>
-  );
 };
 
 export default function ProductosPage() {
@@ -193,9 +132,8 @@ export default function ProductosPage() {
         foto_url: formData.foto_url || null,
       };
 
-      const res = await fetch(url, {
+      const res = await fetchWithCsrf(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
@@ -255,6 +193,11 @@ export default function ProductosPage() {
     return cat ? cat.nombre_es : '—';
   };
 
+  const getAriaSortValue = (field: keyof Producto | 'categoria'): 'ascending' | 'descending' | 'none' => {
+    if (sortField !== field) return 'none';
+    return sortDirection === 'asc' ? 'ascending' : 'descending';
+  };
+
   const handleSort = (field: keyof Producto | 'categoria') => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -272,7 +215,7 @@ export default function ProductosPage() {
   const confirmDeleteProduct = async () => {
     if (!deleteConfirm.id) return;
     try {
-      const res = await fetch(`/api/admin/productos?id=${deleteConfirm.id}`, {
+      const res = await fetchWithCsrf(`/api/admin/productos?id=${deleteConfirm.id}`, {
         method: 'DELETE',
       });
       if (!res.ok) throw new Error('Error al eliminar');
@@ -311,7 +254,7 @@ export default function ProductosPage() {
       : bStr.localeCompare(aStr);
   };
 
-  const filteredProductos = productos
+  const filteredProductos = useMemo(() => productos
     .filter((prod) => {
       const term = searchTerm.toLowerCase();
       return (
@@ -328,7 +271,8 @@ export default function ProductosPage() {
       const aVal = getSortValue(a, sortField);
       const bVal = getSortValue(b, sortField);
       return compareSortValues(aVal, bVal);
-    });
+    }), // eslint-disable-next-line react-hooks/exhaustive-deps -- Helper functions defined inline, stable references
+    [productos, searchTerm, sortField, sortDirection, categorias]);
 
   if (loading) {
     return (
@@ -338,33 +282,52 @@ export default function ProductosPage() {
     );
   }
 
+  const productosEspeciales = productos.filter(p => p.es_especial).length;
+
   return (
-    <div className="pt-20 lg:pt-0 px-6 lg:px-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Productos</h1>
-          <p className="text-muted-foreground">Gestiona los productos del menú</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Buscar productos..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              aria-label="Buscar productos"
-              className="pl-10 pr-4 py-2 border rounded-lg w-64 focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
-            />
+    <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
+      {/* Header con stats */}
+      <div className="bg-primary rounded-lg p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">Productos</h1>
+            <p className="text-primary-foreground/80 text-sm mt-1">Gestiona los productos del menú</p>
           </div>
-          <button
-            onClick={openCreateModal}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
-          >
-            <Plus className="h-4 w-4" />
-            Nuevo Producto
-          </button>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
+              <Utensils className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
+              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{productos.length}</span>
+              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Total</p>
+            </div>
+            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
+              <Star className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
+              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{productosEspeciales}</span>
+              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Destacados</p>
+            </div>
+          </div>
         </div>
+      </div>
+
+      {/* Buscador y acciones */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="relative flex-1 w-full sm:max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Buscar productos..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            aria-label="Buscar productos"
+            className="pl-10 w-full"
+          />
+        </div>
+        <button
+          onClick={openCreateModal}
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 w-full sm:w-auto justify-center"
+        >
+          <Plus className="h-4 w-4" />
+          <span>Nuevo producto</span>
+        </button>
       </div>
 
       {error && (
@@ -379,52 +342,52 @@ export default function ProductosPage() {
         </div>
       )}
 
-      <div className="bg-card rounded-lg shadow-sm border border-border overflow-hidden">
+      <div className="bg-card rounded-lg shadow-elegant border border-border overflow-hidden">
         {/* Desktop table */}
         <div className="hidden md:block overflow-x-auto">
           <table className="min-w-full divide-y divide-border">
             <thead className="bg-muted">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                   Imagen
                 </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:bg-muted"
-                  onClick={() => handleSort('titulo_es')}
-                >
-                  <div className="flex items-center gap-1">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase" aria-sort={getAriaSortValue('titulo_es')}>
+                  <button 
+                    className="flex items-center gap-1 hover:bg-muted"
+                    onClick={() => handleSort('titulo_es')}
+                  >
                     Nombre (ES)
                     <SortIndicator field="titulo_es" currentField={sortField} direction={sortDirection} />
-                  </div>
+                  </button>
                 </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:bg-muted"
-                  onClick={() => handleSort('precio')}
-                >
-                  <div className="flex items-center gap-1">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase" aria-sort={getAriaSortValue('precio')}>
+                  <button 
+                    className="flex items-center gap-1 hover:bg-muted"
+                    onClick={() => handleSort('precio')}
+                  >
                     Precio
                     <SortIndicator field="precio" currentField={sortField} direction={sortDirection} />
-                  </div>
+                  </button>
                 </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:bg-muted"
-                  onClick={() => handleSort('categoria')}
-                >
-                  <div className="flex items-center gap-1">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase" aria-sort={getAriaSortValue('categoria')}>
+                  <button 
+                    className="flex items-center gap-1 hover:bg-muted"
+                    onClick={() => handleSort('categoria')}
+                  >
                     Categoría
                     <SortIndicator field="categoria" currentField={sortField} direction={sortDirection} />
-                  </div>
+                  </button>
                 </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:bg-muted"
-                  onClick={() => handleSort('activo')}
-                >
-                  <div className="flex items-center gap-1">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase" aria-sort={getAriaSortValue('activo')}>
+                  <button 
+                    className="flex items-center gap-1 hover:bg-muted"
+                    onClick={() => handleSort('activo')}
+                  >
                     Estado
                     <SortIndicator field="activo" currentField={sortField} direction={sortDirection} />
-                  </div>
+                  </button>
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">
+                <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">
                   Acciones
                 </th>
               </tr>
@@ -498,7 +461,7 @@ export default function ProductosPage() {
               ))}
               {filteredProductos.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">
+                  <td colSpan={6} aria-live="polite" className="px-6 py-8 text-center text-muted-foreground">
                     {searchTerm ? 'No se encontraron productos con ese criterio.' : 'No hay productos. Crea el primero.'}
                   </td>
                 </tr>
@@ -583,207 +546,26 @@ export default function ProductosPage() {
         </div>
       </div>
 
-      <Dialog open={isModalOpen} onOpenChange={(open) => { if (!open) closeModal(); }}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingId ? 'Editar Producto' : 'Nuevo Producto'}</DialogTitle>
-            <DialogDescription>
-              {editingId ? 'Modifica los datos del producto.' : 'Rellena los datos para crear un producto.'}
-            </DialogDescription>
-          </DialogHeader>
+      <ProductFormDialog
+        open={isModalOpen}
+        onOpenChange={(open) => { if (!open) closeModal(); }}
+        editingId={editingId}
+        formData={formData}
+        onFormChange={setFormData}
+        categorias={categorias}
+        showTranslations={showTranslations}
+        onToggleTranslations={() => setShowTranslations(!showTranslations)}
+        saving={saving}
+        onSubmit={handleSubmit}
+        empresaSlug={empresaSlug}
+      />
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <label htmlFor="titulo_es" className="block text-sm font-medium text-foreground mb-1">
-                    Nombre (Español) *
-                  </label>
-                  <input
-                    id="titulo_es"
-                    type="text"
-                    required
-                    value={formData.titulo_es}
-                    onChange={(e) => setFormData({ ...formData, titulo_es: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
-                  />
-                </div>
-
-                <div className="col-span-2">
-                  <label htmlFor="descripcion_es" className="block text-sm font-medium text-foreground mb-1">
-                    Descripción (Español)
-                  </label>
-                  <textarea
-                    id="descripcion_es"
-                    value={formData.descripcion_es}
-                    onChange={(e) => setFormData({ ...formData, descripcion_es: e.target.value })}
-                    rows={2}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="precio" className="block text-sm font-medium text-foreground mb-1">
-                    Precio (€) *
-                  </label>
-                  <input
-                    id="precio"
-                    type="number"
-                    step="0.01"
-                    required
-                    value={formData.precio}
-                    onChange={(e) => setFormData({ ...formData, precio: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="categoria_id" className="block text-sm font-medium text-foreground mb-1">
-                    Categoría
-                  </label>
-                  <select
-                    id="categoria_id"
-                    value={formData.categoria_id}
-                    onChange={(e) => setFormData({ ...formData, categoria_id: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-card border-border text-foreground"
-                  >
-                    <option value="">Sin categoría</option>
-                    {(() => {
-                      const parents = categorias.filter(c => !c.categoria_padre_id);
-                      const children = categorias.filter(c => c.categoria_padre_id);
-
-                      return parents.map(parent => {
-                        const childCats = children.filter(c => c.categoria_padre_id === parent.id);
-                        if (childCats.length > 0) {
-                          return (
-                            <optgroup key={parent.id} label={parent.nombre_es}>
-                              <option key={`${parent.id}-self`} value={parent.id}>
-                                {parent.nombre_es} (principal)
-                              </option>
-                              {childCats.map(sub => (
-                                <option key={sub.id} value={sub.id}>
-                                  └─ {sub.nombre_es}
-                                </option>
-                              ))}
-                            </optgroup>
-                          );
-                        }
-                        return (
-                          <option key={parent.id} value={parent.id}>
-                            {parent.nombre_es}
-                          </option>
-                        );
-                      });
-                    })()}
-                  </select>
-                </div>
-
-                <div className="col-span-2">
-                  <ImageUploader
-                    value={formData.foto_url}
-                    onChange={(url) => setFormData({ ...formData, foto_url: url })}
-                    label="Imagen del producto"
-                    empresaSlug={empresaSlug}
-                  />
-                </div>
-
-                <div className="col-span-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowTranslations(!showTranslations)}
-                    className="flex items-center gap-2 text-sm font-medium text-foreground mt-4 hover:text-primary dark:hover:text-primary"
-                  >
-                    {showTranslations ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                    <Languages className="h-4 w-4" />
-                    Traducciones ({showTranslations ? 'ocultar' : 'mostrar'})
-                  </button>
-                </div>
-
-                {showTranslations && (
-                  <TranslationFields
-                    formData={formData}
-                    onChange={setFormData}
-                    show={showTranslations}
-                  />
-                )}
-
-                <div className="col-span-2 flex gap-6 mt-4">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={formData.es_especial}
-                      onChange={(e) => setFormData({ ...formData, es_especial: e.target.checked })}
-                      className="rounded border-border"
-                    />
-                    <span className="text-sm text-foreground">Producto especial</span>
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={formData.activo}
-                      onChange={(e) => setFormData({ ...formData, activo: e.target.checked })}
-                      className="rounded border-border"
-                    />
-                    <span className="text-sm text-foreground">Activo</span>
-                  </label>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="px-4 py-2 border rounded-md hover:bg-muted/50 border-border text-foreground"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
-                >
-                  {saving ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
-                      Guardando...
-                    </>
-                  ) : (
-                    'Guardar'
-                  )}
-                </button>
-              </div>
-            </form>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={deleteConfirm.show} onOpenChange={(open) => { if (!open) setDeleteConfirm({ show: false, id: null, nombre: null }); }}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-3">
-              <div className="p-2 bg-destructive/10 rounded-full">
-                <Trash2 className="w-5 h-5 text-destructive" />
-              </div>
-              Eliminar producto
-            </DialogTitle>
-            <DialogDescription>
-              ¿Estás seguro de que quieres eliminar <strong>{deleteConfirm.nombre}</strong>? Esta acción no se puede deshacer.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex gap-3 justify-end">
-            <button
-              onClick={() => setDeleteConfirm({ show: false, id: null, nombre: null })}
-              className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={confirmDeleteProduct}
-              className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg"
-            >
-              Eliminar
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <DeleteConfirmDialog
+        open={deleteConfirm.show}
+        onOpenChange={(open) => { if (!open) setDeleteConfirm({ show: false, id: null, nombre: null }); }}
+        productName={deleteConfirm.nombre}
+        onConfirm={confirmDeleteProduct}
+      />
     </div>
   );
 }

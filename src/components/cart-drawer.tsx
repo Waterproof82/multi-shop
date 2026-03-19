@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useCallback, useRef, useEffect } from "react"
 import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,16 +18,63 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog"
-import { useState } from "react"
-
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { useCart, type Complement } from "@/lib/cart-context"
 import { useLanguage } from "@/lib/language-context"
 import { t } from "@/lib/translations"
+import { COUNTRY_CODES, DEFAULT_COUNTRY_CODE } from "@/core/domain/constants/country-codes"
 import type { MenuItemVM } from "@/core/application/dtos/menu-view-model"
 
 function getItemKey(item: MenuItemVM, complements?: Complement[]): string {
   const complementIds = complements?.map(c => c.id).sort().join(',') || '';
   return `${item.id}-${complementIds}`;
+}
+
+function RippleButton({ children, onClick, className, disabled, variant = "default", size = "default", 'aria-label': ariaLabel, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "default" | "outline" | "ghost"; size?: "default" | "icon" }) {
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  const createRipple = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const button = event.currentTarget;
+    const rect = button.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const ripple = document.createElement("span");
+    ripple.className = "ripple";
+    ripple.style.left = `${x}px`;
+    ripple.style.top = `${y}px`;
+    const existingRipple = button.querySelector(".ripple");
+    if (existingRipple) existingRipple.remove();
+    button.appendChild(ripple);
+    setTimeout(() => ripple.remove(), 500);
+  }
+
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!disabled) {
+      createRipple(e);
+      onClick?.(e);
+    }
+  }
+
+  return (
+    <Button
+      ref={buttonRef}
+      variant={variant}
+      size={size}
+      className={`relative overflow-hidden ${className}`}
+      disabled={disabled}
+      onClick={handleClick}
+      aria-label={ariaLabel}
+      {...props}
+    >
+      {children}
+    </Button>
+  );
 }
 
 export function CartDrawer() {
@@ -45,42 +93,121 @@ export function CartDrawer() {
   const [confirming, setConfirming] = useState(false)
   const [companyPhone, setCompanyPhone] = useState<string | null>(null)
   const [orderNumber, setOrderNumber] = useState<number | null>(null)
+  const [messageCopied, setMessageCopied] = useState(false)
+  const [retryCountdown, setRetryCountdown] = useState<number | null>(null)
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [nombre, setNombre] = useState('')
   const [telefono, setTelefono] = useState('')
+  const [countryCode, setCountryCode] = useState(DEFAULT_COUNTRY_CODE)
   const [email, setEmail] = useState('')
   const [errors, setErrors] = useState<{ nombre?: string; telefono?: string }>({})
 
-  const abrirWhatsApp = (numero: string, mensaje: string) => {
+  const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  const buildWhatsAppUrls = (numero: string, mensaje: string) => {
+    const numeroLimpio = numero.replaceAll(/\D/g, '');
     const textoEncoded = encodeURIComponent(mensaje);
-    const url = `https://wa.me/${numero}?text=${textoEncoded}`;
-    globalThis.location.href = url;
+    return {
+      waMeUrl: `https://wa.me/${numeroLimpio}?text=${textoEncoded}`,
+      webUrl: `https://web.whatsapp.com/send?phone=${numeroLimpio}&text=${textoEncoded}`,
+    };
   };
+
+  const abrirWhatsApp = useCallback(async (numero: string, mensaje: string) => {
+    const { waMeUrl } = buildWhatsAppUrls(numero, mensaje);
+
+    if (isMobile) {
+      globalThis.location.href = waMeUrl;
+    } else {
+      try {
+        await navigator.clipboard.writeText(mensaje);
+        setMessageCopied(true);
+      } catch {
+        // Clipboard API not available, continue without copy
+      }
+      // No abrimos automáticamente en desktop — mostramos el diálogo
+      // con opciones para que el usuario elija (wa.me o WhatsApp Web)
+    }
+  }, [isMobile]);
+
+  const clearRetryTimers = useCallback(() => {
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+    setRetryCountdown(null);
+  }, []);
+
+  const handleOpenInApp = useCallback(() => {
+    const link = (globalThis as Record<string, unknown>).__whatsappLink as string | undefined;
+    if (!link) return;
+
+    // Si hay countdown activo, es un reintento del usuario (app ya caliente)
+    if (retryCountdown !== null) {
+      clearRetryTimers();
+      globalThis.open(link, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    // Primer intento: abre wa.me (puede fallar por cold start)
+    globalThis.open(link, '_blank', 'noopener,noreferrer');
+
+    // Cuenta atrás de 10s → al terminar el botón cambia a "Reintentar"
+    const retryDelay = 10;
+    setRetryCountdown(retryDelay);
+
+    countdownRef.current = setInterval(() => {
+      setRetryCountdown(prev => {
+        if (prev === null || prev <= 1) {
+          if (countdownRef.current) clearInterval(countdownRef.current);
+          countdownRef.current = null;
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, [clearRetryTimers, retryCountdown]);
+
+  // Limpiar timers al desmontar
+  useEffect(() => {
+    return () => {
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  }, []);
 
   const getWhatsAppUrl = (): string | null => {
     const link = (globalThis as Record<string, unknown>).__whatsappLink as string | undefined;
     return link || null;
   };
 
-  const validateName = (name: string): string | undefined => {
-    const trimmed = name.trim();
-    if (!trimmed) return t("validationNameRequired", language);
-    if (trimmed.length < 2) return t("validationNameMin", language);
-    if (trimmed.length > 100) return t("validationNameMax", language);
-    if (!/^[a-zA-ZÀ-ÿ\s'-]+$/u.test(trimmed)) return t("validationNameFormat", language);
-    return undefined;
+  const getWhatsAppWebUrl = (): string | null => {
+    const link = (globalThis as Record<string, unknown>).__whatsappLink as string | undefined;
+    if (!link) return null;
+    const match = link.match(/wa\.me\/(\d+)\?text=(.+)/);
+    if (!match) return link;
+    return `https://web.whatsapp.com/send?phone=${match[1]}&text=${match[2]}`;
   };
 
-  const validatePhone = (phone: string): string | undefined => {
-    const trimmed = phone.trim();
-    if (!trimmed) return t("validationPhoneRequired", language);
-    const digitsOnly = trimmed.replaceAll(/\D/g, '');
-    if (digitsOnly.length < 9) return t("validationPhoneMin", language);
-    if (digitsOnly.length > 15) return t("validationPhoneMax", language);
-    return undefined;
-  };
-
-  const handleConfirmOrder = async () => {
+  const handleConfirmOrder = useCallback(async () => {
     setErrors({});
+    
+    const validateName = (name: string): string | undefined => {
+      const trimmed = name.trim();
+      if (!trimmed) return t("validationNameRequired", language);
+      if (trimmed.length < 2) return t("validationNameMin", language);
+      if (trimmed.length > 100) return t("validationNameMax", language);
+      if (!/^[a-zA-ZÀ-ÿ\s'-]+$/u.test(trimmed)) return t("validationNameFormat", language);
+      return undefined;
+    };
+
+    const validatePhone = (phone: string): string | undefined => {
+      const trimmed = phone.trim();
+      if (!trimmed) return t("validationPhoneRequired", language);
+      const digitsOnly = trimmed.replaceAll(/\D/g, '');
+      if (digitsOnly.length < 9) return t("validationPhoneMin", language);
+      if (digitsOnly.length > 15) return t("validationPhoneMax", language);
+      return undefined;
+    };
     
     const nombreError = validateName(nombre);
     const telefonoError = validatePhone(telefono);
@@ -91,7 +218,9 @@ export function CartDrawer() {
     }
 
     const sanitizedNombre = nombre.trim().slice(0, 100);
-    const sanitizedTelefono = telefono.replaceAll(/\D/g, '').slice(0, 15);
+    const selectedCountry = COUNTRY_CODES.find(c => c.code === countryCode);
+    const dialCode = selectedCountry?.dialCode || '34';
+    const sanitizedTelefono = dialCode + telefono.replaceAll(/\D/g, '').slice(0, 15);
     const sanitizedEmail = email.trim().toLowerCase().slice(0, 100);
 
     setSending(true);
@@ -121,13 +250,15 @@ export function CartDrawer() {
       });
       
       const data = await res.json();
+      console.log('[Pedido] Respuesta API:', { success: res.ok, numeroPedido: data.numeroPedido, hasWhatsappLink: !!data.whatsappLink });
       
       if (res.ok) {
         closeCart();
-        setConfirming(true);
         setNombre('');
         setTelefono('');
         setEmail('');
+        setOrderNumber(data.numeroPedido || null);
+        setCompanyPhone(data.companyPhone || null);
         
         if (data.whatsappLink) {
           (globalThis as Record<string, unknown>).__whatsappLink = data.whatsappLink;
@@ -135,27 +266,11 @@ export function CartDrawer() {
           if (match) {
             const numero = match[1];
             const mensaje = decodeURIComponent(match[2]);
-            setCompanyPhone(data.companyPhone || null);
-            setOrderNumber(data.numeroPedido || null); // <-- Added this line
-            setSent(true);
-            setTimeout(() => {
-              setConfirming(false);
-              abrirWhatsApp(numero, mensaje);
-            }, 100);
-          } else {
-            setSent(true);
-            setConfirming(false);
+            abrirWhatsApp(numero, mensaje);
           }
-        } else {
-          setSent(true);
-          setConfirming(false);
         }
-        if (data.companyPhone) {
-          setCompanyPhone(data.companyPhone);
-        }
-        if (data.numeroPedido) { // <-- Added this block
-          setOrderNumber(data.numeroPedido);
-        }
+        setSent(true);
+        setConfirming(false);
       } else {
         setErrors({ nombre: data.error || t("validationOrderError", language) });
       }
@@ -165,7 +280,7 @@ export function CartDrawer() {
     } finally {
       setSending(false);
     }
-  };
+  }, [nombre, telefono, countryCode, email, items, totalPrice, language, closeCart, abrirWhatsApp]);
 
   return (
     <>
@@ -173,6 +288,8 @@ export function CartDrawer() {
         if (!open) {
           setSent(false)
           setConfirming(false)
+          setMessageCopied(false)
+          clearRetryTimers()
           clearCart()
           closeCart()
         }
@@ -184,7 +301,10 @@ export function CartDrawer() {
               {t("sendingOrder", language)}
             </DialogTitle>
             <DialogDescription className="text-base">
-              {confirming ? t("sendingOrder", language) : t("whatsappCheck", language)}
+              {isMobile
+                ? (confirming ? t("sendingOrder", language) : t("whatsappCheck", language))
+                : t("whatsappDesktopChoice", language)
+              }
             </DialogDescription>
             {confirming && companyPhone && (
               <p className="text-xs text-destructive mt-2 text-center">
@@ -194,28 +314,58 @@ export function CartDrawer() {
           </DialogHeader>
           {!confirming && getWhatsAppUrl() && (
             <>
-              <a
-                href={getWhatsAppUrl()!}
-                rel="noopener noreferrer"
-                className="block w-full text-center bg-whatsapp text-white py-3 px-4 rounded-full font-semibold hover:bg-whatsapp-hover transition-colors"
-              >
-                {t("whatsappResend", language)}
-              </a>
-              <a
-                href={getWhatsAppUrl()!}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block w-full text-center text-whatsapp text-sm py-2 font-medium hover:underline"
-              >
-                {t("whatsappWeb", language)}
-              </a>
+              {isMobile ? (
+                <a
+                  href={getWhatsAppUrl()!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full text-center bg-whatsapp text-primary-foreground py-3 px-4 rounded-full font-semibold hover:bg-whatsapp-hover transition-colors duration-150"
+                >
+                  {t("whatsappResend", language)}
+                </a>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={handleOpenInApp}
+                    disabled={retryCountdown !== null && retryCountdown > 0}
+                    className="w-full text-center bg-whatsapp text-primary-foreground py-3 px-4 rounded-full font-semibold hover:bg-whatsapp-hover transition-colors duration-150 disabled:opacity-70"
+                  >
+                    {retryCountdown === null
+                      ? t("whatsappDesktopApp", language)
+                      : retryCountdown > 0
+                        ? t("whatsappRetrying", language).replace("{seconds}", String(retryCountdown))
+                        : t("whatsappRetry", language)
+                    }
+                  </button>
+                  <a
+                    href={getWhatsAppWebUrl()!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full text-center border border-whatsapp text-whatsapp py-3 px-4 rounded-full font-semibold hover:bg-whatsapp/10 transition-colors duration-150"
+                  >
+                    {t("whatsappWeb", language)}
+                  </a>
+                  {messageCopied && (
+                    <p className="text-xs text-muted-foreground mt-1 text-center">
+                      {t("whatsappClipboard", language)}
+                    </p>
+                  )}
+                </div>
+              )}
             </>
           )}
-          {companyPhone && orderNumber && (
-            <div className="bg-foreground text-background p-3 rounded-lg mt-4 w-full text-center">
-              <p className="text-xs font-medium">
-                * {t("whatsappCantSend", language)} {companyPhone} {t("withOrderNumber", language)} #{orderNumber}
+          {companyPhone && (
+            <div className="bg-foreground text-background p-4 rounded-lg mt-4 w-full text-center">
+              <p className="text-sm font-medium">
+                {t("whatsappCantSend", language)}
               </p>
+              <a
+                href={`tel:${companyPhone.replace(/\D/g, '')}`}
+                className="block text-2xl font-bold mt-2 tracking-wide hover:opacity-80 transition-opacity"
+              >
+                {companyPhone.replace(/\D/g, '').replace(/^34/, '')}
+              </a>
             </div>
           )}
         </DialogContent>
@@ -243,7 +393,7 @@ export function CartDrawer() {
 
         {items.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 text-muted-foreground">
-            <div className="relative">
+            <div className="relative animate-empty-float">
               <ShoppingBag className="size-12 opacity-20" />
               <span className="absolute inset-0 flex items-center justify-center text-2xl opacity-30">+</span>
             </div>
@@ -254,7 +404,7 @@ export function CartDrawer() {
                 closeCart();
                 document.getElementById('menu')?.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="mt-2 px-6 py-2 bg-primary text-primary-foreground rounded-full font-medium hover:bg-primary/90 transition-colors"
+              className="mt-2 px-6 py-3 bg-primary text-primary-foreground rounded-full font-medium hover:bg-primary/90 transition-colors min-h-[44px]"
             >
               {t("viewMenu", language)}
             </button>
@@ -267,8 +417,17 @@ export function CartDrawer() {
                   const itemKey = getItemKey(ci.item, ci.selectedComplements);
                   const complementPrice = ci.selectedComplements?.reduce((sum, c) => sum + c.price, 0) || 0;
                   const totalItemPrice = ci.item.price + complementPrice;
+                  let itemAnimationClass = '';
+                  if (ci.justAdded) {
+                    itemAnimationClass = 'animate-cart-item-add';
+                  } else if (ci.justRemoved) {
+                    itemAnimationClass = 'animate-cart-item-remove';
+                  }
                   return (
-                    <li key={itemKey} className="flex items-center gap-3 rounded-lg bg-card p-3">
+                    <li 
+                      key={itemKey} 
+                      className={`flex items-center gap-3 rounded-lg bg-card p-3 ${itemAnimationClass}`}
+                    >
                       <div className="flex-1">
                         <p className="font-semibold text-card-foreground">
                           {(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}
@@ -284,34 +443,36 @@ export function CartDrawer() {
                       </div>
 
                       <div className="flex items-center gap-1 md:gap-2">
-                        <Button
+                        <RippleButton
                           variant="outline"
                           size="icon"
-                          className="md:size-7 size-10 bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="min-h-[44px] min-w-[44px] md:min-h-7 md:min-w-7 bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => updateQuantity(itemKey, ci.quantity - 1)}
                           aria-label={t("reduceQuantity", language)}
                         >
-                          <Minus className="md:size-3 size-4" />
-                        </Button>
-                        <span className="w-6 md:w-6 text-center font-semibold text-foreground">{ci.quantity}</span>
-                        <Button
+                          <Minus className="size-4" />
+                        </RippleButton>
+                        <span className="w-6 md:w-6 text-center font-semibold text-foreground animate-quantity-pulse" key={ci.quantity}>
+                          {ci.quantity}
+                        </span>
+                        <RippleButton
                           variant="outline"
                           size="icon"
-                          className="md:size-7 size-10 bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="min-h-[44px] min-w-[44px] md:min-h-7 md:min-w-7 bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => updateQuantity(itemKey, ci.quantity + 1)}
                           aria-label={t("increaseQuantity", language)}
                         >
-                          <Plus className="md:size-3 size-4" />
-                        </Button>
-                        <Button
+                          <Plus className="size-4" />
+                        </RippleButton>
+                        <RippleButton
                           variant="ghost"
                           size="icon"
-                          className="md:size-7 size-10 text-destructive hover:text-destructive hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="min-h-[44px] min-w-[44px] md:min-h-7 md:min-w-7 text-destructive hover:text-destructive hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => removeItem(itemKey)}
                           aria-label={`${t("remove", language)} ${(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}`}
                         >
-                          <Trash2 className="md:size-3 size-4" />
-                        </Button>
+                          <Trash2 className="size-4" />
+                        </RippleButton>
                       </div>
                     </li>
                   );
@@ -333,25 +494,46 @@ export function CartDrawer() {
                       maxLength={100}
                       autoComplete="name"
                       aria-label={t("placeholderName", language)}
+                      aria-describedby={errors.nombre ? "nombre-error" : undefined}
+                      aria-invalid={!!errors.nombre}
                     />
                   </div>
-                  {errors.nombre && <p className="text-xs text-destructive mt-1 ml-6">{errors.nombre}</p>}
+                  {errors.nombre && <p id="nombre-error" role="alert" className="text-xs text-destructive mt-1 ml-6">{errors.nombre}</p>}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <Phone className="size-4 text-muted-foreground" />
-                    <Input
-                      type="tel"
-                      placeholder={t("placeholderPhone", language)}
-                      value={telefono}
-                      onChange={(e) => { const val = e.target.value.replaceAll(/\D/g, '').slice(0, 15); setTelefono(val); setErrors(prev => ({ ...prev, telefono: undefined })); }}
-                      className={`h-9 ${errors.telefono ? 'border-destructive' : ''}`}
-                      maxLength={15}
-                      autoComplete="tel"
-                      aria-label={t("placeholderPhone", language)}
-                    />
+                    <Phone className="size-4 text-muted-foreground shrink-0" />
+                    <div className="flex gap-1 flex-1">
+                      <Select value={countryCode} onValueChange={setCountryCode}>
+                        <SelectTrigger className="h-9 w-[100px] shrink-0 text-xs px-2" aria-label={t("countryCode", language)}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {COUNTRY_CODES.map((cc) => (
+                            <SelectItem key={cc.code} value={cc.code}>
+                              <span className="flex items-center gap-1.5">
+                                <span>{cc.flag}</span>
+                                <span>+{cc.dialCode}</span>
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        type="tel"
+                        placeholder={t("phonePlaceholder", language)}
+                        value={telefono}
+                        onChange={(e) => { const val = e.target.value.replaceAll(/\D/g, '').slice(0, 15); setTelefono(val); setErrors(prev => ({ ...prev, telefono: undefined })); }}
+                        className={`h-9 flex-1 ${errors.telefono ? 'border-destructive' : ''}`}
+                        maxLength={15}
+                        autoComplete="tel-national"
+                        aria-label={t("placeholderPhone", language)}
+                        aria-describedby={errors.telefono ? "telefono-error" : undefined}
+                        aria-invalid={!!errors.telefono}
+                      />
+                    </div>
                   </div>
-                  {errors.telefono && <p className="text-xs text-destructive mt-1 ml-6">{errors.telefono}</p>}
+                  {errors.telefono && <p id="telefono-error" role="alert" className="text-xs text-destructive mt-1 ml-6">{errors.telefono}</p>}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
@@ -373,14 +555,14 @@ export function CartDrawer() {
 
               <div className="mb-4 flex items-center justify-between px-2">
                 <span className="text-lg font-semibold text-foreground">{t("total", language)}</span>
-                <span className="text-2xl font-bold text-foreground tabular-nums">
+                <span className="text-2xl font-bold text-foreground tabular-nums animate-price-update" key={totalPrice}>
                   {totalPrice.toFixed(2).replace(".", ",") + "€"}
                 </span>
               </div>
 
               <div className="flex flex-col gap-2 px-1">
                 <Button 
-                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full py-3 text-lg font-semibold shadow-md transition-colors duration-200"
+                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full py-3 text-lg font-semibold shadow-elegant transition-colors duration-150"
                   size="lg"
                   onClick={handleConfirmOrder}
                   disabled={sending || confirming}

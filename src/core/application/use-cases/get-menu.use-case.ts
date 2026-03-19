@@ -61,9 +61,19 @@ export class GetMenuUseCase {
 
       // Mapa de complemento_obligatorio por categoría padre
       const complementoObligatorioMap = new Map<string, boolean>();
+      // Mapa de nombre de categoría complemento por categoría padre
+      const complementCategoryNameMap = new Map<string, string>();
+      // Mapa de traducciones de categoría complemento por categoría padre
+      const complementCategoryTranslationsMap = new Map<string, Category['translations']>();
       for (const compCat of complementCategories) {
         if (compCat.categoriaComplementoDe) {
           complementoObligatorioMap.set(compCat.categoriaComplementoDe, compCat.complementoObligatorio);
+          if (compCat.nombre) {
+            complementCategoryNameMap.set(compCat.categoriaComplementoDe, compCat.nombre);
+          }
+          if (compCat.translations) {
+            complementCategoryTranslationsMap.set(compCat.categoriaComplementoDe, compCat.translations);
+          }
         }
       }
 
@@ -95,6 +105,8 @@ export class GetMenuUseCase {
         const childSubcategories = subcategoriesByParent.get(parentCat.id) || [];
         const categoryComplements = complementsByCategoryId.get(parentCat.id) || [];
         const requiresComplement = complementoObligatorioMap.get(parentCat.id) || false;
+        const complementCategoryName = complementCategoryNameMap.get(parentCat.id);
+        const complementCategoryTranslations = complementCategoryTranslationsMap.get(parentCat.id);
 
         return MenuMapper.toCategoryVM(
           parentCat,
@@ -104,6 +116,8 @@ export class GetMenuUseCase {
           requiresComplement,
           categoriesById,
           products,
+          complementCategoryName,
+          complementCategoryTranslations,
         );
       });
 

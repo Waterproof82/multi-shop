@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, Fragment } from 'react';
-import { Search, ChevronDown, ChevronUp, Check, Clock, Trash2 } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
+import { Search, ChevronDown, ChevronUp, Check, Clock, Trash2, ShoppingCart, Calendar } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import type { PedidoItem, PedidoComplemento } from '@/core/domain/entities/types';
 import { PEDIDO_ESTADOS, PEDIDO_ESTADO_LABELS, PEDIDO_ESTADO_COLORS, type PedidoEstado } from '@/core/domain/constants/pedido';
 import {
@@ -11,6 +12,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { fetchWithCsrf } from '@/lib/csrf-client';
 
 interface Cliente {
   nombre: string | null;
@@ -40,24 +42,27 @@ export default function PedidosPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; id: string | null; numero: number | null }>({ show: false, id: null, numero: null });
 
   useEffect(() => {
+    const controller = new AbortController();
     async function fetchPedidos() {
       try {
-        const res = await fetch('/api/admin/pedidos');
+        const res = await fetch('/api/admin/pedidos', { signal: controller.signal });
         if (res.ok) {
           const data = await res.json();
           setPedidos(data.pedidos || []);
         }
       } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
         console.error('Error fetching pedidos:', error);
       } finally {
         setLoading(false);
       }
     }
     fetchPedidos();
+    return () => controller.abort();
   }, []);
 
-  const filteredPedidos = pedidos
-    .filter(p => 
+  const filteredPedidos = useMemo(() => pedidos
+    .filter(p =>
       p.numero_pedido.toString().includes(searchTerm) ||
       p.clientes?.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.clientes?.telefono?.includes(searchTerm) ||
@@ -72,16 +77,16 @@ export default function PedidosPage() {
       if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
       if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
       return 0;
-    });
+    }), [pedidos, searchTerm, sortField, sortDirection]);
 
-  const handleSort = (field: keyof Pedido) => {
+  const handleSort = useCallback((field: keyof Pedido) => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
       setSortField(field);
       setSortDirection('desc');
     }
-  };
+  }, [sortField, sortDirection]);
 
   const getEstadoBadge = (estado: string, pedidoId: string) => {
     const estadoIndex = PEDIDO_ESTADOS.indexOf(estado as PedidoEstado);
@@ -105,32 +110,29 @@ export default function PedidosPage() {
     setExpandedPedido(expandedPedido === id ? null : id);
   };
 
-  const updateEstado = async (id: string, nuevoEstado: string) => {
+  const updateEstado = useCallback(async (id: string, nuevoEstado: string) => {
     try {
-      const res = await fetch('/api/admin/pedidos', {
+      const res = await fetchWithCsrf('/api/admin/pedidos', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, estado: nuevoEstado }),
       });
       if (res.ok) {
-        setPedidos(pedidos.map(p => p.id === id ? { ...p, estado: nuevoEstado } : p));
+        setPedidos(prev => prev.map(p => p.id === id ? { ...p, estado: nuevoEstado } : p));
       }
     } catch (error) {
       console.error('Error updating estado:', error);
     }
-  };
+  }, []);
 
-  const deletePedido = async (id: string) => {
-    const orderNum = pedidos.find(p => p.id === id)?.numero_pedido ?? null;
+  const deletePedido = useCallback((id: string, orderNum: number | null) => {
     setDeleteConfirm({ show: true, id, numero: orderNum });
-  };
+  }, []);
 
   const confirmDelete = async () => {
     if (!deleteConfirm.id) return;
     try {
-      const res = await fetch('/api/admin/pedidos', {
+      const res = await fetchWithCsrf('/api/admin/pedidos', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: deleteConfirm.id }),
       });
       if (res.ok) {
@@ -143,34 +145,78 @@ export default function PedidosPage() {
     }
   };
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount);
+  };
+
+  const stats = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    
+    const pedidosHoy = pedidos.filter(p => new Date(p.created_at) >= today);
+    const pedidosMes = pedidos.filter(p => new Date(p.created_at) >= monthStart);
+    
+    return {
+      pedidosHoy: pedidosHoy.length,
+      totalHoy: pedidosHoy.reduce((sum, p) => sum + p.total, 0),
+      pedidosMes: pedidosMes.length,
+      totalMes: pedidosMes.reduce((sum, p) => sum + p.total, 0),
+    };
+  }, [pedidos]);
+
   if (loading) {
     return (
-      <div className="pt-20 lg:pt-0 px-6 lg:px-8 flex items-center justify-center min-h-[50vh]">
+      <div className="pt-16 lg:pt-0 px-6 lg:px-8 flex items-center justify-center min-h-[50vh]">
         <div className="text-muted-foreground">Cargando...</div>
       </div>
     );
   }
 
   return (
-    <div className="pt-20 lg:pt-0 px-6 lg:px-8">
-      <h1 className="text-2xl font-bold text-foreground mb-2">
-        Pedidos
-      </h1>
-      <p className="text-muted-foreground mb-6">
-        Gestiona los pedidos de tus clientes
-      </p>
+    <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
+      {/* Header con stats */}
+      <div className="bg-primary rounded-lg p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">Pedidos</h1>
+            <p className="text-primary-foreground/80 text-sm mt-1">Gestiona los pedidos de tus clientes</p>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
+              <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
+              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{stats.pedidosHoy}</span>
+              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Hoy</p>
+            </div>
+            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
+              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{formatCurrency(stats.totalHoy)}</span>
+              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Ventas hoy</p>
+            </div>
+            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
+              <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
+              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{stats.pedidosMes}</span>
+              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Este mes</p>
+            </div>
+            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
+              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{formatCurrency(stats.totalMes)}</span>
+              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Ventas mes</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
-      <div className="bg-card rounded-lg shadow-sm border border-border">
+      {/* Buscador */}
+      <div className="bg-card rounded-lg shadow-elegant border border-border">
         <div className="p-4 border-b border-border">
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input
+            <Input
               type="text"
               placeholder="Buscar por número, cliente o teléfono..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               aria-label="Buscar pedidos"
-              className="w-full pl-10 pr-4 py-2 border rounded-lg bg-card border-border text-foreground"
+              className="pl-10"
             />
           </div>
         </div>
@@ -179,37 +225,49 @@ export default function PedidosPage() {
           <table className="w-full">
             <thead className="bg-muted">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'numero_pedido' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
-                  <button onClick={() => handleSort('numero_pedido')} className="flex items-center gap-1">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'numero_pedido' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                  <button 
+                    onClick={() => handleSort('numero_pedido')} 
+                    className="flex items-center gap-1"
+                  >
                     #
                     {sortField === 'numero_pedido' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Cliente
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Teléfono
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'total' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
-                  <button onClick={() => handleSort('total')} className="flex items-center gap-1">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'total' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                  <button 
+                    onClick={() => handleSort('total')} 
+                    className="flex items-center gap-1"
+                  >
                     Total
                     {sortField === 'total' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'estado' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
-                  <button onClick={() => handleSort('estado')} className="flex items-center gap-1">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'estado' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                  <button 
+                    onClick={() => handleSort('estado')} 
+                    className="flex items-center gap-1"
+                  >
                     Estado
                     {sortField === 'estado' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'created_at' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
-                  <button onClick={() => handleSort('created_at')} className="flex items-center gap-1">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'created_at' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                  <button 
+                    onClick={() => handleSort('created_at')} 
+                    className="flex items-center gap-1"
+                  >
                     Fecha
                     {sortField === 'created_at' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Acciones
                 </th>
               </tr>
@@ -217,8 +275,8 @@ export default function PedidosPage() {
             <tbody className="divide-y divide-border">
               {filteredPedidos.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
-                    No hay pedidos
+                  <td colSpan={7} aria-live="polite" className="px-4 py-8 text-center text-muted-foreground">
+                    {searchTerm ? 'No se encontraron pedidos con ese criterio.' : 'No hay pedidos.'}
                   </td>
                 </tr>
               ) : (
@@ -255,7 +313,7 @@ export default function PedidosPage() {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <button
-                          onClick={(e) => { e.stopPropagation(); deletePedido(pedido.id); }}
+                          onClick={(e) => { e.stopPropagation(); deletePedido(pedido.id, pedido.numero_pedido); }}
                           className="p-2.5 text-destructive hover:bg-destructive/10 rounded"
                           aria-label="Eliminar pedido"
                         >
