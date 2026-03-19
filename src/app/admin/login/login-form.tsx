@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { saveCsrfToken } from '@/lib/csrf-client';
+import { logClientError } from '@/lib/client-error';
 
 interface LoginFormProps {
   readonly empresaNombre: string | null;
@@ -28,7 +29,7 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
           saveCsrfToken(data.csrfToken);
         }
       })
-      .catch(console.error);
+      .catch((error) => logClientError(error, 'fetchCsrfToken'));
   }, []);
 
   const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {

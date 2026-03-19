@@ -8,6 +8,7 @@ import { useAdmin } from '@/lib/admin-context';
 import { ProductFormDialog, DeleteConfirmDialog } from '@/components/admin/product-form-dialog';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import type { ProductoFormData } from '@/components/admin/product-form-dialog';
+import { formatPrice } from '@/lib/format-price';
 
 interface Categoria {
   id: string;
@@ -427,7 +428,7 @@ export default function ProductosPage() {
                     )}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-foreground">
-                    {prod.precio.toFixed(2)} €
+                    {formatPrice(prod.precio)}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
                     {getCategoriaNombre(prod.categoria_id)}

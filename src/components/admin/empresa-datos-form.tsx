@@ -1,8 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Instagram, Facebook, MapPin, Phone, Mail, Link as LinkIcon } from 'lucide-react';
+import { MapPin, Phone, Mail, Link as LinkIcon, Users, Camera } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { fetchWithCsrf } from '@/lib/csrf-client';
+import { logClientError } from '@/lib/client-error';
 
 interface EmpresaDatosFormProps {
   readonly initialData: {
@@ -29,7 +32,7 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
     setSaved(false);
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSaving(true);
 
@@ -43,7 +46,7 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
         setSaved(true);
       }
     } catch (error) {
-      console.error('Error guardando datos:', error);
+      logClientError(error, 'handleSubmit');
     } finally {
       setSaving(false);
     }
@@ -58,16 +61,16 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
             <Mail className="w-4 h-4" />
             Email de notificaciones
           </label>
-          <input
+          <Input
             id="email_notification"
             name="email_notification"
             type="email"
             value={formData.email_notification}
             onChange={(e) => handleChange('email_notification', e.target.value)}
             placeholder="pedidos@tuempresa.com"
-            className="px-3 py-2 border rounded-md bg-card border-border text-foreground text-sm"
+            aria-describedby="email_notification_help"
           />
-          <span className="text-xs text-muted-foreground">Recibirás los pedidos nuevos en este email</span>
+          <span id="email_notification_help" className="text-xs text-muted-foreground">Recibirás los pedidos nuevos en este email</span>
         </div>
 
         {/* WhatsApp */}
@@ -76,14 +79,13 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
             <Phone className="w-4 h-4" />
             WhatsApp
           </label>
-          <input
+          <Input
             id="telefono_whatsapp"
             name="telefono_whatsapp"
             type="text"
             value={formData.telefono_whatsapp}
             onChange={(e) => handleChange('telefono_whatsapp', e.target.value)}
-            placeholder="+5491112345678"
-            className="px-3 py-2 border rounded-md bg-card border-border text-foreground text-sm"
+            placeholder="+34612345678"
           />
           <span className="text-xs text-muted-foreground">Número con código de país sin espacios</span>
         </div>
@@ -94,48 +96,45 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
             <MapPin className="w-4 h-4" />
             Dirección
           </label>
-          <input
+          <Input
             id="direccion"
             name="direccion"
             type="text"
             value={formData.direccion}
             onChange={(e) => handleChange('direccion', e.target.value)}
             placeholder="Av. Example 123, Ciudad"
-            className="px-3 py-2 border rounded-md bg-card border-border text-foreground text-sm"
           />
         </div>
 
         {/* Facebook */}
         <div className="flex flex-col gap-2">
           <label htmlFor="fb" className="text-sm font-medium text-foreground flex items-center gap-2">
-            <Facebook className="w-4 h-4" />
+            <Users className="w-4 h-4" />
             Facebook
           </label>
-          <input
+          <Input
             id="fb"
             name="fb"
             type="url"
             value={formData.fb}
             onChange={(e) => handleChange('fb', e.target.value)}
             placeholder="https://facebook.com/tuempresa"
-            className="px-3 py-2 border rounded-md bg-card border-border text-foreground text-sm"
           />
         </div>
 
         {/* Instagram */}
         <div className="flex flex-col gap-2">
           <label htmlFor="instagram" className="text-sm font-medium text-foreground flex items-center gap-2">
-            <Instagram className="w-4 h-4" />
+            <Camera className="w-4 h-4" />
             Instagram
           </label>
-          <input
+          <Input
             id="instagram"
             name="instagram"
             type="url"
             value={formData.instagram}
             onChange={(e) => handleChange('instagram', e.target.value)}
             placeholder="https://instagram.com/tuempresa"
-            className="px-3 py-2 border rounded-md bg-card border-border text-foreground text-sm"
           />
         </div>
 
@@ -145,14 +144,13 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
             <LinkIcon className="w-4 h-4" />
             Embed del mapa (iframe)
           </label>
-          <input
+          <Input
             id="url_mapa"
             name="url_mapa"
             type="url"
             value={formData.url_mapa}
             onChange={(e) => handleChange('url_mapa', e.target.value)}
             placeholder="https://www.google.com/maps/embed?pb=..."
-            className="px-3 py-2 border rounded-md bg-card border-border text-foreground text-sm"
           />
           <span className="text-xs text-muted-foreground">
             Ir a Google Maps → Compartir → Insertar mapa → Copiar HTML → Pegar solo la URL del src
@@ -164,8 +162,9 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
         <button
           type="submit"
           disabled={saving}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50 transition-opacity"
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center gap-2"
         >
+          {saving && <Loader2 className="h-4 w-4 animate-spin" />}
           {saving ? 'Guardando...' : 'Guardar datos'}
         </button>
         {saved && (

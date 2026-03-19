@@ -5,6 +5,7 @@ import { BarChart3, ShoppingCart, Euro, TrendingUp, TrendingDown, Users, Calenda
 import { motion, useReducedMotion } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, LineChart, Line } from 'recharts';
 import { fetchWithCsrf } from '@/lib/csrf-client';
+import { logClientError } from '@/lib/client-error';
 
 interface Stats {
   pedidosHoy: number;
@@ -76,7 +77,7 @@ export default function EstadisticasPage() {
         }
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') return;
-        console.error('Error fetching stats:', error);
+        logClientError(error, 'fetchStats');
       } finally {
         setLoading(false);
       }

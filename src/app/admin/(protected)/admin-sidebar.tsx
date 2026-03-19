@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, Utensils, Tags, LogOut, Menu, X, ShoppingCart, BarChart3, Users, Megaphone, Settings, ExternalLink } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
+import { useAdmin } from '@/lib/admin-context';
 
 interface NavItem {
   href: string;
@@ -30,6 +32,7 @@ interface AdminSidebarProps {
 export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
+  const { empresaLogo } = useAdmin();
 
   const closeMenu = () => setIsOpen(false);
 
@@ -42,9 +45,21 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
     <>
       {/* Mobile header */}
       <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-card border-b border-border z-30 flex items-center justify-between px-4">
-        <h1 className="text-lg font-semibold text-foreground">
-          Administración
-        </h1>
+        {empresaLogo ? (
+          <div className="relative w-10 h-10">
+            <Image
+              src={empresaLogo}
+              alt="Logo de la empresa"
+              fill
+              className="object-contain"
+              sizes="40px"
+            />
+          </div>
+        ) : (
+          <h1 className="text-lg font-semibold text-foreground">
+            Administración
+          </h1>
+        )}
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="p-2 rounded-lg hover:bg-muted transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -75,10 +90,22 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
         <div className="h-full flex flex-col">
           {/* Desktop header */}
           <div className="hidden lg:block p-6 border-b border-border">
-            <h1 className="text-lg font-semibold text-foreground">
-              Administración
-            </h1>
-            <p className="text-xs text-muted-foreground mt-1">
+            {empresaLogo ? (
+              <div className="relative w-20 h-20 mx-auto">
+                <Image
+                  src={empresaLogo}
+                  alt="Logo de la empresa"
+                  fill
+                  className="object-contain"
+                  sizes="80px"
+                />
+              </div>
+            ) : (
+              <h1 className="text-lg font-semibold text-foreground">
+                Administración
+              </h1>
+            )}
+            <p className="text-xs text-muted-foreground mt-1 text-center">
               {empresaId ? 'Empresa conectada' : 'Panel'}
             </p>
           </div>

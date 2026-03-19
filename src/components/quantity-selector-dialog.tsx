@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label"
 import { useLanguage } from "@/lib/language-context"
 import { useCart } from "@/lib/cart-context"
 import { t } from "@/lib/translations"
+import { formatPrice } from "@/lib/format-price"
 import type { MenuItemVM, ComplementVM } from "@/core/application/dtos/menu-view-model"
 
 interface QuantitySelectorDialogProps {
@@ -181,7 +182,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
                         </div>
                       </div>
                       <span className="font-semibold text-sm">
-                        +{complement.price.toFixed(2).replace(".", ",")}€
+                        +{formatPrice(complement.price)}
                       </span>
                     </button>
                   );
@@ -223,7 +224,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
           </div>
           <div className="flex justify-between items-center text-lg font-bold">
             <span>{t("total", language)}:</span>
-            <span className="animate-price-update" key={totalPrice}>{totalPrice.toFixed(2).replace(".", ",")}€</span>
+            <span className="animate-price-update" key={totalPrice}>{formatPrice(totalPrice)}</span>
           </div>
         </div>
         

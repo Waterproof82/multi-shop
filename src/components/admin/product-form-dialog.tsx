@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { Loader2, ChevronDown, ChevronRight, Languages } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -43,7 +42,7 @@ interface TranslationFieldsProps {
   show: boolean;
 }
 
-function TranslationFields({ formData, onChange, show }: TranslationFieldsProps) {
+function TranslationFields({ formData, onChange, show }: Readonly<TranslationFieldsProps>) {
   if (!show) return null;
 
   const languages = [
@@ -95,7 +94,7 @@ interface ProductFormDialogProps {
   showTranslations: boolean;
   onToggleTranslations: () => void;
   saving: boolean;
-  onSubmit: (e: React.FormEvent) => void;
+  onSubmit: (e: React.SyntheticEvent) => void;
   empresaSlug: string;
 }
 
@@ -111,7 +110,7 @@ export function ProductFormDialog({
   saving,
   onSubmit,
   empresaSlug,
-}: ProductFormDialogProps) {
+}: Readonly<ProductFormDialogProps>) {
   const handleClose = () => onOpenChange(false);
 
   const handleSelectChange = (value: string) => {
@@ -180,9 +179,10 @@ export function ProductFormDialog({
               </label>
               <select
                 id="categoria_id"
+                name="categoria_id"
                 value={formData.categoria_id}
                 onChange={(e) => handleSelectChange(e.target.value)}
-                className="w-full px-3 py-2 rounded-md border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background transition-colors cursor-pointer"
+                className="w-full px-3 py-2 rounded-md border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background cursor-pointer min-h-[44px]"
                 aria-label="Categoría del producto"
               >
                 <option value="">Sin categoría</option>
@@ -264,14 +264,14 @@ export function ProductFormDialog({
             <button
               type="button"
               onClick={handleClose}
-              className="px-4 py-2 border rounded-md hover:bg-muted/50 border-border text-foreground"
+              className="px-4 py-2 border rounded-md hover:bg-muted/50 border-border text-foreground min-h-[44px]"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 min-h-[44px]"
             >
               {saving ? (
                 <>
@@ -301,7 +301,7 @@ export function DeleteConfirmDialog({
   onOpenChange,
   productName,
   onConfirm,
-}: DeleteConfirmDialogProps) {
+}: Readonly<DeleteConfirmDialogProps>) {
   const handleClose = () => onOpenChange(false);
 
   return (
@@ -320,14 +320,16 @@ export function DeleteConfirmDialog({
         </DialogHeader>
         <div className="flex gap-3 justify-end">
           <button
+            type="button"
             onClick={handleClose}
-            className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg"
+            className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg min-h-[44px]"
           >
             Cancelar
           </button>
           <button
+            type="button"
             onClick={onConfirm}
-            className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg"
+            className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg min-h-[44px]"
           >
             Eliminar
           </button>
