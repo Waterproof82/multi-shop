@@ -148,43 +148,53 @@ const buildWhatsAppUrls = (numero, mensaje) => ({
   webUrl: `https://web.whatsapp.com/send?phone=${numero}&text=${encodeURIComponent(mensaje)}`,
 });
 
-// Mobile: wa.me → redirect directo a app nativa
+// Mobile: wa.me → redirect directo a app nativa (siempre funciona bien)
 if (isMobile) {
   globalThis.location.href = waMeUrl;
 }
-// Desktop: wa.me → intenta abrir app nativa via window.open
+// Desktop: copiar al clipboard + NO abrir automáticamente
+// Mostrar diálogo con dos opciones para que el usuario elija
 else {
-  globalThis.open(waMeUrl, '_blank', 'noopener,noreferrer');
+  await navigator.clipboard.writeText(mensaje);
+  // El diálogo se muestra con dos botones: App y Web
 }
 ```
 
-**Estrategia "intenta app, fallback a web":**
-- Se usa `wa.me` siempre como primer intento (respeta la app instalada del usuario)
-- Si la app Desktop está abierta → funciona perfecto, mensaje se pre-rellena
-- Si la app tarda en arrancar (cold start) y el mensaje se pierde → el diálogo muestra
-  un botón "Abrir en WhatsApp Web" que usa `web.whatsapp.com/send` como fallback seguro
-- El usuario decide cuál usar, no lo forzamos
+**El problema de fondo en Windows Desktop:**
 
-| Formato | Desktop | Mobile |
-|---------|---------|--------|
-| `wa.me` | Intenta app nativa (primer intento) | Abre app directamente |
-| `web.whatsapp.com/send` | Siempre abre en navegador (fallback) | No usado |
+Cuando `wa.me` abre WhatsApp Desktop y la app tarda en arrancar (cold start), el
+protocol handler de Windows pierde TODOS los parámetros (phone + text). La app se
+abre en la pantalla principal sin ningún chat abierto ni mensaje pre-rellenado.
+Esto ocurre de forma intermitente dependiendo de si la app estaba abierta o suspendida.
 
-### Manual Fallback
+No hay solución técnica para controlar el cold start desde el frontend. Cada método
+tiene una limitación diferente:
 
-Se guarda el enlace wa.me original. Para desktop se ofrece un fallback web:
+| Método | Funciona si... | Falla si... |
+|--------|---------------|-------------|
+| `wa.me` | App abierta/arranque rápido | Cold start (pierde phone+text) |
+| `web.whatsapp.com/send` | Siempre (carga en navegador) | No tiene sesión web (pide QR) |
 
-```typescript
-(globalThis as Record<string, unknown>).__whatsappLink = data.whatsappLink;
+**Estrategia: "el usuario elige + clipboard como red de seguridad"**
 
-// getWhatsAppUrl() → devuelve wa.me (link universal, intenta app nativa)
-// getWhatsAppWebUrl() → convierte a web.whatsapp.com/send (fallback navegador, solo desktop)
-```
+En vez de elegir por el usuario (y fallar), mostramos el diálogo con las opciones:
 
-En el diálogo de confirmación:
-- **Botón principal "Reenviar"**: usa `wa.me` (reintenta la app nativa)
-- **Botón "Abrir en WhatsApp Web"**: solo visible en desktop, usa `web.whatsapp.com/send` como
-  fallback si la app nativa no captó el mensaje por cold start
+1. **Clipboard (automático)**: Se copia el texto del pedido al portapapeles antes de
+   mostrar el diálogo. Si `wa.me` pierde los params, el usuario pega con Ctrl+V.
+2. **Botón "Abrir en la app"**: usa `wa.me` → funciona si la app está activa
+3. **Botón "Abrir WhatsApp Web"**: usa `web.whatsapp.com/send` → siempre funciona
+   con sesión web activa, y el mensaje aparece pre-rellenado
+
+### Diálogo según plataforma
+
+**Móvil**: Apertura automática con `wa.me` (redirect). Diálogo simple con botón de reenvío.
+
+**Desktop**: Sin apertura automática. Diálogo con:
+- Título: "Elige cómo enviar el pedido por WhatsApp"
+- Botón verde sólido: "Abrir en la app de WhatsApp" → `wa.me`
+- Botón verde outline: "Abrir WhatsApp Web" → `web.whatsapp.com/send`
+- Texto info: "El mensaje se ha copiado al portapapeles. Si la app no muestra el pedido, pégalo con Ctrl+V"
+- Info de teléfono + nº pedido como último recurso manual
 
 ## Database Schema
 

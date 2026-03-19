@@ -85,6 +85,7 @@ export function CartDrawer() {
   const [confirming, setConfirming] = useState(false)
   const [companyPhone, setCompanyPhone] = useState<string | null>(null)
   const [orderNumber, setOrderNumber] = useState<number | null>(null)
+  const [messageCopied, setMessageCopied] = useState(false)
   const [nombre, setNombre] = useState('')
   const [telefono, setTelefono] = useState('')
   const [email, setEmail] = useState('')
@@ -104,13 +105,20 @@ export function CartDrawer() {
     };
   };
 
-  const abrirWhatsApp = useCallback((numero: string, mensaje: string) => {
+  const abrirWhatsApp = useCallback(async (numero: string, mensaje: string) => {
     const { waMeUrl } = buildWhatsAppUrls(numero, mensaje);
 
     if (isMobile) {
       globalThis.location.href = waMeUrl;
     } else {
-      globalThis.open(waMeUrl, '_blank', 'noopener,noreferrer');
+      try {
+        await navigator.clipboard.writeText(mensaje);
+        setMessageCopied(true);
+      } catch {
+        // Clipboard API not available, continue without copy
+      }
+      // No abrimos automáticamente en desktop — mostramos el diálogo
+      // con opciones para que el usuario elija (wa.me o WhatsApp Web)
     }
   }, [isMobile]);
 
@@ -225,6 +233,7 @@ export function CartDrawer() {
         if (!open) {
           setSent(false)
           setConfirming(false)
+          setMessageCopied(false)
           clearCart()
           closeCart()
         }
@@ -236,7 +245,10 @@ export function CartDrawer() {
               {t("sendingOrder", language)}
             </DialogTitle>
             <DialogDescription className="text-base">
-              {confirming ? t("sendingOrder", language) : t("whatsappCheck", language)}
+              {isMobile
+                ? (confirming ? t("sendingOrder", language) : t("whatsappCheck", language))
+                : t("whatsappDesktopChoice", language)
+              }
             </DialogDescription>
             {confirming && companyPhone && (
               <p className="text-xs text-destructive mt-2 text-center">
@@ -246,23 +258,39 @@ export function CartDrawer() {
           </DialogHeader>
           {!confirming && getWhatsAppUrl() && (
             <>
-              <a
-                href={getWhatsAppUrl()!}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block w-full text-center bg-whatsapp text-primary-foreground py-3 px-4 rounded-full font-semibold hover:bg-whatsapp-hover transition-colors duration-150"
-              >
-                {t("whatsappResend", language)}
-              </a>
-              {!isMobile && (
+              {isMobile ? (
                 <a
-                  href={getWhatsAppWebUrl()!}
+                  href={getWhatsAppUrl()!}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block w-full text-center text-whatsapp text-sm py-2 font-medium hover:underline"
+                  className="block w-full text-center bg-whatsapp text-primary-foreground py-3 px-4 rounded-full font-semibold hover:bg-whatsapp-hover transition-colors duration-150"
                 >
-                  {t("whatsappWeb", language)}
+                  {t("whatsappResend", language)}
                 </a>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <a
+                    href={getWhatsAppUrl()!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full text-center bg-whatsapp text-primary-foreground py-3 px-4 rounded-full font-semibold hover:bg-whatsapp-hover transition-colors duration-150"
+                  >
+                    {t("whatsappDesktopApp", language)}
+                  </a>
+                  <a
+                    href={getWhatsAppWebUrl()!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full text-center border border-whatsapp text-whatsapp py-3 px-4 rounded-full font-semibold hover:bg-whatsapp/10 transition-colors duration-150"
+                  >
+                    {t("whatsappWeb", language)}
+                  </a>
+                  {messageCopied && (
+                    <p className="text-xs text-muted-foreground mt-1 text-center">
+                      {t("whatsappClipboard", language)}
+                    </p>
+                  )}
+                </div>
               )}
             </>
           )}
