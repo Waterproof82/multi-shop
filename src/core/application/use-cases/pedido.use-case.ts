@@ -66,9 +66,22 @@ export class PedidoUseCase {
 
   async create(empresaId: string, data: CreatePedidoDTO): Promise<Result<{ id: string; numero_pedido: number }>> {
     try {
-      const clienteResult = await this.clienteRepo.findByTelefono(data.telefono, empresaId);
+      let clienteResult = await this.clienteRepo.findByTelefono(data.telefono, empresaId);
       if (!clienteResult.success) {
         return { success: false, error: clienteResult.error };
+      }
+
+      // Backward compatibility: if no match, try with "34" prefix for legacy 9-digit records
+      if (!clienteResult.data && data.telefono.length > 9) {
+        const withoutPrefix = data.telefono.replace(/^34/, '');
+        if (withoutPrefix !== data.telefono && withoutPrefix.length === 9) {
+          const legacyResult = await this.clienteRepo.findByTelefono(withoutPrefix, empresaId);
+          if (legacyResult.success && legacyResult.data) {
+            // Update the legacy record's phone to the new format
+            await this.clienteRepo.update(legacyResult.data.id, empresaId, { telefono: data.telefono });
+            clienteResult = legacyResult;
+          }
+        }
       }
 
       let clienteId: string | null = null;
