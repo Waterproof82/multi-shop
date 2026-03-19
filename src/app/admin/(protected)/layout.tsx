@@ -30,7 +30,7 @@ export default async function AdminProtectedLayout({
   return (
     <AdminThemeProvider>
       <EmpresaThemeProvider colores={empresa?.colores || null}>
-        <AdminProvider empresaId={empresaId} empresaNombre={empresa?.nombre || 'default'}>
+        <AdminProvider empresaId={empresaId} empresaNombre={empresa?.nombre || 'default'} empresaLogo={empresa?.logoUrl}>
           <div className="min-h-screen bg-muted">
             {/* Skip to main content link for accessibility */}
             <a

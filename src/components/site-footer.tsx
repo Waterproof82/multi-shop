@@ -1,6 +1,6 @@
 "use client"
 
-import { MapPin, Mail, Globe, MessageCircle } from "lucide-react"
+import { MapPin, Mail, Globe, Phone, Settings } from "lucide-react"
 import { useLanguage, type Language } from "@/lib/language-context"
 import type { EmpresaPublic } from "@/core/domain/entities/types"
 
@@ -124,12 +124,13 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
                 </li>
               )}
               {empresa.telefono && (() => {
-                const telefonoLimpio = empresa.telefono.replaceAll(/\D/g, '');
+                const telefonoDigits = empresa.telefono.replaceAll(/\D/g, '');
+                const telefonoDisplay = telefonoDigits.replace(/^(00|\+)?34/, '');
                 return (
                 <li className="flex items-center gap-3">
-                  <MessageCircle className="w-4 h-4 text-background/40 shrink-0" />
-                  <a href={`https://wa.me/${telefonoLimpio}`} target="_blank" rel="noopener noreferrer" className="text-sm text-background/75 hover:text-background transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm">
-                    {empresa.telefono}
+                  <Phone className="w-4 h-4 text-background/40 shrink-0" />
+                  <a href={`tel:${telefonoDigits}`} className="text-sm text-background/75 hover:text-background transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm">
+                    {telefonoDisplay}
                   </a>
                 </li>
                 );
@@ -173,9 +174,11 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
           <p>© {currentYear} {empresa.nombre}</p>
           <a
             href="/admin/login"
-            className="text-background/20 hover:text-background/75 transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm"
+            className="flex items-center gap-2 text-background/70 hover:text-background transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm"
+            aria-label="Acceder al panel de administración"
           >
-            Admin
+            <Settings className="w-4 h-4 text-primary" />
+            <span>Admin</span>
           </a>
         </div>
       </div>
