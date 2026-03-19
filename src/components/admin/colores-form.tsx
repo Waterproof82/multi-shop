@@ -105,7 +105,7 @@ export function ColoresForm({ coloresIniciales, empresaId }: ColoresFormProps) {
         <button
           type="submit"
           disabled={saving}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50 transition-opacity"
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px]"
         >
           {saving ? 'Guardando...' : 'Guardar colores'}
         </button>

@@ -48,7 +48,7 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
     setFormData(initialData);
   }, [initialData]);
 
-  const handleImageChange = async (url: string) => {
+  const handleImageChange = async (url = '') => {
     const newUrl = url || null;
     setFormData((prev) => ({ ...prev, url_image: newUrl }));
     setSaved(false);
@@ -62,7 +62,7 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
     }
   };
 
-  const handleLogoChange = async (url: string) => {
+  const handleLogoChange = async (url = '') => {
     const newUrl = url || null;
     setFormData((prev) => ({ ...prev, logo_url: newUrl }));
     setSaved(false);
@@ -76,7 +76,7 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSaving(true);
     try {
@@ -193,7 +193,7 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
         <button
           type="submit"
           disabled={saving}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50 transition-opacity"
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px]"
         >
           {saving ? 'Guardando...' : 'Guardar descripciones'}
         </button>

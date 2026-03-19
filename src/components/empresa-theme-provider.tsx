@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, ReactNode, useMemo } from 'react';
+import { useEffect, ReactNode, useMemo, useSyncExternalStore } from 'react';
 import { EmpresaColores } from '@/core/domain/entities/types';
 
 interface EmpresaThemeProviderProps {
@@ -14,32 +14,111 @@ function isValidHex(value: string): boolean {
   return HEX_COLOR_RE.test(value);
 }
 
-/**
- * Applies tenant brand colors to CSS custom properties.
- * Uses CSS native light-dark() for automatic dark mode handling.
- */
-export function EmpresaThemeProvider({ children, colores }: EmpresaThemeProviderProps) {
-  const [mounted, setMounted] = useState(false);
+function getSystemDarkMode(): boolean {
+  if (typeof globalThis === 'undefined') return false;
+  return globalThis.matchMedia('(prefers-color-scheme: dark)').matches;
+}
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+function subscribeToDarkMode(callback: () => void): () => void {
+  if (typeof globalThis === 'undefined') return () => {};
+  const mediaQuery = globalThis.matchMedia('(prefers-color-scheme: dark)');
+  mediaQuery.addEventListener('change', callback);
+  return () => mediaQuery.removeEventListener('change', callback);
+}
+
+function lightenColor(hex: string, percent: number): string {
+  const num = Number.parseInt(hex.replaceAll('#', ''), 16);
+  const amt = Math.round(2.55 * percent);
+  const R = Math.min(255, (num >> 16) + amt);
+  const G = Math.min(255, ((num >> 8) & 0x00ff) + amt);
+  const B = Math.min(255, (num & 0x0000ff) + amt);
+  return `#${(1 << 24 | R << 16 | G << 8 | B).toString(16).slice(1)}`;
+}
+
+function darkenColor(hex: string, percent: number): string {
+  const num = Number.parseInt(hex.replaceAll('#', ''), 16);
+  const amt = Math.round(2.55 * percent);
+  const R = Math.max(0, (num >> 16) - amt);
+  const G = Math.max(0, ((num >> 8) & 0x00ff) - amt);
+  const B = Math.max(0, (num & 0x0000ff) - amt);
+  return `#${(1 << 24 | R << 16 | G << 8 | B).toString(16).slice(1)}`;
+}
+
+function getLuminance(hex: string): number {
+  const rgb = hex.replaceAll('#', '').match(/.{2}/g)?.map(x => Number.parseInt(x, 16) / 255) || [0, 0, 0];
+  const [r, g, b] = rgb.map(c => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function isColorDark(hex: string): boolean {
+  return getLuminance(hex) < 0.5;
+}
+
+function adjustForDarkMode(hex: string, isDarkMode: boolean): string {
+  if (!isDarkMode) return hex;
+  const isDark = isColorDark(hex);
+  if (isDark) {
+    return lightenColor(hex, 15);
+  } else {
+    return darkenColor(hex, 15);
+  }
+}
+
+function adjustForegroundForBackground(foreground: string, background: string, isDarkMode: boolean): string {
+  const bgIsDark = isColorDark(background);
+  const fgIsDark = isColorDark(foreground);
+  
+  if (isDarkMode && !bgIsDark && fgIsDark) {
+    return darkenColor(foreground, 30);
+  }
+  if (!isDarkMode && bgIsDark && !fgIsDark) {
+    return lightenColor(foreground, 30);
+  }
+  return foreground;
+}
+
+export function EmpresaThemeProvider({ children, colores }: Readonly<EmpresaThemeProviderProps>) {
+  const isDarkMode = useSyncExternalStore(
+    subscribeToDarkMode,
+    getSystemDarkMode,
+    () => false
+  );
 
   const brandColors = useMemo(() => {
     if (!colores) return null;
 
+    const primary = colores.primary;
+    const secondary = colores.secondary;
+    const accent = colores.accent;
+    
+    const primaryForeground = adjustForegroundForBackground(
+      colores.primaryForeground,
+      primary,
+      isDarkMode
+    );
+    const secondaryForeground = adjustForegroundForBackground(
+      colores.secondaryForeground,
+      secondary,
+      isDarkMode
+    );
+    const accentForeground = adjustForegroundForBackground(
+      colores.accentForeground,
+      accent,
+      isDarkMode
+    );
+
     return {
-      primary: colores.primary,
-      primaryForeground: colores.primaryForeground,
-      secondary: colores.secondary,
-      secondaryForeground: colores.secondaryForeground,
-      accent: colores.accent,
-      accentForeground: colores.accentForeground,
+      primary: adjustForDarkMode(primary, isDarkMode),
+      primaryForeground,
+      secondary: adjustForDarkMode(secondary, isDarkMode),
+      secondaryForeground,
+      accent: adjustForDarkMode(accent, isDarkMode),
+      accentForeground,
     };
-  }, [colores]);
+  }, [colores, isDarkMode]);
 
   useEffect(() => {
-    if (!brandColors || !mounted) return;
+    if (!brandColors) return;
 
     const root = document.documentElement;
 
@@ -53,20 +132,20 @@ export function EmpresaThemeProvider({ children, colores }: EmpresaThemeProvider
       '--ring': brandColors.primary,
     };
 
-    const appliedProps: string[] = [];
     for (const [prop, value] of Object.entries(tokenMap)) {
-      if (!isValidHex(value)) continue;
-      root.style.setProperty(prop, value);
-      root.style.setProperty(`--color-${prop.slice(2)}`, value);
-      appliedProps.push(prop, `--color-${prop.slice(2)}`);
+      if (isValidHex(value)) {
+        root.style.setProperty(prop, value);
+        root.style.setProperty(`--color-${prop.slice(2)}`, value);
+      }
     }
 
     return () => {
-      for (const prop of appliedProps) {
+      const propsToRemove = Object.keys(tokenMap).flatMap(prop => [prop, `--color-${prop.slice(2)}`]);
+      for (const prop of propsToRemove) {
         root.style.removeProperty(prop);
       }
     };
-  }, [brandColors, mounted]);
+  }, [brandColors]);
 
   return <>{children}</>;
 }

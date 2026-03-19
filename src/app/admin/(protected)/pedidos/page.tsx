@@ -284,11 +284,8 @@ export default function PedidosPage() {
                   <Fragment key={pedido.id}>
                     <tr
                       className="hover:bg-muted/50 cursor-pointer"
-                      role="button"
-                      tabIndex={0}
                       aria-expanded={expandedPedido === pedido.id}
                       onClick={() => toggleExpand(pedido.id)}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExpand(pedido.id); } }}
                     >
                       <td className="px-4 py-3 whitespace-nowrap font-medium text-foreground">
                         #{pedido.numero_pedido}

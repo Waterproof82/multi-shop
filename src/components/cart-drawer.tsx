@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useCart, type Complement } from "@/lib/cart-context"
-import { useLanguage } from "@/lib/language-context"
+import { useLanguage, type Language } from "@/lib/language-context"
 import { t } from "@/lib/translations"
 import { COUNTRY_CODES, DEFAULT_COUNTRY_CODE } from "@/core/domain/constants/country-codes"
 import type { MenuItemVM } from "@/core/application/dtos/menu-view-model"
@@ -34,6 +34,27 @@ import type { MenuItemVM } from "@/core/application/dtos/menu-view-model"
 function getItemKey(item: MenuItemVM, complements?: Complement[]): string {
   const complementIds = complements?.map(c => c.id).sort().join(',') || '';
   return `${item.id}-${complementIds}`;
+}
+
+type TranslationKey = keyof typeof import('@/lib/translations').translations.es;
+type TranslateFn = (key: TranslationKey, language: Language) => string;
+
+function validateNameInput(name: string, translate: TranslateFn, language: Language): string | undefined {
+  const trimmed = name.trim();
+  if (!trimmed) return translate("validationNameRequired", language);
+  if (trimmed.length < 2) return translate("validationNameMin", language);
+  if (trimmed.length > 100) return translate("validationNameMax", language);
+  if (!/^[a-zA-ZÀ-ÿ\s'-]+$/u.test(trimmed)) return translate("validationNameFormat", language);
+  return undefined;
+}
+
+function validatePhoneInput(phone: string, translate: TranslateFn, language: Language): string | undefined {
+  const trimmed = phone.trim();
+  if (!trimmed) return translate("validationPhoneRequired", language);
+  const digitsOnly = trimmed.replaceAll(/\D/g, '');
+  if (digitsOnly.length < 9) return translate("validationPhoneMin", language);
+  if (digitsOnly.length > 15) return translate("validationPhoneMax", language);
+  return undefined;
 }
 
 function RippleButton({ children, onClick, className, disabled, variant = "default", size = "default", 'aria-label': ariaLabel, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "default" | "outline" | "ghost"; size?: "default" | "icon" }) {
@@ -92,7 +113,6 @@ export function CartDrawer() {
   const [sent, setSent] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [companyPhone, setCompanyPhone] = useState<string | null>(null)
-  const [orderNumber, setOrderNumber] = useState<number | null>(null)
   const [messageCopied, setMessageCopied] = useState(false)
   const [retryCountdown, setRetryCountdown] = useState<number | null>(null)
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -103,6 +123,16 @@ export function CartDrawer() {
   const [errors, setErrors] = useState<{ nombre?: string; telefono?: string }>({})
 
   const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  const getMobileDialogDescription = () => confirming ? t("sendingOrder", language) : t("whatsappCheck", language);
+  const dialogDescription = isMobile ? getMobileDialogDescription() : t("whatsappDesktopChoice", language);
+
+  const getRetryButtonLabel = () => {
+    if (retryCountdown === null) return t("whatsappDesktopApp", language);
+    if (retryCountdown > 0) return t("whatsappRetrying", language).replaceAll("{seconds}", String(retryCountdown));
+    return t("whatsappRetry", language);
+  };
+  const retryButtonText = getRetryButtonLabel();
 
   const buildWhatsAppUrls = (numero: string, mensaje: string) => {
     const numeroLimpio = numero.replaceAll(/\D/g, '');
@@ -183,7 +213,7 @@ export function CartDrawer() {
   const getWhatsAppWebUrl = (): string | null => {
     const link = (globalThis as Record<string, unknown>).__whatsappLink as string | undefined;
     if (!link) return null;
-    const match = link.match(/wa\.me\/(\d+)\?text=(.+)/);
+    const match = /wa\.me\/(\d+)\?text=(.+)/.exec(link);
     if (!match) return link;
     return `https://web.whatsapp.com/send?phone=${match[1]}&text=${match[2]}`;
   };
@@ -191,35 +221,17 @@ export function CartDrawer() {
   const handleConfirmOrder = useCallback(async () => {
     setErrors({});
     
-    const validateName = (name: string): string | undefined => {
-      const trimmed = name.trim();
-      if (!trimmed) return t("validationNameRequired", language);
-      if (trimmed.length < 2) return t("validationNameMin", language);
-      if (trimmed.length > 100) return t("validationNameMax", language);
-      if (!/^[a-zA-ZÀ-ÿ\s'-]+$/u.test(trimmed)) return t("validationNameFormat", language);
-      return undefined;
-    };
-
-    const validatePhone = (phone: string): string | undefined => {
-      const trimmed = phone.trim();
-      if (!trimmed) return t("validationPhoneRequired", language);
-      const digitsOnly = trimmed.replaceAll(/\D/g, '');
-      if (digitsOnly.length < 9) return t("validationPhoneMin", language);
-      if (digitsOnly.length > 15) return t("validationPhoneMax", language);
-      return undefined;
-    };
-    
-    const nombreError = validateName(nombre);
-    const telefonoError = validatePhone(telefono);
+    const nombreError = validateNameInput(nombre, t, language);
+    const telefonoError = validatePhoneInput(telefono, t, language);
     
     if (nombreError || telefonoError) {
       setErrors({ nombre: nombreError, telefono: telefonoError });
       return;
     }
 
-    const sanitizedNombre = nombre.trim().slice(0, 100);
     const selectedCountry = COUNTRY_CODES.find(c => c.code === countryCode);
     const dialCode = selectedCountry?.dialCode || '34';
+    const sanitizedNombre = nombre.trim().slice(0, 100);
     const sanitizedTelefono = dialCode + telefono.replaceAll(/\D/g, '').slice(0, 15);
     const sanitizedEmail = email.trim().toLowerCase().slice(0, 100);
 
@@ -250,22 +262,20 @@ export function CartDrawer() {
       });
       
       const data = await res.json();
-      console.log('[Pedido] Respuesta API:', { success: res.ok, numeroPedido: data.numeroPedido, hasWhatsappLink: !!data.whatsappLink });
       
       if (res.ok) {
         closeCart();
         setNombre('');
         setTelefono('');
         setEmail('');
-        setOrderNumber(data.numeroPedido || null);
         setCompanyPhone(data.companyPhone || null);
         
         if (data.whatsappLink) {
           (globalThis as Record<string, unknown>).__whatsappLink = data.whatsappLink;
-          const match = data.whatsappLink.match(/wa\.me\/(\d+)\?text=(.+)/);
-          if (match) {
-            const numero = match[1];
-            const mensaje = decodeURIComponent(match[2]);
+          const matchResult = data.whatsappLink.match(/wa\.me\/(\d+)\?text=(.+)/);
+          if (matchResult) {
+            const numero = matchResult[1];
+            const mensaje = decodeURIComponent(matchResult[2]);
             abrirWhatsApp(numero, mensaje);
           }
         }
@@ -282,18 +292,20 @@ export function CartDrawer() {
     }
   }, [nombre, telefono, countryCode, email, items, totalPrice, language, closeCart, abrirWhatsApp]);
 
+  const handleDialogClose = useCallback((open: boolean) => {
+    if (!open) {
+      setSent(false);
+      setConfirming(false);
+      setMessageCopied(false);
+      clearRetryTimers();
+      clearCart();
+      closeCart();
+    }
+  }, [clearRetryTimers, clearCart, closeCart]);
+
   return (
     <>
-      <Dialog open={sent} onOpenChange={(open) => {
-        if (!open) {
-          setSent(false)
-          setConfirming(false)
-          setMessageCopied(false)
-          clearRetryTimers()
-          clearCart()
-          closeCart()
-        }
-      }}>
+      <Dialog open={sent} onOpenChange={handleDialogClose}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-primary">
@@ -301,10 +313,7 @@ export function CartDrawer() {
               {t("sendingOrder", language)}
             </DialogTitle>
             <DialogDescription className="text-base">
-              {isMobile
-                ? (confirming ? t("sendingOrder", language) : t("whatsappCheck", language))
-                : t("whatsappDesktopChoice", language)
-              }
+              {dialogDescription}
             </DialogDescription>
             {confirming && companyPhone && (
               <p className="text-xs text-destructive mt-2 text-center">
@@ -331,12 +340,7 @@ export function CartDrawer() {
                     disabled={retryCountdown !== null && retryCountdown > 0}
                     className="w-full text-center bg-whatsapp text-primary-foreground py-3 px-4 rounded-full font-semibold hover:bg-whatsapp-hover transition-colors duration-150 disabled:opacity-70"
                   >
-                    {retryCountdown === null
-                      ? t("whatsappDesktopApp", language)
-                      : retryCountdown > 0
-                        ? t("whatsappRetrying", language).replace("{seconds}", String(retryCountdown))
-                        : t("whatsappRetry", language)
-                    }
+                    {retryButtonText}
                   </button>
                   <a
                     href={getWhatsAppWebUrl()!}
@@ -361,10 +365,10 @@ export function CartDrawer() {
                 {t("whatsappCantSend", language)}
               </p>
               <a
-                href={`tel:${companyPhone.replace(/\D/g, '')}`}
+                href={`tel:${companyPhone.replaceAll(/\D/g, '')}`}
                 className="block text-2xl font-bold mt-2 tracking-wide hover:opacity-80 transition-opacity"
               >
-                {companyPhone.replace(/\D/g, '').replace(/^34/, '')}
+                {companyPhone.replaceAll(/\D/g, '').slice(2)}
               </a>
             </div>
           )}

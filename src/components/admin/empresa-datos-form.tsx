@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Instagram, Facebook, MapPin, Phone, Mail, Link as LinkIcon } from 'lucide-react';
+import { MapPin, Phone, Mail, Link as LinkIcon, Users, Camera } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 
 interface EmpresaDatosFormProps {
@@ -29,7 +29,7 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
     setSaved(false);
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSaving(true);
 
@@ -66,8 +66,9 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
             onChange={(e) => handleChange('email_notification', e.target.value)}
             placeholder="pedidos@tuempresa.com"
             className="px-3 py-2 border rounded-md bg-card border-border text-foreground text-sm"
+            aria-describedby="email_notification_help"
           />
-          <span className="text-xs text-muted-foreground">Recibirás los pedidos nuevos en este email</span>
+          <span id="email_notification_help" className="text-xs text-muted-foreground">Recibirás los pedidos nuevos en este email</span>
         </div>
 
         {/* WhatsApp */}
@@ -108,7 +109,7 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
         {/* Facebook */}
         <div className="flex flex-col gap-2">
           <label htmlFor="fb" className="text-sm font-medium text-foreground flex items-center gap-2">
-            <Facebook className="w-4 h-4" />
+            <Users className="w-4 h-4" />
             Facebook
           </label>
           <input
@@ -125,7 +126,7 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
         {/* Instagram */}
         <div className="flex flex-col gap-2">
           <label htmlFor="instagram" className="text-sm font-medium text-foreground flex items-center gap-2">
-            <Instagram className="w-4 h-4" />
+            <Camera className="w-4 h-4" />
             Instagram
           </label>
           <input
