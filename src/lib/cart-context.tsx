@@ -51,7 +51,10 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [isCartOpen, setIsCartOpen] = useState(false)
   const [lastAddedItem, setLastAddedItem] = useState<AddedItemInfo | null>(null)
 
-  const openCart = useCallback(() => setIsCartOpen(true), [])
+  const openCart = useCallback(() => {
+    setLastAddedItem(null);
+    setIsCartOpen(true);
+  }, [])
   const closeCart = useCallback(() => setIsCartOpen(false), [])
 
   const addItem = useCallback((item: MenuItemVM, quantity = 1, selectedComplements?: Complement[]) => {
@@ -78,6 +81,7 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
   }, [])
 
   const removeItem = useCallback((itemKey: string) => {
+    setLastAddedItem(null);
     setItems((prev) => {
       const next = prev.map(ci => 
         getItemKey(ci.item, ci.selectedComplements) === itemKey 
@@ -87,9 +91,6 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
       setTimeout(() => {
         setItems(prev => {
           const filtered = prev.filter((ci) => getItemKey(ci.item, ci.selectedComplements) !== itemKey);
-          if (filtered.length === 0) {
-            setLastAddedItem(null);
-          }
           return filtered;
         });
       }, 200);
@@ -98,6 +99,7 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
   }, [])
 
   const updateQuantity = useCallback((itemKey: string, quantity: number) => {
+    setLastAddedItem(null);
     if (quantity <= 0) {
       setItems((prev) => {
         const next = prev.map(ci => 
@@ -108,9 +110,6 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
         setTimeout(() => {
           setItems(prev => {
             const filtered = prev.filter((ci) => getItemKey(ci.item, ci.selectedComplements) !== itemKey);
-            if (filtered.length === 0) {
-              setLastAddedItem(null);
-            }
             return filtered;
           });
         }, 200);
