@@ -6,6 +6,7 @@ import { Users, Mail, FileText, Send, CheckCircle, Image as ImageIcon, Loader2 }
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { fetchWithCsrf, getCsrfToken } from '@/lib/csrf-client';
+import { logClientError } from '@/lib/client-error';
 
 interface Cliente {
   id: string;
@@ -104,7 +105,7 @@ export default function PromocionesPage() {
           setPromociones(data.promociones || []);
         }
       } catch (error) {
-        console.error('Error fetching data:', error);
+        logClientError(error, 'fetchData');
       } finally {
         // Data loaded
       }
@@ -188,7 +189,7 @@ export default function PromocionesPage() {
         setTimeout(() => setShowSuccess(false), 3000);
       }
     } catch (error) {
-      console.error('Error creating promocion:', error);
+      logClientError(error, 'handleCreatePromocion');
       alert('Error al crear la promoción');
     } finally {
       setSavingPromo(false);

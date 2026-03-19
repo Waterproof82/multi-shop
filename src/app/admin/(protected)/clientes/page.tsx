@@ -12,6 +12,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { fetchWithCsrf } from '@/lib/csrf-client';
+import { logClientError } from '@/lib/client-error';
 
 interface Cliente {
   id: string;
@@ -48,7 +49,7 @@ export default function ClientesPage() {
         }
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') return;
-        console.error('Error fetching clientes:', error);
+        logClientError(error, 'fetchClientes');
         setError('Error de conexión. Verifica tu conexión a internet.');
       } finally {
         setLoading(false);
@@ -82,7 +83,7 @@ export default function ClientesPage() {
         ));
       }
     } catch (error) {
-      console.error('Error updating cliente:', error);
+      logClientError(error, 'handleTogglePromociones');
     }
   };
 
@@ -140,7 +141,7 @@ export default function ClientesPage() {
         closeEditModal();
       }
     } catch (error) {
-      console.error('Error saving cliente:', error);
+      logClientError(error, 'handleUpdateCliente');
     } finally {
       setSaving(false);
     }
@@ -167,7 +168,7 @@ export default function ClientesPage() {
         closeCreateModal();
       }
     } catch (error) {
-      console.error('Error creating cliente:', error);
+      logClientError(error, 'handleCreateCliente');
     } finally {
       setSaving(false);
     }
@@ -187,7 +188,7 @@ export default function ClientesPage() {
         setClientes(prev => prev.filter(c => c.id !== id));
       }
     } catch (error) {
-      console.error('Error deleting cliente:', error);
+      logClientError(error, 'handleDeleteCliente');
     } finally {
       setSaving(false);
     }

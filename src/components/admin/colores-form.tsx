@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Loader2 } from 'lucide-react';
 import { EmpresaColores } from '@/core/domain/entities/types';
 import { DEFAULT_EMPRESA_COLORES } from '@/core/domain/constants/empresa-defaults';
 import { fetchWithCsrf } from '@/lib/csrf-client';
+import { logClientError } from '@/lib/client-error';
 
 interface ColoresFormProps {
   readonly coloresIniciales: EmpresaColores | null;
@@ -54,7 +56,7 @@ export function ColoresForm({ coloresIniciales, empresaId }: ColoresFormProps) {
         globalThis.location.reload();
       }
     } catch (error) {
-      console.error('Error guardando colores:', error);
+      logClientError(error, 'handleSubmit');
     } finally {
       setSaving(false);
     }
@@ -105,8 +107,9 @@ export function ColoresForm({ coloresIniciales, empresaId }: ColoresFormProps) {
         <button
           type="submit"
           disabled={saving}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px]"
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px] flex items-center gap-2"
         >
+          {saving && <Loader2 className="h-4 w-4 animate-spin" />}
           {saving ? 'Guardando...' : 'Guardar colores'}
         </button>
         {saved && (

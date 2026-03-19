@@ -10,6 +10,8 @@ import { useCart } from "@/lib/cart-context";
 import { useLanguage } from "@/lib/language-context";
 import type { EmpresaPublic } from "@/core/domain/entities/types";
 
+const SCROLL_OFFSET_PX = 140;
+
 interface SiteHeaderClientProps {
   readonly showCart: boolean;
   readonly empresa?: EmpresaPublic | null;
@@ -44,8 +46,7 @@ export function SiteHeaderClient({ showCart, empresa }: SiteHeaderClientProps) {
   const scrollToFirstCategory = () => {
     const firstSection = document.querySelector("section[id]");
     if (firstSection) {
-      const offset = 140;
-      const top = firstSection.getBoundingClientRect().top + window.scrollY - offset;
+      const top = firstSection.getBoundingClientRect().top + window.scrollY - SCROLL_OFFSET_PX;
       window.scrollTo({ top, behavior: "smooth" });
     }
   };

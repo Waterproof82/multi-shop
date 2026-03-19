@@ -6,6 +6,7 @@ import { ShoppingBag, Users, Package, TrendingUp, ArrowRight, Clock } from 'luci
 import type { MenuCategoryVM } from '@/core/application/dtos/menu-view-model';
 import { PEDIDO_ESTADO_LABELS, PEDIDO_ESTADO_COLORS } from '@/core/domain/constants/pedido';
 import type { PedidoEstado } from '@/core/domain/constants/pedido';
+import { formatPrice } from '@/lib/format-price';
 
 export default async function AdminDashboard() {
   const cookieStore = await cookies();
@@ -60,10 +61,6 @@ export default async function AdminDashboard() {
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 5);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount);
-  };
-
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString('es-ES', { 
@@ -91,7 +88,7 @@ export default async function AdminDashboard() {
             </div>
             <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
               <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
-              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{formatCurrency(stats?.totalMes || 0)}</span>
+              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{formatPrice(stats?.totalMes || 0)}</span>
               <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Ventas mes</p>
             </div>
             <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
@@ -154,7 +151,7 @@ export default async function AdminDashboard() {
                   <p className="text-sm text-muted-foreground truncate">{pedido.clientes?.nombre || 'Cliente'} • {pedido.clientes?.telefono || 'Sin teléfono'}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-semibold text-foreground">{formatCurrency(pedido.total)}</p>
+                  <p className="font-semibold text-foreground">{formatPrice(pedido.total)}</p>
                   <p className="text-xs text-muted-foreground">{formatDate(pedido.created_at)}</p>
                 </div>
               </div>

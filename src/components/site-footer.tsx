@@ -174,7 +174,7 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
           <p>© {currentYear} {empresa.nombre}</p>
           <a
             href="/admin/login"
-            className="flex items-center gap-2 text-background/70 hover:text-background transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm"
+            className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm"
             aria-label="Acceder al panel de administración"
           >
             <Settings className="w-4 h-4 text-primary" />

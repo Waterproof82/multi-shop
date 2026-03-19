@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, memo, useCallback } from "react"
+import Image from "next/image"
 import { motion, useReducedMotion } from "framer-motion"
 import { ChevronRight } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -13,6 +14,7 @@ import {
 } from "@/components/ui/dialog"
 import { useLanguage, type Language } from "@/lib/language-context"
 import { t } from "@/lib/translations"
+import { formatPrice } from "@/lib/format-price"
 import { MenuCategoryVM, MenuItemVM, MenuSubcategoryVM } from "@/core/application/dtos/menu-view-model"
 import { QuantitySelectorDialog } from "@/components/quantity-selector-dialog"
 
@@ -262,13 +264,15 @@ function CardMedia({ item, displayName, priority, onError }: Readonly<{
     );
   }
   return (
-    <img
+    <Image
       src={item.image!}
       alt={displayName}
-      className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 md:group-hover:scale-105 will-change-transform"
+      fill
+      className="object-cover transition-transform duration-300 md:group-hover:scale-105 will-change-transform"
       loading={priority ? "eager" : "lazy"}
-      decoding="async"
+      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
       onError={onError}
+      unoptimized
     />
   );
 }
@@ -354,7 +358,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
         )}
         <div className="flex items-center justify-between gap-3 pt-3 mt-auto border-t border-border/50">
           <span className="text-lg font-bold text-foreground tabular-nums">
-            {item.price.toFixed(2).replace(".", ",")}€
+            {formatPrice(item.price)}
           </span>
           {showCart && (
             <button
@@ -376,7 +380,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
               <span className="break-words">{complementLabel}</span>
               {minComplementPrice > 0 && (
                 <span className="ml-1.5 text-foreground/70 font-medium whitespace-nowrap">
-                  {t("from", safeLanguage)} +{minComplementPrice.toFixed(2).replace(".", ",")}€
+                  {t("from", safeLanguage)} +{formatPrice(minComplementPrice)}
                 </span>
               )}
             </span>
@@ -446,7 +450,7 @@ function ItemDetailDialog(props: Readonly<{
                     )}
                   </div>
                   <span className="font-semibold text-sm shrink-0 ml-3">
-                    +{comp.price.toFixed(2).replace(".", ",")}€
+                    +{formatPrice(comp.price)}
                   </span>
                 </div>
               );

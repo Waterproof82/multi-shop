@@ -13,6 +13,8 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { fetchWithCsrf } from '@/lib/csrf-client';
+import { formatPrice } from '@/lib/format-price';
+import { logClientError } from '@/lib/client-error';
 
 interface Cliente {
   nombre: string | null;
@@ -52,7 +54,7 @@ export default function PedidosPage() {
         }
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') return;
-        console.error('Error fetching pedidos:', error);
+        logClientError(error, 'fetchPedidos');
       } finally {
         setLoading(false);
       }
@@ -120,7 +122,7 @@ export default function PedidosPage() {
         setPedidos(prev => prev.map(p => p.id === id ? { ...p, estado: nuevoEstado } : p));
       }
     } catch (error) {
-      console.error('Error updating estado:', error);
+      logClientError(error, 'updateEstado');
     }
   }, []);
 
@@ -139,14 +141,10 @@ export default function PedidosPage() {
         setPedidos(pedidos.filter(p => p.id !== deleteConfirm.id));
       }
     } catch (error) {
-      console.error('Error deleting pedido:', error);
+      logClientError(error, 'confirmDelete');
     } finally {
       setDeleteConfirm({ show: false, id: null, numero: null });
     }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount);
   };
 
   const stats = useMemo(() => {
@@ -189,7 +187,7 @@ export default function PedidosPage() {
               <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Hoy</p>
             </div>
             <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
-              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{formatCurrency(stats.totalHoy)}</span>
+              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{formatPrice(stats.totalHoy)}</span>
               <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Ventas hoy</p>
             </div>
             <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
@@ -198,7 +196,7 @@ export default function PedidosPage() {
               <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Este mes</p>
             </div>
             <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
-              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{formatCurrency(stats.totalMes)}</span>
+              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{formatPrice(stats.totalMes)}</span>
               <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Ventas mes</p>
             </div>
           </div>
@@ -297,7 +295,7 @@ export default function PedidosPage() {
                         {pedido.clientes?.telefono || '-'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap font-medium text-foreground">
-                        {pedido.total.toFixed(2)} {pedido.moneda || '€'}
+                        {formatPrice(pedido.total)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         {getEstadoBadge(pedido.estado, pedido.id)}
@@ -331,12 +329,12 @@ export default function PedidosPage() {
                                   <li key={item.nombre + '-' + item.cantidad} className="flex flex-col">
                                     <div className="flex justify-between">
                                       <span>{item.cantidad}x {item.nombre}</span>
-                                      <span className="font-medium">{itemTotal.toFixed(2)}€</span>
+                                      <span className="font-medium">{formatPrice(itemTotal)}</span>
                                     </div>
                                     {item.complementos && item.complementos.length > 0 && (
                                       <ul className="ml-4 mt-1 text-xs text-muted-foreground">
                                         {item.complementos.map((comp: PedidoComplemento) => (
-                                          <li key={comp.nombre || comp.name}>+ {comp.nombre || comp.name} ({(comp.precio || comp.price || 0).toFixed(2)}€)</li>
+                                          <li key={comp.nombre || comp.name}>+ {comp.nombre || comp.name} ({formatPrice(comp.precio || comp.price || 0)})</li>
                                         ))}
                                       </ul>
                                     )}

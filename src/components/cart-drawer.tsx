@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useCallback, useRef, useEffect } from "react"
-import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail } from "lucide-react"
+import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, Check } from "lucide-react"
+import { useReducedMotion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -28,6 +29,7 @@ import {
 import { useCart, type Complement } from "@/lib/cart-context"
 import { useLanguage, type Language } from "@/lib/language-context"
 import { t } from "@/lib/translations"
+import { formatPrice } from "@/lib/format-price"
 import { COUNTRY_CODES, DEFAULT_COUNTRY_CODE } from "@/core/domain/constants/country-codes"
 import type { MenuItemVM } from "@/core/application/dtos/menu-view-model"
 
@@ -109,6 +111,7 @@ export function CartDrawer() {
     closeCart 
   } = useCart()
   const { language } = useLanguage()
+  const shouldReduceMotion = useReducedMotion() ?? false
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -285,7 +288,6 @@ export function CartDrawer() {
         setErrors({ nombre: data.error || t("validationOrderError", language) });
       }
     } catch (err) {
-      console.error('Error:', err);
       setErrors({ nombre: t("connectionError", language) });
     } finally {
       setSending(false);
@@ -309,7 +311,7 @@ export function CartDrawer() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-primary">
-              <span className="text-2xl">✓</span>
+              <Check className="w-6 h-6" />
               {t("sendingOrder", language)}
             </DialogTitle>
             <DialogDescription className="text-base">
@@ -397,7 +399,7 @@ export function CartDrawer() {
 
         {items.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 text-muted-foreground">
-            <div className="relative animate-empty-float">
+            <div className={`relative ${!shouldReduceMotion ? 'animate-empty-float' : ''}`}>
               <ShoppingBag className="size-12 opacity-20" />
               <span className="absolute inset-0 flex items-center justify-center text-2xl opacity-30">+</span>
             </div>
@@ -406,7 +408,7 @@ export function CartDrawer() {
             <button
               onClick={() => {
                 closeCart();
-                document.getElementById('menu')?.scrollIntoView({ behavior: 'smooth' });
+                document.getElementById('menu')?.scrollIntoView({ behavior: shouldReduceMotion ? 'auto' : 'smooth' });
               }}
               className="mt-2 px-6 py-3 bg-primary text-primary-foreground rounded-full font-medium hover:bg-primary/90 transition-colors min-h-[44px]"
             >
@@ -442,7 +444,7 @@ export function CartDrawer() {
                           </p>
                         )}
                         <p className="text-sm text-muted-foreground">
-                          {totalItemPrice.toFixed(2).replace(".", ",")}{"€"}
+                          {formatPrice(totalItemPrice)}
                         </p>
                       </div>
 
@@ -560,7 +562,7 @@ export function CartDrawer() {
               <div className="mb-4 flex items-center justify-between px-2">
                 <span className="text-lg font-semibold text-foreground">{t("total", language)}</span>
                 <span className="text-2xl font-bold text-foreground tabular-nums animate-price-update" key={totalPrice}>
-                  {totalPrice.toFixed(2).replace(".", ",") + "€"}
+                  {formatPrice(totalPrice)}
                 </span>
               </div>
 
