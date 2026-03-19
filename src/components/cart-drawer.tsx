@@ -87,7 +87,6 @@ export function CartDrawer() {
   const [orderNumber, setOrderNumber] = useState<number | null>(null)
   const [messageCopied, setMessageCopied] = useState(false)
   const [retryCountdown, setRetryCountdown] = useState<number | null>(null)
-  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [nombre, setNombre] = useState('')
   const [telefono, setTelefono] = useState('')
@@ -126,10 +125,6 @@ export function CartDrawer() {
   }, [isMobile]);
 
   const clearRetryTimers = useCallback(() => {
-    if (retryTimerRef.current) {
-      clearTimeout(retryTimerRef.current);
-      retryTimerRef.current = null;
-    }
     if (countdownRef.current) {
       clearInterval(countdownRef.current);
       countdownRef.current = null;
@@ -141,11 +136,17 @@ export function CartDrawer() {
     const link = (globalThis as Record<string, unknown>).__whatsappLink as string | undefined;
     if (!link) return;
 
+    // Si hay countdown activo, es un reintento del usuario (app ya caliente)
+    if (retryCountdown !== null) {
+      clearRetryTimers();
+      globalThis.open(link, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
     // Primer intento: abre wa.me (puede fallar por cold start)
     globalThis.open(link, '_blank', 'noopener,noreferrer');
 
-    // Programar UN reintento a los 10s (la app ya estará activa)
-    clearRetryTimers();
+    // Cuenta atrás de 10s → al terminar el botón cambia a "Reintentar"
     const retryDelay = 10;
     setRetryCountdown(retryDelay);
 
@@ -154,23 +155,16 @@ export function CartDrawer() {
         if (prev === null || prev <= 1) {
           if (countdownRef.current) clearInterval(countdownRef.current);
           countdownRef.current = null;
-          return null;
+          return 0;
         }
         return prev - 1;
       });
     }, 1000);
-
-    retryTimerRef.current = setTimeout(() => {
-      // Segundo intento: la app ya arrancó, ahora sí captura los params
-      globalThis.open(link, '_blank', 'noopener,noreferrer');
-      retryTimerRef.current = null;
-    }, retryDelay * 1000);
-  }, [clearRetryTimers]);
+  }, [clearRetryTimers, retryCountdown]);
 
   // Limpiar timers al desmontar
   useEffect(() => {
     return () => {
-      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
       if (countdownRef.current) clearInterval(countdownRef.current);
     };
   }, []);
@@ -326,12 +320,14 @@ export function CartDrawer() {
                   <button
                     type="button"
                     onClick={handleOpenInApp}
-                    disabled={retryCountdown !== null}
+                    disabled={retryCountdown !== null && retryCountdown > 0}
                     className="w-full text-center bg-whatsapp text-primary-foreground py-3 px-4 rounded-full font-semibold hover:bg-whatsapp-hover transition-colors duration-150 disabled:opacity-70"
                   >
-                    {retryCountdown !== null
-                      ? t("whatsappRetrying", language).replace("{seconds}", String(retryCountdown))
-                      : t("whatsappDesktopApp", language)
+                    {retryCountdown === null
+                      ? t("whatsappDesktopApp", language)
+                      : retryCountdown > 0
+                        ? t("whatsappRetrying", language).replace("{seconds}", String(retryCountdown))
+                        : t("whatsappRetry", language)
                     }
                   </button>
                   <a
