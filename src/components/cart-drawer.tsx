@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useRef } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -86,6 +86,9 @@ export function CartDrawer() {
   const [companyPhone, setCompanyPhone] = useState<string | null>(null)
   const [orderNumber, setOrderNumber] = useState<number | null>(null)
   const [messageCopied, setMessageCopied] = useState(false)
+  const [retryCountdown, setRetryCountdown] = useState<number | null>(null)
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [nombre, setNombre] = useState('')
   const [telefono, setTelefono] = useState('')
   const [email, setEmail] = useState('')
@@ -121,6 +124,56 @@ export function CartDrawer() {
       // con opciones para que el usuario elija (wa.me o WhatsApp Web)
     }
   }, [isMobile]);
+
+  const clearRetryTimers = useCallback(() => {
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+    setRetryCountdown(null);
+  }, []);
+
+  const handleOpenInApp = useCallback(() => {
+    const link = (globalThis as Record<string, unknown>).__whatsappLink as string | undefined;
+    if (!link) return;
+
+    // Primer intento: abre wa.me (puede fallar por cold start)
+    globalThis.open(link, '_blank', 'noopener,noreferrer');
+
+    // Programar UN reintento a los 10s (la app ya estará activa)
+    clearRetryTimers();
+    const retryDelay = 10;
+    setRetryCountdown(retryDelay);
+
+    countdownRef.current = setInterval(() => {
+      setRetryCountdown(prev => {
+        if (prev === null || prev <= 1) {
+          if (countdownRef.current) clearInterval(countdownRef.current);
+          countdownRef.current = null;
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    retryTimerRef.current = setTimeout(() => {
+      // Segundo intento: la app ya arrancó, ahora sí captura los params
+      globalThis.open(link, '_blank', 'noopener,noreferrer');
+      retryTimerRef.current = null;
+    }, retryDelay * 1000);
+  }, [clearRetryTimers]);
+
+  // Limpiar timers al desmontar
+  useEffect(() => {
+    return () => {
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  }, []);
 
   const getWhatsAppUrl = (): string | null => {
     const link = (globalThis as Record<string, unknown>).__whatsappLink as string | undefined;
@@ -234,6 +287,7 @@ export function CartDrawer() {
           setSent(false)
           setConfirming(false)
           setMessageCopied(false)
+          clearRetryTimers()
           clearCart()
           closeCart()
         }
@@ -269,14 +323,17 @@ export function CartDrawer() {
                 </a>
               ) : (
                 <div className="flex flex-col gap-2">
-                  <a
-                    href={getWhatsAppUrl()!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block w-full text-center bg-whatsapp text-primary-foreground py-3 px-4 rounded-full font-semibold hover:bg-whatsapp-hover transition-colors duration-150"
+                  <button
+                    type="button"
+                    onClick={handleOpenInApp}
+                    disabled={retryCountdown !== null}
+                    className="w-full text-center bg-whatsapp text-primary-foreground py-3 px-4 rounded-full font-semibold hover:bg-whatsapp-hover transition-colors duration-150 disabled:opacity-70"
                   >
-                    {t("whatsappDesktopApp", language)}
-                  </a>
+                    {retryCountdown !== null
+                      ? t("whatsappRetrying", language).replace("{seconds}", String(retryCountdown))
+                      : t("whatsappDesktopApp", language)
+                    }
+                  </button>
                   <a
                     href={getWhatsAppWebUrl()!}
                     target="_blank"
