@@ -8,7 +8,7 @@ export const createClienteSchema = z.object({
   direccion: z.string().optional().nullable(),
 });
 
-// Update schema - no requiere empresaId
+// Update schema - does not require empresaId
 export const updateClienteSchema = z.object({
   id: z.string().uuid(),
   nombre: z.string().optional().nullable(),

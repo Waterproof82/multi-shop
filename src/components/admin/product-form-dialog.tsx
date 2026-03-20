@@ -11,6 +11,8 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { useLanguage } from '@/lib/language-context';
+import { t } from '@/lib/translations';
 
 interface Categoria {
   id: string;
@@ -111,6 +113,7 @@ export function ProductFormDialog({
   onSubmit,
   empresaSlug,
 }: Readonly<ProductFormDialogProps>) {
+  const { language } = useLanguage();
   const handleClose = () => onOpenChange(false);
 
   const handleSelectChange = (value: string) => {
@@ -124,7 +127,7 @@ export function ProductFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{editingId ? 'Editar Producto' : 'Nuevo Producto'}</DialogTitle>
+          <DialogTitle>{editingId ? t("editProduct", language) : t("newProductDialog", language)}</DialogTitle>
           <DialogDescription>
             {editingId ? 'Modifica los datos del producto.' : 'Rellena los datos para crear un producto.'}
           </DialogDescription>

@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { fetchWithCsrf, getCsrfToken } from '@/lib/csrf-client';
 import { logClientError } from '@/lib/client-error';
+import { useLanguage } from '@/lib/language-context';
+import { t } from '@/lib/translations';
 
 interface Cliente {
   id: string;
@@ -24,7 +26,7 @@ interface Promocion {
   created_at: string;
 }
 
-// Optimizar imagen antes de subir (reduce a 480x480, WebP, 80% calidad)
+// Optimize image before upload (resize to 480x480, WebP, 80% quality)
 const MAX_WIDTH = 480;
 const MAX_HEIGHT = 480;
 const QUALITY = 0.8;
@@ -78,6 +80,7 @@ async function optimizeImage(file: File): Promise<{ file: File; type: string }> 
 }
 
 export default function PromocionesPage() {
+  const { language } = useLanguage();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [promociones, setPromociones] = useState<Promocion[]>([]);
   const [savingPromo, setSavingPromo] = useState(false);
@@ -118,9 +121,9 @@ export default function PromocionesPage() {
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // El archivo se optimizará antes de subir, pero advertimos si es muy grande
+      // The file will be optimized before upload, but warn if too large
       if (file.size > 10 * 1024 * 1024) {
-        alert('La imagen se optimizará automáticamente antes de subir.');
+        alert('The image will be optimized automatically before uploading.');
       }
       setSelectedImage(file);
       // Create preview URL
@@ -140,12 +143,12 @@ export default function PromocionesPage() {
     
     setSavingPromo(true);
     try {
-      // Upload image to R2 if selected (optimizada)
+      // Upload image to R2 if selected (optimized)
       let imagenUrl: string | null = null;
       if (selectedImage) {
         setUploadingImage(true);
         try {
-          // Optimizar imagen antes de subir
+          // Optimize image before upload
           const optimized = await optimizeImage(selectedImage);
           
           const formData = new FormData();
@@ -224,7 +227,7 @@ export default function PromocionesPage() {
       <div className="bg-card rounded-lg border shadow-elegant p-6">
         <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
           <Send className="w-5 h-5" />
-          Nueva Promoción
+          {t("newPromotion", language)}
         </h2>
         
         <div className="space-y-4">

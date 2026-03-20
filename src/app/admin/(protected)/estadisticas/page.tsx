@@ -6,6 +6,8 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, LineChart, Line } from 'recharts';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { logClientError } from '@/lib/client-error';
+import { useLanguage } from '@/lib/language-context';
+import { t } from '@/lib/translations';
 
 interface Stats {
   pedidosHoy: number;
@@ -52,6 +54,7 @@ function getChartColors(): string[] {
 }
 
 export default function EstadisticasPage() {
+  const { language } = useLanguage();
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState({ mes: new Date().getMonth(), año: new Date().getFullYear() });
@@ -110,7 +113,7 @@ export default function EstadisticasPage() {
   if (loading) {
     return (
       <div className="pt-16 lg:pt-0 px-6 lg:px-8 flex items-center justify-center min-h-[50vh]">
-        <div className="text-muted-foreground">Cargando...</div>
+        <div className="text-muted-foreground">{t("loading", language)}</div>
       </div>
     );
   }

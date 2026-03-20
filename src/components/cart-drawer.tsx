@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useCart, type Complement } from "@/lib/cart-context"
+import { useCart, type Complement, type CartItem } from "@/lib/cart-context"
 import { useLanguage, type Language } from "@/lib/language-context"
 import { t } from "@/lib/translations"
 import { formatPrice } from "@/lib/format-price"
@@ -100,6 +100,56 @@ function RippleButton({ children, onClick, className, disabled, variant = "defau
   );
 }
 
+interface OrderFormData {
+  nombre: string;
+  telefono: string;
+  countryCode: string;
+  email: string;
+  items: CartItem[];
+  totalPrice: number;
+  language: Language;
+}
+
+function validateAndBuildOrderData(
+  formData: OrderFormData,
+  translate: TranslateFn
+): { valid: true; data: Record<string, unknown> } | { valid: false; errors: { nombre?: string; telefono?: string } } {
+  const { nombre, telefono, countryCode, email, items, totalPrice, language } = formData;
+  
+  const nombreError = validateNameInput(nombre, translate, language);
+  const telefonoError = validatePhoneInput(telefono, translate, language);
+  
+  if (nombreError || telefonoError) {
+    return { valid: false, errors: { nombre: nombreError, telefono: telefonoError } };
+  }
+
+  const selectedCountry = COUNTRY_CODES.find(c => c.code === countryCode);
+  const dialCode = selectedCountry?.dialCode || '34';
+  
+  return {
+    valid: true,
+    data: {
+      items: items.map(ci => ({
+        item: {
+          id: ci.item.id,
+          name: (language !== 'es' && ci.item.translations?.[language]?.name) || ci.item.name,
+          price: ci.item.price,
+          translations: ci.item.translations,
+        },
+        quantity: ci.quantity,
+        selectedComplements: ci.selectedComplements?.map(c => ({
+          name: c.name,
+          price: c.price,
+        })),
+      })),
+      total: totalPrice,
+      nombre: nombre.trim().slice(0, 100),
+      telefono: dialCode + telefono.replaceAll(/\D/g, '').slice(0, 15),
+      email: email.trim().toLowerCase().slice(0, 100),
+    },
+  };
+}
+
 export function CartDrawer() {
   const { 
     items, 
@@ -127,15 +177,18 @@ export function CartDrawer() {
 
   const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-  const getMobileDialogDescription = () => confirming ? t("sendingOrder", language) : t("whatsappCheck", language);
-  const dialogDescription = isMobile ? getMobileDialogDescription() : t("whatsappDesktopChoice", language);
+  const getDialogDescription = useCallback(() => {
+    if (isMobile) {
+      return confirming ? t("sendingOrder", language) : t("whatsappCheck", language);
+    }
+    return t("whatsappDesktopChoice", language);
+  }, [isMobile, confirming, language]);
 
-  const getRetryButtonLabel = () => {
+  const getRetryButtonText = useCallback(() => {
     if (retryCountdown === null) return t("whatsappDesktopApp", language);
     if (retryCountdown > 0) return t("whatsappRetrying", language).replaceAll("{seconds}", String(retryCountdown));
     return t("whatsappRetry", language);
-  };
-  const retryButtonText = getRetryButtonLabel();
+  }, [retryCountdown, language]);
 
   const buildWhatsAppUrls = (numero: string, mensaje: string) => {
     const numeroLimpio = numero.replaceAll(/\D/g, '');
@@ -158,8 +211,8 @@ export function CartDrawer() {
       } catch {
         // Clipboard API not available, continue without copy
       }
-      // No abrimos automáticamente en desktop — mostramos el diálogo
-      // con opciones para que el usuario elija (wa.me o WhatsApp Web)
+      // Don't auto-open on desktop — show dialog with options
+      // for user to choose (wa.me or WhatsApp Web)
     }
   }, [isMobile]);
 
@@ -175,17 +228,17 @@ export function CartDrawer() {
     const link = (globalThis as Record<string, unknown>).__whatsappLink as string | undefined;
     if (!link) return;
 
-    // Si hay countdown activo, es un reintento del usuario (app ya caliente)
+    // If countdown is active, this is a retry (app already warm)
     if (retryCountdown !== null) {
       clearRetryTimers();
       globalThis.open(link, '_blank', 'noopener,noreferrer');
       return;
     }
 
-    // Primer intento: abre wa.me (puede fallar por cold start)
+    // First attempt: opens wa.me (may fail due to cold start)
     globalThis.open(link, '_blank', 'noopener,noreferrer');
 
-    // Cuenta atrás de 10s → al terminar el botón cambia a "Reintentar"
+    // 10s countdown → when done, button changes to "Retry"
     const retryDelay = 10;
     setRetryCountdown(retryDelay);
 
@@ -224,44 +277,19 @@ export function CartDrawer() {
   const handleConfirmOrder = useCallback(async () => {
     setErrors({});
     
-    const nombreError = validateNameInput(nombre, t, language);
-    const telefonoError = validatePhoneInput(telefono, t, language);
+    const validation = validateAndBuildOrderData({ nombre, telefono, countryCode, email, items, totalPrice, language }, t);
     
-    if (nombreError || telefonoError) {
-      setErrors({ nombre: nombreError, telefono: telefonoError });
+    if (!validation.valid) {
+      setErrors(validation.errors);
       return;
     }
-
-    const selectedCountry = COUNTRY_CODES.find(c => c.code === countryCode);
-    const dialCode = selectedCountry?.dialCode || '34';
-    const sanitizedNombre = nombre.trim().slice(0, 100);
-    const sanitizedTelefono = dialCode + telefono.replaceAll(/\D/g, '').slice(0, 15);
-    const sanitizedEmail = email.trim().toLowerCase().slice(0, 100);
 
     setSending(true);
     try {
       const res = await fetch('/api/pedidos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: items.map(ci => ({
-            item: {
-              id: ci.item.id,
-              name: (language !== 'es' && ci.item.translations?.[language]?.name) || ci.item.name,
-              price: ci.item.price,
-              translations: ci.item.translations,
-            },
-            quantity: ci.quantity,
-            selectedComplements: ci.selectedComplements?.map(c => ({
-              name: c.name,
-              price: c.price,
-            })),
-          })),
-          total: totalPrice,
-          nombre: sanitizedNombre,
-          telefono: sanitizedTelefono,
-          email: sanitizedEmail,
-        }),
+        body: JSON.stringify(validation.data),
       });
       
       const data = await res.json();
@@ -287,7 +315,7 @@ export function CartDrawer() {
       } else {
         setErrors({ nombre: data.error || t("validationOrderError", language) });
       }
-    } catch (err) {
+    } catch {
       setErrors({ nombre: t("connectionError", language) });
     } finally {
       setSending(false);
@@ -315,7 +343,7 @@ export function CartDrawer() {
               {t("sendingOrder", language)}
             </DialogTitle>
             <DialogDescription className="text-base">
-              {dialogDescription}
+              {getDialogDescription()}
             </DialogDescription>
             {confirming && companyPhone && (
               <p className="text-xs text-destructive mt-2 text-center">
@@ -336,13 +364,19 @@ export function CartDrawer() {
                 </a>
               ) : (
                 <div className="flex flex-col gap-2">
+                  {/* Screen reader announcement for countdown */}
+                  <span aria-live="polite" aria-atomic="true" className="sr-only">
+                    {retryCountdown !== null && retryCountdown > 0 && (
+                      <>Reintentando en {retryCountdown} segundos...</>
+                    )}
+                  </span>
                   <button
                     type="button"
                     onClick={handleOpenInApp}
                     disabled={retryCountdown !== null && retryCountdown > 0}
                     className="w-full text-center bg-whatsapp text-primary-foreground py-3 px-4 rounded-full font-semibold hover:bg-whatsapp-hover transition-colors duration-150 disabled:opacity-70"
                   >
-                    {retryButtonText}
+                    {getRetryButtonText()}
                   </button>
                   <a
                     href={getWhatsAppWebUrl()!}
@@ -398,19 +432,21 @@ export function CartDrawer() {
         )}
 
         {items.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-4 text-muted-foreground">
-            <div className={`relative ${!shouldReduceMotion ? 'animate-empty-float' : ''}`}>
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 text-muted-foreground px-4">
+            <div className={`relative ${shouldReduceMotion ? '' : 'animate-empty-float'}`}>
               <ShoppingBag className="size-12 opacity-20" />
               <span className="absolute inset-0 flex items-center justify-center text-2xl opacity-30">+</span>
             </div>
-            <p className="text-base font-medium text-foreground">{t("emptyCart", language)}</p>
-            <p className="text-sm text-center max-w-[200px]">{t("addDishesToStart", language)}</p>
+            <div className="text-center">
+              <p className="text-base font-medium text-foreground">{t("emptyCart", language)}</p>
+              <p className="text-sm text-muted-foreground mt-1 max-w-[240px]">{t("addDishesToStart", language)}</p>
+            </div>
             <button
               onClick={() => {
                 closeCart();
                 document.getElementById('menu')?.scrollIntoView({ behavior: shouldReduceMotion ? 'auto' : 'smooth' });
               }}
-              className="mt-2 px-6 py-3 bg-primary text-primary-foreground rounded-full font-medium hover:bg-primary/90 transition-colors min-h-[44px]"
+              className="mt-2 px-6 py-3 bg-primary text-primary-foreground rounded-full font-medium hover:bg-primary/90 active:scale-[0.98] transition-all duration-150 min-h-[44px]"
             >
               {t("viewMenu", language)}
             </button>

@@ -13,6 +13,8 @@ import {
 } from '@/components/ui/dialog';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { logClientError } from '@/lib/client-error';
+import { useLanguage } from '@/lib/language-context';
+import { t } from '@/lib/translations';
 
 interface Cliente {
   id: string;
@@ -26,6 +28,7 @@ interface Cliente {
 }
 
 export default function ClientesPage() {
+  const { language } = useLanguage();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,19 +48,19 @@ export default function ClientesPage() {
           const data = await res.json();
           setClientes(data.clientes || []);
         } else {
-          setError('Error al cargar clientes. Por favor, inténtalo de nuevo.');
+          setError(t("errorLoadingClients", language));
         }
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') return;
         logClientError(error, 'fetchClientes');
-        setError('Error de conexión. Verifica tu conexión a internet.');
+        setError(t("connectionErrorClients", language));
       } finally {
         setLoading(false);
       }
     }
     fetchClientes();
     return () => controller.abort();
-  }, []);
+  }, [language]);
 
   const filteredClientes = clientes.filter(c =>
     c.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -216,8 +219,8 @@ export default function ClientesPage() {
               className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 font-semibold shrink-0"
             >
               <Plus className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">Nuevo Cliente</span>
-              <span className="sm:hidden">Nuevo</span>
+              <span className="hidden sm:inline">{t("newClient", language)}</span>
+              <span className="sm:hidden">{t("new", language)}</span>
             </Button>
           </div>
         </div>
@@ -351,13 +354,14 @@ export default function ClientesPage() {
                       </button>
                     </td>
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() => handleDeleteCliente(cliente.id)}
-                        className="p-2 hover:bg-muted rounded-lg transition-colors text-destructive hover:text-destructive/80"
-                        title="Eliminar"
-                      >
-                        <Trash2 className="size-4" />
-                      </button>
+              <button
+                type="button"
+                onClick={() => setCreatingCliente(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors text-sm font-medium"
+              >
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">{t("newClient", language)}</span>
+              </button>
                     </td>
                   </tr>
                 ))}
@@ -371,7 +375,7 @@ export default function ClientesPage() {
       <Dialog open={!!editingCliente} onOpenChange={(open) => { if (!open) closeEditModal(); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Editar Cliente</DialogTitle>
+            <DialogTitle>{t("editClient", language)}</DialogTitle>
             <DialogDescription>
               Modifica los datos del cliente.
             </DialogDescription>
@@ -441,7 +445,7 @@ export default function ClientesPage() {
       <Dialog open={creatingCliente} onOpenChange={(open) => { if (!open) closeCreateModal(); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Nuevo Cliente</DialogTitle>
+            <DialogTitle>{t("newClient", language)}</DialogTitle>
             <DialogDescription>
               Crea un nuevo cliente en el sistema.
             </DialogDescription>
@@ -501,7 +505,7 @@ export default function ClientesPage() {
               Cancelar
             </Button>
             <Button onClick={handleCreateCliente} disabled={saving || (!editForm.nombre && !editForm.email && !editForm.telefono)}>
-              {saving ? 'Creando...' : 'Crear Cliente'}
+              {saving ? 'Creando...' : t("createClient", language)}
             </Button>
           </div>
         </DialogContent>

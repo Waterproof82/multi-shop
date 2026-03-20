@@ -48,7 +48,7 @@ export class GetMenuUseCase {
       const mainCategories = categories.filter((cat) => !cat.categoriaComplementoDe);
       const complementCategories = categories.filter((cat) => cat.categoriaComplementoDe);
 
-      // Mapa de complementos por categoría padre
+      // Map of complements by parent category
       const complementsByCategoryId = new Map<string, Product[]>();
       for (const compCat of complementCategories) {
         const parentId = compCat.categoriaComplementoDe!;
@@ -59,11 +59,11 @@ export class GetMenuUseCase {
         complementsByCategoryId.get(parentId)!.push(...compProducts);
       }
 
-      // Mapa de complemento_obligatorio por categoría padre
+      // Map of required_complement by parent category
       const complementoObligatorioMap = new Map<string, boolean>();
-      // Mapa de nombre de categoría complemento por categoría padre
+      // Map of complement category name by parent category
       const complementCategoryNameMap = new Map<string, string>();
-      // Mapa de traducciones de categoría complemento por categoría padre
+      // Map of complement category translations by parent category
       const complementCategoryTranslationsMap = new Map<string, Category['translations']>();
       for (const compCat of complementCategories) {
         if (compCat.categoriaComplementoDe) {
@@ -77,14 +77,14 @@ export class GetMenuUseCase {
         }
       }
 
-      // Separar categorías padres de subcategorías
+      // Separate parent categories from subcategories
       const parentCategories = mainCategories.filter((cat) => !cat.categoriaPadreId);
       const subCategories = mainCategories.filter((cat) => cat.categoriaPadreId);
 
       parentCategories.sort((a, b) => (a.orden || 0) - (b.orden || 0));
       subCategories.sort((a, b) => (a.orden || 0) - (b.orden || 0));
 
-      // Mapa de subcategorías por padre
+      // Map of subcategories by parent
       const subcategoriesByParent = new Map<string, Category[]>();
       for (const subCat of subCategories) {
         const parentId = subCat.categoriaPadreId!;
@@ -94,13 +94,13 @@ export class GetMenuUseCase {
         subcategoriesByParent.get(parentId)!.push(subCat);
       }
 
-      // Mapa de todas las categorías por ID
+      // Map of all categories by ID
       const categoriesById = new Map<string, Category>();
       for (const cat of categories) {
         categoriesById.set(cat.id, cat);
       }
 
-      // Delegar el mapeo al MenuMapper
+      // Delegate mapping to MenuMapper
       const menu: MenuCategoryVM[] = parentCategories.map((parentCat) => {
         const childSubcategories = subcategoriesByParent.get(parentCat.id) || [];
         const categoryComplements = complementsByCategoryId.get(parentCat.id) || [];

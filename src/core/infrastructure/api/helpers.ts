@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Result } from '@/core/domain/entities/types';
+import { AUTH_ERRORS, createErrorResponse } from '@/core/domain/constants/api-errors';
 
 // Auth middleware helper
 export async function requireAuth(request: NextRequest): Promise<{ empresaId: string | null; error: NextResponse | null }> {
@@ -7,7 +8,7 @@ export async function requireAuth(request: NextRequest): Promise<{ empresaId: st
   if (!empresaId) {
     return { 
       empresaId: null, 
-      error: NextResponse.json({ error: 'No autorizado' }, { status: 401 }) 
+      error: NextResponse.json(createErrorResponse(AUTH_ERRORS.UNAUTHORIZED), { status: 401 }) 
     };
   }
   return { empresaId, error: null };

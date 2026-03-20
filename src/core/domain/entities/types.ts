@@ -194,5 +194,5 @@ export type Result<T, E = AppError> =
   | { success: true; data: T }
   | { success: false; error: E };
 
-// Helper type para funciones que pueden retornar error sin detalles
+// Helper type for functions that may return error without details
 export type SimpleResult<T> = Result<T, { code: string; message: string; module: ErrorModule; method?: string }>;

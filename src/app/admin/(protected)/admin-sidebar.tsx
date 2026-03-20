@@ -7,6 +7,8 @@ import { usePathname } from 'next/navigation';
 import { LayoutDashboard, Utensils, Tags, LogOut, Menu, X, ShoppingCart, BarChart3, Users, Megaphone, Settings, ExternalLink } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useAdmin } from '@/lib/admin-context';
+import { useLanguage } from '@/lib/language-context';
+import { t } from '@/lib/translations';
 
 interface NavItem {
   href: string;
@@ -33,6 +35,7 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
   const { empresaLogo } = useAdmin();
+  const { language } = useLanguage();
 
   const closeMenu = () => setIsOpen(false);
 
@@ -102,11 +105,11 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
               </div>
             ) : (
               <h1 className="text-lg font-semibold text-foreground">
-                Administración
+                {t("administration", language)}
               </h1>
             )}
             <p className="text-xs text-muted-foreground mt-1 text-center">
-              {empresaId ? 'Empresa conectada' : 'Panel'}
+              {empresaId ? t("companyConnected", language) : 'Panel'}
             </p>
           </div>
 
@@ -152,7 +155,7 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
               className="flex items-center gap-3 px-3 py-2.5 text-sm text-destructive hover:bg-destructive/10 w-full rounded-lg transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <LogOut className="h-4 w-4" />
-              Cerrar Sesión
+              {t("logout", language)}
             </button>
           </div>
         </div>

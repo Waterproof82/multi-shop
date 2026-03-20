@@ -13,6 +13,8 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { fetchWithCsrf } from '@/lib/csrf-client';
+import { useLanguage } from '@/lib/language-context';
+import { t } from '@/lib/translations';
 
 interface Category {
   id: string;
@@ -68,6 +70,7 @@ const emptyForm: CategoryFormData = {
 };
 
 export default function CategoriasPage() {
+  const { language } = useLanguage();
   const [categorias, setCategorias] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -455,7 +458,7 @@ export default function CategoriasPage() {
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {editingId ? 'Editar Categoría' : 'Nueva Categoría'}
+              {editingId ? t("editCategory", language) : t("newCategory", language)}
             </DialogTitle>
             <DialogDescription>
               {editingId ? 'Modifica los datos de la categoría.' : 'Rellena los datos para crear una categoría.'}
@@ -601,7 +604,7 @@ export default function CategoriasPage() {
 
             <div>
               <label htmlFor="categoria_padre_id" className="block text-sm font-medium text-foreground mb-1">
-                Categoría Padre (para subcategorías)
+                {t("parentCategory", language)}
               </label>
               <select
                 id="categoria_padre_id"
