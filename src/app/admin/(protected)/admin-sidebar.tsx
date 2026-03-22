@@ -12,19 +12,19 @@ import { t } from '@/lib/translations';
 
 interface NavItem {
   href: string;
-  label: string;
+  labelKey: Parameters<typeof t>[0];
   icon: React.ComponentType<{ className?: string }>;
 }
 
 const navItems: NavItem[] = [
-  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/admin/categorias', label: 'Categorías', icon: Tags },
-  { href: '/admin/productos', label: 'Productos', icon: Utensils },
-  { href: '/admin/pedidos', label: 'Pedidos', icon: ShoppingCart },
-  { href: '/admin/clientes', label: 'Clientes', icon: Users },
-  { href: '/admin/promociones', label: 'Promociones', icon: Megaphone },
-  { href: '/admin/estadisticas', label: 'Estadísticas', icon: BarChart3 },
-  { href: '/admin/configuracion', label: 'Configuración', icon: Settings },
+  { href: '/admin', labelKey: 'sidebarDashboard', icon: LayoutDashboard },
+  { href: '/admin/categorias', labelKey: 'sidebarCategories', icon: Tags },
+  { href: '/admin/productos', labelKey: 'sidebarProducts', icon: Utensils },
+  { href: '/admin/pedidos', labelKey: 'sidebarOrders', icon: ShoppingCart },
+  { href: '/admin/clientes', labelKey: 'sidebarClients', icon: Users },
+  { href: '/admin/promociones', labelKey: 'sidebarPromotions', icon: Megaphone },
+  { href: '/admin/estadisticas', labelKey: 'sidebarStatistics', icon: BarChart3 },
+  { href: '/admin/configuracion', labelKey: 'sidebarSettings', icon: Settings },
 ];
 
 interface AdminSidebarProps {
@@ -60,13 +60,13 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
           </div>
         ) : (
           <h1 className="text-lg font-semibold text-foreground">
-            Administración
+            {t("administration", language)}
           </h1>
         )}
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="p-2 rounded-lg hover:bg-muted transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          aria-label={isOpen ? 'Cerrar menú' : 'Abrir menú'}
+          aria-label={isOpen ? t("closeMenu", language) : t("openMenu", language)}
           aria-expanded={isOpen}
         >
           {isOpen ? <X className="h-5 w-5 text-foreground" /> : <Menu className="h-5 w-5 text-foreground" />}
@@ -78,7 +78,7 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
         <button
           type="button"
           className="lg:hidden fixed inset-0 bg-overlay z-40"
-          aria-label="Cerrar menú"
+          aria-label={t("closeMenu", language)}
           onClick={closeMenu}
         />
       )}
@@ -109,7 +109,7 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
               </h1>
             )}
             <p className="text-xs text-muted-foreground mt-1 text-center">
-              {empresaId ? t("companyConnected", language) : 'Panel'}
+              {t("companyConnected", language)}
             </p>
           </div>
 
@@ -133,7 +133,7 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
                       `}
                     >
                       <Icon className="h-4 w-4" />
-                      {item.label}
+                      {t(item.labelKey, language)}
                     </Link>
                   </li>
                 );
@@ -147,7 +147,7 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
               className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground w-full rounded-lg transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <ExternalLink className="h-4 w-4" />
-              Ver tienda
+              {t("viewStore", language)}
             </Link>
             <button
               type="button"

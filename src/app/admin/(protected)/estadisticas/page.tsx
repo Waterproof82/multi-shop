@@ -27,8 +27,6 @@ interface Stats {
   mesSeleccionado: string;
 }
 
-const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-
 function getChartColors(): string[] {
   if (typeof window === 'undefined') return [
     'hsl(var(--chart-orange))',
@@ -55,6 +53,7 @@ function getChartColors(): string[] {
 
 export default function EstadisticasPage() {
   const { language } = useLanguage();
+  const meses = [t("monthJan", language), t("monthFeb", language), t("monthMar", language), t("monthApr", language), t("monthMay", language), t("monthJun", language), t("monthJul", language), t("monthAug", language), t("monthSep", language), t("monthOct", language), t("monthNov", language), t("monthDec", language)];
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState({ mes: new Date().getMonth(), año: new Date().getFullYear() });
@@ -124,8 +123,8 @@ export default function EstadisticasPage() {
       <div className="bg-primary rounded-lg p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">Estadísticas</h1>
-            <p className="text-primary-foreground/80 text-sm mt-1">Resumen de pedidos y facturación</p>
+            <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">{t("statsTitle", language)}</h1>
+            <p className="text-primary-foreground/80 text-sm mt-1">{t("statsSubtitle", language)}</p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -152,11 +151,11 @@ export default function EstadisticasPage() {
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
         {[
-          { icon: ShoppingCart, label: 'Pedidos hoy', value: stats?.pedidosHoy || 0, iconClass: 'bg-muted', iconColor: 'text-foreground' },
-          { icon: BarChart3, label: 'Pedidos mes', value: stats?.pedidosMes || 0, iconClass: 'bg-primary/10', iconColor: 'text-primary' },
-          { icon: Euro, label: 'Ventas hoy', value: `${(stats?.totalHoy || 0).toFixed(2)}€`, iconClass: 'bg-primary/10', iconColor: 'text-primary' },
-          { icon: BarChart3, label: 'Ventas mes', value: `${(stats?.totalMes || 0).toFixed(2)}€`, iconClass: 'bg-muted', iconColor: 'text-foreground' },
-          { icon: TrendingUp, label: 'Ventas año', value: `${(stats?.totalAno || 0).toFixed(2)}€`, iconClass: 'bg-secondary', iconColor: 'text-secondary-foreground' },
+          { icon: ShoppingCart, label: t("ordersToday", language), value: stats?.pedidosHoy || 0, iconClass: 'bg-muted', iconColor: 'text-foreground' },
+          { icon: BarChart3, label: t("ordersMonth", language), value: stats?.pedidosMes || 0, iconClass: 'bg-primary/10', iconColor: 'text-primary' },
+          { icon: Euro, label: t("salesToday", language), value: `${(stats?.totalHoy || 0).toFixed(2)}€`, iconClass: 'bg-primary/10', iconColor: 'text-primary' },
+          { icon: BarChart3, label: t("salesMonth", language), value: `${(stats?.totalMes || 0).toFixed(2)}€`, iconClass: 'bg-muted', iconColor: 'text-foreground' },
+          { icon: TrendingUp, label: t("salesYear", language), value: `${(stats?.totalAno || 0).toFixed(2)}€`, iconClass: 'bg-secondary', iconColor: 'text-secondary-foreground' },
         ].map((kpi, i) => (
           <motion.div
             key={`kpi-${i}`}
@@ -185,7 +184,7 @@ export default function EstadisticasPage() {
           className="bg-card rounded-lg border border-border p-4"
         >
           <div className="flex items-center justify-between mb-2">
-            <p className="text-sm text-muted-foreground">Ticket medio</p>
+            <p className="text-sm text-muted-foreground">{t("avgTicket", language)}</p>
             <Euro className="w-4 h-4 text-muted-foreground" />
           </div>
           <p className="text-2xl font-bold text-foreground">{(stats?.ticketMedio || 0).toFixed(2)}€</p>
@@ -197,7 +196,7 @@ export default function EstadisticasPage() {
           className="bg-card rounded-lg border border-border p-4"
         >
           <div className="flex items-center justify-between mb-2">
-            <p className="text-sm text-muted-foreground">vs mes anterior</p>
+            <p className="text-sm text-muted-foreground">{t("vsPreviousMonth", language)}</p>
             {stats && stats.pedidosAnterior > 0 ? (
               stats.pedidosMes >= stats.pedidosAnterior ? (
                 <ArrowUpRight className="w-4 h-4 text-primary" />
@@ -214,7 +213,7 @@ export default function EstadisticasPage() {
             <p className="text-2xl font-bold text-muted-foreground">--</p>
           )}
           <p className="text-xs text-muted-foreground mt-1">
-            {stats?.pedidosAnterior || 0} pedidos el mes pasado
+            {stats?.pedidosAnterior || 0} {t("ordersPreviousMonth", language)}
           </p>
         </motion.div>
 
@@ -224,12 +223,12 @@ export default function EstadisticasPage() {
           className="bg-card rounded-lg border border-border p-4"
         >
           <div className="flex items-center justify-between mb-2">
-            <p className="text-sm text-muted-foreground">Clientes</p>
+            <p className="text-sm text-muted-foreground">{t("clientsTitle", language)}</p>
             <Users className="w-4 h-4 text-muted-foreground" />
           </div>
           <p className="text-2xl font-bold text-foreground">{(stats?.clientesNuevos || 0) + (stats?.clientesRecurrentes || 0)}</p>
           <p className="text-xs text-muted-foreground mt-1">
-            {(stats?.clientesNuevos || 0)} nuevos, {(stats?.clientesRecurrentes || 0)} recurrentes
+            {(stats?.clientesNuevos || 0)} {t("newClientsLabel", language)}, {(stats?.clientesRecurrentes || 0)} {t("returningClients", language)}
           </p>
         </motion.div>
       </div>
@@ -243,7 +242,7 @@ export default function EstadisticasPage() {
         >
           <h2 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
             <Calendar className="w-5 h-5" />
-            Pedidos por día ({meses[mesActual]})
+            {t("ordersByDay", language)} ({meses[mesActual]})
           </h2>
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
@@ -263,8 +262,8 @@ export default function EstadisticasPage() {
                     color: 'var(--foreground)'
                   }}
                   formatter={(value: number, name: string) => [
-                    name === 'pedidos' ? `${value} pedidos` : `${value.toFixed(2)}€`,
-                    name === 'pedidos' ? 'Pedidos' : 'Ingresos'
+                    name === 'pedidos' ? `${value} ${t("xOrders", language)}` : `${value.toFixed(2)}€`,
+                    name === 'pedidos' ? t("xOrders", language) : t("revenueLabel", language)
                   ]}
                 />
                 <Line
@@ -290,7 +289,7 @@ export default function EstadisticasPage() {
         >
           <h2 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
             <ShoppingCart className="w-5 h-5" />
-            Top platos (este mes)
+            {t("topDishes", language)} ({t("thisMonthLabel", language)})
           </h2>
           
           {stats?.topPlatos && stats.topPlatos.length > 0 ? (
@@ -327,7 +326,7 @@ export default function EstadisticasPage() {
             </div>
           ) : (
             <p className="text-muted-foreground text-center py-8">
-              No hay datos suficientes para mostrar estadísticas
+              {t("noStatsData", language)}
             </p>
           )}
         </motion.div>
@@ -340,7 +339,7 @@ export default function EstadisticasPage() {
         >
           <h2 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
             <Euro className="w-5 h-5" />
-            Ingresos por plato (este mes)
+            {t("revenueByDish", language)} ({t("thisMonthLabel", language)})
           </h2>
           
           {stats?.topPlatos && stats.topPlatos.length > 0 ? (
@@ -392,7 +391,7 @@ export default function EstadisticasPage() {
             </>
           ) : (
             <p className="text-muted-foreground text-center py-8">
-              No hay datos suficientes para mostrar estadísticas
+              {t("noStatsData", language)}
             </p>
           )}
         </motion.div>

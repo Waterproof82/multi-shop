@@ -337,12 +337,35 @@
   }
 }
 
-.ripple {
+.ripple-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.ripple-button::after {
+  content: "";
   position: absolute;
-  border-radius: 50%;
+  inset: 0;
+  border-radius: inherit;
   background-color: var(--primary);
+  opacity: 0;
   pointer-events: none;
+  transform: scale(0);
+}
+
+.ripple-button.ripple-active::after {
   animation: ripple 0.6s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(4);
+    opacity: 0;
+  }
 }
 
 .animate-cart-item-add {

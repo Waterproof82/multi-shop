@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useCallback, useEffect } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Plus, Minus, Check } from "lucide-react"
 import {
   Dialog,
@@ -10,9 +10,9 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { RippleButton } from "@/components/ui/ripple-button"
 import { useLanguage } from "@/lib/language-context"
 import { useCart } from "@/lib/cart-context"
 import { t } from "@/lib/translations"
@@ -23,47 +23,6 @@ interface QuantitySelectorDialogProps {
   item: MenuItemVM | null
   open: boolean
   onOpenChange: (open: boolean) => void
-}
-
-function RippleButton({ children, onClick, className, disabled, variant = "default", size = "default", 'aria-label': ariaLabel, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "default" | "outline"; size?: "default" | "icon" }) {
-  const buttonRef = useRef<HTMLButtonElement>(null);
-
-  const createRipple = (event: React.MouseEvent<HTMLButtonElement>) => {
-    const button = event.currentTarget;
-    const rect = button.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    const ripple = document.createElement("span");
-    ripple.className = "ripple";
-    ripple.style.left = `${x}px`;
-    ripple.style.top = `${y}px`;
-    const existingRipple = button.querySelector(".ripple");
-    if (existingRipple) existingRipple.remove();
-    button.appendChild(ripple);
-    setTimeout(() => ripple.remove(), 500);
-  }
-
-  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    if (!disabled) {
-      createRipple(e);
-      onClick?.(e);
-    }
-  }
-
-  return (
-    <Button
-      ref={buttonRef}
-      variant={variant}
-      size={size}
-      className={`relative overflow-hidden ${className}`}
-      disabled={disabled}
-      onClick={handleClick}
-      aria-label={ariaLabel}
-      {...props}
-    >
-      {children}
-    </Button>
-  );
 }
 
 export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogProps>) {

@@ -32,8 +32,11 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
           saveCsrfToken(data.csrfToken);
         }
       })
-      .catch((error) => logClientError(error, 'fetchCsrfToken'));
-  }, []);
+      .catch((error) => {
+        logClientError(error, 'fetchCsrfToken');
+        setError(t('loginFormError', language));
+      });
+  }, [language]);
 
   const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -53,12 +56,12 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Error al iniciar sesión');
+        throw new Error(data.error || t('loginErrorDefault', language));
       }
 
       router.push('/admin');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setError(err instanceof Error ? err.message : t('unknownError', language));
     } finally {
       setLoading(false);
     }

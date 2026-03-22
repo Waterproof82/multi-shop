@@ -90,11 +90,11 @@ export default function CategoriasPage() {
   const fetchCategorias = async () => {
     try {
       const res = await fetch('/api/admin/categorias');
-      if (!res.ok) throw new Error('Error al cargar categorías');
+      if (!res.ok) throw new Error(t("loadCategoriesError", language));
       const data = await res.json();
       setCategorias(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setError(err instanceof Error ? err.message : t("unknownError", language));
     } finally {
       setLoading(false);
     }
@@ -119,30 +119,30 @@ export default function CategoriasPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || 'Error al guardar');
+        throw new Error(data.error || t("saveError", language));
       }
 
       await fetchCategorias();
       closeModal();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setError(err instanceof Error ? err.message : t("unknownError", language));
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('¿Estás seguro de eliminar esta categoría?')) return;
+    if (!confirm(t("confirmDeleteCategory", language))) return;
 
     try {
       const res = await fetchWithCsrf(`/api/admin/categorias?id=${id}`, {
         method: 'DELETE',
       });
 
-      if (!res.ok) throw new Error('Error al eliminar');
+      if (!res.ok) throw new Error(t("deleteError", language));
       await fetchCategorias();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setError(err instanceof Error ? err.message : t("unknownError", language));
     }
   };
 
@@ -239,19 +239,19 @@ export default function CategoriasPage() {
       <div className="bg-primary rounded-lg p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">Categorías</h1>
-            <p className="text-primary-foreground/80 text-sm mt-1">Gestiona las categorías del menú</p>
+            <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">{t("categoriesTitle", language)}</h1>
+            <p className="text-primary-foreground/80 text-sm mt-1">{t("categoriesSubtitle", language)}</p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
               <Tags className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
               <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{categorias.filter(c => !c.categoria_padre_id).length}</span>
-              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Categorías</p>
+              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">{t("categoriesLabel", language)}</p>
             </div>
             <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
               <FolderTree className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
               <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{subcategoriasCount}</span>
-              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Subcategorías</p>
+              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">{t("subcategories", language)}</p>
             </div>
           </div>
         </div>
@@ -263,10 +263,10 @@ export default function CategoriasPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="Buscar categorías..."
+            placeholder={t("searchCategories", language)}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            aria-label="Buscar categorías"
+            aria-label={t("searchCategories", language)}
             className="pl-10 w-full"
           />
         </div>
@@ -275,7 +275,7 @@ export default function CategoriasPage() {
           className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring transition-colors duration-150 w-full sm:w-auto justify-center"
         >
           <Plus className="h-4 w-4" />
-          <span>Nueva categoría</span>
+          <span>{t("newCategory", language)}</span>
         </button>
       </div>
 
@@ -296,7 +296,7 @@ export default function CategoriasPage() {
                   onClick={() => handleSort('orden')}
                 >
                     <div className="flex items-center gap-1">
-                      Orden
+                      {t("orderLabel", language)}
                       {sortField === 'orden' && (
                         sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
                       )}
@@ -308,7 +308,7 @@ export default function CategoriasPage() {
                   onClick={() => handleSort('nombre_es')}
                 >
                     <div className="flex items-center gap-1">
-                      Nombre (ES)
+                      {t("nameES", language)}
                       {sortField === 'nombre_es' && (
                         sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
                       )}
@@ -316,16 +316,16 @@ export default function CategoriasPage() {
                     </div>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
-                  Tipo
+                  {t("typeLabel", language)}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
-                  Subcategorías
+                  {t("subcategories", language)}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
-                  Complemento de
+                  {t("complementOf", language)}
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">
-                  Acciones
+                  {t("actions", language)}
                 </th>
               </tr>
             </thead>
@@ -342,7 +342,7 @@ export default function CategoriasPage() {
                     {cat.categoria_padre_id ? (
                       <div className="flex flex-col gap-1">
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground text-xs font-medium">
-                          Subcategoría
+                          {t("subcategory", language)}
                         </span>
                         {cat.parentName && (
                           <span className="text-xs text-muted-foreground">
@@ -352,7 +352,7 @@ export default function CategoriasPage() {
                       </div>
                     ) : (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-foreground text-xs font-medium">
-                        Principal
+                        {t("mainCategory", language)}
                       </span>
                     )}
                   </td>
@@ -395,7 +395,7 @@ export default function CategoriasPage() {
               {filteredCategorias.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">
-                    {searchTerm ? 'No se encontraron categorías.' : 'No hay categorías. Crea la primera.'}
+                    {searchTerm ? t("noCategoriesFound", language) : t("noCategoriesYet", language)}
                   </td>
                 </tr>
               )}
@@ -419,12 +419,12 @@ export default function CategoriasPage() {
                     )}
                     {!cat.categoria_padre_id && cat.hasSubcategories && (
                       <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium">
-                        Principal
+                        {t("mainCategory", language)}
                       </span>
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {cat.categoria_padre_id && cat.parentName ? `Subcategoría de ${cat.parentName}` : ''}
+                    {cat.categoria_padre_id && cat.parentName ? `${t("subcategoryOf", language)} ${cat.parentName}` : ''}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -448,7 +448,7 @@ export default function CategoriasPage() {
           ))}
           {filteredCategorias.length === 0 && (
             <div className="p-8 text-center text-muted-foreground">
-              {searchTerm ? 'No se encontraron categorías.' : 'No hay categorías. Crea la primera.'}
+              {searchTerm ? t("noCategoriesFound", language) : t("noCategoriesYet", language)}
             </div>
           )}
         </div>
@@ -461,14 +461,14 @@ export default function CategoriasPage() {
               {editingId ? t("editCategory", language) : t("newCategory", language)}
             </DialogTitle>
             <DialogDescription>
-              {editingId ? 'Modifica los datos de la categoría.' : 'Rellena los datos para crear una categoría.'}
+              {editingId ? t("editCategoryDesc", language) : t("newCategoryDesc", language)}
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="nombre_es" className="block text-sm font-medium text-foreground mb-1">
-                Nombre (Español) *
+                {t("nameSpanish", language)}
               </label>
               <Input
                 id="nombre_es"
@@ -483,7 +483,7 @@ export default function CategoriasPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="nombre_en" className="block text-sm font-medium text-foreground mb-1">
-                    Nombre (Inglés)
+                    {t("nameEnglish", language)}
                   </label>
                   <Input
                     id="nombre_en"
@@ -494,7 +494,7 @@ export default function CategoriasPage() {
                 </div>
                 <div>
                   <label htmlFor="nombre_fr" className="block text-sm font-medium text-foreground mb-1">
-                    Nombre (Francés)
+                    {t("nameFrench", language)}
                   </label>
                   <Input
                     id="nombre_fr"
@@ -505,7 +505,7 @@ export default function CategoriasPage() {
                 </div>
                 <div>
                   <label htmlFor="nombre_it" className="block text-sm font-medium text-foreground mb-1">
-                    Nombre (Italiano)
+                    {t("nameItalian", language)}
                   </label>
                   <Input
                     id="nombre_it"
@@ -516,7 +516,7 @@ export default function CategoriasPage() {
                 </div>
                 <div>
                   <label htmlFor="nombre_de" className="block text-sm font-medium text-foreground mb-1">
-                    Nombre (Alemán)
+                    {t("nameGerman", language)}
                   </label>
                   <Input
                     id="nombre_de"
@@ -530,14 +530,14 @@ export default function CategoriasPage() {
 
             <div>
               <label htmlFor="descripcion_es" className="block text-sm font-medium text-foreground mb-1">
-                Descripción (Español)
+                {t("descSpanish", language)}
               </label>
               <Textarea
                 id="descripcion_es"
                 value={formData.descripcion_es}
                 onChange={(e) => setFormData({ ...formData, descripcion_es: e.target.value })}
                 rows={2}
-                placeholder="Texto que se mostrará encima de los productos..."
+                placeholder={t("descPlaceholder", language)}
               />
             </div>
 
@@ -545,7 +545,7 @@ export default function CategoriasPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="descripcion_en" className="block text-sm font-medium text-foreground mb-1">
-                    Descripción (Inglés)
+                    {t("descEnglish", language)}
                   </label>
                   <Textarea
                     id="descripcion_en"
@@ -556,7 +556,7 @@ export default function CategoriasPage() {
                 </div>
                 <div>
                   <label htmlFor="descripcion_fr" className="block text-sm font-medium text-foreground mb-1">
-                    Descripción (Francés)
+                    {t("descFrench", language)}
                   </label>
                   <Textarea
                     id="descripcion_fr"
@@ -567,7 +567,7 @@ export default function CategoriasPage() {
                 </div>
                 <div>
                   <label htmlFor="descripcion_it" className="block text-sm font-medium text-foreground mb-1">
-                    Descripción (Italiano)
+                    {t("descItalian", language)}
                   </label>
                   <Textarea
                     id="descripcion_it"
@@ -578,7 +578,7 @@ export default function CategoriasPage() {
                 </div>
                 <div>
                   <label htmlFor="descripcion_de" className="block text-sm font-medium text-foreground mb-1">
-                    Descripción (Alemán)
+                    {t("descGerman", language)}
                   </label>
                   <Textarea
                     id="descripcion_de"
@@ -592,7 +592,7 @@ export default function CategoriasPage() {
 
             <div>
               <label htmlFor="orden" className="block text-sm font-medium text-foreground mb-1">
-                Orden
+                {t("orderLabel", language)}
               </label>
               <Input
                 id="orden"
@@ -613,7 +613,7 @@ export default function CategoriasPage() {
                 className="w-full px-3 py-2 rounded-md border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background transition-colors cursor-pointer"
                 aria-label="Categoría padre"
               >
-                <option value="">Ninguna (categoría principal)</option>
+                <option value="">{t("noParent", language)}</option>
                 {categorias
                   .filter((c) => !c.categoria_padre_id && c.id !== editingId)
                   .map((c) => (
@@ -623,22 +623,22 @@ export default function CategoriasPage() {
                   ))}
               </select>
               <p className="text-xs text-muted-foreground mt-1">
-                Selecciona una categoría padre para crear una subcategoría.
+                {t("parentCategoryHelp", language)}
               </p>
             </div>
 
             <div>
               <label htmlFor="categoria_complemento_de" className="block text-sm font-medium text-foreground mb-1">
-                Complemento de categoría
+                {t("complementCategory", language)}
               </label>
               <select
                 id="categoria_complemento_de"
                 value={formData.categoria_complemento_de || ''}
                 onChange={(e) => setFormData({ ...formData, categoria_complemento_de: e.target.value || null })}
                 className="w-full px-3 py-2 rounded-md border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background transition-colors cursor-pointer"
-                aria-label="Complemento de categoría"
+                aria-label={t("complementCategory", language)}
               >
-                <option value="">Ninguna (categoría principal)</option>
+                <option value="">{t("noParent", language)}</option>
                 {categorias
                   .filter((c) => c.id !== editingId)
                   .map((c) => (
@@ -648,7 +648,7 @@ export default function CategoriasPage() {
                   ))}
               </select>
               <p className="text-xs text-muted-foreground mt-1">
-                Los productos de esta categoría aparecerán como complemento al añadir productos de la categoría seleccionada.
+                {t("complementCategoryHelp", language)}
               </p>
             </div>
 
@@ -662,7 +662,7 @@ export default function CategoriasPage() {
                   className="w-4 h-4 rounded border-border text-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background cursor-pointer accent-primary"
                 />
                 <label htmlFor="complemento_obligatorio" className="text-sm text-foreground cursor-pointer">
-                  Seleccionar complemento obligatorio
+                  {t("mandatoryComplement", language)}
                 </label>
               </div>
             )}
@@ -675,22 +675,22 @@ export default function CategoriasPage() {
               >
                 {showTranslations ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                 <Languages className="h-4 w-4" />
-                Traducciones ({showTranslations ? 'ocultar' : 'mostrar'})
+                {t("translationsToggle", language)} ({showTranslations ? t("hideLabel", language) : t("showLabel", language)})
               </button>
             </div>
 
             <div className="flex justify-end gap-3 pt-4 col-span-2">
               <Button variant="outline" type="button" onClick={closeModal}>
-                Cancelar
+                {t("cancel", language)}
               </Button>
               <Button type="submit" disabled={saving}>
                 {saving ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Guardando...
+                    {t("savingProgress", language)}
                   </>
                 ) : (
-                  'Guardar'
+                  t("save", language)
                 )}
               </Button>
             </div>

@@ -5,7 +5,7 @@ import { ShoppingBag, Package, ArrowRight, Clock } from 'lucide-react';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import type { MenuCategoryVM } from '@/core/application/dtos/menu-view-model';
-import { PEDIDO_ESTADO_LABELS, PEDIDO_ESTADO_COLORS } from '@/core/domain/constants/pedido';
+import { PEDIDO_ESTADO_COLORS } from '@/core/domain/constants/pedido';
 import type { PedidoEstado } from '@/core/domain/constants/pedido';
 import { formatPrice } from '@/lib/format-price';
 
@@ -56,13 +56,11 @@ export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menu
 
   if (menuError) {
     return (
-      <div className="pt-16 lg:pt-0 px-6 lg:px-8">
-        <h1 className="text-2xl font-bold text-foreground mb-2">
-          {t("dashboard", language)}
-        </h1>
-        <p className="text-muted-foreground mb-6">
-          {t("dashboard", language)}: <strong>{empresaNombre}</strong>
-        </p>
+      <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
+        <div className="bg-primary rounded-lg p-4 sm:p-6">
+          <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">{t("dashboard", language)}</h1>
+          <p className="text-primary-foreground/80 text-sm mt-1">{empresaNombre}</p>
+        </div>
         <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
           <p className="text-destructive">{menuError}</p>
         </div>
@@ -73,28 +71,30 @@ export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menu
   return (
     <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
       {/* Header con stats */}
-      <div className="bg-card rounded-lg border border-border p-4 sm:p-6">
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+      <div className="bg-primary rounded-lg p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-xl sm:text-2xl font-semibold text-foreground">{t("dashboard", language)}</h1>
-            <p className="text-muted-foreground text-sm mt-1">{empresaNombre}</p>
+            <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">{t("dashboard", language)}</h1>
+            <p className="text-primary-foreground/80 text-sm mt-1">{empresaNombre}</p>
           </div>
-          <div className="flex flex-wrap gap-6">
-            <div className="text-center sm:text-left">
-              <p className="text-3xl font-bold text-foreground tabular-nums">{stats?.pedidosHoy || 0}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{t("pedidosHoy", language)}</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
+              <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
+              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{stats?.pedidosHoy || 0}</span>
+              <p className="text-primary-foreground/80 text-xs mt-0.5">{t("pedidosHoy", language)}</p>
             </div>
-            <div className="text-center sm:text-left">
-              <p className="text-3xl font-bold text-foreground tabular-nums">{formatPrice(stats?.totalMes || 0)}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{t("ventasDelMes", language)}</p>
+            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
+              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{formatPrice(stats?.totalMes || 0)}</span>
+              <p className="text-primary-foreground/80 text-xs mt-0.5">{t("ventasDelMes", language)}</p>
             </div>
-            <div className="text-center sm:text-left">
-              <p className="text-3xl font-bold text-foreground tabular-nums">{totalProductos}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{t("products", language)}</p>
+            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
+              <Package className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
+              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{totalProductos}</span>
+              <p className="text-primary-foreground/80 text-xs mt-0.5">{t("products", language)}</p>
             </div>
-            <div className="text-center sm:text-left">
-              <p className="text-3xl font-bold text-foreground tabular-nums">{productosEspeciales}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{t("destacados", language)}</p>
+            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
+              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{productosEspeciales}</span>
+              <p className="text-primary-foreground/80 text-xs mt-0.5">{t("destacados", language)}</p>
             </div>
           </div>
         </div>
@@ -140,7 +140,17 @@ export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menu
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
                       PEDIDO_ESTADO_COLORS[pedido.estado as PedidoEstado] || 'bg-muted text-muted-foreground'
                     }`}>
-                      {PEDIDO_ESTADO_LABELS[pedido.estado as keyof typeof PEDIDO_ESTADO_LABELS] || pedido.estado}
+                      {(() => {
+                        const key = {
+                          pendiente: 'statusPendiente',
+                          aceptado: 'statusAceptado',
+                          preparando: 'statusPreparando',
+                          enviado: 'statusEnviado',
+                          entregado: 'statusEntregado',
+                          cancelado: 'statusCancelado',
+                        }[pedido.estado] as Parameters<typeof t>[0] | undefined;
+                        return key ? t(key, language) : pedido.estado;
+                      })()}
                     </span>
                   </div>
                   <p className="text-sm text-muted-foreground truncate">

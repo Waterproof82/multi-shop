@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
 import { Search, ChevronDown, ChevronUp, Check, Clock, Trash2, ShoppingCart, Calendar } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import type { PedidoItem, PedidoComplemento } from '@/core/domain/entities/types';
-import { PEDIDO_ESTADOS, PEDIDO_ESTADO_LABELS, PEDIDO_ESTADO_COLORS, type PedidoEstado } from '@/core/domain/constants/pedido';
+import { PEDIDO_ESTADOS, PEDIDO_ESTADO_COLORS, type PedidoEstado } from '@/core/domain/constants/pedido';
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,8 @@ import {
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { formatPrice } from '@/lib/format-price';
 import { logClientError } from '@/lib/client-error';
+import { useLanguage } from '@/lib/language-context';
+import { t } from '@/lib/translations';
 
 interface Cliente {
   nombre: string | null;
@@ -42,6 +44,7 @@ export default function PedidosPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [expandedPedido, setExpandedPedido] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; id: string | null; numero: number | null }>({ show: false, id: null, numero: null });
+  const { language } = useLanguage();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -90,10 +93,20 @@ export default function PedidosPage() {
     }
   }, [sortField, sortDirection]);
 
+  const ESTADO_TRANSLATION_KEYS: Record<PedidoEstado, keyof typeof import('@/lib/translations').translations.es> = {
+    pendiente: 'statusPendiente',
+    aceptado: 'statusAceptado',
+    preparando: 'statusPreparando',
+    enviado: 'statusEnviado',
+    entregado: 'statusEntregado',
+    cancelado: 'statusCancelado',
+  };
+
   const getEstadoBadge = (estado: string, pedidoId: string) => {
     const estadoIndex = PEDIDO_ESTADOS.indexOf(estado as PedidoEstado);
     const isPendiente = estadoIndex <= 0;
     const siguienteEstado = isPendiente ? 'aceptado' : 'pendiente';
+    const translationKey = ESTADO_TRANSLATION_KEYS[estado as PedidoEstado];
 
     return (
       <button
@@ -103,7 +116,7 @@ export default function PedidosPage() {
         }`}
       >
         {estado === 'pendiente' || estado === 'cancelado' ? <Clock className="w-3 h-3" /> : <Check className="w-3 h-3" />}
-        {PEDIDO_ESTADO_LABELS[estado as PedidoEstado] || estado}
+        {translationKey ? t(translationKey, language) : estado}
       </button>
     );
   };
@@ -166,7 +179,7 @@ export default function PedidosPage() {
   if (loading) {
     return (
       <div className="pt-16 lg:pt-0 px-6 lg:px-8 flex items-center justify-center min-h-[50vh]">
-        <div className="text-muted-foreground">Cargando...</div>
+        <div className="text-muted-foreground">{t("loading", language)}</div>
       </div>
     );
   }
@@ -177,27 +190,27 @@ export default function PedidosPage() {
       <div className="bg-primary rounded-lg p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">Pedidos</h1>
-            <p className="text-primary-foreground/80 text-sm mt-1">Gestiona los pedidos de tus clientes</p>
+            <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">{t("ordersTitle", language)}</h1>
+            <p className="text-primary-foreground/80 text-sm mt-1">{t("ordersSubtitle", language)}</p>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
             <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
               <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
               <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{stats.pedidosHoy}</span>
-              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Hoy</p>
+              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">{t("today", language)}</p>
             </div>
             <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
               <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{formatPrice(stats.totalHoy)}</span>
-              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Ventas hoy</p>
+              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">{t("salesToday", language)}</p>
             </div>
             <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
               <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
               <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{stats.pedidosMes}</span>
-              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Este mes</p>
+              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">{t("thisMonth", language)}</p>
             </div>
             <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
               <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{formatPrice(stats.totalMes)}</span>
-              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Ventas mes</p>
+              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">{t("salesMonth", language)}</p>
             </div>
           </div>
         </div>
@@ -210,10 +223,10 @@ export default function PedidosPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Buscar por número, cliente o teléfono..."
+              placeholder={t("searchOrders", language)}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              aria-label="Buscar pedidos"
+              aria-label={t("searchOrders", language)}
               className="pl-10"
             />
           </div>
@@ -233,17 +246,17 @@ export default function PedidosPage() {
                   </button>
                 </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Cliente
+                  {t("customer", language)}
                 </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Teléfono
+                  {t("phone", language)}
                 </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'total' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
                   <button 
                     onClick={() => handleSort('total')} 
                     className="flex items-center gap-1"
                   >
-                    Total
+                    {t("total", language)}
                     {sortField === 'total' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                   </button>
                 </th>
@@ -252,7 +265,7 @@ export default function PedidosPage() {
                     onClick={() => handleSort('estado')} 
                     className="flex items-center gap-1"
                   >
-                    Estado
+                    {t("status", language)}
                     {sortField === 'estado' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                   </button>
                 </th>
@@ -261,12 +274,12 @@ export default function PedidosPage() {
                     onClick={() => handleSort('created_at')} 
                     className="flex items-center gap-1"
                   >
-                    Fecha
+                    {t("date", language)}
                     {sortField === 'created_at' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                   </button>
                 </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Acciones
+                  {t("actions", language)}
                 </th>
               </tr>
             </thead>
@@ -274,7 +287,7 @@ export default function PedidosPage() {
               {filteredPedidos.length === 0 ? (
                 <tr>
                   <td colSpan={7} aria-live="polite" className="px-4 py-8 text-center text-muted-foreground">
-                    {searchTerm ? 'No se encontraron pedidos con ese criterio.' : 'No hay pedidos.'}
+                    {searchTerm ? t("noOrdersFound", language) : t("noOrders", language)}
                   </td>
                 </tr>
               ) : (
@@ -310,7 +323,7 @@ export default function PedidosPage() {
                         <button
                           onClick={(e) => { e.stopPropagation(); deletePedido(pedido.id, pedido.numero_pedido); }}
                           className="p-2.5 text-destructive hover:bg-destructive/10 rounded"
-                          aria-label="Eliminar pedido"
+                          aria-label={t("deleteOrder", language)}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -320,7 +333,7 @@ export default function PedidosPage() {
                       <tr>
                         <td colSpan={7} className="px-4 py-4 bg-muted/30">
                           <div className="max-w-2xl">
-                            <h4 className="font-medium mb-2 text-foreground">Detalles del pedido:</h4>
+                            <h4 className="font-medium mb-2 text-foreground">{t("orderDetails", language)}</h4>
                             <ul className="space-y-2 text-sm text-foreground">
                               {pedido.detalle_pedido?.map((item: PedidoItem) => {
                                 const complementoTotal = item.complementos?.reduce((sum: number, comp: PedidoComplemento) => sum + (comp.precio || comp.price || 0), 0) || 0;
@@ -361,10 +374,10 @@ export default function PedidosPage() {
               <div className="p-2 bg-destructive/10 rounded-full">
                 <Trash2 className="w-5 h-5 text-destructive" />
               </div>
-              Eliminar pedido
+              {t("deleteOrder", language)}
             </DialogTitle>
             <DialogDescription>
-              ¿Estás seguro de que quieres eliminar el pedido <strong>#{deleteConfirm.numero}</strong>? Esta acción no se puede deshacer.
+              {t("deleteOrderConfirm", language)} <strong>#{deleteConfirm.numero}</strong>? {t("cannotUndo", language)}
             </DialogDescription>
           </DialogHeader>
           <div className="flex gap-3 justify-end">
@@ -372,13 +385,13 @@ export default function PedidosPage() {
               onClick={() => setDeleteConfirm({ show: false, id: null, numero: null })}
               className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg"
             >
-              Cancelar
+              {t("cancel", language)}
             </button>
             <button
               onClick={confirmDelete}
               className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg"
             >
-              Eliminar
+              {t("delete", language)}
             </button>
           </div>
         </DialogContent>

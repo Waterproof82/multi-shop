@@ -1,6 +1,6 @@
 "use client"
 
-import { MapPin, Mail, Globe, Phone, Settings, Instagram, Facebook } from "lucide-react"
+import { MapPin, Mail, Globe, Phone, Settings, Camera, Link } from "lucide-react"
 import { useLanguage } from "@/lib/language-context"
 import { t } from "@/lib/translations"
 import type { EmpresaPublic } from "@/core/domain/entities/types"
@@ -18,7 +18,7 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
   return (
     <footer className="w-full bg-foreground text-background/80 mt-12 border-t border-foreground/10">
       <div className="max-w-7xl mx-auto px-6 py-10">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
 
           {/* Columna 1: Redes Sociales */}
           <div className="space-y-4">
@@ -27,14 +27,14 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
               {empresa.instagram && (
                 <li>
                   <a href={empresa.instagram} target="_blank" rel="noopener noreferrer" className="text-background/70 hover:text-background transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm" aria-label="Instagram">
-                    <Instagram className="w-5 h-5" />
+                    <Camera className="w-5 h-5" />
                   </a>
                 </li>
               )}
               {empresa.fb && (
                 <li>
                   <a href={empresa.fb} target="_blank" rel="noopener noreferrer" className="text-background/70 hover:text-background transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm" aria-label="Facebook">
-                    <Facebook className="w-5 h-5" />
+                    <Link className="w-5 h-5" />
                   </a>
                 </li>
               )}
@@ -84,7 +84,7 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
               <h3 className="text-xs font-semibold text-background uppercase tracking-wider">{t("location", language)}</h3>
               <div className="rounded-lg overflow-hidden border border-background/10 h-48 w-full">
                 <iframe
-                  title={t("location", language)}
+                  title="Ubicacion del restaurante"
                   width="100%"
                   height="100%"
                   style={{ border: 0 }}

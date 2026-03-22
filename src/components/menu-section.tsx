@@ -260,6 +260,7 @@ function CardMedia({ item, displayName, priority, onError }: Readonly<{
         playsInline
         className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 md:group-hover:scale-105 will-change-transform"
         onError={onError}
+        aria-label={displayName}
       />
     );
   }

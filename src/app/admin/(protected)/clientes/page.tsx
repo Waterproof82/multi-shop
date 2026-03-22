@@ -37,6 +37,7 @@ export default function ClientesPage() {
   const [creatingCliente, setCreatingCliente] = useState(false);
   const [editForm, setEditForm] = useState({ nombre: '', email: '', telefono: '', direccion: '' });
   const [saving, setSaving] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; id: string | null; nombre: string | null }>({ show: false, id: null, nombre: null });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -177,23 +178,28 @@ export default function ClientesPage() {
     }
   };
 
-  const handleDeleteCliente = async (id: string) => {
-    if (!confirm('¿Estás seguro de que quieres eliminar este cliente?')) return;
-    
+  const handleDeleteCliente = (cliente: Cliente) => {
+    setDeleteConfirm({ show: true, id: cliente.id, nombre: cliente.nombre });
+  };
+
+  const confirmDeleteCliente = async () => {
+    if (!deleteConfirm.id) return;
+
     setSaving(true);
     try {
       const res = await fetchWithCsrf('/api/admin/clientes', {
         method: 'DELETE',
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ id: deleteConfirm.id }),
       });
-      
+
       if (res.ok) {
-        setClientes(prev => prev.filter(c => c.id !== id));
+        setClientes(prev => prev.filter(c => c.id !== deleteConfirm.id));
       }
     } catch (error) {
       logClientError(error, 'handleDeleteCliente');
     } finally {
       setSaving(false);
+      setDeleteConfirm({ show: false, id: null, nombre: null });
     }
   };
 
@@ -204,15 +210,15 @@ export default function ClientesPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-4">
             <div>
-              <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">Clientes</h1>
-              <p className="text-primary-foreground/80 text-sm mt-1">Gestiona tus clientes</p>
+              <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">{t("clientsTitle", language)}</h1>
+              <p className="text-primary-foreground/80 text-sm mt-1">{t("clientsSubtitle", language)}</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
             <div className="bg-primary-foreground/20 rounded-lg px-4 py-3 text-center">
               <Users className="w-6 h-6 sm:w-8 sm:h-8 text-primary-foreground mx-auto mb-1" />
               <span className="text-xl sm:text-2xl font-semibold text-primary-foreground">{clientes.length}</span>
-              <p className="text-primary-foreground/80 text-xs">Total clientes</p>
+              <p className="text-primary-foreground/80 text-xs">{t("totalClients", language)}</p>
             </div>
             <Button 
               onClick={openCreateModal}
@@ -232,10 +238,10 @@ export default function ClientesPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="Buscar clientes..."
+            placeholder={t("searchClients", language)}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            aria-label="Buscar clientes"
+            aria-label={t("searchClients", language)}
             className="pl-10"
           />
         </div>
@@ -243,7 +249,7 @@ export default function ClientesPage() {
 
       {/* Tabla clientes */}
       {loading && (
-        <div className="text-center py-8 text-muted-foreground">Cargando...</div>
+        <div className="text-center py-8 text-muted-foreground">{t("loading", language)}</div>
       )}
       {error && (
         <div className="mb-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
@@ -254,7 +260,7 @@ export default function ClientesPage() {
             className="mt-2"
             onClick={() => globalThis.location.reload()}
           >
-            Reintentar
+            {t("retry", language)}
           </Button>
         </div>
       )}
@@ -262,10 +268,10 @@ export default function ClientesPage() {
         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
           <Users className="w-12 h-12 opacity-30 mb-3" />
           <p className="text-base font-medium text-foreground">
-            {searchTerm ? 'No se encontraron clientes' : 'No hay clientes registrados'}
+            {searchTerm ? t("noClientsFound", language) : t("noClientsYet", language)}
           </p>
           <p className="text-sm mt-1">
-            {searchTerm ? 'Prueba con otros términos de búsqueda' : 'Los clientes aparecerán aquí cuando realicen pedidos'}
+            {searchTerm ? t("noClientsFoundHint", language) : t("noClientsYetHint", language)}
           </p>
         </div>
       )}
@@ -275,13 +281,13 @@ export default function ClientesPage() {
             <table className="w-full">
               <thead className="bg-muted/50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Nombre</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Email</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Teléfono</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Dirección</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Pedidos</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Fecha</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Promociones</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t("name", language)}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t("email", language)}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t("phone", language)}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t("address", language)}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t("ordersLabel", language)}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t("date", language)}</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">{t("promotionsLabel", language)}</th>
                   <th className="px-4 py-3"></th>
                 </tr>
               </thead>
@@ -348,20 +354,19 @@ export default function ClientesPage() {
                       <button
                         onClick={() => openEditModal(cliente)}
                         className="p-2 hover:bg-muted rounded-lg transition-colors"
-                        title="Editar"
+                        title={t("edit", language)}
                       >
                         <Pencil className="size-4 text-muted-foreground" />
                       </button>
                     </td>
                     <td className="px-4 py-3">
-              <button
-                type="button"
-                onClick={() => setCreatingCliente(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors text-sm font-medium"
-              >
-                <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline">{t("newClient", language)}</span>
-              </button>
+                      <button
+                        onClick={() => handleDeleteCliente(cliente)}
+                        className="p-2 hover:bg-destructive/10 rounded-lg transition-colors"
+                        title={t("delete", language)}
+                      >
+                        <Trash2 className="size-4 text-destructive" />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -377,25 +382,25 @@ export default function ClientesPage() {
           <DialogHeader>
             <DialogTitle>{t("editClient", language)}</DialogTitle>
             <DialogDescription>
-              Modifica los datos del cliente.
+              {t("editClientDesc", language)}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
               <label htmlFor="edit_nombre" className="block text-sm font-medium text-foreground mb-1">
-                Nombre
+                {t("name", language)}
               </label>
               <Input
                 id="edit_nombre"
                 type="text"
                 value={editForm.nombre}
                 onChange={(e) => setEditForm(prev => ({ ...prev, nombre: e.target.value }))}
-                placeholder="Nombre del cliente"
+                placeholder={t("clientNamePlaceholder", language)}
               />
             </div>
             <div>
               <label htmlFor="edit_email" className="block text-sm font-medium text-foreground mb-1">
-                Email
+                {t("email", language)}
               </label>
               <Input
                 id="edit_email"
@@ -407,35 +412,35 @@ export default function ClientesPage() {
             </div>
             <div>
               <label htmlFor="edit_telefono" className="block text-sm font-medium text-foreground mb-1">
-                Teléfono
+                {t("phone", language)}
               </label>
               <Input
                 id="edit_telefono"
                 type="tel"
                 value={editForm.telefono}
                 onChange={(e) => setEditForm(prev => ({ ...prev, telefono: e.target.value }))}
-                placeholder="Teléfono"
+                placeholder={t("phone", language)}
               />
             </div>
             <div>
               <label htmlFor="edit_direccion" className="block text-sm font-medium text-foreground mb-1">
-                Dirección <span className="text-muted-foreground font-normal">(opcional)</span>
+                {t("address", language)} <span className="text-muted-foreground font-normal">({t("optional", language)})</span>
               </label>
               <Input
                 id="edit_direccion"
                 type="text"
                 value={editForm.direccion}
                 onChange={(e) => setEditForm(prev => ({ ...prev, direccion: e.target.value }))}
-                placeholder="Dirección del cliente"
+                placeholder={t("addressPlaceholder", language)}
               />
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="outline" onClick={closeEditModal}>
-              Cancelar
+              {t("cancel", language)}
             </Button>
             <Button onClick={handleSaveEdit} disabled={saving}>
-              {saving ? 'Guardando...' : 'Guardar'}
+              {saving ? t("savingProgress", language) : t("save", language)}
             </Button>
           </div>
         </DialogContent>
@@ -447,25 +452,25 @@ export default function ClientesPage() {
           <DialogHeader>
             <DialogTitle>{t("newClient", language)}</DialogTitle>
             <DialogDescription>
-              Crea un nuevo cliente en el sistema.
+              {t("newClientDesc", language)}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
               <label htmlFor="create_nombre" className="block text-sm font-medium text-foreground mb-1">
-                Nombre
+                {t("name", language)}
               </label>
               <Input
                 id="create_nombre"
                 type="text"
                 value={editForm.nombre}
                 onChange={(e) => setEditForm(prev => ({ ...prev, nombre: e.target.value }))}
-                placeholder="Nombre del cliente"
+                placeholder={t("clientNamePlaceholder", language)}
               />
             </div>
             <div>
               <label htmlFor="create_email" className="block text-sm font-medium text-foreground mb-1">
-                Email
+                {t("email", language)}
               </label>
               <Input
                 id="create_email"
@@ -477,36 +482,69 @@ export default function ClientesPage() {
             </div>
             <div>
               <label htmlFor="create_telefono" className="block text-sm font-medium text-foreground mb-1">
-                Teléfono
+                {t("phone", language)}
               </label>
               <Input
                 id="create_telefono"
                 type="tel"
                 value={editForm.telefono}
                 onChange={(e) => setEditForm(prev => ({ ...prev, telefono: e.target.value }))}
-                placeholder="Teléfono"
+                placeholder={t("phone", language)}
               />
             </div>
             <div>
               <label htmlFor="create_direccion" className="block text-sm font-medium text-foreground mb-1">
-                Dirección <span className="text-muted-foreground font-normal">(opcional)</span>
+                {t("address", language)} <span className="text-muted-foreground font-normal">({t("optional", language)})</span>
               </label>
               <Input
                 id="create_direccion"
                 type="text"
                 value={editForm.direccion}
                 onChange={(e) => setEditForm(prev => ({ ...prev, direccion: e.target.value }))}
-                placeholder="Dirección del cliente"
+                placeholder={t("addressPlaceholder", language)}
               />
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="outline" onClick={closeCreateModal}>
-              Cancelar
+              {t("cancel", language)}
             </Button>
             <Button onClick={handleCreateCliente} disabled={saving || (!editForm.nombre && !editForm.email && !editForm.telefono)}>
-              {saving ? 'Creando...' : t("createClient", language)}
+              {saving ? t("creatingProgress", language) : t("createClient", language)}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de confirmación de eliminación */}
+      <Dialog open={deleteConfirm.show} onOpenChange={(open) => { if (!open) setDeleteConfirm({ show: false, id: null, nombre: null }); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              <div className="p-2 bg-destructive/10 rounded-full">
+                <Trash2 className="w-5 h-5 text-destructive" />
+              </div>
+              {t("deleteClient", language)}
+            </DialogTitle>
+            <DialogDescription>
+              {t("deleteClientConfirm", language)} <strong>{deleteConfirm.nombre || '-'}</strong>? {t("cannotUndo", language)}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-3 justify-end">
+            <button
+              type="button"
+              onClick={() => setDeleteConfirm({ show: false, id: null, nombre: null })}
+              className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg min-h-[44px]"
+            >
+              {t("cancel", language)}
+            </button>
+            <button
+              type="button"
+              onClick={confirmDeleteCliente}
+              className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg min-h-[44px]"
+            >
+              {t("delete", language)}
+            </button>
           </div>
         </DialogContent>
       </Dialog>

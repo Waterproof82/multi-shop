@@ -5,6 +5,7 @@ import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, Check } from "luci
 import { useReducedMotion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { RippleButton } from "@/components/ui/ripple-button"
 import {
   Sheet,
   SheetContent,
@@ -57,47 +58,6 @@ function validatePhoneInput(phone: string, translate: TranslateFn, language: Lan
   if (digitsOnly.length < 9) return translate("validationPhoneMin", language);
   if (digitsOnly.length > 15) return translate("validationPhoneMax", language);
   return undefined;
-}
-
-function RippleButton({ children, onClick, className, disabled, variant = "default", size = "default", 'aria-label': ariaLabel, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "default" | "outline" | "ghost"; size?: "default" | "icon" }) {
-  const buttonRef = useRef<HTMLButtonElement>(null);
-
-  const createRipple = (event: React.MouseEvent<HTMLButtonElement>) => {
-    const button = event.currentTarget;
-    const rect = button.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    const ripple = document.createElement("span");
-    ripple.className = "ripple";
-    ripple.style.left = `${x}px`;
-    ripple.style.top = `${y}px`;
-    const existingRipple = button.querySelector(".ripple");
-    if (existingRipple) existingRipple.remove();
-    button.appendChild(ripple);
-    setTimeout(() => ripple.remove(), 500);
-  }
-
-  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    if (!disabled) {
-      createRipple(e);
-      onClick?.(e);
-    }
-  }
-
-  return (
-    <Button
-      ref={buttonRef}
-      variant={variant}
-      size={size}
-      className={`relative overflow-hidden ${className}`}
-      disabled={disabled}
-      onClick={handleClick}
-      aria-label={ariaLabel}
-      {...props}
-    >
-      {children}
-    </Button>
-  );
 }
 
 interface OrderFormData {
