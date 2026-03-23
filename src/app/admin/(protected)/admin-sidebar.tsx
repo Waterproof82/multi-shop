@@ -65,7 +65,7 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
         )}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="p-2 rounded-lg hover:bg-muted transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-muted transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           aria-label={isOpen ? t("closeMenu", language) : t("openMenu", language)}
           aria-expanded={isOpen}
         >
@@ -86,7 +86,7 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
       {/* Sidebar */}
       <aside className={`
         fixed top-0 h-full w-64 bg-card border-r border-border z-40
-        transform transition-transform duration-200 ease-in-out will-change-transform
+        transform transition-transform duration-200 ease-in-out
         lg:translate-x-0
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>

@@ -163,6 +163,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
                 className="h-11 w-11 md:h-10 md:w-10"
                 onClick={handleDecrement}
                 disabled={quantity <= 1}
+                aria-label={t("reduceQuantity", language)}
               >
                 <Minus className="h-4 w-4" />
               </RippleButton>
@@ -172,11 +173,11 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
                 value={quantity}
                 className="mx-1 h-10 w-12 flex items-center justify-center text-center text-lg font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 readOnly
-                tabIndex={-1}
+                tabIndex={0}
                 aria-live="polite"
                 aria-label={t("quantity", language)}
               />
-              <RippleButton variant="outline" size="icon" className="h-11 w-11 md:h-10 md:w-10" onClick={handleIncrement}>
+              <RippleButton variant="outline" size="icon" className="h-11 w-11 md:h-10 md:w-10" onClick={handleIncrement} aria-label={t("increaseQuantity", language)}>
                 <Plus className="h-4 w-4" />
               </RippleButton>
             </div>

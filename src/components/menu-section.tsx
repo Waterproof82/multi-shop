@@ -259,7 +259,7 @@ function CardMedia({ item, displayName, priority, onError, shouldReduceMotion }:
         loop={!shouldReduceMotion}
         muted
         playsInline
-        className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 md:group-hover:scale-105 will-change-transform"
+        className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 md:group-hover:scale-105"
         onError={onError}
         aria-label={displayName}
       />
@@ -270,7 +270,7 @@ function CardMedia({ item, displayName, priority, onError, shouldReduceMotion }:
       src={item.image!}
       alt={displayName}
       fill
-      className="object-cover transition-transform duration-300 md:group-hover:scale-105 will-change-transform"
+      className="object-cover transition-transform duration-300 md:group-hover:scale-105"
       loading={priority ? "eager" : "lazy"}
       sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
       onError={onError}

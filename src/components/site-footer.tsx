@@ -53,7 +53,7 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
               )}
               {empresa.telefono && (() => {
                 const telefonoDigits = empresa.telefono.replaceAll(/\D/g, '');
-                const telefonoDisplay = telefonoDigits.replace(/^(00|\+)?34/, '');
+                const telefonoDisplay = telefonoDigits.replace(/^(00|\+)?\d{1,3}(?=\d{9})/, '');
                 return (
                 <li className="flex items-center gap-3">
                   <Phone className="w-4 h-4 text-background/40 shrink-0" />

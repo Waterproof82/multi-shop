@@ -68,8 +68,9 @@ export function CartToast() {
             </span>
           </div>
           <button
+            type="button"
             onClick={handleClose}
-            className="p-1 hover:bg-muted rounded-full transition-colors"
+            className="p-1 hover:bg-muted rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             aria-label={t("close", language)}
           >
             <X className="w-4 h-4 text-muted-foreground" />
@@ -85,11 +86,12 @@ export function CartToast() {
               Total: {totalPrice.toFixed(2).replace('.', ',')}€
             </span>
             <button
+              type="button"
               onClick={() => {
                 handleClose();
                 openCart();
               }}
-              className="text-xs font-medium text-primary hover:underline transition-all hover:translate-x-0.5"
+              className="text-xs font-medium text-primary hover:underline transition-all hover:translate-x-0.5 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
             >
               {t("viewCart", language)} →
             </button>

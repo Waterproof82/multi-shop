@@ -121,7 +121,7 @@ export function ProductFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-xl lg:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editingId ? t("editProduct", language) : t("newProductDialog", language)}</DialogTitle>
           <DialogDescription>
@@ -238,8 +238,9 @@ export function ProductFormDialog({
             />
 
             <div className="col-span-2 flex gap-6 mt-4">
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label htmlFor="es_especial" className="flex items-center gap-2 cursor-pointer">
                 <input
+                  id="es_especial"
                   type="checkbox"
                   checked={formData.es_especial}
                   onChange={(e) => onFormChange({ ...formData, es_especial: e.target.checked })}
@@ -247,8 +248,9 @@ export function ProductFormDialog({
                 />
                 <span className="text-sm text-foreground">{t("specialProduct", language)}</span>
               </label>
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label htmlFor="activo" className="flex items-center gap-2 cursor-pointer">
                 <input
+                  id="activo"
                   type="checkbox"
                   checked={formData.activo}
                   onChange={(e) => onFormChange({ ...formData, activo: e.target.checked })}

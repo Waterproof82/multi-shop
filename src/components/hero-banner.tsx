@@ -72,7 +72,7 @@ export function HeroBanner({ empresa }: HeroBannerProps) {
         className="relative z-10"
       >
         {showTitulo && (
-          <h1 className="font-serif text-4xl font-bold tracking-tight text-primary-foreground md:text-6xl">
+          <h1 className="font-serif text-3xl font-bold tracking-tight text-primary-foreground sm:text-4xl md:text-5xl lg:text-6xl">
             {titulo}
           </h1>
         )}
