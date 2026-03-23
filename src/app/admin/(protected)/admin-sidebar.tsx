@@ -86,7 +86,7 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
       {/* Sidebar */}
       <aside className={`
         fixed top-0 h-full w-64 bg-card border-r border-border z-40
-        transform transition-transform duration-200 ease-in-out
+        transform transition-transform duration-200 ease-in-out will-change-transform
         lg:translate-x-0
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>

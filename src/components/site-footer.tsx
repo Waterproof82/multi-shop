@@ -84,7 +84,7 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
               <h3 className="text-xs font-semibold text-background uppercase tracking-wider">{t("location", language)}</h3>
               <div className="rounded-lg overflow-hidden border border-background/10 h-48 w-full">
                 <iframe
-                  title="Ubicacion del restaurante"
+                  title={t("locationIframe", language)}
                   width="100%"
                   height="100%"
                   style={{ border: 0 }}

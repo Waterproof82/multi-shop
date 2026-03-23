@@ -261,7 +261,7 @@ export default function PromocionesPage() {
                   <button
                     type="button"
                     onClick={handleRemoveImage}
-                    className="px-3 py-1.5 bg-destructive text-destructive-foreground rounded-md text-sm hover:bg-destructive/90"
+                    className="px-3 py-1.5 bg-destructive text-destructive-foreground rounded-md text-sm hover:bg-destructive/90 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     {t("delete", language)}
                   </button>

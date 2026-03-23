@@ -307,6 +307,18 @@ export const translations = {
     monthOct: "Octubre",
     monthNov: "Noviembre",
     monthDec: "Diciembre",
+    // Navigation
+    previousMonth: "Mes anterior",
+    nextMonth: "Mes siguiente",
+    selectLanguage: "Seleccionar idioma",
+    locationIframe: "Ubicación del restaurante",
+    // Promo notifications
+    promoSubscribed: "Te has dado de alta en las promociones.",
+    promoUnsubscribed: "Te has dado de baja de las promociones.",
+    promoErrorInvalid: "Enlace no válido.",
+    promoErrorNotFound: "No se encontró el registro.",
+    promoErrorInternal: "Ocurrió un error. Inténtalo más tarde.",
+    skipToContent: "Saltar al contenido principal",
     // Footer
     contact: "Contacto",
     location: "Ubicación",
@@ -618,6 +630,18 @@ export const translations = {
     monthOct: "October",
     monthNov: "November",
     monthDec: "December",
+    // Navigation
+    previousMonth: "Previous month",
+    nextMonth: "Next month",
+    selectLanguage: "Select language",
+    locationIframe: "Restaurant location",
+    // Promo notifications
+    promoSubscribed: "You have subscribed to promotions.",
+    promoUnsubscribed: "You have unsubscribed from promotions.",
+    promoErrorInvalid: "Invalid link.",
+    promoErrorNotFound: "Record not found.",
+    promoErrorInternal: "An error occurred. Please try again later.",
+    skipToContent: "Skip to main content",
     // Footer
     contact: "Contact",
     location: "Location",
@@ -929,6 +953,18 @@ export const translations = {
     monthOct: "Octobre",
     monthNov: "Novembre",
     monthDec: "Décembre",
+    // Navigation
+    previousMonth: "Mois précédent",
+    nextMonth: "Mois suivant",
+    selectLanguage: "Choisir la langue",
+    locationIframe: "Emplacement du restaurant",
+    // Promo notifications
+    promoSubscribed: "Vous êtes inscrit aux promotions.",
+    promoUnsubscribed: "Vous êtes désinscrit des promotions.",
+    promoErrorInvalid: "Lien non valide.",
+    promoErrorNotFound: "Enregistrement non trouvé.",
+    promoErrorInternal: "Une erreur est survenue. Réessayez plus tard.",
+    skipToContent: "Aller au contenu principal",
     // Footer
     contact: "Contact",
     location: "Emplacement",
@@ -1240,6 +1276,18 @@ export const translations = {
     monthOct: "Ottobre",
     monthNov: "Novembre",
     monthDec: "Dicembre",
+    // Navigation
+    previousMonth: "Mese precedente",
+    nextMonth: "Mese successivo",
+    selectLanguage: "Seleziona lingua",
+    locationIframe: "Posizione del ristorante",
+    // Promo notifications
+    promoSubscribed: "Ti sei iscritto alle promozioni.",
+    promoUnsubscribed: "Ti sei cancellato dalle promozioni.",
+    promoErrorInvalid: "Link non valido.",
+    promoErrorNotFound: "Registro non trovato.",
+    promoErrorInternal: "Si è verificato un errore. Riprova più tardi.",
+    skipToContent: "Vai al contenuto principale",
     // Footer
     contact: "Contatti",
     location: "Posizione",
@@ -1551,6 +1599,18 @@ export const translations = {
     monthOct: "Oktober",
     monthNov: "November",
     monthDec: "Dezember",
+    // Navigation
+    previousMonth: "Vorheriger Monat",
+    nextMonth: "Nächster Monat",
+    selectLanguage: "Sprache auswählen",
+    locationIframe: "Standort des Restaurants",
+    // Promo notifications
+    promoSubscribed: "Sie haben sich für Werbeaktionen angemeldet.",
+    promoUnsubscribed: "Sie haben sich von Werbeaktionen abgemeldet.",
+    promoErrorInvalid: "Ungültiger Link.",
+    promoErrorNotFound: "Eintrag nicht gefunden.",
+    promoErrorInternal: "Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.",
+    skipToContent: "Zum Hauptinhalt springen",
     // Footer
     contact: "Kontakt",
     location: "Standort",

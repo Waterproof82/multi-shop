@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useLanguage, type Language } from "@/lib/language-context"
+import { t } from "@/lib/translations"
 import { FLAG_SVGS } from "@/components/ui/flag-icons"
 
 const languages: { code: Language; label: string }[] = [
@@ -23,13 +24,12 @@ export function LanguageSelector() {
   const { language, setLanguage } = useLanguage()
 
   const currentLang = languages.find(l => l.code === language) || languages[0]
-  const CurrentFlag = FLAG_SVGS[currentLang.code]
   const FlagIcon = FLAG_SVGS[currentLang.code]
 
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="gap-2 px-2" aria-label="Select language" id="language-selector-trigger">
+        <Button variant="ghost" size="sm" className="gap-2 px-2" aria-label={t("selectLanguage", language)} id="language-selector-trigger">
           {FlagIcon && <FlagIcon className="w-5 h-3.5 rounded-sm" />}
           <Languages className="size-4" />
           <span className="text-xs font-medium uppercase">{currentLang.code}</span>

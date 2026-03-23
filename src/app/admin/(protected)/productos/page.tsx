@@ -343,7 +343,7 @@ export default function ProductosPage() {
         </div>
         <button
           onClick={openCreateModal}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 w-full sm:w-auto justify-center"
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 w-full sm:w-auto justify-center outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px]"
         >
           <Plus className="h-4 w-4" />
           <span>{t("newProduct", language)}</span>
@@ -373,7 +373,7 @@ export default function ProductosPage() {
                 </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase" aria-sort={getAriaSortValue('titulo_es')}>
                   <button 
-                    className="flex items-center gap-1 hover:bg-muted"
+                    className="flex items-center gap-1 hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm px-1"
                     onClick={() => handleSort('titulo_es')}
                   >
                     {t("nameES", language)}
@@ -382,7 +382,7 @@ export default function ProductosPage() {
                 </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase" aria-sort={getAriaSortValue('precio')}>
                   <button 
-                    className="flex items-center gap-1 hover:bg-muted"
+                    className="flex items-center gap-1 hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm px-1"
                     onClick={() => handleSort('precio')}
                   >
                     {t("price", language)}
@@ -391,7 +391,7 @@ export default function ProductosPage() {
                 </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase" aria-sort={getAriaSortValue('categoria')}>
                   <button 
-                    className="flex items-center gap-1 hover:bg-muted"
+                    className="flex items-center gap-1 hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm px-1"
                     onClick={() => handleSort('categoria')}
                   >
                     {t("category", language)}
@@ -400,7 +400,7 @@ export default function ProductosPage() {
                 </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase" aria-sort={getAriaSortValue('activo')}>
                   <button 
-                    className="flex items-center gap-1 hover:bg-muted"
+                    className="flex items-center gap-1 hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm px-1"
                     onClick={() => handleSort('activo')}
                   >
                     {t("status", language)}
@@ -456,7 +456,8 @@ export default function ProductosPage() {
                   <td className="px-4 py-3 whitespace-nowrap">
                     <button
                       onClick={() => toggleActivo(prod)}
-                      className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
+                      aria-label={`${prod.activo ? t("inactive", language) : t("active", language)} ${prod.titulo_es}`}
+                      className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                         prod.activo
                           ? 'bg-primary/10 text-primary hover:bg-primary/20'
                           : 'bg-muted text-foreground hover:bg-muted/80'
@@ -468,14 +469,14 @@ export default function ProductosPage() {
                   <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
                     <button
                       onClick={() => openEditModal(prod)}
-                      className="text-primary hover:text-primary/80 mr-3"
+                      className="text-primary hover:text-primary/80 mr-3 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
                       aria-label={`Editar ${prod.titulo_es}`}
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => handleDeleteProduct(prod.id)}
-                      className="text-destructive hover:text-destructive/80"
+                      className="text-destructive hover:text-destructive/80 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
                       aria-label={`Eliminar ${prod.titulo_es}`}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -532,14 +533,14 @@ export default function ProductosPage() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => openEditModal(prod)}
-                        className="p-1.5 text-primary hover:bg-primary/10 dark:hover:bg-primary/20 rounded"
+                        className="p-1.5 min-h-[44px] min-w-[44px] flex items-center justify-center text-primary hover:bg-primary/10 dark:hover:bg-primary/20 rounded outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         aria-label={`Editar ${prod.titulo_es}`}
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => handleDeleteProduct(prod.id)}
-                        className="p-1.5 text-destructive hover:bg-destructive/10 rounded"
+                        className="p-1.5 min-h-[44px] min-w-[44px] flex items-center justify-center text-destructive hover:bg-destructive/10 rounded outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         aria-label={`Eliminar ${prod.titulo_es}`}
                       >
                         <Trash2 className="h-4 w-4" />

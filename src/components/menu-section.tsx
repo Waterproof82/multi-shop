@@ -76,7 +76,7 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
     : category.descripcion;
 
   return (
-    <section id={category.id} className="scroll-mt-[--scroll-offset]">
+    <section id={category.id} className="scroll-mt-[--scroll-offset]" style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 500px' }}>
       <div className="mb-5 flex items-center gap-4 overflow-hidden">
         <h2 className="font-serif text-2xl font-semibold text-foreground md:text-3xl tracking-tight truncate shrink min-w-0">
           {(translationLang && category.translations?.[translationLang]?.name) || category.label}
@@ -244,18 +244,19 @@ function getCardAriaLabel(showCart: boolean | undefined, safeLanguage: Language,
   return `${t("viewOptions", safeLanguage)}: ${displayName}`;
 }
 
-function CardMedia({ item, displayName, priority, onError }: Readonly<{
+function CardMedia({ item, displayName, priority, onError, shouldReduceMotion }: Readonly<{
   item: MenuItemVM;
   displayName: string;
   priority: boolean;
   onError: () => void;
+  shouldReduceMotion: boolean;
 }>) {
   if (item.image?.endsWith(".mp4")) {
     return (
       <video
         src={item.image}
-        autoPlay
-        loop
+        autoPlay={!shouldReduceMotion}
+        loop={!shouldReduceMotion}
         muted
         playsInline
         className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 md:group-hover:scale-105 will-change-transform"
@@ -292,6 +293,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
   const { language: appLanguage } = useLanguage();
   const safeLanguage = appLanguage || "es";
   const [imageError, setImageError] = useState(false);
+  const shouldReduceMotionCard = useReducedMotion() ?? false;
   const hasComplements = item.complements && item.complements.length > 0;
   const isClickable = showCart || hasComplements;
 
@@ -338,7 +340,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
       )}
       {item.image && !imageError && (
         <div className="relative aspect-[16/10] w-full overflow-hidden">
-          <CardMedia item={item} displayName={displayName} priority={priority} onError={() => setImageError(true)} />
+          <CardMedia item={item} displayName={displayName} priority={priority} onError={() => setImageError(true)} shouldReduceMotion={shouldReduceMotionCard} />
         </div>
       )}
       <div className="flex flex-1 flex-col p-4">

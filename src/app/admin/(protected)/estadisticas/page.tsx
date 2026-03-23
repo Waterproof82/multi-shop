@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { BarChart3, ShoppingCart, Euro, TrendingUp, TrendingDown, Users, Calendar, ArrowUpRight, ArrowDownRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BarChart3, ShoppingCart, Euro, TrendingUp, TrendingDown, Users, Calendar, ArrowUpRight, ArrowDownRight, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, LineChart, Line } from 'recharts';
 import { fetchWithCsrf } from '@/lib/csrf-client';
@@ -29,25 +29,25 @@ interface Stats {
 
 function getChartColors(): string[] {
   if (typeof window === 'undefined') return [
-    'hsl(var(--chart-orange))',
-    'hsl(var(--chart-blue))',
-    'hsl(var(--chart-green))',
-    'hsl(var(--chart-purple))',
-    'hsl(var(--chart-pink))',
-    'hsl(var(--chart-teal))',
-    'hsl(var(--chart-rose))',
-    'hsl(var(--chart-lime))',
+    '#F97316',
+    '#3B82F6',
+    '#10B981',
+    '#8B5CF6',
+    '#EC4899',
+    '#14B8A6',
+    '#F43F5E',
+    '#84CC16',
   ];
   const style = getComputedStyle(document.documentElement);
   return [
-    style.getPropertyValue('--color-chart-orange').trim() || 'hsl(var(--chart-orange))',
-    style.getPropertyValue('--color-chart-blue').trim() || 'hsl(var(--chart-blue))',
-    style.getPropertyValue('--color-chart-green').trim() || 'hsl(var(--chart-green))',
-    style.getPropertyValue('--color-chart-purple').trim() || 'hsl(var(--chart-purple))',
-    style.getPropertyValue('--color-chart-pink').trim() || 'hsl(var(--chart-pink))',
-    style.getPropertyValue('--color-chart-teal').trim() || 'hsl(var(--chart-teal))',
-    style.getPropertyValue('--color-chart-rose').trim() || 'hsl(var(--chart-rose))',
-    style.getPropertyValue('--color-chart-lime').trim() || 'hsl(var(--chart-lime))',
+    style.getPropertyValue('--color-chart-orange').trim() || '#F97316',
+    style.getPropertyValue('--color-chart-blue').trim() || '#3B82F6',
+    style.getPropertyValue('--color-chart-green').trim() || '#10B981',
+    style.getPropertyValue('--color-chart-purple').trim() || '#8B5CF6',
+    style.getPropertyValue('--color-chart-pink').trim() || '#EC4899',
+    style.getPropertyValue('--color-chart-teal').trim() || '#14B8A6',
+    style.getPropertyValue('--color-chart-rose').trim() || '#F43F5E',
+    style.getPropertyValue('--color-chart-lime').trim() || '#84CC16',
   ];
 }
 
@@ -112,7 +112,7 @@ export default function EstadisticasPage() {
   if (loading) {
     return (
       <div className="pt-16 lg:pt-0 px-6 lg:px-8 flex items-center justify-center min-h-[50vh]">
-        <div className="text-muted-foreground">{t("loading", language)}</div>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -129,6 +129,7 @@ export default function EstadisticasPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => cambiarMes(-1)}
+              aria-label={t("previousMonth", language)}
               className="p-2 rounded-lg bg-primary-foreground/20 hover:bg-primary-foreground/30 transition-colors"
             >
               <ChevronLeft className="w-5 h-5 text-primary-foreground" />
@@ -141,6 +142,7 @@ export default function EstadisticasPage() {
             <button
               onClick={() => cambiarMes(1)}
               disabled={esMesActual}
+              aria-label={t("nextMonth", language)}
               className="p-2 rounded-lg bg-primary-foreground/20 hover:bg-primary-foreground/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronRight className="w-5 h-5 text-primary-foreground" />
@@ -269,9 +271,9 @@ export default function EstadisticasPage() {
                 <Line
                   type="monotone"
                   dataKey="pedidos"
-                  stroke={chartColors[0] || 'hsl(var(--chart-orange))'}
+                  stroke={chartColors[0] || '#F97316'}
                   strokeWidth={2}
-                  dot={{ fill: chartColors[0] || 'hsl(var(--chart-orange))', r: 3 }}
+                  dot={{ fill: chartColors[0] || '#F97316', r: 3 }}
                   activeDot={{ r: 5 }}
                 />
               </LineChart>

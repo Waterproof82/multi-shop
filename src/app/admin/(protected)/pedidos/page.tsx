@@ -237,9 +237,9 @@ export default function PedidosPage() {
             <thead className="bg-muted">
               <tr>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'numero_pedido' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
-                  <button 
-                    onClick={() => handleSort('numero_pedido')} 
-                    className="flex items-center gap-1"
+                  <button
+                    onClick={() => handleSort('numero_pedido')}
+                    className="flex items-center gap-1 rounded-sm px-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     #
                     {sortField === 'numero_pedido' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
@@ -252,27 +252,27 @@ export default function PedidosPage() {
                   {t("phone", language)}
                 </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'total' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
-                  <button 
-                    onClick={() => handleSort('total')} 
-                    className="flex items-center gap-1"
+                  <button
+                    onClick={() => handleSort('total')}
+                    className="flex items-center gap-1 rounded-sm px-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     {t("total", language)}
                     {sortField === 'total' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                   </button>
                 </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'estado' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
-                  <button 
-                    onClick={() => handleSort('estado')} 
-                    className="flex items-center gap-1"
+                  <button
+                    onClick={() => handleSort('estado')}
+                    className="flex items-center gap-1 rounded-sm px-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     {t("status", language)}
                     {sortField === 'estado' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                   </button>
                 </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'created_at' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
-                  <button 
-                    onClick={() => handleSort('created_at')} 
-                    className="flex items-center gap-1"
+                  <button
+                    onClick={() => handleSort('created_at')}
+                    className="flex items-center gap-1 rounded-sm px-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     {t("date", language)}
                     {sortField === 'created_at' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
@@ -322,7 +322,7 @@ export default function PedidosPage() {
                       <td className="px-4 py-3 whitespace-nowrap">
                         <button
                           onClick={(e) => { e.stopPropagation(); deletePedido(pedido.id, pedido.numero_pedido); }}
-                          className="p-2.5 text-destructive hover:bg-destructive/10 rounded"
+                          className="p-2.5 text-destructive hover:bg-destructive/10 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           aria-label={t("deleteOrder", language)}
                         >
                           <Trash2 className="w-4 h-4" />
@@ -383,13 +383,13 @@ export default function PedidosPage() {
           <div className="flex gap-3 justify-end">
             <button
               onClick={() => setDeleteConfirm({ show: false, id: null, numero: null })}
-              className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg"
+              className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
             >
               {t("cancel", language)}
             </button>
             <button
               onClick={confirmDelete}
-              className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg"
+              className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
             >
               {t("delete", language)}
             </button>

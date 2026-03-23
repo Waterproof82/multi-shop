@@ -671,7 +671,7 @@ export default function CategoriasPage() {
               <button
                 type="button"
                 onClick={() => setShowTranslations(!showTranslations)}
-                className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary dark:hover:text-primary"
+                className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary dark:hover:text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 {showTranslations ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                 <Languages className="h-4 w-4" />

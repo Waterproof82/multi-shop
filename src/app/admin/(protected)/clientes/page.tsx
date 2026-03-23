@@ -338,7 +338,7 @@ export default function ClientesPage() {
                       <div className="flex justify-center">
                         <button
                           onClick={() => handleTogglePromociones(cliente)}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                             cliente.aceptar_promociones ? 'bg-primary' : 'bg-muted'
                           }`}
                         >
@@ -353,7 +353,7 @@ export default function ClientesPage() {
                     <td className="px-4 py-3">
                       <button
                         onClick={() => openEditModal(cliente)}
-                        className="p-2 hover:bg-muted rounded-lg transition-colors"
+                        className="p-2 hover:bg-muted rounded-lg transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
                         title={t("edit", language)}
                       >
                         <Pencil className="size-4 text-muted-foreground" />
@@ -362,7 +362,7 @@ export default function ClientesPage() {
                     <td className="px-4 py-3">
                       <button
                         onClick={() => handleDeleteCliente(cliente)}
-                        className="p-2 hover:bg-destructive/10 rounded-lg transition-colors"
+                        className="p-2 hover:bg-destructive/10 rounded-lg transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
                         title={t("delete", language)}
                       >
                         <Trash2 className="size-4 text-destructive" />
@@ -534,14 +534,14 @@ export default function ClientesPage() {
             <button
               type="button"
               onClick={() => setDeleteConfirm({ show: false, id: null, nombre: null })}
-              className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg min-h-[44px]"
+              className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg min-h-[44px] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               {t("cancel", language)}
             </button>
             <button
               type="button"
               onClick={confirmDeleteCliente}
-              className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg min-h-[44px]"
+              className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg min-h-[44px] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               {t("delete", language)}
             </button>

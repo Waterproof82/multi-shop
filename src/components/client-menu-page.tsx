@@ -20,7 +20,7 @@ interface MenuPageProps {
 
 export function MenuPage({ menuData, header, showCart = false, empresa }: Readonly<MenuPageProps>) {
   return (
-    <div className="flex min-h-screen flex-col bg-background" suppressHydrationWarning>
+    <div className="flex min-h-screen flex-col bg-background">
       {header === undefined ? null : header}
       <PromoNotification />
       <main className="flex-1">
