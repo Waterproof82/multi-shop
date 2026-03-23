@@ -64,19 +64,27 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
       isManualScrolling.current = true
       setActiveId(id)
 
-      const offset = 140
-      const elementPosition = el.getBoundingClientRect().top + window.scrollY
-      const offsetPosition = elementPosition - offset
+      // Temporarily disable content-visibility so getBoundingClientRect returns real positions
+      const sections = document.querySelectorAll<HTMLElement>('section.cv-auto')
+      sections.forEach((s) => { s.style.contentVisibility = 'visible' })
 
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: "smooth",
+      requestAnimationFrame(() => {
+        const offset = 140
+        const elementPosition = el.getBoundingClientRect().top + window.scrollY
+        const offsetPosition = elementPosition - offset
+
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: "smooth",
+        })
+
+        // Restore content-visibility after scroll settles
+        if (timeoutRef.current) clearTimeout(timeoutRef.current)
+        timeoutRef.current = setTimeout(() => {
+          sections.forEach((s) => { s.style.contentVisibility = '' })
+          isManualScrolling.current = false
+        }, 1000)
       })
-
-      if (timeoutRef.current) clearTimeout(timeoutRef.current)
-      timeoutRef.current = setTimeout(() => {
-        isManualScrolling.current = false
-      }, 1000)
     }
   }
 

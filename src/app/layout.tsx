@@ -113,9 +113,9 @@ export default function RootLayout({
               >
                 Saltar al contenido principal
               </a>
-              <div id="main-content">
+              <main id="main-content">
                 {children}
-              </div>
+              </main>
               <Toaster />
               <PromoToast />
             </CartProvider>
