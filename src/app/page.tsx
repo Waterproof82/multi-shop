@@ -45,9 +45,12 @@ export default async function Home() {
     if (menuResult.data) {
       menuData = menuResult.data;
     } else if (menuResult.error) {
+      const errorMsg = typeof menuResult.error === 'string' 
+        ? menuResult.error 
+        : (menuResult.error as { message?: string }).message || 'Error fetching menu';
       logger.logError({
         codigo: 'MENU_FETCH_ERROR',
-        mensaje: menuResult.error.message || 'Error fetching menu',
+        mensaje: errorMsg,
         modulo: 'use-case',
         metodo: 'execute',
         severity: 'error',

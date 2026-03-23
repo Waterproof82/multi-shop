@@ -281,7 +281,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       const totalAno = pedidosFiltrados.reduce((sum, p) => sum + (p.total || 0), 0);
       const ingresosAnterior = pedidosAnterior.reduce((sum, p) => sum + (p.total || 0), 0);
 
-      // Build pedidos por dia
+      // Build orders by day
       const pedidosPorDiaMap: Record<number, { pedidos: number; ingresos: number }> = {};
       const daysInMonth = new Date(año, mes + 1, 0).getDate();
       for (let d = 1; d <= daysInMonth; d++) {

@@ -85,6 +85,31 @@ export async function GET(request: NextRequest) {
 }
 ```
 ---
+API Error Codes (centralized in `core/domain/constants/api-errors.ts`)
+```typescript
+// Authentication errors - use in proxy.ts and auth routes
+AUTH_ERRORS.UNAUTHORIZED    → { code: 'AUTH_001', message: 'Authentication required' }
+AUTH_ERRORS.INVALID_TOKEN   → { code: 'AUTH_002', message: 'Invalid or expired token' }
+AUTH_ERRORS.FORBIDDEN       → { code: 'AUTH_003', message: 'Access denied' }
+AUTH_ERRORS.CSRF_REQUIRED   → { code: 'AUTH_004', message: 'CSRF token required' }
+AUTH_ERRORS.CSRF_INVALID    → { code: 'AUTH_005', message: 'Invalid CSRF token' }
+
+// Validation errors - use in API routes for form/file validation
+VALIDATION_ERRORS.MISSING_FILE      → { code: 'VAL_002', message: 'No file provided' }
+VALIDATION_ERRORS.FILE_TOO_LARGE    → { code: 'VAL_003', message: 'File exceeds maximum size' }
+VALIDATION_ERRORS.INVALID_FILE_TYPE → { code: 'VAL_004', message: 'File type not allowed' }
+
+// Server errors - use for internal errors
+SERVER_ERRORS.CONFIG_ERROR   → { code: 'SRV_002', message: 'Server configuration error' }
+SERVER_ERRORS.STORAGE_ERROR  → { code: 'SRV_003', message: 'Storage configuration error' }
+SERVER_ERRORS.DATABASE_ERROR → { code: 'SRV_004', message: 'Database error' }
+SERVER_ERRORS.UPLOAD_ERROR   → { code: 'SRV_005', message: 'Error processing upload' }
+
+// Usage in API routes:
+import { createErrorResponse } from '@/core/domain/constants/api-errors';
+return NextResponse.json(createErrorResponse(AUTH_ERRORS.UNAUTHORIZED), { status: 401 });
+```
+---
 Imports principales
 ```typescript
 // Use Cases y repos — SIEMPRE importar desde aqui
@@ -113,6 +138,7 @@ import { parseMainDomain, getDomainFromHeaders } from '@/lib/domain-utils';
 // Constantes
 import { DEFAULT_EMPRESA_COLORES, DEFAULT_PEDIDOS_SUBDOMAIN } from '@/core/domain/constants/empresa-defaults';
 import { PEDIDO_ESTADOS, PEDIDO_ESTADO_LABELS, PEDIDO_ESTADO_COLORS } from '@/core/domain/constants/pedido';
+import { AUTH_ERRORS, VALIDATION_ERRORS, SERVER_ERRORS, createErrorResponse } from '@/core/domain/constants/api-errors';
 
 // Supabase singletons
 import { getSupabaseClient, getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';

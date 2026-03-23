@@ -11,6 +11,8 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { useLanguage } from '@/lib/language-context';
+import { t } from '@/lib/translations';
 
 interface Categoria {
   id: string;
@@ -43,22 +45,18 @@ interface TranslationFieldsProps {
 }
 
 function TranslationFields({ formData, onChange, show }: Readonly<TranslationFieldsProps>) {
+  const { language } = useLanguage();
   if (!show) return null;
 
-  const languages = [
-    { key: 'en' as const, label: 'Inglés' },
-    { key: 'fr' as const, label: 'Francés' },
-    { key: 'it' as const, label: 'Italiano' },
-    { key: 'de' as const, label: 'Alemán' },
-  ];
+  const langs = ['en', 'fr', 'it', 'de'] as const;
 
   return (
     <>
-      {languages.map(({ key, label }) => (
+      {langs.map((key) => (
         <div key={key} className="col-span-2 grid grid-cols-2 gap-4">
           <div>
             <label htmlFor={`titulo_${key}`} className="block text-sm text-muted-foreground mb-1">
-              Nombre ({key.toUpperCase()})
+              {t("nameLabel", language)} ({key.toUpperCase()})
             </label>
             <Input
               id={`titulo_${key}`}
@@ -69,7 +67,7 @@ function TranslationFields({ formData, onChange, show }: Readonly<TranslationFie
           </div>
           <div>
             <label htmlFor={`descripcion_${key}`} className="block text-sm text-muted-foreground mb-1">
-              Descripción ({key.toUpperCase()})
+              {t("descriptionLabel", language)} ({key.toUpperCase()})
             </label>
             <Textarea
               id={`descripcion_${key}`}
@@ -111,6 +109,7 @@ export function ProductFormDialog({
   onSubmit,
   empresaSlug,
 }: Readonly<ProductFormDialogProps>) {
+  const { language } = useLanguage();
   const handleClose = () => onOpenChange(false);
 
   const handleSelectChange = (value: string) => {
@@ -124,9 +123,9 @@ export function ProductFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{editingId ? 'Editar Producto' : 'Nuevo Producto'}</DialogTitle>
+          <DialogTitle>{editingId ? t("editProduct", language) : t("newProductDialog", language)}</DialogTitle>
           <DialogDescription>
-            {editingId ? 'Modifica los datos del producto.' : 'Rellena los datos para crear un producto.'}
+            {editingId ? t("editProductDesc", language) : t("newProductDesc", language)}
           </DialogDescription>
         </DialogHeader>
 
@@ -134,7 +133,7 @@ export function ProductFormDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <label htmlFor="titulo_es" className="block text-sm font-medium text-foreground mb-1">
-                Nombre (Español) *
+                {t("nameSpanish", language)}
               </label>
               <Input
                 id="titulo_es"
@@ -148,7 +147,7 @@ export function ProductFormDialog({
 
             <div className="col-span-2">
               <label htmlFor="descripcion_es" className="block text-sm font-medium text-foreground mb-1">
-                Descripción (Español)
+                {t("descSpanish", language)}
               </label>
               <Textarea
                 id="descripcion_es"
@@ -160,7 +159,7 @@ export function ProductFormDialog({
 
             <div>
               <label htmlFor="precio" className="block text-sm font-medium text-foreground mb-1">
-                Precio (€) *
+                {t("priceLabel", language)}
               </label>
               <Input
                 id="precio"
@@ -175,7 +174,7 @@ export function ProductFormDialog({
 
             <div>
               <label htmlFor="categoria_id" className="block text-sm font-medium text-foreground mb-1">
-                Categoría
+                {t("category", language)}
               </label>
               <select
                 id="categoria_id"
@@ -183,16 +182,16 @@ export function ProductFormDialog({
                 value={formData.categoria_id}
                 onChange={(e) => handleSelectChange(e.target.value)}
                 className="w-full px-3 py-2 rounded-md border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background cursor-pointer min-h-[44px]"
-                aria-label="Categoría del producto"
+                aria-label={t("category", language)}
               >
-                <option value="">Sin categoría</option>
+                <option value="">{t("noCategory", language)}</option>
                 {parents.map(parent => {
                   const childCats = children.filter(c => c.categoria_padre_id === parent.id);
                   if (childCats.length > 0) {
                     return (
                       <optgroup key={parent.id} label={parent.nombre_es}>
                         <option key={`${parent.id}-self`} value={parent.id}>
-                          {parent.nombre_es} (principal)
+                          {parent.nombre_es} ({t("mainCategory", language)})
                         </option>
                         {childCats.map(sub => (
                           <option key={sub.id} value={sub.id}>
@@ -215,7 +214,7 @@ export function ProductFormDialog({
               <ImageUploader
                 value={formData.foto_url}
                 onChange={(url) => onFormChange({ ...formData, foto_url: url })}
-                label="Imagen del producto"
+                label={t("productImage", language)}
                 empresaSlug={empresaSlug}
               />
             </div>
@@ -228,7 +227,7 @@ export function ProductFormDialog({
               >
                 {showTranslations ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                 <Languages className="h-4 w-4" />
-                Traducciones ({showTranslations ? 'ocultar' : 'mostrar'})
+                {t("translationsToggle", language)} ({showTranslations ? t("hideLabel", language) : t("showLabel", language)})
               </button>
             </div>
 
@@ -246,7 +245,7 @@ export function ProductFormDialog({
                   onChange={(e) => onFormChange({ ...formData, es_especial: e.target.checked })}
                   className="w-4 h-4 rounded border-border text-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background cursor-pointer accent-primary"
                 />
-                <span className="text-sm text-foreground">Producto especial</span>
+                <span className="text-sm text-foreground">{t("specialProduct", language)}</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -255,7 +254,7 @@ export function ProductFormDialog({
                   onChange={(e) => onFormChange({ ...formData, activo: e.target.checked })}
                   className="w-4 h-4 rounded border-border text-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background cursor-pointer accent-primary"
                 />
-                <span className="text-sm text-foreground">Activo</span>
+                <span className="text-sm text-foreground">{t("active", language)}</span>
               </label>
             </div>
           </div>
@@ -266,7 +265,7 @@ export function ProductFormDialog({
               onClick={handleClose}
               className="px-4 py-2 border rounded-md hover:bg-muted/50 border-border text-foreground min-h-[44px]"
             >
-              Cancelar
+              {t("cancel", language)}
             </button>
             <button
               type="submit"
@@ -276,10 +275,10 @@ export function ProductFormDialog({
               {saving ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
-                  Guardando...
+                  {t("savingProgress", language)}
                 </>
               ) : (
-                'Guardar'
+                t("save", language)
               )}
             </button>
           </div>
@@ -302,6 +301,7 @@ export function DeleteConfirmDialog({
   productName,
   onConfirm,
 }: Readonly<DeleteConfirmDialogProps>) {
+  const { language } = useLanguage();
   const handleClose = () => onOpenChange(false);
 
   return (
@@ -312,10 +312,10 @@ export function DeleteConfirmDialog({
             <div className="p-2 bg-destructive/10 rounded-full">
               <Loader2 className="w-5 h-5 text-destructive" />
             </div>
-            Eliminar producto
+            {t("deleteProduct", language)}
           </DialogTitle>
           <DialogDescription>
-            ¿Estás seguro de que quieres eliminar <strong>{productName}</strong>? Esta acción no se puede deshacer.
+            {t("deleteProductConfirm", language)} <strong>{productName}</strong>? {t("cannotUndo", language)}
           </DialogDescription>
         </DialogHeader>
         <div className="flex gap-3 justify-end">
@@ -324,14 +324,14 @@ export function DeleteConfirmDialog({
             onClick={handleClose}
             className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg min-h-[44px]"
           >
-            Cancelar
+            {t("cancel", language)}
           </button>
           <button
             type="button"
             onClick={onConfirm}
             className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg min-h-[44px]"
           >
-            Eliminar
+            {t("delete", language)}
           </button>
         </div>
       </DialogContent>

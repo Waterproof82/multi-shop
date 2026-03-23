@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 import { authAdminUseCase, empresaUseCase } from '@/core/infrastructure/database';
 import { ColoresForm } from '@/components/admin/colores-form';
 import { EmpresaDatosForm } from '@/components/admin/empresa-datos-form';
@@ -10,18 +11,18 @@ export default async function ConfiguracionPage() {
   const token = cookieStore.get('admin_token')?.value;
 
   if (!token) {
-    return <div>No autorizado</div>;
+    redirect('/admin/login');
   }
 
   const admin = await authAdminUseCase.verifyToken(token);
 
   if (!admin) {
-    return <div>No autorizado</div>;
+    redirect('/admin/login');
   }
 
-  const empresaResult = await empresaUseCase.getById(admin.empresa.id);
+  const empresaId: string = admin.empresa.id;
+  const empresaResult = await empresaUseCase.getById(empresaId);
   
-  // Handle error case - use defaults
   const empresaData = empresaResult.success ? empresaResult.data : null;
   
   const empresaDatos = {
@@ -43,7 +44,7 @@ export default async function ConfiguracionPage() {
     descripcion_de: empresaData?.descripcion?.de || '',
   };
 
-  const empresaSlug = empresaData?.dominio || admin.empresa.id;
+  const empresaSlug = empresaData?.dominio || empresaId;
 
   return (
     <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
@@ -100,7 +101,7 @@ export default async function ConfiguracionPage() {
         </p>
         <ColoresForm
           coloresIniciales={admin.empresa.colores}
-          empresaId={admin.empresa.id}
+          empresaId={empresaId}
         />
       </div>
     </div>

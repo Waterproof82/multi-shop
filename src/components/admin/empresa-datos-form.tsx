@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MapPin, Phone, Mail, Link as LinkIcon, Users, Camera } from 'lucide-react';
-import { Loader2 } from 'lucide-react';
+import { MapPin, Phone, Mail, Link as LinkIcon, Users, Camera, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { logClientError } from '@/lib/client-error';

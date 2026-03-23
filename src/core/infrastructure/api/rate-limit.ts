@@ -17,7 +17,7 @@ function getRedis(): Redis | null {
 }
 
 /**
- * Rate limiter para login: 5 intentos por 15 minutos por IP.
+ * Rate limiter for login: 5 attempts per 15 minutes per IP.
  */
 let loginLimiter: Ratelimit | null = null;
 
@@ -36,7 +36,7 @@ function getLoginLimiter(): Ratelimit | null {
 }
 
 /**
- * Rate limiter para rutas públicas (unsubscribe, pedidos): 20 requests por minuto por IP.
+ * Rate limiter for public routes (unsubscribe, orders): 20 requests per minute per IP.
  */
 let publicLimiter: Ratelimit | null = null;
 
@@ -55,7 +55,7 @@ function getPublicLimiter(): Ratelimit | null {
 }
 
 /**
- * Rate limiter para rutas admin: 60 requests por minuto por IP.
+ * Rate limiter for admin routes: 60 requests per minute per IP.
  */
 let adminLimiter: Ratelimit | null = null;
 
@@ -82,18 +82,18 @@ function getClientIp(request: Request): string {
 }
 
 /**
- * Aplica rate limiting al login. Devuelve NextResponse 429 si se excede, o null si pasa.
+ * Apply rate limiting to login. Returns NextResponse 429 if exceeded, or null if passed.
  */
 export async function rateLimitLogin(request: Request): Promise<NextResponse | null> {
   const limiter = getLoginLimiter();
-  if (!limiter) return null; // Sin Redis configurado, no limitar
+  if (!limiter) return null; // No Redis configured, skip rate limiting
 
   const ip = getClientIp(request);
   const { success, limit, remaining, reset } = await limiter.limit(ip);
 
   if (!success) {
     return NextResponse.json(
-      { error: "Demasiados intentos de login. Inténtalo de nuevo más tarde." },
+      { error: "Too many login attempts. Please try again later." },
       {
         status: 429,
         headers: {
@@ -110,7 +110,7 @@ export async function rateLimitLogin(request: Request): Promise<NextResponse | n
 }
 
 /**
- * Aplica rate limiting a rutas públicas. Devuelve NextResponse 429 si se excede, o null si pasa.
+ * Apply rate limiting to public routes. Returns NextResponse 429 if exceeded, or null if passed.
  */
 export async function rateLimitPublic(request: Request): Promise<NextResponse | null> {
   const limiter = getPublicLimiter();
@@ -121,7 +121,7 @@ export async function rateLimitPublic(request: Request): Promise<NextResponse | 
 
   if (!success) {
     return NextResponse.json(
-      { error: "Demasiadas solicitudes. Inténtalo de nuevo más tarde." },
+      { error: "Too many requests. Please try again later." },
       {
         status: 429,
         headers: {
@@ -138,7 +138,7 @@ export async function rateLimitPublic(request: Request): Promise<NextResponse | 
 }
 
 /**
- * Aplica rate limiting a rutas admin. Devuelve NextResponse 429 si se excede, o null si pasa.
+ * Apply rate limiting to admin routes. Returns NextResponse 429 if exceeded, or null if passed.
  */
 export async function rateLimitAdmin(request: Request): Promise<NextResponse | null> {
   const limiter = getAdminLimiter();
@@ -149,7 +149,7 @@ export async function rateLimitAdmin(request: Request): Promise<NextResponse | n
 
   if (!success) {
     return NextResponse.json(
-      { error: "Demasiadas solicitudes al panel de administración. Inténtalo de nuevo más tarde." },
+      { error: "Too many requests to admin panel. Please try again later." },
       {
         status: 429,
         headers: {

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 import { verifyCsrfToken } from '@/lib/csrf';
+import { AUTH_ERRORS, SERVER_ERRORS, createErrorResponse } from '@/core/domain/constants/api-errors';
 
 const ADMIN_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
 
@@ -52,11 +53,11 @@ async function handleAdminAuth(request: NextRequest, origin: string | null): Pro
   const adminToken = request.cookies.get('admin_token')?.value;
 
   if (!adminToken) {
-    return addCorsHeaders(NextResponse.json({ error: 'No autorizado' }, { status: 401 }), origin);
+    return addCorsHeaders(NextResponse.json(createErrorResponse(AUTH_ERRORS.UNAUTHORIZED), { status: 401 }), origin);
   }
 
   if (!ADMIN_TOKEN_SECRET) {
-    return addCorsHeaders(NextResponse.json({ error: 'Error de configuración del servidor' }, { status: 500 }), origin);
+    return addCorsHeaders(NextResponse.json(createErrorResponse(SERVER_ERRORS.CONFIG_ERROR), { status: 500 }), origin);
   }
 
   try {
@@ -70,7 +71,7 @@ async function handleAdminAuth(request: NextRequest, origin: string | null): Pro
     if (isMutativeMethod) {
       if (!csrfHeader || !csrfCookie) {
         return addCorsHeaders(NextResponse.json(
-          { error: 'CSRF token required' },
+          createErrorResponse(AUTH_ERRORS.CSRF_REQUIRED),
           { status: 403 }
         ), origin);
       }
@@ -78,7 +79,7 @@ async function handleAdminAuth(request: NextRequest, origin: string | null): Pro
       const [token, signature] = csrfCookie.split(':');
       if (!token || !signature || !verifyCsrfToken(token, signature) || csrfHeader !== token) {
         return addCorsHeaders(NextResponse.json(
-          { error: 'CSRF token inválido' },
+          createErrorResponse(AUTH_ERRORS.CSRF_INVALID),
           { status: 403 }
         ), origin);
       }
@@ -92,7 +93,7 @@ async function handleAdminAuth(request: NextRequest, origin: string | null): Pro
     const response = NextResponse.next({ request: { headers: requestHeaders } });
     return addCorsHeaders(response, origin);
   } catch {
-    return addCorsHeaders(NextResponse.json({ error: 'Token inválido o expirado' }, { status: 401 }), origin);
+    return addCorsHeaders(NextResponse.json(createErrorResponse(AUTH_ERRORS.INVALID_TOKEN), { status: 401 }), origin);
   }
 }
 
@@ -106,12 +107,12 @@ export async function proxy(request: NextRequest) {
     return addCorsHeaders(new NextResponse(null, { status: 204 }), origin);
   }
 
-  // Admin auth (rutas protegidas)
+  // Admin auth (protected routes)
   if (path.startsWith('/api/admin') && !isPublicRoute(path)) {
     return handleAdminAuth(request, origin);
   }
 
-  // Access token para carrito
+  // Access token for cart
   const accessToken = url.searchParams.get('access');
   if (accessToken) {
     return handleCartAccessToken(url, accessToken);

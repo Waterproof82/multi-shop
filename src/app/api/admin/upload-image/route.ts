@@ -1,9 +1,10 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { requireAuth, successResponse, errorResponse } from '@/core/infrastructure/api/helpers';
 import { getR2Config, uploadToR2 } from '@/core/infrastructure/storage/s3-client';
 import { empresaUseCase } from '@/core/infrastructure/database';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
+import { VALIDATION_ERRORS, SERVER_ERRORS, AUTH_ERRORS, createErrorResponse } from '@/core/domain/constants/api-errors';
 
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const MIME_TO_EXT: Record<string, string> = {
@@ -16,17 +17,17 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 export async function POST(request: NextRequest) {
   const { empresaId, error: authError } = await requireAuth(request);
-  if (authError || !empresaId) return authError ?? errorResponse('No autorizado', 401);
+  if (authError || !empresaId) return authError ?? NextResponse.json(createErrorResponse(AUTH_ERRORS.UNAUTHORIZED), { status: 401 });
 
   const { publicDomain } = getR2Config();
   if (!publicDomain) {
-    return errorResponse('Configuración de almacenamiento incompleta');
+    return NextResponse.json(createErrorResponse(SERVER_ERRORS.STORAGE_ERROR));
   }
 
-  // Derivar el slug desde la DB — nunca del cliente (OWASP: confianza en datos de servidor)
+  // Derive slug from DB - never from client (OWASP: trust server-side data)
   const empresaResult = await empresaUseCase.getById(empresaId);
   if (!empresaResult.success) {
-    return errorResponse('Error al obtener datos de empresa');
+    return errorResponse(SERVER_ERRORS.DATABASE_ERROR.message);
   }
   const empresa = empresaResult.data;
   const empresaSlug = empresa?.slug ?? empresa?.dominio ?? empresaId!;
@@ -35,20 +36,20 @@ export async function POST(request: NextRequest) {
   try {
     formData = await request.formData();
   } catch {
-    return errorResponse('Error al leer los datos del formulario', 400);
+    return NextResponse.json(createErrorResponse(SERVER_ERRORS.FORM_DATA_ERROR), { status: 400 });
   }
 
   const file = formData.get('file') as File | null;
   if (!file || !(file instanceof File)) {
-    return errorResponse('No se recibió ningún archivo', 400);
+    return NextResponse.json(createErrorResponse(VALIDATION_ERRORS.MISSING_FILE), { status: 400 });
   }
 
   if (!ALLOWED_MIME_TYPES.has(file.type)) {
-    return errorResponse('Tipo de archivo no permitido. Solo JPEG, PNG, WEBP o GIF.', 400);
+    return NextResponse.json(createErrorResponse(VALIDATION_ERRORS.INVALID_FILE_TYPE), { status: 400 });
   }
 
   if (file.size > MAX_FILE_SIZE) {
-    return errorResponse('El archivo excede el tamaño máximo de 10MB.', 400);
+    return NextResponse.json(createErrorResponse(VALIDATION_ERRORS.FILE_TOO_LARGE), { status: 400 });
   }
 
   try {
@@ -58,8 +59,8 @@ export async function POST(request: NextRequest) {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
 
-    // OWASP: nunca usar file.name del cliente en el path (path traversal).
-    // Usamos solo la extensión derivada del MIME type validado.
+    // OWASP: never use file.name from client in path (path traversal prevention)
+    // We only use extension derived from validated MIME type
     const ext = MIME_TO_EXT[file.type] ?? 'bin';
     const key = `${empresaSlug}/${year}/${month}/${uuid}.${ext}`;
 
@@ -69,6 +70,6 @@ export async function POST(request: NextRequest) {
     return successResponse({ publicUrl });
   } catch (error) {
     await logApiError('Upload image', error, 'POST');
-    return errorResponse('Error al procesar la imagen', 500);
+    return NextResponse.json(createErrorResponse(SERVER_ERRORS.UPLOAD_ERROR), { status: 500 });
   }
 }

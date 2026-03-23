@@ -103,8 +103,7 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
           onChange={handleLogoChange}
           label=""
           empresaSlug={empresaSlug}
-          previewClassName="relative group rounded-lg overflow-hidden border"
-          previewStyle={{ aspectRatio: '1/1', maxWidth: '200px' }}
+          previewClassName="relative group rounded-lg overflow-hidden border aspect-square w-48 max-w-48"
         />
         <p className="text-xs text-muted-foreground mt-1">
           Se mostrará en el header y footer del menú. Recomendado: 512×512px (cuadrado).
@@ -122,8 +121,7 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
           onChange={handleImageChange}
           label=""
           empresaSlug={empresaSlug}
-          previewClassName="relative group rounded-lg overflow-hidden border w-full"
-          previewStyle={{ aspectRatio: '16/5' }}
+          previewClassName="relative group rounded-lg overflow-hidden border w-full aspect-video max-h-48"
         />
         <p className="text-xs text-muted-foreground mt-1">
           Se mostrará como fondo del banner principal. Recomendado: 1920×600px.
