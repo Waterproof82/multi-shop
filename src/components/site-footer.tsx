@@ -102,6 +102,7 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
           <p>© {currentYear} {empresa.nombre}</p>
           <a
             href="/admin/login"
+            rel="nofollow"
             className="text-primary hover:text-primary/80 transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm"
             aria-label="Admin"
           >

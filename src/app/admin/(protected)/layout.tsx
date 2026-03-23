@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { AdminSidebar } from './admin-sidebar';
@@ -5,6 +6,10 @@ import { AdminProvider } from '@/lib/admin-context';
 import { authAdminUseCase } from '@/core/infrastructure/database';
 import { AdminThemeProvider } from '@/components/admin-theme-provider';
 import { EmpresaThemeProvider } from '@/components/empresa-theme-provider';
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 export default async function AdminProtectedLayout({
   children,

@@ -9,7 +9,7 @@ import { PromoToast } from "@/components/promo-toast";
 import { getEmpresaByDomain } from "@/lib/server-services";
 import { getDomainFromHeaders } from "@/lib/domain-utils";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 const playfair = Playfair_Display({
   subsets: ["latin"],
   variable: "--font-playfair",
@@ -33,14 +33,44 @@ export const viewport: Viewport = {
 export async function generateMetadata(): Promise<Metadata> {
   const domain = await getDomainFromHeaders();
   const empresa = domain ? await getEmpresaByDomain(domain) : null;
+  const baseUrl = domain ? `https://${domain}` : "https://localhost:3000";
 
   const faviconUrl = empresa?.logoUrl || '/favicon.ico';
   const mimeType = getMimeType(faviconUrl);
   const isDefaultFavicon = faviconUrl === '/favicon.ico';
 
+  const title = empresa?.nombre || "Mermelada de Tomate";
+  const description = empresa?.descripcion?.es?.substring(0, 160) || "Carta digital y pedidos";
+  const ogImage = empresa?.urlImage || empresa?.logoUrl || undefined;
+
   return {
-    title: empresa?.nombre || "Mermelada de Tomate",
-    description: empresa?.descripcion?.es?.substring(0, 160) || "Carta digital y pedidos",
+    title,
+    description,
+    metadataBase: new URL(baseUrl),
+    robots: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large" as const,
+      "max-snippet": -1,
+    },
+    alternates: {
+      canonical: "/",
+    },
+    openGraph: {
+      title,
+      description,
+      url: baseUrl,
+      siteName: title,
+      type: "website",
+      locale: "es_ES",
+      ...(ogImage ? { images: [{ url: ogImage, width: 1200, height: 630, alt: title }] } : {}),
+    },
+    twitter: {
+      card: ogImage ? "summary_large_image" : "summary",
+      title,
+      description,
+      ...(ogImage ? { images: [ogImage] } : {}),
+    },
     icons: isDefaultFavicon
       ? { icon: [{ url: '/favicon.ico', type: 'image/x-icon' }] }
       : {
@@ -64,6 +94,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://imagenes.almadearena.es" />
+      </head>
       <body className={`${inter.variable} ${playfair.variable} font-sans`} suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
@@ -80,9 +113,9 @@ export default function RootLayout({
               >
                 Saltar al contenido principal
               </a>
-              <main id="main-content">
+              <div id="main-content">
                 {children}
-              </main>
+              </div>
               <Toaster />
               <PromoToast />
             </CartProvider>

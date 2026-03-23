@@ -35,16 +35,16 @@ export function HeroBanner({ empresa }: HeroBannerProps) {
   return (
     <div className="relative flex flex-col items-center justify-center overflow-hidden bg-primary px-4 py-16 text-center md:py-24">
       {urlImage && (
-        <div 
-          className="absolute inset-0 z-0"
-          style={{
-            backgroundImage: `url("${urlImage}")`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-          }}
-          role="img"
-          aria-label={empresa?.nombre ?? "Imagen de fondo del restaurante"}
-        >
+        <div className="absolute inset-0 z-0">
+          <Image
+            src={urlImage}
+            alt={empresa?.nombre ?? "Imagen de fondo del restaurante"}
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover"
+            unoptimized
+          />
           <div className="absolute inset-0 bg-foreground/70" />
         </div>
       )}
