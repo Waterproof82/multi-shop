@@ -6,10 +6,6 @@ import type { MenuCategoryVM } from "@/core/application/dtos/menu-view-model"
 import { useLanguage } from "@/lib/language-context"
 import { t } from "@/lib/translations"
 
-const SCROLL_OFFSET_PX = 180;
-const INTERSECTION_ROOT_MARGIN_TOP = "-100px";
-const INTERSECTION_ROOT_MARGIN_BOTTOM = "-70%";
-
 interface CategoryNavProps {
   categories: MenuCategoryVM[]
 }
@@ -35,7 +31,7 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
           setActiveId(sorted[0].target.id)
         }
       },
-      { rootMargin: `${INTERSECTION_ROOT_MARGIN_TOP} 0px ${INTERSECTION_ROOT_MARGIN_BOTTOM} 0px`, threshold: 0 }
+      { rootMargin: "-100px 0px -70% 0px", threshold: 0 }
     )
 
     for (const cat of categories) {
@@ -68,30 +64,19 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
       isManualScrolling.current = true
       setActiveId(id)
 
-      const performScroll = () => {
-        el.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        })
-      }
+      const offset = 140
+      const elementPosition = el.getBoundingClientRect().top + window.scrollY
+      const offsetPosition = elementPosition - offset
 
-      if (el.getBoundingClientRect().height === 0) {
-        const observer = new MutationObserver(() => {
-          if (el.getBoundingClientRect().height > 0) {
-            observer.disconnect()
-            requestAnimationFrame(performScroll)
-          }
-        })
-        observer.observe(el, { attributes: true, childList: true, subtree: true })
-        setTimeout(() => observer.disconnect(), 2000)
-      } else {
-        requestAnimationFrame(performScroll)
-      }
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: "smooth",
+      })
 
       if (timeoutRef.current) clearTimeout(timeoutRef.current)
       timeoutRef.current = setTimeout(() => {
         isManualScrolling.current = false
-      }, 2000)
+      }, 1000)
     }
   }
 

@@ -76,7 +76,7 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
     : category.descripcion;
 
   return (
-    <section id={category.id} className="scroll-mt-[--scroll-offset]" style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 500px' }}>
+    <section id={category.id} className="scroll-mt-32">
       <div className="mb-5 flex items-center gap-4 overflow-hidden">
         <h2 className="font-serif text-2xl font-semibold text-foreground md:text-3xl tracking-tight truncate shrink min-w-0">
           {(translationLang && category.translations?.[translationLang]?.name) || category.label}
