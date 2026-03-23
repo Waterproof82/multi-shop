@@ -9,7 +9,7 @@ import { PEDIDO_ESTADO_COLORS } from '@/core/domain/constants/pedido';
 import type { PedidoEstado } from '@/core/domain/constants/pedido';
 import { formatPrice } from '@/lib/format-price';
 
-interface PedidoItem {
+export interface DashboardPedido {
   id: string;
   numero_pedido: number;
   clientes: { nombre: string | null; telefono: string | null } | null;
@@ -18,7 +18,7 @@ interface PedidoItem {
   created_at: string;
 }
 
-interface StatsData {
+export interface DashboardStats {
   pedidosHoy: number;
   totalMes: number;
 }
@@ -26,8 +26,8 @@ interface StatsData {
 interface AdminDashboardClientProps {
   readonly empresaNombre: string;
   readonly menu: MenuCategoryVM[];
-  readonly pedidos: PedidoItem[];
-  readonly stats: StatsData | null;
+  readonly pedidos: DashboardPedido[];
+  readonly stats: DashboardStats | null;
   readonly menuError?: string;
 }
 
@@ -104,14 +104,14 @@ export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menu
       <div className="flex flex-wrap gap-3">
         <Link 
           href="/admin/productos" 
-          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           <Package className="w-4 h-4" />
           {t("newProduct", language)}
         </Link>
         <Link 
           href="/admin/pedidos" 
-          className="inline-flex items-center gap-2 px-4 py-2 bg-card border border-border text-foreground rounded-lg hover:bg-muted transition-colors text-sm font-medium"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-card border border-border text-foreground rounded-lg hover:bg-muted transition-colors text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           <ShoppingBag className="w-4 h-4" />
           {t("viewOrders", language)}

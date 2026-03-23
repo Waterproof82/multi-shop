@@ -5,6 +5,7 @@ import type { MenuCategoryVM } from "@/core/application/dtos/menu-view-model"
 import { EmpresaThemeProvider } from "@/components/empresa-theme-provider";
 import { getDomainFromHeaders } from "@/lib/domain-utils";
 import { logger } from "@/core/infrastructure/logging/logger";
+import { JsonLd } from "@/components/json-ld";
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -45,12 +46,9 @@ export default async function Home() {
     if (menuResult.data) {
       menuData = menuResult.data;
     } else if (menuResult.error) {
-      const errorMsg = typeof menuResult.error === 'string' 
-        ? menuResult.error 
-        : (menuResult.error as { message?: string }).message || 'Error fetching menu';
       logger.logError({
         codigo: 'MENU_FETCH_ERROR',
-        mensaje: errorMsg,
+        mensaje: menuResult.error,
         modulo: 'use-case',
         metodo: 'execute',
         severity: 'error',
@@ -61,8 +59,11 @@ export default async function Home() {
   }
 
   const header = await SiteHeaderWrapper({ showCart, empresa });
+  const baseUrl = fullDomain ? `https://${fullDomain}` : "https://localhost:3000";
+
   return (
     <EmpresaThemeProvider colores={empresa?.colores || null}>
+      {empresa && <JsonLd empresa={empresa} menuData={menuData} baseUrl={baseUrl} />}
       <MenuPage menuData={menuData} header={header} showCart={showCart} empresa={empresa} />
     </EmpresaThemeProvider>
   );

@@ -102,6 +102,7 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoComplete="email"
               aria-invalid={!!error}
               aria-describedby={error ? "login-error" : undefined}
               placeholder="admin@tuempresa.com"
@@ -119,6 +120,7 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              autoComplete="current-password"
               aria-invalid={!!error}
               aria-describedby={error ? "login-error" : undefined}
               placeholder="••••••••"

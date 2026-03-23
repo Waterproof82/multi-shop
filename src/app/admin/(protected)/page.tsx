@@ -4,6 +4,7 @@ import { authAdminUseCase, pedidoUseCase } from '@/core/infrastructure/database'
 import { getMenuUseCase } from '@/lib/server-services';
 import { AdminDashboardClient } from '@/components/admin/admin-dashboard-client';
 import type { MenuCategoryVM } from '@/core/application/dtos/menu-view-model';
+import type { DashboardPedido, DashboardStats } from '@/components/admin/admin-dashboard-client';
 
 export default async function AdminDashboard() {
   const cookieStore = await cookies();
@@ -29,16 +30,16 @@ export default async function AdminDashboard() {
 
   const menu: MenuCategoryVM[] = menuResult.data || [];
   const menuError = menuResult.error || undefined;
-  
-  const pedidos = pedidosResult.success ? pedidosResult.data || [] : [];
-  const stats = statsResult.success ? statsResult.data : null;
+
+  const pedidos: DashboardPedido[] = pedidosResult.success ? (pedidosResult.data || []) as DashboardPedido[] : [];
+  const stats: DashboardStats | null = statsResult.success ? statsResult.data as DashboardStats : null;
 
   return (
     <AdminDashboardClient
       empresaNombre={admin.empresa.nombre}
       menu={menu}
-      pedidos={pedidos as any}
-      stats={stats as any}
+      pedidos={pedidos}
+      stats={stats}
       menuError={menuError}
     />
   );

@@ -171,7 +171,7 @@ export function ImageUploader({
         <div className={previewClassName} style={previewStyle}>
           <Image
             src={value}
-            alt="Preview"
+            alt={`${label} preview`}
             fill
             className="object-cover"
             unoptimized

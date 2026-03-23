@@ -58,8 +58,9 @@ export function PromoToast() {
 
       <div className="relative bg-card text-card-foreground rounded-lg shadow-elegant-lg max-w-sm w-full p-6 animate-in fade-in zoom-in duration-200">
         <button
+          type="button"
           onClick={handleClose}
-          className="absolute top-3 right-3 p-1 rounded-full hover:bg-muted transition-colors duration-150"
+          className="absolute top-3 right-3 p-1 rounded-full hover:bg-muted transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           aria-label="Cerrar"
         >
           <X className="w-5 h-5 text-muted-foreground" />
@@ -81,8 +82,9 @@ export function PromoToast() {
           </p>
 
           <button
+            type="button"
             onClick={handleClose}
-            className="mt-6 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+            className="mt-6 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             Aceptar
           </button>

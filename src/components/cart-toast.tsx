@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { ShoppingBag, X, Check } from 'lucide-react';
+import { X, Check } from 'lucide-react';
 import { useCart } from '@/lib/cart-context';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 
 export function CartToast() {
-  const { lastAddedItem, totalItems, totalPrice, isCartOpen, openCart } = useCart();
+  const { lastAddedItem, totalPrice, isCartOpen, openCart } = useCart();
   const { language } = useLanguage();
   const [visible, setVisible] = useState(false);
   const [exiting, setExiting] = useState(false);
@@ -68,8 +68,9 @@ export function CartToast() {
             </span>
           </div>
           <button
+            type="button"
             onClick={handleClose}
-            className="p-1 hover:bg-muted rounded-full transition-colors"
+            className="p-1 hover:bg-muted rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             aria-label={t("close", language)}
           >
             <X className="w-4 h-4 text-muted-foreground" />
@@ -85,11 +86,12 @@ export function CartToast() {
               Total: {totalPrice.toFixed(2).replace('.', ',')}€
             </span>
             <button
+              type="button"
               onClick={() => {
                 handleClose();
                 openCart();
               }}
-              className="text-xs font-medium text-primary hover:underline transition-all hover:translate-x-0.5"
+              className="text-xs font-medium text-primary hover:underline transition-all hover:translate-x-0.5 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
             >
               {t("viewCart", language)} →
             </button>

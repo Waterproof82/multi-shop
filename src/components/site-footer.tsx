@@ -53,7 +53,7 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
               )}
               {empresa.telefono && (() => {
                 const telefonoDigits = empresa.telefono.replaceAll(/\D/g, '');
-                const telefonoDisplay = telefonoDigits.replace(/^(00|\+)?34/, '');
+                const telefonoDisplay = telefonoDigits.replace(/^(00|\+)?\d{1,3}(?=\d{9})/, '');
                 return (
                 <li className="flex items-center gap-3">
                   <Phone className="w-4 h-4 text-background/40 shrink-0" />
@@ -102,6 +102,7 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
           <p>© {currentYear} {empresa.nombre}</p>
           <a
             href="/admin/login"
+            rel="nofollow"
             className="text-primary hover:text-primary/80 transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm"
             aria-label="Admin"
           >

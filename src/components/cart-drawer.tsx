@@ -47,7 +47,7 @@ function validateNameInput(name: string, translate: TranslateFn, language: Langu
   if (!trimmed) return translate("validationNameRequired", language);
   if (trimmed.length < 2) return translate("validationNameMin", language);
   if (trimmed.length > 100) return translate("validationNameMax", language);
-  if (!/^[a-zA-ZÀ-ÿ\s'-]+$/u.test(trimmed)) return translate("validationNameFormat", language);
+  if (!/^[\p{L}\s'-]+$/u.test(trimmed)) return translate("validationNameFormat", language);
   return undefined;
 }
 
@@ -135,7 +135,11 @@ export function CartDrawer() {
   const [email, setEmail] = useState('')
   const [errors, setErrors] = useState<{ nombre?: string; telefono?: string }>({})
 
-  const isMobile = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    setIsMobile(globalThis.matchMedia('(pointer: coarse)').matches);
+  }, []);
 
   const getDialogDescription = useCallback(() => {
     if (isMobile) {
@@ -485,9 +489,11 @@ export function CartDrawer() {
             <div className="border-t border-border pt-4 pb-6 px-2 bg-background/80 shadow-elegant rounded-b-xl">
               <div className="space-y-3 mb-4">
                 <div>
+                  <label htmlFor="cart-nombre" className="text-xs font-medium text-muted-foreground ml-6 mb-1 block">{t("placeholderName", language)}</label>
                   <div className="flex items-center gap-2">
-                    <User className="size-4 text-muted-foreground" />
+                    <User className="size-4 text-muted-foreground" aria-hidden="true" />
                     <Input
+                      id="cart-nombre"
                       type="text"
                       placeholder={t("placeholderName", language)}
                       value={nombre}
@@ -495,7 +501,6 @@ export function CartDrawer() {
                       className={`h-9 ${errors.nombre ? 'border-destructive' : ''}`}
                       maxLength={100}
                       autoComplete="name"
-                      aria-label={t("placeholderName", language)}
                       aria-describedby={errors.nombre ? "nombre-error" : undefined}
                       aria-invalid={!!errors.nombre}
                     />
@@ -503,8 +508,9 @@ export function CartDrawer() {
                   {errors.nombre && <p id="nombre-error" role="alert" className="text-xs text-destructive mt-1 ml-6">{errors.nombre}</p>}
                 </div>
                 <div>
+                  <label htmlFor="cart-telefono" className="text-xs font-medium text-muted-foreground ml-6 mb-1 block">{t("placeholderPhone", language)}</label>
                   <div className="flex items-center gap-2">
-                    <Phone className="size-4 text-muted-foreground shrink-0" />
+                    <Phone className="size-4 text-muted-foreground shrink-0" aria-hidden="true" />
                     <div className="flex gap-1 flex-1">
                       <Select value={countryCode} onValueChange={setCountryCode}>
                         <SelectTrigger className="h-9 w-[100px] shrink-0 text-xs px-2" aria-label={t("countryCode", language)}>
@@ -522,6 +528,7 @@ export function CartDrawer() {
                         </SelectContent>
                       </Select>
                       <Input
+                        id="cart-telefono"
                         type="tel"
                         placeholder={t("phonePlaceholder", language)}
                         value={telefono}
@@ -529,7 +536,6 @@ export function CartDrawer() {
                         className={`h-9 flex-1 ${errors.telefono ? 'border-destructive' : ''}`}
                         maxLength={15}
                         autoComplete="tel-national"
-                        aria-label={t("placeholderPhone", language)}
                         aria-describedby={errors.telefono ? "telefono-error" : undefined}
                         aria-invalid={!!errors.telefono}
                       />
@@ -538,9 +544,11 @@ export function CartDrawer() {
                   {errors.telefono && <p id="telefono-error" role="alert" className="text-xs text-destructive mt-1 ml-6">{errors.telefono}</p>}
                 </div>
                 <div>
+                  <label htmlFor="cart-email" className="text-xs font-medium text-muted-foreground ml-6 mb-1 block">{t("placeholderEmail", language)}</label>
                   <div className="flex items-center gap-2">
-                    <Mail className="size-4 text-muted-foreground" />
+                    <Mail className="size-4 text-muted-foreground" aria-hidden="true" />
                     <Input
+                      id="cart-email"
                       type="email"
                       placeholder={t("placeholderEmail", language)}
                       value={email}
@@ -548,7 +556,6 @@ export function CartDrawer() {
                       className="h-9"
                       maxLength={100}
                       autoComplete="email"
-                      aria-label={t("placeholderEmail", language)}
                     />
                   </div>
                   <p className="text-xs mt-1 ml-6 text-muted-foreground">{t("promoMessage", language)}</p>

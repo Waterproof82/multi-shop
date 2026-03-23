@@ -76,7 +76,7 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
     : category.descripcion;
 
   return (
-    <section id={category.id} className="scroll-mt-[--scroll-offset]" style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 500px' }}>
+    <section id={category.id} className="scroll-mt-32 cv-auto" style={{ contentVisibility: priority ? 'visible' : 'auto', containIntrinsicSize: 'auto 500px' }}>
       <div className="mb-5 flex items-center gap-4 overflow-hidden">
         <h2 className="font-serif text-2xl font-semibold text-foreground md:text-3xl tracking-tight truncate shrink min-w-0">
           {(translationLang && category.translations?.[translationLang]?.name) || category.label}
@@ -259,7 +259,7 @@ function CardMedia({ item, displayName, priority, onError, shouldReduceMotion }:
         loop={!shouldReduceMotion}
         muted
         playsInline
-        className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 md:group-hover:scale-105 will-change-transform"
+        className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 md:group-hover:scale-105"
         onError={onError}
         aria-label={displayName}
       />
@@ -270,7 +270,7 @@ function CardMedia({ item, displayName, priority, onError, shouldReduceMotion }:
       src={item.image!}
       alt={displayName}
       fill
-      className="object-cover transition-transform duration-300 md:group-hover:scale-105 will-change-transform"
+      className="object-cover transition-transform duration-300 md:group-hover:scale-105"
       loading={priority ? "eager" : "lazy"}
       sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
       onError={onError}
@@ -322,7 +322,6 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
       className={`group relative flex h-full flex-col overflow-hidden rounded-lg bg-card border transition-[box-shadow,transform,border-color] duration-200 ${
         isClickable ? "hover:shadow-elegant hover:-translate-y-0.5 cursor-pointer" : ""
       } ${borderClass}`}
-      onClick={isClickable ? handleClick : undefined}
     >
       {isClickable && (
         <button

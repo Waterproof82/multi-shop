@@ -43,6 +43,7 @@ export function LanguageSelector() {
               key={lang.code}
               onClick={() => setLanguage(lang.code)}
               className="flex items-center gap-3"
+              aria-current={language === lang.code ? "true" : undefined}
             >
               {LangFlag && <LangFlag className="w-6 h-4 rounded-sm shrink-0" />}
               <span className={language === lang.code ? "font-semibold" : ""}>

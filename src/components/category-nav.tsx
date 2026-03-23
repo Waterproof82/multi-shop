@@ -6,10 +6,6 @@ import type { MenuCategoryVM } from "@/core/application/dtos/menu-view-model"
 import { useLanguage } from "@/lib/language-context"
 import { t } from "@/lib/translations"
 
-const SCROLL_OFFSET_PX = 180;
-const INTERSECTION_ROOT_MARGIN_TOP = "-100px";
-const INTERSECTION_ROOT_MARGIN_BOTTOM = "-70%";
-
 interface CategoryNavProps {
   categories: MenuCategoryVM[]
 }
@@ -35,7 +31,7 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
           setActiveId(sorted[0].target.id)
         }
       },
-      { rootMargin: `${INTERSECTION_ROOT_MARGIN_TOP} 0px ${INTERSECTION_ROOT_MARGIN_BOTTOM} 0px`, threshold: 0 }
+      { rootMargin: "-100px 0px -70% 0px", threshold: 0 }
     )
 
     for (const cat of categories) {
@@ -68,30 +64,27 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
       isManualScrolling.current = true
       setActiveId(id)
 
-      const performScroll = () => {
-        el.scrollIntoView({
+      // Temporarily disable content-visibility so getBoundingClientRect returns real positions
+      const sections = document.querySelectorAll<HTMLElement>('section.cv-auto')
+      sections.forEach((s) => { s.style.contentVisibility = 'visible' })
+
+      requestAnimationFrame(() => {
+        const offset = 140
+        const elementPosition = el.getBoundingClientRect().top + window.scrollY
+        const offsetPosition = elementPosition - offset
+
+        window.scrollTo({
+          top: offsetPosition,
           behavior: "smooth",
-          block: "start",
         })
-      }
 
-      if (el.getBoundingClientRect().height === 0) {
-        const observer = new MutationObserver(() => {
-          if (el.getBoundingClientRect().height > 0) {
-            observer.disconnect()
-            requestAnimationFrame(performScroll)
-          }
-        })
-        observer.observe(el, { attributes: true, childList: true, subtree: true })
-        setTimeout(() => observer.disconnect(), 2000)
-      } else {
-        requestAnimationFrame(performScroll)
-      }
-
-      if (timeoutRef.current) clearTimeout(timeoutRef.current)
-      timeoutRef.current = setTimeout(() => {
-        isManualScrolling.current = false
-      }, 2000)
+        // Restore content-visibility after scroll settles
+        if (timeoutRef.current) clearTimeout(timeoutRef.current)
+        timeoutRef.current = setTimeout(() => {
+          sections.forEach((s) => { s.style.contentVisibility = '' })
+          isManualScrolling.current = false
+        }, 1000)
+      })
     }
   }
 
