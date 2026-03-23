@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { ShoppingBag, X, Check } from 'lucide-react';
+import { X, Check } from 'lucide-react';
 import { useCart } from '@/lib/cart-context';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 
 export function CartToast() {
-  const { lastAddedItem, totalItems, totalPrice, isCartOpen, openCart } = useCart();
+  const { lastAddedItem, totalPrice, isCartOpen, openCart } = useCart();
   const { language } = useLanguage();
   const [visible, setVisible] = useState(false);
   const [exiting, setExiting] = useState(false);

@@ -322,7 +322,6 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
       className={`group relative flex h-full flex-col overflow-hidden rounded-lg bg-card border transition-[box-shadow,transform,border-color] duration-200 ${
         isClickable ? "hover:shadow-elegant hover:-translate-y-0.5 cursor-pointer" : ""
       } ${borderClass}`}
-      onClick={isClickable ? handleClick : undefined}
     >
       {isClickable && (
         <button

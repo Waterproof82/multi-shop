@@ -41,7 +41,7 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
 
   const handleLogout = async () => {
     await fetchWithCsrf('/api/admin/logout', { method: 'POST' });
-    window.location.href = '/';
+    globalThis.location.href = '/';
   };
 
   return (

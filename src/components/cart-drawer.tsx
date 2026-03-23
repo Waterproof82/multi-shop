@@ -138,7 +138,7 @@ export function CartDrawer() {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    setIsMobile(window.matchMedia('(pointer: coarse)').matches);
+    setIsMobile(globalThis.matchMedia('(pointer: coarse)').matches);
   }, []);
 
   const getDialogDescription = useCallback(() => {

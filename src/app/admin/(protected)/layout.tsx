@@ -45,9 +45,9 @@ export default async function AdminProtectedLayout({
               Saltar al contenido principal
             </a>
             <AdminSidebar empresaId={empresaId} />
-            <div id="main-content" role="main" className="lg:ml-64 min-h-screen">
+            <main id="main-content" className="lg:ml-64 min-h-screen">
               {children}
-            </div>
+            </main>
           </div>
         </AdminProvider>
       </EmpresaThemeProvider>
