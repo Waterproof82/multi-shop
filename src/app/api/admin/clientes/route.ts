@@ -35,13 +35,14 @@ export async function POST(request: NextRequest) {
     return validationErrorResponse('Al menos un campo es requerido');
   }
 
-  const result = await clienteUseCase.create(parsed.data);
-  
+  const result = await clienteUseCase.createOrUpdate(parsed.data);
+
   if (!result.success) {
     return handleResult(result);
   }
-  
-  return handleResultWithStatus({ success: true, data: { cliente: result.data } }, 201);
+
+  const status = result.data.isUpdate ? 200 : 201;
+  return handleResultWithStatus({ success: true, data: { cliente: result.data.cliente, isUpdate: result.data.isUpdate } }, status);
 }
 
 export async function PATCH(request: NextRequest) {

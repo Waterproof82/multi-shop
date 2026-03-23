@@ -88,7 +88,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px] flex flex-col max-h-[80vh]">
+      <DialogContent className="sm:max-w-[425px] flex flex-col max-h-[80vh]" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>{t("selectQuantity", language)}</DialogTitle>
           <DialogDescription>

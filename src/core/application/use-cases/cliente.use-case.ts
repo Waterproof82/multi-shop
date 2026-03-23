@@ -38,6 +38,63 @@ export class ClienteUseCase {
     }
   }
 
+  /**
+   * Creates a new client or updates an existing one if a match is found by phone or email.
+   * Priority: telefono match first, then email match.
+   * Returns { data, isUpdate } to indicate whether it was an update or creation.
+   */
+  async createOrUpdate(data: CreateClienteDTO): Promise<Result<{ cliente: Cliente; isUpdate: boolean }>> {
+    try {
+      // 1. Look up by telefono (primary identifier)
+      if (data.telefono) {
+        const byPhone = await this.clienteRepo.findByTelefono(data.telefono, data.empresaId);
+        if (!byPhone.success) {
+          return { success: false, error: { ...byPhone.error, method: 'ClienteUseCase.createOrUpdate' } };
+        }
+        if (byPhone.data) {
+          const updateResult = await this.clienteRepo.update(byPhone.data.id, data.empresaId, {
+            nombre: data.nombre ?? byPhone.data.nombre,
+            email: data.email ?? byPhone.data.email,
+            direccion: data.direccion ?? byPhone.data.direccion,
+          });
+          if (!updateResult.success) {
+            return { success: false, error: { ...updateResult.error, method: 'ClienteUseCase.createOrUpdate' } };
+          }
+          return { success: true, data: { cliente: updateResult.data, isUpdate: true } };
+        }
+      }
+
+      // 2. Look up by email (secondary identifier)
+      if (data.email) {
+        const byEmail = await this.clienteRepo.findByEmail(data.email, data.empresaId);
+        if (!byEmail.success) {
+          return { success: false, error: { ...byEmail.error, method: 'ClienteUseCase.createOrUpdate' } };
+        }
+        if (byEmail.data) {
+          const updateResult = await this.clienteRepo.update(byEmail.data.id, data.empresaId, {
+            nombre: data.nombre ?? byEmail.data.nombre,
+            telefono: data.telefono ?? byEmail.data.telefono,
+            direccion: data.direccion ?? byEmail.data.direccion,
+          });
+          if (!updateResult.success) {
+            return { success: false, error: { ...updateResult.error, method: 'ClienteUseCase.createOrUpdate' } };
+          }
+          return { success: true, data: { cliente: updateResult.data, isUpdate: true } };
+        }
+      }
+
+      // 3. No match found — create new client
+      const createResult = await this.clienteRepo.create(data);
+      if (!createResult.success) {
+        return { success: false, error: { ...createResult.error, method: 'ClienteUseCase.createOrUpdate' } };
+      }
+      return { success: true, data: { cliente: createResult.data, isUpdate: false } };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'use-case', 'ClienteUseCase.createOrUpdate', { empresaId: data.empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
   async update(id: string, empresaId: string, data: Partial<UpdateClienteDTO>): Promise<Result<Cliente>> {
     try {
       const result = await this.clienteRepo.update(id, empresaId, data);
