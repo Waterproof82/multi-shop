@@ -27,28 +27,45 @@ interface Stats {
   mesSeleccionado: string;
 }
 
-function getChartColors(): string[] {
-  if (typeof window === 'undefined') return [
-    '#F97316',
-    '#3B82F6',
-    '#10B981',
-    '#8B5CF6',
-    '#EC4899',
-    '#14B8A6',
-    '#F43F5E',
-    '#84CC16',
-  ];
+interface ChartTheme {
+  colors: string[];
+  tickFill: string;
+  gridStroke: string;
+  tooltipBg: string;
+  tooltipBorder: string;
+  tooltipColor: string;
+}
+
+const DEFAULT_CHART_THEME: ChartTheme = {
+  colors: ['#F97316', '#3B82F6', '#10B981', '#8B5CF6', '#EC4899', '#14B8A6', '#F43F5E', '#84CC16'],
+  tickFill: '#71717A',
+  gridStroke: '#E4E4E7',
+  tooltipBg: '#ffffff',
+  tooltipBorder: '#E4E4E7',
+  tooltipColor: '#18181B',
+};
+
+function getChartTheme(): ChartTheme {
+  if (typeof window === 'undefined') return DEFAULT_CHART_THEME;
   const style = getComputedStyle(document.documentElement);
-  return [
-    style.getPropertyValue('--color-chart-orange').trim() || '#F97316',
-    style.getPropertyValue('--color-chart-blue').trim() || '#3B82F6',
-    style.getPropertyValue('--color-chart-green').trim() || '#10B981',
-    style.getPropertyValue('--color-chart-purple').trim() || '#8B5CF6',
-    style.getPropertyValue('--color-chart-pink').trim() || '#EC4899',
-    style.getPropertyValue('--color-chart-teal').trim() || '#14B8A6',
-    style.getPropertyValue('--color-chart-rose').trim() || '#F43F5E',
-    style.getPropertyValue('--color-chart-lime').trim() || '#84CC16',
-  ];
+  const get = (v: string) => style.getPropertyValue(v).trim();
+  return {
+    colors: [
+      get('--color-chart-orange') || '#F97316',
+      get('--color-chart-blue') || '#3B82F6',
+      get('--color-chart-green') || '#10B981',
+      get('--color-chart-purple') || '#8B5CF6',
+      get('--color-chart-pink') || '#EC4899',
+      get('--color-chart-teal') || '#14B8A6',
+      get('--color-chart-rose') || '#F43F5E',
+      get('--color-chart-lime') || '#84CC16',
+    ],
+    tickFill: get('--muted-foreground') || '#71717A',
+    gridStroke: get('--border') || '#E4E4E7',
+    tooltipBg: get('--card') || '#ffffff',
+    tooltipBorder: get('--border') || '#E4E4E7',
+    tooltipColor: get('--foreground') || '#18181B',
+  };
 }
 
 export default function EstadisticasPage() {
@@ -57,14 +74,14 @@ export default function EstadisticasPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState({ mes: new Date().getMonth(), año: new Date().getFullYear() });
-  const [chartColors, setChartColors] = useState<string[]>([]);
+  const [chartTheme, setChartTheme] = useState<ChartTheme>(DEFAULT_CHART_THEME);
   const shouldReduceMotion = useReducedMotion() ?? false;
   const motionProps = shouldReduceMotion
     ? { initial: {}, animate: {} }
     : { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } };
 
   useEffect(() => {
-    setChartColors(getChartColors());
+    setChartTheme(getChartTheme());
   }, []);
 
   useEffect(() => {
@@ -249,20 +266,27 @@ export default function EstadisticasPage() {
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={stats.pedidosPorDia}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis 
-                  dataKey="dia" 
-                  tick={{ fontSize: 12 }}
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartTheme.gridStroke} />
+                <XAxis
+                  dataKey="dia"
+                  tick={{ fontSize: 12, fill: chartTheme.tickFill }}
                   tickFormatter={(value) => `${value}`}
+                  axisLine={{ stroke: chartTheme.gridStroke }}
+                  tickLine={{ stroke: chartTheme.gridStroke }}
                 />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip 
+                <YAxis
+                  tick={{ fontSize: 12, fill: chartTheme.tickFill }}
+                  axisLine={{ stroke: chartTheme.gridStroke }}
+                  tickLine={{ stroke: chartTheme.gridStroke }}
+                />
+                <Tooltip
                   contentStyle={{
-                    backgroundColor: 'var(--card)',
-                    border: '1px solid var(--border)',
+                    backgroundColor: chartTheme.tooltipBg,
+                    border: `1px solid ${chartTheme.tooltipBorder}`,
                     borderRadius: '8px',
-                    color: 'var(--foreground)'
                   }}
+                  labelStyle={{ color: chartTheme.tooltipColor }}
+                  itemStyle={{ color: chartTheme.tooltipColor }}
                   formatter={(value: number, name: string) => [
                     name === 'pedidos' ? `${value} ${t("xOrders", language)}` : `${value.toFixed(2)}€`,
                     name === 'pedidos' ? t("xOrders", language) : t("revenueLabel", language)
@@ -271,9 +295,9 @@ export default function EstadisticasPage() {
                 <Line
                   type="monotone"
                   dataKey="pedidos"
-                  stroke={chartColors[0] || '#F97316'}
+                  stroke={chartTheme.colors[0]}
                   strokeWidth={2}
-                  dot={{ fill: chartColors[0] || '#F97316', r: 3 }}
+                  dot={{ fill: chartTheme.colors[0], r: 3 }}
                   activeDot={{ r: 5 }}
                 />
               </LineChart>
@@ -298,28 +322,30 @@ export default function EstadisticasPage() {
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={stats.topPlatos.slice(0, 8)} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                  <XAxis type="number" hide />
-                  <YAxis 
-                    type="category" 
-                    dataKey="nombre" 
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={chartTheme.gridStroke} />
+                  <XAxis type="number" hide axisLine={false} tickLine={false} />
+                  <YAxis
+                    type="category"
+                    dataKey="nombre"
                     width={100}
-                    tick={{ fontSize: 12 }}
-                    style={{ fill: 'currentColor' }}
+                    tick={{ fontSize: 12, fill: chartTheme.tickFill }}
+                    axisLine={{ stroke: chartTheme.gridStroke }}
+                    tickLine={false}
                   />
-                  <Tooltip 
+                  <Tooltip
                     contentStyle={{
-                      backgroundColor: 'var(--card)',
-                      border: '1px solid var(--border)',
+                      backgroundColor: chartTheme.tooltipBg,
+                      border: `1px solid ${chartTheme.tooltipBorder}`,
                       borderRadius: '8px',
-                      color: 'var(--foreground)'
                     }}
+                    labelStyle={{ color: chartTheme.tooltipColor }}
+                    itemStyle={{ color: chartTheme.tooltipColor }}
                   />
                   <Bar dataKey="cantidad" radius={[0, 4, 4, 0]} animationDuration={800}>
                     {stats.topPlatos.slice(0, 8).map((plato, index) => (
-                      <Cell 
-                        key={`${plato.nombre}-bar`} 
-                        fill={chartColors[index % chartColors.length]} 
+                      <Cell
+                        key={`${plato.nombre}-bar`}
+                        fill={chartTheme.colors[index % chartTheme.colors.length]}
                       />
                     ))}
                   </Bar>
@@ -361,20 +387,21 @@ export default function EstadisticasPage() {
                       animationDuration={800}
                     >
                       {stats.topPlatos.slice(0, 8).map((plato, index) => (
-                        <Cell 
-                          key={`${plato.nombre}-pie`} 
-                          fill={chartColors[index % chartColors.length]} 
+                        <Cell
+                          key={`${plato.nombre}-pie`}
+                          fill={chartTheme.colors[index % chartTheme.colors.length]}
                         />
                       ))}
                     </Pie>
-                    <Tooltip 
+                    <Tooltip
                       formatter={(value: number) => `${value.toFixed(2)}€`}
                       contentStyle={{
-                        backgroundColor: 'var(--card)',
-                        border: '1px solid var(--border)',
+                        backgroundColor: chartTheme.tooltipBg,
+                        border: `1px solid ${chartTheme.tooltipBorder}`,
                         borderRadius: '8px',
-                        color: 'var(--foreground)'
                       }}
+                      labelStyle={{ color: chartTheme.tooltipColor }}
+                      itemStyle={{ color: chartTheme.tooltipColor }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
@@ -382,9 +409,9 @@ export default function EstadisticasPage() {
               <div className="mt-4 grid grid-cols-2 gap-2">
                 {stats.topPlatos.slice(0, 6).map((plato, index) => (
                   <div key={plato.nombre} className="flex items-center gap-2 text-sm">
-                    <div 
-                      className="w-3 h-3 rounded-full" 
-                      style={{ backgroundColor: chartColors[index % chartColors.length] }}
+                    <div
+                      className="w-3 h-3 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: chartTheme.colors[index % chartTheme.colors.length] }}
                     />
                     <span className="truncate text-muted-foreground">{plato.nombre}</span>
                   </div>
