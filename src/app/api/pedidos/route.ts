@@ -7,17 +7,17 @@ import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 const createPedidoSchema = z.object({
   items: z.array(z.object({
     item: z.object({
-      id: z.string(),
-      name: z.string(),
-      price: z.number(),
+      id: z.string().uuid(),
+      name: z.string().max(200),
+      price: z.number().min(0).max(100_000),
     }),
-    quantity: z.number().min(1),
+    quantity: z.number().min(1).max(100),
     selectedComplements: z.array(z.object({
-      name: z.string(),
-      price: z.number(),
-    })).optional(),
-  })),
-  total: z.number().min(0).optional(),
+      name: z.string().max(200),
+      price: z.number().min(0).max(100_000),
+    })).max(20).optional(),
+  })).min(1).max(50),
+  total: z.number().min(0).max(100_000).optional(),
   nombre: z.string().min(2).max(100),
   telefono: z.string().min(10).max(18).regex(/^[0-9]+$/, 'Formato de teléfono no válido'),
   email: z.string().email().optional().or(z.literal('')),

@@ -32,7 +32,12 @@ export async function PATCH(request: NextRequest) {
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
 
-  const body = await request.json();
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return validationErrorResponse('Invalid request body');
+  }
   const parsed = updatePedidoSchema.safeParse(body);
 
   if (!parsed.success) {
@@ -50,8 +55,13 @@ export async function DELETE(request: NextRequest) {
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
 
-  const body = await request.json();
-  const parsed = pedidoIdSchema.safeParse({ id: body.id });
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return validationErrorResponse('Invalid request body');
+  }
+  const parsed = pedidoIdSchema.safeParse({ id: (body as Record<string, unknown>).id });
 
   if (!parsed.success) {
     return validationErrorResponse('ID inválido');

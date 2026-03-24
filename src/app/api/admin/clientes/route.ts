@@ -24,8 +24,13 @@ export async function POST(request: NextRequest) {
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
 
-  const body = await request.json();
-  const parsed = createClienteSchema.safeParse({ ...body, empresaId });
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return validationErrorResponse('Invalid request body');
+  }
+  const parsed = createClienteSchema.safeParse({ ...(body as Record<string, unknown>), empresaId });
 
   if (!parsed.success) {
     return validationErrorResponse(parsed.error.errors[0].message);
@@ -49,7 +54,12 @@ export async function PATCH(request: NextRequest) {
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
 
-  const body = await request.json();
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return validationErrorResponse('Invalid request body');
+  }
   const parsed = updateClienteSchema.safeParse(body);
 
   if (!parsed.success) {
@@ -70,8 +80,13 @@ export async function DELETE(request: NextRequest) {
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
 
-  const body = await request.json();
-  const parsed = clienteIdSchema.safeParse({ id: body.id });
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return validationErrorResponse('Invalid request body');
+  }
+  const parsed = clienteIdSchema.safeParse({ id: (body as Record<string, unknown>).id });
 
   if (!parsed.success) {
     return validationErrorResponse('ID inválido');

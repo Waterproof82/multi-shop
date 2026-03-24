@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers';
-import { randomBytes, createHmac } from 'crypto';
+import { randomBytes, createHmac, timingSafeEqual } from 'crypto';
 
 const CSRF_COOKIE_NAME = 'csrf_token';
 const CSRF_HEADER_NAME = 'x-csrf-token';
@@ -27,8 +27,11 @@ export function signCsrfToken(token: string): string {
 }
 
 export function verifyCsrfToken(token: string, signature: string): boolean {
-  const expectedSignature = signCsrfToken(token);
-  return signature === expectedSignature;
+  const expected = signCsrfToken(token);
+  const a = Buffer.from(signature, 'hex');
+  const b = Buffer.from(expected, 'hex');
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
 }
 
 export async function getCsrfCookie(): Promise<string | null> {

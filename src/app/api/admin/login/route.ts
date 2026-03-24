@@ -30,7 +30,12 @@ export async function POST(request: NextRequest) {
   const rateLimited = await rateLimitLogin(request);
   if (rateLimited) return rateLimited;
 
-  const body = await request.json();
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return validationErrorResponse('Invalid request body');
+  }
 
   const parsed = loginSchema.safeParse(body);
   if (!parsed.success) {

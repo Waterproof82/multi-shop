@@ -50,8 +50,13 @@ export async function POST(request: NextRequest) {
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
 
-  const body = await request.json();
-  const parsed = createProductSchema.safeParse({ ...body, empresaId });
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return validationErrorResponse('Invalid request body');
+  }
+  const parsed = createProductSchema.safeParse({ ...(body as Record<string, unknown>), empresaId });
 
   if (!parsed.success) {
     return validationErrorResponse(parsed.error.errors[0].message);
@@ -78,9 +83,14 @@ export async function PUT(request: NextRequest) {
     return validationErrorResponse('ID inválido');
   }
 
-  const body = await request.json();
-  const { id: _bodyId, ...updateData } = body;
-  
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return validationErrorResponse('Invalid request body');
+  }
+  const { id: _bodyId, ...updateData } = body as Record<string, unknown>;
+
   // Merge id from query param with body data
   const dataWithId = { ...updateData, id: idParsed.data.id };
   const parsed = updateProductSchema.safeParse(dataWithId);

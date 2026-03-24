@@ -4,6 +4,7 @@ import { requireAuth, successResponse, errorResponse } from '@/core/infrastructu
 import { getR2Config, uploadToR2 } from '@/core/infrastructure/storage/s3-client';
 import { empresaUseCase } from '@/core/infrastructure/database';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
+import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import { VALIDATION_ERRORS, SERVER_ERRORS, AUTH_ERRORS, createErrorResponse } from '@/core/domain/constants/api-errors';
 
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
@@ -34,6 +35,9 @@ const MIME_TO_EXT: Record<string, string> = {
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 export async function POST(request: NextRequest) {
+  const rateLimited = await rateLimitAdmin(request);
+  if (rateLimited) return rateLimited;
+
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError || !empresaId) return authError ?? NextResponse.json(createErrorResponse(AUTH_ERRORS.UNAUTHORIZED), { status: 401 });
 

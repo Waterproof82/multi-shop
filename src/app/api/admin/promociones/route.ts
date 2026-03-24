@@ -99,12 +99,25 @@ export async function POST(request: NextRequest) {
       await deleteImageFromR2(oldImageUrl);
     }
 
-    const BREVO_API_KEY = process.env.BREVO_API_KEY;
-    if (BREVO_API_KEY && emailTargets.length > 0 && empresa) {
-      const empresaLogoUrl = empresa.logoUrl || '';
-      const baseUrl = empresa.dominio ? `https://${empresa.dominio}` : '';
+    let emailsSent = 0;
+    let emailError: string | null = null;
 
-      if (baseUrl) {
+    const BREVO_API_KEY = process.env.BREVO_API_KEY;
+    if (!BREVO_API_KEY) {
+      emailError = 'BREVO_API_KEY no configurada';
+    } else if (!empresa) {
+      emailError = 'Empresa no encontrada';
+    } else if (emailTargets.length === 0) {
+      emailError = 'Sin clientes suscritos';
+    } else {
+      const senderEmail = empresa.emailNotification || process.env.BREVO_DEFAULT_SENDER_EMAIL;
+      if (!senderEmail) {
+        emailError = 'Email remitente no configurado (emailNotification o BREVO_DEFAULT_SENDER_EMAIL)';
+      } else {
+        const empresaLogoUrl = empresa.logoUrl || '';
+        const requestOrigin = new URL(request.url).origin;
+        const baseUrl = empresa.dominio ? `https://${empresa.dominio}` : requestOrigin;
+
         const emailHtml = buildEmailHtml({
           empresaLogoUrl,
           empresaNombre: empresa.nombre || 'Empresa',
@@ -115,19 +128,28 @@ export async function POST(request: NextRequest) {
         });
 
         for (const email of emailTargets) {
-          const personalizedHtml = emailHtml.replaceAll('__EMAIL__', encodeURIComponent(email));
-          await sendEmail({
-            to: [email],
-            subject: 'Nueva promocion disponible',
-            htmlContent: personalizedHtml,
-            senderName: empresa.nombre || 'Promociones',
-            senderEmail: empresa.emailNotification || process.env.BREVO_DEFAULT_SENDER_EMAIL || 'noreply@example.com',
-          });
+          try {
+            const personalizedHtml = emailHtml.replaceAll('__EMAIL__', encodeURIComponent(email));
+            await sendEmail({
+              to: [email],
+              subject: 'Nueva promocion disponible',
+              htmlContent: personalizedHtml,
+              senderName: empresa.nombre || 'Promociones',
+              senderEmail,
+            });
+            emailsSent++;
+          } catch (sendErr) {
+            await logApiError(`Send promo email to ${email}`, sendErr, 'POST');
+          }
         }
       }
     }
 
-    return NextResponse.json({ promocion: promo });
+    if (emailError) {
+      await logApiError('Promo emails skipped', new Error(emailError), 'POST');
+    }
+
+    return NextResponse.json({ promocion: promo, emailsSent, emailError });
   } catch (error) {
     await logApiError('Create promocion', error, 'POST');
     return errorResponse('Error interno');
