@@ -74,9 +74,21 @@ function getAdminLimiter(): Ratelimit | null {
 }
 
 function getClientIp(request: Request): string {
+  // Cloudflare sets cf-connecting-ip to the real client IP.
+  // When this header is absent (e.g. Cloudflare DNS-only or direct Vercel),
+  // fall back to x-forwarded-for FIRST entry: Cloudflare rewrites the header
+  // so the real client IP is always first, then appends its own edge IP last.
+  // Taking the last entry would key rate limits on a rotating Cloudflare IP,
+  // allowing unlimited retries from the same client.
+  // NOTE: UPSTASH_REDIS_REST_URL is required in production for login rate limiting.
+  const cfIp = request.headers.get("cf-connecting-ip");
+  if (cfIp) return cfIp.trim();
+
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) {
-    return forwarded.split(",")[0].trim();
+    const ips = forwarded.split(",").map(ip => ip.trim());
+    // First IP is the real client IP set by Cloudflare
+    return ips[0];
   }
   return request.headers.get("x-real-ip") || "unknown";
 }

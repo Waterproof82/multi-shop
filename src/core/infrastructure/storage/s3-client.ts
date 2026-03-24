@@ -1,6 +1,4 @@
 import { S3Client, DeleteObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
-import { NodeHttpHandler } from "@smithy/node-http-handler";
-import https from "node:https";
 
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
 const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
@@ -19,8 +17,6 @@ export function getS3Client(): S3Client {
     throw new Error('Configuración de R2 incompleta');
   }
 
-  const isDev = process.env.NODE_ENV !== "production";
-
   s3Client = new S3Client({
     region: "auto",
     endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
@@ -31,11 +27,6 @@ export function getS3Client(): S3Client {
     forcePathStyle: true,
     requestChecksumCalculation: "WHEN_REQUIRED",
     responseChecksumValidation: "WHEN_REQUIRED",
-    ...(isDev && {
-      requestHandler: new NodeHttpHandler({
-        httpsAgent: new https.Agent({ rejectUnauthorized: false }),
-      }),
-    }),
   });
 
   return s3Client;
