@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { clienteUseCase } from '@/core/infrastructure/database';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
+import { verifyUnsubscribeToken } from '@/lib/unsubscribe-token';
 
 const emailSchema = z.string().email();
 const uuidSchema = z.string().uuid();
@@ -22,8 +23,13 @@ export async function GET(request: Request) {
     let email = searchParams.get('email');
     const empresaId = searchParams.get('empresa');
     const action = searchParams.get('action') as 'alta' | 'baja' | null;
+    const token = searchParams.get('token');
 
     if (!email || !empresaId || !emailSchema.safeParse(email).success || !uuidSchema.safeParse(empresaId).success) {
+      return NextResponse.redirect(`${baseUrl}/?error=invalid`);
+    }
+
+    if (!action || (action !== 'alta' && action !== 'baja')) {
       return NextResponse.redirect(`${baseUrl}/?error=invalid`);
     }
 
@@ -36,6 +42,11 @@ export async function GET(request: Request) {
 
     // Normalizar email: trim, lowercase
     const normalizedEmail = email.trim().toLowerCase();
+
+    // Verify HMAC-signed token — prevents unauthorized subscription toggling
+    if (!token || !verifyUnsubscribeToken(token, normalizedEmail, empresaId, action)) {
+      return NextResponse.redirect(`${baseUrl}/?error=invalid`);
+    }
 
     const nuevoValor = await clienteUseCase.togglePromoSubscription(normalizedEmail, empresaId, action ?? undefined);
 

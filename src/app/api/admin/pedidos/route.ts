@@ -29,6 +29,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const rateLimited = await rateLimitAdmin(request);
+  if (rateLimited) return rateLimited;
+
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
 
@@ -47,6 +50,9 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const rateLimited = await rateLimitAdmin(request);
+  if (rateLimited) return rateLimited;
+
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
 

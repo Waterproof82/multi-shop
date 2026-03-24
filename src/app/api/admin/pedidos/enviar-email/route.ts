@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { sendEmail } from '@/lib/brevo-email';
 import { empresaUseCase } from '@/core/infrastructure/database';
 import { requireAuth } from '@/core/infrastructure/api/helpers';
+import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
 import { escapeHtml } from '@/lib/html-utils';
 
@@ -127,6 +128,9 @@ function generateOrderEmail(items: OrderItem[], total: number, empresaNombre: st
 
 export async function POST(request: NextRequest) {
   try {
+    const rateLimited = await rateLimitAdmin(request);
+    if (rateLimited) return rateLimited;
+
     const { empresaId, error: authError } = await requireAuth(request);
     if (authError) return authError;
 

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { clienteUseCase } from '@/core/infrastructure/database';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
+import { verifyUnsubscribeToken } from '@/lib/unsubscribe-token';
 
 const emailSchema = z.string().email();
 const uuidSchema = z.string().uuid();
@@ -21,12 +22,19 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const email = searchParams.get('email');
     const empresaId = searchParams.get('empresa');
+    const token = searchParams.get('token');
 
     if (!email || !empresaId || !emailSchema.safeParse(email).success || !uuidSchema.safeParse(empresaId).success) {
       return NextResponse.redirect(`${baseUrl}/?error=invalid`);
     }
 
     const normalizedEmail = decodeURIComponent(email).trim().toLowerCase();
+
+    // Verify HMAC-signed token — prevents unauthorized subscription toggling
+    if (!token || !verifyUnsubscribeToken(token, normalizedEmail, empresaId, 'baja')) {
+      return NextResponse.redirect(`${baseUrl}/?error=invalid`);
+    }
+
     const nuevoValor = await clienteUseCase.togglePromoSubscription(normalizedEmail, empresaId);
 
     if (nuevoValor === null) {
@@ -36,7 +44,7 @@ export async function GET(request: Request) {
     const mensaje = nuevoValor ? 'promo=on' : 'promo=off';
     return NextResponse.redirect(`${baseUrl}/?${mensaje}`);
   } catch (error) {
-    console.error('[Unsubscribe] Error:', error);
+    void error;
     return NextResponse.redirect(`${baseUrl}/?error=internal`);
   }
 }

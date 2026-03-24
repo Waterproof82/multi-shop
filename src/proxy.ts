@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 import { verifyCsrfToken } from '@/lib/csrf';
+import { timingSafeEqual } from 'crypto';
 import { AUTH_ERRORS, SERVER_ERRORS, createErrorResponse } from '@/core/domain/constants/api-errors';
 
 const ADMIN_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
@@ -82,7 +83,11 @@ async function handleAdminAuth(request: NextRequest, origin: string | null): Pro
       }
 
       const [token, signature] = csrfCookie.split(':');
-      if (!token || !signature || !verifyCsrfToken(token, signature) || csrfHeader !== token) {
+      const csrfHeaderMatchesToken = (() => {
+        try { return timingSafeEqual(Buffer.from(csrfHeader), Buffer.from(token)); }
+        catch { return false; }
+      })();
+      if (!token || !signature || !verifyCsrfToken(token, signature) || !csrfHeaderMatchesToken) {
         return addCorsHeaders(NextResponse.json(
           createErrorResponse(AUTH_ERRORS.CSRF_INVALID),
           { status: 403 }
