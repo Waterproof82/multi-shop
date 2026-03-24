@@ -82,8 +82,11 @@ export async function PUT(request: NextRequest) {
   const añoParam = searchParams.get('año');
 
   const now = new Date();
-  const selectedMonth = mesParam ? Number.parseInt(mesParam) : now.getMonth();
-  const selectedYear = añoParam ? Number.parseInt(añoParam) : now.getFullYear();
+  const mesSchema = z.coerce.number().int().min(0).max(11);
+  const añoSchema = z.coerce.number().int().min(2020).max(2100);
+
+  const selectedMonth = mesParam ? (mesSchema.safeParse(mesParam).data ?? now.getMonth()) : now.getMonth();
+  const selectedYear = añoParam ? (añoSchema.safeParse(añoParam).data ?? now.getFullYear()) : now.getFullYear();
 
   const result = await pedidoUseCase.getStats(empresaId!, selectedMonth, selectedYear);
   if (!result.success) {

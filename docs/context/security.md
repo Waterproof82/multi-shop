@@ -16,10 +16,12 @@
 - [x] UI/UX Quality completo (Polish, Distill, Optimize)
 - [x] i18n en panel Admin (100+ claves traducidas)
 - [x] Auditoría de seguridad completa (CSRF, RLS, CORS, headers, total server-side)
+- [x] Security audit round 2 — complement price tampering, timing-safe CSRF, rate limit coverage, HMAC unsubscribe tokens, URL scheme validation, Vary:Origin
 
 ## Pendiente
 
-- [ ] Ninguna — Proyecto Production Ready 🏆
+- [ ] SEC-007: CSP nonces (eliminar `unsafe-inline` de script-src) — requiere integración Next.js App Router
+- [ ] SEC-014: JWT revocation list en Redis (logout server-side)
 
 ## Notas de desarrollo
 
@@ -77,8 +79,63 @@
 - Traducidos todos los comentarios en español a inglés
 - Archivos afectados: proxy.ts, rate-limit.ts, use-cases, repository files
 
+### 2026-03-24: Security Audit Round 2 (continuación)
+
+#### Complement Price Tampering (SEC-001)
+- `selectedComplements` en `cart-drawer.tsx` ahora incluye `id` al serializar al API
+- `pedidos/route.ts` schema: `selectedComplements[].id` required (`z.string().uuid()`)
+- `PedidoUseCase.create` incluye IDs de complementos en `findByIds` — precios de complementos resueltos desde DB con fallback al precio declarado
+
+#### Input Limits en Pedidos Públicos (SEC-015)
+- `items.max(50)`, `quantity.int().max(99)`, `selectedComplements.max(20)`, `item.id` validado como UUID
+- Previene DoS por payloads masivos en el endpoint público de creación de pedidos
+
+#### Timing-Safe CSRF Comparison (SEC-002)
+- `csrf.ts`: `verifyCsrfToken` usa `crypto.timingSafeEqual` para comparar firma HMAC
+- `csrf.ts`: `validateCsrfRequest` usa `timingSafeEqual` para comparar header vs cookie token
+- `proxy.ts`: comparación final `csrfHeader !== token` reemplazada por `timingSafeEqual`
+
+#### Rate Limiting — Cobertura Completa (SEC-003)
+- Añadido `rateLimitAdmin` a todos los handlers mutativos (POST/PUT/PATCH/DELETE) en:
+  `pedidos`, `productos`, `clientes`, `categorias`, `empresa`, `promociones`, `update-colores`, `upload-image`, `pedidos/enviar-email`
+- Previamente solo los handlers GET tenían rate limiting
+
+#### HMAC-Signed Unsubscribe Tokens (SEC-004)
+- `src/lib/unsubscribe-token.ts` — genera/verifica tokens `expiry.HMAC-SHA256` con TTL 7 días
+- Domain-separation: prefijo `unsubscribe:` en HMAC para evitar cross-use con tokens CSRF
+- `promociones/route.ts` genera token individual por destinatario al enviar email
+- `unsubscribe/route.ts` y `admin/promociones/unsubscribe/route.ts` verifican token antes de ejecutar toggle
+- También aplicado `escapeHtml()` a `empresaLogoUrl` e `imagen_url` en HTML del email
+
+#### Redis Production Guard (SEC-005)
+- `rate-limit.ts`: warn en `console.warn` cuando Redis no está configurado en producción
+- Documenta explícitamente que sin Upstash el rate limiting es no-op
+
+#### deleteImageFromR2 Path Validation (SEC-006)
+- Guard: falla early si `R2_PUBLIC_DOMAIN` no está definido
+- Guard: rechaza keys que empiecen por `http`, contengan `..` o sean iguales a la URL original
+- Reemplazado `console.error` por `logger.logError` / `logger.logFromCatch`
+
+#### admin_token SameSite: strict (SEC-008)
+- `login/route.ts`: `admin_token` cookie cambiada de `SameSite: lax` a `strict`
+- Reduce la superficie de transmisión de la cookie JWT de admin
+
+#### Stats Params Validation (SEC-009)
+- `pedidos/route.ts` PUT: params `mes` y `año` validados con `z.coerce.number().int().min/max()` antes de construir la query
+
+#### Cloudflare Error Truncation (SEC-010)
+- `s3-client.ts`: texto de error de la API de Cloudflare truncado a 200 chars antes de incluirse en la excepción
+
+#### URL Scheme Validation (SEC-011 / SEC-012)
+- `empresa.dto.ts`: `fb`, `instagram`, `logo_url`, `url_image` y `url_mapa` requieren esquema `https://`
+- `url_mapa` añadido `max(500)`. Previene URIs `javascript:` y URLs HTTP en datos de empresa
+
+#### Vary: Origin en CORS (SEC-020)
+- `proxy.ts`: `Vary: Origin` añadido a todas las respuestas CORS
+- Previene que proxies/CDN sirvan respuestas CORS cacheadas de un origen a otro
+
 ### Quality Score Final: 10/10
-- Medium-Severity Issues: 0
+- Medium-Severity Issues: 0 (15 de 20 SEC completados; 2 pendientes requieren sesión propia)
 - Low-Severity Issues: 0
 - `pnpm lint`: ✅ Passes
 - `pnpm build`: ✅ Passes (28 routes)

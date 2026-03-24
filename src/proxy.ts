@@ -30,6 +30,7 @@ function isAllowedOrigin(origin: string | null): boolean {
 }
 
 function addCorsHeaders(response: NextResponse, origin: string | null): NextResponse {
+  response.headers.set('Vary', 'Origin');
   if (origin && isAllowedOrigin(origin)) {
     response.headers.set('Access-Control-Allow-Origin', origin);
     response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');

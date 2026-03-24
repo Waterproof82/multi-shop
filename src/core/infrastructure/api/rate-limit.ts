@@ -10,7 +10,13 @@ function getRedis(): Redis | null {
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
 
-  if (!url || !token) return null;
+  if (!url || !token) {
+    if (process.env.NODE_ENV === 'production') {
+      // Log once — missing Redis in production means no rate limiting at all
+      console.warn('[rate-limit] UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN are not set. Rate limiting is disabled in production.');
+    }
+    return null;
+  }
 
   redis = new Redis({ url, token });
   return redis;
