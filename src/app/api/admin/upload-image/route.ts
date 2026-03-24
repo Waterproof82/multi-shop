@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     return errorResponse(SERVER_ERRORS.DATABASE_ERROR.message);
   }
   const empresa = empresaResult.data;
-  const empresaSlug = empresa?.slug ?? empresa?.dominio ?? empresaId!;
+  const empresaSlug = empresa?.slug ?? empresa?.dominio ?? empresaId;
 
   let formData: FormData;
   try {

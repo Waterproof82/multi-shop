@@ -8,10 +8,16 @@ export interface SendEmailParams {
   senderEmail?: string;
 }
 
-export async function sendEmail({ to, subject, htmlContent, senderName = 'Pedidos', senderEmail = process.env.BREVO_DEFAULT_SENDER_EMAIL || 'noreply@example.com' }: SendEmailParams) {
+export async function sendEmail({ to, subject, htmlContent, senderName = 'Pedidos', senderEmail }: SendEmailParams) {
   if (!BREVO_API_KEY) {
     console.error('BREVO_API_KEY not configured');
     throw new Error('BREVO_API_KEY not configured');
+  }
+
+  const resolvedSenderEmail = senderEmail || process.env.BREVO_DEFAULT_SENDER_EMAIL;
+  if (!resolvedSenderEmail) {
+    console.error('No sender email configured (BREVO_DEFAULT_SENDER_EMAIL missing)');
+    throw new Error('Sender email not configured');
   }
 
   const recipients = Array.isArray(to) 
@@ -21,7 +27,7 @@ export async function sendEmail({ to, subject, htmlContent, senderName = 'Pedido
   const payload = {
     subject,
     htmlContent,
-    sender: { name: senderName, email: senderEmail },
+    sender: { name: senderName, email: resolvedSenderEmail },
     to: recipients,
   };
 

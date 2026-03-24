@@ -1,9 +1,35 @@
 /** @type {import('next').NextConfig} */
 
-
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Build CSP fallback for static assets (pages get a nonce-based CSP from middleware)
+function normalizeR2Origin(raw) {
+  if (!raw) return '';
+  const stripped = raw.replace(/^https?:\/\//, '');
+  return `https://${stripped}`;
+}
+const r2Origin = normalizeR2Origin(process.env.NEXT_PUBLIC_R2_DOMAIN);
+const imgSrc = ["'self'", r2Origin, "https://*.supabase.co", "data:", "blob:"]
+  .filter(Boolean).join(' ');
+const mediaSrc = ["'self'", r2Origin]
+  .filter(Boolean).join(' ');
+
+const cspFallback = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-eval'",
+  "style-src 'self' 'unsafe-inline'",
+  `img-src ${imgSrc}`,
+  `media-src ${mediaSrc}`,
+  "font-src 'self'",
+  "connect-src 'self' https://*.supabase.co https://api.brevo.com https://*.upstash.io",
+  "frame-src 'self' https://www.google.com https://maps.google.com",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'self'",
+].join('; ') + ';';
 
 const nextConfig = {
   typescript: {
@@ -29,8 +55,19 @@ const nextConfig = {
           { key: 'X-DNS-Prefetch-Control', value: 'on' },
           { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains; preload' },
           { key: 'X-Powered-By', value: '' },
+          {
+            key: 'Content-Security-Policy',
+            // Fallback CSP for static assets; middleware overrides this for page requests with a per-request nonce
+            value: cspFallback,
+          },
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=(), usb=()' },
           { key: 'X-XSS-Protection', value: '1; mode=block' },
+        ],
+      },
+      {
+        source: '/admin/(.*)',
+        headers: [
+          { key: 'X-Frame-Options', value: 'DENY' },
         ],
       },
       {

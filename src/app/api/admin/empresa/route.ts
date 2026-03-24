@@ -50,7 +50,12 @@ export async function PUT(request: NextRequest) {
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
 
-  const body = await request.json();
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return validationErrorResponse('Invalid request body');
+  }
   const parsed = updateEmpresaSchema.safeParse(body);
 
   if (!parsed.success) {

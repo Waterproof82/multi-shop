@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { jwtVerify } from 'jose';
 import { revokeToken } from '@/lib/token-revocation';
+import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 
 export async function POST(request: NextRequest) {
+  const rateLimited = await rateLimitAdmin(request);
+  if (rateLimited) return rateLimited;
+
   const cookieStore = await cookies();
   const token = request.cookies.get('admin_token')?.value;
 
@@ -24,5 +28,6 @@ export async function POST(request: NextRequest) {
   }
 
   cookieStore.delete('admin_token');
+  cookieStore.delete('csrf_token');
   return NextResponse.json({ success: true });
 }

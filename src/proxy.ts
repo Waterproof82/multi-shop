@@ -2,29 +2,11 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 import { verifyCsrfToken } from '@/lib/csrf';
-import { timingSafeEqual, randomBytes } from 'crypto';
+import { timingSafeEqual } from 'crypto';
 import { isTokenRevoked } from '@/lib/token-revocation';
 import { AUTH_ERRORS, SERVER_ERRORS, createErrorResponse } from '@/core/domain/constants/api-errors';
 
 const ADMIN_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
-
-const CSP_DIRECTIVES_BASE = [
-  "default-src 'self'",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' https://imagenes.almadearena.es https://*.supabase.co data: blob:",
-  "media-src 'self' https://imagenes.almadearena.es",
-  "font-src 'self'",
-  "connect-src 'self' https://*.supabase.co https://api.brevo.com https://*.upstash.io",
-  "frame-src 'self' https://www.google.com https://maps.google.com",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'self'",
-];
-
-function buildPageCsp(nonce: string): string {
-  return [`script-src 'self' 'nonce-${nonce}'`, ...CSP_DIRECTIVES_BASE].join('; ');
-}
 
 function isAllowedOrigin(origin: string | null): boolean {
   if (!origin) return false;
@@ -85,7 +67,6 @@ async function handleAdminAuth(request: NextRequest, origin: string | null): Pro
     const secret = new TextEncoder().encode(ADMIN_TOKEN_SECRET);
     const { payload } = await jwtVerify(adminToken, secret);
 
-    // Verify this is an admin token (not a cart access token)
     if (!payload.empresaId || !payload.adminId) {
       return addCorsHeaders(NextResponse.json(createErrorResponse(AUTH_ERRORS.INVALID_TOKEN), { status: 401 }), origin);
     }
@@ -132,40 +113,6 @@ async function handleAdminAuth(request: NextRequest, origin: string | null): Pro
   }
 }
 
-export async function proxy(request: NextRequest) {
-  const url = request.nextUrl.clone();
-  const path = request.nextUrl.pathname;
-  const origin = request.headers.get('origin');
-
-  // Preflight CORS
-  if (request.method === 'OPTIONS' && path.startsWith('/api/')) {
-    return addCorsHeaders(new NextResponse(null, { status: 204 }), origin);
-  }
-
-  // Admin auth (protected routes)
-  if (path.startsWith('/api/admin') && !isPublicRoute(path)) {
-    return handleAdminAuth(request, origin);
-  }
-
-  // Access token for cart
-  const accessToken = url.searchParams.get('access');
-  if (accessToken) {
-    return handleCartAccessToken(url, accessToken);
-  }
-
-  // Page routes: generate per-request nonce and set CSP
-  if (!path.startsWith('/api/')) {
-    const nonce = randomBytes(16).toString('base64');
-    const requestHeaders = new Headers(request.headers);
-    requestHeaders.set('x-nonce', nonce);
-    const response = NextResponse.next({ request: { headers: requestHeaders } });
-    response.headers.set('Content-Security-Policy', buildPageCsp(nonce));
-    return response;
-  }
-
-  return NextResponse.next();
-}
-
 async function handleCartAccessToken(url: URL, accessToken: string): Promise<NextResponse> {
   const sanitizedToken = accessToken.replaceAll(/[^a-zA-Z0-9._-]/g, '');
   const secretKey = process.env.CART_TOKEN_SECRET;
@@ -198,6 +145,74 @@ async function handleCartAccessToken(url: URL, accessToken: string): Promise<Nex
     url.searchParams.delete('access');
     return NextResponse.redirect(url);
   }
+}
+
+function normalizeR2Origin(raw: string | undefined): string {
+  if (!raw) return '';
+  // Strip any existing protocol so we always produce a clean https:// origin
+  const stripped = raw.replace(/^https?:\/\//, '');
+  return `https://${stripped}`;
+}
+
+function buildCsp(nonce: string): string {
+  const r2Origin = normalizeR2Origin(process.env.NEXT_PUBLIC_R2_DOMAIN);
+  const imgSources = ["'self'", r2Origin, "https://*.supabase.co", "data:", "blob:"]
+    .filter(Boolean).join(' ');
+  const mediaSources = ["'self'", r2Origin]
+    .filter(Boolean).join(' ');
+
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' 'unsafe-eval'`,
+    "style-src 'self' 'unsafe-inline'",
+    `img-src ${imgSources}`,
+    `media-src ${mediaSources}`,
+    "font-src 'self'",
+    "connect-src 'self' https://*.supabase.co https://api.brevo.com https://*.upstash.io",
+    "frame-src 'self' https://www.google.com https://maps.google.com",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'self'",
+  ].join('; ');
+}
+
+export async function proxy(request: NextRequest) {
+  const url = request.nextUrl.clone();
+  const path = request.nextUrl.pathname;
+  const origin = request.headers.get('origin');
+
+  // Preflight CORS
+  if (request.method === 'OPTIONS' && path.startsWith('/api/')) {
+    return addCorsHeaders(new NextResponse(null, { status: 204 }), origin);
+  }
+
+  // Admin auth (protected routes)
+  if (path.startsWith('/api/admin') && !isPublicRoute(path)) {
+    return handleAdminAuth(request, origin);
+  }
+
+  // Access token for cart
+  const accessToken = url.searchParams.get('access');
+  if (accessToken) {
+    return handleCartAccessToken(url, accessToken);
+  }
+
+  // Generate per-request nonce for CSP (HIGH-005)
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-nonce', nonce);
+
+  const csp = buildCsp(nonce);
+  // Set on request so server components can read it via headers()
+  requestHeaders.set('Content-Security-Policy', csp);
+
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+
+  // Set on response so the browser enforces it
+  response.headers.set('Content-Security-Policy', csp);
+
+  return response;
 }
 
 export const config = {
