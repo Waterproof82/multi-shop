@@ -17,6 +17,8 @@
 - [x] i18n en panel Admin (100+ claves traducidas)
 - [x] Auditoría de seguridad completa (CSRF, RLS, CORS, headers, total server-side)
 - [x] Security audit round 2 — complement price tampering, timing-safe CSRF, rate limit coverage, HMAC unsubscribe tokens, URL scheme validation, Vary:Origin
+- [x] JWT revocation list en Redis (logout server-side, jti claim, isTokenRevoked en proxy)
+- [x] CSP nonces por request (elimina unsafe-inline de script-src, CSP dinámico en middleware)
 
 ## Pendiente
 
