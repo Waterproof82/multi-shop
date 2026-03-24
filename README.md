@@ -133,6 +133,9 @@ src/
 └── lib/
     ├── domain-utils.ts              # parseMainDomain(), getDomainFromHeaders()
     ├── html-utils.ts                # escapeHtml()
+    ├── csrf.ts                      # HMAC-SHA256 tokens CSRF (timingSafeEqual)
+    ├── token-revocation.ts          # JWT revocation list (Upstash Redis REST)
+    ├── unsubscribe-token.ts         # HMAC tokens para unsubscribe (TTL 7d)
     ├── server-services.ts           # getEmpresaByDomain(), getMenuUseCase
     ├── admin-context.tsx            # AdminContext (empresaId, empresaNombre)
     ├── cart-context.tsx             # CartContext
@@ -171,17 +174,27 @@ export class ProductUseCase {
 const supabase = createClient(url, key); // fuera de supabase-client.ts
 ```
 
-### ✅ OWASP (100%)
+### ✅ OWASP / Seguridad (100%)
 
 | Principio | Implementación |
 |-----------|----------------|
-| **JWT** | HS256 con `jose` | HttpOnly cookie, 24h expiry |
-| **Autorización** | Proxy middleware valida JWT, inyecta `x-empresa-id` |
-| **Validación de entrada** | Zod `safeParse` en **todas** las API routes |
+| **JWT** | HS256 con `jose`, HttpOnly cookie, 24h expiry, `SameSite=strict`, claim `jti` en cada token |
+| **JWT Revocation** | Logout almacena `jti` en Upstash Redis con TTL restante. Proxy verifica revocación en cada request (`src/lib/token-revocation.ts`) |
+| **CSRF** | Tokens HMAC-SHA256 (`src/lib/csrf.ts`), comparación `timingSafeEqual`, cookie HttpOnly + header `x-csrf-token`. Validado en proxy para todos los métodos mutativos de `/api/admin/*` |
+| **CSP Nonces** | `proxy.ts` genera nonce criptográfico por request. CSP dinámico con `script-src 'nonce-{n}'` — sin `unsafe-inline`. Nonce disponible como `x-nonce` para server components |
+| **Autorización** | Proxy middleware valida JWT e inyecta `x-empresa-id`, `x-admin-id`, `x-admin-rol` |
+| **Rate limiting** | Upstash Redis — login: 5/15min, público: 20/min, admin: 60/min por IP real (Cloudflare-aware). Todos los endpoints mutativos protegidos |
+| **Validación de entrada** | Zod `safeParse` en **todas** las API routes. Límites: items ≤50, quantity ≤99, complements ≤20, UUIDs validados |
+| **Magic bytes** | Upload valida firma binaria del archivo — previene MIME type spoofing (JPEG, PNG, WebP, GIF) |
+| **Price tampering** | `PedidoUseCase.create` recalcula total (productos + complementos) desde precios reales de DB — el total del cliente se ignora |
 | **Sanitización HTML** | `escapeHtml()` en todos los templates de email |
-| **Validación colores** | Regex `#RRGGBB` en Zod antes de persistir |
+| **Unsubscribe tokens** | HMAC-SHA256 con TTL 7 días y prefijo de dominio (`unsubscribe:`) — previene uso cruzado con tokens CSRF |
+| **URL scheme** | DTOs de empresa validan `https://` en fb, instagram, logo_url, url_imagen, url_mapa |
+| **RLS Supabase** | `anon` explícitamente denegado en pedidos, clientes, log_errors, perfiles_admin, promociones. Escrituras via `service_role` |
+| **Security headers** | HSTS, X-Frame-Options, X-Content-Type-Options, Permissions-Policy, X-XSS-Protection, frame-ancestors. CSP dinámico con nonce vía middleware |
+| **CORS** | Whitelist de dominios via `CORS_ALLOWED_DOMAINS`. `Vary: Origin` en todas las respuestas. Preflight con 204 |
+| **Número de pedido atómico** | `get_next_pedido_number()` con mutex por tenant (lock en fila `empresas`) |
 | **Sin secretos hardcodeados** | Todas las claves en variables de entorno |
-| **`NEXT_PUBLIC_BASE_URL`** | Obligatorio en producción — sin fallbacks inseguros |
 
 ---
 
@@ -282,7 +295,7 @@ import {
 | **IEmpresaRepository** | `getById`, `findByDomain`, `update`, `updateColores` |
 | **IPedidoRepository** | `findAllByTenant`, `updateStatus`, `delete`, `create`, `getStats` |
 | **IPromocionRepository** | `findAllByTenant`, `create`, `deleteAllByTenant` |
-| **IProductRepository** | `findAllByTenant`, `create`, `update`, `delete` |
+| **IProductRepository** | `findAllByTenant`, `findByIds`, `create`, `update`, `delete` |
 | **ICategoryRepository** | `findAllByTenant`, `create`, `update`, `delete` |
 | **ILogErrorRepository** | `log` |
 
@@ -346,8 +359,16 @@ POST /api/admin/login
   → AuthAdminUseCase.login()
   → adminRepo.loginWithPassword()  (Supabase Auth)
   → adminRepo.findById()           (perfil + empresa)
-  → JWT HS256, 24h
-  → cookie admin_token (HttpOnly, SameSite=lax)
+  → JWT HS256, 24h, jti=randomUUID()
+  → cookie admin_token (HttpOnly, SameSite=strict)
+```
+
+### Flujo de logout
+```
+POST /api/admin/logout
+  → jwtVerify(admin_token) → extrae jti + exp
+  → revokeToken(jti, ttlRestante) → Upstash Redis SET key EX ttl
+  → delete cookie admin_token
 ```
 
 ### Verificación de sesión en pages
@@ -366,7 +387,10 @@ if (!admin) redirect('/admin/login');
 
 ### Middleware (proxy.ts)
 - Verifica JWT en todas las rutas `/api/admin/*`
+- Comprueba revocación del `jti` en Redis antes de permitir acceso
+- Valida CSRF (timingSafeEqual) en todos los métodos mutativos
 - Inyecta `x-empresa-id`, `x-admin-id`, `x-admin-rol` como headers
+- Genera nonce criptográfico por request para rutas de página; emite `Content-Security-Policy` dinámico y pasa `x-nonce` a server components
 - Rutas públicas sin JWT: `/api/admin/login`, `/api/admin/logout`, `/api/unsubscribe`, `/api/admin/promociones/unsubscribe`
 
 > ⚠️ Agregar nuevas rutas públicas a `isPublicRoute` en `proxy.ts`
@@ -425,7 +449,7 @@ npx tsx scripts/setup-r2-cors.ts
 | `categorias` | id (uuid) | empresa_id → empresas | categoria_padre_id, categoriaComplementoDe |
 | `productos` | id (uuid) | empresa_id, categoria_id | i18n: titulo_es/en/fr/it/de |
 | `clientes` | id (uuid) | empresa_id | telefono único por empresa |
-| `pedidos` | id (uuid) | empresa_id, cliente_id | detalle_pedido: JSON (PedidoItem[]) |
+| `pedidos` | id (uuid) | empresa_id, cliente_id | numero_pedido (atómico por tenant), detalle_pedido: JSON (PedidoItem[]) |
 | `promociones` | id (uuid) | empresa_id | imagen_url, numero_envios |
 
 > ⚠️ `pedidos` NO tiene columna `telefono` — el teléfono está en `clientes`
@@ -443,14 +467,26 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJxxx
 SUPABASE_SERVICE_ROLE_KEY=eyJxxx
 
 # Auth JWT
-ACCESS_TOKEN_SECRET=secreto_largo_y_aleatorio
+ACCESS_TOKEN_SECRET=secreto_largo_aleatorio        # openssl rand -hex 32
+
+# CSRF + Carrito (obligatorios en producción)
+CSRF_HMAC_SECRET=secreto_largo_aleatorio           # openssl rand -hex 32 — lanza en runtime si falta
+CART_TOKEN_SECRET=secreto_largo_aleatorio          # openssl rand -hex 32
+
+# Rate Limiting (Upstash Redis)
+UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
+UPSTASH_REDIS_REST_TOKEN=xxx
+
+# CORS
+CORS_ALLOWED_DOMAINS=tudominio.com                 # dominios base separados por coma
 
 # Cloudflare R2
 R2_ACCOUNT_ID=xxx
 R2_ACCESS_KEY_ID=xxx
 R2_SECRET_ACCESS_KEY=xxx
 R2_BUCKET_NAME=images
-NEXT_PUBLIC_R2_PUBLIC_DOMAIN=https://xxx.r2.dev
+NEXT_PUBLIC_R2_DOMAIN=https://xxx.r2.dev
+CLOUDFLARE_API_TOKEN=xxx                           # opcional, fallback a AWS SDK
 
 # Email (Brevo)
 BREVO_API_KEY=xxx
@@ -481,7 +517,7 @@ npx tsx scripts/setup-r2-cors.ts     # Configurar CORS en R2
 | **Build** | ✅ Compila correctamente |
 | **Clean Architecture** | ✅ 100% — Domain / Application / Infrastructure |
 | **SOLID** | ✅ 100% — DIP, sin `any`, repositorios inyectados |
-| **OWASP** | ✅ 100% — JWT HttpOnly, Zod safeParse, escapeHtml, hex validation |
+| **OWASP / Seguridad** | ✅ 100% — Auditoría completa (20/20 SECs). JWT revocation, CSP nonces, CSRF timing-safe, rate limiting total, price tampering server-side, HMAC unsubscribe tokens |
 | **Tipos TypeScript** | ✅ Sin `any` en core ni API routes |
 | **Código duplicado** | ✅ `parseMainDomain`/`getDomainFromHeaders` centralizados en `lib/domain-utils.ts` |
 | **Error Handling (Result\<T\>)** | ✅ 100% — Todos los módulos migrados al patrón Result<T, E> |

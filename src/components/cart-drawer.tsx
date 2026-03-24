@@ -98,6 +98,7 @@ function validateAndBuildOrderData(
         },
         quantity: ci.quantity,
         selectedComplements: ci.selectedComplements?.map(c => ({
+          id: c.id,
           name: c.name,
           price: c.price,
         })),

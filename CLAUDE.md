@@ -148,6 +148,9 @@ import { getS3Client, getR2Config, deleteImageFromR2 } from '@/core/infrastructu
 
 // HTML seguro para emails
 import { escapeHtml } from '@/lib/html-utils';
+
+// CSRF
+import { generateCsrfToken, validateCsrfToken } from '@/lib/csrf';
 ```
 ---
 API helpers — referencia rapida
@@ -188,7 +191,7 @@ Tabla	Claves	Notas
 `categorias`	PK: id, FK: empresa_id	categoria_padre_id, categoriaComplementoDe
 `productos`	PK: id, FK: empresa_id, categoria_id	i18n: titulo_es/en/fr/it/de
 `clientes`	PK: id, FK: empresa_id	telefono unico por empresa
-`pedidos`	PK: id, FK: empresa_id, cliente_id	detalle_pedido: JSON array de PedidoItem
+`pedidos`	PK: id, FK: empresa_id, cliente_id	detalle_pedido: JSON array de PedidoItem; numero_pedido: entero atomico por tenant (via `get_next_pedido_number()`)
 `promociones`	PK: id, FK: empresa_id	imagen_url, numero_envios
 `log_errors`	PK: id, FK: empresa_id	logging centralizado (codigo, mensaje, modulo, metodo, severity, metadata JSONB)
 Trampas de datos:
@@ -211,8 +214,17 @@ Zod `safeParse` en TODAS las API routes — NUNCA `parse` (lanza excepciones)
 Colores: validar `#RRGGBB` con regex
 Telefono: validar con `/^\+?[0-9\s\-()]+$/`
 No hardcodear secrets ni URLs de fallback
-Security headers en `next.config.mjs`: CSP, HSTS, X-Content-Type-Options, X-Frame-Options
+Security headers en `next.config.mjs`: CSP (`frame-ancestors 'self'`), HSTS, X-Content-Type-Options, X-Frame-Options, Permissions-Policy, X-XSS-Protection
 URLs base: derivar del request (`new URL(request.url)`), NUNCA de env vars
+CSRF: `src/lib/csrf.ts` — tokens HMAC-SHA256, cookie HttpOnly `csrf_token` + header `x-csrf-token`. Validado en proxy para todos los metodos mutativos de `/api/admin/*`. Requiere `CSRF_HMAC_SECRET` env var.
+Magic bytes: `POST /api/admin/upload-image` verifica firma binaria del archivo (JPEG/PNG/WebP/GIF) antes de aceptar el upload — previene MIME spoofing
+Total server-side: `PedidoUseCase.create` recalcula el total desde precios reales de DB via `IProductRepository.findByIds` — el total del cliente se ignora completamente
+RLS hardened: anon explicitamente denegado en `pedidos`, `clientes`, `log_errors`, `perfiles_admin`, `promociones`. Todas las escrituras van por `service_role` (bypasa RLS).
+Variables de entorno obligatorias para seguridad:
+- `CSRF_HMAC_SECRET` — firmar tokens CSRF (generar con `openssl rand -hex 32`)
+- `CART_TOKEN_SECRET` — JWT de acceso al carrito
+- `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` — rate limiting en produccion
+- `CORS_ALLOWED_DOMAINS` — whitelist de dominios para CORS (separados por coma)
 ---
 Multi-tenant y subdominios
 Dominio	Comportamiento
@@ -267,8 +279,10 @@ Internacionalizacion (i18n)
 `lib/language-context.tsx` — contexto React para idioma activo
 Productos: campos i18n `titulo_es`, `titulo_en`, `titulo_fr`, `titulo_it`, `titulo_de`
 Rate Limiting (Upstash Redis)
-`rateLimitLogin`: 5 intentos / 15 min por IP
-`rateLimitPublic`: 20 requests / min por IP
+`rateLimitLogin`: 5 intentos / 15 min por IP (POST `/api/admin/login`)
+`rateLimitPublic`: 20 requests / min por IP (GET login, `/api/pedidos`, `/api/unsubscribe`)
+`rateLimitAdmin`: 60 requests / min por IP (rutas admin autenticadas)
+IP detection: usa `cf-connecting-ip` si existe, sino primer entry de `x-forwarded-for` (IP real del cliente). NUNCA usar el ultimo entry (es IP edge de Cloudflare que rota).
 Graceful degradation: sin Redis configurado no limita (dev local funciona)
 Promociones
 POST crea promo y envia emails a clientes suscritos
@@ -306,6 +320,8 @@ Crear nuevos clientes S3/Supabase (usar singletons)
 Derivar `baseUrl` de env vars (derivar del request)
 Usar `parse` de Zod en vez de `safeParse` (lanza excepciones no controladas)
 Hardcodear colores de marca en componentes (usar CSS variables del tenant)
+Confiar en el total enviado por el cliente en pedidos — `PedidoUseCase.create` lo recalcula server-side desde DB
+Usar el ultimo entry de `x-forwarded-for` como IP del cliente — usar el primero (o `cf-connecting-ip`)
 ---
 Proceso de revision — Orden de prioridad
 Cuando revises o modifiques codigo, seguir este orden antes de dar la tarea por completada:

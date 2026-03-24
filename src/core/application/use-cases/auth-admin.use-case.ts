@@ -1,4 +1,5 @@
 import { SignJWT, jwtVerify } from "jose";
+import { randomUUID } from "crypto";
 import { IAdminRepository, AdminWithEmpresa } from "@/core/domain/repositories/IAdminRepository";
 import { LoginDTO, loginSchema } from "../dtos/auth.dto";
 import { Result } from "@/core/domain/entities/types";
@@ -75,6 +76,7 @@ export class AuthAdminUseCase {
         rol: adminResult.data.rol,
       })
         .setProtectedHeader({ alg: "HS256" })
+        .setJti(randomUUID())
         .setIssuedAt()
         .setExpirationTime(TOKEN_EXPIRY)
         .sign(new TextEncoder().encode(ADMIN_TOKEN_SECRET));

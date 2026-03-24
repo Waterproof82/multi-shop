@@ -1,4 +1,5 @@
 import { S3Client, DeleteObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { logger } from "@/core/infrastructure/logging/logger";
 
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
 const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
@@ -56,7 +57,7 @@ export async function uploadToR2(
     });
     if (!res.ok) {
       const text = await res.text().catch(() => res.statusText);
-      throw new Error(`Cloudflare API error ${res.status}: ${text}`);
+      throw new Error(`Cloudflare API error ${res.status}: ${text.slice(0, 200)}`);
     }
     return;
   }
@@ -76,21 +77,32 @@ export async function uploadToR2(
 
 export async function deleteImageFromR2(imageUrl: string): Promise<boolean> {
   if (!imageUrl || !R2_BUCKET_NAME) return false;
-  
+
+  if (!R2_PUBLIC_DOMAIN) {
+    await logger.logError({ codigo: 'STORAGE_CONFIG_ERROR', mensaje: 'R2_PUBLIC_DOMAIN not set — cannot derive key from URL', modulo: 'repository' });
+    return false;
+  }
+
+  // Extract key by removing the public domain prefix
+  const key = imageUrl.replace(`${R2_PUBLIC_DOMAIN}/`, '');
+
+  // Guard: key must not be a URL or contain path traversal
+  if (key.startsWith('http') || key.includes('..') || key === imageUrl) {
+    await logger.logError({ codigo: 'STORAGE_INVALID_KEY', mensaje: `Invalid R2 key derived from URL`, modulo: 'repository', metadata: { imageUrl: imageUrl.slice(0, 100) } });
+    return false;
+  }
+
   try {
-    // Extract key from URL (remove domain)
-    const key = imageUrl.replace(`${R2_PUBLIC_DOMAIN}/`, '');
-    
     const client = getS3Client();
     const command = new DeleteObjectCommand({
       Bucket: R2_BUCKET_NAME,
       Key: key,
     });
-    
+
     await client.send(command);
     return true;
   } catch (error) {
-    console.error('Error deleting image from R2:', error);
+    await logger.logFromCatch(error, 'repository', 'deleteImageFromR2', { details: { imageUrl: imageUrl.slice(0, 100) } });
     return false;
   }
 }

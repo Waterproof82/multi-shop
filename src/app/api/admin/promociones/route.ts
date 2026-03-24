@@ -7,6 +7,7 @@ import { requireAuth, errorResponse, handleResult } from '@/core/infrastructure/
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
 import { escapeHtml } from '@/lib/html-utils';
+import { generateUnsubscribeToken } from '@/lib/unsubscribe-token';
 
 const createPromocionSchema = z.object({
   texto_promocion: z.string().min(1, 'El texto de promoción es requerido').max(1000),
@@ -20,8 +21,12 @@ function buildEmailHtml(params: {
   imagen_url: string | undefined;
   baseUrl: string;
   empresaId: string;
+  recipientEmail: string;
 }): string {
-  const { empresaLogoUrl, empresaNombre, textoEscapado, imagen_url, baseUrl, empresaId } = params;
+  const { empresaLogoUrl, empresaNombre, textoEscapado, imagen_url, baseUrl, empresaId, recipientEmail } = params;
+  const encodedEmail = encodeURIComponent(recipientEmail);
+  const tokenBaja = generateUnsubscribeToken(recipientEmail, empresaId, 'baja');
+  const tokenAlta = generateUnsubscribeToken(recipientEmail, empresaId, 'alta');
   return `
 <!DOCTYPE html>
 <html>
@@ -31,18 +36,18 @@ function buildEmailHtml(params: {
 </head>
 <body style="margin: 0; padding: 20px; background-color: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
   <div style="max-width: 500px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-    ${empresaLogoUrl ? `<img src="${empresaLogoUrl}" alt="${escapeHtml(empresaNombre)}" style="width: 100%; max-width: 200px; display: block; margin: 20px auto;">` : ''}
+    ${empresaLogoUrl ? `<img src="${escapeHtml(empresaLogoUrl)}" alt="${escapeHtml(empresaNombre)}" style="width: 100%; max-width: 200px; display: block; margin: 20px auto;">` : ''}
     <div style="padding: 20px;">
       <h2 style="margin: 0 0 16px; color: #333; text-align: center;">Nueva promoción disponible</h2>
       <div style="background-color: #f9f9f9; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
         <p style="margin: 0; color: #555; line-height: 1.6;">${textoEscapado}</p>
       </div>
-      ${imagen_url ? `<img src="${imagen_url}" alt="Promoción" style="width: 100%; border-radius: 8px; margin-bottom: 16px;">` : ''}
+      ${imagen_url ? `<img src="${escapeHtml(imagen_url)}" alt="Promoción" style="width: 100%; border-radius: 8px; margin-bottom: 16px;">` : ''}
       <p style="margin: 16px 0 8px; font-size: 12px; color: #999; text-align: center;">
-        <a href="${baseUrl}/api/unsubscribe?email=__EMAIL__&empresa=${empresaId}&action=baja" style="color: #dc2626; text-decoration: underline;">Dar de baja las promociones</a>
+        <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=baja&token=${tokenBaja}" style="color: #dc2626; text-decoration: underline;">Dar de baja las promociones</a>
       </p>
       <p style="margin: 0; font-size: 12px; color: #999; text-align: center;">
-        <a href="${baseUrl}/api/unsubscribe?email=__EMAIL__&empresa=${empresaId}&action=alta" style="color: #16a34a; text-decoration: underline;">Volver a dar de alta</a>
+        <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=alta&token=${tokenAlta}" style="color: #16a34a; text-decoration: underline;">Volver a dar de alta</a>
       </p>
     </div>
   </div>
@@ -65,6 +70,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const rateLimited = await rateLimitAdmin(request);
+  if (rateLimited) return rateLimited;
+
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
 
@@ -105,17 +113,16 @@ export async function POST(request: NextRequest) {
       const baseUrl = empresa.dominio ? `https://${empresa.dominio}` : '';
 
       if (baseUrl) {
-        const emailHtml = buildEmailHtml({
-          empresaLogoUrl,
-          empresaNombre: empresa.nombre || 'Empresa',
-          textoEscapado: escapeHtml(texto_promocion),
-          imagen_url: imagen_url ?? undefined,
-          baseUrl,
-          empresaId: empresaId!,
-        });
-
         for (const email of emailTargets) {
-          const personalizedHtml = emailHtml.replaceAll('__EMAIL__', encodeURIComponent(email));
+          const personalizedHtml = buildEmailHtml({
+            empresaLogoUrl,
+            empresaNombre: empresa.nombre || 'Empresa',
+            textoEscapado: escapeHtml(texto_promocion),
+            imagen_url: imagen_url ?? undefined,
+            baseUrl,
+            empresaId: empresaId!,
+            recipientEmail: email,
+          });
           await sendEmail({
             to: [email],
             subject: 'Nueva promocion disponible',

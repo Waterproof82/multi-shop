@@ -8,7 +8,7 @@ export interface CreatePedidoDTO {
   items: {
     item: { id: string; name: string; price: number };
     quantity: number;
-    selectedComplements?: { name: string; price: number }[];
+    selectedComplements?: { id: string; name: string; price: number }[];
   }[];
   /** Client-supplied total is ignored — the server recalculates it from DB prices */
   total?: number;
@@ -112,14 +112,22 @@ export class PedidoUseCase {
         clienteId = createResult.data.id;
       }
 
-      // Recalculate total server-side from DB prices to prevent price tampering
+      // Recalculate total server-side from DB prices to prevent price tampering.
+      // Includes complement IDs so both product and complement prices are validated against DB.
       const productIds = data.items
         .map(ci => ci.item?.id)
         .filter((id): id is string => Boolean(id));
 
+      const complementIds = data.items
+        .flatMap(ci => ci.selectedComplements ?? [])
+        .map(c => c.id)
+        .filter((id): id is string => Boolean(id));
+
+      const allIds = [...new Set([...productIds, ...complementIds])];
+
       let priceMap: Map<string, number> = new Map();
-      if (productIds.length > 0) {
-        const productsResult = await this.productRepo.findByIds(productIds, empresaId);
+      if (allIds.length > 0) {
+        const productsResult = await this.productRepo.findByIds(allIds, empresaId);
         if (!productsResult.success) {
           return { success: false, error: productsResult.error };
         }
@@ -130,7 +138,7 @@ export class PedidoUseCase {
         // Use authoritative DB price if product exists, otherwise fall back to declared price
         const unitPrice = priceMap.get(ci.item?.id ?? '') ?? ci.item?.price ?? 0;
         const complementsTotal = (ci.selectedComplements ?? []).reduce(
-          (cs, c) => cs + (c.price ?? 0),
+          (cs, c) => cs + (priceMap.get(c.id) ?? c.price ?? 0),
           0
         );
         return sum + (unitPrice + complementsTotal) * ci.quantity;

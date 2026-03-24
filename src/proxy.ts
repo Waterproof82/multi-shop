@@ -2,9 +2,29 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 import { verifyCsrfToken } from '@/lib/csrf';
+import { timingSafeEqual, randomBytes } from 'crypto';
+import { isTokenRevoked } from '@/lib/token-revocation';
 import { AUTH_ERRORS, SERVER_ERRORS, createErrorResponse } from '@/core/domain/constants/api-errors';
 
 const ADMIN_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
+
+const CSP_DIRECTIVES_BASE = [
+  "default-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' https://imagenes.almadearena.es https://*.supabase.co data: blob:",
+  "media-src 'self' https://imagenes.almadearena.es",
+  "font-src 'self'",
+  "connect-src 'self' https://*.supabase.co https://api.brevo.com https://*.upstash.io",
+  "frame-src 'self' https://www.google.com https://maps.google.com",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'self'",
+];
+
+function buildPageCsp(nonce: string): string {
+  return [`script-src 'self' 'nonce-${nonce}'`, ...CSP_DIRECTIVES_BASE].join('; ');
+}
 
 function isAllowedOrigin(origin: string | null): boolean {
   if (!origin) return false;
@@ -29,6 +49,7 @@ function isAllowedOrigin(origin: string | null): boolean {
 }
 
 function addCorsHeaders(response: NextResponse, origin: string | null): NextResponse {
+  response.headers.set('Vary', 'Origin');
   if (origin && isAllowedOrigin(origin)) {
     response.headers.set('Access-Control-Allow-Origin', origin);
     response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
@@ -69,6 +90,11 @@ async function handleAdminAuth(request: NextRequest, origin: string | null): Pro
       return addCorsHeaders(NextResponse.json(createErrorResponse(AUTH_ERRORS.INVALID_TOKEN), { status: 401 }), origin);
     }
 
+    // Check revocation list — token may be valid but already logged out
+    if (payload.jti && await isTokenRevoked(payload.jti)) {
+      return addCorsHeaders(NextResponse.json(createErrorResponse(AUTH_ERRORS.INVALID_TOKEN), { status: 401 }), origin);
+    }
+
     const csrfCookie = request.cookies.get('csrf_token')?.value;
     const csrfHeader = request.headers.get('x-csrf-token');
 
@@ -82,7 +108,11 @@ async function handleAdminAuth(request: NextRequest, origin: string | null): Pro
       }
 
       const [token, signature] = csrfCookie.split(':');
-      if (!token || !signature || !verifyCsrfToken(token, signature) || csrfHeader !== token) {
+      const csrfHeaderMatchesToken = (() => {
+        try { return timingSafeEqual(Buffer.from(csrfHeader), Buffer.from(token)); }
+        catch { return false; }
+      })();
+      if (!token || !signature || !verifyCsrfToken(token, signature) || !csrfHeaderMatchesToken) {
         return addCorsHeaders(NextResponse.json(
           createErrorResponse(AUTH_ERRORS.CSRF_INVALID),
           { status: 403 }
@@ -121,6 +151,16 @@ export async function proxy(request: NextRequest) {
   const accessToken = url.searchParams.get('access');
   if (accessToken) {
     return handleCartAccessToken(url, accessToken);
+  }
+
+  // Page routes: generate per-request nonce and set CSP
+  if (!path.startsWith('/api/')) {
+    const nonce = randomBytes(16).toString('base64');
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set('x-nonce', nonce);
+    const response = NextResponse.next({ request: { headers: requestHeaders } });
+    response.headers.set('Content-Security-Policy', buildPageCsp(nonce));
+    return response;
   }
 
   return NextResponse.next();
