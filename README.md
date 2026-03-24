@@ -171,17 +171,23 @@ export class ProductUseCase {
 const supabase = createClient(url, key); // fuera de supabase-client.ts
 ```
 
-### ✅ OWASP (100%)
+### ✅ OWASP / Seguridad (100%)
 
 | Principio | Implementación |
 |-----------|----------------|
-| **JWT** | HS256 con `jose` | HttpOnly cookie, 24h expiry |
-| **Autorización** | Proxy middleware valida JWT, inyecta `x-empresa-id` |
-| **Validación de entrada** | Zod `safeParse` en **todas** las API routes |
+| **JWT** | HS256 con `jose`, HttpOnly cookie, 24h expiry |
+| **CSRF** | Tokens HMAC-SHA256 (`src/lib/csrf.ts`), cookie HttpOnly + header `x-csrf-token`. Validado en proxy para todos los métodos mutativos de `/api/admin/*` |
+| **Autorización** | Proxy middleware valida JWT e inyecta `x-empresa-id`, `x-admin-id`, `x-admin-rol` |
+| **Rate limiting** | Upstash Redis — login: 5/15min, público: 20/min, admin: 60/min por IP real (Cloudflare-aware) |
+| **Validación de entrada** | Zod `safeParse` en **todas** las API routes. DTOs con regex para teléfono y límites `max()` |
+| **Magic bytes** | Upload valida firma binaria del archivo — previene MIME type spoofing |
+| **Total server-side** | `PedidoUseCase.create` recalcula total desde precios reales de DB — el total del cliente se ignora |
 | **Sanitización HTML** | `escapeHtml()` en todos los templates de email |
-| **Validación colores** | Regex `#RRGGBB` en Zod antes de persistir |
+| **RLS Supabase** | `anon` explícitamente denegado en pedidos, clientes, log_errors, perfiles_admin, promociones. Escrituras via `service_role` |
+| **Security headers** | CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Permissions-Policy, X-XSS-Protection, frame-ancestors |
+| **CORS** | Whitelist de dominios via `CORS_ALLOWED_DOMAINS`. Preflight con 204 |
+| **Número de pedido atómico** | `get_next_pedido_number()` con mutex por tenant (lock en fila `empresas`) |
 | **Sin secretos hardcodeados** | Todas las claves en variables de entorno |
-| **`NEXT_PUBLIC_BASE_URL`** | Obligatorio en producción — sin fallbacks inseguros |
 
 ---
 
@@ -282,7 +288,7 @@ import {
 | **IEmpresaRepository** | `getById`, `findByDomain`, `update`, `updateColores` |
 | **IPedidoRepository** | `findAllByTenant`, `updateStatus`, `delete`, `create`, `getStats` |
 | **IPromocionRepository** | `findAllByTenant`, `create`, `deleteAllByTenant` |
-| **IProductRepository** | `findAllByTenant`, `create`, `update`, `delete` |
+| **IProductRepository** | `findAllByTenant`, `findByIds`, `create`, `update`, `delete` |
 | **ICategoryRepository** | `findAllByTenant`, `create`, `update`, `delete` |
 | **ILogErrorRepository** | `log` |
 
@@ -425,7 +431,7 @@ npx tsx scripts/setup-r2-cors.ts
 | `categorias` | id (uuid) | empresa_id → empresas | categoria_padre_id, categoriaComplementoDe |
 | `productos` | id (uuid) | empresa_id, categoria_id | i18n: titulo_es/en/fr/it/de |
 | `clientes` | id (uuid) | empresa_id | telefono único por empresa |
-| `pedidos` | id (uuid) | empresa_id, cliente_id | detalle_pedido: JSON (PedidoItem[]) |
+| `pedidos` | id (uuid) | empresa_id, cliente_id | numero_pedido (atómico por tenant), detalle_pedido: JSON (PedidoItem[]) |
 | `promociones` | id (uuid) | empresa_id | imagen_url, numero_envios |
 
 > ⚠️ `pedidos` NO tiene columna `telefono` — el teléfono está en `clientes`
@@ -443,14 +449,26 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJxxx
 SUPABASE_SERVICE_ROLE_KEY=eyJxxx
 
 # Auth JWT
-ACCESS_TOKEN_SECRET=secreto_largo_y_aleatorio
+ACCESS_TOKEN_SECRET=secreto_largo_aleatorio        # openssl rand -hex 32
+
+# CSRF + Carrito (obligatorios en producción)
+CSRF_HMAC_SECRET=secreto_largo_aleatorio           # openssl rand -hex 32 — lanza en runtime si falta
+CART_TOKEN_SECRET=secreto_largo_aleatorio          # openssl rand -hex 32
+
+# Rate Limiting (Upstash Redis)
+UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
+UPSTASH_REDIS_REST_TOKEN=xxx
+
+# CORS
+CORS_ALLOWED_DOMAINS=tudominio.com                 # dominios base separados por coma
 
 # Cloudflare R2
 R2_ACCOUNT_ID=xxx
 R2_ACCESS_KEY_ID=xxx
 R2_SECRET_ACCESS_KEY=xxx
 R2_BUCKET_NAME=images
-NEXT_PUBLIC_R2_PUBLIC_DOMAIN=https://xxx.r2.dev
+NEXT_PUBLIC_R2_DOMAIN=https://xxx.r2.dev
+CLOUDFLARE_API_TOKEN=xxx                           # opcional, fallback a AWS SDK
 
 # Email (Brevo)
 BREVO_API_KEY=xxx
