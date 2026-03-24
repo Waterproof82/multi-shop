@@ -20,8 +20,7 @@
 
 ## Pendiente
 
-- [ ] SEC-007: CSP nonces (eliminar `unsafe-inline` de script-src) — requiere integración Next.js App Router
-- [ ] SEC-014: JWT revocation list en Redis (logout server-side)
+_(ningún pendiente — todos los SECs completados)_
 
 ## Notas de desarrollo
 
@@ -134,8 +133,15 @@
 - `proxy.ts`: `Vary: Origin` añadido a todas las respuestas CORS
 - Previene que proxies/CDN sirvan respuestas CORS cacheadas de un origen a otro
 
+#### CSP Nonces — eliminar unsafe-inline (SEC-007)
+- `proxy.ts`: genera nonce criptográfico por request con `randomBytes(16).toString('base64')` para rutas de página (no-API)
+- Inyecta `x-nonce` en request headers para que server components lo lean via `headers()`
+- Respuesta incluye `Content-Security-Policy: script-src 'self' 'nonce-{nonce}'` — sin `unsafe-inline`
+- `next.config.mjs`: CSP estático eliminado (lo gestiona el middleware dinámicamente)
+- `style-src` mantiene `unsafe-inline` (necesario para Tailwind/CSS-in-JS)
+
 ### Quality Score Final: 10/10
-- Medium-Severity Issues: 0 (15 de 20 SEC completados; 2 pendientes requieren sesión propia)
+- Medium-Severity Issues: 0 (20 de 20 SEC completados)
 - Low-Severity Issues: 0
 - `pnpm lint`: ✅ Passes
 - `pnpm build`: ✅ Passes (28 routes)
