@@ -64,6 +64,11 @@ async function handleAdminAuth(request: NextRequest, origin: string | null): Pro
     const secret = new TextEncoder().encode(ADMIN_TOKEN_SECRET);
     const { payload } = await jwtVerify(adminToken, secret);
 
+    // Verify this is an admin token (not a cart access token)
+    if (!payload.empresaId || !payload.adminId) {
+      return addCorsHeaders(NextResponse.json(createErrorResponse(AUTH_ERRORS.INVALID_TOKEN), { status: 401 }), origin);
+    }
+
     const csrfCookie = request.cookies.get('csrf_token')?.value;
     const csrfHeader = request.headers.get('x-csrf-token');
 
@@ -123,7 +128,7 @@ export async function proxy(request: NextRequest) {
 
 async function handleCartAccessToken(url: URL, accessToken: string): Promise<NextResponse> {
   const sanitizedToken = accessToken.replaceAll(/[^a-zA-Z0-9._-]/g, '');
-  const secretKey = process.env.ACCESS_TOKEN_SECRET;
+  const secretKey = process.env.CART_TOKEN_SECRET;
 
   if (!secretKey) return NextResponse.next();
 

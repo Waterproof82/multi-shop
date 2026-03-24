@@ -31,6 +31,6 @@ export const productUseCase = new ProductUseCase(productRepository);
 export const categoryUseCase = new CategoryUseCase(categoryRepository);
 export const clienteUseCase = new ClienteUseCase(clienteRepository);
 export const empresaUseCase = new EmpresaUseCase(empresaRepository);
-export const pedidoUseCase = new PedidoUseCase(pedidoRepository, clienteRepository);
+export const pedidoUseCase = new PedidoUseCase(pedidoRepository, clienteRepository, productRepository);
 export const promocionUseCase = new PromocionUseCase(promocionRepository, clienteRepository);
 export const authAdminUseCase = new AuthAdminUseCase(adminRepository);

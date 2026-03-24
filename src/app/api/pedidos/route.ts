@@ -17,7 +17,7 @@ const createPedidoSchema = z.object({
       price: z.number(),
     })).optional(),
   })),
-  total: z.number().min(0),
+  total: z.number().min(0).optional(),
   nombre: z.string().min(2).max(100),
   telefono: z.string().min(10).max(18).regex(/^[0-9]+$/, 'Formato de teléfono no válido'),
   email: z.string().email().optional().or(z.literal('')),
@@ -72,11 +72,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
     }
 
-    const { items, total, nombre, telefono, email } = parsed.data;
+    const { items, nombre, telefono, email } = parsed.data;
 
     const pedidoResult = await pedidoUseCase.create(empresa.id, {
       items,
-      total,
       nombre,
       telefono,
       email: email || undefined,
@@ -86,12 +85,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: pedidoResult.error.message }, { status: 500 });
     }
 
-    const { id: pedidoId, numero_pedido: numeroPedido } = pedidoResult.data;
+    const { id: pedidoId, numero_pedido: numeroPedido, total: serverTotal } = pedidoResult.data;
 
     let whatsappLink: string | undefined;
     if (empresa.telefono_whatsapp) {
       const telefonoLimpio = empresa.telefono_whatsapp.replaceAll(/\D/g, '');
-      const mensaje = generateWhatsAppMessage(items, total, nombre, numeroPedido);
+      const mensaje = generateWhatsAppMessage(items, serverTotal, nombre, numeroPedido);
       whatsappLink = `https://wa.me/${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`;
     }
 

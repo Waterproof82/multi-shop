@@ -3,10 +3,12 @@ import { cookies } from 'next/headers';
 import { authAdminUseCase } from '@/core/infrastructure/database';
 import { loginSchema } from '@/core/application/dtos/auth.dto';
 import { successResponse, validationErrorResponse, handleResult } from '@/core/infrastructure/api/helpers';
-import { rateLimitLogin } from '@/core/infrastructure/api/rate-limit';
+import { rateLimitLogin, rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 import { generateCsrfToken, signCsrfToken } from '@/lib/csrf';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const rateLimit = await rateLimitPublic(request);
+  if (rateLimit) return rateLimit;
   const token = generateCsrfToken();
   const signature = signCsrfToken(token);
   const cookieValue = `${token}:${signature}`;

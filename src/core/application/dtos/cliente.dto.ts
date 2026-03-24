@@ -4,7 +4,7 @@ export const createClienteSchema = z.object({
   empresaId: z.string().uuid(),
   nombre: z.string().optional().nullable(),
   email: z.string().email().optional().nullable().or(z.literal('')),
-  telefono: z.string().optional().nullable(),
+  telefono: z.string().min(7).max(30).regex(/^\+?[0-9\s\-()+]+$/).optional().nullable(),
   direccion: z.string().optional().nullable(),
 });
 
@@ -13,7 +13,7 @@ export const updateClienteSchema = z.object({
   id: z.string().uuid(),
   nombre: z.string().optional().nullable(),
   email: z.string().email().optional().nullable().or(z.literal('')),
-  telefono: z.string().optional().nullable(),
+  telefono: z.string().min(7).max(30).regex(/^\+?[0-9\s\-()+]+$/).optional().nullable(),
   direccion: z.string().optional().nullable(),
   aceptar_promociones: z.boolean().optional().nullable(),
 });
