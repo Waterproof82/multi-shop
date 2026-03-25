@@ -87,32 +87,27 @@ export async function GET(request: NextRequest) {
 ---
 API Error Codes (centralized in `core/domain/constants/api-errors.ts`)
 ```typescript
-// Authentication errors - use in proxy.ts and auth routes
 AUTH_ERRORS.UNAUTHORIZED    → { code: 'AUTH_001', message: 'Authentication required' }
 AUTH_ERRORS.INVALID_TOKEN   → { code: 'AUTH_002', message: 'Invalid or expired token' }
 AUTH_ERRORS.FORBIDDEN       → { code: 'AUTH_003', message: 'Access denied' }
 AUTH_ERRORS.CSRF_REQUIRED   → { code: 'AUTH_004', message: 'CSRF token required' }
 AUTH_ERRORS.CSRF_INVALID    → { code: 'AUTH_005', message: 'Invalid CSRF token' }
-
-// Validation errors - use in API routes for form/file validation
 VALIDATION_ERRORS.MISSING_FILE      → { code: 'VAL_002', message: 'No file provided' }
 VALIDATION_ERRORS.FILE_TOO_LARGE    → { code: 'VAL_003', message: 'File exceeds maximum size' }
 VALIDATION_ERRORS.INVALID_FILE_TYPE → { code: 'VAL_004', message: 'File type not allowed' }
-
-// Server errors - use for internal errors
 SERVER_ERRORS.CONFIG_ERROR   → { code: 'SRV_002', message: 'Server configuration error' }
 SERVER_ERRORS.STORAGE_ERROR  → { code: 'SRV_003', message: 'Storage configuration error' }
 SERVER_ERRORS.DATABASE_ERROR → { code: 'SRV_004', message: 'Database error' }
 SERVER_ERRORS.UPLOAD_ERROR   → { code: 'SRV_005', message: 'Error processing upload' }
 
-// Usage in API routes:
+// Usage:
 import { createErrorResponse } from '@/core/domain/constants/api-errors';
 return NextResponse.json(createErrorResponse(AUTH_ERRORS.UNAUTHORIZED), { status: 401 });
 ```
 ---
 Imports principales
 ```typescript
-// Use Cases y repos — SIEMPRE importar desde aqui
+// Use Cases y repos
 import {
   productUseCase, categoryUseCase, clienteUseCase, empresaUseCase,
   pedidoUseCase, promocionUseCase, authAdminUseCase,
@@ -120,7 +115,7 @@ import {
   empresaPublicRepository,  // anon key (paginas publicas)
 } from '@/core/infrastructure/database';
 
-// API helpers — OBLIGATORIOS en rutas
+// API helpers
 import { requireAuth, successResponse, errorResponse, validationErrorResponse, handleResult, handleResultWithStatus } from '@/core/infrastructure/api/helpers';
 
 // DTOs Zod
@@ -151,19 +146,6 @@ import { escapeHtml } from '@/lib/html-utils';
 
 // CSRF
 import { generateCsrfToken, validateCsrfToken } from '@/lib/csrf';
-```
----
-API helpers — referencia rapida
-```typescript
-const { empresaId, error } = await requireAuth(request); // TODAS las rutas /api/admin/*
-if (error) return error;
-
-return successResponse(data);            // 200
-return successResponse(data, 201);       // 201
-return errorResponse('msg', 404);        // error con status
-return validationErrorResponse('msg');   // 400
-return handleResult(result);             // auto success/error desde Result<T>
-return handleResultWithStatus(result, 201);
 ```
 ---
 Use Cases — metodos disponibles
@@ -199,32 +181,31 @@ Trampas de datos:
 `detalle_pedido[].complementos` almacena objetos `{ name, price }` (tipo `PedidoComplemento`)
 Repositories devuelven camelCase (dominio). APIs admin transforman a snake_case para el frontend
 ---
-Entidades clave
-```typescript
-interface Empresa { id, nombre, dominio, slug, logoUrl, mostrarCarrito, moneda, emailNotification, colores, descripcion, fb?, instagram?, urlMapa?, direccion?, telefonoWhatsapp? }
-interface PedidoItem { producto_id?, nombre, precio, cantidad, complementos?: PedidoComplemento[] }
-interface PedidoComplemento { nombre?: string; name?: string; precio?: number; price?: number; } // dual format por compatibilidad
-interface CartItem { item?: { id, name, price }; quantity: number; selectedComplements?: { name: string; price: number }[]; }
-```
----
-Seguridad (OWASP)
-JWT en cookies HttpOnly, `Secure` (prod), `SameSite: lax`
-Zod `safeParse` en TODAS las API routes — NUNCA `parse` (lanza excepciones)
-`escapeHtml()` en emails — nunca insertar input de usuario directo en HTML
-Colores: validar `#RRGGBB` con regex
-Telefono: validar con `/^\+?[0-9\s\-()]+$/`
-No hardcodear secrets ni URLs de fallback
-Security headers en `next.config.mjs`: CSP (`frame-ancestors 'self'`), HSTS, X-Content-Type-Options, X-Frame-Options, Permissions-Policy, X-XSS-Protection
-URLs base: derivar del request (`new URL(request.url)`), NUNCA de env vars
-CSRF: `src/lib/csrf.ts` — tokens HMAC-SHA256, cookie HttpOnly `csrf_token` + header `x-csrf-token`. Validado en proxy para todos los metodos mutativos de `/api/admin/*`. Requiere `CSRF_HMAC_SECRET` env var.
-Magic bytes: `POST /api/admin/upload-image` verifica firma binaria del archivo (JPEG/PNG/WebP/GIF) antes de aceptar el upload — previene MIME spoofing
-Total server-side: `PedidoUseCase.create` recalcula el total desde precios reales de DB via `IProductRepository.findByIds` — el total del cliente se ignora completamente
-RLS hardened: anon explicitamente denegado en `pedidos`, `clientes`, `log_errors`, `perfiles_admin`, `promociones`. Todas las escrituras van por `service_role` (bypasa RLS).
-Variables de entorno obligatorias para seguridad:
-- `CSRF_HMAC_SECRET` — firmar tokens CSRF (generar con `openssl rand -hex 32`)
+Seguridad — Reglas para desarrollo
+> Referencia completa: `docs/context/security.md`
+
+Reglas obligatorias:
+- JWT en cookies HttpOnly, `Secure` (prod), `SameSite: strict`, claim `jti` para revocacion
+- Zod `safeParse` en TODAS las API routes — NUNCA `parse` (lanza excepciones)
+- `escapeHtml()` en emails — nunca insertar input de usuario directo en HTML
+- Colores: validar `#RRGGBB` con regex
+- Telefono: validar con `/^\+?[0-9\s\-()]+$/`
+- URLs: validar `https://` en DTOs (fb, instagram, logo_url, url_mapa)
+- No hardcodear secrets ni URLs de fallback
+- URLs base: derivar del request (`new URL(request.url)`), NUNCA de env vars
+- CSRF validado en proxy para todos los metodos mutativos de `/api/admin/*`
+- Magic bytes en uploads — verificar firma binaria, no solo MIME
+- Total server-side: `PedidoUseCase.create` recalcula total desde DB — ignorar total del cliente
+- RLS: anon denegado en pedidos, clientes, log_errors, perfiles_admin, promociones. Escrituras via service_role
+- IP real: usar `cf-connecting-ip` o primer entry de `x-forwarded-for` — NUNCA el ultimo
+- Rate limiting: login 5/15min, publico 20/min, admin 60/min. Sin Redis no limita (dev local)
+
+Variables de entorno obligatorias:
+- `ACCESS_TOKEN_SECRET` — firma JWT
+- `CSRF_HMAC_SECRET` — firmar tokens CSRF
 - `CART_TOKEN_SECRET` — JWT de acceso al carrito
-- `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` — rate limiting en produccion
-- `CORS_ALLOWED_DOMAINS` — whitelist de dominios para CORS (separados por coma)
+- `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` — rate limiting + JWT revocation
+- `CORS_ALLOWED_DOMAINS` — whitelist de dominios para CORS
 ---
 Multi-tenant y subdominios
 Dominio	Comportamiento
@@ -251,39 +232,22 @@ if (!admin) redirect('/admin/login');
 // admin.empresaId, admin.empresa, admin.nombreCompleto
 ```
 ---
-Panel Admin — rutas
-Ruta	Funcion
-`/admin/login`	Login
-`/admin`	Dashboard
-`/admin/productos`	CRUD productos
-`/admin/categorias`	CRUD categorias
-`/admin/pedidos`	Pedidos + estadisticas
-`/admin/clientes`	CRM clientes
-`/admin/promociones`	Envio masivo por email
-`/admin/configuracion`	Colores, contacto, redes, logo
-`/admin/estadisticas`	Graficas y metricas
----
 Subsistemas
 Imagenes (R2 / Cloudflare)
 Optimizacion en cliente: 480x480, WebP, 80% (`components/ui/image-uploader.tsx`)
 Upload server-side: `POST /api/admin/upload-image` → Cloudflare API o AWS SDK S3
 `empresaSlug` derivado de DB, nunca del cliente
-URLs: `https://imagenes.almadearena.es/{slug}/{anio}/{mes}/{uuid}-{file}.webp`
+URLs: `https://{R2_DOMAIN}/{slug}/{anio}/{mes}/{uuid}.webp`
 `deleteImageFromR2(url)` para borrar imagenes del bucket
 Email (Brevo)
 `lib/brevo-email.ts` — envio de emails transaccionales via Brevo API
 Usado en promociones y confirmacion de pedidos
 Siempre escapar texto con `escapeHtml()` antes de insertar en HTML
 Internacionalizacion (i18n)
-`lib/translations.ts` — diccionario de traducciones
+`lib/translations.ts` — diccionario de traducciones (es/en/fr/it/de)
 `lib/language-context.tsx` — contexto React para idioma activo
 Productos: campos i18n `titulo_es`, `titulo_en`, `titulo_fr`, `titulo_it`, `titulo_de`
-Rate Limiting (Upstash Redis)
-`rateLimitLogin`: 5 intentos / 15 min por IP (POST `/api/admin/login`)
-`rateLimitPublic`: 20 requests / min por IP (GET login, `/api/pedidos`, `/api/unsubscribe`)
-`rateLimitAdmin`: 60 requests / min por IP (rutas admin autenticadas)
-IP detection: usa `cf-connecting-ip` si existe, sino primer entry de `x-forwarded-for` (IP real del cliente). NUNCA usar el ultimo entry (es IP edge de Cloudflare que rota).
-Graceful degradation: sin Redis configurado no limita (dev local funciona)
+Todos los textos de UI (incluidos aria-labels) deben usar `t()` — nunca hardcodear texto en un solo idioma
 Promociones
 POST crea promo y envia emails a clientes suscritos
 Imagen se sube a R2, al crear nueva promo se borra la anterior con `deleteImageFromR2`
@@ -322,6 +286,10 @@ Usar `parse` de Zod en vez de `safeParse` (lanza excepciones no controladas)
 Hardcodear colores de marca en componentes (usar CSS variables del tenant)
 Confiar en el total enviado por el cliente en pedidos — `PedidoUseCase.create` lo recalcula server-side desde DB
 Usar el ultimo entry de `x-forwarded-for` como IP del cliente — usar el primero (o `cf-connecting-ip`)
+Hardcodear texto de UI en un solo idioma — usar `t()` de translations (incluidos aria-labels, botones, placeholders)
+Usar `focus-visible:outline-*` para focus rings — usar patron estandar `outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2`
+Crear botones interactivos menores de 44px — todos los touch targets deben tener `min-h-[44px] min-w-[44px]`
+Ignorar `prefers-reduced-motion` — usar `useReducedMotion()` de framer-motion o `motion-reduce:` de Tailwind
 ---
 Proceso de revision — Orden de prioridad
 Cuando revises o modifiques codigo, seguir este orden antes de dar la tarea por completada:
@@ -332,7 +300,7 @@ Auth — ¿Todas las rutas admin usan `requireAuth()`? ¿Nuevas rutas publicas e
 Result pattern — ¿Use cases y repos retornan `Result<T, E>`? ¿Ningun `throw` suelto?
 SOLID — ¿Alguna clase tiene mas de una responsabilidad? ¿DIP respetado?
 DRY — ¿Hay logica duplicada que pertenece a un util o helper canonico?
-UI/UX — Focus states, reduced-motion, ARIA labels, CSS variables (no colores hardcodeados)
+UI/UX — Focus rings (`ring-2`), reduced-motion, ARIA labels (traducidos con `t()`), CSS variables (no colores hardcodeados), touch targets 44px
 `pnpm lint && pnpm build` ← OBLIGATORIO antes de marcar como completado
 ---
 Comandos
@@ -365,17 +333,19 @@ Clarity over decoration — Preferir whitespace y jerarquia tipografica clara so
 Consistent token usage — SIEMPRE usar CSS variables/tokens del design system. Nunca hardcodear colores (`bg-black`, `text-blue-400`, etc.). Los componentes deben respetar el tema del tenant.
 Accessible by default (WCAG AA) — Contraste minimo 4.5:1, navegacion por teclado, aria-labels en elementos interactivos, soporte para reduced-motion.
 UI Polish — Estandar minimo para cada componente
-Focus states: `focus-visible` con outline + ring offset en todos los elementos interactivos
+Focus states: `outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2` en todos los elementos interactivos
 Hover states: Transiciones de 150ms con `ease-out`
 Active states: Efecto `scale-[0.98]` para feedback tactico
 Animaciones: Solo `transform` y `opacity` — nunca propiedades que causen layout/paint
-Reduced motion: Respetar `prefers-reduced-motion` en todas las animaciones (Framer Motion y CSS)
+Reduced motion: Respetar `prefers-reduced-motion` en todas las animaciones (Framer Motion `useReducedMotion()` y CSS `motion-reduce:`)
 Empty states: Con icono y mensaje explicativo util, nunca listas o tablas vacias sin contexto
 Content visibility: Secciones largas del menu usan `content-visibility: auto`
+Touch targets: Minimo 44x44px en todos los elementos interactivos (`min-h-[44px] min-w-[44px]`)
+ARIA switches: Toggles custom deben tener `role="switch"` y `aria-checked`
 ```tsx
 // Patron Button con polish completo
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-all duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+  "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-all duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
   {
     variants: {
       variant: {

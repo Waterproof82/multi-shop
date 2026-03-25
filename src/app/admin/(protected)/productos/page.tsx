@@ -469,14 +469,14 @@ export default function ProductosPage() {
                   <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
                     <button
                       onClick={() => openEditModal(prod)}
-                      className="text-primary hover:text-primary/80 mr-3 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+                      className="p-2 text-primary hover:text-primary/80 mr-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
                       aria-label={`Editar ${prod.titulo_es}`}
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => handleDeleteProduct(prod.id)}
-                      className="text-destructive hover:text-destructive/80 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+                      className="p-2 text-destructive hover:text-destructive/80 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
                       aria-label={`Eliminar ${prod.titulo_es}`}
                     >
                       <Trash2 className="h-4 w-4" />

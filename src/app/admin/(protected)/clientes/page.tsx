@@ -338,6 +338,9 @@ export default function ClientesPage() {
                       <div className="flex justify-center">
                         <button
                           onClick={() => handleTogglePromociones(cliente)}
+                          role="switch"
+                          aria-checked={!!cliente.aceptar_promociones}
+                          aria-label={t("promotionsLabel", language)}
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                             cliente.aceptar_promociones ? 'bg-primary' : 'bg-muted'
                           }`}

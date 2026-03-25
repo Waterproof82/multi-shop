@@ -111,7 +111,8 @@ export default function PedidosPage() {
     return (
       <button
         onClick={(e) => { e.stopPropagation(); updateEstado(pedidoId, siguienteEstado); }}
-        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+        aria-label={`${translationKey ? t(translationKey, language) : estado} — ${t("edit", language)}`}
+        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
           PEDIDO_ESTADO_COLORS[estado as PedidoEstado] || 'bg-muted text-foreground hover:bg-muted/80'
         }`}
       >

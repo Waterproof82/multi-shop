@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { X, CheckCircle, AlertCircle } from 'lucide-react';
+import { useLanguage } from '@/lib/language-context';
+import { t } from '@/lib/translations';
 
 export function PromoToast() {
+  const { language } = useLanguage();
   const [visible, setVisible] = useState(false);
   const [message, setMessage] = useState('');
   const [type, setType] = useState<'success' | 'error'>('success');
@@ -53,7 +56,7 @@ export function PromoToast() {
         type="button"
         className="absolute inset-0 bg-overlay cursor-default"
         onClick={handleClose}
-        aria-label="Cerrar"
+        aria-label={t("close", language)}
       />
 
       <div className="relative bg-card text-card-foreground rounded-lg shadow-elegant-lg max-w-sm w-full p-6 animate-in fade-in zoom-in duration-200">
@@ -61,7 +64,7 @@ export function PromoToast() {
           type="button"
           onClick={handleClose}
           className="absolute top-3 right-3 p-1 rounded-full hover:bg-muted transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          aria-label="Cerrar"
+          aria-label={t("close", language)}
         >
           <X className="w-5 h-5 text-muted-foreground" />
         </button>
@@ -86,7 +89,7 @@ export function PromoToast() {
             onClick={handleClose}
             className="mt-6 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
-            Aceptar
+            {t("accept", language)}
           </button>
         </div>
       </div>

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { useReducedMotion } from "framer-motion"
 import { cn } from "@/lib/utils"
 import type { MenuCategoryVM } from "@/core/application/dtos/menu-view-model"
 import { useLanguage } from "@/lib/language-context"
@@ -17,6 +18,7 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
   const navRef = useRef<HTMLDivElement>(null)
   const isManualScrolling = useRef(false)
   const timeoutRef = useRef<NodeJS.Timeout>(null)
+  const shouldReduceMotion = useReducedMotion() ?? false
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -50,13 +52,13 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
       const activeBtn = navRef.current.querySelector(`button[data-id="${activeId}"]`)
       if (activeBtn) {
         activeBtn.scrollIntoView({
-          behavior: "smooth",
+          behavior: shouldReduceMotion ? "instant" : "smooth",
           block: "nearest",
           inline: "center",
         })
       }
     }
-  }, [activeId])
+  }, [activeId, shouldReduceMotion])
 
   const scrollTo = (id: string) => {
     const el = document.getElementById(id)
@@ -75,7 +77,7 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
 
         window.scrollTo({
           top: offsetPosition,
-          behavior: "smooth",
+          behavior: shouldReduceMotion ? "instant" : "smooth",
         })
 
         // Restore content-visibility after scroll settles

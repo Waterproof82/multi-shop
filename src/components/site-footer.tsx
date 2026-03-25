@@ -16,7 +16,7 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
   if (!empresa) return null
 
   return (
-    <footer className="w-full bg-foreground text-background/80 mt-12 border-t border-foreground/10">
+    <footer className="w-full bg-foreground text-background mt-12 border-t border-foreground/10">
       <div className="max-w-7xl mx-auto px-6 py-10">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
 
@@ -26,14 +26,14 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
             <ul className="flex gap-4 pt-1">
               {empresa.instagram && (
                 <li>
-                  <a href={empresa.instagram} target="_blank" rel="noopener noreferrer" className="text-background/70 hover:text-background transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm" aria-label="Instagram">
+                  <a href={empresa.instagram} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] text-background/85 hover:text-background transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm" aria-label="Instagram">
                     <Camera className="w-5 h-5" />
                   </a>
                 </li>
               )}
               {empresa.fb && (
                 <li>
-                  <a href={empresa.fb} target="_blank" rel="noopener noreferrer" className="text-background/70 hover:text-background transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm" aria-label="Facebook">
+                  <a href={empresa.fb} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] text-background/85 hover:text-background transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm" aria-label="Facebook">
                     <Link className="w-5 h-5" />
                   </a>
                 </li>
@@ -48,7 +48,7 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
               {empresa.direccion && (
                 <li className="flex items-start gap-3">
                   <MapPin className="w-4 h-4 text-background/40 shrink-0 mt-0.5" />
-                  <span className="text-sm text-background/75">{empresa.direccion}</span>
+                  <span className="text-sm text-background/85">{empresa.direccion}</span>
                 </li>
               )}
               {empresa.telefono && (() => {
@@ -57,7 +57,7 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
                 return (
                 <li className="flex items-center gap-3">
                   <Phone className="w-4 h-4 text-background/40 shrink-0" />
-                  <a href={`tel:${telefonoDigits}`} className="text-sm text-background/75 hover:text-background transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm">
+                  <a href={`tel:${telefonoDigits}`} className="text-sm text-background/85 hover:text-background transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm">
                     {telefonoDisplay}
                   </a>
                 </li>
@@ -66,14 +66,14 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
               {empresa.emailNotification && (
                 <li className="flex items-center gap-3">
                   <Mail className="w-4 h-4 text-background/40 shrink-0" />
-                  <a href={`mailto:${empresa.emailNotification}`} className="text-sm text-background/75 hover:text-background transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm">
+                  <a href={`mailto:${empresa.emailNotification}`} className="text-sm text-background/85 hover:text-background transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm">
                     {empresa.emailNotification}
                   </a>
                 </li>
               )}
               <li className="flex items-center gap-3">
                 <Globe className="w-4 h-4 text-background/40 shrink-0" />
-                <span className="text-sm text-background/75">{empresa.dominio}</span>
+                <span className="text-sm text-background/85">{empresa.dominio}</span>
               </li>
             </ul>
           </div>

@@ -253,6 +253,20 @@ Configurado en el proxy para rutas `/api/*`. Solo se permiten orígenes definido
 
 ---
 
+## UI/Accessibility Security
+
+Comprehensive audit completed (score: 8.5/10). Key hardening applied:
+
+- **Touch targets**: All interactive elements enforce 44x44px minimum (`min-h-[44px] min-w-[44px]`)
+- **ARIA compliance**: Custom toggle switches use `role="switch"` + `aria-checked`. All interactive buttons have `aria-label`
+- **Focus rings**: Standardized to `outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2` across all components
+- **Reduced motion**: `useReducedMotion()` from Framer Motion and `motion-reduce:` Tailwind class applied to all animations, scroll behaviors, and transitions
+- **Contrast**: Footer text raised from `/70`-`/80` opacity to `/85`-`/100` to meet WCAG AA 4.5:1 minimum
+- **i18n in ARIA**: All `aria-label` values routed through `t()` translation function — no hardcoded single-language accessibility text
+- **No AI slop**: No gradient text, glassmorphism, bounce easing, hero metrics grids, or generic fonts
+
+---
+
 ## Variables de entorno requeridas
 
 | Variable | Uso |

@@ -272,7 +272,7 @@ export default function CategoriasPage() {
         </div>
         <button
           onClick={openCreateModal}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring transition-colors duration-150 w-full sm:w-auto justify-center"
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-colors duration-150 w-full sm:w-auto justify-center"
         >
           <Plus className="h-4 w-4" />
           <span>{t("newCategory", language)}</span>
@@ -378,14 +378,14 @@ export default function CategoriasPage() {
                     <button
                       onClick={() => openEditModal(cat)}
                       aria-label={`Editar ${cat.nombre_es}`}
-                      className="text-primary hover:text-primary/80 mr-3 rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                      className="p-2 text-primary hover:text-primary/80 mr-1 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => handleDelete(cat.id)}
                       aria-label={`Eliminar ${cat.nombre_es}`}
-                      className="text-destructive hover:text-destructive/80 rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                      className="p-2 text-destructive hover:text-destructive/80 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -431,14 +431,14 @@ export default function CategoriasPage() {
                   <button
                     onClick={() => openEditModal(cat)}
                     aria-label={`Editar ${cat.nombre_es}`}
-                    className="p-1.5 text-primary hover:bg-primary/10 dark:hover:bg-primary/20 rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                    className="p-2 text-primary hover:bg-primary/10 dark:hover:bg-primary/20 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
                   >
                     <Pencil className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => handleDelete(cat.id)}
                     aria-label={`Eliminar ${cat.nombre_es}`}
-                    className="p-1.5 text-destructive hover:bg-destructive/10 rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                    className="p-2 text-destructive hover:bg-destructive/10 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -468,7 +468,7 @@ export default function CategoriasPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="nombre_es" className="block text-sm font-medium text-foreground mb-1">
-                {t("nameSpanish", language)}
+                {t("nameSpanish", language)} <span className="text-destructive" aria-hidden="true">*</span>
               </label>
               <Input
                 id="nombre_es"
