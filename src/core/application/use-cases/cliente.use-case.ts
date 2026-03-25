@@ -3,6 +3,11 @@ import { Cliente, Result } from "@/core/domain/entities/types";
 import { CreateClienteDTO, UpdateClienteDTO } from "@/core/application/dtos/cliente.dto";
 import { logger } from "@/core/infrastructure/logging/logger";
 
+function anonymizeEmail(email: string): string {
+  const [local, domain] = email.split('@');
+  return `${local.substring(0, 2)}***@${domain ?? '***'}`;
+}
+
 export class ClienteUseCase {
   constructor(private readonly clienteRepo: IClienteRepository) {}
 
@@ -153,9 +158,9 @@ export class ClienteUseCase {
 
       return { success: true, data: nuevoValor };
     } catch (e) {
-      const appError = await logger.logFromCatch(e, 'use-case', 'ClienteUseCase.togglePromoSubscription', { 
-        empresaId, 
-        details: { email } 
+      const appError = await logger.logFromCatch(e, 'use-case', 'ClienteUseCase.togglePromoSubscription', {
+        empresaId,
+        details: { email: anonymizeEmail(email) }
       });
       return { success: false, error: appError };
     }

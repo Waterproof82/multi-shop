@@ -11,7 +11,10 @@ import { generateUnsubscribeToken } from '@/lib/unsubscribe-token';
 
 const createPromocionSchema = z.object({
   texto_promocion: z.string().min(1, 'El texto de promoción es requerido').max(1000),
-  imagen_url: z.string().url().optional().nullable(),
+  imagen_url: z.string().url().refine(
+    (url) => url.startsWith('https://'),
+    { message: 'imagen_url must use HTTPS' }
+  ).optional().nullable(),
 });
 
 function buildEmailHtml(params: {
@@ -83,7 +86,12 @@ export async function POST(request: NextRequest) {
     }
     const empresa = empresaResult.data;
 
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
     const parsed = createPromocionSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
@@ -146,7 +154,7 @@ export async function POST(request: NextRequest) {
             });
             emailsSent++;
           } catch (sendErr) {
-            await logApiError(`Send promo email to ${email}`, sendErr, 'POST');
+            await logApiError('Send promo email failed', sendErr, 'POST');
           }
         }
       }

@@ -15,7 +15,7 @@ Plataforma multi-tenant de menú digital con sistema de pedidos online, panel de
 | AWS SDK v3 | ^3.994 | Cliente S3/R2 |
 | Zod | 3.25.x | Validación schemas |
 | jose | ^6.1.3 | JWT (sign + verify) |
-| Upstash Redis | — | Rate limiting |
+| Upstash Redis | — | Rate limiting + JWT revocation |
 | Brevo | — | Envío de emails |
 
 ---
@@ -102,49 +102,62 @@ src/
 │   │   └── use-cases/               # Un use case por entidad
 │   └── infrastructure/
 │       ├── api/
-│       │   ├── helpers.ts           # requireAuth, handleResult, responses
-│       │   ├── rate-limit.ts        # rateLimitLogin, rateLimitPublic, rateLimitAdmin
+│       │   ├── helpers.ts           # requireAuth, handleResult (error code → HTTP status), responses
+│       │   ├── rate-limit.ts        # rateLimitLogin (fail-closed prod), rateLimitPublic, rateLimitAdmin
 │       │   └── api-logger.ts        # logApiError
 │       ├── database/
 │       │   ├── supabase-client.ts   # Singletons Supabase
 │       │   └── index.ts             # Inyección de dependencias
 │       ├── logging/logger.ts        # ErrorLogger singleton
-│       └── storage/s3-client.ts     # Singleton R2
+│       ├── storage/s3-client.ts     # Singleton R2
+│       └── env-validation.ts        # Validación de env vars al startup
 │
-├── proxy.ts                         # Middleware JWT + CSRF + CSP nonce
+├── instrumentation.ts               # Next.js startup hook → validateEnv()
+├── proxy.ts                         # Middleware JWT + CSRF + CSP nonce + CORS
 │
 └── lib/
-    ├── csrf.ts                      # Generación y verificación CSRF (HMAC)
+    ├── csrf.ts                      # HMAC-SHA256 tokens CSRF (timingSafeEqual)
     ├── domain-utils.ts              # parseMainDomain(), getDomainFromHeaders()
     ├── html-utils.ts                # escapeHtml()
-    ├── csrf.ts                      # HMAC-SHA256 tokens CSRF (timingSafeEqual)
     ├── token-revocation.ts          # JWT revocation list (Upstash Redis REST)
     ├── unsubscribe-token.ts         # HMAC tokens para unsubscribe (TTL 7d)
     ├── brevo-email.ts               # sendEmail()
     ├── server-services.ts           # getEmpresaByDomain(), getMenuUseCase
     ├── admin-context.tsx            # AdminContext (empresaId, empresaNombre)
     ├── cart-context.tsx             # CartContext
-    └── translations.ts              # Traducciones i18n
+    └── translations.ts              # Traducciones i18n (es/en/fr/it/de)
 ```
 
 ---
 
 ## Seguridad
 
-La seguridad está documentada en detalle en [`docs/context/security.md`](docs/context/security.md). Resumen:
+Documentación completa en [`docs/context/security.md`](docs/context/security.md).
 
 | Área | Implementación |
 |------|----------------|
-| **Autenticación** | JWT HS256 en cookie HttpOnly + SameSite |
+| **Autenticación** | JWT HS256 en cookie HttpOnly + SameSite strict, jti claim, 24h expiry, runtime guard en secret |
+| **JWT Revocation** | Verificada en proxy (API) y `verifyToken` (pages SSR). Fail-closed en producción |
 | **Autorización** | `proxy.ts` verifica JWT e inyecta `x-empresa-id` por tenant |
-| **CSRF** | Token HMAC-SHA256 verificado con `timingSafeEqual` |
-| **CSP** | Nonce por request generado en `proxy.ts`, sin `unsafe-inline` en scripts |
-| **Rate limiting** | Upstash Redis — 5/15min login, 20/min público, 60/min admin |
-| **Validación** | Zod `safeParse` en todas las rutas + try/catch en `request.json()` |
-| **Uploads** | Validación MIME + magic bytes + tamaño + path seguro |
-| **Multi-tenant** | Aislamiento por `empresaId` en cada query |
-| **XSS emails** | `escapeHtml()` en todos los templates HTML |
+| **CSRF** | Token HMAC-SHA256 verificado con `timingSafeEqual`, Cache-Control no-store |
+| **CSP** | Nonce criptográfico por request en `proxy.ts`, sin `unsafe-inline` en scripts |
+| **Rate limiting** | Upstash Redis — 5/15min login (fail-closed en prod), 20/min público, 60/min admin |
+| **Env validation** | `instrumentation.ts` → `validateEnv()` al startup, falla fatal en producción |
+| **Validación** | Zod `safeParse` + try/catch en `request.json()` + max-length en todos los DTOs |
+| **Uploads** | Validación MIME + magic bytes + tamaño + path seguro (slug desde DB) |
+| **Multi-tenant** | Aislamiento por `empresaId` en cada query, RLS + service_role |
+| **Mínimo privilegio** | Endpoints públicos usan `empresaPublicRepository` (anon key) para lecturas |
+| **XSS emails** | `escapeHtml()` en todos los templates HTML, logging centralizado sin PII |
+| **Price tampering** | Total recalculado server-side + rechazo de productos desconocidos (`PRODUCT_NOT_FOUND`) |
+| **Anti-enumeración** | Login devuelve mensaje genérico para todos los tipos de fallo auth |
+| **Unsubscribe** | HMAC-SHA256 con TTL 7d, acción explícita `'baja'` (no toggle) |
+| **CORS** | Whitelist de dominios, `Vary: Origin`, preflight 204, headers en rutas públicas |
+| **Cart tokens** | Validación con audience claim `'cart-access'` para prevenir token confusion |
+| **JSON-LD** | Sanitización de `<`, `>`, `&` para prevenir inyección en script tags |
 | **Headers** | HSTS, X-Frame-Options, X-Content-Type-Options, Permissions-Policy |
+| **URL schemes** | DTOs validan `https://` en fb, instagram, logo_url, url_mapa, foto_url, imagen_url |
+| **Error mapping** | `handleResult()` mapea error codes a HTTP status (400, 401, 404, 500) |
+| **Pedido atómico** | `get_next_pedido_number()` con mutex por tenant |
 
 ---
 
@@ -175,28 +188,6 @@ export class ProductUseCase {
 }
 ```
 
-### ✅ OWASP / Seguridad (100%)
-
-| Principio | Implementación |
-|-----------|----------------|
-| **JWT** | HS256 con `jose`, HttpOnly cookie, 24h expiry, `SameSite=strict`, claim `jti` en cada token |
-| **JWT Revocation** | Logout almacena `jti` en Upstash Redis con TTL restante. Proxy verifica revocación en cada request (`src/lib/token-revocation.ts`) |
-| **CSRF** | Tokens HMAC-SHA256 (`src/lib/csrf.ts`), comparación `timingSafeEqual`, cookie HttpOnly + header `x-csrf-token`. Validado en proxy para todos los métodos mutativos de `/api/admin/*` |
-| **CSP Nonces** | `proxy.ts` genera nonce criptográfico por request. CSP dinámico con `script-src 'nonce-{n}'` — sin `unsafe-inline`. Nonce disponible como `x-nonce` para server components |
-| **Autorización** | Proxy middleware valida JWT e inyecta `x-empresa-id`, `x-admin-id`, `x-admin-rol` |
-| **Rate limiting** | Upstash Redis — login: 5/15min, público: 20/min, admin: 60/min por IP real (Cloudflare-aware). Todos los endpoints mutativos protegidos |
-| **Validación de entrada** | Zod `safeParse` en **todas** las API routes. Límites: items ≤50, quantity ≤99, complements ≤20, UUIDs validados |
-| **Magic bytes** | Upload valida firma binaria del archivo — previene MIME type spoofing (JPEG, PNG, WebP, GIF) |
-| **Price tampering** | `PedidoUseCase.create` recalcula total (productos + complementos) desde precios reales de DB — el total del cliente se ignora |
-| **Sanitización HTML** | `escapeHtml()` en todos los templates de email |
-| **Unsubscribe tokens** | HMAC-SHA256 con TTL 7 días y prefijo de dominio (`unsubscribe:`) — previene uso cruzado con tokens CSRF |
-| **URL scheme** | DTOs de empresa validan `https://` en fb, instagram, logo_url, url_imagen, url_mapa |
-| **RLS Supabase** | `anon` explícitamente denegado en pedidos, clientes, log_errors, perfiles_admin, promociones. Escrituras via `service_role` |
-| **Security headers** | HSTS, X-Frame-Options, X-Content-Type-Options, Permissions-Policy, X-XSS-Protection, frame-ancestors. CSP dinámico con nonce vía middleware |
-| **CORS** | Whitelist de dominios via `CORS_ALLOWED_DOMAINS`. `Vary: Origin` en todas las respuestas. Preflight con 204 |
-| **Número de pedido atómico** | `get_next_pedido_number()` con mutex por tenant (lock en fila `empresas`) |
-| **Sin secretos hardcodeados** | Todas las claves en variables de entorno |
-
 ---
 
 ## Helpers de API
@@ -211,8 +202,11 @@ return successResponse(data);             // 200 OK
 return successResponse(data, 201);        // 201 Created
 return errorResponse('msg', 404);         // 404 Not Found
 return validationErrorResponse('msg');    // 400 Bad Request
-return handleResult(result);             // automático desde Result<T>
+return handleResult(result);             // automático desde Result<T> (mapea error codes a HTTP status)
 ```
+
+`handleResult` mapea automáticamente códigos de error a HTTP status:
+- `VALIDATION_ERROR` → 400, `AUTH_*` → 401, `*_NOT_FOUND` → 404, otros → 500
 
 ## Códigos de Error Centralizados
 
@@ -333,7 +327,7 @@ POST /api/admin/login
 POST /api/admin/logout
   → jwtVerify(admin_token) → extrae jti + exp
   → revokeToken(jti, ttlRestante) → Upstash Redis SET key EX ttl
-  → delete cookie admin_token
+  → delete cookie admin_token + csrf_token
 ```
 
 ### Verificación de sesión en pages
@@ -351,16 +345,19 @@ if (!admin) redirect('/admin/login');
 ```
 
 ### Middleware (proxy.ts)
+- Lee secrets de forma lazy (`getAdminTokenSecret()`) — nunca constantes a nivel de módulo
 - Verifica JWT en todas las rutas `/api/admin/*`
-- Comprueba revocación del `jti` en Redis antes de permitir acceso
+- Comprueba revocación del `jti` en Redis (fail-closed en producción)
 - Valida CSRF (timingSafeEqual) en todos los métodos mutativos
 - Inyecta `x-empresa-id`, `x-admin-id`, `x-admin-rol` como headers
-- Genera nonce criptográfico por request para rutas de página; emite `Content-Security-Policy` dinámico y pasa `x-nonce` a server components
-- Rutas públicas sin JWT: `/api/admin/login`, `/api/admin/logout`, `/api/unsubscribe`, `/api/admin/promociones/unsubscribe`
+- Genera nonce criptográfico por request para rutas de página; emite CSP dinámico y pasa `x-nonce` a server components
+- Aplica CORS headers a todas las rutas `/api/*` (admin y públicas)
+- Valida cart access tokens con audience claim `'cart-access'`
+- Rutas públicas sin JWT (match exacto): `/api/admin/login`, `/api/admin/logout`, `/api/unsubscribe`, `/api/admin/promociones/unsubscribe`, `/api/csp-report`
 
-> ⚠️ Agregar nuevas rutas públicas a `isPublicRoute` en `proxy.ts`
+> Agregar nuevas rutas públicas a `isPublicRoute` en `proxy.ts` (usar `===`, no `startsWith`)
 
-> ⚠️ `pedidos` NO tiene columna `telefono` — el teléfono está en `clientes`
+> `pedidos` NO tiene columna `telefono` — el teléfono está en `clientes`
 
 ---
 
@@ -394,9 +391,9 @@ const main = parseMainDomain(domain); // elimina subdominio pedidos
 | `promociones` | id (uuid) | empresa_id | imagen_url, numero_envios |
 | `log_errors` | id (uuid) | empresa_id | logging centralizado con severity y metadata JSONB |
 
-> ⚠️ `pedidos` NO tiene columna `telefono` — el teléfono está en `clientes`
+> `pedidos` NO tiene columna `telefono` — el teléfono está en `clientes`
 
-> ⚠️ `detalle_pedido[].complementos` almacena objetos `{ name, price }` — tipo `PedidoComplemento[]`
+> `detalle_pedido[].complementos` almacena objetos `{ name, price }` — tipo `PedidoComplemento[]`
 
 ---
 
@@ -412,31 +409,28 @@ SUPABASE_SERVICE_ROLE_KEY=eyJxxx
 ACCESS_TOKEN_SECRET=secreto_largo_aleatorio        # openssl rand -hex 32
 
 # CSRF + Carrito (obligatorios en producción)
-CSRF_HMAC_SECRET=secreto_largo_aleatorio           # openssl rand -hex 32 — lanza en runtime si falta
-CART_TOKEN_SECRET=secreto_largo_aleatorio          # openssl rand -hex 32
+CSRF_HMAC_SECRET=secreto_largo_aleatorio           # openssl rand -hex 32
+CART_TOKEN_SECRET=secreto_largo_aleatorio           # openssl rand -hex 32
 
-# Rate Limiting (Upstash Redis)
+# Rate Limiting + JWT Revocation (Upstash Redis)
 UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
 UPSTASH_REDIS_REST_TOKEN=xxx
 
 # CORS
-CORS_ALLOWED_DOMAINS=tudominio.com                 # dominios base separados por coma
+CORS_ALLOWED_ORIGINS=https://tudominio.com,https://pedidos.tudominio.com
+CORS_ALLOWED_DOMAINS=tudominio.com
 
 # Cloudflare R2
 R2_ACCOUNT_ID=xxx
 R2_ACCESS_KEY_ID=xxx
 R2_SECRET_ACCESS_KEY=xxx
 R2_BUCKET_NAME=images
-NEXT_PUBLIC_R2_DOMAIN=https://tudominio.com         # incluir https://
+NEXT_PUBLIC_R2_DOMAIN=https://imagenes.tudominio.com
 CLOUDFLARE_API_TOKEN=xxx                           # opcional, fallback a AWS SDK
 
 # Email (Brevo)
 BREVO_API_KEY=xxx
 BREVO_DEFAULT_SENDER_EMAIL=noreply@tudominio.com
-
-# CORS
-CORS_ALLOWED_ORIGINS=https://tudominio.com,https://pedidos.tudominio.com
-CORS_ALLOWED_DOMAINS=tudominio.com
 ```
 
 ---
@@ -480,18 +474,16 @@ npx tsx scripts/setup-r2-cors.ts
 
 | Aspecto | Estado |
 |---------|--------|
-| **Build** | ✅ Compila correctamente |
-| **Clean Architecture** | ✅ 100% — Domain / Application / Infrastructure |
-| **SOLID** | ✅ 100% — DIP, sin `any`, repositorios inyectados |
-| **OWASP / Seguridad** | ✅ 100% — Auditoría completa (20/20 SECs). JWT revocation, CSP nonces, CSRF timing-safe, rate limiting total, price tampering server-side, HMAC unsubscribe tokens |
-| **Tipos TypeScript** | ✅ Sin `any` en core ni API routes |
-| **Código duplicado** | ✅ `parseMainDomain`/`getDomainFromHeaders` centralizados en `lib/domain-utils.ts` |
-| **Error Handling (Result\<T\>)** | ✅ 100% — Todos los módulos migrados al patrón Result<T, E> |
-| **API Error Codes** | ✅ 100% — Códigos centralizados en `core/domain/constants/api-errors.ts` |
-| **Logging Centralizado** | ✅ 100% — Tabla log_errors + ErrorLogger singleton |
-| **UI/UX Quality** | ✅ 100% — Focus states, reduced-motion, ARIA, mobile-first. Distill, Polish, Optimize aplicados |
-| **i18n Admin** | ✅ 100% — es/en/fr/it/de en productos + panel admin traducido |
-| **Quality Score** | 🏆 **10/10** — Production Ready |
+| **Build** | Compila correctamente |
+| **Clean Architecture** | 100% — Domain / Application / Infrastructure |
+| **SOLID** | 100% — DIP, sin `any`, repositorios inyectados |
+| **Seguridad** | Auditoría completa — JWT revocation (fail-closed), env validation startup, rate limiting (fail-closed login), CSP nonces, CSRF timing-safe, price tampering + product rejection, anti-enumeración, mínimo privilegio, cart token audience, JSON-LD sanitización |
+| **Tipos TypeScript** | Sin `any` en core ni API routes |
+| **Error Handling** | 100% — Result<T, E> en todos los módulos |
+| **API Error Codes** | Códigos centralizados en `core/domain/constants/api-errors.ts` |
+| **Logging** | Tabla log_errors + ErrorLogger singleton |
+| **UI/UX** | Audit 8.5/10 — WCAG AA, focus states, reduced-motion, ARIA, mobile-first, 44px touch targets |
+| **i18n** | es/en/fr/it/de en productos + panel admin + componentes públicos |
 
 ## Documentación
 

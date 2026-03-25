@@ -14,7 +14,8 @@ export async function GET(request: NextRequest) {
   const cookieValue = `${token}:${signature}`;
 
   const response = NextResponse.json({ csrfToken: token });
-  
+  response.headers.set('Cache-Control', 'no-store, private');
+
   response.cookies.set('csrf_token', cookieValue, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -45,10 +46,11 @@ export async function POST(request: NextRequest) {
   const result = await authAdminUseCase.login(parsed.data);
   
   if (!result.success) {
-    if (result.error.code === 'AUTH_LOGIN_ERROR' || 
+    if (result.error.code === 'AUTH_LOGIN_ERROR' ||
         result.error.code === 'ADMIN_NOT_AUTHORIZED' ||
         result.error.code === 'AUTH_NO_USER') {
-      return NextResponse.json({ error: result.error.message }, { status: 401 });
+      // Generic message for all auth failures to prevent user enumeration
+      return NextResponse.json({ error: 'Credenciales inválidas' }, { status: 401 });
     }
     return handleResult(result);
   }

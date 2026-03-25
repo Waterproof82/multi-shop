@@ -29,7 +29,7 @@ export function LanguageSelector() {
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="gap-2 px-2" aria-label={t("selectLanguage", language)} id="language-selector-trigger">
+        <Button variant="ghost" size="sm" className="gap-2 px-2 min-h-[44px]" aria-label={t("selectLanguage", language)} id="language-selector-trigger">
           {FlagIcon && <FlagIcon className="w-5 h-3.5 rounded-sm" />}
           <Languages className="size-4" />
           <span className="text-xs font-medium uppercase">{currentLang.code}</span>

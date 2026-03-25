@@ -35,13 +35,17 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${baseUrl}/?error=invalid`);
     }
 
-    const nuevoValor = await clienteUseCase.togglePromoSubscription(normalizedEmail, empresaId);
+    const result = await clienteUseCase.togglePromoSubscription(normalizedEmail, empresaId, 'baja');
 
-    if (nuevoValor === null) {
+    if (!result.success) {
+      return NextResponse.redirect(`${baseUrl}/?error=internal`);
+    }
+
+    if (result.data === null) {
       return NextResponse.redirect(`${baseUrl}/?error=notfound`);
     }
 
-    const mensaje = nuevoValor ? 'promo=on' : 'promo=off';
+    const mensaje = result.data ? 'promo=on' : 'promo=off';
     return NextResponse.redirect(`${baseUrl}/?${mensaje}`);
   } catch (error) {
     void error;

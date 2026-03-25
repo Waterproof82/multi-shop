@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { empresaRepository, pedidoUseCase } from '@/core/infrastructure/database';
+import { empresaPublicRepository, pedidoUseCase } from '@/core/infrastructure/database';
 import { parseMainDomain, getDomainFromHeaders } from '@/lib/domain-utils';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 
@@ -20,7 +20,7 @@ const createPedidoSchema = z.object({
   })).min(1).max(50),
   total: z.number().min(0).max(100_000).optional(),
   nombre: z.string().min(2).max(100),
-  telefono: z.string().min(10).max(18).regex(/^[0-9]+$/, 'Formato de teléfono no válido'),
+  telefono: z.string().min(9).max(18).regex(/^\+?[0-9]+$/, 'Formato de teléfono no válido'),
   email: z.string().email().optional().or(z.literal('')),
 });
 
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     const domain = await getDomainFromHeaders();
     const mainDomain = parseMainDomain(domain);
 
-    const empresaResult = await empresaRepository.findByDomain(mainDomain);
+    const empresaResult = await empresaPublicRepository.findByDomain(mainDomain);
     if (!empresaResult.success) {
       return NextResponse.json({ error: 'Error al buscar empresa' }, { status: 500 });
     }
@@ -66,7 +66,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 });
     }
 
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
     const parsed = createPedidoSchema.safeParse(body);
 
     if (!parsed.success) {
@@ -83,7 +88,10 @@ export async function POST(request: Request) {
     });
 
     if (!pedidoResult.success) {
-      return NextResponse.json({ error: pedidoResult.error.message }, { status: 500 });
+      if (pedidoResult.error.code === 'PRODUCT_NOT_FOUND') {
+        return NextResponse.json({ error: 'Producto no disponible' }, { status: 400 });
+      }
+      return NextResponse.json({ error: 'Error al crear el pedido' }, { status: 500 });
     }
 
     const { id: pedidoId, numero_pedido: numeroPedido, total: serverTotal } = pedidoResult.data;

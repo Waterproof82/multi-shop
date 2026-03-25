@@ -88,7 +88,7 @@ export function ColoresForm({ coloresIniciales, empresaId }: ColoresFormProps) {
                 type="color"
                 value={colores[key]}
                 onChange={(e) => handleChange(key, e.target.value)}
-                className="w-12 h-10 rounded cursor-pointer border-0"
+                className="w-12 h-10 rounded cursor-pointer border border-border"
               />
               <input
                 id={`color-text-${key}`}

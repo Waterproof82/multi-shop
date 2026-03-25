@@ -27,19 +27,28 @@ export function validationErrorResponse(errors: string): NextResponse {
   return NextResponse.json({ error: errors }, { status: 400 });
 }
 
+/** Maps known error codes to appropriate HTTP status codes */
+function errorCodeToStatus(code: string): number {
+  if (code === 'VALIDATION_ERROR') return 400;
+  if (code === 'PRODUCT_NOT_FOUND' || code === 'NOT_FOUND') return 404;
+  if (code === 'AUTH_003' || code === 'AUTH_FORBIDDEN' || code === 'FORBIDDEN') return 403;
+  if (code.startsWith('AUTH_')) return 401;
+  return 500;
+}
+
 // Result handling helpers
 export function handleResult<T>(result: Result<T>): NextResponse {
   if (result.success) {
     return successResponse(result.data);
   }
-  return errorResponse(result.error.message);
+  return errorResponse(result.error.message, errorCodeToStatus(result.error.code));
 }
 
 export function handleResultWithStatus<T>(result: Result<T>, successStatus = 200): NextResponse {
   if (result.success) {
     return successResponse(result.data, successStatus);
   }
-  return errorResponse(result.error.message);
+  return errorResponse(result.error.message, errorCodeToStatus(result.error.code));
 }
 
 // Helper to get empresaId from request headers

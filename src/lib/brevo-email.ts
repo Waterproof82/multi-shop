@@ -1,4 +1,12 @@
-const BREVO_API_KEY = process.env.BREVO_API_KEY;
+import { logger } from '@/core/infrastructure/logging/logger';
+
+function getBrevoApiKey(): string {
+  const key = process.env.BREVO_API_KEY;
+  if (!key) {
+    throw new Error('BREVO_API_KEY is not configured');
+  }
+  return key;
+}
 
 export interface SendEmailParams {
   to: string | string[];
@@ -9,18 +17,14 @@ export interface SendEmailParams {
 }
 
 export async function sendEmail({ to, subject, htmlContent, senderName = 'Pedidos', senderEmail }: SendEmailParams) {
-  if (!BREVO_API_KEY) {
-    console.error('BREVO_API_KEY not configured');
-    throw new Error('BREVO_API_KEY not configured');
-  }
+  const apiKey = getBrevoApiKey();
 
   const resolvedSenderEmail = senderEmail || process.env.BREVO_DEFAULT_SENDER_EMAIL;
   if (!resolvedSenderEmail) {
-    console.error('No sender email configured (BREVO_DEFAULT_SENDER_EMAIL missing)');
     throw new Error('Sender email not configured');
   }
 
-  const recipients = Array.isArray(to) 
+  const recipients = Array.isArray(to)
     ? to.map(email => ({ email }))
     : [{ email: to }];
 
@@ -37,21 +41,30 @@ export async function sendEmail({ to, subject, htmlContent, senderName = 'Pedido
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
-        'api-key': BREVO_API_KEY,
+        'api-key': apiKey,
       },
       body: JSON.stringify(payload),
     });
 
     const result = await response.json();
-    
+
     if (!response.ok) {
-      console.error('Brevo API error:', response.status, result);
+      await logger.logAndReturnError(
+        'BREVO_API_ERROR',
+        `Brevo API error: ${response.status}`,
+        'api',
+        'sendEmail',
+        { details: { status: response.status, recipientCount: recipients.length } }
+      );
       throw new Error(`Brevo API error: ${response.status}`);
     }
 
     return result;
   } catch (error) {
-    console.error('Error sending Brevo email:', error);
+    if (error instanceof Error && error.message.startsWith('Brevo API error:')) {
+      throw error;
+    }
+    await logger.logFromCatch(error, 'api', 'sendEmail');
     throw error;
   }
 }

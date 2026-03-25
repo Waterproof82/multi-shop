@@ -6,7 +6,9 @@ import { timingSafeEqual } from 'crypto';
 import { isTokenRevoked } from '@/lib/token-revocation';
 import { AUTH_ERRORS, SERVER_ERRORS, createErrorResponse } from '@/core/domain/constants/api-errors';
 
-const ADMIN_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
+function getAdminTokenSecret(): string | undefined {
+  return process.env.ACCESS_TOKEN_SECRET;
+}
 
 function isAllowedOrigin(origin: string | null): boolean {
   if (!origin) return false;
@@ -45,7 +47,7 @@ function addCorsHeaders(response: NextResponse, origin: string | null): NextResp
 function isPublicRoute(path: string): boolean {
   return (
     path === '/api/unsubscribe' ||
-    path.startsWith('/api/admin/promociones/unsubscribe') ||
+    path === '/api/admin/promociones/unsubscribe' ||
     path === '/api/admin/login' ||
     path === '/api/admin/logout' ||
     path === '/api/csp-report'
@@ -59,12 +61,13 @@ async function handleAdminAuth(request: NextRequest, origin: string | null): Pro
     return addCorsHeaders(NextResponse.json(createErrorResponse(AUTH_ERRORS.UNAUTHORIZED), { status: 401 }), origin);
   }
 
-  if (!ADMIN_TOKEN_SECRET) {
+  const tokenSecret = getAdminTokenSecret();
+  if (!tokenSecret) {
     return addCorsHeaders(NextResponse.json(createErrorResponse(SERVER_ERRORS.CONFIG_ERROR), { status: 500 }), origin);
   }
 
   try {
-    const secret = new TextEncoder().encode(ADMIN_TOKEN_SECRET);
+    const secret = new TextEncoder().encode(tokenSecret);
     const { payload } = await jwtVerify(adminToken, secret);
 
     if (!payload.empresaId || !payload.adminId) {
@@ -117,11 +120,17 @@ async function handleCartAccessToken(url: URL, accessToken: string): Promise<Nex
   const sanitizedToken = accessToken.replaceAll(/[^a-zA-Z0-9._-]/g, '');
   const secretKey = process.env.CART_TOKEN_SECRET;
 
-  if (!secretKey) return NextResponse.next();
+  if (!secretKey) {
+    if (process.env.NODE_ENV === 'production') {
+      return new NextResponse('Server configuration error', { status: 500 });
+    }
+    return NextResponse.next();
+  }
 
   try {
     const secret = new TextEncoder().encode(secretKey);
-    const { payload } = await jwtVerify(sanitizedToken, secret);
+    // Require 'cart-access' audience to prevent token confusion with admin JWTs
+    const { payload } = await jwtVerify(sanitizedToken, secret, { audience: 'cart-access' });
 
     url.searchParams.delete('access');
     const response = NextResponse.redirect(url);
@@ -135,7 +144,7 @@ async function handleCartAccessToken(url: URL, accessToken: string): Promise<Nex
     response.cookies.set('access_token', sanitizedToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: 'strict',
       path: '/',
       maxAge,
     });
@@ -163,7 +172,7 @@ function buildCsp(nonce: string): string {
 
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'unsafe-eval'`,
+    `script-src 'self' 'nonce-${nonce}'${process.env.NODE_ENV !== 'production' ? " 'unsafe-eval'" : ''}`,
     "style-src 'self' 'unsafe-inline'",
     `img-src ${imgSources}`,
     `media-src ${mediaSources}`,
@@ -211,6 +220,11 @@ export async function proxy(request: NextRequest) {
 
   // Set on response so the browser enforces it
   response.headers.set('Content-Security-Policy', csp);
+
+  // Add CORS headers to public API routes (pedidos subdomain may differ from main domain)
+  if (path.startsWith('/api/')) {
+    addCorsHeaders(response, origin);
+  }
 
   return response;
 }

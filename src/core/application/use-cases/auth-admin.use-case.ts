@@ -4,9 +4,22 @@ import { IAdminRepository, AdminWithEmpresa } from "@/core/domain/repositories/I
 import { LoginDTO, loginSchema } from "../dtos/auth.dto";
 import { Result } from "@/core/domain/entities/types";
 import { logger } from "@/core/infrastructure/logging/logger";
+import { isTokenRevoked } from "@/lib/token-revocation";
 
-const ADMIN_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET!;
 const TOKEN_EXPIRY = "24h";
+
+function anonymizeEmail(email: string): string {
+  const [local, domain] = email.split('@');
+  return `${local.substring(0, 2)}***@${domain ?? '***'}`;
+}
+
+function getTokenSecret(): Uint8Array {
+  const secret = process.env.ACCESS_TOKEN_SECRET;
+  if (!secret) {
+    throw new Error('ACCESS_TOKEN_SECRET is not configured');
+  }
+  return new TextEncoder().encode(secret);
+}
 
 export interface LoginResult {
   token: string;
@@ -56,7 +69,7 @@ export class AuthAdminUseCase {
         'Usuario no autorizado como admin',
         'use-case',
         'AuthAdminUseCase.login',
-        { details: { email } }
+        { details: { email: anonymizeEmail(email) } }
       );
       return {
         success: false,
@@ -79,25 +92,30 @@ export class AuthAdminUseCase {
         .setJti(randomUUID())
         .setIssuedAt()
         .setExpirationTime(TOKEN_EXPIRY)
-        .sign(new TextEncoder().encode(ADMIN_TOKEN_SECRET));
+        .sign(getTokenSecret());
 
       return { success: true, data: { token, admin: adminResult.data } };
     } catch (e) {
-      const appError = await logger.logFromCatch(e, 'use-case', 'AuthAdminUseCase.login', { details: { email } });
+      const appError = await logger.logFromCatch(e, 'use-case', 'AuthAdminUseCase.login', { details: { email: anonymizeEmail(email) } });
       return { success: false, error: appError };
     }
   }
 
   async verifyToken(token: string): Promise<AdminWithEmpresa | null> {
     try {
-      const secret = new TextEncoder().encode(ADMIN_TOKEN_SECRET);
+      const secret = getTokenSecret();
       const { payload } = await jwtVerify(token, secret);
 
+      // Check revocation list — token may be valid but already logged out
+      if (payload.jti && await isTokenRevoked(payload.jti)) {
+        return null;
+      }
+
       const adminId = payload.adminId as string;
-      
+
       // Use findById - it returns Result but we handle the case
       const result = await this.adminRepo.findById(adminId);
-      
+
       if (!result.success) {
         // Log but return null (soft failure - token might be invalid)
         await logger.logError({
@@ -109,7 +127,7 @@ export class AuthAdminUseCase {
         });
         return null;
       }
-      
+
       return result.data;
     } catch (e) {
       await logger.logAndReturnError(

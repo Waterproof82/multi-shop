@@ -8,7 +8,10 @@ interface JsonLdProps {
 }
 
 function safeJsonStringify(data: Record<string, unknown>): string {
-  return JSON.stringify(data).replace(/</g, "\\u003c");
+  return JSON.stringify(data)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026');
 }
 
 function buildRestaurantJsonLd(empresa: EmpresaPublic, menuData: MenuCategoryVM[], baseUrl: string): Record<string, unknown> {
