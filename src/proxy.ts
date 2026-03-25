@@ -172,7 +172,7 @@ function buildCsp(nonce: string): string {
 
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}'${process.env.NODE_ENV !== 'production' ? " 'unsafe-eval'" : ''}`,
+    `script-src 'self' 'unsafe-inline' 'unsafe-eval'`,
     "style-src 'self' 'unsafe-inline'",
     `img-src ${imgSources}`,
     `media-src ${mediaSources}`,
