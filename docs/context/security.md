@@ -153,15 +153,17 @@ const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
 
 El nonce se inyecta en:
 - Header de request `x-nonce` → leído por `layout.tsx` para pasarlo a `ThemeProvider`
-- Header de respuesta `Content-Security-Policy` con `'nonce-{nonce}'` en `script-src`
+- Header de respuesta `Content-Security-Policy` con `'nonce-{nonce}' 'strict-dynamic'` en `script-src`
 
-Esto elimina la necesidad de `unsafe-inline` en `script-src`.
+Next.js propaga automáticamente el nonce a sus propios scripts SSR (hidratación, bootstrap, chunks),
+por lo que `'strict-dynamic'` cubre los scripts cargados dinámicamente sin necesidad de `'unsafe-inline'`.
+En desarrollo se usa `'unsafe-inline' 'unsafe-eval'` porque Turbopack HMR lo requiere.
 
 ### Directivas vigentes
 
 | Directiva | Valor |
 |-----------|-------|
-| `script-src` | `'self' 'nonce-{nonce}'` (prod) / `+ 'unsafe-eval'` (dev) |
+| `script-src` | `'self' 'nonce-{nonce}' 'strict-dynamic'` (prod) / `'self' 'unsafe-inline' 'unsafe-eval'` (dev) |
 | `style-src` | `'self' 'unsafe-inline'` |
 | `img-src` | `'self' {R2_DOMAIN} https://*.supabase.co data: blob:` |
 | `media-src` | `'self' {R2_DOMAIN}` |
