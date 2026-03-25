@@ -11,7 +11,10 @@ import { generateUnsubscribeToken } from '@/lib/unsubscribe-token';
 
 const createPromocionSchema = z.object({
   texto_promocion: z.string().min(1, 'El texto de promoción es requerido').max(1000),
-  imagen_url: z.string().url().optional().nullable(),
+  imagen_url: z.string().url().refine(
+    (url) => url.startsWith('https://'),
+    { message: 'imagen_url must use HTTPS' }
+  ).optional().nullable(),
 });
 
 function buildEmailHtml(params: {

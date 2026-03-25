@@ -134,11 +134,39 @@ export class PedidoUseCase {
         priceMap = new Map(productsResult.data.map(p => [p.id, p.precio]));
       }
 
+      // Verify all product IDs exist in DB — reject orders with unknown products
+      for (const ci of data.items) {
+        const pid = ci.item?.id;
+        if (pid && !priceMap.has(pid)) {
+          return {
+            success: false,
+            error: {
+              code: 'PRODUCT_NOT_FOUND',
+              message: `Producto no encontrado: ${pid}`,
+              module: 'use-case',
+              method: 'PedidoUseCase.create',
+            },
+          };
+        }
+        for (const c of ci.selectedComplements ?? []) {
+          if (c.id && !priceMap.has(c.id)) {
+            return {
+              success: false,
+              error: {
+                code: 'PRODUCT_NOT_FOUND',
+                message: `Complemento no encontrado: ${c.id}`,
+                module: 'use-case',
+                method: 'PedidoUseCase.create',
+              },
+            };
+          }
+        }
+      }
+
       const serverTotal = data.items.reduce((sum, ci) => {
-        // Use authoritative DB price if product exists, otherwise fall back to declared price
-        const unitPrice = priceMap.get(ci.item?.id ?? '') ?? ci.item?.price ?? 0;
+        const unitPrice = priceMap.get(ci.item?.id ?? '') ?? 0;
         const complementsTotal = (ci.selectedComplements ?? []).reduce(
-          (cs, c) => cs + (priceMap.get(c.id) ?? c.price ?? 0),
+          (cs, c) => cs + (priceMap.get(c.id) ?? 0),
           0
         );
         return sum + (unitPrice + complementsTotal) * ci.quantity;

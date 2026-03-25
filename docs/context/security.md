@@ -18,9 +18,48 @@ El panel admin usa JWT firmados con `ACCESS_TOKEN_SECRET` almacenados en una coo
 
 El token incluye `empresaId`, `adminId` y `rol` en el payload.
 
+### Runtime guard para ACCESS_TOKEN_SECRET
+
+El secret de JWT se obtiene mediante una función `getTokenSecret()` que lanza un error si la variable no está configurada, evitando que se firmen tokens con un secret vacío o `"undefined"`:
+
+```typescript
+function getTokenSecret(): Uint8Array {
+  const secret = process.env.ACCESS_TOKEN_SECRET;
+  if (!secret) {
+    throw new Error('ACCESS_TOKEN_SECRET is not configured');
+  }
+  return new TextEncoder().encode(secret);
+}
+```
+
 ### JWT Revocation
 
-Al hacer logout, el `jti` del token se almacena en Upstash Redis con TTL igual al tiempo restante de expiración. El proxy verifica revocación en cada request antes de permitir acceso (`src/lib/token-revocation.ts`).
+Al hacer logout, el `jti` del token se almacena en Upstash Redis con TTL igual al tiempo restante de expiración. La revocación se verifica en dos puntos:
+
+1. **Proxy** (`proxy.ts`): verifica revocación en cada request API antes de permitir acceso
+2. **`verifyToken`** (`auth-admin.use-case.ts`): verifica revocación en páginas server-side del admin
+
+Ambos puntos llaman a `isTokenRevoked(jti)` de `src/lib/token-revocation.ts`.
+
+#### Fail-closed en producción
+
+Si Redis no está disponible (caída o mala configuración), `isTokenRevoked` retorna `true` (tratado como revocado) en producción. En desarrollo retorna `false` (fail-open) para conveniencia local:
+
+```typescript
+export async function isTokenRevoked(jti: string): Promise<boolean> {
+  const config = getRedisConfig();
+  if (!config) {
+    return process.env.NODE_ENV === 'production';
+  }
+  try {
+    const key = `${REVOCATION_KEY_PREFIX}${jti}`;
+    const result = await redisRequest(config, ['EXISTS', key]);
+    return result === 1;
+  } catch {
+    return process.env.NODE_ENV === 'production';
+  }
+}
+```
 
 ### Flujo de autenticación
 
@@ -28,14 +67,21 @@ Al hacer logout, el `jti` del token se almacena en Upstash Redis con TTL igual a
 Login (POST /api/admin/login)
   → Zod valida credenciales
   → AuthAdminUseCase.login() verifica contra Supabase
+  → getTokenSecret() valida que ACCESS_TOKEN_SECRET existe
   → JWT firmado con jti=randomUUID() → cookie admin_token
   → CSRF token generado → cookie csrf_token
 
 Cada request a /api/admin/* (excepto rutas públicas)
   → proxy.ts verifica JWT
-  → Comprueba revocación del jti en Redis
+  → Comprueba revocación del jti en Redis (fail-closed en prod)
   → Inyecta x-empresa-id, x-admin-id, x-admin-rol en headers
   → requireAuth() lee x-empresa-id para aislar tenant
+
+Páginas admin server-side
+  → AuthAdminUseCase.verifyToken(token)
+  → Verifica firma JWT
+  → Comprueba revocación del jti en Redis (fail-closed en prod)
+  → Retorna admin con empresaId o null
 
 Logout (POST /api/admin/logout)
   → jwtVerify(admin_token) → extrae jti + exp
@@ -45,12 +91,12 @@ Logout (POST /api/admin/logout)
 
 ### Rutas públicas (sin autenticación)
 
-Definidas en `isPublicRoute()` dentro de `proxy.ts`:
+Definidas en `isPublicRoute()` dentro de `proxy.ts` con coincidencia exacta (no prefijo):
 
 - `GET /api/admin/login` — obtener CSRF token
 - `POST /api/admin/login` — autenticarse
 - `POST /api/admin/logout` — cerrar sesión
-- `POST /api/admin/promociones/unsubscribe` — baja de promociones
+- `GET /api/admin/promociones/unsubscribe` — baja de promociones
 - `POST /api/unsubscribe` — baja de promociones (ruta pública)
 - `POST /api/csp-report` — recolector de violaciones CSP
 
@@ -141,7 +187,7 @@ Configurados en `next.config.mjs` para todas las rutas:
 
 ## Rate Limiting
 
-Implementado con Upstash Redis (`@upstash/ratelimit`). Con degradación elegante: si Redis no está configurado, no limita (útil en desarrollo local).
+Implementado con Upstash Redis (`@upstash/ratelimit`).
 
 | Limitador | Rutas | Límite |
 |-----------|-------|--------|
@@ -149,7 +195,56 @@ Implementado con Upstash Redis (`@upstash/ratelimit`). Con degradación elegante
 | `rateLimitPublic` | `GET /api/admin/login`, `/api/pedidos`, `/api/unsubscribe` | 20 req / min por IP |
 | `rateLimitAdmin` | Todas las rutas `/api/admin/*` | 60 req / min por IP |
 
-La IP real se extrae del header `cf-connecting-ip` (Cloudflare) con fallback a `x-forwarded-for`.
+La IP real se extrae del header `cf-connecting-ip` (Cloudflare) con fallback al primer entry de `x-forwarded-for`.
+
+### Fail-closed en login (producción)
+
+Si Redis no está configurado en producción, `rateLimitLogin` devuelve **503 Service Unavailable** en lugar de permitir intentos ilimitados. Esto previene ataques de fuerza bruta si Redis falla o no se configura:
+
+```typescript
+if (!limiter) {
+  if (FAIL_CLOSED_IN_PRODUCTION) {
+    return NextResponse.json(
+      { error: "Service temporarily unavailable. Please try again later." },
+      { status: 503 }
+    );
+  }
+  return null; // dev: skip rate limiting
+}
+```
+
+Los limitadores `rateLimitPublic` y `rateLimitAdmin` degradan gracefully (sin límite) cuando Redis no está disponible — solo login es fail-closed por ser el vector de ataque más crítico.
+
+---
+
+## Validación de entorno al startup
+
+El módulo `src/core/infrastructure/env-validation.ts` se ejecuta al iniciar la aplicación vía `src/instrumentation.ts` (hook `register()` de Next.js):
+
+```typescript
+export function register() {
+  validateEnv();
+}
+```
+
+### Comportamiento por entorno
+
+- **Producción**: falla con error fatal si faltan variables requeridas (incluyendo `UPSTASH_*` y `CORS_*`)
+- **Desarrollo**: muestra warnings para variables recomendadas en producción, error en consola para variables siempre requeridas
+
+### Variables validadas
+
+| Variable | Siempre requerida | Solo producción |
+|----------|:-:|:-:|
+| `ACCESS_TOKEN_SECRET` | ✓ | |
+| `CSRF_HMAC_SECRET` | ✓ | |
+| `CART_TOKEN_SECRET` | ✓ | |
+| `NEXT_PUBLIC_SUPABASE_URL` | ✓ | |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✓ | |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✓ | |
+| `UPSTASH_REDIS_REST_URL` | | ✓ |
+| `UPSTASH_REDIS_REST_TOKEN` | | ✓ |
+| `CORS_ALLOWED_DOMAINS` | | ✓ |
 
 ---
 
@@ -192,6 +287,20 @@ selectedComplements: z.array(...).max(20)
 selectedComplements[].id: z.string().uuid()  // verified against DB
 ```
 
+### Límites en productos
+
+Los schemas de creación/actualización de productos incluyen:
+
+- Títulos (i18n): max 200 caracteres
+- Descripciones (i18n): max 2000 caracteres
+- `foto_url`: requiere esquema `https://`
+- `precio`: min 0
+
+### Límites en promociones
+
+- `texto_promocion`: max 1000 caracteres
+- `imagen_url`: requiere esquema `https://`
+
 ---
 
 ## Seguridad en uploads de imágenes
@@ -211,6 +320,7 @@ El endpoint `POST /api/admin/upload-image` aplica:
 - El proxy extrae `empresaId` del JWT verificado e inyecta `x-empresa-id` en los headers de cada request
 - `requireAuth()` lee ese header — no acepta el header si el proxy no lo inyectó
 - Todos los repositorios filtran por `empresaId` en cada query
+- Update y delete usan filtro compuesto: `.eq("id", id).eq("empresa_id", empresaId)`
 - Supabase usa `service_role` con RLS; el aislamiento de tenant se enforza a nivel de aplicación en el repositorio
 
 ---
@@ -227,11 +337,48 @@ textoEscapado: escapeHtml(texto_promocion),
 
 Nunca se inserta input de usuario directamente en cadenas HTML.
 
+### Logging centralizado en emails
+
+El módulo `brevo-email.ts` usa el logger centralizado (`logger`) en lugar de `console.error`. Los datos sensibles (como respuestas de la API de Brevo) no se loguean — solo se registra el código de status y el número de destinatarios:
+
+```typescript
+await logger.logAndReturnError(
+  'BREVO_API_ERROR',
+  `Brevo API error: ${response.status}`,
+  'api',
+  'sendEmail',
+  { details: { status: response.status, recipientCount: recipients.length } }
+);
+```
+
 ---
 
 ## Price Tampering Protection
 
 `PedidoUseCase.create` recalcula el total desde precios reales de DB via `IProductRepository.findByIds` — el total del cliente se ignora completamente. Los complementos también se verifican por ID contra la base de datos.
+
+### Rechazo de productos desconocidos
+
+Si un producto o complemento enviado por el cliente no existe en la base de datos, el pedido se rechaza con error `PRODUCT_NOT_FOUND` en lugar de aceptar el precio declarado por el cliente:
+
+```typescript
+for (const ci of data.items) {
+  const pid = ci.item?.id;
+  if (pid && !priceMap.has(pid)) {
+    return {
+      success: false,
+      error: {
+        code: 'PRODUCT_NOT_FOUND',
+        message: `Producto no encontrado: ${pid}`,
+        module: 'use-case',
+        method: 'PedidoUseCase.create',
+      },
+    };
+  }
+}
+```
+
+Esto elimina el vector de ataque donde un cliente podía enviar un UUID válido pero inexistente con precio `0.01`.
 
 ---
 
@@ -239,17 +386,31 @@ Nunca se inserta input de usuario directamente en cadenas HTML.
 
 HMAC-SHA256 con TTL 7 días y prefijo de dominio (`unsubscribe:`) — previene uso cruzado con tokens CSRF. Cada destinatario recibe un token individual al enviar promociones.
 
+El handler de unsubscribe usa el Result pattern correctamente para manejar errores del use case:
+
+```typescript
+const result = await clienteUseCase.togglePromoSubscription(normalizedEmail, empresaId);
+if (!result.success) {
+  return NextResponse.redirect(`${baseUrl}/?error=internal`);
+}
+if (result.data === null) {
+  return NextResponse.redirect(`${baseUrl}/?error=notfound`);
+}
+```
+
 ---
 
 ## CORS
 
-Configurado en el proxy para rutas `/api/*`. Solo se permiten orígenes definidos en:
+Configurado en el proxy para todas las rutas `/api/*` (admin y públicas). Solo se permiten orígenes definidos en:
 
 - `CORS_ALLOWED_ORIGINS` — lista exacta de orígenes separada por comas
 - `CORS_ALLOWED_DOMAINS` — dominios (incluye subdominios)
 - `http://localhost:*` — permitido automáticamente en desarrollo
 
 `Vary: Origin` se añade a todas las respuestas para evitar cache poisoning.
+
+Las rutas públicas (`/api/pedidos`, `/api/unsubscribe`) también reciben headers CORS — necesario porque el subdominio de pedidos puede diferir del dominio principal.
 
 ---
 
@@ -269,15 +430,31 @@ Comprehensive audit completed (score: 8.5/10). Key hardening applied:
 
 ## Variables de entorno requeridas
 
-| Variable | Uso |
-|----------|-----|
-| `ACCESS_TOKEN_SECRET` | Firma JWT de sesión admin |
-| `CSRF_HMAC_SECRET` | Firma HMAC de tokens CSRF |
-| `CART_TOKEN_SECRET` | JWT de acceso al carrito |
-| `NEXT_PUBLIC_R2_DOMAIN` | Dominio público de imágenes R2 (incluye protocolo) |
-| `UPSTASH_REDIS_REST_URL` | Rate limiting + JWT revocation |
-| `UPSTASH_REDIS_REST_TOKEN` | Rate limiting + JWT revocation |
-| `BREVO_API_KEY` | Envío de emails transaccionales |
-| `BREVO_DEFAULT_SENDER_EMAIL` | Remitente por defecto si la empresa no tiene `emailNotification` configurado |
-| `CORS_ALLOWED_ORIGINS` | Orígenes permitidos en CORS |
-| `CORS_ALLOWED_DOMAINS` | Dominios permitidos en CORS |
+| Variable | Uso | Validación startup |
+|----------|-----|--------------------|
+| `ACCESS_TOKEN_SECRET` | Firma JWT de sesión admin | ✓ Siempre |
+| `CSRF_HMAC_SECRET` | Firma HMAC de tokens CSRF | ✓ Siempre |
+| `CART_TOKEN_SECRET` | JWT de acceso al carrito | ✓ Siempre |
+| `NEXT_PUBLIC_SUPABASE_URL` | URL de Supabase | ✓ Siempre |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Clave anónima de Supabase | ✓ Siempre |
+| `SUPABASE_SERVICE_ROLE_KEY` | Clave service role de Supabase | ✓ Siempre |
+| `NEXT_PUBLIC_R2_DOMAIN` | Dominio público de imágenes R2 | — |
+| `UPSTASH_REDIS_REST_URL` | Rate limiting + JWT revocation | ✓ Producción |
+| `UPSTASH_REDIS_REST_TOKEN` | Rate limiting + JWT revocation | ✓ Producción |
+| `BREVO_API_KEY` | Envío de emails transaccionales | — |
+| `BREVO_DEFAULT_SENDER_EMAIL` | Remitente por defecto | — |
+| `CORS_ALLOWED_ORIGINS` | Orígenes permitidos en CORS | — |
+| `CORS_ALLOWED_DOMAINS` | Dominios permitidos en CORS | ✓ Producción |
+| `CLOUDFLARE_API_TOKEN` | Upload directo vía Cloudflare API | — |
+
+---
+
+## Pendientes conocidos
+
+| Item | Severidad | Notas |
+|------|-----------|-------|
+| RBAC en rutas admin | Medium | El proxy inyecta `x-admin-rol` pero ninguna ruta lo verifica. Cualquier admin autenticado puede realizar cualquier acción. |
+| `unsafe-eval` en CSP | Medium | Requerido por Next.js/Turbopack. Considerar `report-to` para monitorizar explotación. |
+| CSP reporting endpoint | Low | `/api/csp-report` está en `isPublicRoute` pero el endpoint no existe. Las violaciones CSP no se registran. |
+| `unsafe-inline` en style-src | Low | Estándar para la mayoría de aplicaciones. Mejorable con style nonces si el framework lo soporta. |
+| Rate limit por tenant en emails | Low | Un tenant con miles de clientes suscritos puede disparar un envío masivo. Brevo limita externamente pero no hay protección a nivel de aplicación. |

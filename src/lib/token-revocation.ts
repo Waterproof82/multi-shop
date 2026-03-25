@@ -48,13 +48,23 @@ export async function revokeToken(jti: string, ttlSeconds: number): Promise<void
 
 /**
  * Returns true if the given JTI has been revoked.
- * Returns false if Redis is not configured (fail-open — safe for graceful degradation).
+ * In production, returns true (fail-closed) if Redis is unavailable to prevent
+ * revoked tokens from being accepted during a Redis outage.
+ * In development, returns false (fail-open) for convenience.
  */
 export async function isTokenRevoked(jti: string): Promise<boolean> {
   const config = getRedisConfig();
-  if (!config) return false;
+  if (!config) {
+    // Fail-closed in production: treat as revoked if we can't verify
+    return process.env.NODE_ENV === 'production';
+  }
 
-  const key = `${REVOCATION_KEY_PREFIX}${jti}`;
-  const result = await redisRequest(config, ['EXISTS', key]);
-  return result === 1;
+  try {
+    const key = `${REVOCATION_KEY_PREFIX}${jti}`;
+    const result = await redisRequest(config, ['EXISTS', key]);
+    return result === 1;
+  } catch {
+    // Redis request failed — fail-closed in production
+    return process.env.NODE_ENV === 'production';
+  }
 }

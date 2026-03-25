@@ -45,7 +45,7 @@ function addCorsHeaders(response: NextResponse, origin: string | null): NextResp
 function isPublicRoute(path: string): boolean {
   return (
     path === '/api/unsubscribe' ||
-    path.startsWith('/api/admin/promociones/unsubscribe') ||
+    path === '/api/admin/promociones/unsubscribe' ||
     path === '/api/admin/login' ||
     path === '/api/admin/logout' ||
     path === '/api/csp-report'
@@ -211,6 +211,11 @@ export async function proxy(request: NextRequest) {
 
   // Set on response so the browser enforces it
   response.headers.set('Content-Security-Policy', csp);
+
+  // Add CORS headers to public API routes (pedidos subdomain may differ from main domain)
+  if (path.startsWith('/api/')) {
+    addCorsHeaders(response, origin);
+  }
 
   return response;
 }

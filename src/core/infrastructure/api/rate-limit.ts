@@ -12,8 +12,7 @@ function getRedis(): Redis | null {
 
   if (!url || !token) {
     if (process.env.NODE_ENV === 'production') {
-      // Log once — missing Redis in production means no rate limiting at all
-      console.warn('[rate-limit] UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN are not set. Rate limiting is disabled in production.');
+      console.error('[rate-limit] CRITICAL: UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN are not set. Rate limiting is disabled in production.');
     }
     return null;
   }
@@ -21,6 +20,12 @@ function getRedis(): Redis | null {
   redis = new Redis({ url, token });
   return redis;
 }
+
+/**
+ * In production, if Redis is not configured, login rate limiting MUST block requests
+ * to prevent brute-force attacks. Other rate limiters degrade gracefully.
+ */
+const FAIL_CLOSED_IN_PRODUCTION = process.env.NODE_ENV === 'production';
 
 /**
  * Rate limiter for login: 5 attempts per 15 minutes per IP.
@@ -104,7 +109,16 @@ function getClientIp(request: Request): string {
  */
 export async function rateLimitLogin(request: Request): Promise<NextResponse | null> {
   const limiter = getLoginLimiter();
-  if (!limiter) return null; // No Redis configured, skip rate limiting
+  if (!limiter) {
+    // Fail-closed in production: block login if Redis is unavailable to prevent brute-force
+    if (FAIL_CLOSED_IN_PRODUCTION) {
+      return NextResponse.json(
+        { error: "Service temporarily unavailable. Please try again later." },
+        { status: 503 }
+      );
+    }
+    return null;
+  }
 
   const ip = getClientIp(request);
   const { success, limit, remaining, reset } = await limiter.limit(ip);
