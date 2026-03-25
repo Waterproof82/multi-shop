@@ -6,7 +6,9 @@ import { timingSafeEqual } from 'crypto';
 import { isTokenRevoked } from '@/lib/token-revocation';
 import { AUTH_ERRORS, SERVER_ERRORS, createErrorResponse } from '@/core/domain/constants/api-errors';
 
-const ADMIN_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
+function getAdminTokenSecret(): string | undefined {
+  return process.env.ACCESS_TOKEN_SECRET;
+}
 
 function isAllowedOrigin(origin: string | null): boolean {
   if (!origin) return false;
@@ -59,12 +61,13 @@ async function handleAdminAuth(request: NextRequest, origin: string | null): Pro
     return addCorsHeaders(NextResponse.json(createErrorResponse(AUTH_ERRORS.UNAUTHORIZED), { status: 401 }), origin);
   }
 
-  if (!ADMIN_TOKEN_SECRET) {
+  const tokenSecret = getAdminTokenSecret();
+  if (!tokenSecret) {
     return addCorsHeaders(NextResponse.json(createErrorResponse(SERVER_ERRORS.CONFIG_ERROR), { status: 500 }), origin);
   }
 
   try {
-    const secret = new TextEncoder().encode(ADMIN_TOKEN_SECRET);
+    const secret = new TextEncoder().encode(tokenSecret);
     const { payload } = await jwtVerify(adminToken, secret);
 
     if (!payload.empresaId || !payload.adminId) {
@@ -121,7 +124,8 @@ async function handleCartAccessToken(url: URL, accessToken: string): Promise<Nex
 
   try {
     const secret = new TextEncoder().encode(secretKey);
-    const { payload } = await jwtVerify(sanitizedToken, secret);
+    // Require 'cart-access' audience to prevent token confusion with admin JWTs
+    const { payload } = await jwtVerify(sanitizedToken, secret, { audience: 'cart-access' });
 
     url.searchParams.delete('access');
     const response = NextResponse.redirect(url);

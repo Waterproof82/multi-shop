@@ -102,16 +102,18 @@ src/
 │   │   └── use-cases/               # Un use case por entidad
 │   └── infrastructure/
 │       ├── api/
-│       │   ├── helpers.ts           # requireAuth, handleResult, responses
-│       │   ├── rate-limit.ts        # rateLimitLogin, rateLimitPublic, rateLimitAdmin
+│       │   ├── helpers.ts           # requireAuth, handleResult (error code → HTTP status), responses
+│       │   ├── rate-limit.ts        # rateLimitLogin (fail-closed prod), rateLimitPublic, rateLimitAdmin
 │       │   └── api-logger.ts        # logApiError
 │       ├── database/
 │       │   ├── supabase-client.ts   # Singletons Supabase
 │       │   └── index.ts             # Inyección de dependencias
 │       ├── logging/logger.ts        # ErrorLogger singleton
-│       └── storage/s3-client.ts     # Singleton R2
+│       ├── storage/s3-client.ts     # Singleton R2
+│       └── env-validation.ts        # Validación de env vars al startup
 │
-├── proxy.ts                         # Middleware JWT + CSRF + CSP nonce
+├── instrumentation.ts               # Next.js startup hook → validateEnv()
+├── proxy.ts                         # Middleware JWT + CSRF + CSP nonce + CORS
 │
 └── lib/
     ├── csrf.ts                      # HMAC-SHA256 tokens CSRF (timingSafeEqual)
@@ -134,21 +136,27 @@ Documentación completa en [`docs/context/security.md`](docs/context/security.md
 
 | Área | Implementación |
 |------|----------------|
-| **Autenticación** | JWT HS256 en cookie HttpOnly + SameSite strict, jti claim, 24h expiry |
-| **JWT Revocation** | Logout almacena jti en Upstash Redis con TTL restante |
+| **Autenticación** | JWT HS256 en cookie HttpOnly + SameSite strict, jti claim, 24h expiry, runtime guard en secret |
+| **JWT Revocation** | Verificada en proxy (API) y `verifyToken` (pages SSR). Fail-closed en producción |
 | **Autorización** | `proxy.ts` verifica JWT e inyecta `x-empresa-id` por tenant |
-| **CSRF** | Token HMAC-SHA256 verificado con `timingSafeEqual` en métodos mutativos |
+| **CSRF** | Token HMAC-SHA256 verificado con `timingSafeEqual`, Cache-Control no-store |
 | **CSP** | Nonce criptográfico por request en `proxy.ts`, sin `unsafe-inline` en scripts |
-| **Rate limiting** | Upstash Redis — 5/15min login, 20/min público, 60/min admin |
-| **Validación** | Zod `safeParse` en todas las rutas + try/catch en `request.json()` |
+| **Rate limiting** | Upstash Redis — 5/15min login (fail-closed en prod), 20/min público, 60/min admin |
+| **Env validation** | `instrumentation.ts` → `validateEnv()` al startup, falla fatal en producción |
+| **Validación** | Zod `safeParse` + try/catch en `request.json()` + max-length en todos los DTOs |
 | **Uploads** | Validación MIME + magic bytes + tamaño + path seguro (slug desde DB) |
 | **Multi-tenant** | Aislamiento por `empresaId` en cada query, RLS + service_role |
-| **XSS emails** | `escapeHtml()` en todos los templates HTML |
-| **Price tampering** | Total recalculado server-side desde precios reales de DB |
-| **Unsubscribe** | HMAC-SHA256 con TTL 7d y prefijo de dominio |
-| **CORS** | Whitelist de dominios, `Vary: Origin`, preflight 204 |
+| **Mínimo privilegio** | Endpoints públicos usan `empresaPublicRepository` (anon key) para lecturas |
+| **XSS emails** | `escapeHtml()` en todos los templates HTML, logging centralizado sin PII |
+| **Price tampering** | Total recalculado server-side + rechazo de productos desconocidos (`PRODUCT_NOT_FOUND`) |
+| **Anti-enumeración** | Login devuelve mensaje genérico para todos los tipos de fallo auth |
+| **Unsubscribe** | HMAC-SHA256 con TTL 7d, acción explícita `'baja'` (no toggle) |
+| **CORS** | Whitelist de dominios, `Vary: Origin`, preflight 204, headers en rutas públicas |
+| **Cart tokens** | Validación con audience claim `'cart-access'` para prevenir token confusion |
+| **JSON-LD** | Sanitización de `<`, `>`, `&` para prevenir inyección en script tags |
 | **Headers** | HSTS, X-Frame-Options, X-Content-Type-Options, Permissions-Policy |
-| **URL schemes** | DTOs validan `https://` en fb, instagram, logo_url, url_mapa |
+| **URL schemes** | DTOs validan `https://` en fb, instagram, logo_url, url_mapa, foto_url, imagen_url |
+| **Error mapping** | `handleResult()` mapea error codes a HTTP status (400, 401, 404, 500) |
 | **Pedido atómico** | `get_next_pedido_number()` con mutex por tenant |
 
 ---
@@ -194,8 +202,11 @@ return successResponse(data);             // 200 OK
 return successResponse(data, 201);        // 201 Created
 return errorResponse('msg', 404);         // 404 Not Found
 return validationErrorResponse('msg');    // 400 Bad Request
-return handleResult(result);             // automático desde Result<T>
+return handleResult(result);             // automático desde Result<T> (mapea error codes a HTTP status)
 ```
+
+`handleResult` mapea automáticamente códigos de error a HTTP status:
+- `VALIDATION_ERROR` → 400, `AUTH_*` → 401, `*_NOT_FOUND` → 404, otros → 500
 
 ## Códigos de Error Centralizados
 
@@ -334,14 +345,17 @@ if (!admin) redirect('/admin/login');
 ```
 
 ### Middleware (proxy.ts)
+- Lee secrets de forma lazy (`getAdminTokenSecret()`) — nunca constantes a nivel de módulo
 - Verifica JWT en todas las rutas `/api/admin/*`
-- Comprueba revocación del `jti` en Redis antes de permitir acceso
+- Comprueba revocación del `jti` en Redis (fail-closed en producción)
 - Valida CSRF (timingSafeEqual) en todos los métodos mutativos
 - Inyecta `x-empresa-id`, `x-admin-id`, `x-admin-rol` como headers
-- Genera nonce criptográfico por request para rutas de página; emite `Content-Security-Policy` dinámico y pasa `x-nonce` a server components
-- Rutas públicas sin JWT: `/api/admin/login`, `/api/admin/logout`, `/api/unsubscribe`, `/api/admin/promociones/unsubscribe`
+- Genera nonce criptográfico por request para rutas de página; emite CSP dinámico y pasa `x-nonce` a server components
+- Aplica CORS headers a todas las rutas `/api/*` (admin y públicas)
+- Valida cart access tokens con audience claim `'cart-access'`
+- Rutas públicas sin JWT (match exacto): `/api/admin/login`, `/api/admin/logout`, `/api/unsubscribe`, `/api/admin/promociones/unsubscribe`, `/api/csp-report`
 
-> Agregar nuevas rutas públicas a `isPublicRoute` en `proxy.ts`
+> Agregar nuevas rutas públicas a `isPublicRoute` en `proxy.ts` (usar `===`, no `startsWith`)
 
 > `pedidos` NO tiene columna `telefono` — el teléfono está en `clientes`
 
@@ -463,7 +477,7 @@ npx tsx scripts/setup-r2-cors.ts
 | **Build** | Compila correctamente |
 | **Clean Architecture** | 100% — Domain / Application / Infrastructure |
 | **SOLID** | 100% — DIP, sin `any`, repositorios inyectados |
-| **Seguridad** | Auditoría completa — JWT revocation, CSP nonces, CSRF timing-safe, rate limiting, price tampering server-side, HMAC unsubscribe tokens |
+| **Seguridad** | Auditoría completa — JWT revocation (fail-closed), env validation startup, rate limiting (fail-closed login), CSP nonces, CSRF timing-safe, price tampering + product rejection, anti-enumeración, mínimo privilegio, cart token audience, JSON-LD sanitización |
 | **Tipos TypeScript** | Sin `any` en core ni API routes |
 | **Error Handling** | 100% — Result<T, E> en todos los módulos |
 | **API Error Codes** | Códigos centralizados en `core/domain/constants/api-errors.ts` |

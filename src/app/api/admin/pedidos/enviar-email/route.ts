@@ -12,18 +12,18 @@ const BREVO_API_KEY = process.env.BREVO_API_KEY;
 const enviarEmailSchema = z.object({
   items: z.array(z.object({
     item: z.object({
-      id: z.string(),
-      name: z.string(),
-      price: z.number(),
+      id: z.string().uuid(),
+      name: z.string().max(200),
+      price: z.number().min(0).max(100_000),
     }),
-    quantity: z.number().min(1),
+    quantity: z.number().int().min(1).max(99),
     selectedComplements: z.array(z.object({
-      name: z.string(),
-      price: z.number(),
-    })).optional(),
-  })),
-  total: z.number().min(0),
-  numeroOrden: z.number().optional(),
+      name: z.string().max(200),
+      price: z.number().min(0).max(100_000),
+    })).max(20).optional(),
+  })).min(1).max(50),
+  total: z.number().min(0).max(100_000),
+  numeroOrden: z.number().int().optional(),
   nombre: z.string().max(100).optional(),
   telefono: z.string().max(20).optional(),
   email: z.string().email().optional().or(z.literal('')),
@@ -154,7 +154,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email de notificación no configurado' }, { status: 400 });
     }
 
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
     const parsed = enviarEmailSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });

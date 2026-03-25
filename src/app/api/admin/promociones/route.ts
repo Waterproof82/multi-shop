@@ -86,7 +86,12 @@ export async function POST(request: NextRequest) {
     }
     const empresa = empresaResult.data;
 
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
     const parsed = createPromocionSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
@@ -149,7 +154,7 @@ export async function POST(request: NextRequest) {
             });
             emailsSent++;
           } catch (sendErr) {
-            await logApiError(`Send promo email to ${email}`, sendErr, 'POST');
+            await logApiError('Send promo email failed', sendErr, 'POST');
           }
         }
       }

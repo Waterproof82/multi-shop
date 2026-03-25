@@ -35,7 +35,7 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${baseUrl}/?error=invalid`);
     }
 
-    const result = await clienteUseCase.togglePromoSubscription(normalizedEmail, empresaId);
+    const result = await clienteUseCase.togglePromoSubscription(normalizedEmail, empresaId, 'baja');
 
     if (!result.success) {
       return NextResponse.redirect(`${baseUrl}/?error=internal`);

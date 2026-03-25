@@ -20,15 +20,24 @@ El token incluye `empresaId`, `adminId` y `rol` en el payload.
 
 ### Runtime guard para ACCESS_TOKEN_SECRET
 
-El secret de JWT se obtiene mediante una función `getTokenSecret()` que lanza un error si la variable no está configurada, evitando que se firmen tokens con un secret vacío o `"undefined"`:
+El secret de JWT se obtiene mediante funciones lazy que leen la variable de entorno en cada invocación (no al cargar el módulo), evitando que se firmen tokens con un secret vacío o `"undefined"`:
+
+- **`auth-admin.use-case.ts`**: `getTokenSecret()` lanza error si falta — para firma y verificación de tokens
+- **`proxy.ts`**: `getAdminTokenSecret()` retorna `undefined` si falta — retorna 500 al cliente
 
 ```typescript
+// auth-admin.use-case.ts
 function getTokenSecret(): Uint8Array {
   const secret = process.env.ACCESS_TOKEN_SECRET;
   if (!secret) {
     throw new Error('ACCESS_TOKEN_SECRET is not configured');
   }
   return new TextEncoder().encode(secret);
+}
+
+// proxy.ts — lazy read, not module-level constant
+function getAdminTokenSecret(): string | undefined {
+  return process.env.ACCESS_TOKEN_SECRET;
 }
 ```
 
@@ -108,7 +117,7 @@ Definidas en `isPublicRoute()` dentro de `proxy.ts` con coincidencia exacta (no 
 
 Se usa un token HMAC-SHA256 firmado con `CSRF_HMAC_SECRET`. El flujo es:
 
-1. El cliente solicita `GET /api/admin/login` → recibe el token en la respuesta JSON y una cookie `csrf_token` con el formato `token:firma`
+1. El cliente solicita `GET /api/admin/login` → recibe el token en la respuesta JSON (con `Cache-Control: no-store, private` para evitar caching por proxies) y una cookie `csrf_token` con el formato `token:firma`
 2. En cada mutación (POST, PUT, PATCH, DELETE), el cliente envía el token en el header `x-csrf-token`
 3. El proxy verifica que `x-csrf-token` coincide con el token de la cookie y que la firma HMAC es válida
 
@@ -263,7 +272,7 @@ if (!parsed.success) {
 
 ### try/catch en request.json()
 
-Todas las rutas que leen el body envuelven `request.json()` en try/catch para evitar crashes por JSON malformado:
+**Todas** las rutas que leen el body envuelven `request.json()` en un try/catch dedicado para evitar crashes por JSON malformado y devolver un 400 descriptivo en lugar de un 500 genérico:
 
 ```typescript
 let body: unknown;
@@ -273,6 +282,8 @@ try {
   return validationErrorResponse('Invalid request body');
 }
 ```
+
+Rutas cubiertas: `/api/admin/login`, `/api/admin/productos`, `/api/admin/categorias`, `/api/admin/clientes`, `/api/admin/empresa`, `/api/admin/update-colores`, `/api/admin/pedidos`, `/api/admin/pedidos/enviar-email`, `/api/admin/promociones`, `/api/pedidos`.
 
 ### Schema público de pedidos — límites anti-abuso
 
@@ -296,10 +307,34 @@ Los schemas de creación/actualización de productos incluyen:
 - `foto_url`: requiere esquema `https://`
 - `precio`: min 0
 
+### Límites en categorías
+
+Los schemas de creación/actualización de categorías incluyen:
+
+- Nombres (i18n): max 200 caracteres
+- Descripciones (i18n): max 2000 caracteres
+
+### Límites en clientes
+
+- `nombre`: max 200 caracteres
+- `direccion`: max 500 caracteres
+- `telefono`: min 7, max 30, regex `^\+?[0-9\s\-()+]+$`
+
 ### Límites en promociones
 
 - `texto_promocion`: max 1000 caracteres
 - `imagen_url`: requiere esquema `https://`
+
+### Límites en enviar-email (admin)
+
+Schema endurecido con las mismas restricciones que el schema público de pedidos:
+
+- `item.id`: UUID validado
+- `item.name`: max 200 caracteres
+- `item.price`: min 0, max 100.000
+- `quantity`: entero, min 1, max 99
+- `items`: min 1, max 50
+- `selectedComplements`: max 20, name max 200
 
 ---
 
@@ -312,6 +347,72 @@ El endpoint `POST /api/admin/upload-image` aplica:
 3. **Límite de tamaño**: 10 MB máximo
 4. **Path seguro**: el nombre de fichero del cliente nunca se usa en la ruta de R2 — se genera `{slug}/{año}/{mes}/{uuid}.{ext}`
 5. **Slug desde DB**: el slug de la empresa se obtiene de la base de datos, nunca del cliente
+
+---
+
+## Prevención de enumeración de usuarios
+
+El endpoint `POST /api/admin/login` retorna un mensaje genérico `"Credenciales inválidas"` para todos los tipos de fallo de autenticación (usuario no encontrado, contraseña incorrecta, usuario no autorizado como admin). Esto previene que un atacante pueda determinar si un email existe en el sistema.
+
+---
+
+## Manejo de errores HTTP
+
+`handleResult()` en `helpers.ts` mapea códigos de error de dominio a status HTTP apropiados:
+
+| Error code | HTTP status |
+|------------|-------------|
+| `VALIDATION_ERROR` | 400 |
+| `PRODUCT_NOT_FOUND`, `NOT_FOUND` | 404 |
+| `AUTH_*` | 401 |
+| Otros | 500 |
+
+---
+
+## Principio de mínimo privilegio en endpoints públicos
+
+El endpoint público `POST /api/pedidos` usa `empresaPublicRepository` (clave anon de Supabase) para la consulta de empresa, en lugar de `empresaRepository` (service role). Las operaciones de escritura (creación de pedido/cliente) usan service role ya que son necesarias.
+
+---
+
+## JSON-LD Sanitization
+
+El componente `json-ld.tsx` sanitiza los datos antes de insertarlos en `<script type="application/ld+json">` para prevenir inyección:
+
+```typescript
+function safeJsonStringify(data: Record<string, unknown>): string {
+  return JSON.stringify(data)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026');
+}
+```
+
+---
+
+## Cart Access Token
+
+El proxy valida cart tokens (recibidos via `?access=` query param) con `CART_TOKEN_SECRET` y requiere el audience claim `'cart-access'` para prevenir token confusion con admin JWTs:
+
+```typescript
+const { payload } = await jwtVerify(sanitizedToken, secret, { audience: 'cart-access' });
+```
+
+Cuando se implemente la generación de cart tokens, deben incluir:
+
+```typescript
+new SignJWT({ /* claims */ })
+  .setProtectedHeader({ alg: 'HS256' })
+  .setAudience('cart-access')
+  .setExpirationTime('15m')
+  .sign(new TextEncoder().encode(process.env.CART_TOKEN_SECRET));
+```
+
+---
+
+## Multi-tenant — dominio parsing
+
+`parseMainDomain()` en `domain-utils.ts` usa `endsWith('-pedidos')` (no `includes`) para el sufijo de pedidos, evitando falsos positivos con dominios como `evil-pedidos-attack.com`.
 
 ---
 
@@ -339,7 +440,7 @@ Nunca se inserta input de usuario directamente en cadenas HTML.
 
 ### Logging centralizado en emails
 
-El módulo `brevo-email.ts` usa el logger centralizado (`logger`) en lugar de `console.error`. Los datos sensibles (como respuestas de la API de Brevo) no se loguean — solo se registra el código de status y el número de destinatarios:
+El módulo `brevo-email.ts` usa el logger centralizado (`logger`) en lugar de `console.error`. Los datos sensibles (como respuestas de la API de Brevo y direcciones email de destinatarios) no se loguean — solo se registra el código de status y el número de destinatarios:
 
 ```typescript
 await logger.logAndReturnError(
@@ -386,10 +487,10 @@ Esto elimina el vector de ataque donde un cliente podía enviar un UUID válido 
 
 HMAC-SHA256 con TTL 7 días y prefijo de dominio (`unsubscribe:`) — previene uso cruzado con tokens CSRF. Cada destinatario recibe un token individual al enviar promociones.
 
-El handler de unsubscribe usa el Result pattern correctamente para manejar errores del use case:
+El handler de unsubscribe en `/api/admin/promociones/unsubscribe` usa el Result pattern y pasa explícitamente la acción `'baja'` para garantizar que siempre desuscribe (nunca toggle):
 
 ```typescript
-const result = await clienteUseCase.togglePromoSubscription(normalizedEmail, empresaId);
+const result = await clienteUseCase.togglePromoSubscription(normalizedEmail, empresaId, 'baja');
 if (!result.success) {
   return NextResponse.redirect(`${baseUrl}/?error=internal`);
 }
@@ -397,6 +498,8 @@ if (result.data === null) {
   return NextResponse.redirect(`${baseUrl}/?error=notfound`);
 }
 ```
+
+El endpoint público `/api/unsubscribe` acepta el parámetro `action` (`alta`/`baja`) desde la URL y lo pasa al use case.
 
 ---
 
@@ -454,7 +557,9 @@ Comprehensive audit completed (score: 8.5/10). Key hardening applied:
 | Item | Severidad | Notas |
 |------|-----------|-------|
 | RBAC en rutas admin | Medium | El proxy inyecta `x-admin-rol` pero ninguna ruta lo verifica. Cualquier admin autenticado puede realizar cualquier acción. |
+| Cart token generación con audience | Low | El proxy valida `aud: 'cart-access'` pero aún no hay generación de cart tokens en el codebase. Cuando se implemente, usar `new SignJWT({...}).setAudience('cart-access')`. |
 | `unsafe-eval` en CSP | Medium | Requerido por Next.js/Turbopack. Considerar `report-to` para monitorizar explotación. |
 | CSP reporting endpoint | Low | `/api/csp-report` está en `isPublicRoute` pero el endpoint no existe. Las violaciones CSP no se registran. |
 | `unsafe-inline` en style-src | Low | Estándar para la mayoría de aplicaciones. Mejorable con style nonces si el framework lo soporta. |
 | Rate limit por tenant en emails | Low | Un tenant con miles de clientes suscritos puede disparar un envío masivo. Brevo limita externamente pero no hay protección a nivel de aplicación. |
+| Order number gaps | Low | Si el INSERT falla tras `get_next_pedido_number`, el número se pierde. Operacionalmente menor, no es un riesgo de seguridad. |

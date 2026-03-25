@@ -20,7 +20,7 @@ API Route (Zod + requireAuth) → Use Case (logica) → Repository (Supabase/R2)
 Capa	Ubicacion	Responsabilidad
 Domain	`core/domain/`	Entidades (`types.ts`), interfaces repos, constantes, tipos de error
 Application	`core/application/`	DTOs (Zod), Use Cases, Mappers
-Infrastructure	`core/infrastructure/`	Repos Supabase, logger, API helpers, storage R2
+Infrastructure	`core/infrastructure/`	Repos Supabase, logger, API helpers, storage R2, env validation
 Reglas inquebrantables:
 NUNCA acceder a DB desde API routes ni pages — siempre Use Case → Repository
 NUNCA llamar `createClient()` fuera de `supabase-client.ts` — usar singletons
@@ -186,26 +186,42 @@ Seguridad — Reglas para desarrollo
 
 Reglas obligatorias:
 - JWT en cookies HttpOnly, `Secure` (prod), `SameSite: strict`, claim `jti` para revocacion
+- JWT revocation verificada en proxy (API) Y en `verifyToken` (pages SSR) — ambos llaman `isTokenRevoked(jti)`
+- Secrets leidos lazy (nunca constantes a nivel de modulo): `getTokenSecret()`, `getAdminTokenSecret()`
 - Zod `safeParse` en TODAS las API routes — NUNCA `parse` (lanza excepciones)
+- `request.json()` SIEMPRE envuelto en try/catch dedicado — retornar 400, no 500
 - `escapeHtml()` en emails — nunca insertar input de usuario directo en HTML
 - Colores: validar `#RRGGBB` con regex
 - Telefono: validar con `/^\+?[0-9\s\-()]+$/`
-- URLs: validar `https://` en DTOs (fb, instagram, logo_url, url_mapa)
+- URLs: validar `https://` en DTOs (fb, instagram, logo_url, url_mapa, foto_url, imagen_url)
 - No hardcodear secrets ni URLs de fallback
 - URLs base: derivar del request (`new URL(request.url)`), NUNCA de env vars
 - CSRF validado en proxy para todos los metodos mutativos de `/api/admin/*`
+- CSRF token endpoint con `Cache-Control: no-store, private`
 - Magic bytes en uploads — verificar firma binaria, no solo MIME
-- Total server-side: `PedidoUseCase.create` recalcula total desde DB — ignorar total del cliente
+- Total server-side: `PedidoUseCase.create` recalcula total desde DB — rechaza productos/complementos no encontrados con `PRODUCT_NOT_FOUND`
 - RLS: anon denegado en pedidos, clientes, log_errors, perfiles_admin, promociones. Escrituras via service_role
+- Minimo privilegio: endpoints publicos usan `empresaPublicRepository` (anon key) para lecturas
 - IP real: usar `cf-connecting-ip` o primer entry de `x-forwarded-for` — NUNCA el ultimo
-- Rate limiting: login 5/15min, publico 20/min, admin 60/min. Sin Redis no limita (dev local)
+- Rate limiting: login 5/15min (fail-closed en prod), publico 20/min, admin 60/min
+- Token revocation: fail-closed en produccion (Redis caido = tokens tratados como revocados)
+- Login: mensaje generico para todos los fallos auth (previene enumeracion de usuarios)
+- No loguear PII (emails) en errores — solo datos anonimizados
+- Max-length en todos los DTOs: titulos 200, descripciones 2000, nombres 200, direcciones 500
+- JSON-LD sanitizado con escape de `<`, `>`, `&`
+- Cart tokens: proxy valida `aud: 'cart-access'` — al generar usar `.setAudience('cart-access')`
+- `handleResult()` mapea error codes a HTTP status (400, 401, 404, 500)
+
+Validacion de env vars al startup (`src/instrumentation.ts` → `validateEnv()`):
+- Produccion: falla fatal si faltan secrets criticos
+- Desarrollo: warnings para vars recomendadas en produccion
 
 Variables de entorno obligatorias:
 - `ACCESS_TOKEN_SECRET` — firma JWT
 - `CSRF_HMAC_SECRET` — firmar tokens CSRF
-- `CART_TOKEN_SECRET` — JWT de acceso al carrito
-- `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` — rate limiting + JWT revocation
-- `CORS_ALLOWED_DOMAINS` — whitelist de dominios para CORS
+- `CART_TOKEN_SECRET` — JWT de acceso al carrito (requiere `aud: 'cart-access'`)
+- `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` — rate limiting + JWT revocation (produccion)
+- `CORS_ALLOWED_DOMAINS` — whitelist de dominios para CORS (produccion)
 ---
 Multi-tenant y subdominios
 Dominio	Comportamiento
@@ -283,9 +299,17 @@ Tipar con `any`
 Crear nuevos clientes S3/Supabase (usar singletons)
 Derivar `baseUrl` de env vars (derivar del request)
 Usar `parse` de Zod en vez de `safeParse` (lanza excepciones no controladas)
+Llamar `request.json()` sin try/catch dedicado — siempre envolver y retornar 400
 Hardcodear colores de marca en componentes (usar CSS variables del tenant)
-Confiar en el total enviado por el cliente en pedidos — `PedidoUseCase.create` lo recalcula server-side desde DB
+Confiar en el total enviado por el cliente en pedidos — `PedidoUseCase.create` recalcula y rechaza productos desconocidos
+Aceptar precios del cliente si el producto no existe en DB — retornar `PRODUCT_NOT_FOUND`
 Usar el ultimo entry de `x-forwarded-for` como IP del cliente — usar el primero (o `cf-connecting-ip`)
+Leer secrets como constantes a nivel de modulo (`const SECRET = process.env.X`) — usar funciones lazy
+Usar `empresaRepository` (service role) en endpoints publicos — usar `empresaPublicRepository` (anon key)
+Loguear PII (emails, telefonos) en errores — usar datos anonimizados
+Crear schemas sin max-length — todos los strings deben tener `.max()` apropiado
+Retornar mensajes de error distintos por tipo de fallo en login — mensaje generico para prevenir enumeracion
+Usar `includes('-pedidos')` para detectar subdominios — usar `endsWith('-pedidos')`
 Hardcodear texto de UI en un solo idioma — usar `t()` de translations (incluidos aria-labels, botones, placeholders)
 Usar `focus-visible:outline-*` para focus rings — usar patron estandar `outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2`
 Crear botones interactivos menores de 44px — todos los touch targets deben tener `min-h-[44px] min-w-[44px]`
@@ -295,9 +319,10 @@ Proceso de revision — Orden de prioridad
 Cuando revises o modifiques codigo, seguir este orden antes de dar la tarea por completada:
 Violaciones de capas — ¿Alguna route/page accede a DB directamente?
 Tipos — ¿Hay `any`? Reemplazar por tipos de dominio
-Validacion — ¿Todas las routes usan Zod `safeParse`?
+Validacion — ¿Todas las routes usan Zod `safeParse`? ¿`request.json()` en try/catch? ¿Max-length en strings?
 Auth — ¿Todas las rutas admin usan `requireAuth()`? ¿Nuevas rutas publicas en `isPublicRoute`?
 Result pattern — ¿Use cases y repos retornan `Result<T, E>`? ¿Ningun `throw` suelto?
+Seguridad — ¿Secrets leidos lazy? ¿URLs con `https://`? ¿Sin PII en logs? ¿Endpoints publicos usan anon client?
 SOLID — ¿Alguna clase tiene mas de una responsabilidad? ¿DIP respetado?
 DRY — ¿Hay logica duplicada que pertenece a un util o helper canonico?
 UI/UX — Focus rings (`ring-2`), reduced-motion, ARIA labels (traducidos con `t()`), CSS variables (no colores hardcodeados), touch targets 44px
