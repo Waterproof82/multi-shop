@@ -164,15 +164,22 @@ function normalizeR2Origin(raw: string | undefined): string {
 }
 
 function buildCsp(nonce: string): string {
+  const isDev = process.env.NODE_ENV !== 'production';
   const r2Origin = normalizeR2Origin(process.env.NEXT_PUBLIC_R2_DOMAIN);
   const imgSources = ["'self'", r2Origin, "https://*.supabase.co", "data:", "blob:"]
     .filter(Boolean).join(' ');
   const mediaSources = ["'self'", r2Origin]
     .filter(Boolean).join(' ');
 
+  // In production: nonce + strict-dynamic (Next.js auto-injects nonce on its own scripts).
+  // In dev: unsafe-inline + unsafe-eval needed for Turbopack HMR.
+  const scriptSrc = isDev
+    ? `script-src 'self' 'unsafe-inline' 'unsafe-eval'`
+    : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`;
+
   return [
     "default-src 'self'",
-    `script-src 'self' 'unsafe-inline' 'unsafe-eval'`,
+    scriptSrc,
     "style-src 'self' 'unsafe-inline'",
     `img-src ${imgSources}`,
     `media-src ${mediaSources}`,
