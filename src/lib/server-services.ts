@@ -5,6 +5,7 @@ import { SupabaseCategoryRepository } from "@/core/infrastructure/database/Supab
 import { GetMenuUseCase } from "@/core/application/use-cases/get-menu.use-case";
 import { empresaPublicRepository } from "@/core/infrastructure/database";
 import { parseMainDomain } from "@/lib/domain-utils";
+import { logger } from "@/core/infrastructure/logging/logger";
 import type { EmpresaPublic } from "@/core/domain/entities/types";
 
 // Repository instantiation (anon key for public read)
@@ -20,7 +21,12 @@ export async function getEmpresaByDomain(domain: string): Promise<EmpresaPublic 
   const mainDomain = parseMainDomain(domain);
   const result = await empresaPublicRepository.findByDomainPublic(mainDomain);
   if (!result.success) {
-    console.error('[getEmpresaByDomain] Error:', result.error.message);
+    await logger.logError({
+      codigo: result.error.code,
+      mensaje: result.error.message,
+      modulo: result.error.module,
+      metodo: result.error.method ?? 'getEmpresaByDomain',
+    });
     return null;
   }
   return result.data;

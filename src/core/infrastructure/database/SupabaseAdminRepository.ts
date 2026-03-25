@@ -4,6 +4,11 @@ import { Empresa, Result } from "@/core/domain/entities/types";
 import { DEFAULT_EMPRESA_COLORES } from "@/core/domain/constants/empresa-defaults";
 import { logger } from "@/core/infrastructure/logging/logger";
 
+function anonymizeEmail(email: string): string {
+  const [local, domain] = email.split('@');
+  return `${local.substring(0, 2)}***@${domain ?? '***'}`;
+}
+
 export class SupabaseAdminRepository implements IAdminRepository {
   constructor(
     private readonly supabase: SupabaseClient,
@@ -20,7 +25,7 @@ export class SupabaseAdminRepository implements IAdminRepository {
           error.message,
           'repository',
           'SupabaseAdminRepository.loginWithPassword',
-          { details: { email, code: error.code, status: error.status } }
+          { details: { email: anonymizeEmail(email), code: error.code, status: error.status } }
         );
         return { 
           success: false, 
@@ -47,7 +52,7 @@ export class SupabaseAdminRepository implements IAdminRepository {
       
       return { success: true, data: data.user.id };
     } catch (e) {
-      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseAdminRepository.loginWithPassword', { details: { email } });
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseAdminRepository.loginWithPassword', { details: { email: anonymizeEmail(email) } });
       return { success: false, error: appError };
     }
   }

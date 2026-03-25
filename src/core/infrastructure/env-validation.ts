@@ -27,6 +27,15 @@ const ENV_VARS: EnvVar[] = [
   { name: 'UPSTASH_REDIS_REST_TOKEN', required: true, productionOnly: true },
   // CORS (critical in production)
   { name: 'CORS_ALLOWED_DOMAINS', required: true, productionOnly: true },
+  // Email (Brevo)
+  { name: 'BREVO_API_KEY', required: true, productionOnly: true },
+  { name: 'BREVO_DEFAULT_SENDER_EMAIL', required: true, productionOnly: true },
+  // Storage (Cloudflare R2)
+  { name: 'R2_ACCOUNT_ID', required: true, productionOnly: true },
+  { name: 'R2_ACCESS_KEY_ID', required: true, productionOnly: true },
+  { name: 'R2_SECRET_ACCESS_KEY', required: true, productionOnly: true },
+  { name: 'R2_BUCKET_NAME', required: true, productionOnly: true },
+  { name: 'NEXT_PUBLIC_R2_DOMAIN', required: true, productionOnly: true },
 ];
 
 export function validateEnv(): void {

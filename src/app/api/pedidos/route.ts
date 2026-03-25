@@ -88,7 +88,10 @@ export async function POST(request: Request) {
     });
 
     if (!pedidoResult.success) {
-      return NextResponse.json({ error: pedidoResult.error.message }, { status: 500 });
+      if (pedidoResult.error.code === 'PRODUCT_NOT_FOUND') {
+        return NextResponse.json({ error: 'Producto no disponible' }, { status: 400 });
+      }
+      return NextResponse.json({ error: 'Error al crear el pedido' }, { status: 500 });
     }
 
     const { id: pedidoId, numero_pedido: numeroPedido, total: serverTotal } = pedidoResult.data;

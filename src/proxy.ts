@@ -120,7 +120,12 @@ async function handleCartAccessToken(url: URL, accessToken: string): Promise<Nex
   const sanitizedToken = accessToken.replaceAll(/[^a-zA-Z0-9._-]/g, '');
   const secretKey = process.env.CART_TOKEN_SECRET;
 
-  if (!secretKey) return NextResponse.next();
+  if (!secretKey) {
+    if (process.env.NODE_ENV === 'production') {
+      return new NextResponse('Server configuration error', { status: 500 });
+    }
+    return NextResponse.next();
+  }
 
   try {
     const secret = new TextEncoder().encode(secretKey);
@@ -139,7 +144,7 @@ async function handleCartAccessToken(url: URL, accessToken: string): Promise<Nex
     response.cookies.set('access_token', sanitizedToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: 'strict',
       path: '/',
       maxAge,
     });
@@ -167,7 +172,7 @@ function buildCsp(nonce: string): string {
 
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'unsafe-eval'`,
+    `script-src 'self' 'nonce-${nonce}'${process.env.NODE_ENV !== 'production' ? " 'unsafe-eval'" : ''}`,
     "style-src 'self' 'unsafe-inline'",
     `img-src ${imgSources}`,
     `media-src ${mediaSources}`,

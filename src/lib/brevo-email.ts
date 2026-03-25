@@ -1,6 +1,12 @@
 import { logger } from '@/core/infrastructure/logging/logger';
 
-const BREVO_API_KEY = process.env.BREVO_API_KEY;
+function getBrevoApiKey(): string {
+  const key = process.env.BREVO_API_KEY;
+  if (!key) {
+    throw new Error('BREVO_API_KEY is not configured');
+  }
+  return key;
+}
 
 export interface SendEmailParams {
   to: string | string[];
@@ -11,9 +17,7 @@ export interface SendEmailParams {
 }
 
 export async function sendEmail({ to, subject, htmlContent, senderName = 'Pedidos', senderEmail }: SendEmailParams) {
-  if (!BREVO_API_KEY) {
-    throw new Error('BREVO_API_KEY not configured');
-  }
+  const apiKey = getBrevoApiKey();
 
   const resolvedSenderEmail = senderEmail || process.env.BREVO_DEFAULT_SENDER_EMAIL;
   if (!resolvedSenderEmail) {
@@ -37,7 +41,7 @@ export async function sendEmail({ to, subject, htmlContent, senderName = 'Pedido
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
-        'api-key': BREVO_API_KEY,
+        'api-key': apiKey,
       },
       body: JSON.stringify(payload),
     });

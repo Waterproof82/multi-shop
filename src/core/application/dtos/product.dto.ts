@@ -22,8 +22,8 @@ export const createProductSchema = z.object({
   foto_url: z.string().url().refine(
     (url) => url.startsWith('https://'),
     { message: 'foto_url must use HTTPS' }
-  ).nullable().optional().nullable(),
-  categoria_id: z.string().uuid().nullable().optional().nullable(),
+  ).nullable().optional(),
+  categoria_id: z.string().uuid().nullable().optional(),
   es_especial: z.boolean().default(false),
   activo: z.boolean().default(true),
 });

@@ -8,6 +8,11 @@ import { isTokenRevoked } from "@/lib/token-revocation";
 
 const TOKEN_EXPIRY = "24h";
 
+function anonymizeEmail(email: string): string {
+  const [local, domain] = email.split('@');
+  return `${local.substring(0, 2)}***@${domain ?? '***'}`;
+}
+
 function getTokenSecret(): Uint8Array {
   const secret = process.env.ACCESS_TOKEN_SECRET;
   if (!secret) {
@@ -64,7 +69,7 @@ export class AuthAdminUseCase {
         'Usuario no autorizado como admin',
         'use-case',
         'AuthAdminUseCase.login',
-        { details: { email } }
+        { details: { email: anonymizeEmail(email) } }
       );
       return {
         success: false,
@@ -91,7 +96,7 @@ export class AuthAdminUseCase {
 
       return { success: true, data: { token, admin: adminResult.data } };
     } catch (e) {
-      const appError = await logger.logFromCatch(e, 'use-case', 'AuthAdminUseCase.login', { details: { email } });
+      const appError = await logger.logFromCatch(e, 'use-case', 'AuthAdminUseCase.login', { details: { email: anonymizeEmail(email) } });
       return { success: false, error: appError };
     }
   }

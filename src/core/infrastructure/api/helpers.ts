@@ -31,6 +31,7 @@ export function validationErrorResponse(errors: string): NextResponse {
 function errorCodeToStatus(code: string): number {
   if (code === 'VALIDATION_ERROR') return 400;
   if (code === 'PRODUCT_NOT_FOUND' || code === 'NOT_FOUND') return 404;
+  if (code === 'AUTH_003' || code === 'AUTH_FORBIDDEN' || code === 'FORBIDDEN') return 403;
   if (code.startsWith('AUTH_')) return 401;
   return 500;
 }
