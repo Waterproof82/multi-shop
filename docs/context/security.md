@@ -18,26 +18,24 @@ El panel admin usa JWT firmados con `ACCESS_TOKEN_SECRET` almacenados en una coo
 
 El token incluye `empresaId`, `adminId` y `rol` en el payload.
 
-### Runtime guard para ACCESS_TOKEN_SECRET
+### Runtime guard para secrets (lazy reads)
 
-El secret de JWT se obtiene mediante funciones lazy que leen la variable de entorno en cada invocación (no al cargar el módulo), evitando que se firmen tokens con un secret vacío o `"undefined"`:
+Todos los secrets se leen lazily (dentro de funciones, nunca como constantes a nivel de módulo) para evitar capturar `undefined` en build time o en imports tempranos:
 
-- **`auth-admin.use-case.ts`**: `getTokenSecret()` lanza error si falta — para firma y verificación de tokens
-- **`proxy.ts`**: `getAdminTokenSecret()` retorna `undefined` si falta — retorna 500 al cliente
+| Módulo | Función lazy | Comportamiento si falta |
+|--------|-------------|------------------------|
+| `auth-admin.use-case.ts` | `getTokenSecret()` | Lanza error — token no se firma |
+| `proxy.ts` | `getAdminTokenSecret()` | Retorna 500 al cliente |
+| `csrf.ts` | `getCsrfSecret()` | Lanza error — token no se genera |
+| `brevo-email.ts` | `getBrevoApiKey()` | Lanza error — email no se envía |
+| `s3-client.ts` | `getS3Client()` / `getR2Config()` | Lanza error — upload no procede |
 
 ```typescript
-// auth-admin.use-case.ts
-function getTokenSecret(): Uint8Array {
-  const secret = process.env.ACCESS_TOKEN_SECRET;
-  if (!secret) {
-    throw new Error('ACCESS_TOKEN_SECRET is not configured');
-  }
-  return new TextEncoder().encode(secret);
-}
-
-// proxy.ts — lazy read, not module-level constant
-function getAdminTokenSecret(): string | undefined {
-  return process.env.ACCESS_TOKEN_SECRET;
+// Patrón aplicado en todos los módulos con secrets
+function getBrevoApiKey(): string {
+  const key = process.env.BREVO_API_KEY;
+  if (!key) throw new Error('BREVO_API_KEY is not configured');
+  return key;
 }
 ```
 
@@ -163,7 +161,7 @@ Esto elimina la necesidad de `unsafe-inline` en `script-src`.
 
 | Directiva | Valor |
 |-----------|-------|
-| `script-src` | `'self' 'nonce-{nonce}' 'unsafe-eval'` |
+| `script-src` | `'self' 'nonce-{nonce}'` (prod) / `+ 'unsafe-eval'` (dev) |
 | `style-src` | `'self' 'unsafe-inline'` |
 | `img-src` | `'self' {R2_DOMAIN} https://*.supabase.co data: blob:` |
 | `media-src` | `'self' {R2_DOMAIN}` |
@@ -175,7 +173,7 @@ Esto elimina la necesidad de `unsafe-inline` en `script-src`.
 | `form-action` | `'self'` |
 | `frame-ancestors` | `'self'` |
 
-> `unsafe-eval` es necesario por el runtime interno de Next.js/Turbopack.
+> `unsafe-eval` solo se incluye cuando `NODE_ENV !== 'production'` — requerido por Turbopack en desarrollo.
 > `{R2_DOMAIN}` se deriva de la variable de entorno `NEXT_PUBLIC_R2_DOMAIN` (sin `https://` hardcodeado).
 
 ### Headers adicionales
@@ -350,6 +348,22 @@ El endpoint `POST /api/admin/upload-image` aplica:
 
 ---
 
+## Anonimización de PII en logs
+
+Ningún dato de identificación personal (email, teléfono) se escribe en texto plano en la tabla `log_errors`. Los emails se anonimi antes de pasar al logger mediante una función helper local en cada módulo:
+
+```typescript
+function anonymizeEmail(email: string): string {
+  const [local, domain] = email.split('@');
+  return `${local.substring(0, 2)}***@${domain ?? '***'}`;
+}
+// "usuario@ejemplo.com" → "us***@ejemplo.com"
+```
+
+Módulos que aplican esta anonimización: `SupabaseAdminRepository`, `AuthAdminUseCase`, `ClienteUseCase`.
+
+---
+
 ## Prevención de enumeración de usuarios
 
 El endpoint `POST /api/admin/login` retorna un mensaje genérico `"Credenciales inválidas"` para todos los tipos de fallo de autenticación (usuario no encontrado, contraseña incorrecta, usuario no autorizado como admin). Esto previene que un atacante pueda determinar si un email existe en el sistema.
@@ -364,8 +378,13 @@ El endpoint `POST /api/admin/login` retorna un mensaje genérico `"Credenciales 
 |------------|-------------|
 | `VALIDATION_ERROR` | 400 |
 | `PRODUCT_NOT_FOUND`, `NOT_FOUND` | 404 |
-| `AUTH_*` | 401 |
+| `AUTH_003`, `AUTH_FORBIDDEN`, `FORBIDDEN` | 403 |
+| `AUTH_*` (resto) | 401 |
 | Otros | 500 |
+
+### PRODUCT_NOT_FOUND en endpoint público
+
+La ruta pública `POST /api/pedidos` intercepta el error `PRODUCT_NOT_FOUND` antes de devolverlo al cliente y retorna un mensaje genérico (`"Producto no disponible"`) para evitar exponer UUIDs internos. El mensaje interno detallado (con el UUID) se mantiene para logging.
 
 ---
 
@@ -392,7 +411,34 @@ function safeJsonStringify(data: Record<string, unknown>): string {
 
 ## Cart Access Token
 
-El proxy valida cart tokens (recibidos via `?access=` query param) con `CART_TOKEN_SECRET` y requiere el audience claim `'cart-access'` para prevenir token confusion con admin JWTs:
+El proxy valida cart tokens (recibidos via `?access=` query param) con `CART_TOKEN_SECRET` y requiere el audience claim `'cart-access'` para prevenir token confusion con admin JWTs.
+
+### Fail-closed para CART_TOKEN_SECRET faltante
+
+Si `CART_TOKEN_SECRET` no está configurado en producción, el proxy retorna **500** en lugar de ignorar el token y conceder acceso. En desarrollo, pasa a través sin validar (conveniencia local):
+
+```typescript
+if (!secretKey) {
+  if (process.env.NODE_ENV === 'production') {
+    return new NextResponse('Server configuration error', { status: 500 });
+  }
+  return NextResponse.next(); // dev only
+}
+```
+
+### Cookie del cart token
+
+La cookie `access_token` se establece con `SameSite: strict` (igual que `admin_token`) para prevenir envío cross-site:
+
+```typescript
+response.cookies.set('access_token', sanitizedToken, {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'strict',
+  path: '/',
+  maxAge,
+});
+```
 
 ```typescript
 const { payload } = await jwtVerify(sanitizedToken, secret, { audience: 'cart-access' });
@@ -412,7 +458,7 @@ new SignJWT({ /* claims */ })
 
 ## Multi-tenant — dominio parsing
 
-`parseMainDomain()` en `domain-utils.ts` usa `endsWith('-pedidos')` (no `includes`) para el sufijo de pedidos, evitando falsos positivos con dominios como `evil-pedidos-attack.com`.
+`parseMainDomain()` en `domain-utils.ts` y los métodos `findByDomain`/`findByDomainPublic` de `SupabaseClienteEmpresaRepository.ts` usan `endsWith('-pedidos')` (no `includes`) para el sufijo de pedidos, evitando falsos positivos con dominios como `evil-something-pedidos-attack.com`.
 
 ---
 
@@ -541,13 +587,17 @@ Comprehensive audit completed (score: 8.5/10). Key hardening applied:
 | `NEXT_PUBLIC_SUPABASE_URL` | URL de Supabase | ✓ Siempre |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Clave anónima de Supabase | ✓ Siempre |
 | `SUPABASE_SERVICE_ROLE_KEY` | Clave service role de Supabase | ✓ Siempre |
-| `NEXT_PUBLIC_R2_DOMAIN` | Dominio público de imágenes R2 | — |
 | `UPSTASH_REDIS_REST_URL` | Rate limiting + JWT revocation | ✓ Producción |
 | `UPSTASH_REDIS_REST_TOKEN` | Rate limiting + JWT revocation | ✓ Producción |
-| `BREVO_API_KEY` | Envío de emails transaccionales | — |
-| `BREVO_DEFAULT_SENDER_EMAIL` | Remitente por defecto | — |
-| `CORS_ALLOWED_ORIGINS` | Orígenes permitidos en CORS | — |
 | `CORS_ALLOWED_DOMAINS` | Dominios permitidos en CORS | ✓ Producción |
+| `BREVO_API_KEY` | Envío de emails transaccionales | ✓ Producción |
+| `BREVO_DEFAULT_SENDER_EMAIL` | Remitente por defecto | ✓ Producción |
+| `R2_ACCOUNT_ID` | Cloudflare R2 storage | ✓ Producción |
+| `R2_ACCESS_KEY_ID` | Cloudflare R2 storage | ✓ Producción |
+| `R2_SECRET_ACCESS_KEY` | Cloudflare R2 storage | ✓ Producción |
+| `R2_BUCKET_NAME` | Cloudflare R2 storage | ✓ Producción |
+| `NEXT_PUBLIC_R2_DOMAIN` | Dominio público de imágenes R2 | ✓ Producción |
+| `CORS_ALLOWED_ORIGINS` | Lista exacta de orígenes CORS | — |
 | `CLOUDFLARE_API_TOKEN` | Upload directo vía Cloudflare API | — |
 
 ---
@@ -558,7 +608,6 @@ Comprehensive audit completed (score: 8.5/10). Key hardening applied:
 |------|-----------|-------|
 | RBAC en rutas admin | Medium | El proxy inyecta `x-admin-rol` pero ninguna ruta lo verifica. Cualquier admin autenticado puede realizar cualquier acción. |
 | Cart token generación con audience | Low | El proxy valida `aud: 'cart-access'` pero aún no hay generación de cart tokens en el codebase. Cuando se implemente, usar `new SignJWT({...}).setAudience('cart-access')`. |
-| `unsafe-eval` en CSP | Medium | Requerido por Next.js/Turbopack. Considerar `report-to` para monitorizar explotación. |
 | CSP reporting endpoint | Low | `/api/csp-report` está en `isPublicRoute` pero el endpoint no existe. Las violaciones CSP no se registran. |
 | `unsafe-inline` en style-src | Low | Estándar para la mayoría de aplicaciones. Mejorable con style nonces si el framework lo soporta. |
 | Rate limit por tenant en emails | Low | Un tenant con miles de clientes suscritos puede disparar un envío masivo. Brevo limita externamente pero no hay protección a nivel de aplicación. |
