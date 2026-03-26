@@ -514,9 +514,10 @@ export function CartDrawer() {
                     <Phone className="size-4 text-muted-foreground shrink-0" aria-hidden="true" />
                     <div className="flex gap-1 flex-1">
                       <Select value={countryCode} onValueChange={setCountryCode}>
-                        <SelectTrigger className="h-9 w-[100px] shrink-0 text-xs px-2" aria-label={t("countryCode", language)}>
+                        <SelectTrigger id="country-code-select" className="h-9 w-[100px] shrink-0 text-xs px-2" aria-labelledby="country-code-label">
                           <SelectValue />
                         </SelectTrigger>
+                        <span id="country-code-label" className="sr-only">{t("countryCode", language)}</span>
                         <SelectContent>
                           {COUNTRY_CODES.map((cc) => (
                             <SelectItem key={cc.code} value={cc.code}>
