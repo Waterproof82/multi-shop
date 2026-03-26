@@ -2,12 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { sendEmail } from '@/lib/brevo-email';
 import { empresaUseCase } from '@/core/infrastructure/database';
-import { requireAuth } from '@/core/infrastructure/api/helpers';
+import { requireAuth, requireRole } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
 import { escapeHtml } from '@/lib/html-utils';
-
-const BREVO_API_KEY = process.env.BREVO_API_KEY;
 
 const enviarEmailSchema = z.object({
   items: z.array(z.object({
@@ -133,10 +131,8 @@ export async function POST(request: NextRequest) {
 
     const { empresaId, error: authError } = await requireAuth(request);
     if (authError) return authError;
-
-    if (!BREVO_API_KEY) {
-      return NextResponse.json({ error: 'Email service not configured' }, { status: 500 });
-    }
+    const roleError = requireRole(request, ['admin']);
+    if (roleError) return roleError;
 
     const empresaResult = await empresaUseCase.getById(empresaId!);
 

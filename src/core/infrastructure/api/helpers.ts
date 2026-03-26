@@ -55,3 +55,20 @@ export function handleResultWithStatus<T>(result: Result<T>, successStatus = 200
 export function getEmpresaIdFromRequest(request: NextRequest): string | null {
   return request.headers.get('x-empresa-id');
 }
+
+/**
+ * RBAC guard — verifies that the authenticated admin has one of the allowed roles.
+ * Reads the `x-admin-rol` header injected by the proxy after JWT verification.
+ * Returns a 403 response if the role check fails, or null if the request may proceed.
+ *
+ * Usage:
+ *   const forbidden = await requireRole(request, ['superadmin']);
+ *   if (forbidden) return forbidden;
+ */
+export function requireRole(request: NextRequest, allowedRoles: string[]): NextResponse | null {
+  const role = request.headers.get('x-admin-rol');
+  if (!role || !allowedRoles.includes(role)) {
+    return NextResponse.json(createErrorResponse(AUTH_ERRORS.FORBIDDEN), { status: 403 });
+  }
+  return null;
+}

@@ -40,20 +40,6 @@ export async function getCsrfCookie(): Promise<string | null> {
   return cookieStore.get(CSRF_COOKIE_NAME)?.value || null;
 }
 
-export function setCsrfCookieHeaders(): Record<string, string> {
-  const token = generateCsrfToken();
-  const signature = signCsrfToken(token);
-  
-  return {
-    [CSRF_COOKIE_NAME]: `${token}:${signature}`,
-    'Path': '/',
-    'HttpOnly': 'true',
-    'Secure': process.env.NODE_ENV === 'production' ? 'true' : 'false',
-    'SameSite': 'strict',
-    'Max-Age': '3600',
-  };
-}
-
 export function getCsrfTokenFromHeader(request: Request): string | null {
   return request.headers.get(CSRF_HEADER_NAME);
 }

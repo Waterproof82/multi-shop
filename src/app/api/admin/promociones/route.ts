@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { sendEmail } from '@/lib/brevo-email';
 import { deleteImageFromR2 } from '@/core/infrastructure/storage/s3-client';
 import { promocionUseCase, empresaUseCase } from '@/core/infrastructure/database';
-import { requireAuth, errorResponse, handleResult } from '@/core/infrastructure/api/helpers';
+import { requireAuth, requireRole, errorResponse, handleResult } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
 import { escapeHtml } from '@/lib/html-utils';
@@ -78,6 +78,8 @@ export async function POST(request: NextRequest) {
 
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
+  const roleError = requireRole(request, ['admin']);
+  if (roleError) return roleError;
 
   try {
     const empresaResult = await empresaUseCase.getById(empresaId!);
@@ -118,13 +120,13 @@ export async function POST(request: NextRequest) {
     let emailsSent = 0;
     let emailError: string | null = null;
 
-    const BREVO_API_KEY = process.env.BREVO_API_KEY;
-    if (!BREVO_API_KEY) {
-      emailError = 'BREVO_API_KEY no configurada';
-    } else if (!empresa) {
+    const MAX_EMAIL_RECIPIENTS = 500;
+    if (!empresa) {
       emailError = 'Empresa no encontrada';
     } else if (emailTargets.length === 0) {
       emailError = 'Sin clientes suscritos';
+    } else if (emailTargets.length > MAX_EMAIL_RECIPIENTS) {
+      emailError = `Demasiados destinatarios (${emailTargets.length}). Límite: ${MAX_EMAIL_RECIPIENTS}`;
     } else {
       const senderEmail = empresa.emailNotification || process.env.BREVO_DEFAULT_SENDER_EMAIL;
       if (!senderEmail) {
@@ -155,6 +157,9 @@ export async function POST(request: NextRequest) {
             emailsSent++;
           } catch (sendErr) {
             await logApiError('Send promo email failed', sendErr, 'POST');
+            if (!emailError) {
+              emailError = sendErr instanceof Error ? sendErr.message : 'Error al enviar email';
+            }
           }
         }
       }

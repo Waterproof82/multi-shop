@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { empresaUseCase } from '@/core/infrastructure/database';
 import { updateEmpresaSchema } from '@/core/application/dtos/empresa.dto';
-import { requireAuth, handleResult, errorResponse, validationErrorResponse } from '@/core/infrastructure/api/helpers';
+import { requireAuth, requireRole, handleResult, errorResponse, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 
 export async function GET(request: NextRequest) {
@@ -49,6 +49,8 @@ export async function PUT(request: NextRequest) {
 
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
+  const roleError = requireRole(request, ['admin']);
+  if (roleError) return roleError;
 
   let body: unknown;
   try {

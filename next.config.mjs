@@ -18,7 +18,7 @@ const mediaSrc = ["'self'", r2Origin]
 
 const cspFallback = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-eval'",
+  `script-src 'self'${process.env.NODE_ENV !== 'production' ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline'",
   `img-src ${imgSrc}`,
   `media-src ${mediaSrc}`,
@@ -29,6 +29,7 @@ const cspFallback = [
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'self'",
+  "report-uri /api/csp-report",
 ].join('; ') + ';';
 
 const nextConfig = {

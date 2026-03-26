@@ -106,8 +106,8 @@ export class AuthAdminUseCase {
       const secret = getTokenSecret();
       const { payload } = await jwtVerify(token, secret);
 
-      // Check revocation list — token may be valid but already logged out
-      if (payload.jti && await isTokenRevoked(payload.jti)) {
+      // Reject tokens without jti (irrevocable) and revoked tokens (logged-out sessions).
+      if (!payload.jti || await isTokenRevoked(payload.jti)) {
         return null;
       }
 

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { clienteUseCase } from '@/core/infrastructure/database';
 import { createClienteSchema, updateClienteSchema, clienteIdSchema } from '@/core/application/dtos/cliente.dto';
-import { requireAuth, handleResult, handleResultWithStatus, validationErrorResponse } from '@/core/infrastructure/api/helpers';
+import { requireAuth, requireRole, handleResult, handleResultWithStatus, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 
 export async function GET(request: NextRequest) {
@@ -26,6 +26,8 @@ export async function POST(request: NextRequest) {
 
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
+  const roleError = requireRole(request, ['admin']);
+  if (roleError) return roleError;
 
   let body: unknown;
   try {
@@ -59,6 +61,8 @@ export async function PATCH(request: NextRequest) {
 
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
+  const roleError = requireRole(request, ['admin']);
+  if (roleError) return roleError;
 
   let body: unknown;
   try {
@@ -88,6 +92,8 @@ export async function DELETE(request: NextRequest) {
 
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
+  const roleError = requireRole(request, ['admin']);
+  if (roleError) return roleError;
 
   let body: unknown;
   try {

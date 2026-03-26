@@ -88,12 +88,19 @@ export async function deleteImageFromR2(imageUrl: string): Promise<boolean> {
     return false;
   }
 
-  // Extract key by removing the public domain prefix
-  const key = imageUrl.replace(`${publicDomain}/`, '');
+  // Extract key by removing the public domain prefix — use startsWith+slice
+  // instead of replace() to avoid partial substitution when the domain appears
+  // more than once in the URL.
+  const prefix = publicDomain.endsWith('/') ? publicDomain : `${publicDomain}/`;
+  if (!imageUrl.startsWith(prefix)) {
+    await logger.logError({ codigo: 'STORAGE_INVALID_KEY', mensaje: 'Image URL does not match configured R2 domain', modulo: 'repository', metadata: { imageUrl: imageUrl.slice(0, 100) } });
+    return false;
+  }
+  const key = imageUrl.slice(prefix.length);
 
-  // Guard: key must not be a URL or contain path traversal
-  if (key.startsWith('http') || key.includes('..') || key === imageUrl) {
-    await logger.logError({ codigo: 'STORAGE_INVALID_KEY', mensaje: `Invalid R2 key derived from URL`, modulo: 'repository', metadata: { imageUrl: imageUrl.slice(0, 100) } });
+  // Guard: key must be a valid relative path with no traversal or forbidden chars
+  if (!key || key.includes('..') || !/^[a-zA-Z0-9_\-/.]+$/.test(key)) {
+    await logger.logError({ codigo: 'STORAGE_INVALID_KEY', mensaje: 'Invalid R2 key derived from URL', modulo: 'repository', metadata: { imageUrl: imageUrl.slice(0, 100) } });
     return false;
   }
 

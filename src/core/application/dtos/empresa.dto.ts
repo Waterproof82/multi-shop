@@ -5,7 +5,7 @@ const httpsUrl = z.string().url().refine(val => val.startsWith('https://'), { me
 const httpsUrlMax500 = z.string().max(500).url().refine(val => val.startsWith('https://'), { message: 'URL must use https://' });
 
 export const updateEmpresaSchema = z.object({
-  email_notification: z.string().email().optional().or(z.literal('')),
+  email_notification: z.string().email().max(254).optional().or(z.literal('')),
   telefono_whatsapp: z.string().max(30).regex(/^\+?[0-9\s\-()+]+$/).optional().or(z.literal('')).optional(),
   fb: httpsUrl.optional().or(z.literal('')),
   instagram: httpsUrl.optional().or(z.literal('')),

@@ -14,16 +14,17 @@ export async function POST(request: NextRequest) {
   // Revoke the JWT by storing its jti in Redis until the token expires
   if (token) {
     const secret = process.env.ACCESS_TOKEN_SECRET;
-    if (secret) {
-      try {
-        const { payload } = await jwtVerify(token, new TextEncoder().encode(secret));
-        if (payload.jti && payload.exp) {
-          const remainingTtl = payload.exp - Math.floor(Date.now() / 1000);
-          await revokeToken(payload.jti, remainingTtl);
-        }
-      } catch {
-        // Token already invalid — nothing to revoke
+    if (!secret) {
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
+    try {
+      const { payload } = await jwtVerify(token, new TextEncoder().encode(secret));
+      if (payload.jti && payload.exp) {
+        const remainingTtl = payload.exp - Math.floor(Date.now() / 1000);
+        await revokeToken(payload.jti, remainingTtl);
       }
+    } catch {
+      // Token already invalid — nothing to revoke
     }
   }
 

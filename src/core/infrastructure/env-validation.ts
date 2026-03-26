@@ -21,6 +21,7 @@ const ENV_VARS: EnvVar[] = [
   { name: 'ACCESS_TOKEN_SECRET', required: true },
   { name: 'CSRF_HMAC_SECRET', required: true },
   { name: 'CART_TOKEN_SECRET', required: true },
+  { name: 'UNSUBSCRIBE_HMAC_SECRET', required: true, productionOnly: true },
   // Supabase
   { name: 'NEXT_PUBLIC_SUPABASE_URL', required: true },
   { name: 'NEXT_PUBLIC_SUPABASE_ANON_KEY', required: true },

@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 import { verifyCsrfToken } from '@/lib/csrf';
-import { timingSafeEqual } from 'crypto';
+import { timingSafeEqual } from 'node:crypto';
 import { isTokenRevoked } from '@/lib/token-revocation';
 import { AUTH_ERRORS, SERVER_ERRORS, createErrorResponse } from '@/core/domain/constants/api-errors';
+import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 
 function getAdminTokenSecret(): string | undefined {
   return process.env.ACCESS_TOKEN_SECRET;
@@ -49,12 +50,15 @@ function isPublicRoute(path: string): boolean {
     path === '/api/unsubscribe' ||
     path === '/api/admin/promociones/unsubscribe' ||
     path === '/api/admin/login' ||
-    path === '/api/admin/logout' ||
     path === '/api/csp-report'
   );
 }
 
 async function handleAdminAuth(request: NextRequest, origin: string | null): Promise<NextResponse> {
+  // Rate limit before JWT verification to prevent brute-force flooding of the verify step
+  const rateLimited = await rateLimitAdmin(request);
+  if (rateLimited) return addCorsHeaders(rateLimited, origin);
+
   const adminToken = request.cookies.get('admin_token')?.value;
 
   if (!adminToken) {
@@ -74,8 +78,9 @@ async function handleAdminAuth(request: NextRequest, origin: string | null): Pro
       return addCorsHeaders(NextResponse.json(createErrorResponse(AUTH_ERRORS.INVALID_TOKEN), { status: 401 }), origin);
     }
 
-    // Check revocation list — token may be valid but already logged out
-    if (payload.jti && await isTokenRevoked(payload.jti)) {
+    // Reject tokens without jti — they cannot be revoked and are permanently valid.
+    // Also reject tokens whose jti appears in the revocation list (logged-out sessions).
+    if (!payload.jti || await isTokenRevoked(payload.jti)) {
       return addCorsHeaders(NextResponse.json(createErrorResponse(AUTH_ERRORS.INVALID_TOKEN), { status: 401 }), origin);
     }
 
@@ -190,6 +195,7 @@ function buildCsp(nonce: string): string {
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'self'",
+    "report-uri /api/csp-report",
   ].join('; ');
 }
 
