@@ -59,7 +59,7 @@ export function SiteHeaderClient({ showCart, empresa }: SiteHeaderClientProps) {
             <div className="relative h-12 w-24 md:h-16 md:w-32">
               <Image
                 src={logoUrl}
-                alt={empresa?.nombre ?? "Logo"}
+                alt={empresa?.nombre ?? t("companyLogo", language)}
                 fill
                 className="object-contain"
                 loading="eager"

@@ -3,6 +3,7 @@
 import { motion, useReducedMotion } from "framer-motion"
 import Image from "next/image"
 import { useLanguage } from "@/lib/language-context"
+import { t } from "@/lib/translations"
 import type { EmpresaPublic } from "@/core/domain/entities/types"
 
 interface HeroBannerProps {
@@ -38,7 +39,7 @@ export function HeroBanner({ empresa }: HeroBannerProps) {
         <div className="absolute inset-0 z-0">
           <Image
             src={urlImage}
-            alt={empresa?.nombre ?? "Imagen de fondo del restaurante"}
+            alt={empresa?.nombre ?? t("heroBackgroundAlt", language)}
             fill
             priority
             sizes="100vw"
@@ -57,7 +58,7 @@ export function HeroBanner({ empresa }: HeroBannerProps) {
         {logoUrl && (
           <Image
             src={logoUrl}
-            alt={empresa?.nombre ?? "Logo"}
+            alt={empresa?.nombre ?? t("companyLogo", language)}
             width={200}
             height={100}
             className="mx-auto mb-6 h-24 w-auto md:h-32"

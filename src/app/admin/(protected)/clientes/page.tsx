@@ -277,7 +277,7 @@ export default function ClientesPage() {
       )}
       {!loading && filteredClientes.length > 0 && (
         <div className="bg-card rounded-lg border overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto scrollbar scrollbar-thumb-muted-foreground/40 scrollbar-track-transparent scrollbar-thin">
             <table className="w-full">
               <thead className="bg-muted/50">
                 <tr>

@@ -52,7 +52,7 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
           <div className="relative w-10 h-10">
             <Image
               src={empresaLogo}
-              alt="Logo de la empresa"
+                  alt={t("companyLogo", language)}
               fill
               className="object-contain"
               sizes="40px"
@@ -97,7 +97,7 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
               <div className="relative w-20 h-20 mx-auto">
                 <Image
                   src={empresaLogo}
-                  alt="Logo de la empresa"
+              alt={t("companyLogo", language)}
                   fill
                   className="object-contain"
                   sizes="80px"

@@ -19,8 +19,8 @@ const SelectTrigger = React.forwardRef<
     data-slot="select-trigger"
     data-error={hasError}
     className={cn(
-      'flex h-9 w-full items-center justify-between gap-2 whitespace-nowrap rounded-md border border-border bg-transparent px-3 py-2 text-sm shadow-xs transition-colors',
-      'placeholder:text-muted-foreground',
+      'flex h-11 min-h-[44px] w-full items-center justify-between gap-2 whitespace-nowrap rounded-md border border-border bg-transparent px-3 py-2 text-sm shadow-xs transition-colors',
+      'placeholder:text-placeholder',
       'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background',
       'aria-invalid:border-destructive aria-invalid:ring-destructive/20',
       'disabled:cursor-not-allowed disabled:opacity-50',
@@ -125,18 +125,18 @@ SelectLabel.displayName = SelectPrimitive.Label.displayName
 const SelectItem = React.forwardRef<
   React.ComponentRef<typeof SelectPrimitive.Item>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item> & {
-    isOptgroup?: boolean
+    isSubcategory?: boolean
   }
->(({ className, children, isOptgroup, ...props }, ref) => (
+>(({ className, children, isSubcategory, ...props }, ref) => (
   <SelectPrimitive.Item
     ref={ref}
     data-slot="select-item"
-    data-optgroup={isOptgroup}
+    data-subcategory={isSubcategory}
     className={cn(
       'relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-hidden',
       'focus:bg-accent focus:text-accent-foreground',
       'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
-      isOptgroup && 'pl-6',
+      isSubcategory && 'pl-8',
       className,
     )}
     {...props}

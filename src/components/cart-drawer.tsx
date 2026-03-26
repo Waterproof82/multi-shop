@@ -419,7 +419,7 @@ export function CartDrawer() {
         ) : (
           <>
             <div className="flex-1 overflow-y-auto">
-              <ul className="flex flex-col gap-3 py-4">
+              <ul className="flex flex-col gap-3 py-4 cv-auto" style={{ contentVisibility: 'auto' }}>
                 {items.map((ci) => {
                   const itemKey = getItemKey(ci.item, ci.selectedComplements);
                   const complementPrice = ci.selectedComplements?.reduce((sum, c) => sum + c.price, 0) || 0;

@@ -259,6 +259,7 @@ function CardMedia({ item, displayName, priority, onError, shouldReduceMotion }:
         loop={!shouldReduceMotion}
         muted
         playsInline
+        poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 180'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23f3f4f6'/%3E%3Cstop offset='100%25' stop-color='%23d1d5db'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect fill='url(%23g)' width='320' height='180'/%3E%3Ccircle cx='160' cy='90' r='30' fill='%239ca3af' opacity='0.5'/%3E%3Cpath d='M150 75 L185 90 L150 105 Z' fill='%23fff' opacity='0.7'/%3E%3C/svg%3E"
         className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 md:group-hover:scale-105"
         onError={onError}
         aria-label={displayName}

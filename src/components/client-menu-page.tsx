@@ -10,6 +10,8 @@ import { CartDrawer } from "@/components/cart-drawer"
 import { CartToast } from "@/components/cart-toast"
 import { PromoNotification } from "@/components/promo-notification"
 import type { EmpresaPublic } from "@/core/domain/entities/types"
+import { useLanguage } from "@/lib/language-context"
+import { t } from "@/lib/translations"
 
 interface MenuPageProps {
   menuData: MenuCategoryVM[];
@@ -19,8 +21,17 @@ interface MenuPageProps {
 }
 
 export function MenuPage({ menuData, header, showCart = false, empresa }: Readonly<MenuPageProps>) {
+  const { language } = useLanguage();
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
+      {/* Skip to main content link for accessibility */}
+      <a
+        href="#menu-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-4 focus:left-4 focus:bg-primary focus:text-primary-foreground focus:px-4 focus:py-2 focus:rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+      >
+        {t("skipToContent", language)}
+      </a>
       {header === undefined ? null : header}
       <PromoNotification />
       <div className="flex-1">
@@ -28,7 +39,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa }: Readon
         {menuData.length > 0 ? (
           <>
             <CategoryNav categories={menuData} />
-            <div className="container mx-auto max-w-6xl px-4 py-8 md:px-6">
+            <div id="menu-content" className="container mx-auto max-w-6xl px-4 py-8 md:px-6">
               <div className="space-y-12 md:space-y-16">
                 {menuData.map((category, index) => (
                   <MenuSection key={category.id} category={category} showCart={showCart} priority={index === 0} />
@@ -37,9 +48,9 @@ export function MenuPage({ menuData, header, showCart = false, empresa }: Readon
             </div>
           </>
         ) : (
-          <div className="container mx-auto max-w-6xl px-4 py-8 md:px-6">
+          <div id="menu-content" className="container mx-auto max-w-6xl px-4 py-8 md:px-6">
             <div className="text-center py-20">
-              <p className="text-xl text-muted-foreground">Menú no disponible en este momento.</p>
+              <p className="text-xl text-muted-foreground">{t("menuNotAvailable", language)}</p>
             </div>
           </div>
         )}

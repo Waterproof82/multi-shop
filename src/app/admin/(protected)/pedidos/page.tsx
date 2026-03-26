@@ -233,7 +233,7 @@ export default function PedidosPage() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto scrollbar scrollbar-thumb-muted-foreground/40 scrollbar-track-transparent scrollbar-thin">
           <table className="w-full">
             <thead className="bg-muted">
               <tr>
@@ -323,7 +323,7 @@ export default function PedidosPage() {
                       <td className="px-4 py-3 whitespace-nowrap">
                         <button
                           onClick={(e) => { e.stopPropagation(); deletePedido(pedido.id, pedido.numero_pedido); }}
-                          className="p-2.5 text-destructive hover:bg-destructive/10 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-destructive hover:bg-destructive/10 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           aria-label={t("deleteOrder", language)}
                         >
                           <Trash2 className="w-4 h-4" />
