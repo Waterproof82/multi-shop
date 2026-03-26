@@ -152,7 +152,7 @@ export function requireRole(request: NextRequest, allowedRoles: string[]): NextR
 |-------|-------------------|
 | `/api/admin/productos` | POST, PUT, DELETE |
 | `/api/admin/categorias` | POST, PUT, DELETE |
-| `/api/admin/pedidos` | PATCH, DELETE |
+| `/api/admin/pedidos` | PUT (stats), PATCH, DELETE |
 | `/api/admin/clientes` | POST, PATCH, DELETE |
 | `/api/admin/empresa` | PUT |
 | `/api/admin/update-colores` | POST |
@@ -160,7 +160,7 @@ export function requireRole(request: NextRequest, allowedRoles: string[]): NextR
 | `/api/admin/promociones` | POST |
 | `/api/admin/pedidos/enviar-email` | POST |
 
-Los handlers GET (solo lectura) no requieren verificación de rol.
+Los handlers GET (solo lectura) no requieren verificación de rol. Los handlers PUT usados como lectura (stats) sí requieren `requireRole` dado que exponen métricas financieras del tenant.
 
 ### Rol actual en DB
 
@@ -230,7 +230,7 @@ Next.js propaga automáticamente el nonce a sus propios scripts SSR. En desarrol
 | `object-src` | `'none'` |
 | `base-uri` | `'self'` |
 | `form-action` | `'self'` |
-| `frame-ancestors` | `'self'` |
+| `frame-ancestors` | `'none'` para rutas `/admin/*` — `'self'` para el resto |
 | `report-uri` | `/api/csp-report` |
 
 > `unsafe-eval` solo se incluye cuando `NODE_ENV !== 'production'` — tanto en el CSP dinámico del proxy como en el CSP estático de `next.config.mjs`.
@@ -602,7 +602,7 @@ Configurado en el proxy para todas las rutas `/api/*`. Solo orígenes en:
 
 | Item | Severidad | Notas |
 |------|-----------|-------|
-| Cart token generación con `jti` | Low | El proxy valida y requiere `aud: 'cart-access'` pero no hay revocación de cart tokens. Cuando se implemente la generación, incluir `jti` y llamar `isTokenRevoked` en `handleCartAccessToken`. |
+| Cart token generación con `jti` | Low | El proxy valida `aud: 'cart-access'` y llama `isTokenRevoked(jti)` si el claim está presente. Cuando se implemente la generación, incluir `jti` para habilitar revocación completa. |
 | `unsafe-inline` en `style-src` | Low | Estándar para la mayoría de aplicaciones Next.js. Mejorable con style nonces si el framework lo soporta en el futuro. |
 | Order number gaps | Low | Si el INSERT falla tras `get_next_pedido_number`, el número se pierde. Operacionalmente menor, no es riesgo de seguridad. |
 | Rate limit por tenant en pedidos públicos | Low | La creación de pedidos y clientes usa rate limit por IP. Para tenants con mucho tráfico legítimo desde IPs compartidas (NAT corporativo), considerar rate limit compuesto `empresaId:ip`. |

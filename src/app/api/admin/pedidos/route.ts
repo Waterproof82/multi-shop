@@ -90,6 +90,8 @@ export async function PUT(request: NextRequest) {
 
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
+  const roleError = requireRole(request, ['admin']);
+  if (roleError) return roleError;
 
   const { searchParams } = new URL(request.url);
   const mesParam = searchParams.get('mes');
