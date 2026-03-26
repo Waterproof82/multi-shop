@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useReducedMotion } from 'framer-motion';
 import { X, CheckCircle, AlertCircle } from 'lucide-react';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 
 export function PromoToast() {
   const { language } = useLanguage();
+  const shouldReduceMotion = useReducedMotion() ?? false;
   const [visible, setVisible] = useState(false);
   const [message, setMessage] = useState('');
   const [type, setType] = useState<'success' | 'error'>('success');
@@ -59,7 +61,7 @@ export function PromoToast() {
         aria-label={t("close", language)}
       />
 
-      <div className="relative bg-card text-card-foreground rounded-lg shadow-elegant-lg max-w-sm w-full p-6 animate-in fade-in zoom-in duration-200">
+      <div className={`relative bg-card text-card-foreground rounded-lg shadow-elegant-lg max-w-sm w-full p-6 animate-in fade-in duration-200${shouldReduceMotion ? '' : ' zoom-in'}`}>
         <button
           type="button"
           onClick={handleClose}
