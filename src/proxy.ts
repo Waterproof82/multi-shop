@@ -2,8 +2,14 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 import { verifyCsrfToken } from '@/lib/csrf';
+import { timingSafeEqual } from 'node:crypto';
+import { isTokenRevoked } from '@/lib/token-revocation';
+import { AUTH_ERRORS, SERVER_ERRORS, createErrorResponse } from '@/core/domain/constants/api-errors';
+import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 
-const ADMIN_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
+function getAdminTokenSecret(): string | undefined {
+  return process.env.ACCESS_TOKEN_SECRET;
+}
 
 function isAllowedOrigin(origin: string | null): boolean {
   if (!origin) return false;
@@ -28,6 +34,7 @@ function isAllowedOrigin(origin: string | null): boolean {
 }
 
 function addCorsHeaders(response: NextResponse, origin: string | null): NextResponse {
+  response.headers.set('Vary', 'Origin');
   if (origin && isAllowedOrigin(origin)) {
     response.headers.set('Access-Control-Allow-Origin', origin);
     response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
@@ -41,27 +48,41 @@ function addCorsHeaders(response: NextResponse, origin: string | null): NextResp
 function isPublicRoute(path: string): boolean {
   return (
     path === '/api/unsubscribe' ||
-    path.startsWith('/api/admin/promociones/unsubscribe') ||
+    path === '/api/admin/promociones/unsubscribe' ||
     path === '/api/admin/login' ||
-    path === '/api/admin/logout' ||
     path === '/api/csp-report'
   );
 }
 
 async function handleAdminAuth(request: NextRequest, origin: string | null): Promise<NextResponse> {
+  // Rate limit before JWT verification to prevent brute-force flooding of the verify step
+  const rateLimited = await rateLimitAdmin(request);
+  if (rateLimited) return addCorsHeaders(rateLimited, origin);
+
   const adminToken = request.cookies.get('admin_token')?.value;
 
   if (!adminToken) {
-    return addCorsHeaders(NextResponse.json({ error: 'No autorizado' }, { status: 401 }), origin);
+    return addCorsHeaders(NextResponse.json(createErrorResponse(AUTH_ERRORS.UNAUTHORIZED), { status: 401 }), origin);
   }
 
-  if (!ADMIN_TOKEN_SECRET) {
-    return addCorsHeaders(NextResponse.json({ error: 'Error de configuración del servidor' }, { status: 500 }), origin);
+  const tokenSecret = getAdminTokenSecret();
+  if (!tokenSecret) {
+    return addCorsHeaders(NextResponse.json(createErrorResponse(SERVER_ERRORS.CONFIG_ERROR), { status: 500 }), origin);
   }
 
   try {
-    const secret = new TextEncoder().encode(ADMIN_TOKEN_SECRET);
+    const secret = new TextEncoder().encode(tokenSecret);
     const { payload } = await jwtVerify(adminToken, secret);
+
+    if (!payload.empresaId || !payload.adminId) {
+      return addCorsHeaders(NextResponse.json(createErrorResponse(AUTH_ERRORS.INVALID_TOKEN), { status: 401 }), origin);
+    }
+
+    // Reject tokens without jti — they cannot be revoked and are permanently valid.
+    // Also reject tokens whose jti appears in the revocation list (logged-out sessions).
+    if (!payload.jti || await isTokenRevoked(payload.jti)) {
+      return addCorsHeaders(NextResponse.json(createErrorResponse(AUTH_ERRORS.INVALID_TOKEN), { status: 401 }), origin);
+    }
 
     const csrfCookie = request.cookies.get('csrf_token')?.value;
     const csrfHeader = request.headers.get('x-csrf-token');
@@ -70,15 +91,19 @@ async function handleAdminAuth(request: NextRequest, origin: string | null): Pro
     if (isMutativeMethod) {
       if (!csrfHeader || !csrfCookie) {
         return addCorsHeaders(NextResponse.json(
-          { error: 'CSRF token required' },
+          createErrorResponse(AUTH_ERRORS.CSRF_REQUIRED),
           { status: 403 }
         ), origin);
       }
 
       const [token, signature] = csrfCookie.split(':');
-      if (!token || !signature || !verifyCsrfToken(token, signature) || csrfHeader !== token) {
+      const csrfHeaderMatchesToken = (() => {
+        try { return timingSafeEqual(Buffer.from(csrfHeader), Buffer.from(token)); }
+        catch { return false; }
+      })();
+      if (!token || !signature || !verifyCsrfToken(token, signature) || !csrfHeaderMatchesToken) {
         return addCorsHeaders(NextResponse.json(
-          { error: 'CSRF token inválido' },
+          createErrorResponse(AUTH_ERRORS.CSRF_INVALID),
           { status: 403 }
         ), origin);
       }
@@ -92,43 +117,33 @@ async function handleAdminAuth(request: NextRequest, origin: string | null): Pro
     const response = NextResponse.next({ request: { headers: requestHeaders } });
     return addCorsHeaders(response, origin);
   } catch {
-    return addCorsHeaders(NextResponse.json({ error: 'Token inválido o expirado' }, { status: 401 }), origin);
+    return addCorsHeaders(NextResponse.json(createErrorResponse(AUTH_ERRORS.INVALID_TOKEN), { status: 401 }), origin);
   }
-}
-
-export async function proxy(request: NextRequest) {
-  const url = request.nextUrl.clone();
-  const path = request.nextUrl.pathname;
-  const origin = request.headers.get('origin');
-
-  // Preflight CORS
-  if (request.method === 'OPTIONS' && path.startsWith('/api/')) {
-    return addCorsHeaders(new NextResponse(null, { status: 204 }), origin);
-  }
-
-  // Admin auth (rutas protegidas)
-  if (path.startsWith('/api/admin') && !isPublicRoute(path)) {
-    return handleAdminAuth(request, origin);
-  }
-
-  // Access token para carrito
-  const accessToken = url.searchParams.get('access');
-  if (accessToken) {
-    return handleCartAccessToken(url, accessToken);
-  }
-
-  return NextResponse.next();
 }
 
 async function handleCartAccessToken(url: URL, accessToken: string): Promise<NextResponse> {
   const sanitizedToken = accessToken.replaceAll(/[^a-zA-Z0-9._-]/g, '');
-  const secretKey = process.env.ACCESS_TOKEN_SECRET;
+  const secretKey = process.env.CART_TOKEN_SECRET;
 
-  if (!secretKey) return NextResponse.next();
+  if (!secretKey) {
+    if (process.env.NODE_ENV === 'production') {
+      return new NextResponse('Server configuration error', { status: 500 });
+    }
+    return NextResponse.next();
+  }
 
   try {
     const secret = new TextEncoder().encode(secretKey);
-    const { payload } = await jwtVerify(sanitizedToken, secret);
+    // Require 'cart-access' audience to prevent token confusion with admin JWTs
+    const { payload } = await jwtVerify(sanitizedToken, secret, { audience: 'cart-access' });
+
+    // If the cart token has a jti, check revocation (fail-closed in prod).
+    // Cart tokens generated without jti are accepted today (short 15-min TTL);
+    // once generation includes jti this will revoke on-demand.
+    if (payload.jti && await isTokenRevoked(payload.jti)) {
+      url.searchParams.delete('access');
+      return NextResponse.redirect(url);
+    }
 
     url.searchParams.delete('access');
     const response = NextResponse.redirect(url);
@@ -142,7 +157,7 @@ async function handleCartAccessToken(url: URL, accessToken: string): Promise<Nex
     response.cookies.set('access_token', sanitizedToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: 'strict',
       path: '/',
       maxAge,
     });
@@ -152,6 +167,91 @@ async function handleCartAccessToken(url: URL, accessToken: string): Promise<Nex
     url.searchParams.delete('access');
     return NextResponse.redirect(url);
   }
+}
+
+function normalizeR2Origin(raw: string | undefined): string {
+  if (!raw) return '';
+  // Strip any existing protocol so we always produce a clean https:// origin
+  const stripped = raw.replace(/^https?:\/\//, '');
+  return `https://${stripped}`;
+}
+
+function buildCsp(nonce: string, path: string): string {
+  const isDev = process.env.NODE_ENV !== 'production';
+  const r2Origin = normalizeR2Origin(process.env.NEXT_PUBLIC_R2_DOMAIN);
+  const imgSources = ["'self'", r2Origin, "https://*.supabase.co", "data:", "blob:"]
+    .filter(Boolean).join(' ');
+  const mediaSources = ["'self'", r2Origin]
+    .filter(Boolean).join(' ');
+
+  // In production: nonce + strict-dynamic (Next.js auto-injects nonce on its own scripts).
+  // In dev: unsafe-inline + unsafe-eval needed for Turbopack HMR.
+  const scriptSrc = isDev
+    ? `script-src 'self' 'unsafe-inline' 'unsafe-eval'`
+    : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`;
+
+  // Admin pages must not be embeddable — use 'none' to align with X-Frame-Options: DENY
+  // set in next.config.mjs for /admin/* routes.
+  const frameAncestors = path.startsWith('/admin') ? "frame-ancestors 'none'" : "frame-ancestors 'self'";
+
+  return [
+    "default-src 'self'",
+    scriptSrc,
+    "style-src 'self' 'unsafe-inline'",
+    `img-src ${imgSources}`,
+    `media-src ${mediaSources}`,
+    "font-src 'self'",
+    "connect-src 'self' https://*.supabase.co https://api.brevo.com https://*.upstash.io",
+    "frame-src 'self' https://www.google.com https://maps.google.com",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    frameAncestors,
+    "report-uri /api/csp-report",
+  ].join('; ');
+}
+
+export async function proxy(request: NextRequest) {
+  const url = request.nextUrl.clone();
+  const path = request.nextUrl.pathname;
+  const origin = request.headers.get('origin');
+
+  // Preflight CORS
+  if (request.method === 'OPTIONS' && path.startsWith('/api/')) {
+    return addCorsHeaders(new NextResponse(null, { status: 204 }), origin);
+  }
+
+  // Admin auth (protected routes)
+  if (path.startsWith('/api/admin') && !isPublicRoute(path)) {
+    return handleAdminAuth(request, origin);
+  }
+
+  // Access token for cart
+  const accessToken = url.searchParams.get('access');
+  if (accessToken) {
+    return handleCartAccessToken(url, accessToken);
+  }
+
+  // Generate per-request nonce for CSP (HIGH-005)
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-nonce', nonce);
+
+  const csp = buildCsp(nonce, path);
+  // Set on request so server components can read it via headers()
+  requestHeaders.set('Content-Security-Policy', csp);
+
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+
+  // Set on response so the browser enforces it
+  response.headers.set('Content-Security-Policy', csp);
+
+  // Add CORS headers to public API routes (pedidos subdomain may differ from main domain)
+  if (path.startsWith('/api/')) {
+    addCorsHeaders(response, origin);
+  }
+
+  return response;
 }
 
 export const config = {

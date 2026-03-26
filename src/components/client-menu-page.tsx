@@ -20,10 +20,10 @@ interface MenuPageProps {
 
 export function MenuPage({ menuData, header, showCart = false, empresa }: Readonly<MenuPageProps>) {
   return (
-    <div className="flex min-h-screen flex-col bg-background" suppressHydrationWarning>
+    <div className="flex min-h-screen flex-col bg-background">
       {header === undefined ? null : header}
       <PromoNotification />
-      <main className="flex-1">
+      <div className="flex-1">
         <HeroBanner empresa={empresa} />
         {menuData.length > 0 ? (
           <>
@@ -43,7 +43,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa }: Readon
             </div>
           </div>
         )}
-      </main>
+      </div>
       <SiteFooter empresa={empresa} />
       <CartDrawer />
       {showCart && <CartToast />}

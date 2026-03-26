@@ -26,6 +26,7 @@ export interface UpdateProductData extends Partial<CreateProductData> {
 export interface IProductRepository {
   create(data: CreateProductData): Promise<Result<Product>>;
   findAllByTenant(empresaId: string): Promise<Result<Product[]>>;
+  findByIds(ids: string[], empresaId: string): Promise<Result<Product[]>>;
   update(id: string, empresaId: string, data: Partial<UpdateProductData>): Promise<Result<Product>>;
   delete(id: string, empresaId: string): Promise<Result<void>>;
 }

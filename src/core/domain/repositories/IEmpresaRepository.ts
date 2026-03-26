@@ -6,14 +6,14 @@ export interface UpdateEmpresaData {
   fb?: string;
   instagram?: string;
   url_mapa?: string;
-  direccion?: string;
+  direccion?: string | null;
   logo_url?: string | null;
   url_image?: string | null;
-  descripcion_es?: string;
-  descripcion_en?: string;
-  descripcion_fr?: string;
-  descripcion_it?: string;
-  descripcion_de?: string;
+  descripcion_es?: string | null;
+  descripcion_en?: string | null;
+  descripcion_fr?: string | null;
+  descripcion_it?: string | null;
+  descripcion_de?: string | null;
 }
 
 export interface IEmpresaRepository {

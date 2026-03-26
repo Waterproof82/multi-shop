@@ -1,5 +1,6 @@
 import { IPedidoRepository } from "@/core/domain/repositories/IPedidoRepository";
 import { IClienteRepository } from "@/core/domain/repositories/IClienteRepository";
+import { IProductRepository } from "@/core/domain/repositories/IProductRepository";
 import { Pedido, Result } from "@/core/domain/entities/types";
 import { logger } from "@/core/infrastructure/logging/logger";
 
@@ -7,9 +8,10 @@ export interface CreatePedidoDTO {
   items: {
     item: { id: string; name: string; price: number };
     quantity: number;
-    selectedComplements?: { name: string; price: number }[];
+    selectedComplements?: { id: string; name: string; price: number }[];
   }[];
-  total: number;
+  /** Client-supplied total is ignored — the server recalculates it from DB prices */
+  total?: number;
   nombre: string;
   telefono: string;
   email?: string;
@@ -35,7 +37,8 @@ export interface PedidoStats {
 export class PedidoUseCase {
   constructor(
     private readonly pedidoRepo: IPedidoRepository,
-    private readonly clienteRepo: IClienteRepository
+    private readonly clienteRepo: IClienteRepository,
+    private readonly productRepo: IProductRepository
   ) {}
 
   async getAll(empresaId: string): Promise<Result<Pedido[]>> {
@@ -64,7 +67,7 @@ export class PedidoUseCase {
     }
   }
 
-  async create(empresaId: string, data: CreatePedidoDTO): Promise<Result<{ id: string; numero_pedido: number }>> {
+  async create(empresaId: string, data: CreatePedidoDTO): Promise<Result<{ id: string; numero_pedido: number; total: number }>> {
     try {
       let clienteResult = await this.clienteRepo.findByTelefono(data.telefono, empresaId);
       if (!clienteResult.success) {
@@ -109,7 +112,67 @@ export class PedidoUseCase {
         clienteId = createResult.data.id;
       }
 
-      const pedidoResult = await this.pedidoRepo.create(empresaId, clienteId, data.items, data.total);
+      // Recalculate total server-side from DB prices to prevent price tampering.
+      // Includes complement IDs so both product and complement prices are validated against DB.
+      const productIds = data.items
+        .map(ci => ci.item?.id)
+        .filter((id): id is string => Boolean(id));
+
+      const complementIds = data.items
+        .flatMap(ci => ci.selectedComplements ?? [])
+        .map(c => c.id)
+        .filter((id): id is string => Boolean(id));
+
+      const allIds = [...new Set([...productIds, ...complementIds])];
+
+      let priceMap: Map<string, number> = new Map();
+      if (allIds.length > 0) {
+        const productsResult = await this.productRepo.findByIds(allIds, empresaId);
+        if (!productsResult.success) {
+          return { success: false, error: productsResult.error };
+        }
+        priceMap = new Map(productsResult.data.map(p => [p.id, p.precio]));
+      }
+
+      // Verify all product IDs exist in DB — reject orders with unknown products
+      for (const ci of data.items) {
+        const pid = ci.item?.id;
+        if (pid && !priceMap.has(pid)) {
+          return {
+            success: false,
+            error: {
+              code: 'PRODUCT_NOT_FOUND',
+              message: `Producto no encontrado: ${pid}`,
+              module: 'use-case',
+              method: 'PedidoUseCase.create',
+            },
+          };
+        }
+        for (const c of ci.selectedComplements ?? []) {
+          if (c.id && !priceMap.has(c.id)) {
+            return {
+              success: false,
+              error: {
+                code: 'PRODUCT_NOT_FOUND',
+                message: `Complemento no encontrado: ${c.id}`,
+                module: 'use-case',
+                method: 'PedidoUseCase.create',
+              },
+            };
+          }
+        }
+      }
+
+      const serverTotal = data.items.reduce((sum, ci) => {
+        const unitPrice = priceMap.get(ci.item?.id ?? '') ?? 0;
+        const complementsTotal = (ci.selectedComplements ?? []).reduce(
+          (cs, c) => cs + (priceMap.get(c.id) ?? 0),
+          0
+        );
+        return sum + (unitPrice + complementsTotal) * ci.quantity;
+      }, 0);
+
+      const pedidoResult = await this.pedidoRepo.create(empresaId, clienteId, data.items, serverTotal);
       if (!pedidoResult.success) {
         return { success: false, error: pedidoResult.error };
       }

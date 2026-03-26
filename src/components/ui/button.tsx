@@ -58,3 +58,9 @@ function Button({
 }
 
 export { Button, buttonVariants }
+export type { VariantProps } from 'class-variance-authority'
+
+export type ButtonProps = Readonly<React.ComponentProps<'button'> &
+  VariantProps<typeof buttonVariants> & {
+    asChild?: boolean
+  }>

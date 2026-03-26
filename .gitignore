@@ -39,6 +39,9 @@ Thumbs.db
 network-requests.json
 *.network-requests.json
 
+# Supabase CLI cache
+supabase/.temp/
+
 # Misc
 *.local
 *.sublime-workspace

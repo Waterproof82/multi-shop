@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { pedidoUseCase } from '@/core/infrastructure/database';
-import { requireAuth, successResponse, validationErrorResponse, handleResult } from '@/core/infrastructure/api/helpers';
+import { requireAuth, requireRole, successResponse, validationErrorResponse, handleResult } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import { PEDIDO_ESTADOS } from '@/core/domain/constants/pedido';
 
@@ -29,10 +29,20 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const rateLimited = await rateLimitAdmin(request);
+  if (rateLimited) return rateLimited;
+
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
+  const roleError = requireRole(request, ['admin']);
+  if (roleError) return roleError;
 
-  const body = await request.json();
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return validationErrorResponse('Invalid request body');
+  }
   const parsed = updatePedidoSchema.safeParse(body);
 
   if (!parsed.success) {
@@ -47,11 +57,21 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const rateLimited = await rateLimitAdmin(request);
+  if (rateLimited) return rateLimited;
+
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
+  const roleError = requireRole(request, ['admin']);
+  if (roleError) return roleError;
 
-  const body = await request.json();
-  const parsed = pedidoIdSchema.safeParse({ id: body.id });
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return validationErrorResponse('Invalid request body');
+  }
+  const parsed = pedidoIdSchema.safeParse({ id: (body as Record<string, unknown>).id });
 
   if (!parsed.success) {
     return validationErrorResponse('ID inválido');
@@ -70,14 +90,19 @@ export async function PUT(request: NextRequest) {
 
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
+  const roleError = requireRole(request, ['admin']);
+  if (roleError) return roleError;
 
   const { searchParams } = new URL(request.url);
   const mesParam = searchParams.get('mes');
   const añoParam = searchParams.get('año');
 
   const now = new Date();
-  const selectedMonth = mesParam ? Number.parseInt(mesParam) : now.getMonth();
-  const selectedYear = añoParam ? Number.parseInt(añoParam) : now.getFullYear();
+  const mesSchema = z.coerce.number().int().min(0).max(11);
+  const añoSchema = z.coerce.number().int().min(2020).max(2100);
+
+  const selectedMonth = mesParam ? (mesSchema.safeParse(mesParam).data ?? now.getMonth()) : now.getMonth();
+  const selectedYear = añoParam ? (añoSchema.safeParse(añoParam).data ?? now.getFullYear()) : now.getFullYear();
 
   const result = await pedidoUseCase.getStats(empresaId!, selectedMonth, selectedYear);
   if (!result.success) {

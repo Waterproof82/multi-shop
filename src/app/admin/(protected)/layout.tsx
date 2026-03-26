@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { AdminSidebar } from './admin-sidebar';
@@ -5,6 +6,10 @@ import { AdminProvider } from '@/lib/admin-context';
 import { authAdminUseCase } from '@/core/infrastructure/database';
 import { AdminThemeProvider } from '@/components/admin-theme-provider';
 import { EmpresaThemeProvider } from '@/components/empresa-theme-provider';
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 export default async function AdminProtectedLayout({
   children,
@@ -30,7 +35,7 @@ export default async function AdminProtectedLayout({
   return (
     <AdminThemeProvider>
       <EmpresaThemeProvider colores={empresa?.colores || null}>
-        <AdminProvider empresaId={empresaId} empresaNombre={empresa?.nombre || 'default'}>
+        <AdminProvider empresaId={empresaId} empresaNombre={empresa?.nombre || 'default'} empresaLogo={empresa?.logoUrl}>
           <div className="min-h-screen bg-muted">
             {/* Skip to main content link for accessibility */}
             <a

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { useReducedMotion } from "framer-motion"
 import { cn } from "@/lib/utils"
 import type { MenuCategoryVM } from "@/core/application/dtos/menu-view-model"
 import { useLanguage } from "@/lib/language-context"
@@ -17,6 +18,7 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
   const navRef = useRef<HTMLDivElement>(null)
   const isManualScrolling = useRef(false)
   const timeoutRef = useRef<NodeJS.Timeout>(null)
+  const shouldReduceMotion = useReducedMotion() ?? false
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -50,13 +52,13 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
       const activeBtn = navRef.current.querySelector(`button[data-id="${activeId}"]`)
       if (activeBtn) {
         activeBtn.scrollIntoView({
-          behavior: "smooth",
+          behavior: shouldReduceMotion ? "instant" : "smooth",
           block: "nearest",
           inline: "center",
         })
       }
     }
-  }, [activeId])
+  }, [activeId, shouldReduceMotion])
 
   const scrollTo = (id: string) => {
     const el = document.getElementById(id)
@@ -64,19 +66,27 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
       isManualScrolling.current = true
       setActiveId(id)
 
-      const offset = 140
-      const elementPosition = el.getBoundingClientRect().top + window.scrollY
-      const offsetPosition = elementPosition - offset
+      // Temporarily disable content-visibility so getBoundingClientRect returns real positions
+      const sections = document.querySelectorAll<HTMLElement>('section.cv-auto')
+      sections.forEach((s) => { s.style.contentVisibility = 'visible' })
 
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: "smooth",
+      requestAnimationFrame(() => {
+        const offset = 140
+        const elementPosition = el.getBoundingClientRect().top + window.scrollY
+        const offsetPosition = elementPosition - offset
+
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: shouldReduceMotion ? "instant" : "smooth",
+        })
+
+        // Restore content-visibility after scroll settles
+        if (timeoutRef.current) clearTimeout(timeoutRef.current)
+        timeoutRef.current = setTimeout(() => {
+          sections.forEach((s) => { s.style.contentVisibility = '' })
+          isManualScrolling.current = false
+        }, 1000)
       })
-
-      if (timeoutRef.current) clearTimeout(timeoutRef.current)
-      timeoutRef.current = setTimeout(() => {
-        isManualScrolling.current = false
-      }, 1000)
     }
   }
 

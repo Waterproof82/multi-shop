@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useCallback, useEffect } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Plus, Minus, Check } from "lucide-react"
 import {
   Dialog,
@@ -10,59 +10,19 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { RippleButton } from "@/components/ui/ripple-button"
 import { useLanguage } from "@/lib/language-context"
 import { useCart } from "@/lib/cart-context"
 import { t } from "@/lib/translations"
+import { formatPrice } from "@/lib/format-price"
 import type { MenuItemVM, ComplementVM } from "@/core/application/dtos/menu-view-model"
 
 interface QuantitySelectorDialogProps {
   item: MenuItemVM | null
   open: boolean
   onOpenChange: (open: boolean) => void
-}
-
-function RippleButton({ children, onClick, className, disabled, variant = "default", size = "default", 'aria-label': ariaLabel, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "default" | "outline"; size?: "default" | "icon" }) {
-  const buttonRef = useRef<HTMLButtonElement>(null);
-
-  const createRipple = (event: React.MouseEvent<HTMLButtonElement>) => {
-    const button = event.currentTarget;
-    const rect = button.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    const ripple = document.createElement("span");
-    ripple.className = "ripple";
-    ripple.style.left = `${x}px`;
-    ripple.style.top = `${y}px`;
-    const existingRipple = button.querySelector(".ripple");
-    if (existingRipple) existingRipple.remove();
-    button.appendChild(ripple);
-    setTimeout(() => ripple.remove(), 500);
-  }
-
-  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    if (!disabled) {
-      createRipple(e);
-      onClick?.(e);
-    }
-  }
-
-  return (
-    <Button
-      ref={buttonRef}
-      variant={variant}
-      size={size}
-      className={`relative overflow-hidden ${className}`}
-      disabled={disabled}
-      onClick={handleClick}
-      aria-label={ariaLabel}
-      {...props}
-    >
-      {children}
-    </Button>
-  );
 }
 
 export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogProps>) {
@@ -128,7 +88,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px] flex flex-col max-h-[80vh]">
+      <DialogContent className="sm:max-w-[425px] flex flex-col max-h-[80vh]" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>{t("selectQuantity", language)}</DialogTitle>
           <DialogDescription>
@@ -181,7 +141,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
                         </div>
                       </div>
                       <span className="font-semibold text-sm">
-                        +{complement.price.toFixed(2).replace(".", ",")}€
+                        +{formatPrice(complement.price)}
                       </span>
                     </button>
                   );
@@ -203,6 +163,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
                 className="h-11 w-11 md:h-10 md:w-10"
                 onClick={handleDecrement}
                 disabled={quantity <= 1}
+                aria-label={t("reduceQuantity", language)}
               >
                 <Minus className="h-4 w-4" />
               </RippleButton>
@@ -212,18 +173,18 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
                 value={quantity}
                 className="mx-1 h-10 w-12 flex items-center justify-center text-center text-lg font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 readOnly
-                tabIndex={-1}
+                tabIndex={0}
                 aria-live="polite"
                 aria-label={t("quantity", language)}
               />
-              <RippleButton variant="outline" size="icon" className="h-11 w-11 md:h-10 md:w-10" onClick={handleIncrement}>
+              <RippleButton variant="outline" size="icon" className="h-11 w-11 md:h-10 md:w-10" onClick={handleIncrement} aria-label={t("increaseQuantity", language)}>
                 <Plus className="h-4 w-4" />
               </RippleButton>
             </div>
           </div>
           <div className="flex justify-between items-center text-lg font-bold">
             <span>{t("total", language)}:</span>
-            <span className="animate-price-update" key={totalPrice}>{totalPrice.toFixed(2).replace(".", ",")}€</span>
+            <span className="animate-price-update" key={totalPrice}>{formatPrice(totalPrice)}</span>
           </div>
         </div>
         

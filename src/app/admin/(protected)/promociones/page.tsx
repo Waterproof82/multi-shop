@@ -6,6 +6,9 @@ import { Users, Mail, FileText, Send, CheckCircle, Image as ImageIcon, Loader2 }
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { fetchWithCsrf, getCsrfToken } from '@/lib/csrf-client';
+import { logClientError } from '@/lib/client-error';
+import { useLanguage } from '@/lib/language-context';
+import { t } from '@/lib/translations';
 
 interface Cliente {
   id: string;
@@ -23,7 +26,7 @@ interface Promocion {
   created_at: string;
 }
 
-// Optimizar imagen antes de subir (reduce a 480x480, WebP, 80% calidad)
+// Optimize image before upload (resize to 480x480, WebP, 80% quality)
 const MAX_WIDTH = 480;
 const MAX_HEIGHT = 480;
 const QUALITY = 0.8;
@@ -77,6 +80,7 @@ async function optimizeImage(file: File): Promise<{ file: File; type: string }> 
 }
 
 export default function PromocionesPage() {
+  const { language } = useLanguage();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [promociones, setPromociones] = useState<Promocion[]>([]);
   const [savingPromo, setSavingPromo] = useState(false);
@@ -104,7 +108,7 @@ export default function PromocionesPage() {
           setPromociones(data.promociones || []);
         }
       } catch (error) {
-        console.error('Error fetching data:', error);
+        logClientError(error, 'fetchData');
       } finally {
         // Data loaded
       }
@@ -117,9 +121,9 @@ export default function PromocionesPage() {
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // El archivo se optimizará antes de subir, pero advertimos si es muy grande
+      // The file will be optimized before upload, but warn if too large
       if (file.size > 10 * 1024 * 1024) {
-        alert('La imagen se optimizará automáticamente antes de subir.');
+        alert('The image will be optimized automatically before uploading.');
       }
       setSelectedImage(file);
       // Create preview URL
@@ -139,12 +143,12 @@ export default function PromocionesPage() {
     
     setSavingPromo(true);
     try {
-      // Upload image to R2 if selected (optimizada)
+      // Upload image to R2 if selected (optimized)
       let imagenUrl: string | null = null;
       if (selectedImage) {
         setUploadingImage(true);
         try {
-          // Optimizar imagen antes de subir
+          // Optimize image before upload
           const optimized = await optimizeImage(selectedImage);
           
           const formData = new FormData();
@@ -159,12 +163,12 @@ export default function PromocionesPage() {
             const data = await uploadRes.json().catch(() => ({})) as { error?: string };
             // Handle 413 specifically - file too large for proxy
             if (uploadRes.status === 413) {
-              throw new Error('La imagen es demasiado grande. Máximo 10MB.');
+              throw new Error(t("imageTooLarge", language));
             }
-            throw new Error(data.error ?? 'Error al subir imagen');
+            throw new Error(data.error ?? t("imageUploadError", language));
           }
           const data = await uploadRes.json() as { publicUrl?: string };
-          if (!data.publicUrl) throw new Error('No se recibió la URL de la imagen');
+          if (!data.publicUrl) throw new Error(t("imageUrlError", language));
           imagenUrl = data.publicUrl;
         } finally {
           setUploadingImage(false);
@@ -188,8 +192,8 @@ export default function PromocionesPage() {
         setTimeout(() => setShowSuccess(false), 3000);
       }
     } catch (error) {
-      console.error('Error creating promocion:', error);
-      alert('Error al crear la promoción');
+      logClientError(error, 'handleCreatePromocion');
+      alert(t("promoCreateError", language));
     } finally {
       setSavingPromo(false);
     }
@@ -201,19 +205,19 @@ export default function PromocionesPage() {
       <div className="bg-primary rounded-lg p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-primary-foreground">Promociones</h1>
-            <p className="text-primary-foreground/80 text-sm mt-1">Envía promociones a tus clientes</p>
+            <h1 className="text-2xl font-semibold text-primary-foreground">{t("promotionsTitle", language)}</h1>
+            <p className="text-primary-foreground/80 text-sm mt-1">{t("promotionsSubtitle", language)}</p>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-primary-foreground/20 rounded-lg px-4 py-3 text-center">
               <Users className="w-6 h-6 text-primary-foreground mx-auto mb-1" />
               <span className="text-2xl font-semibold text-primary-foreground">{clientes.length}</span>
-              <p className="text-primary-foreground/80 text-xs">Total</p>
+              <p className="text-primary-foreground/80 text-xs">{t("total", language)}</p>
             </div>
             <div className="bg-primary-foreground/20 rounded-lg px-4 py-3 text-center">
               <Mail className="w-6 h-6 text-primary-foreground mx-auto mb-1" />
               <span className="text-2xl font-semibold text-primary-foreground" aria-live="polite">{clientesConPromociones.length}</span>
-              <p className="text-primary-foreground/80 text-xs">Para enviar</p>
+              <p className="text-primary-foreground/80 text-xs">{t("toSend", language)}</p>
             </div>
           </div>
         </div>
@@ -223,13 +227,13 @@ export default function PromocionesPage() {
       <div className="bg-card rounded-lg border shadow-elegant p-6">
         <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
           <Send className="w-5 h-5" />
-          Nueva Promoción
+          {t("newPromotion", language)}
         </h2>
         
         <div className="space-y-4">
           <div>
             <label htmlFor="promo_texto" className="block text-sm font-medium text-foreground mb-1">
-              Mensaje de la promoción
+              {t("promoMessageLabel", language)}
             </label>
             <Textarea
               id="promo_texto"
@@ -243,7 +247,7 @@ export default function PromocionesPage() {
           {/* Imagen de la promoción */}
           <div>
             <label htmlFor="promo-image" className="block text-sm font-medium text-foreground mb-1">
-              Imagen de la promoción (opcional)
+              {t("promoImageLabel", language)}
             </label>
             {previewImage ? (
               <div className="relative group rounded-lg overflow-hidden border h-48 mb-2">
@@ -257,9 +261,9 @@ export default function PromocionesPage() {
                   <button
                     type="button"
                     onClick={handleRemoveImage}
-                    className="px-3 py-1.5 bg-destructive text-destructive-foreground rounded-md text-sm hover:bg-destructive/90"
+                    className="px-3 py-1.5 bg-destructive text-destructive-foreground rounded-md text-sm hover:bg-destructive/90 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
-                    Eliminar
+                    {t("delete", language)}
                   </button>
                 </div>
               </div>
@@ -275,7 +279,7 @@ export default function PromocionesPage() {
                 <label htmlFor="promo-image" className="cursor-pointer">
                   <ImageIcon className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
                   <span className="text-sm text-muted-foreground">
-                    Click para seleccionar una imagen
+                    {t("clickToSelectImage", language)}
                   </span>
                   <p className="text-xs text-muted-foreground/50 mt-1">
                     JPEG, PNG, WEBP (max 10MB)
@@ -284,7 +288,7 @@ export default function PromocionesPage() {
               </div>
             )}
             <p className="text-xs text-muted-foreground mt-1">
-              Esta imagen se mostrará adjunta en el correo electrónico
+              {t("imageInEmail", language)}
             </p>
           </div>
 
@@ -292,9 +296,9 @@ export default function PromocionesPage() {
           <div className="bg-muted rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-foreground">
-                Esta promoción se enviará a:
+                {t("promoSendTo", language)}
               </span>
-              <span className="text-lg font-bold text-primary">{clientesConPromociones.length} clientes</span>
+              <span className="text-lg font-bold text-primary">{clientesConPromociones.length} {t("clients", language)}</span>
             </div>
             {clientesConPromociones.length > 0 ? (
               <div className="flex flex-wrap gap-2 mt-3">
@@ -309,13 +313,13 @@ export default function PromocionesPage() {
                 ))}
                 {clientesConPromociones.length > 10 && (
                   <span className="inline-flex items-center px-2 py-1 bg-muted rounded-full text-xs text-foreground">
-                    +{clientesConPromociones.length - 10} más
+                    +{clientesConPromociones.length - 10} {t("moreLabel", language)}
                   </span>
                 )}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground mt-2" role="status" aria-live="polite">
-                No hay clientes con promociones activadas
+                {t("noClientsWithPromos", language)}
               </p>
             )}
           </div>
@@ -324,7 +328,7 @@ export default function PromocionesPage() {
             {showSuccess ? (
               <div className="flex items-center gap-2 text-primary" role="status" aria-live="polite">
                 <CheckCircle className="w-5 h-5" />
-                <span className="font-medium">Promoción guardada correctamente</span>
+                <span className="font-medium">{t("promoSavedSuccess", language)}</span>
               </div>
             ) : (
               <Button
@@ -335,12 +339,12 @@ export default function PromocionesPage() {
                 {savingPromo ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    {uploadingImage ? 'Subiendo imagen...' : 'Enviando...'}
+                    {uploadingImage ? t("uploadingImageProgress", language) : t("sendingProgress", language)}
                   </>
                 ) : (
                   <>
                     <Send className="w-4 h-4" />
-                    Guardar y Enviar
+                    {t("saveAndSend", language)}
                   </>
                 )}
               </Button>
@@ -353,7 +357,7 @@ export default function PromocionesPage() {
           <div className="bg-card rounded-lg border shadow-elegant p-6">
             <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
               <FileText className="w-5 h-5" />
-              Última Promoción
+              {t("lastPromotion", language)}
             </h2>
             <div className="space-y-3">
               {promociones.slice(0, 1).map((promo) => (
@@ -378,7 +382,7 @@ export default function PromocionesPage() {
                     </div>
                     <div className="text-right px-4">
                       <span className="text-2xl font-bold text-primary">{promo.numero_envios}</span>
-                      <p className="text-xs text-muted-foreground">clientes</p>
+                      <p className="text-xs text-muted-foreground">{t("clients", language)}</p>
                     </div>
                   </div>
                 </div>
@@ -388,7 +392,7 @@ export default function PromocionesPage() {
         ) : (
           <div className="bg-card rounded-lg border p-12 shadow-elegant text-center" role="status" aria-live="polite">
             <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">No hay promociones guardadas</p>
+            <p className="text-muted-foreground">{t("noPromotions", language)}</p>
           </div>
         )}
       </div>

@@ -298,7 +298,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
 
       if (empresa) return { success: true, data: empresa };
 
-      const isPedidos = dominio.startsWith(`${DEFAULT_PEDIDOS_SUBDOMAIN}.`) || dominio.includes('-pedidos');
+      const isPedidos = dominio.startsWith(`${DEFAULT_PEDIDOS_SUBDOMAIN}.`) || dominio.endsWith('-pedidos');
 
       if (isPedidos) {
         const mainDomainFromSubdomain = dominio.split('.').slice(1).join('.');
@@ -394,7 +394,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
 
       if (data) return { success: true, data: SupabaseEmpresaRepository.mapToEmpresaPublic(data as Record<string, unknown>) };
 
-      const isPedidos = domain.startsWith(`${DEFAULT_PEDIDOS_SUBDOMAIN}.`) || domain.includes('-pedidos');
+      const isPedidos = domain.startsWith(`${DEFAULT_PEDIDOS_SUBDOMAIN}.`) || domain.endsWith('-pedidos');
       if (isPedidos) {
         const mainDomain = domain.split('.').slice(1).join('.');
         const { data: subdomainData } = await this.supabase

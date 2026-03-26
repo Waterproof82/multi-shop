@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { productUseCase } from '@/core/infrastructure/database';
 import { createProductSchema, updateProductSchema, productIdSchema } from '@/core/application/dtos/product.dto';
-import { requireAuth, handleResult, handleResultWithStatus, validationErrorResponse } from '@/core/infrastructure/api/helpers';
+import { requireAuth, requireRole, handleResult, handleResultWithStatus, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import type { Product } from '@/core/domain/entities/types';
 
@@ -47,11 +47,21 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const rateLimited = await rateLimitAdmin(request);
+  if (rateLimited) return rateLimited;
+
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
+  const roleError = requireRole(request, ['admin']);
+  if (roleError) return roleError;
 
-  const body = await request.json();
-  const parsed = createProductSchema.safeParse({ ...body, empresaId });
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return validationErrorResponse('Invalid request body');
+  }
+  const parsed = createProductSchema.safeParse({ ...(body as Record<string, unknown>), empresaId });
 
   if (!parsed.success) {
     return validationErrorResponse(parsed.error.errors[0].message);
@@ -67,8 +77,13 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const rateLimited = await rateLimitAdmin(request);
+  if (rateLimited) return rateLimited;
+
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
+  const roleError = requireRole(request, ['admin']);
+  if (roleError) return roleError;
 
   const { searchParams } = new URL(request.url);
   const idParam = searchParams.get('id');
@@ -78,9 +93,14 @@ export async function PUT(request: NextRequest) {
     return validationErrorResponse('ID inválido');
   }
 
-  const body = await request.json();
-  const { id: _bodyId, ...updateData } = body;
-  
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return validationErrorResponse('Invalid request body');
+  }
+  const { id: _bodyId, ...updateData } = body as Record<string, unknown>;
+
   // Merge id from query param with body data
   const dataWithId = { ...updateData, id: idParsed.data.id };
   const parsed = updateProductSchema.safeParse(dataWithId);
@@ -99,8 +119,13 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const rateLimited = await rateLimitAdmin(request);
+  if (rateLimited) return rateLimited;
+
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
+  const roleError = requireRole(request, ['admin']);
+  if (roleError) return roleError;
 
   const { searchParams } = new URL(request.url);
   const idParam = searchParams.get('id');

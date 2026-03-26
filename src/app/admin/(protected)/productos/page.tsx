@@ -5,9 +5,12 @@ import Image from 'next/image';
 import { Plus, Pencil, Trash2, Loader2, Image as ImageIcon, Search, ArrowUpDown, ArrowUp, ArrowDown, Utensils, Star } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useAdmin } from '@/lib/admin-context';
+import { useLanguage } from '@/lib/language-context';
+import { t } from '@/lib/translations';
 import { ProductFormDialog, DeleteConfirmDialog } from '@/components/admin/product-form-dialog';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import type { ProductoFormData } from '@/components/admin/product-form-dialog';
+import { formatPrice } from '@/lib/format-price';
 
 interface Categoria {
   id: string;
@@ -63,6 +66,7 @@ const SortIndicator = ({ field, currentField, direction }: { field: keyof Produc
 
 export default function ProductosPage() {
   const { empresaSlug } = useAdmin();
+  const { language } = useLanguage();
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);
@@ -98,7 +102,7 @@ export default function ProductosPage() {
         setCategorias(catData);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setError(err instanceof Error ? err.message : t("unknownError", language));
     } finally {
       setLoading(false);
     }
@@ -139,13 +143,13 @@ export default function ProductosPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || 'Error al guardar');
+        throw new Error(data.error || t("saveError", language));
       }
 
       await fetchData();
       closeModal();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setError(err instanceof Error ? err.message : t("unknownError", language));
     } finally {
       setSaving(false);
     }
@@ -187,6 +191,22 @@ export default function ProductosPage() {
     setEditingId(null);
   };
 
+  const toggleActivo = async (prod: Producto) => {
+    const newActivo = !prod.activo;
+    setProductos(prev => prev.map(p => p.id === prod.id ? { ...p, activo: newActivo } : p));
+    try {
+      const res = await fetchWithCsrf(`/api/admin/productos?id=${prod.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ activo: newActivo }),
+      });
+      if (!res.ok) {
+        setProductos(prev => prev.map(p => p.id === prod.id ? { ...p, activo: prod.activo } : p));
+      }
+    } catch {
+      setProductos(prev => prev.map(p => p.id === prod.id ? { ...p, activo: prod.activo } : p));
+    }
+  };
+
   const getCategoriaNombre = (categoriaId: string | null) => {
     if (!categoriaId) return '—';
     const cat = categorias.find(c => c.id === categoriaId);
@@ -218,10 +238,10 @@ export default function ProductosPage() {
       const res = await fetchWithCsrf(`/api/admin/productos?id=${deleteConfirm.id}`, {
         method: 'DELETE',
       });
-      if (!res.ok) throw new Error('Error al eliminar');
+      if (!res.ok) throw new Error(t("deleteError", language));
       await fetchData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setError(err instanceof Error ? err.message : t("unknownError", language));
     } finally {
       setDeleteConfirm({ show: false, id: null, nombre: null });
     }
@@ -290,19 +310,19 @@ export default function ProductosPage() {
       <div className="bg-primary rounded-lg p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">Productos</h1>
-            <p className="text-primary-foreground/80 text-sm mt-1">Gestiona los productos del menú</p>
+            <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">{t("productsTitle", language)}</h1>
+            <p className="text-primary-foreground/80 text-sm mt-1">{t("productsSubtitle", language)}</p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
               <Utensils className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
               <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{productos.length}</span>
-              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Total</p>
+              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">{t("total", language)}</p>
             </div>
             <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
               <Star className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
               <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{productosEspeciales}</span>
-              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">Destacados</p>
+              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">{t("destacados", language)}</p>
             </div>
           </div>
         </div>
@@ -314,19 +334,19 @@ export default function ProductosPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="Buscar productos..."
+            placeholder={t("searchProducts", language)}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            aria-label="Buscar productos"
+            aria-label={t("searchProducts", language)}
             className="pl-10 w-full"
           />
         </div>
         <button
           onClick={openCreateModal}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 w-full sm:w-auto justify-center"
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 w-full sm:w-auto justify-center outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px]"
         >
           <Plus className="h-4 w-4" />
-          <span>Nuevo producto</span>
+          <span>{t("newProduct", language)}</span>
         </button>
       </div>
 
@@ -338,7 +358,7 @@ export default function ProductosPage() {
 
       {categorias.length === 0 && (
         <div className="mb-4 p-4 bg-secondary border border-border text-secondary-foreground rounded-md">
-          No hay categorías creadas. Crea una primero en la sección de Categorías.
+          {t("noCategoriesWarning", language)}
         </div>
       )}
 
@@ -349,46 +369,46 @@ export default function ProductosPage() {
             <thead className="bg-muted">
               <tr>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
-                  Imagen
+                  {t("image", language)}
                 </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase" aria-sort={getAriaSortValue('titulo_es')}>
                   <button 
-                    className="flex items-center gap-1 hover:bg-muted"
+                    className="flex items-center gap-1 hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm px-1"
                     onClick={() => handleSort('titulo_es')}
                   >
-                    Nombre (ES)
+                    {t("nameES", language)}
                     <SortIndicator field="titulo_es" currentField={sortField} direction={sortDirection} />
                   </button>
                 </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase" aria-sort={getAriaSortValue('precio')}>
                   <button 
-                    className="flex items-center gap-1 hover:bg-muted"
+                    className="flex items-center gap-1 hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm px-1"
                     onClick={() => handleSort('precio')}
                   >
-                    Precio
+                    {t("price", language)}
                     <SortIndicator field="precio" currentField={sortField} direction={sortDirection} />
                   </button>
                 </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase" aria-sort={getAriaSortValue('categoria')}>
                   <button 
-                    className="flex items-center gap-1 hover:bg-muted"
+                    className="flex items-center gap-1 hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm px-1"
                     onClick={() => handleSort('categoria')}
                   >
-                    Categoría
+                    {t("category", language)}
                     <SortIndicator field="categoria" currentField={sortField} direction={sortDirection} />
                   </button>
                 </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase" aria-sort={getAriaSortValue('activo')}>
                   <button 
-                    className="flex items-center gap-1 hover:bg-muted"
+                    className="flex items-center gap-1 hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm px-1"
                     onClick={() => handleSort('activo')}
                   >
-                    Estado
+                    {t("status", language)}
                     <SortIndicator field="activo" currentField={sortField} direction={sortDirection} />
                   </button>
                 </th>
-                <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">
-                  Acciones
+                <th scope="col" aria-sort="none" className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">
+                  {t("actions", language)}
                 </th>
               </tr>
             </thead>
@@ -403,6 +423,7 @@ export default function ProductosPage() {
                         width={40}
                         height={40}
                         className="h-10 w-10 rounded-md object-cover"
+                        loading="lazy"
                         unoptimized
                       />
                     ) : (
@@ -416,7 +437,7 @@ export default function ProductosPage() {
                       {prod.titulo_es}
                       {prod.es_especial && (
                         <span className="ml-2 px-2 py-0.5 text-xs bg-accent/10 text-accent rounded-full">
-                          Especial
+                          {t("especial", language)}
                         </span>
                       )}
                     </div>
@@ -427,31 +448,35 @@ export default function ProductosPage() {
                     )}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-foreground">
-                    {prod.precio.toFixed(2)} €
+                    {formatPrice(prod.precio)}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
                     {getCategoriaNombre(prod.categoria_id)}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <span className={`px-2 py-1 text-xs rounded-full ${
-                      prod.activo 
-                        ? 'bg-primary/10 text-primary' 
-                        : 'bg-muted text-foreground'
-                    }`}>
-                      {prod.activo ? 'Activo' : 'Inactivo'}
-                    </span>
+                    <button
+                      onClick={() => toggleActivo(prod)}
+                      aria-label={`${prod.activo ? t("inactive", language) : t("active", language)} ${prod.titulo_es}`}
+                      className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                        prod.activo
+                          ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                          : 'bg-muted text-foreground hover:bg-muted/80'
+                      }`}
+                    >
+                      {prod.activo ? t("active", language) : t("inactive", language)}
+                    </button>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
                     <button
                       onClick={() => openEditModal(prod)}
-                      className="text-primary hover:text-primary/80 mr-3"
+                      className="p-2 text-primary hover:text-primary/80 mr-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
                       aria-label={`Editar ${prod.titulo_es}`}
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => handleDeleteProduct(prod.id)}
-                      className="text-destructive hover:text-destructive/80"
+                      className="p-2 text-destructive hover:text-destructive/80 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
                       aria-label={`Eliminar ${prod.titulo_es}`}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -462,7 +487,7 @@ export default function ProductosPage() {
               {filteredProductos.length === 0 && (
                 <tr>
                   <td colSpan={6} aria-live="polite" className="px-6 py-8 text-center text-muted-foreground">
-                    {searchTerm ? 'No se encontraron productos con ese criterio.' : 'No hay productos. Crea el primero.'}
+                    {searchTerm ? t("noProductsFound", language) : t("noProductsYet", language)}
                   </td>
                 </tr>
               )}
@@ -475,22 +500,23 @@ export default function ProductosPage() {
           {filteredProductos.map((prod) => (
             <div key={prod.id} className="p-4 hover:bg-muted/50">
               <div className="flex gap-3">
-                <div className="flex-shrink-0">
-                  {prod.foto_url ? (
-                    <Image 
-                      src={prod.foto_url} 
-                      alt={prod.titulo_es}
-                      width={64}
-                      height={64}
-                      className="h-16 w-16 rounded-md object-cover"
-                      unoptimized
-                    />
-                  ) : (
-                    <div className="h-16 w-16 rounded-md bg-muted flex items-center justify-center">
-                      <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                    </div>
-                  )}
-                </div>
+                  <div className="flex-shrink-0">
+                    {prod.foto_url ? (
+                      <Image 
+                        src={prod.foto_url} 
+                        alt={prod.titulo_es}
+                        width={64}
+                        height={64}
+                        className="h-16 w-16 rounded-md object-cover"
+                        loading="lazy"
+                        unoptimized
+                      />
+                    ) : (
+                      <div className="h-16 w-16 rounded-md bg-muted flex items-center justify-center">
+                        <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between">
                     <div>
@@ -498,7 +524,7 @@ export default function ProductosPage() {
                         {prod.titulo_es}
                         {prod.es_especial && (
                           <span className="ml-2 px-2 py-0.5 text-xs bg-accent/10 text-accent rounded-full">
-                            Especial
+                            {t("especial", language)}
                           </span>
                         )}
                       </p>
@@ -507,14 +533,14 @@ export default function ProductosPage() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => openEditModal(prod)}
-                        className="p-1.5 text-primary hover:bg-primary/10 dark:hover:bg-primary/20 rounded"
+                        className="p-1.5 min-h-[44px] min-w-[44px] flex items-center justify-center text-primary hover:bg-primary/10 dark:hover:bg-primary/20 rounded outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         aria-label={`Editar ${prod.titulo_es}`}
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => handleDeleteProduct(prod.id)}
-                        className="p-1.5 text-destructive hover:bg-destructive/10 rounded"
+                        className="p-1.5 min-h-[44px] min-w-[44px] flex items-center justify-center text-destructive hover:bg-destructive/10 rounded outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         aria-label={`Eliminar ${prod.titulo_es}`}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -523,13 +549,16 @@ export default function ProductosPage() {
                   </div>
                   <div className="mt-2 flex items-center justify-between">
                     <span className="text-sm font-medium text-foreground">{prod.precio.toFixed(2)} €</span>
-                    <span className={`px-2 py-1 text-xs rounded-full ${
-                      prod.activo 
-                        ? 'bg-primary/10 text-primary' 
-                        : 'bg-muted text-foreground'
-                    }`}>
-                      {prod.activo ? 'Activo' : 'Inactivo'}
-                    </span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleActivo(prod); }}
+                      className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
+                        prod.activo
+                          ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                          : 'bg-muted text-foreground hover:bg-muted/80'
+                      }`}
+                    >
+                      {prod.activo ? t("active", language) : t("inactive", language)}
+                    </button>
                   </div>
                   {prod.descripcion_es && (
                     <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{prod.descripcion_es}</p>
@@ -540,7 +569,7 @@ export default function ProductosPage() {
           ))}
           {filteredProductos.length === 0 && (
             <div className="p-8 text-center text-muted-foreground">
-              {searchTerm ? 'No se encontraron productos con ese criterio.' : 'No hay productos. Crea el primero.'}
+              {searchTerm ? t("noProductsFound", language) : t("noProductsYet", language)}
             </div>
           )}
         </div>

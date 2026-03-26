@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { empresaUseCase } from '@/core/infrastructure/database';
 import { updateEmpresaSchema } from '@/core/application/dtos/empresa.dto';
-import { requireAuth, handleResult, errorResponse, validationErrorResponse } from '@/core/infrastructure/api/helpers';
+import { requireAuth, requireRole, handleResult, errorResponse, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 
 export async function GET(request: NextRequest) {
@@ -44,10 +44,20 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const rateLimited = await rateLimitAdmin(request);
+  if (rateLimited) return rateLimited;
+
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
+  const roleError = requireRole(request, ['admin']);
+  if (roleError) return roleError;
 
-  const body = await request.json();
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return validationErrorResponse('Invalid request body');
+  }
   const parsed = updateEmpresaSchema.safeParse(body);
 
   if (!parsed.success) {

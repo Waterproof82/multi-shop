@@ -15,11 +15,12 @@ Plataforma multi-tenant de menú digital con sistema de pedidos online, panel de
 | AWS SDK v3 | ^3.994 | Cliente S3/R2 |
 | Zod | 3.25.x | Validación schemas |
 | jose | ^6.1.3 | JWT (sign + verify) |
+| Upstash Redis | — | Rate limiting + JWT revocation |
 | Brevo | — | Envío de emails |
 
 ---
 
-## Arquitectura — Clean Architecture 100%
+## Arquitectura — Clean Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -57,7 +58,7 @@ Plataforma multi-tenant de menú digital con sistema de pedidos online, panel de
 ```
 src/
 ├── app/
-│   ├── layout.tsx                   # Root layout (multi-tenant por dominio)
+│   ├── layout.tsx                   # Root layout (multi-tenant, nonce CSP)
 │   ├── page.tsx                     # Menú público (SSR)
 │   ├── admin/
 │   │   ├── login/                   # Login admin
@@ -72,82 +73,102 @@ src/
 │   │       ├── estadisticas/
 │   │       └── configuracion/
 │   └── api/
-│       ├── admin/                   # Protegidas por proxy JWT
+│       ├── admin/                   # Protegidas por proxy.ts JWT
 │       │   ├── login/               # POST — autenticación
 │       │   ├── logout/              # POST — cerrar sesión
 │       │   ├── productos/           # CRUD productos
 │       │   ├── categorias/          # CRUD categorías
 │       │   ├── pedidos/             # GET/PATCH/DELETE + PUT (stats)
-│       │   │   └── enviar-email/    # POST — email de confirmación al admin
-│       │   ├── upload-image/        # POST — upload de imágenes a R2
+│       │   │   └── enviar-email/    # POST — email confirmación al admin
+│       │   ├── upload-image/        # POST — upload imágenes a R2
 │       │   ├── clientes/            # CRUD clientes
 │       │   ├── empresa/             # GET/PUT datos empresa
 │       │   ├── update-colores/      # POST colores del tema
 │       │   └── promociones/
-│       │       └── unsubscribe/     # GET — pública, toggle suscripción
+│       │       └── unsubscribe/     # POST — pública, toggle suscripción
 │       ├── pedidos/                 # POST — pública, crear pedido
 │       └── unsubscribe/             # GET — pública, dar de baja/alta promo
 │
 ├── core/                            # Clean Architecture
 │   ├── domain/
-│   │   ├── entities/types.ts        # Tipos: Product, Category, Empresa,
-│   │   │                            #   EmpresaColores, Cliente, Pedido,
-│   │   │                            #   PedidoItem, PedidoComplemento,
-│   │   │                            #   CartItem, Promocion, Tenant
-│   │   └── repositories/            # Interfaces: IProductRepository,
-│   │                                #   ICategoryRepository, IAdminRepository,
-│   │                                #   IClienteRepository, IEmpresaRepository,
-│   │                                #   IPedidoRepository, IPromocionRepository
+│   │   ├── entities/types.ts        # Tipos de dominio
+│   │   ├── repositories/            # Interfaces I*Repository
+│   │   └── constants/
+│   │       ├── api-errors.ts        # Códigos de error centralizados
+│   │       ├── pedido.ts            # Estados y labels de pedido
+│   │       └── empresa-defaults.ts  # Colores y configuración por defecto
 │   ├── application/
-│   │   ├── dtos/                    # Schemas Zod: product.dto.ts,
-│   │   │                            #   category.dto.ts, cliente.dto.ts,
-│   │   │                            #   empresa.dto.ts, auth.dto.ts
-│   │   └── use-cases/               # product, category, cliente, empresa,
-│   │                                #   pedido, promocion, auth-admin, get-menu
+│   │   ├── dtos/                    # Schemas Zod por entidad
+│   │   └── use-cases/               # Un use case por entidad
 │   └── infrastructure/
-│       ├── api/helpers.ts           # requireAuth, successResponse,
-│       │                            #   errorResponse, validationErrorResponse,
-│       │                            #   handleResult
+│       ├── api/
+│       │   ├── helpers.ts           # requireAuth, handleResult (error code → HTTP status), responses
+│       │   ├── rate-limit.ts        # rateLimitLogin (fail-closed prod), rateLimitPublic, rateLimitAdmin
+│       │   └── api-logger.ts        # logApiError
 │       ├── database/
-│       │   ├── supabase-client.ts   # DOS singletons (service role + anon)
-│       │   ├── index.ts           # Inyección de dependencias — exporta
-│       │   │                        #   todos los use cases y repositories
-│       │   ├── SupabaseProductRepository.ts
-│       │   ├── SupabaseCategoryRepository.ts
-│       │   ├── SupabaseAdminRepository.ts
-│       │   ├── SupabaseClienteEmpresaRepository.ts
-│       │   ├── SupabasePromocionPedidoRepository.ts
-│       │   └── SupabaseLogErrorRepository.ts
-│       ├── logging/
-│       │   └── logger.ts           # ErrorLogger singleton para logging
-│       └── storage/
-│           ├── s3-client.ts         # Singleton R2: getS3Client(),
-│           │                        #   getR2Config(), deleteImageFromR2()
-│           │                        #   uploadToR2() (via Cloudflare API o AWS SDK)
+│       │   ├── supabase-client.ts   # Singletons Supabase
+│       │   └── index.ts             # Inyección de dependencias
+│       ├── logging/logger.ts        # ErrorLogger singleton
+│       ├── storage/s3-client.ts     # Singleton R2
+│       └── env-validation.ts        # Validación de env vars al startup
 │
-├── components/                      # Componentes React
-│   └── ui/                          # ImageUploader, Button, Dialog, etc.
-│
-├── proxy.ts                         # Middleware JWT para /api/admin/*
+├── instrumentation.ts               # Next.js startup hook → validateEnv()
+├── proxy.ts                         # Middleware JWT + CSRF + CSP nonce + CORS
 │
 └── lib/
+    ├── csrf.ts                      # HMAC-SHA256 tokens CSRF (timingSafeEqual)
     ├── domain-utils.ts              # parseMainDomain(), getDomainFromHeaders()
     ├── html-utils.ts                # escapeHtml()
+    ├── token-revocation.ts          # JWT revocation list (Upstash Redis REST)
+    ├── unsubscribe-token.ts         # HMAC tokens para unsubscribe (TTL 1 año, GDPR)
+    ├── brevo-email.ts               # sendEmail()
     ├── server-services.ts           # getEmpresaByDomain(), getMenuUseCase
     ├── admin-context.tsx            # AdminContext (empresaId, empresaNombre)
     ├── cart-context.tsx             # CartContext
-    └── translations.ts             # Traducciones i18n
+    └── translations.ts              # Traducciones i18n (es/en/fr/it/de)
 ```
+
+---
+
+## Seguridad
+
+Documentación completa en [`docs/context/security.md`](docs/context/security.md).
+
+| Área | Implementación |
+|------|----------------|
+| **Autenticación** | JWT HS256 en cookie HttpOnly + SameSite strict, jti claim, 24h expiry, runtime guard en secret |
+| **JWT Revocation** | Verificada en proxy (API) y `verifyToken` (pages SSR). Fail-closed en producción |
+| **Autorización** | `proxy.ts` verifica JWT e inyecta `x-empresa-id` por tenant |
+| **CSRF** | Token HMAC-SHA256 verificado con `timingSafeEqual`, Cache-Control no-store |
+| **CSP** | Nonce criptográfico por request en `proxy.ts`, sin `unsafe-inline` en scripts |
+| **Rate limiting** | Upstash Redis — 5/15min login (fail-closed en prod), 20/min público, 60/min admin |
+| **Env validation** | `instrumentation.ts` → `validateEnv()` al startup, falla fatal en producción |
+| **Validación** | Zod `safeParse` + try/catch en `request.json()` + max-length en todos los DTOs |
+| **Uploads** | Validación MIME + magic bytes + tamaño + path seguro (slug desde DB) |
+| **Multi-tenant** | Aislamiento por `empresaId` en cada query, RLS + service_role |
+| **Mínimo privilegio** | Endpoints públicos usan `empresaPublicRepository` (anon key) para lecturas |
+| **XSS emails** | `escapeHtml()` en todos los templates HTML, logging centralizado sin PII |
+| **Price tampering** | Total recalculado server-side + rechazo de productos desconocidos (`PRODUCT_NOT_FOUND`) |
+| **Anti-enumeración** | Login devuelve mensaje genérico para todos los tipos de fallo auth |
+| **RBAC** | `requireRole(request, ['admin'])` en todos los handlers mutativos de `/api/admin/*` |
+| **Unsubscribe** | HMAC-SHA256 con `UNSUBSCRIBE_HMAC_SECRET` dedicado, TTL 1 año (GDPR/CAN-SPAM), acción explícita `'baja'` |
+| **CORS** | Whitelist de dominios, `Vary: Origin`, preflight 204, headers en rutas públicas |
+| **Cart tokens** | Validación con audience claim `'cart-access'` para prevenir token confusion |
+| **JSON-LD** | Sanitización de `<`, `>`, `&` para prevenir inyección en script tags |
+| **Headers** | HSTS, X-Frame-Options, X-Content-Type-Options, Permissions-Policy |
+| **URL schemes** | DTOs validan `https://` en fb, instagram, logo_url, url_mapa, foto_url, imagen_url |
+| **Error mapping** | `handleResult()` mapea error codes a HTTP status (400, 401, 404, 500) |
+| **Pedido atómico** | `get_next_pedido_number()` con mutex por tenant |
 
 ---
 
 ## Principios Aplicados
 
-### ✅ Clean Architecture (100%)
+### Clean Architecture
 
 | Capa | Contenido |
 |------|-----------|
-| **Domain** | `entities/types.ts`, `repositories/I*.ts` |
+| **Domain** | `entities/types.ts`, `repositories/I*.ts`, `constants/` |
 | **Application** | `dtos/*.ts`, `use-cases/*.ts` |
 | **Infrastructure** | `database/*.ts`, `storage/*.ts`, `api/helpers.ts` |
 
@@ -156,82 +177,64 @@ Reglas estrictas:
 - **SIEMPRE** pasar por: Use Case → Repository → Supabase
 - **NUNCA** llamar `createClient()` fuera de `supabase-client.ts`
 
-### ✅ SOLID (100%)
+### SOLID
 
 - **Dependency Inversion**: repositorios inyectados por constructor, instanciados en `index.ts`
-- Sin `any` — se usan tipos de dominio (`Product`, `Category`, `PedidoItem`, etc.) o `Record<string, unknown>`
+- Sin `any` — se usan tipos de dominio o `Record<string, unknown>`
 
 ```typescript
 // ✅ BIEN — depende de abstracción
 export class ProductUseCase {
   constructor(private readonly productRepo: IProductRepository) {}
 }
-
-// ❌ MAL — depende de implementación
-const supabase = createClient(url, key); // fuera de supabase-client.ts
 ```
-
-### ✅ OWASP (100%)
-
-| Principio | Implementación |
-|-----------|----------------|
-| **JWT** | HS256 con `jose` | HttpOnly cookie, 24h expiry |
-| **Autorización** | Proxy middleware valida JWT, inyecta `x-empresa-id` |
-| **Validación de entrada** | Zod `safeParse` en **todas** las API routes |
-| **Sanitización HTML** | `escapeHtml()` en todos los templates de email |
-| **Validación colores** | Regex `#RRGGBB` en Zod antes de persistir |
-| **Sin secretos hardcodeados** | Todas las claves en variables de entorno |
-| **`NEXT_PUBLIC_BASE_URL`** | Obligatorio en producción — sin fallbacks inseguros |
 
 ---
 
 ## Helpers de API
 
 ```typescript
-// core/infrastructure/api/helpers.ts
-
-// Autenticación — usar en TODAS las rutas protegidas /api/admin/*
+// Autenticación — obligatorio en todas las rutas /api/admin/*
 const { empresaId, error: authError } = await requireAuth(request);
 if (authError) return authError;
 
 // Respuestas consistentes
-return successResponse(data);            // 200 OK
-return successResponse(data, 201);       // 201 Created
-return errorResponse('msg');             // 500 Error
-return errorResponse('msg', 404);        // 404 Not Found
-return validationErrorResponse('msg');   // 400 Bad Request
+return successResponse(data);             // 200 OK
+return successResponse(data, 201);        // 201 Created
+return errorResponse('msg', 404);         // 404 Not Found
+return validationErrorResponse('msg');    // 400 Bad Request
+return handleResult(result);             // automático desde Result<T> (mapea error codes a HTTP status)
 ```
 
-## Helper de dominio
+`handleResult` mapea automáticamente códigos de error a HTTP status:
+- `VALIDATION_ERROR` → 400, `AUTH_*` → 401, `*_NOT_FOUND` → 404, otros → 500
+
+## Códigos de Error Centralizados
 
 ```typescript
-// lib/domain-utils.ts — importar SIEMPRE desde aquí, no duplicar
+import { AUTH_ERRORS, VALIDATION_ERRORS, SERVER_ERRORS, createErrorResponse } from '@/core/domain/constants/api-errors';
 
-import { parseMainDomain, getDomainFromHeaders } from '@/lib/domain-utils';
-
-const domain = await getDomainFromHeaders(); // extrae host del request
-const main = parseMainDomain(domain);        // elimina subdominio pedidos
+// Uso en rutas
+return NextResponse.json(createErrorResponse(AUTH_ERRORS.UNAUTHORIZED), { status: 401 });
 ```
+
+| Prefijo | Códigos | Ejemplos |
+|---------|---------|---------|
+| `AUTH_` | AUTH_001–005 | UNAUTHORIZED, INVALID_TOKEN, CSRF_REQUIRED |
+| `VAL_` | VAL_002–004 | MISSING_FILE, FILE_TOO_LARGE, INVALID_FILE_TYPE |
+| `SRV_` | SRV_002–005 | CONFIG_ERROR, STORAGE_ERROR, DATABASE_ERROR |
 
 ---
 
 ## Repositorios y Use Cases
 
 ```typescript
-// Importar desde core/infrastructure/database
 import {
-  productUseCase,     // ProductUseCase
-  categoryUseCase,    // CategoryUseCase
-  clienteUseCase,     // ClienteUseCase
-  empresaUseCase,     // EmpresaUseCase
-  pedidoUseCase,      // PedidoUseCase
-  promocionUseCase,   // PromocionUseCase
-  authAdminUseCase,   // AuthAdminUseCase
-  empresaRepository,  // IEmpresaRepository (rutas públicas: findByDomain)
+  productUseCase, categoryUseCase, clienteUseCase,
+  empresaUseCase, pedidoUseCase, promocionUseCase,
+  authAdminUseCase, empresaRepository,
 } from '@/core/infrastructure/database';
 ```
-
-### Use Cases — métodos
 
 | Use Case | Métodos |
 |----------|---------|
@@ -252,7 +255,7 @@ import {
 | **IEmpresaRepository** | `getById`, `findByDomain`, `update`, `updateColores` |
 | **IPedidoRepository** | `findAllByTenant`, `updateStatus`, `delete`, `create`, `getStats` |
 | **IPromocionRepository** | `findAllByTenant`, `create`, `deleteAllByTenant` |
-| **IProductRepository** | `findAllByTenant`, `create`, `update`, `delete` |
+| **IProductRepository** | `findAllByTenant`, `findByIds`, `create`, `update`, `delete` |
 | **ICategoryRepository** | `findAllByTenant`, `create`, `update`, `delete` |
 | **ILogErrorRepository** | `log` |
 
@@ -269,14 +272,14 @@ interface Empresa {
   descripcion, fb?, instagram?, urlMapa?, direccion?, telefonoWhatsapp?
 }
 
-interface PedidoComplemento {
-  nombre?: string; name?: string;   // ambos formatos por compatibilidad histórica
-  precio?: number; price?: number;
-}
-
 interface PedidoItem {
   producto_id?, nombre, precio, cantidad,
-  complementos?: PedidoComplemento[]   // objetos, NO strings
+  complementos?: PedidoComplemento[]
+}
+
+interface PedidoComplemento {
+  nombre?: string; name?: string;   // formato dual por compatibilidad
+  precio?: number; price?: number;
 }
 
 interface CartItem {
@@ -316,8 +319,16 @@ POST /api/admin/login
   → AuthAdminUseCase.login()
   → adminRepo.loginWithPassword()  (Supabase Auth)
   → adminRepo.findById()           (perfil + empresa)
-  → JWT HS256, 24h
-  → cookie admin_token (HttpOnly, SameSite=lax)
+  → JWT HS256, 24h, jti=randomUUID()
+  → cookie admin_token (HttpOnly, SameSite=strict)
+```
+
+### Flujo de logout
+```
+POST /api/admin/logout
+  → jwtVerify(admin_token) → extrae jti + exp
+  → revokeToken(jti, ttlRestante) → Upstash Redis SET key EX ttl
+  → delete cookie admin_token + csrf_token
 ```
 
 ### Verificación de sesión en pages
@@ -335,11 +346,19 @@ if (!admin) redirect('/admin/login');
 ```
 
 ### Middleware (proxy.ts)
+- Lee secrets de forma lazy (`getAdminTokenSecret()`) — nunca constantes a nivel de módulo
 - Verifica JWT en todas las rutas `/api/admin/*`
+- Comprueba revocación del `jti` en Redis (fail-closed en producción)
+- Valida CSRF (timingSafeEqual) en todos los métodos mutativos
 - Inyecta `x-empresa-id`, `x-admin-id`, `x-admin-rol` como headers
-- Rutas públicas sin JWT: `/api/admin/login`, `/api/admin/logout`, `/api/unsubscribe`, `/api/admin/promociones/unsubscribe`
+- Genera nonce criptográfico por request para rutas de página; emite CSP dinámico y pasa `x-nonce` a server components
+- Aplica CORS headers a todas las rutas `/api/*` (admin y públicas)
+- Valida cart access tokens con audience claim `'cart-access'`
+- Rutas públicas sin JWT (match exacto): `/api/admin/login`, `/api/unsubscribe`, `/api/admin/promociones/unsubscribe`, `/api/csp-report`
 
-> ⚠️ Agregar nuevas rutas públicas a `isPublicRoute` en `proxy.ts`
+> Agregar nuevas rutas públicas a `isPublicRoute` en `proxy.ts` (usar `===`, no `startsWith`)
+
+> `pedidos` NO tiene columna `telefono` — el teléfono está en `clientes`
 
 ---
 
@@ -351,37 +370,11 @@ if (!admin) redirect('/admin/login');
 | `pedidos.midominio.com` | Menú + carrito |
 | `midominio-pedidos.com` | Menú + carrito (dominio propio) |
 
-La empresa se resuelve por dominio principal. `parseMainDomain()` de `lib/domain-utils.ts` extrae el dominio sin subdominio.
-
----
-
-## Imágenes (Cloudflare R2)
-
-### Estructura de carpetas en bucket
-
-```
-{empresa-slug}/{año}/{mes}/{uuid}-{filename}.webp
-```
-
-### Flujo de upload
-1. Cliente selecciona imagen
-2. Optimización en browser (480×480, WebP, 80%) en `components/ui/image-uploader.tsx`
-3. POST a `/api/admin/upload-image` con `FormData`
-4. El API route deriva `empresaSlug` desde la DB — nunca del cliente
-5. Upload a R2 via Cloudflare API (si `CLOUDFLARE_API_TOKEN` configurado) o AWS SDK fallback
-6. Devuelve `{ publicUrl }`
-
-### Funciones disponibles
 ```typescript
-import { getS3Client, getR2Config, deleteImageFromR2, uploadToR2 } from '@/core/infrastructure/storage/s3-client';
+import { parseMainDomain, getDomainFromHeaders } from '@/lib/domain-utils';
 
-deleteImageFromR2(publicUrl); // elimina imagen por URL pública
-await uploadToR2(key, buffer, contentType); // upload directo (usado por /api/admin/upload-image)
-```
-
-### Configurar CORS (solo una vez)
-```bash
-npx tsx scripts/setup-r2-cors.ts
+const domain = await getDomainFromHeaders();
+const main = parseMainDomain(domain); // elimina subdominio pedidos
 ```
 
 ---
@@ -395,12 +388,13 @@ npx tsx scripts/setup-r2-cors.ts
 | `categorias` | id (uuid) | empresa_id → empresas | categoria_padre_id, categoriaComplementoDe |
 | `productos` | id (uuid) | empresa_id, categoria_id | i18n: titulo_es/en/fr/it/de |
 | `clientes` | id (uuid) | empresa_id | telefono único por empresa |
-| `pedidos` | id (uuid) | empresa_id, cliente_id | detalle_pedido: JSON (PedidoItem[]) |
+| `pedidos` | id (uuid) | empresa_id, cliente_id | numero_pedido (atómico por tenant), detalle_pedido: JSON (PedidoItem[]) |
 | `promociones` | id (uuid) | empresa_id | imagen_url, numero_envios |
+| `log_errors` | id (uuid) | empresa_id | logging centralizado con severity y metadata JSONB |
 
-> ⚠️ `pedidos` NO tiene columna `telefono` — el teléfono está en `clientes`
+> `pedidos` NO tiene columna `telefono` — el teléfono está en `clientes`
 
-> ⚠️ `detalle_pedido[].complementos` almacena objetos `{ name, price }` — tipo `PedidoComplemento[]`
+> `detalle_pedido[].complementos` almacena objetos `{ name, price }` — tipo `PedidoComplemento[]`
 
 ---
 
@@ -413,20 +407,54 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJxxx
 SUPABASE_SERVICE_ROLE_KEY=eyJxxx
 
 # Auth JWT
-ACCESS_TOKEN_SECRET=secreto_largo_y_aleatorio
+ACCESS_TOKEN_SECRET=secreto_largo_aleatorio        # openssl rand -hex 32
+
+# CSRF + Carrito + Unsubscribe (obligatorios en producción)
+CSRF_HMAC_SECRET=secreto_largo_aleatorio           # openssl rand -hex 32
+CART_TOKEN_SECRET=secreto_largo_aleatorio          # openssl rand -hex 32
+UNSUBSCRIBE_HMAC_SECRET=secreto_largo_aleatorio    # openssl rand -hex 32
+
+# Rate Limiting + JWT Revocation (Upstash Redis)
+UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
+UPSTASH_REDIS_REST_TOKEN=xxx
+
+# CORS
+CORS_ALLOWED_ORIGINS=https://tudominio.com,https://pedidos.tudominio.com
+CORS_ALLOWED_DOMAINS=tudominio.com
 
 # Cloudflare R2
 R2_ACCOUNT_ID=xxx
 R2_ACCESS_KEY_ID=xxx
 R2_SECRET_ACCESS_KEY=xxx
 R2_BUCKET_NAME=images
-NEXT_PUBLIC_R2_PUBLIC_DOMAIN=https://xxx.r2.dev
+NEXT_PUBLIC_R2_DOMAIN=https://imagenes.tudominio.com
+CLOUDFLARE_API_TOKEN=xxx                           # opcional, fallback a AWS SDK
 
 # Email (Brevo)
 BREVO_API_KEY=xxx
+BREVO_DEFAULT_SENDER_EMAIL=noreply@tudominio.com
+```
 
-# App (obligatorio en producción)
-NEXT_PUBLIC_BASE_URL=https://tudominio.com
+---
+
+## Imágenes (Cloudflare R2)
+
+### Estructura en bucket
+
+```
+{empresa-slug}/{año}/{mes}/{uuid}.webp
+```
+
+### Flujo de upload
+
+1. Cliente optimiza imagen en browser (480×480, WebP, 80%) — `components/ui/image-uploader.tsx`
+2. `POST /api/admin/upload-image` con `FormData`
+3. El API route valida MIME type, magic bytes y tamaño
+4. Deriva `empresaSlug` desde DB — nunca del cliente
+5. Upload a R2 y devuelve `{ publicUrl }`
+
+```typescript
+import { deleteImageFromR2, uploadToR2 } from '@/core/infrastructure/storage/s3-client';
 ```
 
 ---
@@ -438,8 +466,8 @@ pnpm dev      # Desarrollo con Turbopack
 pnpm build    # Build de producción
 pnpm lint     # Linting
 
-# Scripts
-npx tsx scripts/setup-r2-cors.ts     # Configurar CORS en R2
+# Solo una vez: configurar CORS en R2
+npx tsx scripts/setup-r2-cors.ts
 ```
 
 ---
@@ -448,97 +476,31 @@ npx tsx scripts/setup-r2-cors.ts     # Configurar CORS en R2
 
 | Aspecto | Estado |
 |---------|--------|
-| **Build** | ✅ Compila correctamente |
-| **Clean Architecture** | ✅ 100% — Domain / Application / Infrastructure |
-| **SOLID** | ✅ 100% — DIP, sin `any`, repositorios inyectados |
-| **OWASP** | ✅ 100% — JWT HttpOnly, Zod safeParse, escapeHtml, hex validation |
-| **Tipos TypeScript** | ✅ Sin `any` en core ni API routes |
-| **Código duplicado** | ✅ `parseMainDomain`/`getDomainFromHeaders` centralizados en `lib/domain-utils.ts` |
-| **Error Handling (Result\<T\>)** | ✅ 100% — Todos los módulos migrados al patrón Result<T, E> |
-| **Logging Centralizado** | ✅ 100% — Tabla log_errors + ErrorLogger singleton |
-| **UI/UX Quality** | ✅ 100% — Distill, Polish, Optimize aplicados |
+| **Build** | Compila correctamente |
+| **Clean Architecture** | 100% — Domain / Application / Infrastructure |
+| **SOLID** | 100% — DIP, sin `any`, repositorios inyectados |
+| **Seguridad** | Auditoría completa — JWT revocation (fail-closed), RBAC `requireRole`, env validation startup, rate limiting (fail-closed login), CSP nonces + report-uri, CSRF timing-safe, price tampering + product rejection, anti-enumeración, mínimo privilegio, cart token audience, JSON-LD sanitización |
+| **Tipos TypeScript** | Sin `any` en core ni API routes |
+| **Error Handling** | 100% — Result<T, E> en todos los módulos |
+| **API Error Codes** | Códigos centralizados en `core/domain/constants/api-errors.ts` |
+| **Logging** | Tabla log_errors + ErrorLogger singleton |
+| **UI/UX** | Audit 8.5/10 — WCAG AA, focus states, reduced-motion, ARIA, mobile-first, 44px touch targets |
+| **i18n** | es/en/fr/it/de en productos + panel admin + componentes públicos |
 
----
+## Documentación
 
-## UI/UX Quality — Mejoras Implementadas
-
-### 🎨 Design System
-
-| Componente | Características |
-|------------|----------------|
-| **Button** | Focus-visible con outline + ring offset, transiciones suaves, active:scale |
-| **Input** | Focus-visible con ring, transiciones optimizadas |
-| **Badge** | Animación badge-pop con soporte reduced-motion |
-| **Tema** | Variables CSS para todos los colores, soporte dark mode |
-
-### ✨ Polish — Detalles Finales
-
-- **Focus states**: Todos los elementos interactivos tienen `focus-visible` con outline y ring offset
-- **Hover states**: Transiciones suaves de 150ms con `ease-out`
-- **Active states**: Efecto `scale-95` o `scale-[0.98]` para feedback táctil
-- **Empty states**: Mejorados con iconografía y mensajes helpful
-- **Micro-interactions**: Animaciones sutiles en botones, cards, y elementos del carrito
-- **Transiciones**: Consistencia en duration (150-300ms) y easing (ease-out)
-
-### 🚀 Optimize — Rendimiento
-
-- **Content Visibility**: Secciones del menú usan `contentVisibility: auto` para evitar renderizado innecesario
-- **Reduced Motion**: Animaciones de Framer Motion respetan `prefers-reduced-motion`
-- **Lazy Loading**: Imágenes con `loading="lazy"` (por defecto en Next.js)
-- **Optimización de fuentes**: `display: swap` en Playfair Display e Inter
-- **Animaciones GPU**: Solo `transform` y `opacity` — ninguna propiedad que cause layout/paint
-
-### 🔧 Distill — Simplificación
-
-- **SVGs optimizados**: Iconos de redes sociales en footer usan componentes lucide-react
-- **DRY**: Componente `TranslationFields` extraído para evitar duplicación en formularios de productos
-- **CSS cleanup**: Eliminados estilos redundantes, uso consistente de tokens
-
-### ♿ Accesibilidad
-
-- **Keyboard navigation**: Todos los elementos clickables tienen `tabIndex` y handlers de `onKeyDown`
-- **ARIA labels**: Botones con labels descriptivos para screen readers
-- **Reduced motion**: Respeto total por `prefers-reduced-motion`
-- **Contrast ratios**: Colores verificados contra WCAG AA
-
-### Ejemplo de Component con todas las calidades
-
-```tsx
-// Button con polish + optimize
-const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-  {
-    variants: {
-      variant: {
-        default: 'bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.98]',
-        // ...
-      },
-    },
-  }
-);
-
-// Framer Motion con reduced motion
-const shouldReduceMotion = useReducedMotion() ?? false;
-const variants = shouldReduceMotion
-  ? { initial: {}, animate: {} }
-  : { initial: { opacity: 0, y: 16 }, animate: { opacity: 1, y: 0 } };
-```
-
-### Deuda Técnica
-
-- Ninguna. El proyecto está completo y estable.
-- Sistema de error handling 100% implementado con Result<T, E> pattern
+- [`docs/context/security.md`](docs/context/security.md) — Medidas de seguridad detalladas
+- [`docs/context/bbdd.md`](docs/context/bbdd.md) — Esquema de base de datos
+- [`docs/context/cart_flow.md`](docs/context/cart_flow.md) — Flujo del carrito
+- [`docs/context/context.md`](docs/context/context.md) — Contexto general del proyecto
 
 ---
 
 ## Deployment (Vercel)
 
 1. Conectar repo a Vercel
-2. Configurar variables de entorno
+2. Configurar todas las variables de entorno
 3. Framework Preset: Next.js
-4. Deploy automático en push a main
+4. Deploy automático en push a `main`
 
-**Notas:**
-- Next.js 16 usa Turbopack por defecto — normal ver "Skipping validation of types"
-- R2 necesita CORS configurado para uploads directos desde el browser
-- `NEXT_PUBLIC_BASE_URL` es obligatorio — usado en links de emails de promociones
+> Next.js 16 usa Turbopack — es normal ver "Skipping validation of types" en el build.

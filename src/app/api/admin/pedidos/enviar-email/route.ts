@@ -2,27 +2,26 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { sendEmail } from '@/lib/brevo-email';
 import { empresaUseCase } from '@/core/infrastructure/database';
-import { requireAuth } from '@/core/infrastructure/api/helpers';
+import { requireAuth, requireRole } from '@/core/infrastructure/api/helpers';
+import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
 import { escapeHtml } from '@/lib/html-utils';
-
-const BREVO_API_KEY = process.env.BREVO_API_KEY;
 
 const enviarEmailSchema = z.object({
   items: z.array(z.object({
     item: z.object({
-      id: z.string(),
-      name: z.string(),
-      price: z.number(),
+      id: z.string().uuid(),
+      name: z.string().max(200),
+      price: z.number().min(0).max(100_000),
     }),
-    quantity: z.number().min(1),
+    quantity: z.number().int().min(1).max(99),
     selectedComplements: z.array(z.object({
-      name: z.string(),
-      price: z.number(),
-    })).optional(),
-  })),
-  total: z.number().min(0),
-  numeroOrden: z.number().optional(),
+      name: z.string().max(200),
+      price: z.number().min(0).max(100_000),
+    })).max(20).optional(),
+  })).min(1).max(50),
+  total: z.number().min(0).max(100_000),
+  numeroOrden: z.number().int().optional(),
   nombre: z.string().max(100).optional(),
   telefono: z.string().max(20).optional(),
   email: z.string().email().optional().or(z.literal('')),
@@ -127,12 +126,13 @@ function generateOrderEmail(items: OrderItem[], total: number, empresaNombre: st
 
 export async function POST(request: NextRequest) {
   try {
+    const rateLimited = await rateLimitAdmin(request);
+    if (rateLimited) return rateLimited;
+
     const { empresaId, error: authError } = await requireAuth(request);
     if (authError) return authError;
-
-    if (!BREVO_API_KEY) {
-      return NextResponse.json({ error: 'Email service not configured' }, { status: 500 });
-    }
+    const roleError = requireRole(request, ['admin']);
+    if (roleError) return roleError;
 
     const empresaResult = await empresaUseCase.getById(empresaId!);
 
@@ -150,7 +150,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email de notificación no configurado' }, { status: 400 });
     }
 
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
     const parsed = enviarEmailSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });

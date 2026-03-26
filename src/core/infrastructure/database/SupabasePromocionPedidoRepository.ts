@@ -170,17 +170,24 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     }
   }
 
-  async create(empresaId: string, clienteId: string | null, items: CartItem[], total: number): Promise<Result<{ id: string; numero_pedido: number }>> {
+  async create(empresaId: string, clienteId: string | null, items: CartItem[], total: number): Promise<Result<{ id: string; numero_pedido: number; total: number }>> {
     try {
-      const { data: lastOrder } = await this.supabase
-        .from('pedidos')
-        .select('numero_pedido')
-        .eq('empresa_id', empresaId)
-        .order('numero_pedido', { ascending: false })
-        .limit(1)
-        .single();
+      // Atomically generate next order number using a DB function with row-level lock
+      const { data: nextNum, error: rpcError } = await this.supabase
+        .rpc('get_next_pedido_number', { p_empresa_id: empresaId });
 
-      const nuevoNumeroPedido = (lastOrder?.numero_pedido || 0) + 1;
+      if (rpcError) {
+        await logger.logAndReturnError(
+          'DB_RPC_ERROR',
+          rpcError.message,
+          'repository',
+          'SupabasePedidoRepository.create',
+          { empresaId, details: { code: rpcError.code } }
+        );
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al generar número de pedido', module: 'repository', method: 'create' } };
+      }
+
+      const nuevoNumeroPedido = nextNum as number;
 
       const { data: pedido, error } = await this.supabase
         .from('pedidos')
@@ -198,7 +205,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           total: total,
           estado: 'pendiente',
         })
-        .select('id, numero_pedido')
+        .select('id, numero_pedido, total')
         .single();
 
       if (error) {
@@ -211,7 +218,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         );
         return { success: false, error: { code: 'DB_ERROR', message: 'Error al crear pedido', module: 'repository', method: 'create' } };
       }
-      return { success: true, data: { id: pedido.id, numero_pedido: pedido.numero_pedido } };
+      return { success: true, data: { id: pedido.id, numero_pedido: pedido.numero_pedido, total: pedido.total } };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.create', { empresaId });
       return { success: false, error: appError };
@@ -281,7 +288,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       const totalAno = pedidosFiltrados.reduce((sum, p) => sum + (p.total || 0), 0);
       const ingresosAnterior = pedidosAnterior.reduce((sum, p) => sum + (p.total || 0), 0);
 
-      // Build pedidos por dia
+      // Build orders by day
       const pedidosPorDiaMap: Record<number, { pedidos: number; ingresos: number }> = {};
       const daysInMonth = new Date(año, mes + 1, 0).getDate();
       for (let d = 1; d <= daysInMonth; d++) {

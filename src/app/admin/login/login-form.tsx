@@ -6,6 +6,9 @@ import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { saveCsrfToken } from '@/lib/csrf-client';
+import { logClientError } from '@/lib/client-error';
+import { useLanguage } from '@/lib/language-context';
+import { t } from '@/lib/translations';
 
 interface LoginFormProps {
   readonly empresaNombre: string | null;
@@ -13,6 +16,7 @@ interface LoginFormProps {
 
 export default function LoginForm({ empresaNombre }: LoginFormProps) {
   const router = useRouter();
+  const { language } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -28,8 +32,11 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
           saveCsrfToken(data.csrfToken);
         }
       })
-      .catch(console.error);
-  }, []);
+      .catch((error) => {
+        logClientError(error, 'fetchCsrfToken');
+        setError(t('loginFormError', language));
+      });
+  }, [language]);
 
   const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -49,12 +56,12 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Error al iniciar sesión');
+        throw new Error(data.error || t('loginErrorDefault', language));
       }
 
       router.push('/admin');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setError(err instanceof Error ? err.message : t('unknownError', language));
     } finally {
       setLoading(false);
     }
@@ -70,11 +77,11 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
             </h1>
           ) : (
             <h1 className="text-2xl font-semibold text-foreground">
-              Panel de Administración
+              {t("adminPanel", language)}
             </h1>
           )}
           <p className="text-muted-foreground mt-2">
-            {empresaNombre ? 'Panel de Administración' : 'Inicia sesión con tu cuenta'}
+            {empresaNombre ? t("adminPanel", language) : t("loginSubtitle", language)}
           </p>
         </div>
 
@@ -87,7 +94,7 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
 
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-foreground">
-              Email
+              {t("email", language)}
             </label>
             <Input
               id="email"
@@ -95,6 +102,7 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoComplete="email"
               aria-invalid={!!error}
               aria-describedby={error ? "login-error" : undefined}
               placeholder="admin@tuempresa.com"
@@ -104,7 +112,7 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
 
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-foreground">
-              Contraseña
+              {t("password", language)}
             </label>
             <Input
               id="password"
@@ -112,6 +120,7 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              autoComplete="current-password"
               aria-invalid={!!error}
               aria-describedby={error ? "login-error" : undefined}
               placeholder="••••••••"
@@ -122,22 +131,22 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring disabled:opacity-50 transition-all duration-150 ease-out active:scale-[0.98]"
+            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring dark:focus-visible:ring-offset-background disabled:opacity-50 transition-all duration-150 ease-out active:scale-[0.98]"
           >
             {loading ? (
               <>
                 <Loader2 className="animate-spin h-4 w-4 mr-2" />
-                Iniciando sesión...
+                {t("signingIn", language)}
               </>
             ) : (
-              'Iniciar Sesión'
+              t("loginButton", language)
             )}
           </button>
         </form>
 
         <div className="mt-6 text-center">
           <Link href="/" className="text-sm text-primary hover:underline">
-            ← Volver a la carta
+            ← {t("backToMenu", language)}
           </Link>
         </div>
       </div>

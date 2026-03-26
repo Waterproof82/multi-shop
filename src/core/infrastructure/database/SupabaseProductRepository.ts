@@ -82,6 +82,45 @@ export class SupabaseProductRepository implements IProductRepository {
     }
   }
 
+  async findByIds(ids: string[], empresaId: string): Promise<Result<Product[]>> {
+    try {
+      if (ids.length === 0) return { success: true, data: [] };
+
+      const { data, error } = await this.supabase
+        .from("productos")
+        .select("id, precio, empresa_id")
+        .in("id", ids)
+        .eq("empresa_id", empresaId)
+        .eq("activo", true);
+
+      if (error) {
+        await logger.logAndReturnError(
+          'DB_SELECT_ERROR',
+          error.message,
+          'repository',
+          'SupabaseProductRepository.findByIds',
+          { empresaId, details: { code: error.code, hint: error.hint } }
+        );
+        return {
+          success: false,
+          error: {
+            code: 'DB_ERROR',
+            message: 'Error al obtener productos por IDs',
+            module: 'repository',
+            method: 'findByIds',
+          },
+        };
+      }
+
+      return { success: true, data: data.map((row: Record<string, unknown>) => this.mapToDomain(row)) };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseProductRepository.findByIds', {
+        empresaId,
+      });
+      return { success: false, error: appError };
+    }
+  }
+
   async findAllByTenant(empresaId: string): Promise<Result<Product[]>> {
     try {
       const { data, error } = await this.supabase

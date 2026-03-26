@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, memo, useCallback } from "react"
+import Image from "next/image"
 import { motion, useReducedMotion } from "framer-motion"
 import { ChevronRight } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -13,6 +14,7 @@ import {
 } from "@/components/ui/dialog"
 import { useLanguage, type Language } from "@/lib/language-context"
 import { t } from "@/lib/translations"
+import { formatPrice } from "@/lib/format-price"
 import { MenuCategoryVM, MenuItemVM, MenuSubcategoryVM } from "@/core/application/dtos/menu-view-model"
 import { QuantitySelectorDialog } from "@/components/quantity-selector-dialog"
 
@@ -74,7 +76,7 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
     : category.descripcion;
 
   return (
-    <section id={category.id} className="scroll-mt-32" style={{ contentVisibility: priority ? 'visible' : 'auto', containIntrinsicSize: 'auto 500px' }}>
+    <section id={category.id} className="scroll-mt-32 cv-auto" style={{ contentVisibility: priority ? 'visible' : 'auto', containIntrinsicSize: 'auto 500px' }}>
       <div className="mb-5 flex items-center gap-4 overflow-hidden">
         <h2 className="font-serif text-2xl font-semibold text-foreground md:text-3xl tracking-tight truncate shrink min-w-0">
           {(translationLang && category.translations?.[translationLang]?.name) || category.label}
@@ -242,33 +244,37 @@ function getCardAriaLabel(showCart: boolean | undefined, safeLanguage: Language,
   return `${t("viewOptions", safeLanguage)}: ${displayName}`;
 }
 
-function CardMedia({ item, displayName, priority, onError }: Readonly<{
+function CardMedia({ item, displayName, priority, onError, shouldReduceMotion }: Readonly<{
   item: MenuItemVM;
   displayName: string;
   priority: boolean;
   onError: () => void;
+  shouldReduceMotion: boolean;
 }>) {
   if (item.image?.endsWith(".mp4")) {
     return (
       <video
         src={item.image}
-        autoPlay
-        loop
+        autoPlay={!shouldReduceMotion}
+        loop={!shouldReduceMotion}
         muted
         playsInline
-        className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 md:group-hover:scale-105 will-change-transform"
+        className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 md:group-hover:scale-105"
         onError={onError}
+        aria-label={displayName}
       />
     );
   }
   return (
-    <img
+    <Image
       src={item.image!}
       alt={displayName}
-      className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 md:group-hover:scale-105 will-change-transform"
+      fill
+      className="object-cover transition-transform duration-300 md:group-hover:scale-105"
       loading={priority ? "eager" : "lazy"}
-      decoding="async"
+      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
       onError={onError}
+      unoptimized
     />
   );
 }
@@ -287,6 +293,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
   const { language: appLanguage } = useLanguage();
   const safeLanguage = appLanguage || "es";
   const [imageError, setImageError] = useState(false);
+  const shouldReduceMotionCard = useReducedMotion() ?? false;
   const hasComplements = item.complements && item.complements.length > 0;
   const isClickable = showCart || hasComplements;
 
@@ -315,13 +322,12 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
       className={`group relative flex h-full flex-col overflow-hidden rounded-lg bg-card border transition-[box-shadow,transform,border-color] duration-200 ${
         isClickable ? "hover:shadow-elegant hover:-translate-y-0.5 cursor-pointer" : ""
       } ${borderClass}`}
-      onClick={isClickable ? handleClick : undefined}
     >
       {isClickable && (
         <button
           type="button"
           aria-label={getCardAriaLabel(showCart, safeLanguage, displayName)}
-          className="absolute inset-0 z-10 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring rounded-lg"
+          className="absolute inset-0 z-10 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-lg"
           onClick={handleClick}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -333,7 +339,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
       )}
       {item.image && !imageError && (
         <div className="relative aspect-[16/10] w-full overflow-hidden">
-          <CardMedia item={item} displayName={displayName} priority={priority} onError={() => setImageError(true)} />
+          <CardMedia item={item} displayName={displayName} priority={priority} onError={() => setImageError(true)} shouldReduceMotion={shouldReduceMotionCard} />
         </div>
       )}
       <div className="flex flex-1 flex-col p-4">
@@ -354,12 +360,12 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
         )}
         <div className="flex items-center justify-between gap-3 pt-3 mt-auto border-t border-border/50">
           <span className="text-lg font-bold text-foreground tabular-nums">
-            {item.price.toFixed(2).replace(".", ",")}€
+            {formatPrice(item.price)}
           </span>
           {showCart && (
             <button
               type="button"
-              className="relative z-20 bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 rounded-md px-3.5 py-2 text-sm font-medium focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring transition-all duration-150 min-h-[44px] shrink-0 whitespace-nowrap"
+              className="relative z-20 bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 rounded-md px-3.5 py-2 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-all duration-150 min-h-[44px] shrink-0 whitespace-nowrap"
               onClick={(e) => {
                 e.stopPropagation();
                 onItemClick(item);
@@ -376,7 +382,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
               <span className="break-words">{complementLabel}</span>
               {minComplementPrice > 0 && (
                 <span className="ml-1.5 text-foreground/70 font-medium whitespace-nowrap">
-                  {t("from", safeLanguage)} +{minComplementPrice.toFixed(2).replace(".", ",")}€
+                  {t("from", safeLanguage)} +{formatPrice(minComplementPrice)}
                 </span>
               )}
             </span>
@@ -446,7 +452,7 @@ function ItemDetailDialog(props: Readonly<{
                     )}
                   </div>
                   <span className="font-semibold text-sm shrink-0 ml-3">
-                    +{comp.price.toFixed(2).replace(".", ",")}€
+                    +{formatPrice(comp.price)}
                   </span>
                 </div>
               );

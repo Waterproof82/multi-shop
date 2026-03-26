@@ -1,7 +1,7 @@
 import { headers } from 'next/headers';
 
 export function parseMainDomain(domain: string): string {
-  const isPedidos = domain.startsWith('pedidos.') || domain.includes('-pedidos');
+  const isPedidos = domain.startsWith('pedidos.') || domain.endsWith('-pedidos');
   return isPedidos
     ? domain.replace(/^pedidos\./, '').replace(/-pedidos$/, '')
     : domain;

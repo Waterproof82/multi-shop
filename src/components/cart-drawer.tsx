@@ -1,9 +1,11 @@
 "use client"
 
 import { useState, useCallback, useRef, useEffect } from "react"
-import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail } from "lucide-react"
+import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, Check } from "lucide-react"
+import { useReducedMotion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { RippleButton } from "@/components/ui/ripple-button"
 import {
   Sheet,
   SheetContent,
@@ -25,9 +27,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useCart, type Complement } from "@/lib/cart-context"
-import { useLanguage } from "@/lib/language-context"
+import { useCart, type Complement, type CartItem } from "@/lib/cart-context"
+import { useLanguage, type Language } from "@/lib/language-context"
 import { t } from "@/lib/translations"
+import { formatPrice } from "@/lib/format-price"
 import { COUNTRY_CODES, DEFAULT_COUNTRY_CODE } from "@/core/domain/constants/country-codes"
 import type { MenuItemVM } from "@/core/application/dtos/menu-view-model"
 
@@ -36,45 +39,76 @@ function getItemKey(item: MenuItemVM, complements?: Complement[]): string {
   return `${item.id}-${complementIds}`;
 }
 
-function RippleButton({ children, onClick, className, disabled, variant = "default", size = "default", 'aria-label': ariaLabel, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "default" | "outline" | "ghost"; size?: "default" | "icon" }) {
-  const buttonRef = useRef<HTMLButtonElement>(null);
+type TranslationKey = keyof typeof import('@/lib/translations').translations.es;
+type TranslateFn = (key: TranslationKey, language: Language) => string;
 
-  const createRipple = (event: React.MouseEvent<HTMLButtonElement>) => {
-    const button = event.currentTarget;
-    const rect = button.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    const ripple = document.createElement("span");
-    ripple.className = "ripple";
-    ripple.style.left = `${x}px`;
-    ripple.style.top = `${y}px`;
-    const existingRipple = button.querySelector(".ripple");
-    if (existingRipple) existingRipple.remove();
-    button.appendChild(ripple);
-    setTimeout(() => ripple.remove(), 500);
+function validateNameInput(name: string, translate: TranslateFn, language: Language): string | undefined {
+  const trimmed = name.trim();
+  if (!trimmed) return translate("validationNameRequired", language);
+  if (trimmed.length < 2) return translate("validationNameMin", language);
+  if (trimmed.length > 100) return translate("validationNameMax", language);
+  if (!/^[\p{L}\s'-]+$/u.test(trimmed)) return translate("validationNameFormat", language);
+  return undefined;
+}
+
+function validatePhoneInput(phone: string, translate: TranslateFn, language: Language): string | undefined {
+  const trimmed = phone.trim();
+  if (!trimmed) return translate("validationPhoneRequired", language);
+  const digitsOnly = trimmed.replaceAll(/\D/g, '');
+  if (digitsOnly.length < 9) return translate("validationPhoneMin", language);
+  if (digitsOnly.length > 15) return translate("validationPhoneMax", language);
+  return undefined;
+}
+
+interface OrderFormData {
+  nombre: string;
+  telefono: string;
+  countryCode: string;
+  email: string;
+  items: CartItem[];
+  totalPrice: number;
+  language: Language;
+}
+
+function validateAndBuildOrderData(
+  formData: OrderFormData,
+  translate: TranslateFn
+): { valid: true; data: Record<string, unknown> } | { valid: false; errors: { nombre?: string; telefono?: string } } {
+  const { nombre, telefono, countryCode, email, items, totalPrice, language } = formData;
+  
+  const nombreError = validateNameInput(nombre, translate, language);
+  const telefonoError = validatePhoneInput(telefono, translate, language);
+  
+  if (nombreError || telefonoError) {
+    return { valid: false, errors: { nombre: nombreError, telefono: telefonoError } };
   }
 
-  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    if (!disabled) {
-      createRipple(e);
-      onClick?.(e);
-    }
-  }
-
-  return (
-    <Button
-      ref={buttonRef}
-      variant={variant}
-      size={size}
-      className={`relative overflow-hidden ${className}`}
-      disabled={disabled}
-      onClick={handleClick}
-      aria-label={ariaLabel}
-      {...props}
-    >
-      {children}
-    </Button>
-  );
+  const selectedCountry = COUNTRY_CODES.find(c => c.code === countryCode);
+  const dialCode = selectedCountry?.dialCode || '34';
+  
+  return {
+    valid: true,
+    data: {
+      items: items.map(ci => ({
+        item: {
+          id: ci.item.id,
+          name: (language !== 'es' && ci.item.translations?.[language]?.name) || ci.item.name,
+          price: ci.item.price,
+          translations: ci.item.translations,
+        },
+        quantity: ci.quantity,
+        selectedComplements: ci.selectedComplements?.map(c => ({
+          id: c.id,
+          name: c.name,
+          price: c.price,
+        })),
+      })),
+      total: totalPrice,
+      nombre: nombre.trim().slice(0, 100),
+      telefono: dialCode + telefono.replaceAll(/\D/g, '').slice(0, 15),
+      email: email.trim().toLowerCase().slice(0, 100),
+    },
+  };
 }
 
 export function CartDrawer() {
@@ -88,11 +122,11 @@ export function CartDrawer() {
     closeCart 
   } = useCart()
   const { language } = useLanguage()
+  const shouldReduceMotion = useReducedMotion() ?? false
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [companyPhone, setCompanyPhone] = useState<string | null>(null)
-  const [orderNumber, setOrderNumber] = useState<number | null>(null)
   const [messageCopied, setMessageCopied] = useState(false)
   const [retryCountdown, setRetryCountdown] = useState<number | null>(null)
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -102,7 +136,24 @@ export function CartDrawer() {
   const [email, setEmail] = useState('')
   const [errors, setErrors] = useState<{ nombre?: string; telefono?: string }>({})
 
-  const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    setIsMobile(globalThis.matchMedia('(pointer: coarse)').matches);
+  }, []);
+
+  const getDialogDescription = useCallback(() => {
+    if (isMobile) {
+      return confirming ? t("sendingOrder", language) : t("whatsappCheck", language);
+    }
+    return t("whatsappDesktopChoice", language);
+  }, [isMobile, confirming, language]);
+
+  const getRetryButtonText = useCallback(() => {
+    if (retryCountdown === null) return t("whatsappDesktopApp", language);
+    if (retryCountdown > 0) return t("whatsappRetrying", language).replaceAll("{seconds}", String(retryCountdown));
+    return t("whatsappRetry", language);
+  }, [retryCountdown, language]);
 
   const buildWhatsAppUrls = (numero: string, mensaje: string) => {
     const numeroLimpio = numero.replaceAll(/\D/g, '');
@@ -125,8 +176,8 @@ export function CartDrawer() {
       } catch {
         // Clipboard API not available, continue without copy
       }
-      // No abrimos automáticamente en desktop — mostramos el diálogo
-      // con opciones para que el usuario elija (wa.me o WhatsApp Web)
+      // Don't auto-open on desktop — show dialog with options
+      // for user to choose (wa.me or WhatsApp Web)
     }
   }, [isMobile]);
 
@@ -142,17 +193,17 @@ export function CartDrawer() {
     const link = (globalThis as Record<string, unknown>).__whatsappLink as string | undefined;
     if (!link) return;
 
-    // Si hay countdown activo, es un reintento del usuario (app ya caliente)
+    // If countdown is active, this is a retry (app already warm)
     if (retryCountdown !== null) {
       clearRetryTimers();
       globalThis.open(link, '_blank', 'noopener,noreferrer');
       return;
     }
 
-    // Primer intento: abre wa.me (puede fallar por cold start)
+    // First attempt: opens wa.me (may fail due to cold start)
     globalThis.open(link, '_blank', 'noopener,noreferrer');
 
-    // Cuenta atrás de 10s → al terminar el botón cambia a "Reintentar"
+    // 10s countdown → when done, button changes to "Retry"
     const retryDelay = 10;
     setRetryCountdown(retryDelay);
 
@@ -183,7 +234,7 @@ export function CartDrawer() {
   const getWhatsAppWebUrl = (): string | null => {
     const link = (globalThis as Record<string, unknown>).__whatsappLink as string | undefined;
     if (!link) return null;
-    const match = link.match(/wa\.me\/(\d+)\?text=(.+)/);
+    const match = /wa\.me\/(\d+)\?text=(.+)/.exec(link);
     if (!match) return link;
     return `https://web.whatsapp.com/send?phone=${match[1]}&text=${match[2]}`;
   };
@@ -191,81 +242,36 @@ export function CartDrawer() {
   const handleConfirmOrder = useCallback(async () => {
     setErrors({});
     
-    const validateName = (name: string): string | undefined => {
-      const trimmed = name.trim();
-      if (!trimmed) return t("validationNameRequired", language);
-      if (trimmed.length < 2) return t("validationNameMin", language);
-      if (trimmed.length > 100) return t("validationNameMax", language);
-      if (!/^[a-zA-ZÀ-ÿ\s'-]+$/u.test(trimmed)) return t("validationNameFormat", language);
-      return undefined;
-    };
-
-    const validatePhone = (phone: string): string | undefined => {
-      const trimmed = phone.trim();
-      if (!trimmed) return t("validationPhoneRequired", language);
-      const digitsOnly = trimmed.replaceAll(/\D/g, '');
-      if (digitsOnly.length < 9) return t("validationPhoneMin", language);
-      if (digitsOnly.length > 15) return t("validationPhoneMax", language);
-      return undefined;
-    };
+    const validation = validateAndBuildOrderData({ nombre, telefono, countryCode, email, items, totalPrice, language }, t);
     
-    const nombreError = validateName(nombre);
-    const telefonoError = validatePhone(telefono);
-    
-    if (nombreError || telefonoError) {
-      setErrors({ nombre: nombreError, telefono: telefonoError });
+    if (!validation.valid) {
+      setErrors(validation.errors);
       return;
     }
-
-    const sanitizedNombre = nombre.trim().slice(0, 100);
-    const selectedCountry = COUNTRY_CODES.find(c => c.code === countryCode);
-    const dialCode = selectedCountry?.dialCode || '34';
-    const sanitizedTelefono = dialCode + telefono.replaceAll(/\D/g, '').slice(0, 15);
-    const sanitizedEmail = email.trim().toLowerCase().slice(0, 100);
 
     setSending(true);
     try {
       const res = await fetch('/api/pedidos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: items.map(ci => ({
-            item: {
-              id: ci.item.id,
-              name: (language !== 'es' && ci.item.translations?.[language]?.name) || ci.item.name,
-              price: ci.item.price,
-              translations: ci.item.translations,
-            },
-            quantity: ci.quantity,
-            selectedComplements: ci.selectedComplements?.map(c => ({
-              name: c.name,
-              price: c.price,
-            })),
-          })),
-          total: totalPrice,
-          nombre: sanitizedNombre,
-          telefono: sanitizedTelefono,
-          email: sanitizedEmail,
-        }),
+        body: JSON.stringify(validation.data),
       });
       
       const data = await res.json();
-      console.log('[Pedido] Respuesta API:', { success: res.ok, numeroPedido: data.numeroPedido, hasWhatsappLink: !!data.whatsappLink });
       
       if (res.ok) {
         closeCart();
         setNombre('');
         setTelefono('');
         setEmail('');
-        setOrderNumber(data.numeroPedido || null);
         setCompanyPhone(data.companyPhone || null);
         
         if (data.whatsappLink) {
           (globalThis as Record<string, unknown>).__whatsappLink = data.whatsappLink;
-          const match = data.whatsappLink.match(/wa\.me\/(\d+)\?text=(.+)/);
-          if (match) {
-            const numero = match[1];
-            const mensaje = decodeURIComponent(match[2]);
+          const matchResult = data.whatsappLink.match(/wa\.me\/(\d+)\?text=(.+)/);
+          if (matchResult) {
+            const numero = matchResult[1];
+            const mensaje = decodeURIComponent(matchResult[2]);
             abrirWhatsApp(numero, mensaje);
           }
         }
@@ -274,37 +280,35 @@ export function CartDrawer() {
       } else {
         setErrors({ nombre: data.error || t("validationOrderError", language) });
       }
-    } catch (err) {
-      console.error('Error:', err);
+    } catch {
       setErrors({ nombre: t("connectionError", language) });
     } finally {
       setSending(false);
     }
   }, [nombre, telefono, countryCode, email, items, totalPrice, language, closeCart, abrirWhatsApp]);
 
+  const handleDialogClose = useCallback((open: boolean) => {
+    if (!open) {
+      setSent(false);
+      setConfirming(false);
+      setMessageCopied(false);
+      clearRetryTimers();
+      clearCart();
+      closeCart();
+    }
+  }, [clearRetryTimers, clearCart, closeCart]);
+
   return (
     <>
-      <Dialog open={sent} onOpenChange={(open) => {
-        if (!open) {
-          setSent(false)
-          setConfirming(false)
-          setMessageCopied(false)
-          clearRetryTimers()
-          clearCart()
-          closeCart()
-        }
-      }}>
+      <Dialog open={sent} onOpenChange={handleDialogClose}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-primary">
-              <span className="text-2xl">✓</span>
+              <Check className="w-6 h-6" />
               {t("sendingOrder", language)}
             </DialogTitle>
             <DialogDescription className="text-base">
-              {isMobile
-                ? (confirming ? t("sendingOrder", language) : t("whatsappCheck", language))
-                : t("whatsappDesktopChoice", language)
-              }
+              {getDialogDescription()}
             </DialogDescription>
             {confirming && companyPhone && (
               <p className="text-xs text-destructive mt-2 text-center">
@@ -325,18 +329,19 @@ export function CartDrawer() {
                 </a>
               ) : (
                 <div className="flex flex-col gap-2">
+                  {/* Screen reader announcement for countdown */}
+                  <span aria-live="polite" aria-atomic="true" className="sr-only">
+                    {retryCountdown !== null && retryCountdown > 0 && (
+                      <>Reintentando en {retryCountdown} segundos...</>
+                    )}
+                  </span>
                   <button
                     type="button"
                     onClick={handleOpenInApp}
                     disabled={retryCountdown !== null && retryCountdown > 0}
                     className="w-full text-center bg-whatsapp text-primary-foreground py-3 px-4 rounded-full font-semibold hover:bg-whatsapp-hover transition-colors duration-150 disabled:opacity-70"
                   >
-                    {retryCountdown === null
-                      ? t("whatsappDesktopApp", language)
-                      : retryCountdown > 0
-                        ? t("whatsappRetrying", language).replace("{seconds}", String(retryCountdown))
-                        : t("whatsappRetry", language)
-                    }
+                    {getRetryButtonText()}
                   </button>
                   <a
                     href={getWhatsAppWebUrl()!}
@@ -361,10 +366,10 @@ export function CartDrawer() {
                 {t("whatsappCantSend", language)}
               </p>
               <a
-                href={`tel:${companyPhone.replace(/\D/g, '')}`}
+                href={`tel:${companyPhone.replaceAll(/\D/g, '')}`}
                 className="block text-2xl font-bold mt-2 tracking-wide hover:opacity-80 transition-opacity"
               >
-                {companyPhone.replace(/\D/g, '').replace(/^34/, '')}
+                {companyPhone.replaceAll(/\D/g, '').slice(2)}
               </a>
             </div>
           )}
@@ -392,19 +397,21 @@ export function CartDrawer() {
         )}
 
         {items.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-4 text-muted-foreground">
-            <div className="relative animate-empty-float">
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 text-muted-foreground px-4">
+            <div className={`relative ${shouldReduceMotion ? '' : 'animate-empty-float'}`}>
               <ShoppingBag className="size-12 opacity-20" />
               <span className="absolute inset-0 flex items-center justify-center text-2xl opacity-30">+</span>
             </div>
-            <p className="text-base font-medium text-foreground">{t("emptyCart", language)}</p>
-            <p className="text-sm text-center max-w-[200px]">{t("addDishesToStart", language)}</p>
+            <div className="text-center">
+              <p className="text-base font-medium text-foreground">{t("emptyCart", language)}</p>
+              <p className="text-sm text-muted-foreground mt-1 max-w-[240px]">{t("addDishesToStart", language)}</p>
+            </div>
             <button
               onClick={() => {
                 closeCart();
-                document.getElementById('menu')?.scrollIntoView({ behavior: 'smooth' });
+                document.getElementById('menu')?.scrollIntoView({ behavior: shouldReduceMotion ? 'auto' : 'smooth' });
               }}
-              className="mt-2 px-6 py-3 bg-primary text-primary-foreground rounded-full font-medium hover:bg-primary/90 transition-colors min-h-[44px]"
+              className="mt-2 px-6 py-3 bg-primary text-primary-foreground rounded-full font-medium hover:bg-primary/90 active:scale-[0.98] transition-all duration-150 min-h-[44px]"
             >
               {t("viewMenu", language)}
             </button>
@@ -438,7 +445,7 @@ export function CartDrawer() {
                           </p>
                         )}
                         <p className="text-sm text-muted-foreground">
-                          {totalItemPrice.toFixed(2).replace(".", ",")}{"€"}
+                          {formatPrice(totalItemPrice)}
                         </p>
                       </div>
 
@@ -446,7 +453,7 @@ export function CartDrawer() {
                         <RippleButton
                           variant="outline"
                           size="icon"
-                          className="min-h-[44px] min-w-[44px] md:min-h-7 md:min-w-7 bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="min-h-[44px] min-w-[44px] md:min-h-9 md:min-w-9 bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => updateQuantity(itemKey, ci.quantity - 1)}
                           aria-label={t("reduceQuantity", language)}
                         >
@@ -458,7 +465,7 @@ export function CartDrawer() {
                         <RippleButton
                           variant="outline"
                           size="icon"
-                          className="min-h-[44px] min-w-[44px] md:min-h-7 md:min-w-7 bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="min-h-[44px] min-w-[44px] md:min-h-9 md:min-w-9 bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => updateQuantity(itemKey, ci.quantity + 1)}
                           aria-label={t("increaseQuantity", language)}
                         >
@@ -467,7 +474,7 @@ export function CartDrawer() {
                         <RippleButton
                           variant="ghost"
                           size="icon"
-                          className="min-h-[44px] min-w-[44px] md:min-h-7 md:min-w-7 text-destructive hover:text-destructive hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="min-h-[44px] min-w-[44px] md:min-h-9 md:min-w-9 text-destructive hover:text-destructive hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => removeItem(itemKey)}
                           aria-label={`${t("remove", language)} ${(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}`}
                         >
@@ -483,9 +490,11 @@ export function CartDrawer() {
             <div className="border-t border-border pt-4 pb-6 px-2 bg-background/80 shadow-elegant rounded-b-xl">
               <div className="space-y-3 mb-4">
                 <div>
+                  <label htmlFor="cart-nombre" className="text-xs font-medium text-muted-foreground ml-6 mb-1 block">{t("placeholderName", language)}</label>
                   <div className="flex items-center gap-2">
-                    <User className="size-4 text-muted-foreground" />
+                    <User className="size-4 text-muted-foreground" aria-hidden="true" />
                     <Input
+                      id="cart-nombre"
                       type="text"
                       placeholder={t("placeholderName", language)}
                       value={nombre}
@@ -493,7 +502,6 @@ export function CartDrawer() {
                       className={`h-9 ${errors.nombre ? 'border-destructive' : ''}`}
                       maxLength={100}
                       autoComplete="name"
-                      aria-label={t("placeholderName", language)}
                       aria-describedby={errors.nombre ? "nombre-error" : undefined}
                       aria-invalid={!!errors.nombre}
                     />
@@ -501,8 +509,9 @@ export function CartDrawer() {
                   {errors.nombre && <p id="nombre-error" role="alert" className="text-xs text-destructive mt-1 ml-6">{errors.nombre}</p>}
                 </div>
                 <div>
+                  <label htmlFor="cart-telefono" className="text-xs font-medium text-muted-foreground ml-6 mb-1 block">{t("placeholderPhone", language)}</label>
                   <div className="flex items-center gap-2">
-                    <Phone className="size-4 text-muted-foreground shrink-0" />
+                    <Phone className="size-4 text-muted-foreground shrink-0" aria-hidden="true" />
                     <div className="flex gap-1 flex-1">
                       <Select value={countryCode} onValueChange={setCountryCode}>
                         <SelectTrigger className="h-9 w-[100px] shrink-0 text-xs px-2" aria-label={t("countryCode", language)}>
@@ -520,6 +529,7 @@ export function CartDrawer() {
                         </SelectContent>
                       </Select>
                       <Input
+                        id="cart-telefono"
                         type="tel"
                         placeholder={t("phonePlaceholder", language)}
                         value={telefono}
@@ -527,7 +537,6 @@ export function CartDrawer() {
                         className={`h-9 flex-1 ${errors.telefono ? 'border-destructive' : ''}`}
                         maxLength={15}
                         autoComplete="tel-national"
-                        aria-label={t("placeholderPhone", language)}
                         aria-describedby={errors.telefono ? "telefono-error" : undefined}
                         aria-invalid={!!errors.telefono}
                       />
@@ -536,9 +545,11 @@ export function CartDrawer() {
                   {errors.telefono && <p id="telefono-error" role="alert" className="text-xs text-destructive mt-1 ml-6">{errors.telefono}</p>}
                 </div>
                 <div>
+                  <label htmlFor="cart-email" className="text-xs font-medium text-muted-foreground ml-6 mb-1 block">{t("placeholderEmail", language)}</label>
                   <div className="flex items-center gap-2">
-                    <Mail className="size-4 text-muted-foreground" />
+                    <Mail className="size-4 text-muted-foreground" aria-hidden="true" />
                     <Input
+                      id="cart-email"
                       type="email"
                       placeholder={t("placeholderEmail", language)}
                       value={email}
@@ -546,7 +557,6 @@ export function CartDrawer() {
                       className="h-9"
                       maxLength={100}
                       autoComplete="email"
-                      aria-label={t("placeholderEmail", language)}
                     />
                   </div>
                   <p className="text-xs mt-1 ml-6 text-muted-foreground">{t("promoMessage", language)}</p>
@@ -556,7 +566,7 @@ export function CartDrawer() {
               <div className="mb-4 flex items-center justify-between px-2">
                 <span className="text-lg font-semibold text-foreground">{t("total", language)}</span>
                 <span className="text-2xl font-bold text-foreground tabular-nums animate-price-update" key={totalPrice}>
-                  {totalPrice.toFixed(2).replace(".", ",") + "€"}
+                  {formatPrice(totalPrice)}
                 </span>
               </div>
 

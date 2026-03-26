@@ -1,10 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { BarChart3, ShoppingCart, Euro, TrendingUp, TrendingDown, Users, Calendar, ArrowUpRight, ArrowDownRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BarChart3, ShoppingCart, Euro, TrendingUp, TrendingDown, Users, Calendar, ArrowUpRight, ArrowDownRight, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, LineChart, Line } from 'recharts';
 import { fetchWithCsrf } from '@/lib/csrf-client';
+import { logClientError } from '@/lib/client-error';
+import { useLanguage } from '@/lib/language-context';
+import { t } from '@/lib/translations';
 
 interface Stats {
   pedidosHoy: number;
@@ -24,44 +27,61 @@ interface Stats {
   mesSeleccionado: string;
 }
 
-const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+interface ChartTheme {
+  colors: string[];
+  tickFill: string;
+  gridStroke: string;
+  tooltipBg: string;
+  tooltipBorder: string;
+  tooltipColor: string;
+}
 
-function getChartColors(): string[] {
-  if (typeof window === 'undefined') return [
-    'hsl(var(--chart-orange))',
-    'hsl(var(--chart-blue))',
-    'hsl(var(--chart-green))',
-    'hsl(var(--chart-purple))',
-    'hsl(var(--chart-pink))',
-    'hsl(var(--chart-teal))',
-    'hsl(var(--chart-rose))',
-    'hsl(var(--chart-lime))',
-  ];
+const DEFAULT_CHART_THEME: ChartTheme = {
+  colors: ['#F97316', '#3B82F6', '#10B981', '#8B5CF6', '#EC4899', '#14B8A6', '#F43F5E', '#84CC16'],
+  tickFill: '#71717A',
+  gridStroke: '#E4E4E7',
+  tooltipBg: '#ffffff',
+  tooltipBorder: '#E4E4E7',
+  tooltipColor: '#18181B',
+};
+
+function getChartTheme(): ChartTheme {
+  if (typeof window === 'undefined') return DEFAULT_CHART_THEME;
   const style = getComputedStyle(document.documentElement);
-  return [
-    style.getPropertyValue('--color-chart-orange').trim() || 'hsl(var(--chart-orange))',
-    style.getPropertyValue('--color-chart-blue').trim() || 'hsl(var(--chart-blue))',
-    style.getPropertyValue('--color-chart-green').trim() || 'hsl(var(--chart-green))',
-    style.getPropertyValue('--color-chart-purple').trim() || 'hsl(var(--chart-purple))',
-    style.getPropertyValue('--color-chart-pink').trim() || 'hsl(var(--chart-pink))',
-    style.getPropertyValue('--color-chart-teal').trim() || 'hsl(var(--chart-teal))',
-    style.getPropertyValue('--color-chart-rose').trim() || 'hsl(var(--chart-rose))',
-    style.getPropertyValue('--color-chart-lime').trim() || 'hsl(var(--chart-lime))',
-  ];
+  const get = (v: string) => style.getPropertyValue(v).trim();
+  return {
+    colors: [
+      get('--color-chart-orange') || '#F97316',
+      get('--color-chart-blue') || '#3B82F6',
+      get('--color-chart-green') || '#10B981',
+      get('--color-chart-purple') || '#8B5CF6',
+      get('--color-chart-pink') || '#EC4899',
+      get('--color-chart-teal') || '#14B8A6',
+      get('--color-chart-rose') || '#F43F5E',
+      get('--color-chart-lime') || '#84CC16',
+    ],
+    tickFill: get('--muted-foreground') || '#71717A',
+    gridStroke: get('--border') || '#E4E4E7',
+    tooltipBg: get('--card') || '#ffffff',
+    tooltipBorder: get('--border') || '#E4E4E7',
+    tooltipColor: get('--foreground') || '#18181B',
+  };
 }
 
 export default function EstadisticasPage() {
+  const { language } = useLanguage();
+  const meses = [t("monthJan", language), t("monthFeb", language), t("monthMar", language), t("monthApr", language), t("monthMay", language), t("monthJun", language), t("monthJul", language), t("monthAug", language), t("monthSep", language), t("monthOct", language), t("monthNov", language), t("monthDec", language)];
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState({ mes: new Date().getMonth(), año: new Date().getFullYear() });
-  const [chartColors, setChartColors] = useState<string[]>([]);
+  const [chartTheme, setChartTheme] = useState<ChartTheme>(DEFAULT_CHART_THEME);
   const shouldReduceMotion = useReducedMotion() ?? false;
   const motionProps = shouldReduceMotion
     ? { initial: {}, animate: {} }
     : { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } };
 
   useEffect(() => {
-    setChartColors(getChartColors());
+    setChartTheme(getChartTheme());
   }, []);
 
   useEffect(() => {
@@ -76,7 +96,7 @@ export default function EstadisticasPage() {
         }
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') return;
-        console.error('Error fetching stats:', error);
+        logClientError(error, 'fetchStats');
       } finally {
         setLoading(false);
       }
@@ -109,7 +129,7 @@ export default function EstadisticasPage() {
   if (loading) {
     return (
       <div className="pt-16 lg:pt-0 px-6 lg:px-8 flex items-center justify-center min-h-[50vh]">
-        <div className="text-muted-foreground">Cargando...</div>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -120,12 +140,13 @@ export default function EstadisticasPage() {
       <div className="bg-primary rounded-lg p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">Estadísticas</h1>
-            <p className="text-primary-foreground/80 text-sm mt-1">Resumen de pedidos y facturación</p>
+            <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">{t("statsTitle", language)}</h1>
+            <p className="text-primary-foreground/80 text-sm mt-1">{t("statsSubtitle", language)}</p>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => cambiarMes(-1)}
+              aria-label={t("previousMonth", language)}
               className="p-2 rounded-lg bg-primary-foreground/20 hover:bg-primary-foreground/30 transition-colors"
             >
               <ChevronLeft className="w-5 h-5 text-primary-foreground" />
@@ -138,6 +159,7 @@ export default function EstadisticasPage() {
             <button
               onClick={() => cambiarMes(1)}
               disabled={esMesActual}
+              aria-label={t("nextMonth", language)}
               className="p-2 rounded-lg bg-primary-foreground/20 hover:bg-primary-foreground/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronRight className="w-5 h-5 text-primary-foreground" />
@@ -146,13 +168,13 @@ export default function EstadisticasPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
         {[
-          { icon: ShoppingCart, label: 'Pedidos hoy', value: stats?.pedidosHoy || 0, iconClass: 'bg-muted', iconColor: 'text-foreground' },
-          { icon: BarChart3, label: 'Pedidos mes', value: stats?.pedidosMes || 0, iconClass: 'bg-primary/10', iconColor: 'text-primary' },
-          { icon: Euro, label: 'Ventas hoy', value: `${(stats?.totalHoy || 0).toFixed(2)}€`, iconClass: 'bg-primary/10', iconColor: 'text-primary' },
-          { icon: BarChart3, label: 'Ventas mes', value: `${(stats?.totalMes || 0).toFixed(2)}€`, iconClass: 'bg-muted', iconColor: 'text-foreground' },
-          { icon: TrendingUp, label: 'Ventas año', value: `${(stats?.totalAno || 0).toFixed(2)}€`, iconClass: 'bg-secondary', iconColor: 'text-secondary-foreground' },
+          { icon: ShoppingCart, label: t("ordersToday", language), value: stats?.pedidosHoy || 0, iconClass: 'bg-muted', iconColor: 'text-foreground' },
+          { icon: BarChart3, label: t("ordersMonth", language), value: stats?.pedidosMes || 0, iconClass: 'bg-primary/10', iconColor: 'text-primary' },
+          { icon: Euro, label: t("salesToday", language), value: `${(stats?.totalHoy || 0).toFixed(2)}€`, iconClass: 'bg-primary/10', iconColor: 'text-primary' },
+          { icon: BarChart3, label: t("salesMonth", language), value: `${(stats?.totalMes || 0).toFixed(2)}€`, iconClass: 'bg-muted', iconColor: 'text-foreground' },
+          { icon: TrendingUp, label: t("salesYear", language), value: `${(stats?.totalAno || 0).toFixed(2)}€`, iconClass: 'bg-secondary', iconColor: 'text-secondary-foreground' },
         ].map((kpi, i) => (
           <motion.div
             key={`kpi-${i}`}
@@ -181,7 +203,7 @@ export default function EstadisticasPage() {
           className="bg-card rounded-lg border border-border p-4"
         >
           <div className="flex items-center justify-between mb-2">
-            <p className="text-sm text-muted-foreground">Ticket medio</p>
+            <p className="text-sm text-muted-foreground">{t("avgTicket", language)}</p>
             <Euro className="w-4 h-4 text-muted-foreground" />
           </div>
           <p className="text-2xl font-bold text-foreground">{(stats?.ticketMedio || 0).toFixed(2)}€</p>
@@ -193,7 +215,7 @@ export default function EstadisticasPage() {
           className="bg-card rounded-lg border border-border p-4"
         >
           <div className="flex items-center justify-between mb-2">
-            <p className="text-sm text-muted-foreground">vs mes anterior</p>
+            <p className="text-sm text-muted-foreground">{t("vsPreviousMonth", language)}</p>
             {stats && stats.pedidosAnterior > 0 ? (
               stats.pedidosMes >= stats.pedidosAnterior ? (
                 <ArrowUpRight className="w-4 h-4 text-primary" />
@@ -210,7 +232,7 @@ export default function EstadisticasPage() {
             <p className="text-2xl font-bold text-muted-foreground">--</p>
           )}
           <p className="text-xs text-muted-foreground mt-1">
-            {stats?.pedidosAnterior || 0} pedidos el mes pasado
+            {stats?.pedidosAnterior || 0} {t("ordersPreviousMonth", language)}
           </p>
         </motion.div>
 
@@ -220,12 +242,12 @@ export default function EstadisticasPage() {
           className="bg-card rounded-lg border border-border p-4"
         >
           <div className="flex items-center justify-between mb-2">
-            <p className="text-sm text-muted-foreground">Clientes</p>
+            <p className="text-sm text-muted-foreground">{t("clientsTitle", language)}</p>
             <Users className="w-4 h-4 text-muted-foreground" />
           </div>
           <p className="text-2xl font-bold text-foreground">{(stats?.clientesNuevos || 0) + (stats?.clientesRecurrentes || 0)}</p>
           <p className="text-xs text-muted-foreground mt-1">
-            {(stats?.clientesNuevos || 0)} nuevos, {(stats?.clientesRecurrentes || 0)} recurrentes
+            {(stats?.clientesNuevos || 0)} {t("newClientsLabel", language)}, {(stats?.clientesRecurrentes || 0)} {t("returningClients", language)}
           </p>
         </motion.div>
       </div>
@@ -239,36 +261,43 @@ export default function EstadisticasPage() {
         >
           <h2 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
             <Calendar className="w-5 h-5" />
-            Pedidos por día ({meses[mesActual]})
+            {t("ordersByDay", language)} ({meses[mesActual]})
           </h2>
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={stats.pedidosPorDia}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis 
-                  dataKey="dia" 
-                  tick={{ fontSize: 12 }}
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartTheme.gridStroke} />
+                <XAxis
+                  dataKey="dia"
+                  tick={{ fontSize: 12, fill: chartTheme.tickFill }}
                   tickFormatter={(value) => `${value}`}
+                  axisLine={{ stroke: chartTheme.gridStroke }}
+                  tickLine={{ stroke: chartTheme.gridStroke }}
                 />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip 
+                <YAxis
+                  tick={{ fontSize: 12, fill: chartTheme.tickFill }}
+                  axisLine={{ stroke: chartTheme.gridStroke }}
+                  tickLine={{ stroke: chartTheme.gridStroke }}
+                />
+                <Tooltip
                   contentStyle={{
-                    backgroundColor: 'var(--card)',
-                    border: '1px solid var(--border)',
+                    backgroundColor: chartTheme.tooltipBg,
+                    border: `1px solid ${chartTheme.tooltipBorder}`,
                     borderRadius: '8px',
-                    color: 'var(--foreground)'
                   }}
+                  labelStyle={{ color: chartTheme.tooltipColor }}
+                  itemStyle={{ color: chartTheme.tooltipColor }}
                   formatter={(value: number, name: string) => [
-                    name === 'pedidos' ? `${value} pedidos` : `${value.toFixed(2)}€`,
-                    name === 'pedidos' ? 'Pedidos' : 'Ingresos'
+                    name === 'pedidos' ? `${value} ${t("xOrders", language)}` : `${value.toFixed(2)}€`,
+                    name === 'pedidos' ? t("xOrders", language) : t("revenueLabel", language)
                   ]}
                 />
                 <Line
                   type="monotone"
                   dataKey="pedidos"
-                  stroke={chartColors[0] || 'hsl(var(--chart-orange))'}
+                  stroke={chartTheme.colors[0]}
                   strokeWidth={2}
-                  dot={{ fill: chartColors[0] || 'hsl(var(--chart-orange))', r: 3 }}
+                  dot={{ fill: chartTheme.colors[0], r: 3 }}
                   activeDot={{ r: 5 }}
                 />
               </LineChart>
@@ -286,35 +315,37 @@ export default function EstadisticasPage() {
         >
           <h2 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
             <ShoppingCart className="w-5 h-5" />
-            Top platos (este mes)
+            {t("topDishes", language)} ({t("thisMonthLabel", language)})
           </h2>
           
           {stats?.topPlatos && stats.topPlatos.length > 0 ? (
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={stats.topPlatos.slice(0, 8)} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                  <XAxis type="number" hide />
-                  <YAxis 
-                    type="category" 
-                    dataKey="nombre" 
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={chartTheme.gridStroke} />
+                  <XAxis type="number" hide axisLine={false} tickLine={false} />
+                  <YAxis
+                    type="category"
+                    dataKey="nombre"
                     width={100}
-                    tick={{ fontSize: 12 }}
-                    style={{ fill: 'currentColor' }}
+                    tick={{ fontSize: 12, fill: chartTheme.tickFill }}
+                    axisLine={{ stroke: chartTheme.gridStroke }}
+                    tickLine={false}
                   />
-                  <Tooltip 
+                  <Tooltip
                     contentStyle={{
-                      backgroundColor: 'var(--card)',
-                      border: '1px solid var(--border)',
+                      backgroundColor: chartTheme.tooltipBg,
+                      border: `1px solid ${chartTheme.tooltipBorder}`,
                       borderRadius: '8px',
-                      color: 'var(--foreground)'
                     }}
+                    labelStyle={{ color: chartTheme.tooltipColor }}
+                    itemStyle={{ color: chartTheme.tooltipColor }}
                   />
                   <Bar dataKey="cantidad" radius={[0, 4, 4, 0]} animationDuration={800}>
                     {stats.topPlatos.slice(0, 8).map((plato, index) => (
-                      <Cell 
-                        key={`${plato.nombre}-bar`} 
-                        fill={chartColors[index % chartColors.length]} 
+                      <Cell
+                        key={`${plato.nombre}-bar`}
+                        fill={chartTheme.colors[index % chartTheme.colors.length]}
                       />
                     ))}
                   </Bar>
@@ -323,7 +354,7 @@ export default function EstadisticasPage() {
             </div>
           ) : (
             <p className="text-muted-foreground text-center py-8">
-              No hay datos suficientes para mostrar estadísticas
+              {t("noStatsData", language)}
             </p>
           )}
         </motion.div>
@@ -336,7 +367,7 @@ export default function EstadisticasPage() {
         >
           <h2 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
             <Euro className="w-5 h-5" />
-            Ingresos por plato (este mes)
+            {t("revenueByDish", language)} ({t("thisMonthLabel", language)})
           </h2>
           
           {stats?.topPlatos && stats.topPlatos.length > 0 ? (
@@ -356,20 +387,21 @@ export default function EstadisticasPage() {
                       animationDuration={800}
                     >
                       {stats.topPlatos.slice(0, 8).map((plato, index) => (
-                        <Cell 
-                          key={`${plato.nombre}-pie`} 
-                          fill={chartColors[index % chartColors.length]} 
+                        <Cell
+                          key={`${plato.nombre}-pie`}
+                          fill={chartTheme.colors[index % chartTheme.colors.length]}
                         />
                       ))}
                     </Pie>
-                    <Tooltip 
+                    <Tooltip
                       formatter={(value: number) => `${value.toFixed(2)}€`}
                       contentStyle={{
-                        backgroundColor: 'var(--card)',
-                        border: '1px solid var(--border)',
+                        backgroundColor: chartTheme.tooltipBg,
+                        border: `1px solid ${chartTheme.tooltipBorder}`,
                         borderRadius: '8px',
-                        color: 'var(--foreground)'
                       }}
+                      labelStyle={{ color: chartTheme.tooltipColor }}
+                      itemStyle={{ color: chartTheme.tooltipColor }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
@@ -377,9 +409,9 @@ export default function EstadisticasPage() {
               <div className="mt-4 grid grid-cols-2 gap-2">
                 {stats.topPlatos.slice(0, 6).map((plato, index) => (
                   <div key={plato.nombre} className="flex items-center gap-2 text-sm">
-                    <div 
-                      className="w-3 h-3 rounded-full" 
-                      style={{ backgroundColor: chartColors[index % chartColors.length] }}
+                    <div
+                      className="w-3 h-3 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: chartTheme.colors[index % chartTheme.colors.length] }}
                     />
                     <span className="truncate text-muted-foreground">{plato.nombre}</span>
                   </div>
@@ -388,7 +420,7 @@ export default function EstadisticasPage() {
             </>
           ) : (
             <p className="text-muted-foreground text-center py-8">
-              No hay datos suficientes para mostrar estadísticas
+              {t("noStatsData", language)}
             </p>
           )}
         </motion.div>

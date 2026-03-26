@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Languages, ChevronDown, ChevronRight } from 'lucide-react';
+import { Languages, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 import { ImageUploader } from '@/components/ui/image-uploader';
 import { Textarea } from '@/components/ui/textarea';
 import type { UpdateEmpresaDTO } from '@/core/application/dtos/empresa.dto';
 import { fetchWithCsrf } from '@/lib/csrf-client';
+import { logClientError } from '@/lib/client-error';
 
 const IDIOMAS = [
   { key: 'es', label: 'Español' },
@@ -48,7 +49,7 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
     setFormData(initialData);
   }, [initialData]);
 
-  const handleImageChange = async (url: string) => {
+  const handleImageChange = async (url = '') => {
     const newUrl = url || null;
     setFormData((prev) => ({ ...prev, url_image: newUrl }));
     setSaved(false);
@@ -56,13 +57,13 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
     try {
       await saveEmpresa({ url_image: newUrl });
     } catch (error) {
-      console.error('Error guardando imagen:', error);
+      logClientError(error, 'handleImageChange');
     } finally {
       setSavingImage(false);
     }
   };
 
-  const handleLogoChange = async (url: string) => {
+  const handleLogoChange = async (url = '') => {
     const newUrl = url || null;
     setFormData((prev) => ({ ...prev, logo_url: newUrl }));
     setSaved(false);
@@ -70,20 +71,20 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
     try {
       await saveEmpresa({ logo_url: newUrl });
     } catch (error) {
-      console.error('Error guardando logo:', error);
+      logClientError(error, 'handleLogoChange');
     } finally {
       setSavingLogo(false);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSaving(true);
     try {
       const ok = await saveEmpresa(formData);
       if (ok) setSaved(true);
     } catch (error) {
-      console.error('Error guardando apariencia:', error);
+      logClientError(error, 'handleSubmit');
     } finally {
       setSaving(false);
     }
@@ -102,8 +103,7 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
           onChange={handleLogoChange}
           label=""
           empresaSlug={empresaSlug}
-          previewClassName="relative group rounded-lg overflow-hidden border"
-          previewStyle={{ aspectRatio: '1/1', maxWidth: '200px' }}
+          previewClassName="relative group rounded-lg overflow-hidden border aspect-square w-48 max-w-48"
         />
         <p className="text-xs text-muted-foreground mt-1">
           Se mostrará en el header y footer del menú. Recomendado: 512×512px (cuadrado).
@@ -121,8 +121,7 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
           onChange={handleImageChange}
           label=""
           empresaSlug={empresaSlug}
-          previewClassName="relative group rounded-lg overflow-hidden border w-full"
-          previewStyle={{ aspectRatio: '16/5' }}
+          previewClassName="relative group rounded-lg overflow-hidden border w-full aspect-video max-h-48"
         />
         <p className="text-xs text-muted-foreground mt-1">
           Se mostrará como fondo del banner principal. Recomendado: 1920×600px.
@@ -156,7 +155,7 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
         <button
           type="button"
           onClick={() => setShowTranslations(!showTranslations)}
-          className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary dark:hover:text-primary"
+          className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary dark:hover:text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
         >
           {showTranslations ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           <Languages className="h-4 w-4" />
@@ -193,8 +192,9 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
         <button
           type="submit"
           disabled={saving}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50 transition-opacity"
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px] flex items-center gap-2"
         >
+          {saving && <Loader2 className="h-4 w-4 animate-spin" />}
           {saving ? 'Guardando...' : 'Guardar descripciones'}
         </button>
         {saved && (

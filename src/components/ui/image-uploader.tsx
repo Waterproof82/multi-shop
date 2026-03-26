@@ -171,7 +171,7 @@ export function ImageUploader({
         <div className={previewClassName} style={previewStyle}>
           <Image
             src={value}
-            alt="Preview"
+            alt={`${label} preview`}
             fill
             className="object-cover"
             unoptimized
@@ -196,7 +196,7 @@ export function ImageUploader({
             <button
               type="button"
               onClick={handleClick}
-              className="p-3 bg-card/90 backdrop-blur-sm rounded-full shadow-elegant"
+              className="p-3 bg-card/90 backdrop-blur-sm rounded-full shadow-elegant outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               aria-label="Cambiar imagen"
             >
               <Pencil className="w-4 h-4" />
@@ -204,7 +204,7 @@ export function ImageUploader({
             <button
               type="button"
               onClick={handleRemove}
-              className="p-3 bg-destructive/90 backdrop-blur-sm rounded-full shadow-elegant"
+              className="p-3 bg-destructive/90 backdrop-blur-sm rounded-full shadow-elegant outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               aria-label="Eliminar imagen"
             >
               <Trash2 className="w-4 h-4 text-destructive-foreground" />

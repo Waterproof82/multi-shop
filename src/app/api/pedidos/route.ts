@@ -1,25 +1,26 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { empresaRepository, pedidoUseCase } from '@/core/infrastructure/database';
+import { empresaPublicRepository, pedidoUseCase } from '@/core/infrastructure/database';
 import { parseMainDomain, getDomainFromHeaders } from '@/lib/domain-utils';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 
 const createPedidoSchema = z.object({
   items: z.array(z.object({
     item: z.object({
-      id: z.string(),
-      name: z.string(),
-      price: z.number(),
+      id: z.string().uuid(),
+      name: z.string().max(200),
+      price: z.number().min(0).max(100_000),
     }),
-    quantity: z.number().min(1),
+    quantity: z.number().int().min(1).max(99),
     selectedComplements: z.array(z.object({
-      name: z.string(),
-      price: z.number(),
-    })).optional(),
-  })),
-  total: z.number().min(0),
+      id: z.string().uuid(),
+      name: z.string().max(200),
+      price: z.number().min(0).max(100_000),
+    })).max(20).optional(),
+  })).min(1).max(50),
+  total: z.number().min(0).max(100_000).optional(),
   nombre: z.string().min(2).max(100),
-  telefono: z.string().min(10).max(18).regex(/^[0-9]+$/, 'Formato de teléfono no válido'),
+  telefono: z.string().min(9).max(20).regex(/^\+?[0-9\s\-()+]+$/, 'Formato de teléfono no válido'),
   email: z.string().email().optional().or(z.literal('')),
 });
 
@@ -55,7 +56,7 @@ export async function POST(request: Request) {
     const domain = await getDomainFromHeaders();
     const mainDomain = parseMainDomain(domain);
 
-    const empresaResult = await empresaRepository.findByDomain(mainDomain);
+    const empresaResult = await empresaPublicRepository.findByDomain(mainDomain);
     if (!empresaResult.success) {
       return NextResponse.json({ error: 'Error al buscar empresa' }, { status: 500 });
     }
@@ -65,33 +66,40 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 });
     }
 
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
     const parsed = createPedidoSchema.safeParse(body);
 
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
     }
 
-    const { items, total, nombre, telefono, email } = parsed.data;
+    const { items, nombre, telefono, email } = parsed.data;
 
     const pedidoResult = await pedidoUseCase.create(empresa.id, {
       items,
-      total,
       nombre,
       telefono,
       email: email || undefined,
     });
 
     if (!pedidoResult.success) {
-      return NextResponse.json({ error: pedidoResult.error.message }, { status: 500 });
+      if (pedidoResult.error.code === 'PRODUCT_NOT_FOUND') {
+        return NextResponse.json({ error: 'Producto no disponible' }, { status: 400 });
+      }
+      return NextResponse.json({ error: 'Error al crear el pedido' }, { status: 500 });
     }
 
-    const { id: pedidoId, numero_pedido: numeroPedido } = pedidoResult.data;
+    const { id: pedidoId, numero_pedido: numeroPedido, total: serverTotal } = pedidoResult.data;
 
     let whatsappLink: string | undefined;
     if (empresa.telefono_whatsapp) {
       const telefonoLimpio = empresa.telefono_whatsapp.replaceAll(/\D/g, '');
-      const mensaje = generateWhatsAppMessage(items, total, nombre, numeroPedido);
+      const mensaje = generateWhatsAppMessage(items, serverTotal, nombre, numeroPedido);
       whatsappLink = `https://wa.me/${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`;
     }
 
