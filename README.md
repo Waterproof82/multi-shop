@@ -120,7 +120,7 @@ src/
     ├── domain-utils.ts              # parseMainDomain(), getDomainFromHeaders()
     ├── html-utils.ts                # escapeHtml()
     ├── token-revocation.ts          # JWT revocation list (Upstash Redis REST)
-    ├── unsubscribe-token.ts         # HMAC tokens para unsubscribe (TTL 7d)
+    ├── unsubscribe-token.ts         # HMAC tokens para unsubscribe (TTL 1 año, GDPR)
     ├── brevo-email.ts               # sendEmail()
     ├── server-services.ts           # getEmpresaByDomain(), getMenuUseCase
     ├── admin-context.tsx            # AdminContext (empresaId, empresaNombre)
@@ -150,7 +150,8 @@ Documentación completa en [`docs/context/security.md`](docs/context/security.md
 | **XSS emails** | `escapeHtml()` en todos los templates HTML, logging centralizado sin PII |
 | **Price tampering** | Total recalculado server-side + rechazo de productos desconocidos (`PRODUCT_NOT_FOUND`) |
 | **Anti-enumeración** | Login devuelve mensaje genérico para todos los tipos de fallo auth |
-| **Unsubscribe** | HMAC-SHA256 con TTL 7d, acción explícita `'baja'` (no toggle) |
+| **RBAC** | `requireRole(request, ['admin'])` en todos los handlers mutativos de `/api/admin/*` |
+| **Unsubscribe** | HMAC-SHA256 con `UNSUBSCRIBE_HMAC_SECRET` dedicado, TTL 1 año (GDPR/CAN-SPAM), acción explícita `'baja'` |
 | **CORS** | Whitelist de dominios, `Vary: Origin`, preflight 204, headers en rutas públicas |
 | **Cart tokens** | Validación con audience claim `'cart-access'` para prevenir token confusion |
 | **JSON-LD** | Sanitización de `<`, `>`, `&` para prevenir inyección en script tags |
@@ -353,7 +354,7 @@ if (!admin) redirect('/admin/login');
 - Genera nonce criptográfico por request para rutas de página; emite CSP dinámico y pasa `x-nonce` a server components
 - Aplica CORS headers a todas las rutas `/api/*` (admin y públicas)
 - Valida cart access tokens con audience claim `'cart-access'`
-- Rutas públicas sin JWT (match exacto): `/api/admin/login`, `/api/admin/logout`, `/api/unsubscribe`, `/api/admin/promociones/unsubscribe`, `/api/csp-report`
+- Rutas públicas sin JWT (match exacto): `/api/admin/login`, `/api/unsubscribe`, `/api/admin/promociones/unsubscribe`, `/api/csp-report`
 
 > Agregar nuevas rutas públicas a `isPublicRoute` en `proxy.ts` (usar `===`, no `startsWith`)
 
@@ -408,9 +409,10 @@ SUPABASE_SERVICE_ROLE_KEY=eyJxxx
 # Auth JWT
 ACCESS_TOKEN_SECRET=secreto_largo_aleatorio        # openssl rand -hex 32
 
-# CSRF + Carrito (obligatorios en producción)
+# CSRF + Carrito + Unsubscribe (obligatorios en producción)
 CSRF_HMAC_SECRET=secreto_largo_aleatorio           # openssl rand -hex 32
-CART_TOKEN_SECRET=secreto_largo_aleatorio           # openssl rand -hex 32
+CART_TOKEN_SECRET=secreto_largo_aleatorio          # openssl rand -hex 32
+UNSUBSCRIBE_HMAC_SECRET=secreto_largo_aleatorio    # openssl rand -hex 32
 
 # Rate Limiting + JWT Revocation (Upstash Redis)
 UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
@@ -477,7 +479,7 @@ npx tsx scripts/setup-r2-cors.ts
 | **Build** | Compila correctamente |
 | **Clean Architecture** | 100% — Domain / Application / Infrastructure |
 | **SOLID** | 100% — DIP, sin `any`, repositorios inyectados |
-| **Seguridad** | Auditoría completa — JWT revocation (fail-closed), env validation startup, rate limiting (fail-closed login), CSP nonces, CSRF timing-safe, price tampering + product rejection, anti-enumeración, mínimo privilegio, cart token audience, JSON-LD sanitización |
+| **Seguridad** | Auditoría completa — JWT revocation (fail-closed), RBAC `requireRole`, env validation startup, rate limiting (fail-closed login), CSP nonces + report-uri, CSRF timing-safe, price tampering + product rejection, anti-enumeración, mínimo privilegio, cart token audience, JSON-LD sanitización |
 | **Tipos TypeScript** | Sin `any` en core ni API routes |
 | **Error Handling** | 100% — Result<T, E> en todos los módulos |
 | **API Error Codes** | Códigos centralizados en `core/domain/constants/api-errors.ts` |

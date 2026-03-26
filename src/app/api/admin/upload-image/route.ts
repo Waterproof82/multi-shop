@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-import { requireAuth, successResponse, errorResponse } from '@/core/infrastructure/api/helpers';
+import { requireAuth, requireRole, successResponse, errorResponse } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import { getR2Config, uploadToR2 } from '@/core/infrastructure/storage/s3-client';
 import { empresaUseCase } from '@/core/infrastructure/database';
@@ -40,6 +40,8 @@ export async function POST(request: NextRequest) {
 
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError || !empresaId) return authError ?? NextResponse.json(createErrorResponse(AUTH_ERRORS.UNAUTHORIZED), { status: 401 });
+  const roleError = requireRole(request, ['admin']);
+  if (roleError) return roleError;
 
   const { publicDomain } = getR2Config();
   if (!publicDomain) {

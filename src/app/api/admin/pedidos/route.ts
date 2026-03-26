@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { pedidoUseCase } from '@/core/infrastructure/database';
-import { requireAuth, successResponse, validationErrorResponse, handleResult } from '@/core/infrastructure/api/helpers';
+import { requireAuth, requireRole, successResponse, validationErrorResponse, handleResult } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import { PEDIDO_ESTADOS } from '@/core/domain/constants/pedido';
 
@@ -34,6 +34,8 @@ export async function PATCH(request: NextRequest) {
 
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
+  const roleError = requireRole(request, ['admin']);
+  if (roleError) return roleError;
 
   let body: unknown;
   try {
@@ -60,6 +62,8 @@ export async function DELETE(request: NextRequest) {
 
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
+  const roleError = requireRole(request, ['admin']);
+  if (roleError) return roleError;
 
   let body: unknown;
   try {
@@ -86,6 +90,8 @@ export async function PUT(request: NextRequest) {
 
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
+  const roleError = requireRole(request, ['admin']);
+  if (roleError) return roleError;
 
   const { searchParams } = new URL(request.url);
   const mesParam = searchParams.get('mes');

@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 import { verifyCsrfToken } from '@/lib/csrf';
-import { timingSafeEqual } from 'crypto';
+import { timingSafeEqual } from 'node:crypto';
 import { isTokenRevoked } from '@/lib/token-revocation';
 import { AUTH_ERRORS, SERVER_ERRORS, createErrorResponse } from '@/core/domain/constants/api-errors';
+import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 
 function getAdminTokenSecret(): string | undefined {
   return process.env.ACCESS_TOKEN_SECRET;
@@ -49,12 +50,15 @@ function isPublicRoute(path: string): boolean {
     path === '/api/unsubscribe' ||
     path === '/api/admin/promociones/unsubscribe' ||
     path === '/api/admin/login' ||
-    path === '/api/admin/logout' ||
     path === '/api/csp-report'
   );
 }
 
 async function handleAdminAuth(request: NextRequest, origin: string | null): Promise<NextResponse> {
+  // Rate limit before JWT verification to prevent brute-force flooding of the verify step
+  const rateLimited = await rateLimitAdmin(request);
+  if (rateLimited) return addCorsHeaders(rateLimited, origin);
+
   const adminToken = request.cookies.get('admin_token')?.value;
 
   if (!adminToken) {
@@ -74,8 +78,9 @@ async function handleAdminAuth(request: NextRequest, origin: string | null): Pro
       return addCorsHeaders(NextResponse.json(createErrorResponse(AUTH_ERRORS.INVALID_TOKEN), { status: 401 }), origin);
     }
 
-    // Check revocation list — token may be valid but already logged out
-    if (payload.jti && await isTokenRevoked(payload.jti)) {
+    // Reject tokens without jti — they cannot be revoked and are permanently valid.
+    // Also reject tokens whose jti appears in the revocation list (logged-out sessions).
+    if (!payload.jti || await isTokenRevoked(payload.jti)) {
       return addCorsHeaders(NextResponse.json(createErrorResponse(AUTH_ERRORS.INVALID_TOKEN), { status: 401 }), origin);
     }
 
@@ -132,6 +137,14 @@ async function handleCartAccessToken(url: URL, accessToken: string): Promise<Nex
     // Require 'cart-access' audience to prevent token confusion with admin JWTs
     const { payload } = await jwtVerify(sanitizedToken, secret, { audience: 'cart-access' });
 
+    // If the cart token has a jti, check revocation (fail-closed in prod).
+    // Cart tokens generated without jti are accepted today (short 15-min TTL);
+    // once generation includes jti this will revoke on-demand.
+    if (payload.jti && await isTokenRevoked(payload.jti)) {
+      url.searchParams.delete('access');
+      return NextResponse.redirect(url);
+    }
+
     url.searchParams.delete('access');
     const response = NextResponse.redirect(url);
 
@@ -163,7 +176,7 @@ function normalizeR2Origin(raw: string | undefined): string {
   return `https://${stripped}`;
 }
 
-function buildCsp(nonce: string): string {
+function buildCsp(nonce: string, path: string): string {
   const isDev = process.env.NODE_ENV !== 'production';
   const r2Origin = normalizeR2Origin(process.env.NEXT_PUBLIC_R2_DOMAIN);
   const imgSources = ["'self'", r2Origin, "https://*.supabase.co", "data:", "blob:"]
@@ -177,6 +190,10 @@ function buildCsp(nonce: string): string {
     ? `script-src 'self' 'unsafe-inline' 'unsafe-eval'`
     : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`;
 
+  // Admin pages must not be embeddable — use 'none' to align with X-Frame-Options: DENY
+  // set in next.config.mjs for /admin/* routes.
+  const frameAncestors = path.startsWith('/admin') ? "frame-ancestors 'none'" : "frame-ancestors 'self'";
+
   return [
     "default-src 'self'",
     scriptSrc,
@@ -189,7 +206,8 @@ function buildCsp(nonce: string): string {
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
-    "frame-ancestors 'self'",
+    frameAncestors,
+    "report-uri /api/csp-report",
   ].join('; ');
 }
 
@@ -219,7 +237,7 @@ export async function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-nonce', nonce);
 
-  const csp = buildCsp(nonce);
+  const csp = buildCsp(nonce, path);
   // Set on request so server components can read it via headers()
   requestHeaders.set('Content-Security-Policy', csp);
 

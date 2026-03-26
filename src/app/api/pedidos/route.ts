@@ -20,7 +20,7 @@ const createPedidoSchema = z.object({
   })).min(1).max(50),
   total: z.number().min(0).max(100_000).optional(),
   nombre: z.string().min(2).max(100),
-  telefono: z.string().min(9).max(18).regex(/^\+?[0-9]+$/, 'Formato de teléfono no válido'),
+  telefono: z.string().min(9).max(20).regex(/^\+?[0-9\s\-()+]+$/, 'Formato de teléfono no válido'),
   email: z.string().email().optional().or(z.literal('')),
 });
 

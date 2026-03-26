@@ -24,8 +24,11 @@ function getRedis(): Redis | null {
 /**
  * In production, if Redis is not configured, login rate limiting MUST block requests
  * to prevent brute-force attacks. Other rate limiters degrade gracefully.
+ * Read lazily (inside a function) to avoid capturing NODE_ENV at module load time.
  */
-const FAIL_CLOSED_IN_PRODUCTION = process.env.NODE_ENV === 'production';
+function isFailClosed(): boolean {
+  return process.env.NODE_ENV === 'production';
+}
 
 /**
  * Rate limiter for login: 5 attempts per 15 minutes per IP.
@@ -111,7 +114,7 @@ export async function rateLimitLogin(request: Request): Promise<NextResponse | n
   const limiter = getLoginLimiter();
   if (!limiter) {
     // Fail-closed in production: block login if Redis is unavailable to prevent brute-force
-    if (FAIL_CLOSED_IN_PRODUCTION) {
+    if (isFailClosed()) {
       return NextResponse.json(
         { error: "Service temporarily unavailable. Please try again later." },
         { status: 503 }

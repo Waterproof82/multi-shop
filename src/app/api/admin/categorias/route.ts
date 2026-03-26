@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { categoryUseCase } from '@/core/infrastructure/database';
 import { createCategorySchema, updateCategorySchema, categoryIdSchema } from '@/core/application/dtos/category.dto';
-import { requireAuth, handleResult, handleResultWithStatus, validationErrorResponse } from '@/core/infrastructure/api/helpers';
+import { requireAuth, requireRole, handleResult, handleResultWithStatus, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import type { Category } from '@/core/domain/entities/types';
 
@@ -51,6 +51,8 @@ export async function POST(request: NextRequest) {
 
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
+  const roleError = requireRole(request, ['admin']);
+  if (roleError) return roleError;
 
   let body: unknown;
   try {
@@ -79,6 +81,8 @@ export async function PUT(request: NextRequest) {
 
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
+  const roleError = requireRole(request, ['admin']);
+  if (roleError) return roleError;
 
   const { searchParams } = new URL(request.url);
   const idParam = searchParams.get('id');
@@ -116,6 +120,8 @@ export async function DELETE(request: NextRequest) {
 
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError) return authError;
+  const roleError = requireRole(request, ['admin']);
+  if (roleError) return roleError;
 
   const { searchParams } = new URL(request.url);
   const idParam = searchParams.get('id');

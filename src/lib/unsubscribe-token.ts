@@ -1,11 +1,11 @@
-import { createHmac, timingSafeEqual } from 'crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 
-const TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
+const TOKEN_TTL_SECONDS = 365 * 24 * 60 * 60; // 1 year — GDPR/CAN-SPAM require unsubscribe links to remain valid long-term
 const DOMAIN_PREFIX = 'unsubscribe'; // Separates key usage from CSRF tokens
 
 function getSecret(): string {
-  const secret = process.env.CSRF_HMAC_SECRET;
-  if (!secret) throw new Error('CSRF_HMAC_SECRET environment variable is required');
+  const secret = process.env.UNSUBSCRIBE_HMAC_SECRET;
+  if (!secret) throw new Error('UNSUBSCRIBE_HMAC_SECRET environment variable is required');
   return secret;
 }
 
