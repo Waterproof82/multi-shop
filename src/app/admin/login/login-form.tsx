@@ -131,7 +131,7 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring dark:focus-visible:ring-offset-background disabled:opacity-50 transition-all duration-150 ease-out active:scale-[0.98]"
+            className="w-full flex justify-center py-3 px-4 min-h-[44px] border border-transparent rounded-md text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring disabled:opacity-50 transition-all duration-150 ease-out active:scale-[0.98]"
           >
             {loading ? (
               <>

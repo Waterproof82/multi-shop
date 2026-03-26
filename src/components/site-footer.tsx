@@ -17,7 +17,7 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
 
   return (
     <footer className="w-full bg-foreground text-background mt-12 border-t border-foreground/10">
-      <div className="max-w-7xl mx-auto px-6 py-10">
+      <div className="max-w-[90rem] mx-auto px-6 py-10">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
 
           {/* Columna 1: Redes Sociales */}
@@ -26,14 +26,14 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
             <ul className="flex gap-4 pt-1">
               {empresa.instagram && (
                 <li>
-                  <a href={empresa.instagram} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] text-background/85 hover:text-background transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm" aria-label="Instagram">
+                  <a href={empresa.instagram} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] text-background/85 hover:text-background transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm"                   aria-label={t("instagram", language)}>
                     <Camera className="w-5 h-5" />
                   </a>
                 </li>
               )}
               {empresa.fb && (
                 <li>
-                  <a href={empresa.fb} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] text-background/85 hover:text-background transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm" aria-label="Facebook">
+                  <a href={empresa.fb} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] text-background/85 hover:text-background transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm"                   aria-label={t("facebook", language)}>
                     <Link className="w-5 h-5" />
                   </a>
                 </li>
@@ -104,7 +104,7 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
             href="/admin/login"
             rel="nofollow"
             className="text-primary hover:text-primary/80 transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm"
-            aria-label="Admin"
+            aria-label={t("admin", language)}
           >
             <Settings className="w-4 h-4" />
           </a>

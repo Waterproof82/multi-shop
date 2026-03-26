@@ -78,21 +78,21 @@ export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menu
             <p className="text-primary-foreground/80 text-sm mt-1">{empresaNombre}</p>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
+            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center min-h-[60px] flex flex-col justify-center">
               <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
               <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{stats?.pedidosHoy || 0}</span>
               <p className="text-primary-foreground/80 text-xs mt-0.5">{t("pedidosHoy", language)}</p>
             </div>
-            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
+            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center min-h-[60px] flex flex-col justify-center">
               <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{formatPrice(stats?.totalMes || 0)}</span>
               <p className="text-primary-foreground/80 text-xs mt-0.5">{t("ventasDelMes", language)}</p>
             </div>
-            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
+            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center min-h-[60px] flex flex-col justify-center">
               <Package className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
               <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{totalProductos}</span>
               <p className="text-primary-foreground/80 text-xs mt-0.5">{t("products", language)}</p>
             </div>
-            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
+            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center min-h-[60px] flex flex-col justify-center">
               <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{productosEspeciales}</span>
               <p className="text-primary-foreground/80 text-xs mt-0.5">{t("destacados", language)}</p>
             </div>
@@ -168,6 +168,7 @@ export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menu
           <div className="p-8 text-center text-muted-foreground">
             <ShoppingBag className="w-8 h-8 mx-auto mb-2 opacity-50" />
             <p>{t("noOrdersYet", language)}</p>
+            <p className="text-sm mt-2">{t("ordersArriveHere", language)}</p>
           </div>
         )}
       </div>

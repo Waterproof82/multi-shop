@@ -419,7 +419,7 @@ export function CartDrawer() {
         ) : (
           <>
             <div className="flex-1 overflow-y-auto">
-              <ul className="flex flex-col gap-3 py-4">
+              <ul className="flex flex-col gap-3 py-4 cv-auto" style={{ contentVisibility: 'auto' }}>
                 {items.map((ci) => {
                   const itemKey = getItemKey(ci.item, ci.selectedComplements);
                   const complementPrice = ci.selectedComplements?.reduce((sum, c) => sum + c.price, 0) || 0;
@@ -514,9 +514,10 @@ export function CartDrawer() {
                     <Phone className="size-4 text-muted-foreground shrink-0" aria-hidden="true" />
                     <div className="flex gap-1 flex-1">
                       <Select value={countryCode} onValueChange={setCountryCode}>
-                        <SelectTrigger className="h-9 w-[100px] shrink-0 text-xs px-2" aria-label={t("countryCode", language)}>
+                        <SelectTrigger id="country-code-select" className="h-9 w-[100px] shrink-0 text-xs px-2" aria-labelledby="country-code-label">
                           <SelectValue />
                         </SelectTrigger>
+                        <span id="country-code-label" className="sr-only">{t("countryCode", language)}</span>
                         <SelectContent>
                           {COUNTRY_CODES.map((cc) => (
                             <SelectItem key={cc.code} value={cc.code}>

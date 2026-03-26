@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Image from 'next/image';
 import { Plus, Pencil, Trash2, Loader2, Image as ImageIcon, Search, ArrowUpDown, ArrowUp, ArrowDown, Utensils, Star } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -81,11 +81,7 @@ export default function ProductosPage() {
   const [showTranslations, setShowTranslations] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; id: string | null; nombre: string | null }>({ show: false, id: null, nombre: null });
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [prodRes, catRes] = await Promise.all([
         fetch('/api/admin/productos'),
@@ -106,7 +102,11 @@ export default function ProductosPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [language]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleSubmit = async (e: { preventDefault: () => void }) => {
     e.preventDefault();
@@ -364,7 +364,7 @@ export default function ProductosPage() {
 
       <div className="bg-card rounded-lg shadow-elegant border border-border overflow-hidden">
         {/* Desktop table */}
-        <div className="hidden md:block overflow-x-auto">
+        <div className="hidden md:block overflow-x-auto scrollbar scrollbar-thumb-muted-foreground/40 scrollbar-track-transparent scrollbar-thin">
           <table className="min-w-full divide-y divide-border">
             <thead className="bg-muted">
               <tr>
@@ -470,14 +470,14 @@ export default function ProductosPage() {
                     <button
                       onClick={() => openEditModal(prod)}
                       className="p-2 text-primary hover:text-primary/80 mr-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
-                      aria-label={`Editar ${prod.titulo_es}`}
+                      aria-label={`${t("edit", language)} ${prod.titulo_es}`}
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => handleDeleteProduct(prod.id)}
                       className="p-2 text-destructive hover:text-destructive/80 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
-                      aria-label={`Eliminar ${prod.titulo_es}`}
+                      aria-label={`${t("delete", language)} ${prod.titulo_es}`}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -534,14 +534,14 @@ export default function ProductosPage() {
                       <button
                         onClick={() => openEditModal(prod)}
                         className="p-1.5 min-h-[44px] min-w-[44px] flex items-center justify-center text-primary hover:bg-primary/10 dark:hover:bg-primary/20 rounded outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                        aria-label={`Editar ${prod.titulo_es}`}
+                        aria-label={`${t("edit", language)} ${prod.titulo_es}`}
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => handleDeleteProduct(prod.id)}
                         className="p-1.5 min-h-[44px] min-w-[44px] flex items-center justify-center text-destructive hover:bg-destructive/10 rounded outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                        aria-label={`Eliminar ${prod.titulo_es}`}
+                        aria-label={`${t("delete", language)} ${prod.titulo_es}`}
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>

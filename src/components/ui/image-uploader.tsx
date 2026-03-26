@@ -4,6 +4,8 @@ import { useState, useRef } from 'react';
 import Image from 'next/image';
 import { Upload, Loader2, Pencil, Trash2 } from 'lucide-react';
 import { getCsrfToken } from '@/lib/csrf-client';
+import { useLanguage } from '@/lib/language-context';
+import { t } from '@/lib/translations';
 
 interface ImageUploaderProps {
   readonly value: string;
@@ -74,6 +76,7 @@ export function ImageUploader({
   previewClassName = 'relative group rounded-lg overflow-hidden border h-48',
   previewStyle,
 }: ImageUploaderProps) {
+  const { language } = useLanguage();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [dragOver, setDragOver] = useState(false);
@@ -197,7 +200,7 @@ export function ImageUploader({
               type="button"
               onClick={handleClick}
               className="p-3 bg-card/90 backdrop-blur-sm rounded-full shadow-elegant outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              aria-label="Cambiar imagen"
+              aria-label={t("changeImage", language)}
             >
               <Pencil className="w-4 h-4" />
             </button>
@@ -205,7 +208,7 @@ export function ImageUploader({
               type="button"
               onClick={handleRemove}
               className="p-3 bg-destructive/90 backdrop-blur-sm rounded-full shadow-elegant outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              aria-label="Eliminar imagen"
+              aria-label={t("deleteImage", language)}
             >
               <Trash2 className="w-4 h-4 text-destructive-foreground" />
             </button>
@@ -224,7 +227,7 @@ export function ImageUploader({
             ${dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/40'}
             ${uploading ? 'pointer-events-none opacity-50' : ''}
           `}
-          aria-label="Subir imagen"
+          aria-label={t("uploadImage", language)}
         >
           {uploading ? (
             <>

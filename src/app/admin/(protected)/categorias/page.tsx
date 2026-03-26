@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Plus, Pencil, Trash2, X, Loader2, Search, ArrowUpDown, ArrowUp, ArrowDown, Languages, ChevronDown, ChevronRight, Tags, FolderTree } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -83,11 +83,7 @@ export default function CategoriasPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [showTranslations, setShowTranslations] = useState(false);
 
-  useEffect(() => {
-    fetchCategorias();
-  }, []);
-
-  const fetchCategorias = async () => {
+  const fetchCategorias = useCallback(async () => {
     try {
       const res = await fetch('/api/admin/categorias');
       if (!res.ok) throw new Error(t("loadCategoriesError", language));
@@ -98,7 +94,11 @@ export default function CategoriasPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [language]);
+
+  useEffect(() => {
+    fetchCategorias();
+  }, [fetchCategorias]);
 
   const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
@@ -287,7 +287,7 @@ export default function CategoriasPage() {
 
       <div className="bg-card rounded-lg shadow-elegant border border-border overflow-hidden">
         {/* Desktop table */}
-        <div className="hidden md:block overflow-x-auto">
+        <div className="hidden md:block overflow-x-auto scrollbar scrollbar-thumb-muted-foreground/40 scrollbar-track-transparent scrollbar-thin">
           <table className="min-w-full divide-y divide-border">
             <thead className="bg-muted">
               <tr>
@@ -377,14 +377,14 @@ export default function CategoriasPage() {
                   <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
                     <button
                       onClick={() => openEditModal(cat)}
-                      aria-label={`Editar ${cat.nombre_es}`}
+                      aria-label={`${t("edit", language)} ${cat.nombre_es}`}
                       className="p-2 text-primary hover:text-primary/80 mr-1 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => handleDelete(cat.id)}
-                      aria-label={`Eliminar ${cat.nombre_es}`}
+                      aria-label={`${t("delete", language)} ${cat.nombre_es}`}
                       className="p-2 text-destructive hover:text-destructive/80 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -430,14 +430,14 @@ export default function CategoriasPage() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => openEditModal(cat)}
-                    aria-label={`Editar ${cat.nombre_es}`}
+                    aria-label={`${t("edit", language)} ${cat.nombre_es}`}
                     className="p-2 text-primary hover:bg-primary/10 dark:hover:bg-primary/20 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
                   >
                     <Pencil className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => handleDelete(cat.id)}
-                    aria-label={`Eliminar ${cat.nombre_es}`}
+                    aria-label={`${t("delete", language)} ${cat.nombre_es}`}
                     className="p-2 text-destructive hover:bg-destructive/10 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -611,7 +611,7 @@ export default function CategoriasPage() {
                 value={formData.categoria_padre_id || ''}
                 onChange={(e) => setFormData({ ...formData, categoria_padre_id: e.target.value || null })}
                 className="w-full px-3 py-2 rounded-md border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background transition-colors cursor-pointer"
-                aria-label="Categoría padre"
+                aria-label={t("parentCategory", language)}
               >
                 <option value="">{t("noParent", language)}</option>
                 {categorias

@@ -11,6 +11,15 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  SelectGroup,
+  SelectLabel,
+} from '@/components/ui/select';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 
@@ -176,38 +185,42 @@ export function ProductFormDialog({
               <label htmlFor="categoria_id" className="block text-sm font-medium text-foreground mb-1">
                 {t("category", language)}
               </label>
-              <select
-                id="categoria_id"
-                name="categoria_id"
+              <Select
                 value={formData.categoria_id}
-                onChange={(e) => handleSelectChange(e.target.value)}
-                className="w-full px-3 py-2 rounded-md border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background cursor-pointer min-h-[44px]"
-                aria-label={t("category", language)}
+                onValueChange={handleSelectChange}
               >
-                <option value="">{t("noCategory", language)}</option>
-                {parents.map(parent => {
-                  const childCats = children.filter(c => c.categoria_padre_id === parent.id);
-                  if (childCats.length > 0) {
+                <SelectTrigger
+                  id="categoria_id"
+                  aria-label={t("category", language)}
+                >
+                  <SelectValue placeholder={t("noCategory", language)} />
+                </SelectTrigger>
+                <SelectContent>
+                  {parents.map(parent => {
+                    const childCats = children.filter(c => c.categoria_padre_id === parent.id);
+                    if (childCats.length > 0) {
+                      return (
+                        <SelectGroup key={parent.id}>
+                          <SelectLabel>{parent.nombre_es}</SelectLabel>
+                          <SelectItem value={parent.id}>
+                            {parent.nombre_es} ({t("mainCategory", language)})
+                          </SelectItem>
+                          {childCats.map(sub => (
+                            <SelectItem key={sub.id} value={sub.id} isSubcategory>
+                              └─ {sub.nombre_es}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      );
+                    }
                     return (
-                      <optgroup key={parent.id} label={parent.nombre_es}>
-                        <option key={`${parent.id}-self`} value={parent.id}>
-                          {parent.nombre_es} ({t("mainCategory", language)})
-                        </option>
-                        {childCats.map(sub => (
-                          <option key={sub.id} value={sub.id}>
-                            └─ {sub.nombre_es}
-                          </option>
-                        ))}
-                      </optgroup>
+                      <SelectItem key={parent.id} value={parent.id}>
+                        {parent.nombre_es}
+                      </SelectItem>
                     );
-                  }
-                  return (
-                    <option key={parent.id} value={parent.id}>
-                      {parent.nombre_es}
-                    </option>
-                  );
-                })}
-              </select>
+                  })}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="col-span-2">
