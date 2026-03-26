@@ -116,7 +116,7 @@ import {
 } from '@/core/infrastructure/database';
 
 // API helpers
-import { requireAuth, successResponse, errorResponse, validationErrorResponse, handleResult, handleResultWithStatus } from '@/core/infrastructure/api/helpers';
+import { requireAuth, requireRole, successResponse, errorResponse, validationErrorResponse, handleResult, handleResultWithStatus } from '@/core/infrastructure/api/helpers';
 
 // DTOs Zod
 import { createProductSchema } from '@/core/application/dtos/product.dto';
@@ -314,13 +314,18 @@ Hardcodear texto de UI en un solo idioma — usar `t()` de translations (incluid
 Usar `focus-visible:outline-*` para focus rings — usar patron estandar `outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2`
 Crear botones interactivos menores de 44px — todos los touch targets deben tener `min-h-[44px] min-w-[44px]`
 Ignorar `prefers-reduced-motion` — usar `useReducedMotion()` de framer-motion o `motion-reduce:` de Tailwind
+Agregar rutas mutantes admin sin llamar `requireRole(request, ['admin'])` — RBAC obligatorio en todos los handlers POST/PUT/PATCH/DELETE de `/api/admin/*`
+Agregar `/api/admin/logout` a `isPublicRoute` — logout requiere JWT + CSRF para revocar el token correctamente
+Leer `process.env.BREVO_API_KEY` directamente en routes — usar `sendEmail()` que llama `getBrevoApiKey()` internamente
+Crear tokens JWT sin claim `jti` — son irrevocables permanentemente; el proxy y `verifyToken` rechazan tokens sin `jti`
+Generar tokens de unsubscribe con `CSRF_HMAC_SECRET` — usar `UNSUBSCRIBE_HMAC_SECRET` (aislamiento de contexto criptografico)
 ---
 Proceso de revision — Orden de prioridad
 Cuando revises o modifiques codigo, seguir este orden antes de dar la tarea por completada:
 Violaciones de capas — ¿Alguna route/page accede a DB directamente?
 Tipos — ¿Hay `any`? Reemplazar por tipos de dominio
 Validacion — ¿Todas las routes usan Zod `safeParse`? ¿`request.json()` en try/catch? ¿Max-length en strings?
-Auth — ¿Todas las rutas admin usan `requireAuth()`? ¿Nuevas rutas publicas en `isPublicRoute`?
+Auth — ¿Todas las rutas admin usan `requireAuth()`? ¿Handlers mutativos usan `requireRole(request, ['admin'])`? ¿Nuevas rutas publicas en `isPublicRoute`?
 Result pattern — ¿Use cases y repos retornan `Result<T, E>`? ¿Ningun `throw` suelto?
 Seguridad — ¿Secrets leidos lazy? ¿URLs con `https://`? ¿Sin PII en logs? ¿Endpoints publicos usan anon client?
 SOLID — ¿Alguna clase tiene mas de una responsabilidad? ¿DIP respetado?
