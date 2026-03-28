@@ -31,8 +31,13 @@ export async function GET(request: NextRequest) {
   const rateLimited = await rateLimitAdmin(request);
   if (rateLimited) return rateLimited;
 
-  const { empresaId, error: authError } = await requireAuth(request);
+  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request) as any;
   if (authError) return authError;
+
+  const { searchParams } = new URL(request.url);
+  const queryEmpresaId = searchParams.get('empresaId');
+  
+  const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
 
   const result = await categoryUseCase.getAll(empresaId!);
   
@@ -49,10 +54,14 @@ export async function POST(request: NextRequest) {
   const rateLimited = await rateLimitAdmin(request);
   if (rateLimited) return rateLimited;
 
-  const { empresaId, error: authError } = await requireAuth(request);
+  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request) as any;
   if (authError) return authError;
-  const roleError = requireRole(request, ['admin']);
+  const roleError = requireRole(request, ['admin', 'superadmin']);
   if (roleError) return roleError;
+
+  const { searchParams } = new URL(request.url);
+  const queryEmpresaId = searchParams.get('empresaId');
+  const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
 
   let body: unknown;
   try {
@@ -79,12 +88,14 @@ export async function PUT(request: NextRequest) {
   const rateLimited = await rateLimitAdmin(request);
   if (rateLimited) return rateLimited;
 
-  const { empresaId, error: authError } = await requireAuth(request);
+  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request) as any;
   if (authError) return authError;
-  const roleError = requireRole(request, ['admin']);
+  const roleError = requireRole(request, ['admin', 'superadmin']);
   if (roleError) return roleError;
 
   const { searchParams } = new URL(request.url);
+  const queryEmpresaId = searchParams.get('empresaId');
+  const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
   const idParam = searchParams.get('id');
   const idParsed = categoryIdSchema.safeParse({ id: idParam });
 
@@ -118,12 +129,14 @@ export async function DELETE(request: NextRequest) {
   const rateLimited = await rateLimitAdmin(request);
   if (rateLimited) return rateLimited;
 
-  const { empresaId, error: authError } = await requireAuth(request);
+  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request) as any;
   if (authError) return authError;
-  const roleError = requireRole(request, ['admin']);
+  const roleError = requireRole(request, ['admin', 'superadmin']);
   if (roleError) return roleError;
 
   const { searchParams } = new URL(request.url);
+  const queryEmpresaId = searchParams.get('empresaId');
+  const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
   const idParam = searchParams.get('id');
   const idParsed = categoryIdSchema.safeParse({ id: idParam });
 

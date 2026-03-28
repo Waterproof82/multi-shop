@@ -72,6 +72,10 @@ src/
 │   │       ├── promociones/
 │   │       ├── estadisticas/
 │   │       └── configuracion/
+│   ├── superadmin/                  # Panel Super Admin
+│   │   ├── layout.tsx               # Verifica rol superadmin
+│   │   ├── page.tsx                 # Dashboard global
+│   │   └── empresas/[id]/page.tsx   # Editar empresa
 │   └── api/
 │       ├── admin/                   # Protegidas por proxy.ts JWT
 │       │   ├── login/               # POST — autenticación
@@ -86,6 +90,10 @@ src/
 │       │   ├── update-colores/      # POST colores del tema
 │       │   └── promociones/
 │       │       └── unsubscribe/     # POST — pública, toggle suscripción
+│       ├── superadmin/              # Protegidas, rol superadmin
+│       │   └── empresas/
+│       │       ├── route.ts         # GET — todas las empresas
+│       │       └── [id]/route.ts   # GET/PUT — empresa específica
 │       ├── pedidos/                 # POST — pública, crear pedido
 │       └── unsubscribe/             # GET — pública, dar de baja/alta promo
 │
@@ -245,12 +253,14 @@ import {
 | **PedidoUseCase** | `getAll`, `create`, `updateStatus`, `getStats`, `delete` |
 | **PromocionUseCase** | `getAll`, `create` |
 | **AuthAdminUseCase** | `login`, `verifyToken` |
+| **SuperAdminUseCase** | `getAllEmpresas`, `getEmpresaById`, `updateEmpresa` |
 
 ### Repositories — métodos
 
 | Repository | Métodos |
 |------------|---------|
 | **IAdminRepository** | `loginWithPassword`, `findById` |
+| **ISuperAdminRepository** | `findAllEmpresas`, `findEmpresaById`, `updateEmpresa`, `getEmpresaStats` |
 | **IClienteRepository** | `findAllByTenant`, `findByEmail`, `findByTelefono`, `create`, `update`, `delete` |
 | **IEmpresaRepository** | `getById`, `findByDomain`, `update`, `updateColores` |
 | **IPedidoRepository** | `findAllByTenant`, `updateStatus`, `delete`, `create`, `getStats` |
@@ -313,6 +323,34 @@ function toAdminProduct(prod: Product) {
 
 ## Autenticación Admin
 
+### Roles de Usuario
+
+El sistema soporta dos roles:
+
+| Rol | Descripción | Acceso |
+|-----|-------------|--------|
+| `admin` | Admin de empresa | Panel admin de su empresa, solo datos de su tenant |
+| `superadmin` | Super Admin | Panel superadmin, acceso a TODAS las empresas |
+
+El rol se define en la columna `rol` de la tabla `perfiles_admin`:
+- `admin` → redirige a `/admin`
+- `superadmin` → redirige a `/superadmin`
+
+### Panel Super Admin
+
+Acceso: `/superadmin` - Ver resumen de todas las empresas y editar cualquier campo.
+
+```
+/superadmin                     → Dashboard con stats de todas las empresas
+/superadmin/empresas/[id]      → Editar empresa específica
+```
+
+APIs asociadas:
+```
+/api/superadmin/empresas        → GET todas las empresas con stats
+/api/superadmin/empresas/[id]  → GET/PUT empresa específica
+```
+
 ### Flujo de login
 ```
 POST /api/admin/login
@@ -321,6 +359,7 @@ POST /api/admin/login
   → adminRepo.findById()           (perfil + empresa)
   → JWT HS256, 24h, jti=randomUUID()
   → cookie admin_token (HttpOnly, SameSite=strict)
+  → Redirección según rol: admin → /admin, superadmin → /superadmin
 ```
 
 ### Flujo de logout
@@ -384,7 +423,7 @@ const main = parseMainDomain(domain); // elimina subdominio pedidos
 | Tabla | PK | FK | Notas |
 |-------|----|----|-------|
 | `empresas` | id (uuid) | — | dominio, subdomain_pedidos, colores, fb, instagram, url_mapa, telefono_whatsapp |
-| `perfiles_admin` | id (uuid) | empresa_id → empresas | → auth.users |
+| `perfiles_admin` | id (uuid) | empresa_id → empresas (nullable) | → auth.users, `rol` = 'admin' o 'superadmin' |
 | `categorias` | id (uuid) | empresa_id → empresas | categoria_padre_id, categoriaComplementoDe |
 | `productos` | id (uuid) | empresa_id, categoria_id | i18n: titulo_es/en/fr/it/de |
 | `clientes` | id (uuid) | empresa_id | telefono único por empresa |
@@ -395,6 +434,8 @@ const main = parseMainDomain(domain); // elimina subdominio pedidos
 > `pedidos` NO tiene columna `telefono` — el teléfono está en `clientes`
 
 > `detalle_pedido[].complementos` almacena objetos `{ name, price }` — tipo `PedidoComplemento[]`
+
+> `perfiles_admin.empresa_id` es NULL para superadmins (sin empresa asignada)
 
 ---
 
@@ -468,6 +509,64 @@ pnpm lint     # Linting
 
 # Solo una vez: configurar CORS en R2
 npx tsx scripts/setup-r2-cors.ts
+```
+
+---
+
+## Crear Super Admin
+
+### Requisitos de Base de Datos
+
+El campo `empresa_id` en `perfiles_admin` debe permitir NULL para superadmins:
+
+```sql
+ALTER TABLE public.perfiles_admin 
+ALTER COLUMN empresa_id DROP NOT NULL;
+
+ALTER TABLE public.perfiles_admin 
+DROP CONSTRAINT IF EXISTS perfiles_admin_empresa_id_fkey;
+```
+
+### Script Node (recomendado)
+
+```bash
+# Crear archivo .env desde .env.local si no existe
+cp .env.local .env
+
+# Crear superadmin
+npx tsx scripts/create-superadmin.ts superadmin@tudominio.com Password123 "Super Admin"
+```
+
+### Script SQL (alternativa)
+
+```sql
+-- 1. Crear usuario en Auth (reemplazar valores)
+INSERT INTO auth.users (instance_id, email, encrypted_password, email_confirmed_at, role, aud, created_at, updated_at, raw_app_meta_data, raw_user_meta_data, id)
+VALUES (
+  (SELECT id FROM auth.instances LIMIT 1),
+  'superadmin@tudominio.com',
+  crypt('Password123', gen_salt('bf')),
+  now(),
+  NULL,
+  'authenticated',
+  now(),
+  now(),
+  '{"provider":"email","providers":["email"]}'::jsonb,
+  '{}'::jsonb,
+  gen_random_uuid()
+) RETURNING id;
+
+-- 2. Crear perfil (reemplazar USER_ID)
+INSERT INTO public.perfiles_admin (id, empresa_id, nombre_completo, rol, created_at)
+VALUES ('USER_ID_AQUI', NULL, 'Super Admin', 'superadmin', now());
+```
+
+### Convertir admin existente a superadmin
+
+```sql
+UPDATE public.perfiles_admin 
+SET rol = 'superadmin', empresa_id = NULL
+WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 ```
 
 ---

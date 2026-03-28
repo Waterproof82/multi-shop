@@ -65,8 +65,9 @@ const SortIndicator = ({ field, currentField, direction }: { field: keyof Produc
 };
 
 export default function ProductosPage() {
-  const { empresaSlug } = useAdmin();
+  const { empresaId, empresaSlug, overrideEmpresaId } = useAdmin();
   const { language } = useLanguage();
+  const effectiveEmpresaId = overrideEmpresaId || empresaId;
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,8 +85,8 @@ export default function ProductosPage() {
   const fetchData = useCallback(async () => {
     try {
       const [prodRes, catRes] = await Promise.all([
-        fetch('/api/admin/productos'),
-        fetch('/api/admin/categorias'),
+        fetch(`/api/admin/productos?empresaId=${effectiveEmpresaId}`),
+        fetch(`/api/admin/categorias?empresaId=${effectiveEmpresaId}`),
       ]);
       
       if (prodRes.ok) {
@@ -115,8 +116,8 @@ export default function ProductosPage() {
 
     try {
       const url = editingId 
-        ? `/api/admin/productos?id=${editingId}` 
-        : '/api/admin/productos';
+        ? `/api/admin/productos?id=${editingId}&empresaId=${effectiveEmpresaId}` 
+        : `/api/admin/productos?empresaId=${effectiveEmpresaId}`;
       
       const method = editingId ? 'PUT' : 'POST';
 
@@ -195,7 +196,7 @@ export default function ProductosPage() {
     const newActivo = !prod.activo;
     setProductos(prev => prev.map(p => p.id === prod.id ? { ...p, activo: newActivo } : p));
     try {
-      const res = await fetchWithCsrf(`/api/admin/productos?id=${prod.id}`, {
+      const res = await fetchWithCsrf(`/api/admin/productos?id=${prod.id}&empresaId=${effectiveEmpresaId}`, {
         method: 'PUT',
         body: JSON.stringify({ activo: newActivo }),
       });
@@ -235,7 +236,7 @@ export default function ProductosPage() {
   const confirmDeleteProduct = async () => {
     if (!deleteConfirm.id) return;
     try {
-      const res = await fetchWithCsrf(`/api/admin/productos?id=${deleteConfirm.id}`, {
+      const res = await fetchWithCsrf(`/api/admin/productos?id=${deleteConfirm.id}&empresaId=${effectiveEmpresaId}`, {
         method: 'DELETE',
       });
       if (!res.ok) throw new Error(t("deleteError", language));

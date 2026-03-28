@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
 
   const { empresaId, error: authError } = await requireAuth(request);
   if (authError || !empresaId) return authError ?? NextResponse.json(createErrorResponse(AUTH_ERRORS.UNAUTHORIZED), { status: 401 });
-  const roleError = requireRole(request, ['admin']);
+  const roleError = requireRole(request, ['admin', 'superadmin']);
   if (roleError) return roleError;
 
   const { publicDomain } = getR2Config();

@@ -162,9 +162,31 @@ export function requireRole(request: NextRequest, allowedRoles: string[]): NextR
 
 Los handlers GET (solo lectura) no requieren verificación de rol. Los handlers PUT usados como lectura (stats) sí requieren `requireRole` dado que exponen métricas financieras del tenant.
 
-### Rol actual en DB
+### Roles del sistema
 
-La tabla `perfiles_admin` tiene `rol TEXT DEFAULT 'admin'`. Actualmente existe un único rol: `admin`. Con el RBAC en su lugar, cualquier nuevo rol añadido al sistema (ej. `viewer`) recibirá automáticamente 403 en todas las operaciones destructivas sin cambios adicionales en el código.
+La tabla `perfiles_admin` soporta dos roles definidos en `rol TEXT`:
+
+| Rol | Descripción | Acceso |
+|-----|-------------|--------|
+| `admin` | Admin de empresa | Panel `/admin`, solo datos de su tenant |
+| `superadmin` | Super Admin | Panel `/superadmin`, acceso global a todas las empresas |
+
+El rol se verifica en:
+1. `auth-admin.use-case.ts` - En `verifyToken()`, si `rol === 'superadmin'` no busca empresa asociada (`empresaId: null`)
+2. Layout del admin - Redirige a `/superadmin` si el rol es `superadmin`
+3. `proxy.ts` - Las rutas `/api/superadmin/*` requieren `rol === 'superadmin'`
+
+### Super Admin Panel
+
+Rutas protegidas (`proxy.ts`):
+- `/api/superadmin/empresas` — GET todas las empresas con stats
+- `/api/superadmin/empresas/[id]` — GET/PUT empresa específica
+
+Pages:
+- `/superadmin` — Dashboard global
+- `/superadmin/empresas/[id]` — Editor de empresa
+
+El superadmin tiene acceso a través de `SUPABASE_SERVICE_ROLE_KEY` (bypass RLS) para consultar y modificar cualquier empresa.
 
 ---
 

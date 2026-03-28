@@ -7,6 +7,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { logClientError } from '@/lib/client-error';
 import { useLanguage } from '@/lib/language-context';
+import { useAdmin } from '@/lib/admin-context';
 import { t } from '@/lib/translations';
 
 interface Stats {
@@ -70,6 +71,8 @@ function getChartTheme(): ChartTheme {
 
 export default function EstadisticasPage() {
   const { language } = useLanguage();
+  const { empresaId, overrideEmpresaId } = useAdmin();
+  const effectiveEmpresaId = overrideEmpresaId || empresaId;
   const meses = [t("monthJan", language), t("monthFeb", language), t("monthMar", language), t("monthApr", language), t("monthMay", language), t("monthJun", language), t("monthJul", language), t("monthAug", language), t("monthSep", language), t("monthOct", language), t("monthNov", language), t("monthDec", language)];
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -89,7 +92,7 @@ export default function EstadisticasPage() {
     async function fetchStats() {
       setLoading(true);
       try {
-        const res = await fetchWithCsrf(`/api/admin/pedidos?mes=${selectedMonth.mes}&año=${selectedMonth.año}`, { method: 'PUT', signal: controller.signal });
+        const res = await fetchWithCsrf(`/api/admin/pedidos?empresaId=${effectiveEmpresaId}&mes=${selectedMonth.mes}&año=${selectedMonth.año}`, { method: 'PUT', signal: controller.signal });
         if (res.ok) {
           const data = await res.json();
           setStats(data);

@@ -10,6 +10,15 @@
 -- Helper function used by policies:
 --   get_mi_empresa_id() → returns empresa_id from perfiles_admin where id = auth.uid()
 --   (SECURITY DEFINER, search_path = 'public')
+--
+-- === SUPERADMIN SUPPORT ===
+-- perfiles_admin.empresa_id must be nullable (NULL for superadmins)
+-- Run this migration to enable superadmin:
+--
+-- ALTER TABLE public.perfiles_admin ALTER COLUMN empresa_id DROP NOT NULL;
+-- ALTER TABLE public.perfiles_admin DROP CONSTRAINT IF EXISTS perfiles_admin_empresa_id_fkey;
+--
+-- Roles: 'admin' (per-tenants) or 'superadmin' (global access)
 
 CREATE TABLE public.empresas (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -64,13 +73,13 @@ CREATE TABLE public.empresas (
 
 CREATE TABLE public.perfiles_admin (
   id uuid NOT NULL,
-  empresa_id uuid NOT NULL,
+  empresa_id uuid NULL,  -- NULL for superadmins
   nombre_completo text,
-  rol text DEFAULT 'admin'::text,
+  rol text DEFAULT 'admin'::text CHECK (rol IN ('admin', 'superadmin')),
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()),
   CONSTRAINT perfiles_admin_pkey PRIMARY KEY (id),
-  CONSTRAINT perfiles_admin_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id),
-  CONSTRAINT perfiles_admin_empresa_id_fkey FOREIGN KEY (empresa_id) REFERENCES public.empresas(id)
+  CONSTRAINT perfiles_admin_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
+  -- empresa_id FK removed to allow NULL for superadmins
 );
 -- RLS: SELECT/INSERT/UPDATE own (id = auth.uid()) | No DELETE
 

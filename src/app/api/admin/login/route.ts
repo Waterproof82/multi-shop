@@ -72,7 +72,8 @@ export async function POST(request: NextRequest) {
     admin: {
       id: admin.id,
       nombre: admin.nombreCompleto,
-      empresa: admin.empresa.nombre,
+      empresa: admin.empresa?.nombre ?? 'Super Admin',
+      rol: admin.rol,
     },
   });
 }

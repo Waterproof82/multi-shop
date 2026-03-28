@@ -6,6 +6,7 @@ interface AdminContextType {
   empresaId: string;
   empresaSlug: string;
   empresaLogo: string | null;
+  overrideEmpresaId?: string;
 }
 
 const AdminContext = createContext<AdminContextType>({
@@ -23,15 +24,23 @@ interface AdminProviderProps {
   readonly empresaId: string;
   readonly empresaNombre: string;
   readonly empresaLogo?: string | null;
+  readonly overrideEmpresaId?: string;
 }
 
-export function AdminProvider({ children, empresaId, empresaNombre, empresaLogo }: Readonly<AdminProviderProps>) {
+export function AdminProvider({ children, empresaId, empresaNombre, empresaLogo, overrideEmpresaId }: Readonly<AdminProviderProps>) {
   const empresaSlug = empresaNombre
     .toLowerCase()
     .replaceAll(/[^a-z0-9]+/g, '-')
     .replaceAll(/^-|-$/g, '') || empresaId.slice(0, 8);
 
-  const value = useMemo(() => ({ empresaId, empresaSlug, empresaLogo: empresaLogo || null }), [empresaId, empresaSlug, empresaLogo]);
+  const effectiveEmpresaId = overrideEmpresaId || empresaId;
+  
+  const value = useMemo(() => ({ 
+    empresaId: effectiveEmpresaId, 
+    empresaSlug, 
+    empresaLogo: empresaLogo || null,
+    overrideEmpresaId 
+  }), [effectiveEmpresaId, empresaSlug, empresaLogo, overrideEmpresaId]);
 
   return (
     <AdminContext.Provider value={value}>

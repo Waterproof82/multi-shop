@@ -14,6 +14,7 @@ import {
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { logClientError } from '@/lib/client-error';
 import { useLanguage } from '@/lib/language-context';
+import { useAdmin } from '@/lib/admin-context';
 import { t } from '@/lib/translations';
 
 interface Cliente {
@@ -29,6 +30,8 @@ interface Cliente {
 
 export default function ClientesPage() {
   const { language } = useLanguage();
+  const { empresaId, overrideEmpresaId } = useAdmin();
+  const effectiveEmpresaId = overrideEmpresaId || empresaId;
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +47,7 @@ export default function ClientesPage() {
     async function fetchClientes() {
       try {
         setError(null);
-        const res = await fetch('/api/admin/clientes', { signal: controller.signal });
+        const res = await fetch(`/api/admin/clientes?empresaId=${effectiveEmpresaId}`, { signal: controller.signal });
         if (res.ok) {
           const data = await res.json();
           setClientes(data.clientes || []);
@@ -61,7 +64,7 @@ export default function ClientesPage() {
     }
     fetchClientes();
     return () => controller.abort();
-  }, [language]);
+  }, [language, effectiveEmpresaId]);
 
   const filteredClientes = clientes.filter(c =>
     c.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -73,7 +76,7 @@ export default function ClientesPage() {
     const newValue = !cliente.aceptar_promociones;
     
     try {
-      const res = await fetchWithCsrf('/api/admin/clientes', {
+      const res = await fetchWithCsrf(`/api/admin/clientes?empresaId=${effectiveEmpresaId}`, {
         method: 'PATCH',
         body: JSON.stringify({
           id: cliente.id,
@@ -121,7 +124,7 @@ export default function ClientesPage() {
     
     setSaving(true);
     try {
-      const res = await fetchWithCsrf('/api/admin/clientes', {
+      const res = await fetchWithCsrf(`/api/admin/clientes?empresaId=${effectiveEmpresaId}`, {
         method: 'PATCH',
         body: JSON.stringify({
           id: editingCliente.id,
@@ -156,7 +159,7 @@ export default function ClientesPage() {
     
     setSaving(true);
     try {
-      const res = await fetchWithCsrf('/api/admin/clientes', {
+      const res = await fetchWithCsrf(`/api/admin/clientes?empresaId=${effectiveEmpresaId}`, {
         method: 'POST',
         body: JSON.stringify({
           nombre: editForm.nombre || null,
@@ -187,7 +190,7 @@ export default function ClientesPage() {
 
     setSaving(true);
     try {
-      const res = await fetchWithCsrf('/api/admin/clientes', {
+      const res = await fetchWithCsrf(`/api/admin/clientes?empresaId=${effectiveEmpresaId}`, {
         method: 'DELETE',
         body: JSON.stringify({ id: deleteConfirm.id }),
       });

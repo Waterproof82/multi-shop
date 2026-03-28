@@ -16,6 +16,7 @@ import { fetchWithCsrf } from '@/lib/csrf-client';
 import { formatPrice } from '@/lib/format-price';
 import { logClientError } from '@/lib/client-error';
 import { useLanguage } from '@/lib/language-context';
+import { useAdmin } from '@/lib/admin-context';
 import { t } from '@/lib/translations';
 
 interface Cliente {
@@ -37,6 +38,8 @@ interface Pedido {
 }
 
 export default function PedidosPage() {
+  const { empresaId, overrideEmpresaId } = useAdmin();
+  const effectiveEmpresaId = overrideEmpresaId || empresaId;
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -50,7 +53,7 @@ export default function PedidosPage() {
     const controller = new AbortController();
     async function fetchPedidos() {
       try {
-        const res = await fetch('/api/admin/pedidos', { signal: controller.signal });
+        const res = await fetch(`/api/admin/pedidos?empresaId=${effectiveEmpresaId}`, { signal: controller.signal });
         if (res.ok) {
           const data = await res.json();
           setPedidos(data.pedidos || []);
@@ -64,7 +67,7 @@ export default function PedidosPage() {
     }
     fetchPedidos();
     return () => controller.abort();
-  }, []);
+  }, [effectiveEmpresaId]);
 
   const filteredPedidos = useMemo(() => pedidos
     .filter(p =>
@@ -128,7 +131,7 @@ export default function PedidosPage() {
 
   const updateEstado = useCallback(async (id: string, nuevoEstado: string) => {
     try {
-      const res = await fetchWithCsrf('/api/admin/pedidos', {
+      const res = await fetchWithCsrf(`/api/admin/pedidos?empresaId=${effectiveEmpresaId}`, {
         method: 'PATCH',
         body: JSON.stringify({ id, estado: nuevoEstado }),
       });
@@ -138,7 +141,7 @@ export default function PedidosPage() {
     } catch (error) {
       logClientError(error, 'updateEstado');
     }
-  }, []);
+  }, [effectiveEmpresaId]);
 
   const deletePedido = useCallback((id: string, orderNum: number | null) => {
     setDeleteConfirm({ show: true, id, numero: orderNum });
@@ -147,7 +150,7 @@ export default function PedidosPage() {
   const confirmDelete = async () => {
     if (!deleteConfirm.id) return;
     try {
-      const res = await fetchWithCsrf('/api/admin/pedidos', {
+      const res = await fetchWithCsrf(`/api/admin/pedidos?empresaId=${effectiveEmpresaId}`, {
         method: 'DELETE',
         body: JSON.stringify({ id: deleteConfirm.id }),
       });

@@ -3,15 +3,21 @@ import { Result } from '@/core/domain/entities/types';
 import { AUTH_ERRORS, createErrorResponse } from '@/core/domain/constants/api-errors';
 
 // Auth middleware helper
-export async function requireAuth(request: NextRequest): Promise<{ empresaId: string | null; error: NextResponse | null }> {
+export async function requireAuth(request: NextRequest): Promise<{ empresaId: string | null; error: NextResponse | null; isSuperAdmin?: boolean }> {
   const empresaId = request.headers.get('x-empresa-id');
-  if (!empresaId) {
+  const adminRol = request.headers.get('x-admin-rol');
+  const isSuperAdmin = adminRol === 'superadmin';
+  
+  // Superadmin can have empty empresaId (set by proxy when JWT has null)
+  // They will use query params to specify which empresa to operate on
+  if (!empresaId && !isSuperAdmin) {
     return { 
       empresaId: null, 
-      error: NextResponse.json(createErrorResponse(AUTH_ERRORS.UNAUTHORIZED), { status: 401 }) 
+      error: NextResponse.json(createErrorResponse(AUTH_ERRORS.UNAUTHORIZED), { status: 401 }),
+      isSuperAdmin 
     };
   }
-  return { empresaId, error: null };
+  return { empresaId: empresaId || null, error: null, isSuperAdmin };
 }
 
 // Response helpers

@@ -110,7 +110,7 @@ Imports principales
 // Use Cases y repos
 import {
   productUseCase, categoryUseCase, clienteUseCase, empresaUseCase,
-  pedidoUseCase, promocionUseCase, authAdminUseCase,
+  pedidoUseCase, promocionUseCase, authAdminUseCase, superAdminUseCase,
   empresaRepository,        // service role (admin)
   empresaPublicRepository,  // anon key (paginas publicas)
 } from '@/core/infrastructure/database';
@@ -158,6 +158,7 @@ PedidoUseCase	`getAll`, `create`, `updateStatus`, `getStats`, `delete`
 PromocionUseCase	`getAll`, `create`
 AuthAdminUseCase	`login`, `verifyToken`
 GetMenuUseCase	`execute` (menu publico con productos y categorias)
+SuperAdminUseCase	`getAllEmpresas`, `getGlobalStats`, `getEmpresaStats`
 ---
 Logger
 ```typescript
@@ -233,9 +234,9 @@ Carrito activo si host coincide con `subdomain_pedidos`
 ---
 Proxy y autenticacion
 `src/proxy.ts` autentica JWT para `/api/admin/*` e inyecta headers:
-`x-empresa-id` — ID del tenant (leido por `requireAuth`)
+`x-empresa-id` — ID del tenant (leido por `requireAuth`). Para superadmin puede estar vacio (usa query params)
 `x-admin-id` — ID del admin
-`x-admin-rol` — Rol del admin
+`x-admin-rol` — Rol del admin ('admin' o 'superadmin')
 Rutas publicas (sin JWT): `/api/admin/login`, `/api/admin/logout`, `/api/unsubscribe`, `/api/admin/promociones/unsubscribe`
 > Si agregas nuevas rutas publicas en admin, agregarlas al proxy en `isPublicRoute`
 Auth en pages del admin:
@@ -245,8 +246,13 @@ const token = cookieStore.get('admin_token')?.value;
 if (!token) redirect('/admin/login');
 const admin = await authAdminUseCase.verifyToken(token);
 if (!admin) redirect('/admin/login');
-// admin.empresaId, admin.empresa, admin.nombreCompleto
+// admin.empresaId, admin.empresa, admin.nombreCompleto, admin.rol
 ```
+
+Superadmin: El superadmin tiene `rol: 'superadmin'` y `empresaId: null` en su token JWT.
+- Para gestionar una empresa específica, usa cookie `superadmin_empresa_id` + query param `empresaId` en APIs.
+- Los endpoints admin leen `empresaId` de query string cuando `isSuperAdmin` es true.
+- Ver `src/core/infrastructure/api/helpers.ts` → `requireAuth()`.
 ---
 Subsistemas
 Imagenes (R2 / Cloudflare)
@@ -314,7 +320,7 @@ Hardcodear texto de UI en un solo idioma — usar `t()` de translations (incluid
 Usar `focus-visible:outline-*` para focus rings — usar patron estandar `outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2`
 Crear botones interactivos menores de 44px — todos los touch targets deben tener `min-h-[44px] min-w-[44px]`
 Ignorar `prefers-reduced-motion` — usar `useReducedMotion()` de framer-motion o `motion-reduce:` de Tailwind
-Agregar rutas mutantes admin sin llamar `requireRole(request, ['admin'])` — RBAC obligatorio en todos los handlers POST/PUT/PATCH/DELETE de `/api/admin/*`
+Agregar rutas mutantes admin sin llamar `requireRole(request, ['admin', 'superadmin'])` — RBAC obligatorio en todos los handlers POST/PUT/PATCH/DELETE de `/api/admin/*`
 Agregar `/api/admin/logout` a `isPublicRoute` — logout requiere JWT + CSRF para revocar el token correctamente
 Leer `process.env.BREVO_API_KEY` directamente en routes — usar `sendEmail()` que llama `getBrevoApiKey()` internamente
 Crear tokens JWT sin claim `jti` — son irrevocables permanentemente; el proxy y `verifyToken` rechazan tokens sin `jti`
@@ -325,7 +331,7 @@ Cuando revises o modifiques codigo, seguir este orden antes de dar la tarea por 
 Violaciones de capas — ¿Alguna route/page accede a DB directamente?
 Tipos — ¿Hay `any`? Reemplazar por tipos de dominio
 Validacion — ¿Todas las routes usan Zod `safeParse`? ¿`request.json()` en try/catch? ¿Max-length en strings?
-Auth — ¿Todas las rutas admin usan `requireAuth()`? ¿Handlers mutativos usan `requireRole(request, ['admin'])`? ¿Nuevas rutas publicas en `isPublicRoute`?
+Auth — ¿Todas las rutas admin usan `requireAuth()`? ¿Handlers mutativos usan `requireRole(request, ['admin', 'superadmin'])`? ¿Nuevas rutas publicas en `isPublicRoute`?
 Result pattern — ¿Use cases y repos retornan `Result<T, E>`? ¿Ningun `throw` suelto?
 Seguridad — ¿Secrets leidos lazy? ¿URLs con `https://`? ¿Sin PII en logs? ¿Endpoints publicos usan anon client?
 SOLID — ¿Alguna clase tiene mas de una responsabilidad? ¿DIP respetado?

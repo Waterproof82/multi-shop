@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useLanguage } from '@/lib/language-context';
+import { useAdmin } from '@/lib/admin-context';
 import { t } from '@/lib/translations';
 
 interface Category {
@@ -71,6 +72,8 @@ const emptyForm: CategoryFormData = {
 
 export default function CategoriasPage() {
   const { language } = useLanguage();
+  const { empresaId, overrideEmpresaId } = useAdmin();
+  const effectiveEmpresaId = overrideEmpresaId || empresaId;
   const [categorias, setCategorias] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -85,7 +88,7 @@ export default function CategoriasPage() {
 
   const fetchCategorias = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/categorias');
+      const res = await fetch(`/api/admin/categorias?empresaId=${effectiveEmpresaId}`);
       if (!res.ok) throw new Error(t("loadCategoriesError", language));
       const data = await res.json();
       setCategorias(data);
@@ -94,7 +97,7 @@ export default function CategoriasPage() {
     } finally {
       setLoading(false);
     }
-  }, [language]);
+  }, [language, effectiveEmpresaId]);
 
   useEffect(() => {
     fetchCategorias();
@@ -107,8 +110,8 @@ export default function CategoriasPage() {
 
     try {
       const url = editingId 
-        ? `/api/admin/categorias?id=${editingId}` 
-        : '/api/admin/categorias';
+        ? `/api/admin/categorias?id=${editingId}&empresaId=${effectiveEmpresaId}` 
+        : `/api/admin/categorias?empresaId=${effectiveEmpresaId}`;
       
       const method = editingId ? 'PUT' : 'POST';
 
@@ -135,7 +138,7 @@ export default function CategoriasPage() {
     if (!confirm(t("confirmDeleteCategory", language))) return;
 
     try {
-      const res = await fetchWithCsrf(`/api/admin/categorias?id=${id}`, {
+      const res = await fetchWithCsrf(`/api/admin/categorias?id=${id}&empresaId=${effectiveEmpresaId}`, {
         method: 'DELETE',
       });
 
