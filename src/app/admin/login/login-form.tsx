@@ -56,7 +56,8 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || t('loginErrorDefault', language));
+        if (res.status === 429) throw new Error(t('loginRateLimit', language));
+        throw new Error(t('loginErrorDefault', language));
       }
 
       if (data.data?.admin?.rol === 'superadmin') {

@@ -136,6 +136,7 @@ export const translations = {
     backToMenu: "Volver a la carta",
     loginFormError: "Error al cargar el formulario. Por favor, recarga la página.",
     loginErrorDefault: "Error al iniciar sesión",
+    loginRateLimit: "Demasiados intentos. Por favor, espera unos minutos.",
     unknownError: "Error desconocido",
     // Admin Sidebar
     logout: "Cerrar Sesión",
@@ -515,6 +516,7 @@ export const translations = {
     backToMenu: "Back to menu",
     loginFormError: "Error loading the form. Please reload the page.",
     loginErrorDefault: "Error signing in",
+    loginRateLimit: "Too many attempts. Please wait a few minutes.",
     unknownError: "Unknown error",
     // Admin Sidebar
     logout: "Sign Out",
@@ -894,6 +896,7 @@ export const translations = {
     backToMenu: "Retour au menu",
     loginFormError: "Erreur lors du chargement du formulaire. Veuillez recharger la page.",
     loginErrorDefault: "Erreur de connexion",
+    loginRateLimit: "Trop de tentatives. Veuillez patienter quelques minutes.",
     unknownError: "Erreur inconnue",
     // Admin Sidebar
     logout: "Se déconnecter",
@@ -1273,6 +1276,7 @@ export const translations = {
     backToMenu: "Torna al menu",
     loginFormError: "Errore nel caricamento del modulo. Ricarica la pagina.",
     loginErrorDefault: "Errore di accesso",
+    loginRateLimit: "Troppi tentativi. Attendi qualche minuto.",
     unknownError: "Errore sconosciuto",
     // Admin Sidebar
     logout: "Disconnetti",
@@ -1652,6 +1656,7 @@ export const translations = {
     backToMenu: "Zurück zum Menü",
     loginFormError: "Fehler beim Laden des Formulars. Bitte laden Sie die Seite neu.",
     loginErrorDefault: "Fehler bei der Anmeldung",
+    loginRateLimit: "Zu viele Versuche. Bitte warten Sie einige Minuten.",
     unknownError: "Unbekannter Fehler",
     // Admin Sidebar
     logout: "Abmelden",
