@@ -145,6 +145,19 @@ export class TgtgUseCase {
     }
   }
 
+  async updateHoras(empresaId: string, tgtgPromoId: string, horaRecogidaInicio: string, horaRecogidaFin: string): Promise<Result<TgtgPromocion>> {
+    try {
+      const promoResult = await this.tgtgRepo.findPromoById(tgtgPromoId);
+      if (!promoResult.success) return promoResult;
+      if (!promoResult.data || promoResult.data.empresaId !== empresaId) {
+        return { success: false, error: { code: 'NOT_FOUND', message: 'Campaña no encontrada', module: 'use-case' } };
+      }
+      return await this.tgtgRepo.updateHoras(tgtgPromoId, empresaId, horaRecogidaInicio, horaRecogidaFin);
+    } catch (e) {
+      return { success: false, error: await logger.logFromCatch(e, 'use-case', 'TgtgUseCase.updateHoras', { empresaId, details: { tgtgPromoId } }) };
+    }
+  }
+
   async getPublicItem(itemId: string): Promise<Result<TgtgItem | null>> {
     try {
       return await this.tgtgRepo.findItemById(itemId);

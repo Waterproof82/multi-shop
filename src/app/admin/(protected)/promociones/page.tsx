@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import {
   Users, Mail, FileText, Send, CheckCircle, Image as ImageIcon, Loader2,
-  ShoppingBag, Plus, Trash2, Minus, ChevronDown, ChevronUp, Clock, CalendarOff,
+  ShoppingBag, Plus, Trash2, Minus, ChevronDown, ChevronUp, Clock, CalendarOff, Pencil, X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -144,6 +144,10 @@ export default function PromocionesPage() {
   const [reservasByItem, setReservasByItem] = useState<Record<string, TgtgReserva[]>>({});
   const [expandedReservas, setExpandedReservas] = useState<Set<string>>(new Set());
   const [adjustingItem, setAdjustingItem] = useState<string | null>(null);
+  const [editingHoras, setEditingHoras] = useState(false);
+  const [editHoraInicio, setEditHoraInicio] = useState('');
+  const [editHoraFin, setEditHoraFin] = useState('');
+  const [savingHoras, setSavingHoras] = useState(false);
 
   function createEmptyItem(): TgtgItemForm {
     return {
@@ -409,6 +413,49 @@ export default function PromocionesPage() {
       }
     } catch (error) {
       logClientError(error, 'handleToggleReservas');
+    }
+  };
+
+  const handleStartEditHoras = () => {
+    if (!tgtgPromo) return;
+    setEditHoraInicio(tgtgPromo.horaRecogidaInicio);
+    setEditHoraFin(tgtgPromo.horaRecogidaFin);
+    setEditingHoras(true);
+  };
+
+  const handleCancelEditHoras = () => setEditingHoras(false);
+
+  const handleSaveHoras = async () => {
+    if (!tgtgPromo) return;
+    setSavingHoras(true);
+    try {
+      const res = await fetchWithCsrf(
+        `/api/admin/tgtg/${encodeURIComponent(tgtgPromo.id)}/horas?empresaId=${effectiveEmpresaId}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            hora_recogida_inicio: editHoraInicio,
+            hora_recogida_fin: editHoraFin,
+          }),
+        }
+      );
+      if (res.ok) {
+        const data = await res.json() as { tgtgPromo: { horaRecogidaInicio: string; horaRecogidaFin: string } };
+        setTgtgPromo(prev => prev ? {
+          ...prev,
+          horaRecogidaInicio: data.tgtgPromo.horaRecogidaInicio,
+          horaRecogidaFin: data.tgtgPromo.horaRecogidaFin,
+        } : prev);
+        setEditingHoras(false);
+      } else {
+        const err = await res.json() as { error?: string };
+        alert(err.error ?? 'Error al guardar las horas');
+      }
+    } catch (error) {
+      logClientError(error, 'handleSaveHoras');
+      alert('Error al guardar las horas');
+    } finally {
+      setSavingHoras(false);
     }
   };
 
@@ -709,16 +756,68 @@ export default function PromocionesPage() {
           {/* Active campaign */}
           {tgtgLoading ? (
             <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
-          ) : tgtgPromo ? (
+          ) : tgtgPromo ? (() => {
+            const promoDate = new Date(tgtgPromo.createdAt).toISOString().split('T')[0];
+            const pickupEnd = new Date(`${promoDate}T${tgtgPromo.horaRecogidaFin}:00`);
+            const isExpired = new Date() > pickupEnd;
+            return (
             <div className="bg-card rounded-lg border shadow-elegant p-6 space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-3">
                 <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                  <ShoppingBag className="w-5 h-5 text-green-600" />{t("tgtgActiveCampaign", language)}
+                  <ShoppingBag className={`w-5 h-5 ${isExpired ? 'text-muted-foreground' : 'text-green-600'}`} />
+                  {isExpired ? t("tgtgNoPromo", language) : t("tgtgActiveCampaign", language)}
                 </h2>
-                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5" />
-                  {tgtgPromo.horaRecogidaInicio} – {tgtgPromo.horaRecogidaFin}
-                </span>
+                {editingHoras ? (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <input
+                      type="time"
+                      value={editHoraInicio}
+                      onChange={e => setEditHoraInicio(e.target.value)}
+                      aria-label={t("tgtgPickupFrom", language)}
+                      className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    />
+                    <span className="text-muted-foreground text-sm">–</span>
+                    <input
+                      type="time"
+                      value={editHoraFin}
+                      onChange={e => setEditHoraFin(e.target.value)}
+                      aria-label={t("tgtgPickupTo", language)}
+                      className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    />
+                    <button
+                      onClick={handleSaveHoras}
+                      disabled={savingHoras}
+                      aria-label={t("save", language)}
+                      className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 flex items-center gap-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 min-h-[44px]"
+                    >
+                      {savingHoras ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                      {t("save", language)}
+                    </button>
+                    <button
+                      onClick={handleCancelEditHoras}
+                      disabled={savingHoras}
+                      aria-label={t("cancel", language)}
+                      className="h-8 px-2 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted flex items-center outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 min-h-[44px]"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs flex items-center gap-1 ${isExpired ? 'text-destructive/70' : 'text-muted-foreground'}`}>
+                      <Clock className="w-3.5 h-3.5" />
+                      {tgtgPromo.horaRecogidaInicio} – {tgtgPromo.horaRecogidaFin}
+                      {isExpired && <span className="ml-1">(finalizada)</span>}
+                    </span>
+                    <button
+                      onClick={handleStartEditHoras}
+                      aria-label="Editar horas de recogida"
+                      className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-4">
@@ -736,7 +835,8 @@ export default function PromocionesPage() {
                 ))}
               </div>
             </div>
-          ) : (
+            );
+          })() : (
             <div className="bg-card rounded-lg border p-12 shadow-elegant text-center" role="status" aria-live="polite">
               <CalendarOff className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">{t("tgtgNoPromo", language)}</p>

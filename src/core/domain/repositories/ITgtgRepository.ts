@@ -35,4 +35,5 @@ export interface ITgtgRepository {
   }): Promise<Result<'ok' | 'no_cupones' | 'token_used'>>;
   findItemById(itemId: string): Promise<Result<TgtgItem | null>>;
   findPromoById(tgtgPromoId: string): Promise<Result<TgtgPromocion | null>>;
+  updateHoras(tgtgPromoId: string, empresaId: string, horaRecogidaInicio: string, horaRecogidaFin: string): Promise<Result<TgtgPromocion>>;
 }

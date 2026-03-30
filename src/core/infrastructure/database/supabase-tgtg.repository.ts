@@ -267,6 +267,26 @@ export class SupabaseTgtgRepository implements ITgtgRepository {
     }
   }
 
+  async updateHoras(tgtgPromoId: string, empresaId: string, horaRecogidaInicio: string, horaRecogidaFin: string): Promise<Result<TgtgPromocion>> {
+    try {
+      const { data, error } = await this.supabase
+        .from('tgtg_promociones')
+        .update({ hora_recogida_inicio: horaRecogidaInicio, hora_recogida_fin: horaRecogidaFin })
+        .eq('id', tgtgPromoId)
+        .eq('empresa_id', empresaId)
+        .select()
+        .single();
+
+      if (error || !data) {
+        await logger.logAndReturnError('DB_UPDATE_ERROR', error?.message ?? 'No data', 'repository', 'TgtgRepo.updateHoras', { empresaId, details: { tgtgPromoId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al actualizar horas', module: 'repository' } };
+      }
+      return { success: true, data: mapPromo(data as Record<string, unknown>) };
+    } catch (e) {
+      return { success: false, error: await logger.logFromCatch(e, 'repository', 'TgtgRepo.updateHoras', { empresaId, details: { tgtgPromoId } }) };
+    }
+  }
+
   async findPromoById(tgtgPromoId: string): Promise<Result<TgtgPromocion | null>> {
     try {
       const { data, error } = await this.supabase
