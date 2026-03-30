@@ -32,7 +32,7 @@ export class SupabasePromocionRepository implements IPromocionRepository {
     }
   }
 
-  async create(data: { empresaId: string; texto_promocion: string; imagen_url?: string; numero_envios: number }): Promise<Result<Promocion>> {
+  async create(data: { empresaId: string; texto_promocion: string; imagen_url?: string; numero_envios: number; fecha_fin: string }): Promise<Result<Promocion>> {
     try {
       const { data: promo, error } = await this.supabase
         .from('promociones')
@@ -42,6 +42,7 @@ export class SupabasePromocionRepository implements IPromocionRepository {
           texto_promocion: data.texto_promocion,
           imagen_url: data.imagen_url || null,
           numero_envios: data.numero_envios,
+          fecha_fin: data.fecha_fin ?? null,
         })
         .select()
         .single();

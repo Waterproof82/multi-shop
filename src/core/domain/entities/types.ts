@@ -170,7 +170,45 @@ export interface Promocion {
   texto_promocion: string;
   numero_envios: number;
   imagen_url: string | null;
+  fecha_fin: string | null;
   created_at: string;
+}
+
+export interface TgtgPromocion {
+  id: string;
+  empresaId: string;
+  horaRecogidaInicio: string; // HH:MM
+  horaRecogidaFin: string;   // HH:MM
+  numeroEnvios: number;
+  createdAt: string;
+  items?: TgtgItem[];
+}
+
+export interface TgtgItem {
+  id: string;
+  tgtgPromoId: string;
+  empresaId: string;
+  titulo: string;
+  descripcion: string | null;
+  imagenUrl: string | null;
+  precioOriginal: number;
+  precioDescuento: number;
+  cuponesTotal: number;
+  cuponesDisponibles: number;
+  orden: number;
+  createdAt: string;
+  reservasCount?: number;
+}
+
+export interface TgtgReserva {
+  id: string;
+  itemId: string;
+  tgtgPromoId: string;
+  empresaId: string;
+  email: string;
+  nombre: string | null;
+  token: string;
+  createdAt: string;
 }
 
 // ============================================

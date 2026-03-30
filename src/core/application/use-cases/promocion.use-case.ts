@@ -28,7 +28,7 @@ export class PromocionUseCase {
     }
   }
 
-  async create(empresaId: string, texto_promocion: string, imagen_url?: string | null): Promise<Result<CreatePromocionResult>> {
+  async create(empresaId: string, texto_promocion: string, imagen_url: string | null | undefined, fecha_fin: string): Promise<Result<CreatePromocionResult>> {
     try {
       const [clientesResult, oldPromosResult] = await Promise.all([
         this.clienteRepo.findAllByTenant(empresaId),
@@ -56,6 +56,7 @@ export class PromocionUseCase {
         texto_promocion,
         imagen_url: imagen_url ?? undefined,
         numero_envios: emailTargets.length,
+        fecha_fin,
       });
 
       if (!createResult.success) {
