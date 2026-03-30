@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Pencil, Trash2, X, Loader2, Search, ArrowUpDown, ArrowUp, ArrowDown, Languages, ChevronDown, ChevronRight, Tags, FolderTree } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Search, ArrowUpDown, ArrowUp, ArrowDown, Languages, ChevronDown, ChevronRight, Tags, FolderTree } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -273,13 +273,10 @@ export default function CategoriasPage() {
             className="pl-10 w-full"
           />
         </div>
-        <button
-          onClick={openCreateModal}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-colors duration-150 w-full sm:w-auto justify-center"
-        >
+        <Button onClick={openCreateModal} className="w-full sm:w-auto">
           <Plus className="h-4 w-4" />
           <span>{t("newCategory", language)}</span>
-        </button>
+        </Button>
       </div>
 
       {error && (

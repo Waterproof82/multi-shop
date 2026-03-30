@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { authAdminUseCase } from '@/core/infrastructure/database';
 import { AdminThemeProvider } from '@/components/admin-theme-provider';
+import SuperAdminHeader from './super-admin-header';
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
@@ -33,27 +34,14 @@ export default async function SuperAdminLayout({
   return (
     <AdminThemeProvider>
       <div className="min-h-screen bg-background">
-        <header className="bg-card border-b border-border sticky top-0 z-50">
-          <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-            <h1 className="text-xl font-bold text-foreground">
-              Super Admin Panel
-            </h1>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground">
-                {admin.nombreCompleto || 'Super Admin'}
-              </span>
-              <form action="/api/admin/logout" method="POST">
-                <button
-                  type="submit"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Cerrar sesión
-                </button>
-              </form>
-            </div>
-          </div>
-        </header>
-        <main className="container mx-auto px-4 py-8">
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-foreground focus:ring-2 focus:ring-ring focus:ring-offset-2"
+        >
+          Ir al contenido principal
+        </a>
+        <SuperAdminHeader adminName={admin.nombreCompleto || 'Super Admin'} />
+        <main id="main-content" className="container mx-auto px-4 py-8">
           {children}
         </main>
       </div>

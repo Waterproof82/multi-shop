@@ -177,7 +177,9 @@ export function ImageUploader({
             alt={`${label} preview`}
             fill
             className="object-cover"
-            unoptimized
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            priority={false}
+            loading="lazy"
           />
           <div className="absolute inset-0 bg-overlay opacity-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
             <button
@@ -231,7 +233,7 @@ export function ImageUploader({
         >
           {uploading ? (
             <>
-              <Loader2 className="h-8 w-8 text-primary animate-spin" />
+              <Loader2 className="h-8 w-8 text-primary animate-spin motion-reduce:animate-none" />
               <span className="text-sm text-muted-foreground mt-1">Subiendo...</span>
             </>
           ) : (

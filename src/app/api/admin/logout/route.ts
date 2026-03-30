@@ -28,7 +28,11 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  cookieStore.delete('admin_token');
-  cookieStore.delete('csrf_token');
-  return NextResponse.json({ success: true });
+  const response = NextResponse.json({ success: true });
+
+  response.cookies.set('admin_token', '', { maxAge: 0, path: '/' });
+  response.cookies.set('csrf_token', '', { maxAge: 0, path: '/' });
+  response.cookies.set('superadmin_empresa_id', '', { maxAge: 0, path: '/' });
+
+  return response;
 }

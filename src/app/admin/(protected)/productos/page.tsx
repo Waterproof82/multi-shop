@@ -2,14 +2,16 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Image from 'next/image';
-import { Plus, Pencil, Trash2, Loader2, Image as ImageIcon, Search, ArrowUpDown, ArrowUp, ArrowDown, Utensils, Star } from 'lucide-react';
+import { Plus, Pencil, Trash2, Image as ImageIcon, Search, ArrowUpDown, ArrowUp, ArrowDown, Utensils, Star } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { useAdmin } from '@/lib/admin-context';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import { ProductFormDialog, DeleteConfirmDialog } from '@/components/admin/product-form-dialog';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import type { ProductoFormData } from '@/components/admin/product-form-dialog';
+import { SkeletonTable, SkeletonStats, Skeleton } from '@/components/ui/skeleton';
 import { formatPrice } from '@/lib/format-price';
 
 interface Categoria {
@@ -85,15 +87,23 @@ export default function ProductosPage() {
   const fetchData = useCallback(async () => {
     try {
       const [prodRes, catRes] = await Promise.all([
-        fetch(`/api/admin/productos?empresaId=${effectiveEmpresaId}`),
-        fetch(`/api/admin/categorias?empresaId=${effectiveEmpresaId}`),
+        fetchWithCsrf(`/api/admin/productos?empresaId=${effectiveEmpresaId}`, {}, {
+          maxRetries: 3,
+          baseDelay: 1000,
+          retryOn: (response) => response.status >= 500 || response.status === 429 || response.status === 408
+        }),
+        fetchWithCsrf(`/api/admin/categorias?empresaId=${effectiveEmpresaId}`, {}, {
+          maxRetries: 3,
+          baseDelay: 1000,
+          retryOn: (response) => response.status >= 500 || response.status === 429 || response.status === 408
+        }),
       ]);
-      
+
       if (prodRes.ok) {
         const prodData = await prodRes.json();
         setProductos(prodData);
       }
-      
+
       if (catRes.ok) {
         const catData = await catRes.json();
         setCategorias(catData);
@@ -103,7 +113,7 @@ export default function ProductosPage() {
     } finally {
       setLoading(false);
     }
-  }, [language]);
+  }, [language, effectiveEmpresaId]);
 
   useEffect(() => {
     fetchData();
@@ -140,6 +150,10 @@ export default function ProductosPage() {
       const res = await fetchWithCsrf(url, {
         method,
         body: JSON.stringify(payload),
+      }, {
+        maxRetries: 2,
+        baseDelay: 1000,
+        retryOn: (response) => response.status >= 500 || response.status === 429
       });
 
       if (!res.ok) {
@@ -199,6 +213,10 @@ export default function ProductosPage() {
       const res = await fetchWithCsrf(`/api/admin/productos?id=${prod.id}&empresaId=${effectiveEmpresaId}`, {
         method: 'PUT',
         body: JSON.stringify({ activo: newActivo }),
+      }, {
+        maxRetries: 2,
+        baseDelay: 500,
+        retryOn: (response) => response.status >= 500 || response.status === 429
       });
       if (!res.ok) {
         setProductos(prev => prev.map(p => p.id === prod.id ? { ...p, activo: prod.activo } : p));
@@ -238,6 +256,10 @@ export default function ProductosPage() {
     try {
       const res = await fetchWithCsrf(`/api/admin/productos?id=${deleteConfirm.id}&empresaId=${effectiveEmpresaId}`, {
         method: 'DELETE',
+      }, {
+        maxRetries: 2,
+        baseDelay: 1000,
+        retryOn: (response) => response.status >= 500 || response.status === 429
       });
       if (!res.ok) throw new Error(t("deleteError", language));
       await fetchData();
@@ -297,8 +319,33 @@ export default function ProductosPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
+        {/* Header con stats skeleton */}
+        <div className="bg-primary rounded-lg p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="space-y-2">
+              <Skeleton className="h-6 w-48 bg-primary-foreground/20" />
+              <Skeleton className="h-4 w-64 bg-primary-foreground/20" />
+            </div>
+            <SkeletonStats count={2} itemClassName="bg-primary-foreground/20" />
+          </div>
+        </div>
+
+        {/* Buscador skeleton */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <Skeleton className="h-10 w-full sm:w-80" />
+          <Skeleton className="h-10 w-full sm:w-32" />
+        </div>
+
+        {/* Tabla skeleton */}
+        <div className="bg-card rounded-lg border overflow-hidden">
+          <div className="p-4 border-b">
+            <Skeleton className="h-6 w-32" />
+          </div>
+          <div className="p-4">
+            <SkeletonTable rows={8} columns={6} />
+          </div>
+        </div>
       </div>
     );
   }
@@ -342,13 +389,10 @@ export default function ProductosPage() {
             className="pl-10 w-full"
           />
         </div>
-        <button
-          onClick={openCreateModal}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 w-full sm:w-auto justify-center outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px]"
-        >
+        <Button onClick={openCreateModal} className="w-full sm:w-auto">
           <Plus className="h-4 w-4" />
           <span>{t("newProduct", language)}</span>
-        </button>
+        </Button>
       </div>
 
       {error && (

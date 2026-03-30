@@ -57,17 +57,7 @@ export async function POST(request: NextRequest) {
 
   const { token, admin } = result.data;
 
-  const cookieStore = await cookies();
-
-  cookieStore.set('admin_token', token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: 60 * 60 * 24,
-    path: '/',
-  });
-
-  return successResponse({
+  const response = successResponse({
     success: true,
     admin: {
       id: admin.id,
@@ -76,4 +66,15 @@ export async function POST(request: NextRequest) {
       rol: admin.rol,
     },
   });
+
+  response.cookies.set('superadmin_empresa_id', '', { maxAge: 0, path: '/' });
+  response.cookies.set('admin_token', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 60 * 60 * 24,
+    path: '/',
+  });
+
+  return response;
 }

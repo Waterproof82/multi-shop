@@ -141,7 +141,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
                         </div>
                       </div>
                       <span className="font-semibold text-sm">
-                        +{formatPrice(complement.price)}
+                        +{formatPrice(complement.price, 'EUR', language)}
                       </span>
                     </button>
                   );
@@ -184,7 +184,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
           </div>
           <div className="flex justify-between items-center text-lg font-bold">
             <span>{t("total", language)}:</span>
-            <span className="animate-price-update" key={totalPrice}>{formatPrice(totalPrice)}</span>
+            <span className="animate-price-update" key={totalPrice}>{formatPrice(totalPrice, 'EUR', language)}</span>
           </div>
         </div>
         

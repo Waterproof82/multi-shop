@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, memo, useCallback } from "react"
+import { useState, memo, useCallback, useEffect, useRef } from "react"
 import Image from "next/image"
-import { motion, useReducedMotion } from "framer-motion"
+import { motion } from "framer-motion"
 import { ChevronRight } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -19,6 +19,23 @@ import { MenuCategoryVM, MenuItemVM, MenuSubcategoryVM } from "@/core/applicatio
 import { QuantitySelectorDialog } from "@/components/quantity-selector-dialog"
 
 type LanguageKey = 'en' | 'fr' | 'it' | 'de';
+
+// Static variants to avoid hydration mismatch - always use same initial state
+const staticContainerVariants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.06, delayChildren: 0 } },
+};
+
+const staticItemVariants = {
+  hidden: { opacity: 0, y: 16 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.35 } },
+};
+
+// Disabled variants for reduced motion or server-side
+const disabledVariants = {
+  hidden: {},
+  visible: {},
+};
 
 function getComplementCategoryDisplay(
   lang: LanguageKey | undefined,
@@ -42,21 +59,22 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [detailItem, setDetailItem] = useState<MenuItemVM | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const shouldReduceMotion = useReducedMotion() ?? false;
+  
+  // Only use reduced motion after client hydration to avoid mismatch
+  const [shouldReduceMotion, setShouldReduceMotion] = useState(false);
+  const motionRef = useRef(false);
+  
+  useEffect(() => {
+    if (!motionRef.current) {
+      motionRef.current = true;
+      const prefersReducedMotion = globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      setShouldReduceMotion(prefersReducedMotion);
+    }
+  }, []);
 
-  const containerVariants = shouldReduceMotion
-    ? { hidden: {}, visible: {} }
-    : {
-        hidden: {},
-        visible: { transition: { staggerChildren: 0.06, delayChildren: 0 } },
-      };
-
-  const itemVariants = shouldReduceMotion
-    ? { hidden: {}, visible: {} }
-    : {
-        hidden: { opacity: 0, y: 16 },
-        visible: { opacity: 1, y: 0, transition: { duration: 0.35 } },
-      };
+  // Use static variants on server, client variants after hydration
+  const containerVariants = shouldReduceMotion ? disabledVariants : staticContainerVariants;
+  const itemVariants = shouldReduceMotion ? disabledVariants : staticItemVariants;
 
   const handleItemClick = useCallback((item: MenuItemVM) => {
     setSelectedItem(item);
@@ -294,7 +312,19 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
   const { language: appLanguage } = useLanguage();
   const safeLanguage = appLanguage || "es";
   const [imageError, setImageError] = useState(false);
-  const shouldReduceMotionCard = useReducedMotion() ?? false;
+  
+  // Use static value initially, check on client only after mount
+  const [shouldReduceMotionCard, setShouldReduceMotionCard] = useState(false);
+  const cardMotionRef = useRef(false);
+  
+  useEffect(() => {
+    if (!cardMotionRef.current) {
+      cardMotionRef.current = true;
+      const prefersReducedMotion = globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      setShouldReduceMotionCard(prefersReducedMotion);
+    }
+  }, []);
+  
   const hasComplements = item.complements && item.complements.length > 0;
   const isClickable = showCart || hasComplements;
 
@@ -320,8 +350,8 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
 
   return (
     <div
-      className={`group relative flex h-full flex-col overflow-hidden rounded-lg bg-card border transition-[box-shadow,transform,border-color] duration-200 ${
-        isClickable ? "hover:shadow-elegant hover:-translate-y-0.5 cursor-pointer" : ""
+      className={`group relative flex h-full flex-col overflow-hidden rounded-lg bg-card border transition-all duration-300 ${
+        isClickable ? "hover:shadow-elegant hover:-translate-y-0.5 hover:border-primary/20 cursor-pointer hover:scale-[1.02]" : ""
       } ${borderClass}`}
     >
       {isClickable && (
@@ -345,7 +375,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
       )}
       <div className="flex flex-1 flex-col p-4">
         <div className="mb-1 flex items-start justify-between gap-2">
-          <h3 className="font-serif text-lg font-semibold text-foreground leading-snug truncate flex-1 min-w-0">
+          <h3 className="font-serif text-lg font-semibold text-foreground leading-snug truncate flex-1 min-w-0 group-hover:text-primary transition-colors duration-200">
             {displayName}
           </h3>
           {item.highlight && (
@@ -360,13 +390,13 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
           </p>
         )}
         <div className="flex items-center justify-between gap-3 pt-3 mt-auto border-t border-border/50">
-          <span className="text-lg font-bold text-foreground tabular-nums">
-            {formatPrice(item.price)}
+          <span className="text-lg font-bold text-foreground tabular-nums group-hover:text-primary transition-colors duration-200">
+            {formatPrice(item.price, 'EUR', safeLanguage)}
           </span>
           {showCart && (
             <button
               type="button"
-              className="relative z-20 bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 rounded-md px-3.5 py-2 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-all duration-150 min-h-[44px] shrink-0 whitespace-nowrap"
+              className="relative z-20 bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-105 active:scale-95 rounded-md px-3.5 py-2 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-all duration-200 min-h-[44px] shrink-0 whitespace-nowrap shadow-sm hover:shadow-md"
               onClick={(e) => {
                 e.stopPropagation();
                 onItemClick(item);
@@ -378,16 +408,16 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
           )}
         </div>
         {!showCart && hasComplements && (
-          <div className="flex items-center justify-between gap-2 mt-3 p-2.5 rounded-md bg-muted/50 group-hover:bg-muted transition-colors duration-200">
+          <div className="flex items-center justify-between gap-2 mt-3 p-2.5 rounded-md bg-muted/50 group-hover:bg-muted transition-all duration-200 group-hover:shadow-sm">
             <span className="text-sm text-muted-foreground min-w-0">
               <span className="break-words">{complementLabel}</span>
               {minComplementPrice > 0 && (
                 <span className="ml-1.5 text-foreground/70 font-medium whitespace-nowrap">
-                  {t("from", safeLanguage)} +{formatPrice(minComplementPrice)}
+                  {t("from", safeLanguage)} +{formatPrice(minComplementPrice, 'EUR', safeLanguage)}
                 </span>
               )}
             </span>
-            <ChevronRight className="w-4 h-4 text-primary shrink-0 transition-colors duration-200" />
+            <ChevronRight className="w-4 h-4 text-primary shrink-0 transition-all duration-200 group-hover:translate-x-0.5 group-hover:scale-110" />
           </div>
         )}
       </div>
@@ -453,7 +483,7 @@ function ItemDetailDialog(props: Readonly<{
                     )}
                   </div>
                   <span className="font-semibold text-sm shrink-0 ml-3">
-                    +{formatPrice(comp.price)}
+                    +{formatPrice(comp.price, 'EUR', safeLanguage)}
                   </span>
                 </div>
               );
