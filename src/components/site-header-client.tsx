@@ -61,6 +61,7 @@ export function SiteHeaderClient({ showCart, empresa }: SiteHeaderClientProps) {
                 src={logoUrl}
                 alt={empresa?.nombre ?? t("companyLogo", language)}
                 fill
+                sizes="(max-width: 768px) 96px, 128px"
                 className="object-contain"
                 loading="eager"
               />

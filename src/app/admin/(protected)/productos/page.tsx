@@ -2,7 +2,15 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Image from 'next/image';
-import { Plus, Pencil, Trash2, Image as ImageIcon, Search, ArrowUpDown, ArrowUp, ArrowDown, Utensils, Star } from 'lucide-react';
+import { Plus, Pencil, Trash2, Image as ImageIcon, Search, ArrowUpDown, ArrowUp, ArrowDown, Utensils, Star, Video } from 'lucide-react';
+
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.avif'];
+
+function isValidImageUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  const lowerUrl = url.toLowerCase();
+  return IMAGE_EXTENSIONS.some(ext => lowerUrl.endsWith(ext));
+}
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useAdmin } from '@/lib/admin-context';
@@ -461,15 +469,19 @@ export default function ProductosPage() {
               {filteredProductos.map((prod) => (
                 <tr key={prod.id} className="hover:bg-muted/50">
                   <td className="px-4 py-3 whitespace-nowrap">
-                    {prod.foto_url ? (
+                    {isValidImageUrl(prod.foto_url) ? (
                       <Image 
-                        src={prod.foto_url} 
+                        src={prod.foto_url!} 
                         alt={prod.titulo_es}
                         width={40}
                         height={40}
                         className="h-10 w-10 rounded-md object-cover"
                         loading="lazy"
                       />
+                    ) : prod.foto_url ? (
+                      <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center">
+                        <Video className="h-5 w-5 text-muted-foreground" />
+                      </div>
                     ) : (
                       <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center">
                         <ImageIcon className="h-5 w-5 text-muted-foreground" />
@@ -545,15 +557,19 @@ export default function ProductosPage() {
             <div key={prod.id} className="p-4 hover:bg-muted/50">
               <div className="flex gap-3">
                   <div className="flex-shrink-0">
-                    {prod.foto_url ? (
+                    {isValidImageUrl(prod.foto_url) ? (
                       <Image 
-                        src={prod.foto_url} 
+                        src={prod.foto_url!} 
                         alt={prod.titulo_es}
                         width={64}
                         height={64}
                         className="h-16 w-16 rounded-md object-cover"
                         loading="lazy"
                       />
+                    ) : prod.foto_url ? (
+                      <div className="h-16 w-16 rounded-md bg-muted flex items-center justify-center">
+                        <Video className="h-8 w-8 text-muted-foreground" />
+                      </div>
                     ) : (
                       <div className="h-16 w-16 rounded-md bg-muted flex items-center justify-center">
                         <ImageIcon className="h-8 w-8 text-muted-foreground" />

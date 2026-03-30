@@ -146,7 +146,7 @@ export function requireRole(request: NextRequest, allowedRoles: string[]): NextR
 
 ### Aplicación en routes
 
-`requireRole(request, ['admin'])` se aplica en **todos los handlers mutativos** (POST, PUT, PATCH, DELETE) de las siguientes routes:
+`requireRole(request, ['admin', 'superadmin'])` se aplica en **todos los handlers mutativos** (POST, PUT, PATCH, DELETE) de las siguientes routes:
 
 | Route | Handlers protegidos |
 |-------|-------------------|
@@ -161,6 +161,14 @@ export function requireRole(request: NextRequest, allowedRoles: string[]): NextR
 | `/api/admin/pedidos/enviar-email` | POST |
 
 Los handlers GET (solo lectura) no requieren verificación de rol. Los handlers PUT usados como lectura (stats) sí requieren `requireRole` dado que exponen métricas financieras del tenant.
+
+Las rutas `/api/superadmin/*` requieren adicionalmente `rol === 'superadmin'` validado en el proxy antes de llegar al handler:
+
+| Route | Handlers protegidos |
+|-------|-------------------|
+| `/api/superadmin/empresas` | GET (todas las empresas) |
+| `/api/superadmin/empresas/[id]` | GET, PUT |
+| `/api/superadmin/switch-empresa` | GET (establece cookie de contexto de tenant) |
 
 ### Roles del sistema
 
@@ -485,6 +493,34 @@ La ruta pública `POST /api/pedidos` intercepta `PRODUCT_NOT_FOUND` y retorna un
 
 ---
 
+## Row Level Security (RLS)
+
+RLS está habilitado en todas las tablas de `public`. La app usa `service_role` para escrituras (bypassa RLS) y `anon` para lecturas públicas (respeta RLS).
+
+### Políticas de denegación anónima (RESTRICTIVE)
+
+Las tablas sensibles tienen políticas `AS RESTRICTIVE FOR ALL TO anon USING (false)`. Las políticas RESTRICTIVE usan lógica AND — garantizan denegación incluso si otras políticas permissivas concedieran acceso:
+
+| Tabla | Política |
+|-------|---------|
+| `clientes` | `No direct anon access to clientes` — RESTRICTIVE |
+| `pedidos` | `No direct anon access to pedidos` — RESTRICTIVE |
+| `perfiles_admin` | `No direct anon access to perfiles_admin` — RESTRICTIVE |
+| `promociones` | `No direct anon access to promociones` — RESTRICTIVE |
+| `log_errors` | `No direct anon access to log_errors` — RESTRICTIVE |
+
+> Estas políticas fueron convertidas de PERMISSIVE a RESTRICTIVE para garantizar que `anon` nunca acceda a estos datos, independientemente de otras políticas que puedan existir.
+
+### Lecturas públicas
+
+`categorias`, `productos` y `empresas` tienen políticas SELECT `qual=true` para `anon` — necesarias para el menú público. Las operaciones de escritura (INSERT/UPDATE/DELETE) están restringidas por `get_mi_empresa_id()`.
+
+### RLS e `auth.uid()` en políticas
+
+Las políticas de `perfiles_admin` y `promociones` usan `(SELECT auth.uid())` (con SELECT) en lugar de `auth.uid()` directo para evitar re-evaluación por fila y mejorar el rendimiento de los planes de query.
+
+---
+
 ## JSON-LD Sanitization
 
 El componente `json-ld.tsx` sanitiza datos antes de insertar en `<script type="application/ld+json">`:
@@ -628,3 +664,4 @@ Configurado en el proxy para todas las rutas `/api/*`. Solo orígenes en:
 | `unsafe-inline` en `style-src` | Low | Estándar para la mayoría de aplicaciones Next.js. Mejorable con style nonces si el framework lo soporta en el futuro. |
 | Order number gaps | Low | Si el INSERT falla tras `get_next_pedido_number`, el número se pierde. Operacionalmente menor, no es riesgo de seguridad. |
 | Rate limit por tenant en pedidos públicos | Low | La creación de pedidos y clientes usa rate limit por IP. Para tenants con mucho tráfico legítimo desde IPs compartidas (NAT corporativo), considerar rate limit compuesto `empresaId:ip`. |
+| Leaked password protection (Supabase Auth) | Info | Supabase advierte que la protección contra contraseñas filtradas (HaveIBeenPwned) está deshabilitada. **Requiere plan Pro** — no disponible en el plan actual. No aplica tampoco porque el login de admin usa credenciales de `auth.users` de Supabase gestionadas internamente, no contraseñas definidas por usuarios finales. |
