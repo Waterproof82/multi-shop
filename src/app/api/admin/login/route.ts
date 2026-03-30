@@ -57,9 +57,18 @@ export async function POST(request: NextRequest) {
 
   const { token, admin } = result.data;
 
-  const cookieStore = await cookies();
+  const response = successResponse({
+    success: true,
+    admin: {
+      id: admin.id,
+      nombre: admin.nombreCompleto,
+      empresa: admin.empresa?.nombre ?? 'Super Admin',
+      rol: admin.rol,
+    },
+  });
 
-  cookieStore.set('admin_token', token, {
+  response.cookies.set('superadmin_empresa_id', '', { maxAge: 0, path: '/' });
+  response.cookies.set('admin_token', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
@@ -67,12 +76,5 @@ export async function POST(request: NextRequest) {
     path: '/',
   });
 
-  return successResponse({
-    success: true,
-    admin: {
-      id: admin.id,
-      nombre: admin.nombreCompleto,
-      empresa: admin.empresa.nombre,
-    },
-  });
+  return response;
 }

@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
 
     const { empresaId, error: authError } = await requireAuth(request);
     if (authError) return authError;
-    const roleError = requireRole(request, ['admin']);
+    const roleError = requireRole(request, ['admin', 'superadmin']);
     if (roleError) return roleError;
 
     const empresaResult = await empresaUseCase.getById(empresaId!);

@@ -2,12 +2,15 @@
 
 import Link from 'next/link';
 import { ShoppingBag, Package, ArrowRight, Clock } from 'lucide-react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import type { MenuCategoryVM } from '@/core/application/dtos/menu-view-model';
 import { PEDIDO_ESTADO_COLORS } from '@/core/domain/constants/pedido';
 import type { PedidoEstado } from '@/core/domain/constants/pedido';
 import { formatPrice } from '@/lib/format-price';
+import { formatDate } from '@/lib/format-date';
+import { Button } from '@/components/ui/button';
 
 export interface DashboardPedido {
   id: string;
@@ -33,6 +36,7 @@ interface AdminDashboardClientProps {
 
 export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menuError }: AdminDashboardClientProps) {
   const { language } = useLanguage();
+  const shouldReduceMotion = useReducedMotion() ?? false;
 
   const totalProductos = menu.reduce((sum, cat) => sum + cat.items.length, 0);
   const productosEspeciales = menu.reduce(
@@ -43,16 +47,6 @@ export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menu
   const recentOrders = [...pedidos]
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 5);
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('es-ES', { 
-      day: '2-digit', 
-      month: '2-digit', 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
-  };
 
   if (menuError) {
     return (
@@ -77,67 +71,65 @@ export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menu
             <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">{t("dashboard", language)}</h1>
             <p className="text-primary-foreground/80 text-sm mt-1">{empresaNombre}</p>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center min-h-[60px] flex flex-col justify-center">
-              <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
-              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{stats?.pedidosHoy || 0}</span>
-              <p className="text-primary-foreground/80 text-xs mt-0.5">{t("pedidosHoy", language)}</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="bg-primary-foreground/20 rounded-lg px-4 py-3 text-center min-h-[72px] flex flex-col justify-center group hover:bg-primary-foreground/30 transition-all duration-300 hover:scale-[1.02] motion-reduce:hover:scale-100 hover:shadow-elegant">
+              <ShoppingBag className="w-5 h-5 text-primary-foreground mx-auto mb-2 group-hover:scale-110 motion-reduce:group-hover:scale-100 transition-transform duration-300" />
+              <span className="text-xl font-semibold text-primary-foreground">{stats?.pedidosHoy || 0}</span>
+              <p className="text-primary-foreground/80 text-xs leading-tight mt-1">{t("pedidosHoy", language)}</p>
             </div>
-            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center min-h-[60px] flex flex-col justify-center">
-              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{formatPrice(stats?.totalMes || 0)}</span>
-              <p className="text-primary-foreground/80 text-xs mt-0.5">{t("ventasDelMes", language)}</p>
+            <div className="bg-primary-foreground/20 rounded-lg px-4 py-3 text-center min-h-[72px] flex flex-col justify-center group hover:bg-primary-foreground/30 transition-all duration-300 hover:scale-[1.02] motion-reduce:hover:scale-100 hover:shadow-elegant">
+              <span className="text-xl font-semibold text-primary-foreground">{formatPrice(stats?.totalMes || 0, 'EUR', language)}</span>
+              <p className="text-primary-foreground/80 text-xs leading-tight mt-1">{t("ventasDelMes", language)}</p>
             </div>
-            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center min-h-[60px] flex flex-col justify-center">
-              <Package className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
-              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{totalProductos}</span>
-              <p className="text-primary-foreground/80 text-xs mt-0.5">{t("products", language)}</p>
+            <div className="bg-primary-foreground/20 rounded-lg px-4 py-3 text-center min-h-[72px] flex flex-col justify-center group hover:bg-primary-foreground/30 transition-all duration-300 hover:scale-[1.02] motion-reduce:hover:scale-100 hover:shadow-elegant">
+              <Package className="w-5 h-5 text-primary-foreground mx-auto mb-2 group-hover:scale-110 motion-reduce:group-hover:scale-100 transition-transform duration-300" />
+              <span className="text-xl font-semibold text-primary-foreground">{totalProductos}</span>
+              <p className="text-primary-foreground/80 text-xs leading-tight mt-1">{t("products", language)}</p>
             </div>
-            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center min-h-[60px] flex flex-col justify-center">
-              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{productosEspeciales}</span>
-              <p className="text-primary-foreground/80 text-xs mt-0.5">{t("destacados", language)}</p>
+            <div className="bg-primary-foreground/20 rounded-lg px-4 py-3 text-center min-h-[72px] flex flex-col justify-center group hover:bg-primary-foreground/30 transition-all duration-300 hover:scale-[1.02] motion-reduce:hover:scale-100 hover:shadow-elegant">
+              <span className="text-xl font-semibold text-primary-foreground">{productosEspeciales}</span>
+              <p className="text-primary-foreground/80 text-xs leading-tight mt-1">{t("destacados", language)}</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Quick Actions */}
-      <div className="flex flex-wrap gap-3">
-        <Link 
-          href="/admin/productos" 
-          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
-          <Package className="w-4 h-4" />
-          {t("newProduct", language)}
-        </Link>
-        <Link 
-          href="/admin/pedidos" 
-          className="inline-flex items-center gap-2 px-4 py-2 bg-card border border-border text-foreground rounded-lg hover:bg-muted transition-colors text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
-          <ShoppingBag className="w-4 h-4" />
-          {t("viewOrders", language)}
-        </Link>
+      <div className="flex flex-wrap gap-4">
+        <Button asChild>
+          <Link href="/admin/productos">
+            <Package className="w-5 h-5" />
+            {t("newProduct", language)}
+          </Link>
+        </Button>
+        <Button variant="outline" asChild>
+          <Link href="/admin/pedidos">
+            <ShoppingBag className="w-5 h-5" />
+            {t("viewOrders", language)}
+          </Link>
+        </Button>
       </div>
 
       {/* Recent Orders */}
-      <div className="bg-card rounded-lg border border-border overflow-hidden mb-6">
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <h2 className="font-semibold text-foreground flex items-center gap-2">
-            <Clock className="w-4 h-4 text-muted-foreground" />
+      <div className="bg-card rounded-lg border border-border overflow-hidden">
+        <div className="flex items-center justify-between p-6 border-b border-border">
+          <h2 className="font-semibold text-foreground flex items-center gap-3">
+            <Clock className="w-5 h-5 text-muted-foreground" />
             {t("recentOrders", language)}
           </h2>
-          <Link href="/admin/pedidos" className="text-sm text-primary hover:underline flex items-center gap-1">
-            {t("viewAll", language)} <ArrowRight className="w-3 h-3" />
+          <Link href="/admin/pedidos" className="text-sm text-primary hover:text-primary/80 flex items-center gap-2 font-medium transition-colors">
+            {t("viewAll", language)} <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
         
         {recentOrders.length > 0 ? (
           <div className="divide-y divide-border">
             {recentOrders.map((pedido) => (
-              <div key={pedido.id} className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
+              <div key={pedido.id} className="p-6 flex items-center justify-between hover:bg-muted/30 transition-colors">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3">
-                    <span className="font-medium text-foreground">#{pedido.numero_pedido}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="font-semibold text-foreground">#{pedido.numero_pedido}</span>
+                    <span className={`text-xs px-3 py-1 rounded-full font-medium ${
                       PEDIDO_ESTADO_COLORS[pedido.estado as PedidoEstado] || 'bg-muted text-muted-foreground'
                     }`}>
                       {(() => {
@@ -153,46 +145,60 @@ export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menu
                       })()}
                     </span>
                   </div>
-                  <p className="text-sm text-muted-foreground truncate">
+                  <p className="text-sm text-muted-foreground">
                     {pedido.clientes?.nombre || t("customer", language)} • {pedido.clientes?.telefono || t("noPhone", language)}
                   </p>
                 </div>
-                <div className="text-right">
-                  <p className="font-semibold text-foreground">{formatPrice(pedido.total)}</p>
-                  <p className="text-xs text-muted-foreground">{formatDate(pedido.created_at)}</p>
+                <div className="text-right ml-4">
+                  <p className="font-semibold text-foreground text-lg">{formatPrice(pedido.total, 'EUR', language)}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{formatDate(pedido.created_at, { 
+                    day: '2-digit', 
+                    month: '2-digit', 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                  })}</p>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="p-8 text-center text-muted-foreground">
-            <ShoppingBag className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            <p>{t("noOrdersYet", language)}</p>
-            <p className="text-sm mt-2">{t("ordersArriveHere", language)}</p>
+          <div className="p-12 text-center text-muted-foreground">
+            <motion.div
+              initial={shouldReduceMotion ? {} : { scale: 0.8, opacity: 0 }}
+              animate={shouldReduceMotion ? {} : { scale: 1, opacity: 1 }}
+              transition={shouldReduceMotion ? {} : { duration: 0.5, delay: 0.2 }}
+            >
+              <ShoppingBag className="w-16 h-16 mx-auto mb-6 opacity-50" />
+              <h3 className="text-lg font-semibold mb-2 text-foreground">{t("noOrdersYet", language)}</h3>
+              <p className="text-sm leading-relaxed mb-4">{t("ordersArriveHere", language)}</p>
+              <p className="text-xs text-muted-foreground/70 italic">
+                {t("firstOrder", language)}
+              </p>
+            </motion.div>
           </div>
         )}
       </div>
 
       {/* Menu Preview */}
-      <div className="bg-card rounded-lg border border-border p-4 lg:p-6">
-        <h2 className="text-lg font-semibold mb-4 text-foreground">{t("menuPreview", language)}</h2>
-        <div className="space-y-3">
+      <div className="bg-card rounded-lg border border-border p-6">
+        <h2 className="text-lg font-semibold mb-6 text-foreground">{t("menuPreview", language)}</h2>
+        <div className="space-y-4">
           {menu.slice(0, 5).map((categoria) => (
-            <div key={categoria.id} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
+            <div key={categoria.id} className="flex items-center justify-between py-3 border-b border-border/50 last:border-0">
               <div>
-                <h3 className="font-medium text-foreground">{categoria.label}</h3>
+                <h3 className="font-medium text-foreground mb-1">{categoria.label}</h3>
                 <p className="text-sm text-muted-foreground">{categoria.items.length} {t("products", language)}</p>
               </div>
-              <ArrowRight className="w-4 h-4 text-muted-foreground" />
+              <ArrowRight className="w-5 h-5 text-muted-foreground" />
             </div>
           ))}
           {menu.length > 5 && (
-            <Link href="/admin/categorias" className="block text-center text-sm text-primary hover:underline pt-2">
+            <Link href="/admin/categorias" className="block text-center text-sm text-primary hover:text-primary/80 font-medium pt-4 transition-colors">
               {t("viewAllCategories", language)} ({menu.length})
             </Link>
           )}
           {menu.length === 0 && (
-            <p className="text-muted-foreground text-center py-4">
+            <p className="text-muted-foreground text-center py-8 text-sm">
               {t("noCategoriesConfigured", language)}
             </p>
           )}

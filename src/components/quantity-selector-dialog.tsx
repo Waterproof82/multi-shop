@@ -88,7 +88,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px] flex flex-col max-h-[80vh]" onOpenAutoFocus={(e) => e.preventDefault()}>
+      <DialogContent className="w-[min(calc(100vw-2rem),425px)] flex flex-col max-h-[80vh]" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>{t("selectQuantity", language)}</DialogTitle>
           <DialogDescription>
@@ -119,7 +119,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
                       role="radio"
                       aria-checked={isSelected}
                       onClick={() => toggleComplement(complement)}
-                      className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all duration-200 ${
+                      className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                         isSelected
                           ? 'border-primary bg-primary/10 animate-complement-select'
                           : 'border-border hover:border-border/80 hover:bg-muted/50'
@@ -141,7 +141,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
                         </div>
                       </div>
                       <span className="font-semibold text-sm">
-                        +{formatPrice(complement.price)}
+                        +{formatPrice(complement.price, 'EUR', language)}
                       </span>
                     </button>
                   );
@@ -184,7 +184,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
           </div>
           <div className="flex justify-between items-center text-lg font-bold">
             <span>{t("total", language)}:</span>
-            <span className="animate-price-update" key={totalPrice}>{formatPrice(totalPrice)}</span>
+            <span className="animate-price-update" key={totalPrice}>{formatPrice(totalPrice, 'EUR', language)}</span>
           </div>
         </div>
         

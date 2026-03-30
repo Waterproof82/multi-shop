@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { CartProvider } from "@/lib/cart-context";
 import { LanguageProvider } from "@/lib/language-context";
 import { PromoToast } from "@/components/promo-toast";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { getEmpresaByDomain } from "@/lib/server-services";
 import { getDomainFromHeaders } from "@/lib/domain-utils";
 
@@ -104,22 +105,24 @@ export default async function RootLayout({
           disableTransitionOnChange
           nonce={nonce}
         >
-          <LanguageProvider>
-            <CartProvider>
-              {/* Skip to main content link for accessibility */}
-              <a
-                href="#main-content"
-                className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-4 focus:left-4 focus:bg-primary focus:text-primary-foreground focus:px-4 focus:py-2 focus:rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-              >
-                Saltar al contenido principal
-              </a>
-              <main id="main-content">
-                {children}
-              </main>
-              <Toaster />
-              <PromoToast />
-            </CartProvider>
-          </LanguageProvider>
+          <ErrorBoundary>
+            <LanguageProvider>
+              <CartProvider>
+                {/* Skip to main content link for accessibility */}
+                <a
+                  href="#main-content"
+                  className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-4 focus:left-4 focus:bg-primary focus:text-primary-foreground focus:px-4 focus:py-2 focus:rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                >
+                  Saltar al contenido principal
+                </a>
+                <main id="main-content">
+                  {children}
+                </main>
+                <Toaster />
+                <PromoToast />
+              </CartProvider>
+            </LanguageProvider>
+          </ErrorBoundary>
         </ThemeProvider>
       </body>
     </html>

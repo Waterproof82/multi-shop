@@ -59,7 +59,11 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
         throw new Error(data.error || t('loginErrorDefault', language));
       }
 
-      router.push('/admin');
+      if (data.data?.admin?.rol === 'superadmin') {
+        router.push('/superadmin');
+      } else {
+        router.push('/admin');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : t('unknownError', language));
     } finally {
@@ -112,7 +116,7 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
 
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-foreground">
-              {t("password", language)}
+              {t("passwordLabel", language)}
             </label>
             <Input
               id="password"
@@ -135,7 +139,7 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
           >
             {loading ? (
               <>
-                <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                <Loader2 className="animate-spin motion-reduce:animate-none h-4 w-4 mr-2" />
                 {t("signingIn", language)}
               </>
             ) : (

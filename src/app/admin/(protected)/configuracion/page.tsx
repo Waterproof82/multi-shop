@@ -4,6 +4,7 @@ import { authAdminUseCase, empresaUseCase } from '@/core/infrastructure/database
 import { ColoresForm } from '@/components/admin/colores-form';
 import { EmpresaDatosForm } from '@/components/admin/empresa-datos-form';
 import { EmpresaAparienciaForm } from '@/components/admin/empresa-apariencia-form';
+import { SUPERADMIN_ROLE } from '@/core/domain/repositories/IAdminRepository';
 import { Settings, Palette, Building2 } from 'lucide-react';
 
 export default async function ConfiguracionPage() {
@@ -20,7 +21,19 @@ export default async function ConfiguracionPage() {
     redirect('/admin/login');
   }
 
-  const empresaId: string = admin.empresa.id;
+  let empresaId = admin.empresaId;
+
+  if (admin.rol === SUPERADMIN_ROLE) {
+    const superadminEmpresaId = cookieStore.get('superadmin_empresa_id')?.value;
+    if (!superadminEmpresaId) {
+      redirect('/superadmin');
+    }
+    empresaId = superadminEmpresaId;
+  }
+
+  if (!empresaId) {
+    redirect('/admin/login');
+  }
   const empresaResult = await empresaUseCase.getById(empresaId);
   
   const empresaData = empresaResult.success ? empresaResult.data : null;
@@ -53,7 +66,7 @@ export default async function ConfiguracionPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">Configuración</h1>
-            <p className="text-primary-foreground/80 text-sm mt-1">{admin.empresa.nombre}</p>
+            <p className="text-primary-foreground/80 text-sm mt-1">{empresaData?.nombre ?? 'default'}</p>
           </div>
           <div className="flex items-center gap-3">
             <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
@@ -100,7 +113,7 @@ export default async function ConfiguracionPage() {
           Personaliza los colores de tu menú digital. Los cambios se aplicarán automáticamente.
         </p>
         <ColoresForm
-          coloresIniciales={admin.empresa.colores}
+          coloresIniciales={empresaData?.colores ?? null}
           empresaId={empresaId}
         />
       </div>

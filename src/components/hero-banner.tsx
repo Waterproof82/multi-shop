@@ -44,7 +44,6 @@ export function HeroBanner({ empresa }: HeroBannerProps) {
             priority
             sizes="100vw"
             className="object-cover"
-            unoptimized
           />
           <div className="absolute inset-0 bg-foreground/70" />
         </div>
@@ -62,7 +61,6 @@ export function HeroBanner({ empresa }: HeroBannerProps) {
             width={200}
             height={100}
             className="mx-auto mb-6 h-24 w-auto md:h-32"
-            unoptimized
           />
         )}
       </motion.div>

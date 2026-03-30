@@ -14,7 +14,10 @@ import {
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { logClientError } from '@/lib/client-error';
 import { useLanguage } from '@/lib/language-context';
+import { useAdmin } from '@/lib/admin-context';
 import { t } from '@/lib/translations';
+import { SkeletonTable, Skeleton } from '@/components/ui/skeleton';
+import { formatDate } from '@/lib/format-date';
 
 interface Cliente {
   id: string;
@@ -29,6 +32,8 @@ interface Cliente {
 
 export default function ClientesPage() {
   const { language } = useLanguage();
+  const { empresaId, overrideEmpresaId } = useAdmin();
+  const effectiveEmpresaId = overrideEmpresaId || empresaId;
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +49,13 @@ export default function ClientesPage() {
     async function fetchClientes() {
       try {
         setError(null);
-        const res = await fetch('/api/admin/clientes', { signal: controller.signal });
+        const res = await fetchWithCsrf(`/api/admin/clientes?empresaId=${effectiveEmpresaId}`, {
+          signal: controller.signal
+        }, {
+          maxRetries: 3,
+          baseDelay: 1000,
+          retryOn: (response) => response.status >= 500 || response.status === 429 || response.status === 408
+        });
         if (res.ok) {
           const data = await res.json();
           setClientes(data.clientes || []);
@@ -61,7 +72,7 @@ export default function ClientesPage() {
     }
     fetchClientes();
     return () => controller.abort();
-  }, [language]);
+  }, [language, effectiveEmpresaId]);
 
   const filteredClientes = clientes.filter(c =>
     c.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -73,12 +84,16 @@ export default function ClientesPage() {
     const newValue = !cliente.aceptar_promociones;
     
     try {
-      const res = await fetchWithCsrf('/api/admin/clientes', {
+      const res = await fetchWithCsrf(`/api/admin/clientes?empresaId=${effectiveEmpresaId}`, {
         method: 'PATCH',
         body: JSON.stringify({
           id: cliente.id,
           aceptar_promociones: newValue,
         }),
+      }, {
+        maxRetries: 2,
+        baseDelay: 500,
+        retryOn: (response) => response.status >= 500 || response.status === 429
       });
       
       if (res.ok) {
@@ -121,7 +136,7 @@ export default function ClientesPage() {
     
     setSaving(true);
     try {
-      const res = await fetchWithCsrf('/api/admin/clientes', {
+      const res = await fetchWithCsrf(`/api/admin/clientes?empresaId=${effectiveEmpresaId}`, {
         method: 'PATCH',
         body: JSON.stringify({
           id: editingCliente.id,
@@ -130,6 +145,10 @@ export default function ClientesPage() {
           telefono: editForm.telefono || null,
           direccion: editForm.direccion || null,
         }),
+      }, {
+        maxRetries: 2,
+        baseDelay: 1000,
+        retryOn: (response) => response.status >= 500 || response.status === 429
       });
       
       if (res.ok) {
@@ -156,7 +175,7 @@ export default function ClientesPage() {
     
     setSaving(true);
     try {
-      const res = await fetchWithCsrf('/api/admin/clientes', {
+      const res = await fetchWithCsrf(`/api/admin/clientes?empresaId=${effectiveEmpresaId}`, {
         method: 'POST',
         body: JSON.stringify({
           nombre: editForm.nombre || null,
@@ -164,6 +183,10 @@ export default function ClientesPage() {
           telefono: editForm.telefono || null,
           direccion: editForm.direccion || null,
         }),
+      }, {
+        maxRetries: 2,
+        baseDelay: 1000,
+        retryOn: (response) => response.status >= 500 || response.status === 429
       });
       
       if (res.ok) {
@@ -187,9 +210,13 @@ export default function ClientesPage() {
 
     setSaving(true);
     try {
-      const res = await fetchWithCsrf('/api/admin/clientes', {
+      const res = await fetchWithCsrf(`/api/admin/clientes?empresaId=${effectiveEmpresaId}`, {
         method: 'DELETE',
         body: JSON.stringify({ id: deleteConfirm.id }),
+      }, {
+        maxRetries: 2,
+        baseDelay: 1000,
+        retryOn: (response) => response.status >= 500 || response.status === 429
       });
 
       if (res.ok) {
@@ -249,7 +276,14 @@ export default function ClientesPage() {
 
       {/* Tabla clientes */}
       {loading && (
-        <div className="text-center py-8 text-muted-foreground">{t("loading", language)}</div>
+        <div className="bg-card rounded-lg border overflow-hidden">
+          <div className="p-4 border-b">
+            <Skeleton className="h-6 w-32" />
+          </div>
+          <div className="p-4">
+            <SkeletonTable rows={8} columns={8} />
+          </div>
+        </div>
       )}
       {error && (
         <div className="mb-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
@@ -332,7 +366,7 @@ export default function ClientesPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground text-sm">
-                      {cliente.created_at ? new Date(cliente.created_at).toLocaleDateString('es-ES') : '-'}
+                      {cliente.created_at ? formatDate(cliente.created_at) : '-'}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex justify-center">

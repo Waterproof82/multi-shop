@@ -1,5 +1,5 @@
 import { SupabaseClient } from "@supabase/supabase-js";
-import { IAdminRepository, AdminWithEmpresa } from "@/core/domain/repositories/IAdminRepository";
+import { IAdminRepository, AdminWithEmpresa, SUPERADMIN_ROLE } from "@/core/domain/repositories/IAdminRepository";
 import { Empresa, Result } from "@/core/domain/entities/types";
 import { DEFAULT_EMPRESA_COLORES } from "@/core/domain/constants/empresa-defaults";
 import { logger } from "@/core/infrastructure/logging/logger";
@@ -86,6 +86,34 @@ export class SupabaseAdminRepository implements IAdminRepository {
 
       if (!perfil) {
         return { success: true, data: null };
+      }
+
+      const isSuperAdmin = perfil.rol === SUPERADMIN_ROLE;
+
+      if (isSuperAdmin) {
+        return {
+          success: true,
+          data: {
+            id: perfil.id,
+            empresaId: null,
+            nombreCompleto: perfil.nombre_completo,
+            rol: perfil.rol,
+            email: "",
+            empresa: null,
+          },
+        };
+      }
+
+      if (!perfil.empresa_id) {
+        return { 
+          success: false, 
+          error: { 
+            code: 'EMPRESA_NOT_FOUND', 
+            message: 'Empresa no encontrada para el admin', 
+            module: 'repository', 
+            method: 'findById' 
+          } 
+        };
       }
 
       const { data: empresa } = await this.supabase

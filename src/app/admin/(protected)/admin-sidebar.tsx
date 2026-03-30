@@ -47,12 +47,12 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
   return (
     <>
       {/* Mobile header */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-card border-b border-border z-30 flex items-center justify-between px-4">
+      <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-card border-b border-border z-30 flex items-center justify-between px-6">
         {empresaLogo ? (
           <div className="relative w-10 h-10">
             <Image
               src={empresaLogo}
-                  alt={t("companyLogo", language)}
+              alt={t("companyLogo", language)}
               fill
               className="object-contain"
               sizes="40px"
@@ -94,27 +94,27 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
           {/* Desktop header */}
           <div className="hidden lg:block p-6 border-b border-border">
             {empresaLogo ? (
-              <div className="relative w-20 h-20 mx-auto">
+              <div className="relative w-20 h-20 mx-auto mb-4">
                 <Image
                   src={empresaLogo}
-              alt={t("companyLogo", language)}
+                  alt={t("companyLogo", language)}
                   fill
                   className="object-contain"
                   sizes="80px"
                 />
               </div>
             ) : (
-              <h1 className="text-lg font-semibold text-foreground">
+              <h1 className="text-lg font-semibold text-foreground text-center mb-2">
                 {t("administration", language)}
               </h1>
             )}
-            <p className="text-xs text-muted-foreground mt-1 text-center">
+            <p className="text-xs text-muted-foreground text-center leading-tight">
               {t("companyConnected", language)}
             </p>
           </div>
 
-          <nav className="flex-1 p-3 overflow-y-auto">
-            <ul className="space-y-1">
+          <nav className="flex-1 p-4 overflow-y-auto">
+            <ul className="space-y-2">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = pathname === item.href;
@@ -125,14 +125,14 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
                       onClick={closeMenu}
                       aria-current={isActive ? 'page' : undefined}
                       className={`
-                        flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
+                        flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 group
                         ${isActive
-                          ? 'bg-primary text-primary-foreground font-medium'
-                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                          ? 'bg-primary text-primary-foreground shadow-sm scale-[1.02]'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground hover:scale-[1.01] hover:shadow-sm'
                         }
                       `}
                     >
-                      <Icon className="h-4 w-4" />
+                      <Icon className={`h-5 w-5 flex-shrink-0 transition-transform duration-200 ${isActive ? 'scale-110' : 'group-hover:scale-105'}`} />
                       {t(item.labelKey, language)}
                     </Link>
                   </li>
@@ -141,20 +141,20 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
             </ul>
           </nav>
 
-          <div className="p-3 border-t border-border space-y-1">
+          <div className="p-4 border-t border-border space-y-2">
             <Link
               href="/"
-              className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground w-full rounded-lg transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm text-muted-foreground hover:bg-muted hover:text-foreground w-full rounded-lg transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              <ExternalLink className="h-4 w-4" />
+              <ExternalLink className="h-5 w-5 flex-shrink-0" />
               {t("viewStore", language)}
             </Link>
             <button
               type="button"
               onClick={handleLogout}
-              className="flex items-center gap-3 px-3 py-2.5 text-sm text-destructive hover:bg-destructive/10 w-full rounded-lg transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm text-destructive hover:bg-destructive/10 w-full rounded-lg transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut className="h-5 w-5 flex-shrink-0" />
               {t("logout", language)}
             </button>
           </div>

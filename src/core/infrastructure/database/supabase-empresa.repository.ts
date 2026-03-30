@@ -11,11 +11,22 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
     try {
       const { data: empresa } = await this.supabase
         .from('empresas')
-        .select('email_notification, telefono_whatsapp, nombre, logo_url, fb, instagram, url_mapa, direccion, dominio, slug, url_image, descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de, mostrar_carrito, moneda, subdomain_pedidos')
+        .select('email_notification, telefono_whatsapp, nombre, logo_url, fb, instagram, url_mapa, direccion, dominio, slug, url_image, descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de, mostrar_carrito, moneda, subdomain_pedidos, color_primary, color_primary_foreground, color_secondary, color_secondary_foreground, color_accent, color_accent_foreground, color_background, color_foreground')
         .eq('id', empresaId)
         .single();
 
       if (!empresa) return { success: true, data: null };
+
+      const colores: EmpresaColores | null = empresa.color_primary ? {
+        primary: empresa.color_primary,
+        primaryForeground: empresa.color_primary_foreground,
+        secondary: empresa.color_secondary,
+        secondaryForeground: empresa.color_secondary_foreground,
+        accent: empresa.color_accent,
+        accentForeground: empresa.color_accent_foreground,
+        background: empresa.color_background,
+        foreground: empresa.color_foreground,
+      } : null;
 
       return {
         success: true,
@@ -28,7 +39,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
           mostrarCarrito: empresa.mostrar_carrito ?? false,
           moneda: empresa.moneda ?? 'EUR',
           emailNotification: empresa.email_notification,
-          colores: null,
+          colores,
           fb: empresa.fb ?? null,
           instagram: empresa.instagram ?? null,
           urlMapa: empresa.url_mapa ?? null,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Pencil, Trash2, X, Loader2, Search, ArrowUpDown, ArrowUp, ArrowDown, Languages, ChevronDown, ChevronRight, Tags, FolderTree } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Search, ArrowUpDown, ArrowUp, ArrowDown, Languages, ChevronDown, ChevronRight, Tags, FolderTree } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useLanguage } from '@/lib/language-context';
+import { useAdmin } from '@/lib/admin-context';
 import { t } from '@/lib/translations';
 
 interface Category {
@@ -71,6 +72,8 @@ const emptyForm: CategoryFormData = {
 
 export default function CategoriasPage() {
   const { language } = useLanguage();
+  const { empresaId, overrideEmpresaId } = useAdmin();
+  const effectiveEmpresaId = overrideEmpresaId || empresaId;
   const [categorias, setCategorias] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -85,7 +88,7 @@ export default function CategoriasPage() {
 
   const fetchCategorias = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/categorias');
+      const res = await fetch(`/api/admin/categorias?empresaId=${effectiveEmpresaId}`);
       if (!res.ok) throw new Error(t("loadCategoriesError", language));
       const data = await res.json();
       setCategorias(data);
@@ -94,7 +97,7 @@ export default function CategoriasPage() {
     } finally {
       setLoading(false);
     }
-  }, [language]);
+  }, [language, effectiveEmpresaId]);
 
   useEffect(() => {
     fetchCategorias();
@@ -107,8 +110,8 @@ export default function CategoriasPage() {
 
     try {
       const url = editingId 
-        ? `/api/admin/categorias?id=${editingId}` 
-        : '/api/admin/categorias';
+        ? `/api/admin/categorias?id=${editingId}&empresaId=${effectiveEmpresaId}` 
+        : `/api/admin/categorias?empresaId=${effectiveEmpresaId}`;
       
       const method = editingId ? 'PUT' : 'POST';
 
@@ -135,7 +138,7 @@ export default function CategoriasPage() {
     if (!confirm(t("confirmDeleteCategory", language))) return;
 
     try {
-      const res = await fetchWithCsrf(`/api/admin/categorias?id=${id}`, {
+      const res = await fetchWithCsrf(`/api/admin/categorias?id=${id}&empresaId=${effectiveEmpresaId}`, {
         method: 'DELETE',
       });
 
@@ -270,13 +273,10 @@ export default function CategoriasPage() {
             className="pl-10 w-full"
           />
         </div>
-        <button
-          onClick={openCreateModal}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-colors duration-150 w-full sm:w-auto justify-center"
-        >
+        <Button onClick={openCreateModal} className="w-full sm:w-auto">
           <Plus className="h-4 w-4" />
           <span>{t("newCategory", language)}</span>
-        </button>
+        </Button>
       </div>
 
       {error && (

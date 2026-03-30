@@ -8,7 +8,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { fetchWithCsrf, getCsrfToken } from '@/lib/csrf-client';
 import { logClientError } from '@/lib/client-error';
 import { useLanguage } from '@/lib/language-context';
+import { useAdmin } from '@/lib/admin-context';
 import { t } from '@/lib/translations';
+import { formatDateTime } from '@/lib/format-date';
 
 interface Cliente {
   id: string;
@@ -81,6 +83,8 @@ async function optimizeImage(file: File): Promise<{ file: File; type: string }> 
 
 export default function PromocionesPage() {
   const { language } = useLanguage();
+  const { empresaId, overrideEmpresaId } = useAdmin();
+  const effectiveEmpresaId = overrideEmpresaId || empresaId;
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [promociones, setPromociones] = useState<Promocion[]>([]);
   const [savingPromo, setSavingPromo] = useState(false);
@@ -95,8 +99,8 @@ export default function PromocionesPage() {
     async function fetchData() {
       try {
         const [clientesRes, promocionesRes] = await Promise.all([
-          fetch('/api/admin/clientes'),
-          fetch('/api/admin/promociones'),
+          fetch(`/api/admin/clientes?empresaId=${effectiveEmpresaId}`),
+          fetch(`/api/admin/promociones?empresaId=${effectiveEmpresaId}`),
         ]);
         
         if (clientesRes.ok) {
@@ -114,7 +118,7 @@ export default function PromocionesPage() {
       }
     }
     fetchData();
-  }, []);
+  }, [effectiveEmpresaId]);
 
   const clientesConPromociones = clientes.filter(c => c.aceptar_promociones && c.email);
 
@@ -175,7 +179,7 @@ export default function PromocionesPage() {
         }
       }
 
-      const res = await fetchWithCsrf('/api/admin/promociones', {
+      const res = await fetchWithCsrf(`/api/admin/promociones?empresaId=${effectiveEmpresaId}`, {
         method: 'POST',
         body: JSON.stringify({
           texto_promocion: promoTexto,
@@ -377,7 +381,7 @@ export default function PromocionesPage() {
                     <div className="flex-1">
                       <p className="font-medium text-foreground">{promo.texto_promocion}</p>
                       <p className="text-sm text-muted-foreground">
-                        {new Date(promo.fecha_hora).toLocaleString('es-ES')}
+                        {formatDateTime(promo.fecha_hora)}
                       </p>
                     </div>
                     <div className="text-right px-4">

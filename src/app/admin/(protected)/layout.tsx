@@ -3,13 +3,19 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { AdminSidebar } from './admin-sidebar';
 import { AdminProvider } from '@/lib/admin-context';
-import { authAdminUseCase } from '@/core/infrastructure/database';
+import { authAdminUseCase, empresaUseCase } from '@/core/infrastructure/database';
 import { AdminThemeProvider } from '@/components/admin-theme-provider';
 import { EmpresaThemeProvider } from '@/components/empresa-theme-provider';
+import { SUPERADMIN_ROLE } from '@/core/domain/repositories/IAdminRepository';
+import { SuperadminBanner } from '@/components/superadmin-banner';
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
+
+function getEmpresaIdFromRequest(): string | null {
+  return null;
+}
 
 export default async function AdminProtectedLayout({
   children,
@@ -29,15 +35,40 @@ export default async function AdminProtectedLayout({
     redirect('/admin/login');
   }
 
-  const empresa = admin.empresa;
-  const empresaId = admin.empresaId;
+  let empresaId: string;
+  let empresa = admin.empresa;
+  let isSuperAdminView = false;
+
+  if (admin.rol === SUPERADMIN_ROLE) {
+    const cookieList = await cookies();
+    const superadminEmpresaId = cookieList.get('superadmin_empresa_id')?.value;
+    
+    if (!superadminEmpresaId) {
+      redirect('/superadmin');
+    }
+    empresaId = superadminEmpresaId;
+    isSuperAdminView = true;
+    const empresaResult = await empresaUseCase.getById(empresaId);
+    if (empresaResult.success && empresaResult.data) {
+      empresa = empresaResult.data as typeof empresa;
+    }
+  } else {
+    empresaId = admin.empresaId!;
+  }
 
   return (
     <AdminThemeProvider>
-      <EmpresaThemeProvider colores={empresa?.colores || null}>
-        <AdminProvider empresaId={empresaId} empresaNombre={empresa?.nombre || 'default'} empresaLogo={empresa?.logoUrl}>
+      <EmpresaThemeProvider colores={empresa?.colores ?? null}>
+        <AdminProvider 
+          empresaId={empresaId} 
+          empresaNombre={empresa?.nombre ?? 'default'} 
+          empresaLogo={empresa?.logoUrl ?? undefined}
+          overrideEmpresaId={isSuperAdminView ? empresaId : undefined}
+        >
           <div className="min-h-screen bg-muted">
-            {/* Skip to main content link for accessibility */}
+            {isSuperAdminView && (
+              <SuperadminBanner empresaNombre={empresa?.nombre ?? ''} />
+            )}
             <a
               href="#main-content"
               className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-4 focus:left-4 focus:bg-primary focus:text-primary-foreground focus:px-4 focus:py-2 focus:rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
@@ -45,7 +76,7 @@ export default async function AdminProtectedLayout({
               Saltar al contenido principal
             </a>
             <AdminSidebar empresaId={empresaId} />
-            <main id="main-content" className="lg:ml-64 min-h-screen">
+            <main id="main-content" className={`lg:ml-64 min-h-screen ${isSuperAdminView ? 'pt-20' : 'pt-16'}`}>
               {children}
             </main>
           </div>

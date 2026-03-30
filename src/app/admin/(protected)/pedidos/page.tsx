@@ -16,7 +16,10 @@ import { fetchWithCsrf } from '@/lib/csrf-client';
 import { formatPrice } from '@/lib/format-price';
 import { logClientError } from '@/lib/client-error';
 import { useLanguage } from '@/lib/language-context';
+import { useAdmin } from '@/lib/admin-context';
 import { t } from '@/lib/translations';
+import { SkeletonTable, SkeletonStats, Skeleton } from '@/components/ui/skeleton';
+import { formatDate } from '@/lib/format-date';
 
 interface Cliente {
   nombre: string | null;
@@ -36,7 +39,20 @@ interface Pedido {
   created_at: string;
 }
 
+function getAriaSortValue(sortField: string, currentField: string, sortDirection: 'asc' | 'desc') {
+  if (sortField === currentField) {
+    if (sortDirection === 'asc') {
+      return 'ascending';
+    } else {
+      return 'descending';
+    }
+  }
+  return 'none';
+}
+
 export default function PedidosPage() {
+  const { empresaId, overrideEmpresaId } = useAdmin();
+  const effectiveEmpresaId = overrideEmpresaId || empresaId;
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -50,7 +66,13 @@ export default function PedidosPage() {
     const controller = new AbortController();
     async function fetchPedidos() {
       try {
-        const res = await fetch('/api/admin/pedidos', { signal: controller.signal });
+        const res = await fetchWithCsrf(`/api/admin/pedidos?empresaId=${effectiveEmpresaId}`, {
+          signal: controller.signal
+        }, {
+          maxRetries: 3,
+          baseDelay: 1000,
+          retryOn: (response) => response.status >= 500 || response.status === 429 || response.status === 408
+        });
         if (res.ok) {
           const data = await res.json();
           setPedidos(data.pedidos || []);
@@ -64,7 +86,7 @@ export default function PedidosPage() {
     }
     fetchPedidos();
     return () => controller.abort();
-  }, []);
+  }, [effectiveEmpresaId]);
 
   const filteredPedidos = useMemo(() => pedidos
     .filter(p =>
@@ -128,9 +150,13 @@ export default function PedidosPage() {
 
   const updateEstado = useCallback(async (id: string, nuevoEstado: string) => {
     try {
-      const res = await fetchWithCsrf('/api/admin/pedidos', {
+      const res = await fetchWithCsrf(`/api/admin/pedidos?empresaId=${effectiveEmpresaId}`, {
         method: 'PATCH',
         body: JSON.stringify({ id, estado: nuevoEstado }),
+      }, {
+        maxRetries: 2,
+        baseDelay: 500,
+        retryOn: (response) => response.status >= 500 || response.status === 429
       });
       if (res.ok) {
         setPedidos(prev => prev.map(p => p.id === id ? { ...p, estado: nuevoEstado } : p));
@@ -138,7 +164,7 @@ export default function PedidosPage() {
     } catch (error) {
       logClientError(error, 'updateEstado');
     }
-  }, []);
+  }, [effectiveEmpresaId]);
 
   const deletePedido = useCallback((id: string, orderNum: number | null) => {
     setDeleteConfirm({ show: true, id, numero: orderNum });
@@ -147,9 +173,13 @@ export default function PedidosPage() {
   const confirmDelete = async () => {
     if (!deleteConfirm.id) return;
     try {
-      const res = await fetchWithCsrf('/api/admin/pedidos', {
+      const res = await fetchWithCsrf(`/api/admin/pedidos?empresaId=${effectiveEmpresaId}`, {
         method: 'DELETE',
         body: JSON.stringify({ id: deleteConfirm.id }),
+      }, {
+        maxRetries: 2,
+        baseDelay: 1000,
+        retryOn: (response) => response.status >= 500 || response.status === 429
       });
       if (res.ok) {
         setPedidos(pedidos.filter(p => p.id !== deleteConfirm.id));
@@ -179,8 +209,27 @@ export default function PedidosPage() {
 
   if (loading) {
     return (
-      <div className="pt-16 lg:pt-0 px-6 lg:px-8 flex items-center justify-center min-h-[50vh]">
-        <div className="text-muted-foreground">{t("loading", language)}</div>
+      <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
+        {/* Header con stats skeleton */}
+        <div className="bg-primary rounded-lg p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="space-y-2">
+              <Skeleton className="h-6 w-48 bg-primary-foreground/20" />
+              <Skeleton className="h-4 w-64 bg-primary-foreground/20" />
+            </div>
+            <SkeletonStats count={4} itemClassName="bg-primary-foreground/20" />
+          </div>
+        </div>
+
+        {/* Buscador skeleton */}
+        <div className="bg-card rounded-lg shadow-elegant border border-border">
+          <div className="p-4 border-b border-border">
+            <Skeleton className="h-10 w-full max-w-md" />
+          </div>
+          <div className="p-4">
+            <SkeletonTable rows={8} columns={6} />
+          </div>
+        </div>
       </div>
     );
   }
@@ -237,7 +286,7 @@ export default function PedidosPage() {
           <table className="w-full">
             <thead className="bg-muted">
               <tr>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'numero_pedido' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={getAriaSortValue(sortField, 'numero_pedido', sortDirection)}>
                   <button
                     onClick={() => handleSort('numero_pedido')}
                     className="flex items-center gap-1 rounded-sm px-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -252,7 +301,7 @@ export default function PedidosPage() {
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   {t("phone", language)}
                 </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'total' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={getAriaSortValue(sortField, 'total', sortDirection)}>
                   <button
                     onClick={() => handleSort('total')}
                     className="flex items-center gap-1 rounded-sm px-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -261,7 +310,7 @@ export default function PedidosPage() {
                     {sortField === 'total' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                   </button>
                 </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'estado' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={getAriaSortValue(sortField, 'estado', sortDirection)}>
                   <button
                     onClick={() => handleSort('estado')}
                     className="flex items-center gap-1 rounded-sm px-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -270,7 +319,7 @@ export default function PedidosPage() {
                     {sortField === 'estado' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                   </button>
                 </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={sortField === 'created_at' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={getAriaSortValue(sortField, 'created_at', sortDirection)}>
                   <button
                     onClick={() => handleSort('created_at')}
                     className="flex items-center gap-1 rounded-sm px-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -315,7 +364,7 @@ export default function PedidosPage() {
                         {getEstadoBadge(pedido.estado, pedido.id)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-muted-foreground text-sm">
-                        {new Date(pedido.created_at).toLocaleDateString('es-ES', { 
+                        {formatDate(pedido.created_at, { 
                           day: '2-digit', month: '2-digit', year: 'numeric',
                           hour: '2-digit', minute: '2-digit'
                         })}

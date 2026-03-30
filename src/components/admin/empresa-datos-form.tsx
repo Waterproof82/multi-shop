@@ -5,6 +5,8 @@ import { MapPin, Phone, Mail, Link as LinkIcon, Users, Camera, Loader2 } from 'l
 import { Input } from '@/components/ui/input';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { logClientError } from '@/lib/client-error';
+import { useLanguage } from '@/lib/language-context';
+import { t } from '@/lib/translations';
 
 interface EmpresaDatosFormProps {
   readonly initialData: {
@@ -18,6 +20,7 @@ interface EmpresaDatosFormProps {
 }
 
 export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
+  const { language } = useLanguage();
   const [formData, setFormData] = useState(initialData);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -58,7 +61,7 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
         <div className="flex flex-col gap-2">
           <label htmlFor="email_notification" className="text-sm font-medium text-foreground flex items-center gap-2">
             <Mail className="w-4 h-4" />
-            Email de notificaciones
+            {t('emailNotificationLabel', language)}
           </label>
           <Input
             id="email_notification"
@@ -68,15 +71,17 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
             onChange={(e) => handleChange('email_notification', e.target.value)}
             placeholder="pedidos@tuempresa.com"
             aria-describedby="email_notification_help"
+            aria-required="true"
+            required
           />
-          <span id="email_notification_help" className="text-xs text-muted-foreground">Recibirás los pedidos nuevos en este email</span>
+          <span id="email_notification_help" className="text-xs text-muted-foreground">{t('emailNotificationHelp', language)}</span>
         </div>
 
         {/* WhatsApp */}
         <div className="flex flex-col gap-2">
           <label htmlFor="telefono_whatsapp" className="text-sm font-medium text-foreground flex items-center gap-2">
             <Phone className="w-4 h-4" />
-            WhatsApp
+            {t('whatsappLabel', language)}
           </label>
           <Input
             id="telefono_whatsapp"
@@ -85,15 +90,16 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
             value={formData.telefono_whatsapp}
             onChange={(e) => handleChange('telefono_whatsapp', e.target.value)}
             placeholder="+34612345678"
+            aria-describedby="telefono_whatsapp_help"
           />
-          <span className="text-xs text-muted-foreground">Número con código de país sin espacios</span>
+          <span id="telefono_whatsapp_help" className="text-xs text-muted-foreground">{t('whatsappHelp', language)}</span>
         </div>
 
         {/* Dirección */}
         <div className="flex flex-col gap-2 md:col-span-2">
           <label htmlFor="direccion" className="text-sm font-medium text-foreground flex items-center gap-2">
             <MapPin className="w-4 h-4" />
-            Dirección
+            {t('address', language)}
           </label>
           <Input
             id="direccion"
@@ -102,14 +108,16 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
             value={formData.direccion}
             onChange={(e) => handleChange('direccion', e.target.value)}
             placeholder="Av. Example 123, Ciudad"
+            aria-describedby="direccion_help"
           />
+          <span id="direccion_help" className="text-xs text-muted-foreground">{t('addressHelp', language)}</span>
         </div>
 
         {/* Facebook */}
         <div className="flex flex-col gap-2">
           <label htmlFor="fb" className="text-sm font-medium text-foreground flex items-center gap-2">
             <Users className="w-4 h-4" />
-            Facebook
+            {t('facebook', language)}
           </label>
           <Input
             id="fb"
@@ -118,14 +126,16 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
             value={formData.fb}
             onChange={(e) => handleChange('fb', e.target.value)}
             placeholder="https://facebook.com/tuempresa"
+            aria-describedby="fb_help"
           />
+          <span id="fb_help" className="text-xs text-muted-foreground">{t('facebookHelp', language)}</span>
         </div>
 
         {/* Instagram */}
         <div className="flex flex-col gap-2">
           <label htmlFor="instagram" className="text-sm font-medium text-foreground flex items-center gap-2">
             <Camera className="w-4 h-4" />
-            Instagram
+            {t('instagram', language)}
           </label>
           <Input
             id="instagram"
@@ -134,14 +144,16 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
             value={formData.instagram}
             onChange={(e) => handleChange('instagram', e.target.value)}
             placeholder="https://instagram.com/tuempresa"
+            aria-describedby="instagram_help"
           />
+          <span id="instagram_help" className="text-xs text-muted-foreground">{t('instagramHelp', language)}</span>
         </div>
 
         {/* URL del Mapa */}
         <div className="flex flex-col gap-2 md:col-span-2">
           <label htmlFor="url_mapa" className="text-sm font-medium text-foreground flex items-center gap-2">
             <LinkIcon className="w-4 h-4" />
-            Embed del mapa (iframe)
+            {t('mapEmbedLabel', language)}
           </label>
           <Input
             id="url_mapa"
@@ -150,9 +162,10 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
             value={formData.url_mapa}
             onChange={(e) => handleChange('url_mapa', e.target.value)}
             placeholder="https://www.google.com/maps/embed?pb=..."
+            aria-describedby="url_mapa_help"
           />
-          <span className="text-xs text-muted-foreground">
-            Ir a Google Maps → Compartir → Insertar mapa → Copiar HTML → Pegar solo la URL del src
+          <span id="url_mapa_help" className="text-xs text-muted-foreground">
+            {t('mapEmbedHelp', language)}
           </span>
         </div>
       </div>
@@ -161,13 +174,13 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
         <button
           type="submit"
           disabled={saving}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center gap-2"
+          className="px-4 py-2 min-h-[44px] bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
-          {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-          {saving ? 'Guardando...' : 'Guardar datos'}
+          {saving && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />}
+          {saving ? t('savingProgress', language) : t('saveContactData', language)}
         </button>
         {saved && (
-          <span className="text-primary text-sm">¡Datos guardados correctamente!</span>
+          <span className="text-primary text-sm">{t('contactDataSaved', language)}</span>
         )}
       </div>
     </form>

@@ -39,7 +39,7 @@ function PromoNotificationInner() {
       url.searchParams.delete("error");
       router.replace(url.pathname, { scroll: false });
 
-      const timer = setTimeout(() => setNotification(null), 6000);
+      const timer = setTimeout(() => setNotification(null), msgConfig.type === "error" ? 9000 : 6000);
       return () => clearTimeout(timer);
     }
   }, [searchParams, router, language]);
@@ -52,8 +52,8 @@ function PromoNotificationInner() {
     : "bg-destructive text-destructive-foreground";
 
   return (
-    <div 
-      role="alert" 
+    <div
+      role={notification.type === "error" ? "alert" : "status"}
       aria-live={notification.type === "error" ? "assertive" : "polite"}
       className={`fixed top-20 left-1/2 z-[100] -translate-x-1/2 ${colorClasses} px-6 py-3 rounded-lg shadow-elegant-lg text-sm font-medium max-w-md text-center`}
     >

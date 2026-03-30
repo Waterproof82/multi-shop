@@ -425,27 +425,29 @@ export function CartDrawer() {
                   const complementPrice = ci.selectedComplements?.reduce((sum, c) => sum + c.price, 0) || 0;
                   const totalItemPrice = ci.item.price + complementPrice;
                   let itemAnimationClass = '';
-                  if (ci.justAdded) {
-                    itemAnimationClass = 'animate-cart-item-add';
-                  } else if (ci.justRemoved) {
-                    itemAnimationClass = 'animate-cart-item-remove';
+                  if (!shouldReduceMotion) {
+                    if (ci.justAdded) {
+                      itemAnimationClass = 'animate-cart-item-add';
+                    } else if (ci.justRemoved) {
+                      itemAnimationClass = 'animate-cart-item-remove';
+                    }
                   }
                   return (
                     <li 
                       key={itemKey} 
-                      className={`flex items-center gap-3 rounded-lg bg-card p-3 ${itemAnimationClass}`}
+                      className={`flex items-center gap-3 rounded-lg bg-card p-3 transition-all duration-200 hover:bg-card/80 hover:shadow-sm hover:scale-[1.01] group ${itemAnimationClass}`}
                     >
                       <div className="flex-1">
-                        <p className="font-semibold text-card-foreground">
+                        <p className="font-semibold text-card-foreground group-hover:text-primary transition-colors duration-200">
                           {(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}
                         </p>
                         {ci.selectedComplements && ci.selectedComplements.length > 0 && (
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-muted-foreground group-hover:text-muted-foreground/80 transition-colors duration-200">
                             + {ci.selectedComplements.map(c => c.name).join(', ')}
                           </p>
                         )}
-                        <p className="text-sm text-muted-foreground">
-                          {formatPrice(totalItemPrice)}
+                        <p className="text-sm text-muted-foreground group-hover:text-muted-foreground/90 transition-colors duration-200">
+                          {formatPrice(totalItemPrice, 'EUR', language)}
                         </p>
                       </div>
 
@@ -453,19 +455,19 @@ export function CartDrawer() {
                         <RippleButton
                           variant="outline"
                           size="icon"
-                          className="min-h-[44px] min-w-[44px] md:min-h-9 md:min-w-9 bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="min-h-[44px] min-w-[44px] md:min-h-9 md:min-w-9 bg-transparent hover:bg-muted/50 hover:scale-105 active:scale-95 transition-all duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => updateQuantity(itemKey, ci.quantity - 1)}
                           aria-label={t("reduceQuantity", language)}
                         >
                           <Minus className="size-4" />
                         </RippleButton>
-                        <span className="w-6 md:w-6 text-center font-semibold text-foreground animate-quantity-pulse" key={ci.quantity}>
+                        <span className="w-6 md:w-6 text-center font-semibold text-foreground animate-quantity-pulse transition-all duration-200 hover:scale-110" key={ci.quantity}>
                           {ci.quantity}
                         </span>
                         <RippleButton
                           variant="outline"
                           size="icon"
-                          className="min-h-[44px] min-w-[44px] md:min-h-9 md:min-w-9 bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="min-h-[44px] min-w-[44px] md:min-h-9 md:min-w-9 bg-transparent hover:bg-muted/50 hover:scale-105 active:scale-95 transition-all duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => updateQuantity(itemKey, ci.quantity + 1)}
                           aria-label={t("increaseQuantity", language)}
                         >
@@ -474,7 +476,7 @@ export function CartDrawer() {
                         <RippleButton
                           variant="ghost"
                           size="icon"
-                          className="min-h-[44px] min-w-[44px] md:min-h-9 md:min-w-9 text-destructive hover:text-destructive hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="min-h-[44px] min-w-[44px] md:min-h-9 md:min-w-9 text-destructive hover:text-destructive hover:bg-destructive/10 hover:scale-105 active:scale-95 transition-all duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => removeItem(itemKey)}
                           aria-label={`${t("remove", language)} ${(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}`}
                         >
@@ -567,7 +569,7 @@ export function CartDrawer() {
               <div className="mb-4 flex items-center justify-between px-2">
                 <span className="text-lg font-semibold text-foreground">{t("total", language)}</span>
                 <span className="text-2xl font-bold text-foreground tabular-nums animate-price-update" key={totalPrice}>
-                  {formatPrice(totalPrice)}
+                  {formatPrice(totalPrice, 'EUR', language)}
                 </span>
               </div>
 

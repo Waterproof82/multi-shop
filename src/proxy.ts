@@ -5,6 +5,7 @@ import { verifyCsrfToken } from '@/lib/csrf';
 import { timingSafeEqual } from 'node:crypto';
 import { isTokenRevoked } from '@/lib/token-revocation';
 import { AUTH_ERRORS, SERVER_ERRORS, createErrorResponse } from '@/core/domain/constants/api-errors';
+import { errorResponse } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 
 function getAdminTokenSecret(): string | undefined {
@@ -74,9 +75,12 @@ async function handleAdminAuth(request: NextRequest, origin: string | null): Pro
     const secret = new TextEncoder().encode(tokenSecret);
     const { payload } = await jwtVerify(adminToken, secret);
 
-    if (!payload.empresaId || !payload.adminId) {
+    if (!payload.adminId) {
       return addCorsHeaders(NextResponse.json(createErrorResponse(AUTH_ERRORS.INVALID_TOKEN), { status: 401 }), origin);
     }
+
+    // Superadmin can have null empresaId - allow it
+    // For regular admins, empresaId is required
 
     // Reject tokens without jti — they cannot be revoked and are permanently valid.
     // Also reject tokens whose jti appears in the revocation list (logged-out sessions).
@@ -110,11 +114,14 @@ async function handleAdminAuth(request: NextRequest, origin: string | null): Pro
     }
 
     const requestHeaders = new Headers(request.headers);
-    requestHeaders.set('x-empresa-id', payload.empresaId as string);
+    requestHeaders.set('x-empresa-id', (payload.empresaId as string | undefined) ?? '');
     requestHeaders.set('x-admin-id', payload.adminId as string);
     requestHeaders.set('x-admin-rol', payload.rol as string);
 
     const response = NextResponse.next({ request: { headers: requestHeaders } });
+    response.headers.set('x-empresa-id', (payload.empresaId as string | undefined) ?? '');
+    response.headers.set('x-admin-id', payload.adminId as string);
+    response.headers.set('x-admin-rol', payload.rol as string);
     return addCorsHeaders(response, origin);
   } catch {
     return addCorsHeaders(NextResponse.json(createErrorResponse(AUTH_ERRORS.INVALID_TOKEN), { status: 401 }), origin);
@@ -224,6 +231,19 @@ export async function proxy(request: NextRequest) {
   // Admin auth (protected routes)
   if (path.startsWith('/api/admin') && !isPublicRoute(path)) {
     return handleAdminAuth(request, origin);
+  }
+
+  // Superadmin auth (protected routes)
+  if (path.startsWith('/api/superadmin')) {
+    const adminAuthResponse = await handleAdminAuth(request, origin);
+    if (adminAuthResponse.status !== 200) {
+      return adminAuthResponse;
+    }
+    const rol = adminAuthResponse.headers.get('x-admin-rol');
+    if (rol !== 'superadmin') {
+      return addCorsHeaders(errorResponse('Acceso denegado', 403), origin);
+    }
+    return adminAuthResponse;
   }
 
   // Access token for cart
