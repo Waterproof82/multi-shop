@@ -7,6 +7,8 @@ import { Textarea } from '@/components/ui/textarea';
 import type { UpdateEmpresaDTO } from '@/core/application/dtos/empresa.dto';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { logClientError } from '@/lib/client-error';
+import { useLanguage } from '@/lib/language-context';
+import { t } from '@/lib/translations';
 
 const IDIOMAS = [
   { key: 'es', label: 'Español' },
@@ -38,11 +40,14 @@ async function saveEmpresa(data: Partial<UpdateEmpresaDTO>) {
 }
 
 export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaAparienciaFormProps) {
+  const { language } = useLanguage();
   const [formData, setFormData] = useState(initialData);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [savingImage, setSavingImage] = useState(false);
   const [savingLogo, setSavingLogo] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState<string | null>(null);
   const [showTranslations, setShowTranslations] = useState(false);
 
   useEffect(() => {
@@ -54,10 +59,13 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
     setFormData((prev) => ({ ...prev, url_image: newUrl }));
     setSaved(false);
     setSavingImage(true);
+    setImageError(null);
     try {
-      await saveEmpresa({ url_image: newUrl });
+      const ok = await saveEmpresa({ url_image: newUrl });
+      if (!ok) setImageError('Error al guardar la imagen');
     } catch (error) {
       logClientError(error, 'handleImageChange');
+      setImageError('Error al guardar la imagen');
     } finally {
       setSavingImage(false);
     }
@@ -68,10 +76,13 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
     setFormData((prev) => ({ ...prev, logo_url: newUrl }));
     setSaved(false);
     setSavingLogo(true);
+    setLogoError(null);
     try {
-      await saveEmpresa({ logo_url: newUrl });
+      const ok = await saveEmpresa({ logo_url: newUrl });
+      if (!ok) setLogoError('Error al guardar el logo');
     } catch (error) {
       logClientError(error, 'handleLogoChange');
+      setLogoError('Error al guardar el logo');
     } finally {
       setSavingLogo(false);
     }
@@ -95,8 +106,9 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
       {/* Logo de la empresa */}
       <div>
         <p className="text-sm font-medium text-foreground mb-2">
-          Logo de la empresa
-          {savingLogo && <span className="ml-2 text-xs text-muted-foreground">Guardando...</span>}
+          {t('companyLogo', language)}
+          {savingLogo && <span className="ml-2 text-xs text-muted-foreground">{t('savingProgress', language)}</span>}
+          {logoError && <span className="ml-2 text-xs text-destructive" role="alert">{logoError}</span>}
         </p>
         <ImageUploader
           value={formData.logo_url ?? ''}
@@ -106,15 +118,16 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
           previewClassName="relative group rounded-lg overflow-hidden border aspect-square w-48 max-w-48"
         />
         <p className="text-xs text-muted-foreground mt-1">
-          Se mostrará en el header y footer del menú. Recomendado: 512×512px (cuadrado).
+          {t('logoHelp', language)}
         </p>
       </div>
 
       {/* Imagen de fondo */}
       <div>
         <p className="text-sm font-medium text-foreground mb-2">
-          Imagen de fondo del banner
-          {savingImage && <span className="ml-2 text-xs text-muted-foreground">Guardando...</span>}
+          {t('bannerBackground', language)}
+          {savingImage && <span className="ml-2 text-xs text-muted-foreground">{t('savingProgress', language)}</span>}
+          {imageError && <span className="ml-2 text-xs text-destructive" role="alert">{imageError}</span>}
         </p>
         <ImageUploader
           value={formData.url_image ?? ''}
@@ -124,14 +137,14 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
           previewClassName="relative group rounded-lg overflow-hidden border w-full aspect-video max-h-48"
         />
         <p className="text-xs text-muted-foreground mt-1">
-          Se mostrará como fondo del banner principal. Recomendado: 1920×600px.
+          {t('bannerHelp', language)}
         </p>
       </div>
 
       {/* Descripción — idioma principal (ES) siempre visible */}
       <div>
         <p className="text-sm font-medium text-foreground mb-3">
-          Descripción del restaurante
+          {t('restaurantDescription', language)}
         </p>
         <div className="flex flex-col gap-1">
           <label
@@ -159,7 +172,7 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
         >
           {showTranslations ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           <Languages className="h-4 w-4" />
-          Traducciones ({showTranslations ? 'ocultar' : 'mostrar'})
+          {t('translationsToggle', language)} ({showTranslations ? t('hideLabel', language) : t('showLabel', language)})
         </button>
 
         {showTranslations && (
@@ -192,13 +205,13 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
         <button
           type="submit"
           disabled={saving}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px] flex items-center gap-2"
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px] flex items-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
-          {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-          {saving ? 'Guardando...' : 'Guardar descripciones'}
+          {saving && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />}
+          {saving ? t('savingProgress', language) : t('saveDescriptions', language)}
         </button>
         {saved && (
-          <span className="text-primary text-sm">¡Guardado correctamente!</span>
+          <span className="text-primary text-sm">{t('savedSuccess', language)}</span>
         )}
       </div>
     </form>

@@ -1,6 +1,6 @@
 "use client"
 
-import { MapPin, Mail, Globe, Phone, Settings, Camera, Link } from "lucide-react"
+import { MapPin, Mail, Globe, Phone, Settings, Camera, ExternalLink } from "lucide-react"
 import { useLanguage } from "@/lib/language-context"
 import { t } from "@/lib/translations"
 import type { EmpresaPublic } from "@/core/domain/entities/types"
@@ -34,7 +34,7 @@ export function SiteFooter({ empresa }: SiteFooterProps) {
               {empresa.fb && (
                 <li>
                   <a href={empresa.fb} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] text-background/85 hover:text-background transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-background/50 focus-visible:ring-offset-2 focus-visible:ring-offset-foreground rounded-sm"                   aria-label={t("facebook", language)}>
-                    <Link className="w-5 h-5" />
+                    <ExternalLink className="w-5 h-5" />
                   </a>
                 </li>
               )}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { BarChart3, ShoppingCart, Euro, TrendingUp, Users, Calendar, ArrowUpRight, ArrowDownRight, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { fetchWithCsrf } from '@/lib/csrf-client';
@@ -11,6 +11,7 @@ import { t } from '@/lib/translations';
 import {
   BarChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   Cell, PieChart, LineChart, Line, Bar, Pie,
+  type TooltipProps,
 } from 'recharts';
 
 
@@ -73,13 +74,13 @@ function getChartTheme(): ChartTheme {
   };
 }
 
-function getKpiData(stats: Stats | null, language: string) {
+function getKpiData(stats: Stats | null, lang: Parameters<typeof t>[1]) {
   return [
-    { icon: ShoppingCart, label: t("ordersToday", language as any), value: stats?.pedidosHoy || 0, iconClass: 'bg-muted', iconColor: 'text-foreground' },
-    { icon: BarChart3, label: t("ordersMonth", language as any), value: stats?.pedidosMes || 0, iconClass: 'bg-primary/10', iconColor: 'text-primary' },
-    { icon: Euro, label: t("salesToday", language as any), value: `${(stats?.totalHoy || 0).toFixed(2)}€`, iconClass: 'bg-primary/10', iconColor: 'text-primary' },
-    { icon: BarChart3, label: t("salesMonth", language as any), value: `${(stats?.totalMes || 0).toFixed(2)}€`, iconClass: 'bg-muted', iconColor: 'text-foreground' },
-    { icon: TrendingUp, label: t("salesYear", language as any), value: `${(stats?.totalAno || 0).toFixed(2)}€`, iconClass: 'bg-secondary', iconColor: 'text-secondary-foreground' },
+    { icon: ShoppingCart, label: t("ordersToday", lang), value: stats?.pedidosHoy || 0, iconClass: 'bg-muted', iconColor: 'text-foreground' },
+    { icon: BarChart3, label: t("ordersMonth", lang), value: stats?.pedidosMes || 0, iconClass: 'bg-primary/10', iconColor: 'text-primary' },
+    { icon: Euro, label: t("salesToday", lang), value: `${(stats?.totalHoy || 0).toFixed(2)}€`, iconClass: 'bg-primary/10', iconColor: 'text-primary' },
+    { icon: BarChart3, label: t("salesMonth", lang), value: `${(stats?.totalMes || 0).toFixed(2)}€`, iconClass: 'bg-muted', iconColor: 'text-foreground' },
+    { icon: TrendingUp, label: t("salesYear", lang), value: `${(stats?.totalAno || 0).toFixed(2)}€`, iconClass: 'bg-secondary', iconColor: 'text-secondary-foreground' },
   ];
 }
 
@@ -284,7 +285,7 @@ function StatsHeader({ language, meses, mesActual, añoActual, esMesActual, onMo
           <button
             onClick={() => onMonthChange(-1)}
             aria-label={t("previousMonth", lang)}
-            className="p-2 rounded-lg bg-primary-foreground/20 hover:bg-primary-foreground/30 transition-colors"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-primary-foreground/20 hover:bg-primary-foreground/30 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/50 focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
           >
             <ChevronLeft className="w-5 h-5 text-primary-foreground" />
           </button>
@@ -297,7 +298,7 @@ function StatsHeader({ language, meses, mesActual, añoActual, esMesActual, onMo
             onClick={() => onMonthChange(1)}
             disabled={esMesActual}
             aria-label={t("nextMonth", lang)}
-            className="p-2 rounded-lg bg-primary-foreground/20 hover:bg-primary-foreground/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-primary-foreground/20 hover:bg-primary-foreground/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/50 focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
           >
             <ChevronRight className="w-5 h-5 text-primary-foreground" />
           </button>
@@ -334,11 +335,11 @@ export default function EstadisticasPage() {
     setSelectedMonth(prev => cambiarMes(delta));
   };
 
+  const kpis = useMemo(() => getKpiData(stats, lang), [stats, lang]);
+
   if (loading) {
     return <LoadingSkeleton />;
   }
-
-  const kpis = getKpiData(stats, lang);
 
   return (
     <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
@@ -400,10 +401,10 @@ export default function EstadisticasPage() {
                     }}
                     labelStyle={{ color: chartTheme.tooltipColor }}
                     itemStyle={{ color: chartTheme.tooltipColor }}
-                    formatter={((value: any, name: string) => [
+                    formatter={((value: number, name: string) => [
                       name === 'pedidos' ? `${value} ${t("xOrders", language)}` : `${value.toFixed(2)}€`,
                       name === 'pedidos' ? t("xOrders", language) : t("revenueLabel", language)
-                    ]) as any}
+                    ]) as TooltipProps<number, string>['formatter']}
                   />
                   <Line
                     type="monotone"
@@ -507,7 +508,7 @@ export default function EstadisticasPage() {
                         ))}
                       </Pie>
                       <Tooltip
-                        formatter={((value: any) => `${value.toFixed(2)}€`) as any}
+                        formatter={((value: number) => `${value.toFixed(2)}€`) as TooltipProps<number, string>['formatter']}
                         contentStyle={{
                           backgroundColor: chartTheme.tooltipBg,
                           border: `1px solid ${chartTheme.tooltipBorder}`,

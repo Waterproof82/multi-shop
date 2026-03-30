@@ -63,7 +63,6 @@ export function SiteHeaderClient({ showCart, empresa }: SiteHeaderClientProps) {
                 fill
                 className="object-contain"
                 loading="eager"
-                unoptimized
               />
             </div>
           )}

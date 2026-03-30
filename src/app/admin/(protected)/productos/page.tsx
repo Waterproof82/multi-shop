@@ -469,7 +469,6 @@ export default function ProductosPage() {
                         height={40}
                         className="h-10 w-10 rounded-md object-cover"
                         loading="lazy"
-                        unoptimized
                       />
                     ) : (
                       <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center">
@@ -554,7 +553,6 @@ export default function ProductosPage() {
                         height={64}
                         className="h-16 w-16 rounded-md object-cover"
                         loading="lazy"
-                        unoptimized
                       />
                     ) : (
                       <div className="h-16 w-16 rounded-md bg-muted flex items-center justify-center">

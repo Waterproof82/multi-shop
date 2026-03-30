@@ -293,7 +293,6 @@ function CardMedia({ item, displayName, priority, onError, shouldReduceMotion }:
       loading={priority ? "eager" : "lazy"}
       sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
       onError={onError}
-      unoptimized
     />
   );
 }

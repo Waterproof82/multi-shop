@@ -11,6 +11,7 @@ function normalizeR2Origin(raw) {
   return `https://${stripped}`;
 }
 const r2Origin = normalizeR2Origin(process.env.NEXT_PUBLIC_R2_DOMAIN);
+const r2Hostname = r2Origin ? (() => { try { return new URL(r2Origin).hostname; } catch { return null; } })() : null;
 const imgSrc = ["'self'", r2Origin, "https://*.supabase.co", "data:", "blob:"]
   .filter(Boolean).join(' ');
 const mediaSrc = ["'self'", r2Origin]
@@ -37,7 +38,10 @@ const nextConfig = {
     ignoreBuildErrors: false,
   },
   images: {
-    unoptimized: true,
+    remotePatterns: [
+      ...(r2Hostname ? [{ protocol: 'https', hostname: r2Hostname }] : []),
+      { protocol: 'https', hostname: '**.supabase.co' },
+    ],
   },
   logging: {
     fetches: {

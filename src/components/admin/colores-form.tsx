@@ -6,6 +6,8 @@ import { EmpresaColores } from '@/core/domain/entities/types';
 import { DEFAULT_EMPRESA_COLORES } from '@/core/domain/constants/empresa-defaults';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { logClientError } from '@/lib/client-error';
+import { useLanguage } from '@/lib/language-context';
+import { t } from '@/lib/translations';
 
 interface ColoresFormProps {
   readonly coloresIniciales: EmpresaColores | null;
@@ -14,18 +16,19 @@ interface ColoresFormProps {
 
 type ColorKey = keyof EmpresaColores;
 
-const LABELS: Record<ColorKey, string> = {
-  primary: 'Color Principal',
-  primaryForeground: 'Color del texto principal',
-  secondary: 'Color secundario',
-  secondaryForeground: 'Color del texto secundario',
-  accent: 'Color de acento',
-  accentForeground: 'Color del texto de acento',
-  background: 'Color de fondo',
-  foreground: 'Color del texto',
+const COLOR_KEY_TRANSLATION: Record<ColorKey, Parameters<typeof t>[0]> = {
+  primary: 'colorPrimary',
+  primaryForeground: 'colorPrimaryForeground',
+  secondary: 'colorSecondary',
+  secondaryForeground: 'colorSecondaryForeground',
+  accent: 'colorAccent',
+  accentForeground: 'colorAccentForeground',
+  background: 'colorBackground',
+  foreground: 'colorForeground',
 };
 
 export function ColoresForm({ coloresIniciales, empresaId }: ColoresFormProps) {
+  const { language } = useLanguage();
   const [colores, setColores] = useState<EmpresaColores>({ ...DEFAULT_EMPRESA_COLORES });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -79,7 +82,7 @@ export function ColoresForm({ coloresIniciales, empresaId }: ColoresFormProps) {
         {colorKeys.map((key) => (
           <div key={key} className="flex flex-col gap-2">
             <label htmlFor={`color-picker-${key}`} className="text-sm font-medium text-foreground">
-              {LABELS[key]}
+              {t(COLOR_KEY_TRANSLATION[key], language)}
             </label>
             <div className="flex gap-2">
               <input
@@ -95,7 +98,14 @@ export function ColoresForm({ coloresIniciales, empresaId }: ColoresFormProps) {
                 name={`color-text-${key}`}
                 type="text"
                 value={colores[key]}
-                onChange={(e) => handleChange(key, e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '' || /^#[0-9A-Fa-f]{0,6}$/.test(val)) {
+                    handleChange(key, val);
+                  }
+                }}
+                pattern="#[0-9A-Fa-f]{6}"
+                maxLength={7}
                 className="flex-1 px-3 py-2 border rounded-md bg-card border-border text-foreground text-sm font-mono"
               />
             </div>
@@ -109,16 +119,16 @@ export function ColoresForm({ coloresIniciales, empresaId }: ColoresFormProps) {
           disabled={saving}
           className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50 transition-opacity min-h-[44px] flex items-center gap-2"
         >
-          {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-          {saving ? 'Guardando...' : 'Guardar colores'}
+          {saving && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />}
+          {saving ? t('savingProgress', language) : t('saveColors', language)}
         </button>
         {saved && (
-          <span className="text-primary text-sm">¡Colores guardados correctamente!</span>
+          <span className="text-primary text-sm">{t('colorsSavedSuccess', language)}</span>
         )}
       </div>
 
       <div className="mt-6 p-4 bg-muted rounded-lg">
-        <h4 className="font-medium mb-3 text-foreground">Vista previa</h4>
+        <h4 className="font-medium mb-3 text-foreground">{t('colorPreview', language)}</h4>
         <div
           className="p-4 rounded-lg border"
           style={{

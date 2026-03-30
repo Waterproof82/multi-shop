@@ -144,7 +144,7 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
           <div className="p-4 border-t border-border space-y-2">
             <Link
               href="/"
-              className="flex items-center gap-3 px-4 py-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground w-full rounded-lg transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm text-muted-foreground hover:bg-muted hover:text-foreground w-full rounded-lg transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <ExternalLink className="h-5 w-5 flex-shrink-0" />
               {t("viewStore", language)}
@@ -152,7 +152,7 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
             <button
               type="button"
               onClick={handleLogout}
-              className="flex items-center gap-3 px-4 py-3 text-sm text-destructive hover:bg-destructive/10 w-full rounded-lg transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm text-destructive hover:bg-destructive/10 w-full rounded-lg transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <LogOut className="h-5 w-5 flex-shrink-0" />
               {t("logout", language)}

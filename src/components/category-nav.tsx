@@ -109,7 +109,7 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
                 scrollTo(cat.id)
               }}
               className={cn(
-                "whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px]",
+                "whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px]",
                 activeId === cat.id
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"

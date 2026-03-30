@@ -83,6 +83,7 @@ function TranslationFields({ formData, onChange, show }: Readonly<TranslationFie
               value={formData[`descripcion_${key}` as keyof ProductoFormData] as string}
               onChange={(e) => onChange({ ...formData, [`descripcion_${key}`]: e.target.value })}
               rows={2}
+              maxLength={2000}
             />
           </div>
         </div>
@@ -163,6 +164,7 @@ export function ProductFormDialog({
                 value={formData.descripcion_es}
                 onChange={(e) => onFormChange({ ...formData, descripcion_es: e.target.value })}
                 rows={2}
+                maxLength={2000}
               />
             </div>
 
@@ -337,14 +339,14 @@ export function DeleteConfirmDialog({
           <button
             type="button"
             onClick={handleClose}
-            className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg min-h-[44px]"
+            className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg min-h-[44px] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             {t("cancel", language)}
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg min-h-[44px]"
+            className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg min-h-[44px] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             {t("delete", language)}
           </button>

@@ -425,10 +425,12 @@ export function CartDrawer() {
                   const complementPrice = ci.selectedComplements?.reduce((sum, c) => sum + c.price, 0) || 0;
                   const totalItemPrice = ci.item.price + complementPrice;
                   let itemAnimationClass = '';
-                  if (ci.justAdded) {
-                    itemAnimationClass = 'animate-cart-item-add';
-                  } else if (ci.justRemoved) {
-                    itemAnimationClass = 'animate-cart-item-remove';
+                  if (!shouldReduceMotion) {
+                    if (ci.justAdded) {
+                      itemAnimationClass = 'animate-cart-item-add';
+                    } else if (ci.justRemoved) {
+                      itemAnimationClass = 'animate-cart-item-remove';
+                    }
                   }
                   return (
                     <li 
