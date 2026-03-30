@@ -15,6 +15,7 @@ const createPromocionSchema = z.object({
     (url) => url.startsWith('https://'),
     { message: 'imagen_url must use HTTPS' }
   ).optional().nullable(),
+  fecha_fin: z.string().datetime({ offset: true }),
 });
 
 function buildEmailHtml(params: {
@@ -22,11 +23,16 @@ function buildEmailHtml(params: {
   empresaNombre: string;
   textoEscapado: string;
   imagen_url: string | undefined;
+  fecha_fin: string | null | undefined;
   baseUrl: string;
   empresaId: string;
   recipientEmail: string;
 }): string {
-  const { empresaLogoUrl, empresaNombre, textoEscapado, imagen_url, baseUrl, empresaId, recipientEmail } = params;
+  const { empresaLogoUrl, empresaNombre, textoEscapado, imagen_url, fecha_fin, baseUrl, empresaId, recipientEmail } = params;
+
+  const fechaFinFormatted = fecha_fin
+    ? new Date(fecha_fin).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })
+    : null;
   const encodedEmail = encodeURIComponent(recipientEmail);
   const tokenBaja = generateUnsubscribeToken(recipientEmail, empresaId, 'baja');
   const tokenAlta = generateUnsubscribeToken(recipientEmail, empresaId, 'alta');
@@ -46,6 +52,7 @@ function buildEmailHtml(params: {
         <p style="margin: 0; color: #555; line-height: 1.6;">${textoEscapado}</p>
       </div>
       ${imagen_url ? `<img src="${escapeHtml(imagen_url)}" alt="Promoción" style="width: 100%; border-radius: 8px; margin-bottom: 16px;">` : ''}
+      ${fechaFinFormatted ? `<p style="margin: 0 0 16px; font-size: 13px; color: #666; text-align: center; background-color: #fff8e1; border-radius: 6px; padding: 8px 12px;">⏰ Oferta válida hasta el <strong>${escapeHtml(fechaFinFormatted)}</strong></p>` : ''}
       <p style="margin: 16px 0 8px; font-size: 12px; color: #999; text-align: center;">
         <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=baja&token=${tokenBaja}" style="color: #dc2626; text-decoration: underline;">Dar de baja las promociones</a>
       </p>
@@ -107,12 +114,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
     }
 
-    const { texto_promocion, imagen_url } = parsed.data;
+    const { texto_promocion, imagen_url, fecha_fin } = parsed.data;
 
     const createResult = await promocionUseCase.create(
       empresaId!,
       texto_promocion,
       imagen_url,
+      fecha_fin!,
     );
 
     if (!createResult.success) {
@@ -151,6 +159,7 @@ export async function POST(request: NextRequest) {
               empresaNombre: empresa.nombre || 'Empresa',
               textoEscapado: escapeHtml(texto_promocion),
               imagen_url: imagen_url ?? undefined,
+              fecha_fin: fecha_fin ?? null,
               baseUrl,
               empresaId: empresaId!,
               recipientEmail: email,

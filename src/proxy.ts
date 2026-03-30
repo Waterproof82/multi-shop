@@ -51,7 +51,9 @@ function isPublicRoute(path: string): boolean {
     path === '/api/unsubscribe' ||
     path === '/api/admin/promociones/unsubscribe' ||
     path === '/api/admin/login' ||
-    path === '/api/csp-report'
+    path === '/api/csp-report' ||
+    path === '/api/promo/reservar' ||
+    path.startsWith('/api/promo/item/')
   );
 }
 

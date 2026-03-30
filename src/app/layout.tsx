@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { CartProvider } from "@/lib/cart-context";
 import { LanguageProvider } from "@/lib/language-context";
 import { PromoToast } from "@/components/promo-toast";
+import { TgtgReservaPopup } from "@/components/tgtg-reserva-popup";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { getEmpresaByDomain } from "@/lib/server-services";
 import { getDomainFromHeaders } from "@/lib/domain-utils";
@@ -120,6 +121,7 @@ export default async function RootLayout({
                 </main>
                 <Toaster />
                 <PromoToast />
+                <TgtgReservaPopup />
               </CartProvider>
             </LanguageProvider>
           </ErrorBoundary>
