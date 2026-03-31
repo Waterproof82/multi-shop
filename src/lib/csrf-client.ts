@@ -139,9 +139,24 @@ export async function fetchWithCsrf(
     retryOn = (response: Response) => response.status >= 500 || response.status === 429
   } = retryOptions;
 
+  const isMutative = ['POST', 'PUT', 'PATCH', 'DELETE'].includes((options.method ?? 'GET').toUpperCase());
+
   const csrfToken = await getCsrfTokenWithFallback();
   const headers = buildCsrfHeaders(csrfToken, options.headers);
   const requestOptions = { ...options, headers };
 
-  return executeWithRetry(url, requestOptions, maxRetries, baseDelay, maxDelay, retryOn);
+  const response = await executeWithRetry(url, requestOptions, maxRetries, baseDelay, maxDelay, retryOn);
+
+  // If we got a 403 on a mutative request the CSRF cookie may have expired
+  // (cookie maxAge is 1h, session can last 24h). Refresh the token and retry once.
+  if (response.status === 403 && isMutative) {
+    clearCsrfToken();
+    const freshToken = await ensureCsrfToken();
+    if (freshToken) {
+      const retryHeaders = buildCsrfHeaders(freshToken, options.headers);
+      return fetch(url, { ...options, headers: retryHeaders });
+    }
+  }
+
+  return response;
 }
