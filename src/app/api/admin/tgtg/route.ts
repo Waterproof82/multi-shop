@@ -15,7 +15,7 @@ function buildTgtgEmailHtml(params: {
   empresaNombre: string;
   horaInicio: string;
   horaFin: string;
-  items: Array<TgtgItem & { reservaUrl: string }>;
+  items: Array<TgtgItem & { reservaUrls: string[] }>;
   baseUrl: string;
   empresaId: string;
   recipientEmail: string;
@@ -37,9 +37,10 @@ function buildTgtgEmailHtml(params: {
             <span style="font-size: 20px; font-weight: 800; color: #16a34a;">€${Number(item.precioDescuento).toFixed(2)}</span>
             <span style="font-size: 12px; color: #6b7280; margin-left: auto;">${item.cuponesDisponibles} disponibles</span>
           </div>
-          <a href="${item.reservaUrl}" style="display: block; width: 100%; text-align: center; background-color: #15803d; color: #ffffff; font-size: 15px; font-weight: 600; padding: 12px 0; border-radius: 8px; text-decoration: none;">
-            Reservar ahora
-          </a>
+          ${item.reservaUrls.map((url, idx) => `
+          <a href="${url}" style="display: block; width: 100%; text-align: center; background-color: #15803d; color: #ffffff; font-size: 15px; font-weight: 600; padding: 12px 0; border-radius: 8px; text-decoration: none; margin-top: ${idx > 0 ? '8px' : '0'};">
+            Reservar ahora${item.reservaUrls.length > 1 ? ` (${idx + 1}/${item.reservaUrls.length})` : ''}
+          </a>`).join('')}
         </div>
       </div>
     `)
@@ -203,9 +204,14 @@ export async function POST(request: NextRequest) {
         for (const target of emailTargets) {
           try {
             const itemsWithUrls = createdItems.map((item) => {
-              const token = generateReservaToken(target.email, item.id, promo.id);
-              const reservaUrl = `${baseUrl}/?tgtg=confirm&itemId=${encodeURIComponent(item.id)}&promoId=${encodeURIComponent(promo.id)}&email=${encodeURIComponent(target.email)}&token=${encodeURIComponent(token)}`;
-              return { ...item, reservaUrl };
+              // Generate one unique token per coupon slot so the subscriber
+              // can claim each available coupon independently
+              const slots = Math.max(1, item.cuponesTotal);
+              const reservaUrls = Array.from({ length: slots }, () => {
+                const token = generateReservaToken(target.email, item.id, promo.id);
+                return `${baseUrl}/?tgtg=confirm&itemId=${encodeURIComponent(item.id)}&promoId=${encodeURIComponent(promo.id)}&email=${encodeURIComponent(target.email)}&token=${encodeURIComponent(token)}`;
+              });
+              return { ...item, reservaUrls };
             });
 
             const html = buildTgtgEmailHtml({
