@@ -42,8 +42,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'not_found' }, { status: 404 });
     }
     const promo = promoResult.data;
-    const promoDate = new Date(promo.createdAt).toISOString().split('T')[0]; // YYYY-MM-DD
-    const pickupEndIso = `${promoDate}T${promo.horaRecogidaFin}:00`;
+    // Use fechaActivacion (set by admin) as the reference date, fall back to createdAt for legacy rows
+    const promoDate = promo.fechaActivacion || new Date(promo.createdAt).toISOString().split('T')[0];
+    // Normalize horaRecogidaFin: DB may return "HH:MM:SS" or "HH:MM"
+    const horaFinNorm = promo.horaRecogidaFin.length === 5
+      ? `${promo.horaRecogidaFin}:00`
+      : promo.horaRecogidaFin;
+    const pickupEndIso = `${promoDate}T${horaFinNorm}`;
     if (new Date() > new Date(pickupEndIso)) {
       return NextResponse.json({ result: 'expired' }, { status: 200 });
     }
