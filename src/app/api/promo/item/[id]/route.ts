@@ -13,10 +13,11 @@ export async function GET(
   const { id: itemId } = await params;
 
   try {
-    const [itemResult, promoIdParam] = await Promise.all([
-      tgtgUseCase.getPublicItem(itemId),
-      Promise.resolve(new URL(request.url).searchParams.get('promoId')),
-    ]);
+    const searchParams = new URL(request.url).searchParams;
+    const promoIdParam = searchParams.get('promoId');
+    const tokenParam = searchParams.get('token');
+
+    const itemResult = await tgtgUseCase.getPublicItem(itemId);
 
     if (!itemResult.success) {
       return NextResponse.json({ error: 'Error al obtener oferta' }, { status: 500 });
@@ -27,19 +28,18 @@ export async function GET(
 
     const item = itemResult.data;
 
-    // Fetch pickup time from promo
-    let horaRecogidaInicio: string | null = null;
-    let horaRecogidaFin: string | null = null;
+    // Check token usage and pickup time in parallel
     const promoId = promoIdParam ?? item.tgtgPromoId;
-    if (promoId) {
-      const promoResult = await tgtgUseCase.getPublicPromo(promoId);
-      if (promoResult.success && promoResult.data) {
-        horaRecogidaInicio = promoResult.data.horaRecogidaInicio;
-        horaRecogidaFin = promoResult.data.horaRecogidaFin;
-      }
-    }
+    const [promoResult, tokenUsedResult] = await Promise.all([
+      promoId ? tgtgUseCase.getPublicPromo(promoId) : Promise.resolve(null),
+      tokenParam ? tgtgUseCase.isTokenUsed(tokenParam) : Promise.resolve(null),
+    ]);
 
-    // Return only public-safe fields (no token, no empresaId internal details)
+    const horaRecogidaInicio = promoResult?.success && promoResult.data ? promoResult.data.horaRecogidaInicio : null;
+    const horaRecogidaFin = promoResult?.success && promoResult.data ? promoResult.data.horaRecogidaFin : null;
+    const tokenUsed = tokenUsedResult?.success ? tokenUsedResult.data : false;
+
+    // Return only public-safe fields (no empresaId internal details)
     return NextResponse.json({
       item: {
         id: item.id,
@@ -53,6 +53,7 @@ export async function GET(
       },
       horaRecogidaInicio,
       horaRecogidaFin,
+      tokenUsed,
     });
   } catch (error) {
     await logApiError('Get public TGTG item', error, 'GET');

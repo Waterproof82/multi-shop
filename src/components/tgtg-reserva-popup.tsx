@@ -77,10 +77,25 @@ function TgtgReservaPopupInner() {
 
       setState({ mode: "loading" });
 
-      fetch(`/api/promo/item/${encodeURIComponent(itemId)}?promoId=${encodeURIComponent(promoId)}`)
+      fetch(`/api/promo/item/${encodeURIComponent(itemId)}?promoId=${encodeURIComponent(promoId)}&token=${encodeURIComponent(token)}`)
         .then(async (res) => {
           if (!res.ok) throw new Error("not_found");
-          const data = await res.json() as { item: TgtgItemPublic; horaRecogidaInicio: string | null; horaRecogidaFin: string | null };
+          const data = await res.json() as { item: TgtgItemPublic; horaRecogidaInicio: string | null; horaRecogidaFin: string | null; tokenUsed: boolean };
+
+          if (data.tokenUsed) {
+            setState({ mode: "token_used" });
+            cleanUrl();
+            setTimeout(() => setState(null), 7000);
+            return;
+          }
+
+          if (data.item.cuponesDisponibles <= 0) {
+            setState({ mode: "no_cupones" });
+            cleanUrl();
+            setTimeout(() => setState(null), 7000);
+            return;
+          }
+
           setState({
             mode: "confirm",
             item: data.item,

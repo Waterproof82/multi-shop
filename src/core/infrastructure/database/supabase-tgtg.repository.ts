@@ -252,6 +252,21 @@ export class SupabaseTgtgRepository implements ITgtgRepository {
     }
   }
 
+  async isTokenUsed(token: string): Promise<Result<boolean>> {
+    try {
+      const { count, error } = await this.supabase
+        .from('tgtg_reservas')
+        .select('id', { count: 'exact', head: true })
+        .eq('token', token);
+      if (error) {
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al verificar token', module: 'repository' } };
+      }
+      return { success: true, data: (count ?? 0) > 0 };
+    } catch (e) {
+      return { success: false, error: await logger.logFromCatch(e, 'repository', 'TgtgRepo.isTokenUsed', {}) };
+    }
+  }
+
   async findItemById(itemId: string): Promise<Result<TgtgItem | null>> {
     try {
       const { data, error } = await this.supabase

@@ -160,6 +160,10 @@ export class TgtgUseCase {
     }
   }
 
+  async isTokenUsed(token: string): Promise<Result<boolean>> {
+    return this.tgtgRepo.isTokenUsed(token);
+  }
+
   async getPublicItem(itemId: string): Promise<Result<TgtgItem | null>> {
     try {
       return await this.tgtgRepo.findItemById(itemId);
