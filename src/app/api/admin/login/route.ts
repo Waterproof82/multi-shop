@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
-    maxAge: 3600,
+    maxAge: 60 * 60 * 24, // 24h — matches JWT lifetime so it never expires mid-session
     path: '/',
   });
 
@@ -57,8 +57,13 @@ export async function POST(request: NextRequest) {
 
   const { token, admin } = result.data;
 
+  const csrfToken = generateCsrfToken();
+  const csrfSignature = signCsrfToken(csrfToken);
+  const csrfCookieValue = `${csrfToken}:${csrfSignature}`;
+
   const response = successResponse({
     success: true,
+    csrfToken,
     admin: {
       id: admin.id,
       nombre: admin.nombreCompleto,
@@ -73,6 +78,13 @@ export async function POST(request: NextRequest) {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
     maxAge: 60 * 60 * 24,
+    path: '/',
+  });
+  response.cookies.set('csrf_token', csrfCookieValue, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 60 * 60 * 24, // 24h — matches JWT lifetime
     path: '/',
   });
 

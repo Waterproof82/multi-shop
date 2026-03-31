@@ -60,6 +60,11 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
         throw new Error(t('loginErrorDefault', language));
       }
 
+      // Save the CSRF token returned by login so it's available immediately for admin actions
+      if (data.data?.csrfToken) {
+        saveCsrfToken(data.data.csrfToken);
+      }
+
       if (data.data?.admin?.rol === 'superadmin') {
         router.push('/superadmin');
       } else {
