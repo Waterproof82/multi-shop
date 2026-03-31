@@ -19,13 +19,12 @@ interface TgtgItemPublic {
 
 type PopupState =
   | { mode: "confirm"; item: TgtgItemPublic; horaInicio: string | null; horaFin: string | null; email: string; token: string }
-  | { mode: "success"; item?: TgtgItemPublic; horaInicio?: string | null; horaFin?: string | null; email?: string }
+  | { mode: "success" }
   | { mode: "no_cupones" }
   | { mode: "token_used" }
   | { mode: "expired" }
   | { mode: "invalid" }
   | { mode: "loading" }
-  | { mode: "loading_token"; item: TgtgItemPublic; horaInicio: string | null; horaFin: string | null; email: string }
   | null;
 
 function TgtgReservaPopupInner() {
@@ -128,9 +127,8 @@ function TgtgReservaPopupInner() {
         setState({ mode: "expired" });
         setTimeout(() => setState(null), 7000);
       } else if (data.result === "ok") {
-        // Keep success mode with item info so user can claim another if available
-        setState({ mode: "success", item: state.item, horaInicio: state.horaInicio, horaFin: state.horaFin, email: state.email });
-        setTimeout(() => setState(null), 10000);
+        setState({ mode: "success" });
+        setTimeout(() => setState(null), 7000);
       } else {
         setState({ mode: "invalid" });
         setTimeout(() => setState(null), 7000);
@@ -144,38 +142,6 @@ function TgtgReservaPopupInner() {
     }
   };
 
-  const handleClaimAnother = async () => {
-    if (!state || state.mode !== "success") return;
-    const { item, horaInicio = null, horaFin = null, email } = state;
-    if (!item || !email) return;
-    setState({ mode: "loading_token", item, horaInicio, horaFin, email });
-    try {
-      const res = await fetch(
-        `/api/promo/item/${encodeURIComponent(item.id)}/new-token?promoId=${encodeURIComponent(item.tgtgPromoId)}&email=${encodeURIComponent(email)}`
-      );
-      const data = await res.json() as { token?: string; error?: string };
-      if (!res.ok || !data.token) {
-        setState({ mode: "no_cupones" });
-        setTimeout(() => setState(null), 7000);
-        return;
-      }
-      // Re-fetch item to get updated cuponesDisponibles
-      const itemRes = await fetch(`/api/promo/item/${encodeURIComponent(item.id)}?promoId=${encodeURIComponent(item.tgtgPromoId)}`);
-      const itemData = await itemRes.json() as { item: TgtgItemPublic; horaRecogidaInicio: string | null; horaRecogidaFin: string | null };
-      setState({
-        mode: "confirm",
-        item: itemRes.ok ? itemData.item : item,
-        horaInicio,
-        horaFin,
-        email,
-        token: data.token,
-      });
-    } catch {
-      setState({ mode: "invalid" });
-      setTimeout(() => setState(null), 7000);
-    }
-  };
-
   const handleDismiss = () => {
     cleanUrl();
     setState(null);
@@ -183,8 +149,8 @@ function TgtgReservaPopupInner() {
 
   if (!state) return null;
 
-  // Loading spinners
-  if (state.mode === "loading" || state.mode === "loading_token") {
+  // Loading spinner
+  if (state.mode === "loading") {
     return (
       <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
         <div className="bg-card rounded-2xl shadow-elegant-lg p-8 flex flex-col items-center gap-3">
@@ -195,32 +161,11 @@ function TgtgReservaPopupInner() {
     );
   }
 
-  // Success with "claim another" option
-  if (state.mode === "success") {
-    return (
-      <div
-        role="status"
-        aria-live="polite"
-        className="fixed top-20 left-1/2 z-[200] -translate-x-1/2 flex flex-col items-center gap-2 max-w-sm w-full px-4"
-      >
-        <div className="bg-primary text-primary-foreground px-6 py-3 rounded-lg shadow-elegant-lg text-sm font-medium text-center w-full">
-          {t("tgtgReservedSuccess", language)}
-        </div>
-        {state.item && state.email && state.item.cuponesDisponibles > 1 && (
-          <button
-            onClick={handleClaimAnother}
-            className="bg-card border border-border text-foreground px-6 py-2 rounded-lg shadow-elegant-lg text-sm font-medium hover:bg-muted transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px]"
-          >
-            {t("tgtgClaimAnother", language)}
-          </button>
-        )}
-      </div>
-    );
-  }
-
-  // Simple error toasts
-  if (state.mode === "no_cupones" || state.mode === "token_used" || state.mode === "expired" || state.mode === "invalid") {
+  // Status toasts
+  if (state.mode === "success" || state.mode === "no_cupones" || state.mode === "token_used" || state.mode === "expired" || state.mode === "invalid") {
+    const isSuccess = state.mode === "success";
     const msgKey =
+      state.mode === "success" ? "tgtgReservedSuccess" :
       state.mode === "no_cupones" ? "tgtgNoStock" :
       state.mode === "token_used" ? "tgtgTokenUsed" :
       state.mode === "expired" ? "tgtgExpired" :
@@ -228,9 +173,11 @@ function TgtgReservaPopupInner() {
 
     return (
       <div
-        role="alert"
-        aria-live="assertive"
-        className="fixed top-20 left-1/2 z-[200] -translate-x-1/2 px-6 py-3 rounded-lg shadow-elegant-lg text-sm font-medium max-w-md text-center bg-destructive text-destructive-foreground"
+        role={isSuccess ? "status" : "alert"}
+        aria-live={isSuccess ? "polite" : "assertive"}
+        className={`fixed top-20 left-1/2 z-[200] -translate-x-1/2 px-6 py-3 rounded-lg shadow-elegant-lg text-sm font-medium max-w-md text-center ${
+          isSuccess ? "bg-primary text-primary-foreground" : "bg-destructive text-destructive-foreground"
+        }`}
       >
         {t(msgKey, language)}
       </div>

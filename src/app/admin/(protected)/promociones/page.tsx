@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { fetchWithCsrf, getCsrfToken } from '@/lib/csrf-client';
+import { fetchWithCsrf, ensureCsrfToken } from '@/lib/csrf-client';
 import { logClientError } from '@/lib/client-error';
 import { useLanguage } from '@/lib/language-context';
 import type { Language } from '@/lib/language-context';
@@ -216,10 +216,10 @@ export default function PromocionesPage() {
           const optimized = await optimizeImage(selectedImage);
           const formData = new FormData();
           formData.append('file', optimized.file);
-          const csrfToken = getCsrfToken();
+          const uploadCsrfToken = await ensureCsrfToken();
           const uploadRes = await fetch('/api/admin/upload-image', {
             method: 'POST',
-            headers: csrfToken ? { 'x-csrf-token': csrfToken } : {},
+            headers: uploadCsrfToken ? { 'x-csrf-token': uploadCsrfToken } : {},
             body: formData,
           });
           if (!uploadRes.ok) throw new Error(t("imageUploadError", language));
@@ -319,7 +319,8 @@ export default function PromocionesPage() {
 
     setTgtgSaving(true);
     try {
-      const csrfToken = getCsrfToken();
+      // Ensure CSRF token + cookie are fresh before any requests
+      const csrfToken = await ensureCsrfToken();
       // Upload images in parallel
       const uploadedUrls = await Promise.all(
         tgtgItems.map(async (item, index) => {
