@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import {
   Users, Mail, FileText, Send, CheckCircle, Image as ImageIcon, Loader2,
-  ShoppingBag, Plus, Trash2, Minus, ChevronDown, ChevronUp, Clock, CalendarOff, Pencil, X,
+  ShoppingBag, Plus, Trash2, Minus, ChevronDown, ChevronUp, Clock, CalendarOff, Calendar, Pencil, X, ReceiptText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -54,6 +54,7 @@ interface TgtgPromo {
   id: string;
   horaRecogidaInicio: string;
   horaRecogidaFin: string;
+  fechaActivacion: string;
   numeroEnvios: number;
   createdAt: string;
   items: TgtgItem[];
@@ -140,6 +141,7 @@ export default function PromocionesPage() {
   const [tgtgSuccess, setTgtgSuccess] = useState(false);
   const [horaInicio, setHoraInicio] = useState('18:00');
   const [horaFin, setHoraFin] = useState('20:00');
+  const [tgtgFechaActivacion, setTgtgFechaActivacion] = useState(() => new Date().toISOString().split('T')[0]);
   const [tgtgItems, setTgtgItems] = useState<TgtgItemForm[]>([createEmptyItem()]);
   const [reservasByItem, setReservasByItem] = useState<Record<string, TgtgReserva[]>>({});
   const [expandedReservas, setExpandedReservas] = useState<Set<string>>(new Set());
@@ -148,6 +150,9 @@ export default function PromocionesPage() {
   const [editHoraInicio, setEditHoraInicio] = useState('');
   const [editHoraFin, setEditHoraFin] = useState('');
   const [savingHoras, setSavingHoras] = useState(false);
+  const [allReservas, setAllReservas] = useState<TgtgReserva[]>([]);
+  const [loadingAllReservas, setLoadingAllReservas] = useState(false);
+  const [showAllReservas, setShowAllReservas] = useState(false);
 
   function createEmptyItem(): TgtgItemForm {
     return {
@@ -339,6 +344,7 @@ export default function PromocionesPage() {
         body: JSON.stringify({
           hora_recogida_inicio: horaInicio,
           hora_recogida_fin: horaFin,
+          fecha_activacion: tgtgFechaActivacion,
           items: itemsPayload,
         }),
       });
@@ -416,10 +422,30 @@ export default function PromocionesPage() {
     }
   };
 
+  const handleToggleAllReservas = async () => {
+    if (showAllReservas) { setShowAllReservas(false); return; }
+    if (!tgtgPromo) return;
+    setLoadingAllReservas(true);
+    try {
+      const res = await fetch(
+        `/api/admin/tgtg/reservas?tgtgPromoId=${tgtgPromo.id}&empresaId=${effectiveEmpresaId}`
+      );
+      if (res.ok) {
+        const data = await res.json() as { reservas: TgtgReserva[] };
+        setAllReservas(data.reservas);
+        setShowAllReservas(true);
+      }
+    } catch (error) {
+      logClientError(error, 'handleToggleAllReservas');
+    } finally {
+      setLoadingAllReservas(false);
+    }
+  };
+
   const handleStartEditHoras = () => {
     if (!tgtgPromo) return;
-    setEditHoraInicio(tgtgPromo.horaRecogidaInicio);
-    setEditHoraFin(tgtgPromo.horaRecogidaFin);
+    setEditHoraInicio(tgtgPromo.horaRecogidaInicio.slice(0, 5));
+    setEditHoraFin(tgtgPromo.horaRecogidaFin.slice(0, 5));
     setEditingHoras(true);
   };
 
@@ -672,8 +698,20 @@ export default function PromocionesPage() {
               {t("tgtgNewPromo", language)}
             </h2>
 
-            {/* Pickup time */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Activation date + Pickup time */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label htmlFor="tgtg-fecha" className="block text-sm font-medium text-foreground mb-1">
+                  <Calendar className="w-3.5 h-3.5 inline mr-1" />{t("tgtgActivationDate", language)} <span className="text-destructive" aria-hidden="true">*</span>
+                </label>
+                <input
+                  id="tgtg-fecha"
+                  type="date"
+                  value={tgtgFechaActivacion}
+                  onChange={e => setTgtgFechaActivacion(e.target.value)}
+                  className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                />
+              </div>
               <div>
                 <label htmlFor="hora-inicio" className="block text-sm font-medium text-foreground mb-1">
                   <Clock className="w-3.5 h-3.5 inline mr-1" />{t("tgtgPickupFrom", language)}
@@ -757,15 +795,23 @@ export default function PromocionesPage() {
           {tgtgLoading ? (
             <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
           ) : tgtgPromo ? (() => {
-            const promoDate = new Date(tgtgPromo.createdAt).toISOString().split('T')[0];
-            const pickupEnd = new Date(`${promoDate}T${tgtgPromo.horaRecogidaFin}:00`);
-            const isExpired = new Date() > pickupEnd;
+            // Use fechaActivacion (may be null for legacy rows → fall back to createdAt date)
+            const promoDate = tgtgPromo.fechaActivacion || new Date(tgtgPromo.createdAt).toISOString().split('T')[0];
+            // horaRecogidaFin may be "HH:MM" or "HH:MM:SS" — normalize to avoid invalid date
+            const horaFinNorm = tgtgPromo.horaRecogidaFin.length === 5
+              ? `${tgtgPromo.horaRecogidaFin}:00`
+              : tgtgPromo.horaRecogidaFin;
+            const pickupEnd = new Date(`${promoDate}T${horaFinNorm}`);
+            const isExpired = !isNaN(pickupEnd.getTime()) && new Date() > pickupEnd;
+            // Display times as HH:MM regardless of DB format (strip seconds if present)
+            const displayInicio = tgtgPromo.horaRecogidaInicio.slice(0, 5);
+            const displayFin = tgtgPromo.horaRecogidaFin.slice(0, 5);
             return (
             <div className="bg-card rounded-lg border shadow-elegant p-6 space-y-4">
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
                   <ShoppingBag className={`w-5 h-5 ${isExpired ? 'text-muted-foreground' : 'text-green-600'}`} />
-                  {isExpired ? t("tgtgNoPromo", language) : t("tgtgActiveCampaign", language)}
+                  {isExpired ? t("tgtgCampaignClosed", language) : t("tgtgActiveCampaign", language)}
                 </h2>
                 {editingHoras ? (
                   <div className="flex items-center gap-2 flex-wrap">
@@ -806,8 +852,7 @@ export default function PromocionesPage() {
                   <div className="flex items-center gap-2">
                     <span className={`text-xs flex items-center gap-1 ${isExpired ? 'text-destructive/70' : 'text-muted-foreground'}`}>
                       <Clock className="w-3.5 h-3.5" />
-                      {tgtgPromo.horaRecogidaInicio} – {tgtgPromo.horaRecogidaFin}
-                      {isExpired && <span className="ml-1">(finalizada)</span>}
+                      {displayInicio} – {displayFin}
                     </span>
                     <button
                       onClick={handleStartEditHoras}
@@ -833,6 +878,75 @@ export default function PromocionesPage() {
                     onToggleReservas={handleToggleReservas}
                   />
                 ))}
+              </div>
+
+              {/* Global reservas section */}
+              <div className="border-t pt-4">
+                <button
+                  onClick={handleToggleAllReservas}
+                  className="w-full flex items-center justify-between text-sm font-medium text-foreground hover:text-primary transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] px-1"
+                >
+                  <span className="flex items-center gap-2">
+                    <ReceiptText className="w-4 h-4" />
+                    Cupones validados
+                    <span className="bg-primary/10 text-primary text-xs px-1.5 py-0.5 rounded-full font-medium">
+                      {tgtgPromo.items.reduce((acc, item) => acc + (item.cuponesTotal - item.cuponesDisponibles), 0)}
+                    </span>
+                  </span>
+                  {loadingAllReservas
+                    ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                    : showAllReservas ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                  }
+                </button>
+
+                {showAllReservas && (
+                  <div className="mt-3 rounded-lg border border-border overflow-hidden">
+                    {allReservas.length > 0 ? (
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-muted text-left">
+                            <th className="px-4 py-2 text-xs font-medium text-muted-foreground">Oferta</th>
+                            <th className="px-4 py-2 text-xs font-medium text-muted-foreground">Cliente</th>
+                            <th className="px-4 py-2 text-xs font-medium text-muted-foreground text-right">Precio</th>
+                            <th className="px-4 py-2 text-xs font-medium text-muted-foreground text-right hidden sm:table-cell">Fecha</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {allReservas.map(r => {
+                            const item = tgtgPromo.items.find(i => i.id === r.itemId);
+                            return (
+                              <tr key={r.id} className="bg-card hover:bg-muted/40 transition-colors">
+                                <td className="px-4 py-3">
+                                  <p className="font-medium text-foreground truncate max-w-[120px]">{item?.titulo ?? '—'}</p>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <p className="text-foreground">{r.nombre ?? r.email}</p>
+                                  {r.nombre && <p className="text-xs text-muted-foreground">{r.email}</p>}
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  <span className="font-semibold text-green-600">
+                                    {item ? `€${Number(item.precioDescuento).toFixed(2)}` : '—'}
+                                  </span>
+                                  {item && (
+                                    <p className="text-xs text-muted-foreground line-through">€{Number(item.precioOriginal).toFixed(2)}</p>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-right text-xs text-muted-foreground whitespace-nowrap hidden sm:table-cell">
+                                  {new Date(r.createdAt).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <div className="px-4 py-8 text-center">
+                        <ReceiptText className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                        <p className="text-sm text-muted-foreground">{t("tgtgNoReservas", language)}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
             );

@@ -7,11 +7,13 @@ import {
 import { logger } from '../logging/logger';
 
 function mapPromo(row: Record<string, unknown>): TgtgPromocion {
+  const today = new Date().toISOString().split('T')[0];
   return {
     id: row.id as string,
     empresaId: row.empresa_id as string,
     horaRecogidaInicio: row.hora_recogida_inicio as string,
     horaRecogidaFin: row.hora_recogida_fin as string,
+    fechaActivacion: (row.fecha_activacion as string | null) ?? today,
     numeroEnvios: row.numero_envios as number,
     createdAt: row.created_at as string,
   };
@@ -96,6 +98,7 @@ export class SupabaseTgtgRepository implements ITgtgRepository {
           empresa_id: data.empresaId,
           hora_recogida_inicio: data.horaRecogidaInicio,
           hora_recogida_fin: data.horaRecogidaFin,
+          fecha_activacion: data.fechaActivacion,
           numero_envios: data.numeroEnvios,
         })
         .select()

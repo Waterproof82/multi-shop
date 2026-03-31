@@ -41,6 +41,7 @@ export class TgtgUseCase {
     empresaId: string,
     horaRecogidaInicio: string,
     horaRecogidaFin: string,
+    fechaActivacion: string,
     items: Array<{
       titulo: string;
       descripcion?: string | null;
@@ -67,6 +68,7 @@ export class TgtgUseCase {
         empresaId,
         horaRecogidaInicio,
         horaRecogidaFin,
+        fechaActivacion,
         numeroEnvios: emailTargets.length,
         items,
       });

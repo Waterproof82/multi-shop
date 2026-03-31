@@ -153,12 +153,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
     }
 
-    const { hora_recogida_inicio, hora_recogida_fin, items } = parsed.data;
+    const { hora_recogida_inicio, hora_recogida_fin, fecha_activacion, items } = parsed.data;
+    const today = new Date().toISOString().split('T')[0];
 
     const createResult = await tgtgUseCase.create(
       empresaId!,
       hora_recogida_inicio,
       hora_recogida_fin,
+      fecha_activacion ?? today,
       items.map((item, index) => ({
         titulo: item.titulo,
         descripcion: item.descripcion,

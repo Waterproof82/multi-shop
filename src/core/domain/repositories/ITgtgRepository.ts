@@ -14,6 +14,7 @@ export interface CreateTgtgPromocionData {
   empresaId: string;
   horaRecogidaInicio: string;
   horaRecogidaFin: string;
+  fechaActivacion: string; // YYYY-MM-DD
   numeroEnvios: number;
   items: CreateTgtgItemData[];
 }

@@ -179,6 +179,7 @@ export interface TgtgPromocion {
   empresaId: string;
   horaRecogidaInicio: string; // HH:MM
   horaRecogidaFin: string;   // HH:MM
+  fechaActivacion: string;   // YYYY-MM-DD
   numeroEnvios: number;
   createdAt: string;
   items?: TgtgItem[];

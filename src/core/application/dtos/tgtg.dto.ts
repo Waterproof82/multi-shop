@@ -21,6 +21,10 @@ export const createTgtgSchema = z.object({
   hora_recogida_fin: z
     .string()
     .regex(/^\d{2}:\d{2}$/, 'Formato HH:MM requerido'),
+  fecha_activacion: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato YYYY-MM-DD requerido')
+    .optional(),
   items: z.array(tgtgItemSchema).min(1).max(20),
 });
 
