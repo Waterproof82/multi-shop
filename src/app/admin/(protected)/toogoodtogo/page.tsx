@@ -288,12 +288,17 @@ export default function TooGoodToGoPage() {
         body: JSON.stringify({ promoIds: promoIdsArray }),
       });
       if (res.ok) {
-        const data = await res.json() as { updatedPromos: Array<{ id: string; emailEnviado: boolean; numeroEnvios: number }> };
-        setTgtgCampaigns(prev => prev.map(c => {
-          const updated = data.updatedPromos.find(u => u.id === c.id);
-          return updated ? { ...c, emailEnviado: updated.emailEnviado, numeroEnvios: updated.numeroEnvios } : c;
-        }));
-        setSelectedPromoIds(new Set());
+        const data = await res.json() as { emailsSent: number; emailError: string | null; updatedPromos: Array<{ id: string; emailEnviado: boolean; numeroEnvios: number }> };
+        if (data.emailsSent > 0) {
+          setTgtgCampaigns(prev => prev.map(c => {
+            const updated = data.updatedPromos.find(u => u.id === c.id);
+            return updated ? { ...c, emailEnviado: updated.emailEnviado, numeroEnvios: updated.numeroEnvios } : c;
+          }));
+          setSelectedPromoIds(new Set());
+        }
+        if (data.emailError) {
+          alert(`Error al enviar emails: ${data.emailError}`);
+        }
       } else {
         const err = await res.json() as { error?: string };
         alert(err.error ?? t('tgtgSendEmailsError', language));

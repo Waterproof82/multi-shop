@@ -205,6 +205,11 @@ export async function POST(request: NextRequest) {
 
   const { promoIds } = parsed.data;
 
+  // Fail fast — without this secret token generation will throw for every recipient
+  if (!process.env.RESERVA_HMAC_SECRET) {
+    return NextResponse.json({ error: 'RESERVA_HMAC_SECRET no está configurado en el servidor' }, { status: 500 });
+  }
+
   try {
     const empresaResult = await empresaUseCase.getById(empresaId!);
     if (!empresaResult.success || !empresaResult.data) {
