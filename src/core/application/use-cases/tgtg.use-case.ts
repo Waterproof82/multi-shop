@@ -116,7 +116,7 @@ export class TgtgUseCase {
 
       const emailTargets = clientesResult.data
         .filter((c) => c.aceptar_promociones && c.email)
-        .map((c) => ({ email: c.email as string, nombre: c.nombre, idioma: c.idioma }));
+        .map((c) => ({ email: c.email as string, nombre: c.nombre, idioma: c.idioma || null }));
 
       return { success: true, data: { promo: promoResult.data, emailTargets } };
     } catch (e) {

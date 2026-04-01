@@ -42,7 +42,7 @@ export class PromocionUseCase {
       const clientes = clientesResult.data;
       const emailTargets = clientes
         .filter(c => c.aceptar_promociones && c.email)
-        .map(c => ({ email: c.email as string, idioma: c.idioma }));
+        .map(c => ({ email: c.email as string, idioma: c.idioma || null }));
 
       const oldImageUrl = oldPromosResult.success && oldPromosResult.data[0] ? oldPromosResult.data[0].imagen_url : null;
 
