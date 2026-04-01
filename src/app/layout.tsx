@@ -6,9 +6,8 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
 import { CartProvider } from "@/lib/cart-context";
 import { LanguageProvider } from "@/lib/language-context";
-import { PromoToast } from "@/components/promo-toast";
-import { TgtgReservaPopup } from "@/components/tgtg-reserva-popup";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { LazyPromoToast, LazyTgtgReservaPopup } from "@/components/lazy-client-components";
 import { getEmpresaByDomain } from "@/lib/server-services";
 import { getDomainFromHeaders } from "@/lib/domain-utils";
 
@@ -120,8 +119,8 @@ export default async function RootLayout({
                   {children}
                 </main>
                 <Toaster />
-                <PromoToast />
-                <TgtgReservaPopup />
+                <LazyPromoToast />
+                <LazyTgtgReservaPopup />
               </CartProvider>
             </LanguageProvider>
           </ErrorBoundary>

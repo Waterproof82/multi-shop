@@ -1,17 +1,23 @@
 "use client";
 
-import { ReactNode } from "react"
+import { ReactNode, Suspense } from "react"
+import dynamic from "next/dynamic"
 import { MenuCategoryVM } from "@/core/application/dtos/menu-view-model"
 import { HeroBanner } from "@/components/hero-banner"
 import { CategoryNav } from "@/components/category-nav"
 import { MenuSection } from "@/components/menu-section"
 import { SiteFooter } from "@/components/site-footer"
-import { CartDrawer } from "@/components/cart-drawer"
 import { CartToast } from "@/components/cart-toast"
 import { PromoNotification } from "@/components/promo-notification"
 import type { EmpresaPublic } from "@/core/domain/entities/types"
 import { useLanguage } from "@/lib/language-context"
 import { t } from "@/lib/translations"
+
+// Lazy load cart components - only needed when showCart is true
+const CartDrawer = dynamic(
+  () => import("@/components/cart-drawer").then(mod => ({ default: mod.CartDrawer })),
+  { ssr: false }
+)
 
 interface MenuPageProps {
   menuData: MenuCategoryVM[];
@@ -56,8 +62,13 @@ export function MenuPage({ menuData, header, showCart = false, empresa }: Readon
         )}
       </div>
       <SiteFooter empresa={empresa} />
-      <CartDrawer />
-      {showCart && <CartToast />}
+      {/* Only render cart components when needed */}
+      {showCart && (
+        <>
+          <CartDrawer />
+          <CartToast />
+        </>
+      )}
     </div>
   );
 }

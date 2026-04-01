@@ -275,17 +275,24 @@ Internacionalizacion (i18n)
 Productos: campos i18n `titulo_es`, `titulo_en`, `titulo_fr`, `titulo_it`, `titulo_de`
 Todos los textos de UI (incluidos aria-labels) deben usar `t()` — nunca hardcodear texto en un solo idioma
 Promociones
-POST crea promo y envia emails a clientes suscritos
+POST crea promo y envia emails a clientes suscritos con `htmlContent` + `textContent` (reduce spam)
+Email usa el idioma guardado del cliente (`clientes.idioma`) para subject y cuerpo
 Imagen se sube a R2, al crear nueva promo se borra la anterior con `deleteImageFromR2`
 `texto_promocion` se escapa con `escapeHtml()`
 TooGoodToGo (TGTG)
 Flujo completo en `docs/context/toogoodtogo.md`
-Admin crea campaña con items → envía email a clientes suscritos → clientes reservan via link con token JWT
-`emailEnviado` es inmutable una vez `true` — no se puede eliminar ni re-enviar una campaña enviada
+Admin crea campaña (Pendiente) → selecciona y envía emails → campaña pasa a Activa
+`emailEnviado` es inmutable una vez `true` — no se puede eliminar, re-enviar, ni editar horario
 Borrar campaña bloqueado si `emailEnviado=true` O si hay reservas (`reservasCount > 0`) — HTTP 409
 Codigos de error especificos: `ALREADY_SENT` (409), `HAS_RESERVAS` (409)
-Reserva cliente: token de un solo uso (JWT con `jti` almacenado en `tgtg_reservas.token`), validado con `isTokenUsed()`
+`markEmailSent` solo se llama si `emailsSent > 0` — evita lock sin envios reales
+`RESERVA_HMAC_SECRET` validado al inicio de la ruta de envio — fail-fast 500 si falta
+Emails incluyen `textContent` (plain-text) ademas de `htmlContent` — mejora entregabilidad
+URL de reserva incluye `&lang={idioma_cliente}` — popup usa ese idioma sin depender del navegador
+Reserva cliente: token HMAC de un solo uso almacenado en `tgtg_reservas.token` (UNIQUE), validado con `isTokenUsed()`
 `claimCupon` es atomico — decrementa `cuponesDisponibles` solo si > 0, retorna `NO_COUPONS` si agotado
+UI: lista de campanas en dos secciones acordeon colapsadas por defecto (Pendientes=ambar / Activas=verde)
+Campanas activas muestran `numeroEnvios` en la cabecera de la tarjeta
 Pedidos (flujo publico)
 `POST /api/pedidos` — crea pedido + registra/actualiza cliente (sin auth)
 `POST /api/admin/pedidos/enviar-email` — email de confirmacion (con auth)
@@ -340,6 +347,10 @@ Generar tokens de unsubscribe con `CSRF_HMAC_SECRET` — usar `UNSUBSCRIBE_HMAC_
 Eliminar campana TGTG sin verificar `emailEnviado` y `reservasCount` — ambas condiciones bloquean el borrado (HTTP 409)
 Permitir re-envio de emails a una campana con `emailEnviado=true` — una vez enviado es inmutable
 Reutilizar el mismo token de reserva TGTG — cada token es de un solo uso, validado con `isTokenUsed()` antes de `claimCupon`
+Llamar `markEmailSent` cuando `emailsSent === 0` — solo marcar enviado si al menos un email fue entregado
+Omitir `RESERVA_HMAC_SECRET` en la ruta de envio TGTG — validar al inicio con fail-fast 500
+Enviar email TGTG o de promociones sin `textContent` — siempre incluir version plain-text para reducir spam score
+Mostrar el popup TGTG en el idioma del navegador cuando el email incluye `&lang=` — el param URL tiene maxima prioridad
 ---
 Proceso de revision — Orden de prioridad
 Cuando revises o modifiques codigo, seguir este orden antes de dar la tarea por completada:

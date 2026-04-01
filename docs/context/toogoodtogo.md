@@ -163,7 +163,7 @@ POST /api/admin/tgtg
 ### 2. Seleccionar y enviar campañas
 
 ```
-Admin marca checkboxes en campañas activas no enviadas
+Admin marca checkboxes en campañas pendientes (no enviadas)
   → Sticky bottom bar: "X campaña(s) seleccionada(s)"
   → Botón "Enviar email seleccionadas"
   → Modal de confirmación: muestra fecha/hora + total ofertas + nº destinatarios
@@ -171,14 +171,18 @@ Admin marca checkboxes en campañas activas no enviadas
 
 POST /api/admin/tgtg/enviar
   Body: { promoIds: string[] }  (1–10 IDs)
+  → Fail-fast: verifica RESERVA_HMAC_SECRET al inicio — 500 si no está configurado
   → Para cada promoId:
       tgtgUseCase.sendCampaignEmails() → valida ownership + !emailEnviado
       Recoge items de cada campaña
   → Construye destinatarios únicos (union de emailTargets de todas las promos)
-  → Por destinatario: un solo email HTML con todas las campañas seleccionadas
-  → Envía via Brevo
+  → Por destinatario: un solo email HTML + textContent (plain-text) con todas las campañas
+  → URL de reserva incluye &lang={idioma_del_cliente} para que el popup use el idioma correcto
+  → Envía via Brevo (htmlContent + textContent para evitar spam)
+  → Solo marca emailEnviado=true si emailsSent > 0 (evita lock sin envíos reales)
   → tgtgUseCase.markEmailSent() para cada promo
   → Responde { emailsSent, emailError?, updatedPromos }
+  → Frontend muestra alerta si emailsSent === 0 o hay emailError
   → Frontend actualiza emailEnviado=true, numeroEnvios en estado local
 ```
 
@@ -188,18 +192,27 @@ POST /api/admin/tgtg/enviar
 
 | Estado | Condición | UI |
 |--------|-----------|-----|
-| **Activa — borrador** | `emailEnviado=false` + no expirada | Checkbox para seleccionar, botón trash habilitado |
-| **Activa — enviada** | `emailEnviado=true` + no expirada | Badge verde "Enviada ✓", sin checkbox, trash deshabilitado |
+| **Pendiente** | `emailEnviado=false` + no expirada | Fondo ámbar, checkbox para seleccionar, botón editar horas, botón trash habilitado |
+| **Activa (enviada)** | `emailEnviado=true` + no expirada | Fondo verde, badge "Enviada ✓", nº emails enviados visible, sin checkbox, sin editar horas, trash deshabilitado |
 | **Cerrada** | Hora fin pasada OR todos los cupones agotados | Aparece en sección "Historial" |
 
-### 4. Acciones en campañas activas
+### 4. Vista de campañas — dos secciones acordeón
 
-- **Editar horario** (`PATCH /api/admin/tgtg/[id]/horas`): solo si no está enviada. Inline edit con inputs de tiempo.
+La lista de campañas activas se organiza en dos secciones colapsables, ambas cerradas por defecto:
+
+- **Pendientes** (indicador ámbar): campañas con `emailEnviado=false`. Muestran checkbox de selección y botón de editar horas.
+- **Activas** (indicador verde): campañas con `emailEnviado=true`. Muestran badge "Enviada ✓" y el número de emails enviados (`numeroEnvios`).
+
+Cada sección muestra el contador de campañas en la cabecera. Un clic en la cabecera expande/colapsa todas las campañas de esa sección a la vez.
+
+### 5. Acciones en campañas
+
+- **Editar horario** (`PATCH /api/admin/tgtg/[id]/horas`): solo campañas pendientes (`emailEnviado=false`). Inline edit con inputs de tiempo. El botón de edición no aparece en campañas enviadas.
 - **Ajustar cupones** (`PATCH /api/admin/tgtg/items/[id]/cupones`): +1 / -1 en `cupones_disponibles`.
 - **Ver reservas** (`GET /api/admin/tgtg/reservas?tgtgPromoId=...`): por item o todas a la vez.
 - **Eliminar** (`DELETE /api/admin/tgtg/[id]`): bloqueado si `emailEnviado=true` o hay reservas.
 
-### 5. Historial
+### 6. Historial
 
 Las campañas expiradas (hora fin < ahora) o con todos los cupones agotados pasan a sección de historial. Muestran miniatura, fecha, horario y títulos. Botón "Reutilizar" precarga el formulario con los mismos datos (fecha = hoy).
 
@@ -209,37 +222,52 @@ Las campañas expiradas (hora fin < ahora) o con todos los cupones agotados pasa
 
 ### Email recibido
 
-El email contiene un bloque HTML por cada campaña seleccionada:
-- Imagen de cada oferta
-- Precio original (tachado) + precio descuento
-- Botón "Reservar" → `https://{dominio}/api/promo/item/{itemId}?token={HMAC_TOKEN}`
+El email contiene:
+- Un bloque HTML por cada campaña seleccionada: imagen, precio original (tachado), precio descuento, botón "Reservar"
+- Una versión `textContent` en texto plano (reduce puntuación de spam en Brevo)
+- Botón "Reservar" → `https://{dominio}/?tgtg=confirm&itemId={id}&promoId={id}&email={email}&token={HMAC}&lang={idioma}`
 
 El **token** es un HMAC-SHA256 único por destinatario+item, generado server-side al enviar. Cada token es de un solo uso.
 
-### Reserva desde el email
+El parámetro `lang` corresponde al idioma guardado del cliente (`clientes.idioma`). El popup de confirmación lo lee para mostrarse en el idioma correcto sin depender del navegador.
+
+### Popup de confirmación (`TgtgReservaPopup`)
 
 ```
-Cliente hace clic en "Reservar"
+Cliente hace clic en "Reservar" del email
+  → El link lleva a la página principal con ?tgtg=confirm&...&lang=es
 
-GET /api/promo/item/[itemId]?token={token}
+TgtgReservaPopup (componente global en el layout):
+  → Detecta tgtg=confirm en URL
+  → Aplica lang del parámetro URL (prioridad máxima)
+  → GET /api/promo/item/{itemId}?promoId={promoId}&token={token}
+      Si tokenUsed → toast "token ya usado" (en el idioma del email)
+      Si cuponesDisponibles=0 → toast "sin stock"
+      Si ok → muestra modal de confirmación con datos de la oferta
+  → cleanUrl() elimina todos los params (incluido lang) de la URL
+    (el idioma NO se resetea aunque lang desaparezca de la URL)
+  → Admin confirma → POST /api/promo/reservar
+      → Respuestas: ok | token_used | no_cupones | expired
+  → Toast con resultado en el idioma del email
+```
+
+**Prioridad de idioma en el popup**: parámetro URL `lang` > `localStorage` > idioma del navegador > idioma del contexto React.
+
+### Reserva — API
+
+```
+POST /api/promo/reservar
+  Body: { itemId, tgtgPromoId, email, token }
   → Verifica token HMAC válido
-  → tgtgUseCase.isTokenUsed(token) → si ya usado → 409
-  → Comprueba cupones disponibles → si 0 → 409
-  → Guarda reserva en tgtg_reservas (token UNIQUE en DB)
-  → Decrementa cupones_disponibles en tgtg_items
-  → Redirige a página de confirmación
+  → tgtgUseCase.isTokenUsed(token) → si ya usado → result 'token_used'
+  → tgtgUseCase.claimCupon() atómico:
+      Si cuponesDisponibles=0 → 'no_cupones'
+      Si token en DB → 'token_used' (constraint UNIQUE)
+      Si ok → decrementa cupones_disponibles, guarda reserva → 'ok'
 
-Si el token ya fue usado:
-  GET /api/promo/item/[itemId]/new-token → genera nuevo token HMAC
-  → Permite reintentar la reserva (caso de reenvío de email)
+GET /api/promo/item/[itemId]/new-token
+  → Genera nuevo token HMAC si el anterior ya fue usado (caso de reenvío de email)
 ```
-
-### Página de confirmación
-
-Muestra la oferta reservada con:
-- Título, imagen, precio
-- Horario de recogida
-- Fecha
 
 ---
 
@@ -271,8 +299,10 @@ El email se construye en `POST /api/admin/tgtg/enviar`:
 - **Header**: gradiente verde con logo/nombre del negocio
 - **Por campaña**: fecha + horario en pills de color, cards de oferta con imagen + precios + botón "Reservar" individual por destinatario
 - **Un email por destinatario**: si se seleccionan 3 campañas, el cliente recibe 1 email con las 3 secciones
+- **`htmlContent` + `textContent`**: el email incluye siempre una versión en texto plano. Esto reduce la puntuación de spam en Brevo y mejora la entregabilidad
 - `escapeHtml()` en todos los campos de usuario (título, descripción)
 - Tokens HMAC por destinatario × item (distintos para cada persona)
+- Parámetro `&lang={idioma}` en cada URL de reserva para que el popup use el idioma del cliente
 
 ---
 
@@ -356,9 +386,12 @@ src/
 ## Reglas de negocio destacadas
 
 1. **Máximo 6 campañas almacenadas** — al crear la 7ª se borra la más antigua automáticamente
-2. **Una campaña enviada es inmutable** — ni eliminable, ni re-enviable; el horario tampoco se puede editar una vez enviada (TODO: validar en `updateHoras`)
-3. **El token de reserva es por destinatario × item** — dos clientes con el mismo email no pueden tener el mismo token; un cliente no puede reservar dos veces el mismo item
-4. **Un email por destinatario** — aunque se envíen N campañas seleccionadas, el cliente recibe 1 email con todas las secciones
-5. **`numero_envios` refleja emails enviados**, no reservas; las reservas se cuentan via `tgtg_reservas`
-6. **`cupones_disponibles` es la fuente de verdad** para disponibilidad, no `reservasCount`
-7. **Campaña "cerrada"** = hora fin superada OR todos los cupones agotados (lógica solo en frontend, no hay campo en DB)
+2. **Una campaña enviada es inmutable** — ni eliminable, ni re-enviable, ni editable en horario. `emailEnviado=true` bloquea `updateHoras`, `deletePromo` y el botón de edición en el frontend
+3. **`markEmailSent` solo se llama si `emailsSent > 0`** — si Brevo falla para todos los destinatarios, la campaña no queda bloqueada como enviada
+4. **`RESERVA_HMAC_SECRET` se valida al inicio de la ruta de envío** — si no está configurado se retorna 500 inmediatamente (fail-fast)
+5. **El token de reserva es por destinatario × item** — dos clientes distintos obtienen tokens distintos; un mismo cliente no puede reservar dos veces el mismo item
+6. **Un email por destinatario** — aunque se envíen N campañas seleccionadas, el cliente recibe 1 email con todas las secciones
+7. **`numero_envios` refleja emails enviados**, no reservas; se muestra en la UI de cada campaña activa
+8. **`cupones_disponibles` es la fuente de verdad** para disponibilidad, no `reservasCount`
+9. **Campaña "cerrada"** = hora fin superada OR todos los cupones agotados (lógica solo en frontend, no hay campo en DB)
+10. **Idioma del popup** — se transmite via `&lang=` en la URL del email; el popup lo aplica y no lo pierde cuando `cleanUrl()` limpia los parámetros

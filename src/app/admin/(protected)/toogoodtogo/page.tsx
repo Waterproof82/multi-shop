@@ -635,16 +635,16 @@ export default function TooGoodToGoPage() {
               <button
                 onClick={() => setPendingOpen(o => !o)}
                 aria-expanded={pendingOpen}
-                className="w-full flex items-center justify-between px-4 py-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 hover:bg-amber-100 dark:hover:bg-amber-950/30 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px]"
+                className="w-full flex items-center justify-between px-4 py-3 rounded-lg border border-[var(--campaign-pending-border)] bg-[var(--campaign-pending-bg)] hover:bg-[var(--campaign-pending-hover)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px]"
               >
-                <span className="flex items-center gap-2 font-semibold text-sm text-amber-800 dark:text-amber-300">
-                  <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
+                <span className="flex items-center gap-2 font-semibold text-sm text-[var(--campaign-pending-text)]">
+                  <span className="w-2 h-2 rounded-full bg-[var(--campaign-pending-accent)] flex-shrink-0" />
                   {t("tgtgPendingCampaign", language)}
-                  <span className="bg-amber-200 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 text-xs px-2 py-0.5 rounded-full font-medium">
+                  <span className="bg-[var(--campaign-pending-accent)] text-[var(--campaign-pending-text)] text-xs px-2 py-0.5 rounded-full font-medium opacity-80">
                     {pendingCampaigns.length}
                   </span>
                 </span>
-                {pendingOpen ? <ChevronUp className="w-4 h-4 text-amber-600 dark:text-amber-400" /> : <ChevronDown className="w-4 h-4 text-amber-600 dark:text-amber-400" />}
+                {pendingOpen ? <ChevronUp className="w-4 h-4 text-[var(--campaign-pending-accent)]" /> : <ChevronDown className="w-4 h-4 text-[var(--campaign-pending-accent)]" />}
               </button>
               {pendingOpen && (
                 <div className="space-y-4">
@@ -655,7 +655,7 @@ export default function TooGoodToGoPage() {
                     const campaignNumber = pendingCampaigns.length - index;
                     const isSelected = selectedPromoIds.has(campaign.id);
                     return (
-                      <div key={campaign.id} className={`rounded-lg border shadow-elegant p-6 space-y-4 bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800 ${isSelected ? 'ring-2 ring-green-500' : ''}`}>
+                      <div key={campaign.id} className={`rounded-lg border shadow-elegant p-6 space-y-4 bg-[var(--campaign-pending-bg)] border-[var(--campaign-pending-border)] ${isSelected ? 'ring-2 ring-green-500' : ''}`}>
                         <div className="flex items-center justify-between flex-wrap gap-3">
                           <div className="flex items-center gap-3">
                             <input
@@ -668,7 +668,7 @@ export default function TooGoodToGoPage() {
                             />
                             <div className="flex items-center gap-2">
                               <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                                <ShoppingBag className="w-5 h-5 text-amber-500" />
+                                <ShoppingBag className="w-5 h-5 text-[var(--campaign-pending-accent)]" />
                                 {t("tgtgPendingCampaign", language)}
                                 <span className="text-sm font-normal text-muted-foreground">#{campaignNumber}</span>
                               </h2>
@@ -680,9 +680,15 @@ export default function TooGoodToGoPage() {
                           <div className="flex items-center gap-2 flex-wrap">
                             {editingThis ? (
                               <>
-                                <input type="time" value={editHoraInicio} onChange={e => setEditHoraInicio(e.target.value)} aria-label={t("tgtgPickupFrom", language)} className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
+                                <label className="flex items-center gap-1.5">
+                                  <span className="text-xs text-muted-foreground whitespace-nowrap">{t("tgtgPickupFrom", language)}:</span>
+                                  <input type="time" value={editHoraInicio} onChange={e => setEditHoraInicio(e.target.value)} className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
+                                </label>
                                 <span className="text-muted-foreground text-sm">–</span>
-                                <input type="time" value={editHoraFin} onChange={e => setEditHoraFin(e.target.value)} aria-label={t("tgtgPickupTo", language)} className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
+                                <label className="flex items-center gap-1.5">
+                                  <span className="text-xs text-muted-foreground whitespace-nowrap">{t("tgtgPickupTo", language)}:</span>
+                                  <input type="time" value={editHoraFin} onChange={e => setEditHoraFin(e.target.value)} className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
+                                </label>
                                 <button onClick={() => handleSaveHoras(campaign.id)} disabled={savingHoras} aria-label={t("save", language)} className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 flex items-center gap-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 min-h-[44px]">
                                   {savingHoras ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
                                   {t("save", language)}
@@ -696,7 +702,7 @@ export default function TooGoodToGoPage() {
                                 <span className="text-xs flex items-center gap-1 text-muted-foreground">
                                   <Clock className="w-3.5 h-3.5" />{displayInicio} – {displayFin}
                                 </span>
-                                <button onClick={() => handleStartEditHoras(campaign)} aria-label="Editar horas de recogida" className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center">
+                                <button onClick={() => handleStartEditHoras(campaign)} aria-label={t("tgtgEditPickupHours", language)} className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center">
                                   <Pencil className="w-3.5 h-3.5" />
                                 </button>
                               </>
@@ -776,16 +782,16 @@ export default function TooGoodToGoPage() {
               <button
                 onClick={() => setActiveOpen(o => !o)}
                 aria-expanded={activeOpen}
-                className="w-full flex items-center justify-between px-4 py-3 rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-950/30 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px]"
+                className="w-full flex items-center justify-between px-4 py-3 rounded-lg border border-[var(--campaign-active-border)] bg-[var(--campaign-active-bg)] hover:bg-[var(--campaign-active-hover)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px]"
               >
-                <span className="flex items-center gap-2 font-semibold text-sm text-green-800 dark:text-green-300">
-                  <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                <span className="flex items-center gap-2 font-semibold text-sm text-[var(--campaign-active-text)]">
+                  <span className="w-2 h-2 rounded-full bg-[var(--campaign-active-accent)] flex-shrink-0" />
                   {t("tgtgActiveCampaign", language)}
-                  <span className="bg-green-200 dark:bg-green-900/40 text-green-700 dark:text-green-400 text-xs px-2 py-0.5 rounded-full font-medium">
+                  <span className="bg-[var(--campaign-active-accent)] text-[var(--campaign-active-text)] text-xs px-2 py-0.5 rounded-full font-medium opacity-80">
                     {sentCampaigns.length}
                   </span>
                 </span>
-                {activeOpen ? <ChevronUp className="w-4 h-4 text-green-600 dark:text-green-400" /> : <ChevronDown className="w-4 h-4 text-green-600 dark:text-green-400" />}
+                {activeOpen ? <ChevronUp className="w-4 h-4 text-[var(--campaign-active-accent)]" /> : <ChevronDown className="w-4 h-4 text-[var(--campaign-active-accent)]" />}
               </button>
               {activeOpen && (
                 <div className="space-y-4">
@@ -794,16 +800,16 @@ export default function TooGoodToGoPage() {
                     const displayFin = campaign.horaRecogidaFin.slice(0, 5);
                     const campaignNumber = sentCampaigns.length - index;
                     return (
-                      <div key={campaign.id} className="rounded-lg border shadow-elegant p-6 space-y-4 bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
+                      <div key={campaign.id} className="rounded-lg border shadow-elegant p-6 space-y-4 bg-[var(--campaign-active-bg)] border-[var(--campaign-active-border)]">
                         <div className="flex items-center justify-between flex-wrap gap-3">
                           <div className="flex items-center gap-3">
-                            <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 dark:bg-green-900/30 dark:text-green-400 px-2 py-1 rounded-full">
+                            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-[var(--campaign-active-accent)] text-[var(--campaign-active-text)] opacity-80">
                               <CheckCircle className="w-3.5 h-3.5" />
-                              Enviada ✓
+                              {t("statsTgtgStatusSent", language)} ✓
                             </span>
                             <div className="flex items-center gap-2">
                               <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                                <ShoppingBag className="w-5 h-5 text-green-600" />
+                                <ShoppingBag className="w-5 h-5 text-[var(--campaign-active-accent)]" />
                                 {t("tgtgActiveCampaign", language)}
                                 <span className="text-sm font-normal text-muted-foreground">#{campaignNumber}</span>
                               </h2>

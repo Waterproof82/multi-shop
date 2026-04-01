@@ -333,7 +333,7 @@ export function CartDrawer() {
                   {/* Screen reader announcement for countdown */}
                   <span aria-live="polite" aria-atomic="true" className="sr-only">
                     {retryCountdown !== null && retryCountdown > 0 && (
-                      <>Reintentando en {retryCountdown} segundos...</>
+                      <>{t("whatsappRetryingCountdown", language).replace("{seconds}", String(retryCountdown))}</>
                     )}
                   </span>
                   <button
