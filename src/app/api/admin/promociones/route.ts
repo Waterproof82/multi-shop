@@ -79,21 +79,22 @@ function buildEmailHtml(params: {
       ` : ''}
 
       <!-- CTA para ver menu -->
-      <a href="${escapeHtml(baseUrl)}" style="display: block; width: 100%; box-sizing: border-box; text-align: center; background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); color: #fff; font-size: 15px; font-weight: 700; padding: 14px 0; border-radius: 10px; text-decoration: none; letter-spacing: 0.2px; margin-bottom: 20px;">
-        Ver catalogo completo
+      <a href="${escapeHtml(baseUrl)}" style="display: block; width: 100%; box-sizing: border-box; text-align: center; background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); color: #fff; font-size: 15px; font-weight: 700; padding: 14px 0; border-radius: 10px; text-decoration: none; letter-spacing: 0.2px; margin-bottom: 24px;">
+        Ver nuestra web
       </a>
 
       <!-- Links de suscripcion -->
-      <div style="border-top: 1px solid #f3f4f6; padding-top: 16px; text-align: center;">
-        <p style="margin: 0 0 6px; font-size: 12px; color: #9ca3af;">
-          No quieres recibir mas ofertas? <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=baja&token=${tokenBaja}" style="color: #dc2626; text-decoration: underline;">Darse de baja</a>
+      <div style="border-top: 1px solid #f3f4f6; padding-top: 20px; padding-bottom: 8px; text-align: center;">
+        <p style="margin: 0 0 10px; font-size: 13px; color: #6b7280;">
+          <span style="margin-right: 6px;">❌</span>No quieres recibir mas ofertas? <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=baja&token=${tokenBaja}" style="color: #dc2626; text-decoration: underline;">Darse de baja</a>
         </p>
-        <p style="margin: 0; font-size: 12px; color: #9ca3af;">
-          Cambiaste de opinion? <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=alta&token=${tokenAlta}" style="color: #7c3aed; text-decoration: underline;">Volver a suscribirse</a>
+        <p style="margin: 0; font-size: 13px; color: #6b7280;">
+          <span style="margin-right: 6px;">🔄</span>Cambiaste de opinion? <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=alta&token=${tokenAlta}" style="color: #7c3aed; text-decoration: underline;">Volver a suscribirse</a>
         </p>
       </div>
     </div>
   </div>
+  <div style="height: 24px;"></div>
 </body>
 </html>`;
 }

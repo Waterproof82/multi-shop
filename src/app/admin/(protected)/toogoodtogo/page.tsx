@@ -221,12 +221,12 @@ export default function TooGoodToGoPage() {
       Number(item.cuponesTotal) > 0
     );
     if (!valid) {
-      alert('Completa todos los campos requeridos de cada oferta.');
+      alert(t('tgtgValidationRequiredFields', language));
       return;
     }
     const pickupEnd = new Date(`${tgtgFechaActivacion}T${horaFin}:00`);
     if (isNaN(pickupEnd.getTime()) || pickupEnd <= new Date()) {
-      alert('La fecha y hora de fin de recogida debe ser posterior a la hora actual.');
+      alert(t('tgtgValidationPastTime', language));
       return;
     }
     setTgtgSaving(true);
@@ -268,11 +268,11 @@ export default function TooGoodToGoPage() {
         setTgtgSuccess(true);
         setTimeout(() => setTgtgSuccess(false), 3000);
       } else {
-        alert('Error al crear la campaña TGTG.');
+        alert(t('tgtgCreateError', language));
       }
     } catch (error) {
       logClientError(error, 'handleCreateCampaign');
-      alert('Error al crear la campaña.');
+      alert(t('tgtgCreateError', language));
     } finally {
       setTgtgSaving(false);
     }
@@ -296,11 +296,11 @@ export default function TooGoodToGoPage() {
         setSelectedPromoIds(new Set());
       } else {
         const err = await res.json() as { error?: string };
-        alert(err.error ?? 'Error al enviar los emails.');
+        alert(err.error ?? t('tgtgSendEmailsError', language));
       }
     } catch (error) {
       logClientError(error, 'handleConfirmSendEmails');
-      alert('Error al enviar los emails.');
+      alert(t('tgtgSendEmailsError', language));
     } finally {
       setSendingEmails(false);
     }
@@ -442,11 +442,11 @@ export default function TooGoodToGoPage() {
         setEditingHorasId(null);
       } else {
         const err = await res.json() as { error?: string };
-        alert(err.error ?? 'Error al guardar las horas');
+        alert(err.error ?? t('tgtgSaveHorasError', language));
       }
     } catch (error) {
       logClientError(error, 'handleSaveHoras');
-      alert('Error al guardar las horas');
+      alert(t('tgtgSaveHorasError', language));
     } finally {
       setSavingHoras(false);
     }
