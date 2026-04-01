@@ -118,7 +118,7 @@ export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menu
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-medium text-primary-foreground/70 uppercase tracking-wide">Promociones</p>
+                <p className="text-xs font-medium text-primary-foreground/70 uppercase tracking-wide">{t("sidebarPromotions", language)}</p>
                 {promoSummary.lastDate && (
                   <span className="text-xs text-primary-foreground/50 whitespace-nowrap">
                     {new Date(promoSummary.lastDate).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
@@ -126,10 +126,10 @@ export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menu
                 )}
               </div>
               <p className="text-base font-semibold text-primary-foreground leading-tight">
-                {promoSummary.total} enviadas
+                {promoSummary.total} {t("promotionsSent", language)}
               </p>
               <p className="text-xs text-primary-foreground/60 mt-0.5">
-                {promoSummary.totalEmails.toLocaleString('es-ES')} emails en total
+                {promoSummary.totalEmails.toLocaleString('es-ES')} {t("totalEmails", language)}
               </p>
             </div>
             <ArrowRight className="w-4 h-4 text-primary-foreground/40 flex-shrink-0 group-hover:text-primary-foreground/70 transition-colors" />
@@ -143,15 +143,15 @@ export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menu
               <Tag className="w-4 h-4 text-primary-foreground" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium text-primary-foreground/70 uppercase tracking-wide">TooGoodToGo</p>
+              <p className="text-xs font-medium text-primary-foreground/70 uppercase tracking-wide">{t("sidebarTooGoodToGo", language)}</p>
               <p className="text-base font-semibold text-primary-foreground leading-tight">
                 {tgtgSummary.activeCampaigns > 0
-                  ? `${tgtgSummary.activeCampaigns} activa${tgtgSummary.activeCampaigns > 1 ? 's' : ''}`
-                  : `${tgtgSummary.sentCampaigns} campaña${tgtgSummary.sentCampaigns !== 1 ? 's' : ''}`
+                  ? `${tgtgSummary.activeCampaigns} ${tgtgSummary.activeCampaigns > 1 ? t("activeCampaigns", language) : t("activeCampaign", language)}`
+                  : `${tgtgSummary.sentCampaigns} ${tgtgSummary.sentCampaigns !== 1 ? t("campaigns", language) : t("campaign", language)}`
                 }
               </p>
               <p className="text-xs text-primary-foreground/60 mt-0.5">
-                {tgtgSummary.claimedCoupons} cupones canjeados · {tgtgSummary.sentCampaigns} enviadas
+                {tgtgSummary.claimedCoupons} {t("redeemedSent", language)}
               </p>
             </div>
             <ArrowRight className="w-4 h-4 text-primary-foreground/40 flex-shrink-0 group-hover:text-primary-foreground/70 transition-colors" />

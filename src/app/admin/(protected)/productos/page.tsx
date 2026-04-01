@@ -607,7 +607,7 @@ export default function ProductosPage() {
                     </div>
                   </div>
                   <div className="mt-2 flex items-center justify-between">
-                    <span className="text-sm font-medium text-foreground">{prod.precio.toFixed(2)} €</span>
+                    <span className="text-sm font-medium text-foreground">{formatPrice(prod.precio, 'EUR', language)}</span>
                     <button
                       onClick={(e) => { e.stopPropagation(); toggleActivo(prod); }}
                       className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${

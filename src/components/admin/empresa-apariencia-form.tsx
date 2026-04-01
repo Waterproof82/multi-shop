@@ -48,6 +48,14 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
   const [savingLogo, setSavingLogo] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
   const [logoError, setLogoError] = useState<string | null>(null);
+
+  const idiomas = [
+    { key: 'es', label: t('languageSpanish', language) },
+    { key: 'en', label: t('languageEnglish', language) },
+    { key: 'fr', label: t('languageFrench', language) },
+    { key: 'it', label: t('languageItalian', language) },
+    { key: 'de', label: t('languageGerman', language) },
+  ] as const;
   const [showTranslations, setShowTranslations] = useState(false);
 
   useEffect(() => {
@@ -151,14 +159,14 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
             htmlFor="descripcion_es"
             className="text-xs font-medium text-muted-foreground dark:text-muted-foreground uppercase tracking-wide"
           >
-            Español
+            {t('languageSpanish', language)}
           </label>
           <Textarea
             id="descripcion_es"
             rows={3}
             value={formData.descripcion_es}
             onChange={(e) => { setSaved(false); setFormData((prev) => ({ ...prev, descripcion_es: e.target.value })); }}
-            placeholder="Descripción en Español..."
+            placeholder={`${t('restaurantDescription', language).toLowerCase()} ${t('languageSpanish', language).toLowerCase()}...`}
           />
         </div>
       </div>
@@ -177,7 +185,7 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
 
         {showTranslations && (
           <div className="mt-3 space-y-3">
-            {IDIOMAS.filter(({ key }) => key !== 'es').map(({ key, label }) => {
+            {idiomas.filter(({ key }) => key !== 'es').map(({ key, label }) => {
               const field = `descripcion_${key}` as keyof typeof formData;
               return (
                 <div key={key} className="flex flex-col gap-1">
@@ -192,7 +200,7 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
                     rows={3}
                     value={(formData[field] as string) || ''}
                     onChange={(e) => { setSaved(false); setFormData((prev) => ({ ...prev, [field]: e.target.value })); }}
-                    placeholder={`Descripción en ${label}...`}
+                    placeholder={`${t('restaurantDescription', language).toLowerCase()} ${label.toLowerCase()}...`}
                   />
                 </div>
               );

@@ -8,6 +8,7 @@ import { logClientError } from '@/lib/client-error';
 import { useLanguage } from '@/lib/language-context';
 import { useAdmin } from '@/lib/admin-context';
 import { t } from '@/lib/translations';
+import { formatPrice } from '@/lib/format-price';
 import {
   BarChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   Cell, PieChart, LineChart, Line, Bar, Pie,
@@ -105,9 +106,9 @@ function getKpiData(stats: Stats | null, lang: Parameters<typeof t>[1]) {
   return [
     { icon: ShoppingCart, label: t("ordersToday", lang), value: stats?.pedidosHoy || 0, iconClass: 'bg-muted', iconColor: 'text-foreground' },
     { icon: BarChart3, label: t("ordersMonth", lang), value: stats?.pedidosMes || 0, iconClass: 'bg-primary/10', iconColor: 'text-primary' },
-    { icon: Euro, label: t("salesToday", lang), value: `${(stats?.totalHoy || 0).toFixed(2)}€`, iconClass: 'bg-primary/10', iconColor: 'text-primary' },
-    { icon: BarChart3, label: t("salesMonth", lang), value: `${(stats?.totalMes || 0).toFixed(2)}€`, iconClass: 'bg-muted', iconColor: 'text-foreground' },
-    { icon: TrendingUp, label: t("salesYear", lang), value: `${(stats?.totalAno || 0).toFixed(2)}€`, iconClass: 'bg-secondary', iconColor: 'text-secondary-foreground' },
+    { icon: Euro, label: t("salesToday", lang), value: formatPrice(stats?.totalHoy || 0, 'EUR', lang), iconClass: 'bg-primary/10', iconColor: 'text-primary' },
+    { icon: BarChart3, label: t("salesMonth", lang), value: formatPrice(stats?.totalMes || 0, 'EUR', lang), iconClass: 'bg-muted', iconColor: 'text-foreground' },
+    { icon: TrendingUp, label: t("salesYear", lang), value: formatPrice(stats?.totalAno || 0, 'EUR', lang), iconClass: 'bg-secondary', iconColor: 'text-secondary-foreground' },
   ];
 }
 
@@ -248,7 +249,7 @@ function AvgTicketCard({ stats, language, motionProps, shouldReduceMotion }: Rea
         <p className="text-sm text-muted-foreground">{t("avgTicket", lang)}</p>
         <Euro className="w-4 h-4 text-muted-foreground" />
       </div>
-      <p className="text-2xl font-bold text-foreground">{(stats?.ticketMedio || 0).toFixed(2)}€</p>
+      <p className="text-2xl font-bold text-foreground">{formatPrice(stats?.ticketMedio || 0, 'EUR', lang)}</p>
     </motion.div>
   );
 }
@@ -377,6 +378,8 @@ export default function EstadisticasPage() {
   const { empresaId, overrideEmpresaId } = useAdmin();
   const effectiveEmpresaId = overrideEmpresaId || empresaId;
   const lang = language;
+  const localeMap: Record<string, string> = { es: 'es-ES', en: 'en-US', fr: 'fr-FR', it: 'it-IT', de: 'de-DE' };
+  const dateLocale = localeMap[language] ?? 'es-ES';
   const meses = [t("monthJan", lang), t("monthFeb", lang), t("monthMar", lang), t("monthApr", lang), t("monthMay", lang), t("monthJun", lang), t("monthJul", lang), t("monthAug", lang), t("monthSep", lang), t("monthOct", lang), t("monthNov", lang), t("monthDec", lang)];
   const [selectedMonth, setSelectedMonth] = useState({ mes: new Date().getMonth(), año: new Date().getFullYear() });
   
@@ -458,7 +461,7 @@ export default function EstadisticasPage() {
                     labelStyle={{ color: chartTheme.tooltipColor }}
                     itemStyle={{ color: chartTheme.tooltipColor }}
                     formatter={((value: number, name: string) => [
-                      name === 'pedidos' ? `${value} ${t("xOrders", language)}` : `${value.toFixed(2)}€`,
+                      name === 'pedidos' ? `${value} ${t("xOrders", language)}` : formatPrice(value, 'EUR', language),
                       name === 'pedidos' ? t("xOrders", language) : t("revenueLabel", language)
                     ]) as TooltipProps<number, string>['formatter']}
                   />
@@ -564,7 +567,7 @@ export default function EstadisticasPage() {
                         ))}
                       </Pie>
                       <Tooltip
-                        formatter={((value: number) => `${value.toFixed(2)}€`) as TooltipProps<number, string>['formatter']}
+                        formatter={((value: number) => formatPrice(value, 'EUR', language)) as TooltipProps<number, string>['formatter']}
                         contentStyle={{
                           backgroundColor: chartTheme.tooltipBg,
                           border: `1px solid ${chartTheme.tooltipBorder}`,
@@ -604,7 +607,7 @@ export default function EstadisticasPage() {
       >
         <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
           <Send className="w-5 h-5 text-primary" />
-          Envíos de Promociones
+          {t("statsPromoSends", language)}
         </h2>
         {promos.length > 0 ? (() => {
           const now = new Date();
@@ -623,7 +626,7 @@ export default function EstadisticasPage() {
 
           const byMonth: Record<string, number> = {};
           for (const p of promos) {
-            const key = new Date(p.fecha_hora).toLocaleDateString('es-ES', { month: 'short', year: '2-digit' });
+            const key = new Date(p.fecha_hora).toLocaleDateString(dateLocale, { month: 'short', year: '2-digit' });
             byMonth[key] = (byMonth[key] ?? 0) + p.numero_envios;
           }
           const chartData = Object.entries(byMonth).map(([mes, envios]) => ({ mes, envios })).slice(-12);
@@ -634,19 +637,19 @@ export default function EstadisticasPage() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="bg-primary/5 border border-primary/20 rounded-lg px-4 py-3 text-center">
                   <p className="text-2xl font-bold text-primary">{promos.length}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Promociones enviadas</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t("statsPromosSent", language)}</p>
                 </div>
                 <div className="bg-muted rounded-lg px-4 py-3 text-center">
                   <p className="text-2xl font-bold text-foreground">{thisMonthPromos.length}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Enviadas este mes</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t("statsSentThisMonth", language)}</p>
                 </div>
                 <div className="bg-muted rounded-lg px-4 py-3 text-center">
-                  <p className="text-2xl font-bold text-foreground">{totalEnvios.toLocaleString('es-ES')}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Emails totales</p>
+                  <p className="text-2xl font-bold text-foreground">{totalEnvios.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t("statsTotalEmails", language)}</p>
                 </div>
                 <div className="bg-muted rounded-lg px-4 py-3 text-center">
-                  <p className="text-2xl font-bold text-foreground">{mesEnvios.toLocaleString('es-ES')}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Emails este mes</p>
+                  <p className="text-2xl font-bold text-foreground">{mesEnvios.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t("statsEmailsThisMonth", language)}</p>
                 </div>
               </div>
 
@@ -655,10 +658,10 @@ export default function EstadisticasPage() {
                 <div className="bg-muted/50 border border-border rounded-lg px-4 py-3 flex items-start gap-3">
                   <span className="text-xl flex-shrink-0 mt-0.5">🏆</span>
                   <div className="min-w-0">
-                    <p className="text-xs font-medium text-muted-foreground mb-0.5">Promoción con más alcance</p>
+                    <p className="text-xs font-medium text-muted-foreground mb-0.5">{t("statsTopPromo", language)}</p>
                     <p className="text-sm font-semibold text-foreground truncate">{topPromo.texto_promocion}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {new Date(topPromo.fecha_hora).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })} · <span className="font-medium text-primary">{topPromo.numero_envios} emails</span>
+                      {new Date(topPromo.fecha_hora).toLocaleDateString(dateLocale, { day: '2-digit', month: 'long', year: 'numeric' })} · <span className="font-medium text-primary">{topPromo.numero_envios} emails</span>
                     </p>
                   </div>
                 </div>
@@ -666,7 +669,7 @@ export default function EstadisticasPage() {
 
               {/* Chart: envíos by month */}
               <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2">Emails enviados por mes</p>
+                <p className="text-xs font-medium text-muted-foreground mb-2">{t("statsEmailsByMonth", language)}</p>
                 <div className="h-40 w-full">
                   <ResponsiveContainer width="100%" height={160} minWidth={0}>
                     <BarChart data={chartData}>
@@ -677,7 +680,7 @@ export default function EstadisticasPage() {
                         contentStyle={{ backgroundColor: chartTheme.tooltipBg, border: `1px solid ${chartTheme.tooltipBorder}`, borderRadius: '8px' }}
                         labelStyle={{ color: chartTheme.tooltipColor }}
                         itemStyle={{ color: chartTheme.tooltipColor }}
-                        formatter={(value: number) => [`${value.toLocaleString('es-ES')} emails`, 'Envíos']}
+                        formatter={(value: number) => [`${value.toLocaleString()} emails`, t("statsSendCountLabel", language)]}
                       />
                       <Bar dataKey="envios" fill={chartTheme.colors[1]} radius={[4, 4, 0, 0]} />
                     </BarChart>
@@ -690,8 +693,8 @@ export default function EstadisticasPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-muted">
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Fecha</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">Mensaje</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">{t("date", language)}</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">{t("statsMessageLabel", language)}</th>
                       <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Emails</th>
                     </tr>
                   </thead>
@@ -699,12 +702,12 @@ export default function EstadisticasPage() {
                     {promos.map(p => (
                       <tr key={p.id} className="bg-card hover:bg-muted/40 transition-colors">
                         <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
-                          {new Date(p.fecha_hora).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                          {new Date(p.fecha_hora).toLocaleDateString(dateLocale, { day: '2-digit', month: '2-digit', year: '2-digit' })}
                         </td>
                         <td className="px-4 py-3 hidden sm:table-cell">
                           <p className="text-foreground text-sm truncate max-w-xs">{p.texto_promocion}</p>
                         </td>
-                        <td className="px-4 py-3 text-right font-semibold text-primary">{p.numero_envios.toLocaleString('es-ES')}</td>
+                        <td className="px-4 py-3 text-right font-semibold text-primary">{p.numero_envios.toLocaleString(dateLocale)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -715,7 +718,7 @@ export default function EstadisticasPage() {
         })() : (
           <div className="py-8 text-center">
             <Send className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">No hay promociones enviadas</p>
+            <p className="text-sm text-muted-foreground">{t("statsNoPromosSent", language)}</p>
           </div>
         )}
       </motion.div>
@@ -754,7 +757,7 @@ export default function EstadisticasPage() {
           // reversed = oldest first → #1 = oldest
           const chartData = [...tgtgCampaigns].reverse().slice(0, 6).map((c, idx) => ({
             label: `#${idx + 1}`,
-            fecha: new Date(c.fechaActivacion + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }),
+            fecha: new Date(c.fechaActivacion + 'T00:00:00').toLocaleDateString(dateLocale, { day: '2-digit', month: 'short' }),
             reservas: c.items.reduce((acc, i) => acc + i.reservasCount, 0),
             ingresos: Number(c.items.reduce((acc, i) => acc + i.precioDescuento * i.reservasCount, 0).toFixed(2)),
           }));
@@ -765,23 +768,23 @@ export default function EstadisticasPage() {
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                 <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900 rounded-lg px-4 py-3 text-center">
                   <p className="text-2xl font-bold text-green-700 dark:text-green-400">{sentCampaigns.length}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Campañas enviadas</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t("statsTgtgCampaignsSent", language)}</p>
                 </div>
                 <div className="bg-muted rounded-lg px-4 py-3 text-center">
                   <p className="text-2xl font-bold text-foreground">{thisMonthCampaigns.length}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Enviadas este mes</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t("statsSentThisMonth", language)}</p>
                 </div>
                 <div className="bg-muted rounded-lg px-4 py-3 text-center">
                   <p className="text-2xl font-bold text-foreground">{allStats.reservas}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Reservas totales</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t("statsTgtgReservasTotal", language)}</p>
                 </div>
                 <div className="bg-muted rounded-lg px-4 py-3 text-center">
-                  <p className="text-2xl font-bold text-green-600">€{monthStats.revenue.toFixed(2)}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Ingreso este mes</p>
+                  <p className="text-2xl font-bold text-green-600">{formatPrice(monthStats.revenue, 'EUR', language)}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t("statsTgtgRevenueMonth", language)}</p>
                 </div>
                 <div className="bg-muted rounded-lg px-4 py-3 text-center">
-                  <p className="text-2xl font-bold text-foreground">€{allStats.revenue.toFixed(2)}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Ingreso total</p>
+                  <p className="text-2xl font-bold text-foreground">{formatPrice(allStats.revenue, 'EUR', language)}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t("statsTgtgRevenueTotal", language)}</p>
                 </div>
               </div>
 
@@ -790,8 +793,8 @@ export default function EstadisticasPage() {
                 <div className="bg-primary/5 border border-primary/20 rounded-lg px-4 py-3 flex items-center gap-3">
                   <span className="text-xl flex-shrink-0">🌱</span>
                   <div>
-                    <p className="text-sm font-medium text-foreground">€{allStats.saved.toFixed(2)} ahorrados por los clientes</p>
-                    <p className="text-xs text-muted-foreground">Diferencia precio original vs descuento × reservas realizadas</p>
+                    <p className="text-sm font-medium text-foreground">{formatPrice(allStats.saved, 'EUR', language)} {t("statsTgtgSavedBy", language)}</p>
+                    <p className="text-xs text-muted-foreground">{t("statsTgtgSavingsHelp", language)}</p>
                   </div>
                 </div>
               )}
@@ -799,7 +802,7 @@ export default function EstadisticasPage() {
               {/* Chart: reservas + ingresos por campaña */}
               {chartData.some(d => d.reservas > 0 || d.ingresos > 0) && (
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground mb-2">Reservas e ingresos por campaña (últimas 6)</p>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">{t("statsTgtgChartTitle", language)}</p>
                   <div className="h-40 w-full">
                     <ResponsiveContainer width="100%" height={160} minWidth={0}>
                       <BarChart data={chartData}>
@@ -815,8 +818,8 @@ export default function EstadisticasPage() {
                             return entry ? `${label} · ${entry.fecha}` : label;
                           }}
                           formatter={(value: number, name: string) => [
-                            name === 'reservas' ? `${value} reservas` : `€${value.toFixed(2)}`,
-                            name === 'reservas' ? 'Reservas' : 'Ingresos',
+                            name === 'reservas' ? `${value} ${t("tgtgReservas", language)}` : formatPrice(value, 'EUR', language),
+                            name === 'reservas' ? t("tgtgReservas", language) : t("revenueLabel", language),
                           ]}
                         />
                         <Bar dataKey="reservas" fill={chartTheme.colors[2]} radius={[4, 4, 0, 0]} name="reservas" />
@@ -833,11 +836,11 @@ export default function EstadisticasPage() {
                   <thead>
                     <tr className="bg-muted">
                       <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-8">#</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Campaña</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden lg:table-cell">Horario</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">{t("statsTgtgCampaignHeader", language)}</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden lg:table-cell">{t("statsTgtgScheduleHeader", language)}</th>
                       <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Emails</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Reservas</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground hidden md:table-cell">Ingresos</th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">{t("tgtgReservas", language)}</th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground hidden md:table-cell">{t("revenueLabel", language)}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -856,14 +859,14 @@ export default function EstadisticasPage() {
                             <p className="font-medium text-foreground text-sm truncate max-w-[180px]">{firstTitle}</p>
                             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                               <span className="text-xs text-muted-foreground whitespace-nowrap">
-                                {new Date(c.fechaActivacion + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                                {new Date(c.fechaActivacion + 'T00:00:00').toLocaleDateString(dateLocale, { day: '2-digit', month: '2-digit', year: '2-digit' })}
                               </span>
                               {extraItems > 0 && (
-                                <span className="text-xs text-muted-foreground">+{extraItems} oferta{extraItems > 1 ? 's' : ''}</span>
+                                <span className="text-xs text-muted-foreground">+{extraItems} {extraItems > 1 ? t("statsExtraOffers", language) : t("statsExtraOffer", language)}</span>
                               )}
                               {c.emailEnviado
-                                ? <span className="text-xs font-medium text-green-600 bg-green-50 dark:bg-green-950/30 px-1.5 py-0.5 rounded-full">Enviada</span>
-                                : <span className="text-xs font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">Borrador</span>
+                                ? <span className="text-xs font-medium text-green-600 bg-green-50 dark:bg-green-950/30 px-1.5 py-0.5 rounded-full">{t("statsTgtgStatusSent", language)}</span>
+                                : <span className="text-xs font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">{t("statsTgtgStatusDraft", language)}</span>
                               }
                             </div>
                           </td>
@@ -873,7 +876,7 @@ export default function EstadisticasPage() {
                           <td className="px-4 py-3 text-right font-semibold text-primary">{c.numeroEnvios}</td>
                           <td className="px-4 py-3 text-right font-bold text-foreground">{reservas}</td>
                           <td className="px-4 py-3 text-right font-medium text-green-600 hidden md:table-cell">
-                            €{revenue.toFixed(2)}
+                            {formatPrice(revenue, 'EUR', language)}
                           </td>
                         </tr>
                       );
@@ -886,7 +889,7 @@ export default function EstadisticasPage() {
         })() : (
           <div className="py-8 text-center">
             <ReceiptText className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">No hay campañas TooGoodToGo</p>
+            <p className="text-sm text-muted-foreground">{t("statsNoCampaigns", language)}</p>
           </div>
         )}
       </motion.div>

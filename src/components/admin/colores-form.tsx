@@ -140,13 +140,13 @@ export function ColoresForm({ coloresIniciales, empresaId }: ColoresFormProps) {
             className="text-lg font-bold mb-2"
             style={{ color: colores.primary }}
           >
-            Título de ejemplo
+            {t('colorPreviewTitle', language)}
           </h5>
           <p
             className="mb-3"
             style={{ color: colores.foreground }}
           >
-            Este es un texto de ejemplo con el color de texto principal.
+            {t('colorPreviewText', language)}
           </p>
           <span
             className="inline-block px-3 py-1 rounded text-sm"
@@ -155,7 +155,7 @@ export function ColoresForm({ coloresIniciales, empresaId }: ColoresFormProps) {
               color: colores.secondaryForeground,
             }}
           >
-            Secondary
+            {t('colorPreviewSecondary', language)}
           </span>{' '}
           <span
             className="inline-block px-3 py-1 rounded text-sm"
@@ -164,7 +164,7 @@ export function ColoresForm({ coloresIniciales, empresaId }: ColoresFormProps) {
               color: colores.accentForeground,
             }}
           >
-            Accent
+            {t('colorPreviewAccent', language)}
           </span>
         </div>
       </div>

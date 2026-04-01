@@ -28,7 +28,7 @@ export async function DELETE(
       const status = result.error.code === 'NOT_FOUND' ? 404
         : result.error.code === 'ALREADY_SENT' || result.error.code === 'HAS_RESERVAS' ? 409
         : 500;
-      return NextResponse.json({ error: result.error.message }, { status });
+      return NextResponse.json({ code: result.error.code, error: result.error.message }, { status });
     }
     return NextResponse.json({ ok: true });
   } catch (error) {

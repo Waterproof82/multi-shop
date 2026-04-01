@@ -36,29 +36,62 @@ function buildEmailHtml(params: {
   const encodedEmail = encodeURIComponent(recipientEmail);
   const tokenBaja = generateUnsubscribeToken(recipientEmail, empresaId, 'baja');
   const tokenAlta = generateUnsubscribeToken(recipientEmail, empresaId, 'alta');
-  return `
-<!DOCTYPE html>
+
+  return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body style="margin: 0; padding: 20px; background-color: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-  <div style="max-width: 500px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-    ${empresaLogoUrl ? `<img src="${escapeHtml(empresaLogoUrl)}" alt="${escapeHtml(empresaNombre)}" style="width: 100%; max-width: 200px; display: block; margin: 20px auto;">` : ''}
-    <div style="padding: 20px;">
-      <h2 style="margin: 0 0 16px; color: #333; text-align: center;">Nueva promoción disponible</h2>
-      <div style="background-color: #f9f9f9; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
-        <p style="margin: 0; color: #555; line-height: 1.6;">${textoEscapado}</p>
+<body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <div style="max-width: 540px; margin: 24px auto; background: #fff; border-radius: 20px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.10);">
+    <!-- Header con gradiente -->
+    <div style="background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); padding: 30px 24px 26px; text-align: center;">
+      ${empresaLogoUrl ? `<div style="margin-bottom: 16px;"><img src="${escapeHtml(empresaLogoUrl)}" alt="${escapeHtml(empresaNombre)}" style="max-width: 110px; max-height: 48px; object-fit: contain;"></div>` : ''}
+      <div style="display: inline-block; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); border-radius: 20px; padding: 5px 16px; margin-bottom: 14px;">
+        <span style="font-size: 11px; font-weight: 700; color: #fff; letter-spacing: 1.5px; text-transform: uppercase;">Promocion</span>
       </div>
-      ${imagen_url ? `<img src="${escapeHtml(imagen_url)}" alt="Promoción" style="width: 100%; border-radius: 8px; margin-bottom: 16px;">` : ''}
-      ${fechaFinFormatted ? `<p style="margin: 0 0 16px; font-size: 13px; color: #666; text-align: center; background-color: #fff8e1; border-radius: 6px; padding: 8px 12px;">⏰ Oferta válida hasta el <strong>${escapeHtml(fechaFinFormatted)}</strong></p>` : ''}
-      <p style="margin: 16px 0 8px; font-size: 12px; color: #999; text-align: center;">
-        <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=baja&token=${tokenBaja}" style="color: #dc2626; text-decoration: underline;">Dar de baja las promociones</a>
-      </p>
-      <p style="margin: 0; font-size: 12px; color: #999; text-align: center;">
-        <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=alta&token=${tokenAlta}" style="color: #16a34a; text-decoration: underline;">Volver a dar de alta</a>
-      </p>
+      <h1 style="margin: 0 0 8px; font-size: 28px; font-weight: 800; color: #fff; line-height: 1.2;">Nueva oferta especial</h1>
+      <p style="margin: 0; font-size: 14px; color: rgba(255,255,255,0.85); font-weight: 500;">No te pierdas nuestras mejores promociones</p>
+    </div>
+
+    <!-- Contenido -->
+    <div style="padding: 24px 24px 20px;">
+      <!-- Card de promocion -->
+      <div style="border: 1px solid #e5e7eb; border-radius: 14px; overflow: hidden; margin-bottom: 20px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+        ${imagen_url ? `<img src="${escapeHtml(imagen_url)}" alt="Promocion" style="width: 100%; height: 200px; object-fit: cover; display: block;">` : ''}
+        <div style="padding: 20px;">
+          <p style="margin: 0; font-size: 16px; color: #374151; line-height: 1.7; font-weight: 500;">${textoEscapado}</p>
+        </div>
+      </div>
+
+      <!-- Fecha de fin si existe -->
+      ${fechaFinFormatted ? `
+      <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 1px solid #fcd34d; border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; text-align: center;">
+        <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+          <span style="font-size: 20px;">⏰</span>
+          <div>
+            <p style="margin: 0; font-size: 12px; color: #92400e; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Oferta valida hasta</p>
+            <p style="margin: 2px 0 0 0; font-size: 18px; color: #78350f; font-weight: 800;">${escapeHtml(fechaFinFormatted)}</p>
+          </div>
+        </div>
+      </div>
+      ` : ''}
+
+      <!-- CTA para ver menu -->
+      <a href="${escapeHtml(baseUrl)}" style="display: block; width: 100%; box-sizing: border-box; text-align: center; background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); color: #fff; font-size: 15px; font-weight: 700; padding: 14px 0; border-radius: 10px; text-decoration: none; letter-spacing: 0.2px; margin-bottom: 20px;">
+        Ver catalogo completo
+      </a>
+
+      <!-- Links de suscripcion -->
+      <div style="border-top: 1px solid #f3f4f6; padding-top: 16px; text-align: center;">
+        <p style="margin: 0 0 6px; font-size: 12px; color: #9ca3af;">
+          No quieres recibir mas ofertas? <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=baja&token=${tokenBaja}" style="color: #dc2626; text-decoration: underline;">Darse de baja</a>
+        </p>
+        <p style="margin: 0; font-size: 12px; color: #9ca3af;">
+          Cambiaste de opinion? <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=alta&token=${tokenAlta}" style="color: #7c3aed; text-decoration: underline;">Volver a suscribirse</a>
+        </p>
+      </div>
     </div>
   </div>
 </body>

@@ -319,7 +319,7 @@ export default function TooGoodToGoPage() {
   };
 
   const handleDeleteCampaign = async (promoId: string) => {
-    if (!confirm('¿Eliminar esta campaña? Esta acción no se puede deshacer.')) return;
+    if (!confirm(t('tgtgDeleteCampaignConfirm', language))) return;
     setDeletingId(promoId);
     try {
       const res = await fetchWithCsrf(
@@ -330,12 +330,20 @@ export default function TooGoodToGoPage() {
         setTgtgCampaigns(prev => prev.filter(c => c.id !== promoId));
         setSelectedPromoIds(prev => { const s = new Set(prev); s.delete(promoId); return s; });
       } else {
-        const data = await res.json().catch(() => ({})) as { error?: string };
-        alert(data.error || 'Error al eliminar la campaña.');
+        const data = await res.json().catch(() => ({})) as { code?: string; error?: string };
+        const errorMsg = data.error || t('tgtgDeleteCampaignError', language);
+        // Map backend error codes to translation keys
+        if (data.code === 'ALREADY_SENT') {
+          alert(t('tgtgCannotDeleteSent', language));
+        } else if (data.code === 'HAS_RESERVAS') {
+          alert(t('tgtgCannotDeleteWithReservas', language));
+        } else {
+          alert(errorMsg);
+        }
       }
     } catch (error) {
       logClientError(error, 'handleDeleteCampaign');
-      alert('Error al eliminar la campaña.');
+      alert(t('tgtgDeleteCampaignError', language));
     } finally {
       setDeletingId(null);
     }
@@ -594,9 +602,9 @@ export default function TooGoodToGoPage() {
               className="bg-green-600 hover:bg-green-700 text-white"
             >
               {tgtgSaving || anyItemUploading ? (
-                <><Loader2 className="w-4 h-4 animate-spin" />{t("sendingProgress", language)}</>
+                <><Loader2 className="w-4 h-4 animate-spin" />{t("creatingProgress", language)}</>
               ) : (
-                <><Plus className="w-4 h-4" />Crear campaña</>
+                <><Plus className="w-4 h-4" />{t("tgtgSendCampaign", language)}</>
               )}
             </Button>
           )}
@@ -792,11 +800,11 @@ export default function TooGoodToGoPage() {
       {selectedPromoIds.size > 0 && (
         <div className="fixed bottom-0 left-0 right-0 z-40 bg-card border-t shadow-xl p-4 flex items-center justify-between gap-4 flex-wrap lg:left-64">
           <span className="text-sm font-medium text-foreground">
-            {selectedPromoIds.size} campaña(s) seleccionada(s)
+            {selectedPromoIds.size} {t("tgtgCampaignSelected", language)}
           </span>
           <div className="flex gap-3">
             <Button variant="outline" onClick={() => setSelectedPromoIds(new Set())}>
-              Cancelar
+              {t("cancel", language)}
             </Button>
             <Button
               onClick={() => setShowConfirmModal(true)}
@@ -804,9 +812,9 @@ export default function TooGoodToGoPage() {
               disabled={sendingEmails}
             >
               {sendingEmails ? (
-                <><Loader2 className="w-4 h-4 animate-spin" />Enviando...</>
+                <><Loader2 className="w-4 h-4 animate-spin" />{t("sendingProgress", language)}</>
               ) : (
-                <><Send className="w-4 h-4" />Enviar email seleccionadas</>
+                <><Send className="w-4 h-4" />{t("tgtgSendEmailSelected", language)}</>
               )}
             </Button>
           </div>
