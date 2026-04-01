@@ -27,8 +27,10 @@ function buildEmailHtml(params: {
   baseUrl: string;
   empresaId: string;
   recipientEmail: string;
+  primaryColor: string;
+  primaryForeground: string;
 }): string {
-  const { empresaLogoUrl, empresaNombre, textoEscapado, imagen_url, fecha_fin, baseUrl, empresaId, recipientEmail } = params;
+  const { empresaLogoUrl, empresaNombre, textoEscapado, imagen_url, fecha_fin, baseUrl, empresaId, recipientEmail, primaryColor, primaryForeground } = params;
 
   const fechaFinFormatted = fecha_fin
     ? new Date(fecha_fin).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })
@@ -36,6 +38,9 @@ function buildEmailHtml(params: {
   const encodedEmail = encodeURIComponent(recipientEmail);
   const tokenBaja = generateUnsubscribeToken(recipientEmail, empresaId, 'baja');
   const tokenAlta = generateUnsubscribeToken(recipientEmail, empresaId, 'alta');
+
+  // Darker shade for gradient end
+  const primaryDarker = adjustColorBrightness(primaryColor, -20);
 
   return `<!DOCTYPE html>
 <html>
@@ -45,13 +50,13 @@ function buildEmailHtml(params: {
 </head>
 <body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
   <div style="max-width: 540px; margin: 24px auto; background: #fff; border-radius: 20px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.10);">
-    <!-- Header con gradiente -->
-    <div style="background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); padding: 30px 24px 26px; text-align: center;">
+    <!-- Header con gradiente usando color de la empresa -->
+    <div style="background: linear-gradient(135deg, ${primaryColor} 0%, ${primaryDarker} 100%); padding: 30px 24px 26px; text-align: center;">
       ${empresaLogoUrl ? `<div style="margin-bottom: 16px;"><img src="${escapeHtml(empresaLogoUrl)}" alt="${escapeHtml(empresaNombre)}" style="max-width: 110px; max-height: 48px; object-fit: contain;"></div>` : ''}
       <div style="display: inline-block; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); border-radius: 20px; padding: 5px 16px; margin-bottom: 14px;">
-        <span style="font-size: 11px; font-weight: 700; color: #fff; letter-spacing: 1.5px; text-transform: uppercase;">Promocion</span>
+        <span style="font-size: 11px; font-weight: 700; color: ${primaryForeground}; letter-spacing: 1.5px; text-transform: uppercase;">Promocion</span>
       </div>
-      <h1 style="margin: 0 0 8px; font-size: 28px; font-weight: 800; color: #fff; line-height: 1.2;">Nueva oferta especial</h1>
+      <h1 style="margin: 0 0 8px; font-size: 28px; font-weight: 800; color: ${primaryForeground}; line-height: 1.2;">Nueva oferta especial</h1>
       <p style="margin: 0; font-size: 14px; color: rgba(255,255,255,0.85); font-weight: 500;">No te pierdas nuestras mejores promociones</p>
     </div>
 
@@ -78,18 +83,18 @@ function buildEmailHtml(params: {
       </div>
       ` : ''}
 
-      <!-- CTA para ver menu -->
-      <a href="${escapeHtml(baseUrl)}" style="display: block; width: 100%; box-sizing: border-box; text-align: center; background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); color: #fff; font-size: 15px; font-weight: 700; padding: 14px 0; border-radius: 10px; text-decoration: none; letter-spacing: 0.2px; margin-bottom: 24px;">
-        Ver nuestra web
+      <!-- CTA para ver menu con icono y color de la empresa -->
+      <a href="${escapeHtml(baseUrl)}" style="display: block; width: 100%; box-sizing: border-box; text-align: center; background: linear-gradient(135deg, ${primaryColor} 0%, ${primaryDarker} 100%); color: ${primaryForeground}; font-size: 15px; font-weight: 700; padding: 14px 0; border-radius: 10px; text-decoration: none; letter-spacing: 0.2px; margin-bottom: 24px;">
+        🌐 Ver nuestra web
       </a>
 
       <!-- Links de suscripcion -->
       <div style="border-top: 1px solid #f3f4f6; padding-top: 20px; padding-bottom: 8px; text-align: center;">
         <p style="margin: 0 0 10px; font-size: 13px; color: #6b7280;">
-          <span style="margin-right: 6px;">❌</span>No quieres recibir mas ofertas? <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=baja&token=${tokenBaja}" style="color: #dc2626; text-decoration: underline;">Darse de baja</a>
+          <span style="color: #dc2626;">❌</span> No quieres recibir mas ofertas? <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=baja&token=${tokenBaja}" style="color: ${primaryColor}; text-decoration: underline;">Darse de baja</a>
         </p>
         <p style="margin: 0; font-size: 13px; color: #6b7280;">
-          <span style="margin-right: 6px;">🔄</span>Cambiaste de opinion? <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=alta&token=${tokenAlta}" style="color: #7c3aed; text-decoration: underline;">Volver a suscribirse</a>
+          <span style="color: ${primaryColor};">🔄</span> Cambiaste de opinion? <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=alta&token=${tokenAlta}" style="color: ${primaryColor}; text-decoration: underline;">Volver a suscribirse</a>
         </p>
       </div>
     </div>
@@ -97,6 +102,16 @@ function buildEmailHtml(params: {
   <div style="height: 24px;"></div>
 </body>
 </html>`;
+}
+
+// Helper function to darken/lighten a hex color
+function adjustColorBrightness(hex: string, percent: number): string {
+  const num = parseInt(hex.replace('#', ''), 16);
+  const amt = Math.round(2.55 * percent);
+  const R = Math.max(0, Math.min(255, (num >> 16) + amt));
+  const G = Math.max(0, Math.min(255, ((num >> 8) & 0x00FF) + amt));
+  const B = Math.max(0, Math.min(255, (num & 0x0000FF) + amt));
+  return `#${(0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1).toUpperCase()}`;
 }
 
 export async function GET(request: NextRequest) {
@@ -197,6 +212,8 @@ export async function POST(request: NextRequest) {
               baseUrl,
               empresaId: empresaId!,
               recipientEmail: email,
+              primaryColor: empresa.colores?.primary || '#7c3aed',
+              primaryForeground: empresa.colores?.primaryForeground || '#FFFFFF',
             });
             await sendEmail({
               to: [email],

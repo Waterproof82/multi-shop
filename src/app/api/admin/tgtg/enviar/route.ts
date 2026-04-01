@@ -83,16 +83,17 @@ function buildTgtgEmailHtml(params: {
     </div>
     <div style="padding:24px 24px 20px;">
       ${campaignSections}
-      <div style="border-top:1px solid #f3f4f6;padding-top:16px;text-align:center;">
-        <p style="margin:0 0 6px;font-size:12px;color:#9ca3af;">
-          ¿No quieres recibir más ofertas? <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=baja&token=${tokenBaja}" style="color:#dc2626;text-decoration:underline;">Darse de baja</a>
+      <div style="border-top:1px solid #f3f4f6;padding-top:20px;padding-bottom:8px;text-align:center;">
+        <p style="margin:0 0 10px;font-size:13px;color:#6b7280;">
+          <span style="color:#dc2626;">❌</span> ¿No quieres recibir más ofertas? <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=baja&token=${tokenBaja}" style="color:#dc2626;text-decoration:underline;">Darse de baja</a>
         </p>
-        <p style="margin:0;font-size:12px;color:#9ca3af;">
-          ¿Cambiaste de opinión? <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=alta&token=${tokenAlta}" style="color:#16a34a;text-decoration:underline;">Volver a suscribirse</a>
+        <p style="margin:0;font-size:13px;color:#6b7280;">
+          <span style="color:#16a34a;">🔄</span> ¿Cambiaste de opinión? <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=alta&token=${tokenAlta}" style="color:#16a34a;text-decoration:underline;">Volver a suscribirse</a>
         </p>
       </div>
     </div>
   </div>
+  <div style="height:24px;"></div>
 </body>
 </html>`;
 }
