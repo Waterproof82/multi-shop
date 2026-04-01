@@ -279,7 +279,7 @@ export async function POST(request: NextRequest) {
             const token = generateReservaToken(target.email, item.id, c.promoId);
             return {
               ...item,
-              reservaUrl: `${baseUrl}/?tgtg=confirm&itemId=${encodeURIComponent(item.id)}&promoId=${encodeURIComponent(c.promoId)}&email=${encodeURIComponent(target.email)}&token=${encodeURIComponent(token)}`,
+              reservaUrl: `${baseUrl}/?tgtg=confirm&itemId=${encodeURIComponent(item.id)}&promoId=${encodeURIComponent(c.promoId)}&email=${encodeURIComponent(target.email)}&token=${encodeURIComponent(token)}&lang=${encodeURIComponent(lang)}`,
             };
           }),
         }));

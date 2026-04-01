@@ -4,15 +4,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense, useEffect, useState, useCallback } from "react";
 import { useLanguage, type Language } from "@/lib/language-context";
 import { t } from "@/lib/translations";
-import { CheckCircle, XCircle, ShoppingBag, X, Loader2, Globe } from "lucide-react";
-
-const SUPPORTED_LANGUAGES: { code: Language; label: string; flag: string }[] = [
-  { code: "es", label: "Español", flag: "🇪🇸" },
-  { code: "en", label: "English", flag: "🇬🇧" },
-  { code: "fr", label: "Français", flag: "🇫🇷" },
-  { code: "it", label: "Italiano", flag: "🇮🇹" },
-  { code: "de", label: "Deutsch", flag: "🇩🇪" },
-];
+import { CheckCircle, ShoppingBag, X, Loader2 } from "lucide-react";
 
 interface TgtgItemPublic {
   id: string;
@@ -35,26 +27,24 @@ type PopupState =
   | { mode: "loading" }
   | null;
 
-// Detect browser language
-function detectBrowserLanguage(): Language {
-  if (typeof navigator === "undefined") return "es";
-  const browserLang = navigator.language || (navigator as unknown as { userLanguage?: string }).userLanguage || "es";
-  const lang = browserLang.split("-")[0].toLowerCase();
-  if (["es", "en", "fr", "it", "de"].includes(lang)) {
-    return lang as Language;
-  }
-  return "es";
-}
+const SUPPORTED_LANGS: Language[] = ["es", "en", "fr", "it", "de"];
 
-// Get effective language (context, localStorage, or browser)
-function getEffectiveLanguage(contextLanguage: Language): Language {
-  // If context has a saved preference, use it
-  const storedLang = localStorage.getItem("preferred-language");
-  if (storedLang && ["es", "en", "fr", "it", "de"].includes(storedLang)) {
-    return storedLang as Language;
+function resolveLanguage(urlLang: string | null, contextLanguage: Language): Language {
+  // 1. Lang from email URL param (highest priority — client received email in this language)
+  if (urlLang && SUPPORTED_LANGS.includes(urlLang as Language)) {
+    return urlLang as Language;
   }
-  // If no preference saved, detect browser language
-  return detectBrowserLanguage();
+  // 2. User's saved preference
+  if (typeof localStorage !== "undefined") {
+    const stored = localStorage.getItem("preferred-language");
+    if (stored && SUPPORTED_LANGS.includes(stored as Language)) return stored as Language;
+  }
+  // 3. Browser language
+  if (typeof navigator !== "undefined") {
+    const lang = (navigator.language || "es").split("-")[0].toLowerCase();
+    if (SUPPORTED_LANGS.includes(lang as Language)) return lang as Language;
+  }
+  return contextLanguage;
 }
 
 function TgtgReservaPopupInner() {
@@ -64,12 +54,12 @@ function TgtgReservaPopupInner() {
   const [state, setState] = useState<PopupState>(null);
   const [submitting, setSubmitting] = useState(false);
   const [effectiveLang, setEffectiveLang] = useState<Language>("es");
-  const [showLangDropdown, setShowLangDropdown] = useState(false);
 
-  // Determine effective language on mount (after context is ready)
+  // Determine effective language — URL param from email takes priority
   useEffect(() => {
-    setEffectiveLang(getEffectiveLanguage(contextLanguage));
-  }, [contextLanguage]);
+    const urlLang = searchParams.get("lang");
+    setEffectiveLang(resolveLanguage(urlLang, contextLanguage));
+  }, [searchParams, contextLanguage]);
 
   const cleanUrl = useCallback(() => {
     const url = new URL(globalThis.location.href);
@@ -78,6 +68,7 @@ function TgtgReservaPopupInner() {
     url.searchParams.delete("promoId");
     url.searchParams.delete("email");
     url.searchParams.delete("token");
+    url.searchParams.delete("lang");
     router.replace(url.pathname + (url.search !== "?" ? url.search : ""), { scroll: false });
   }, [router]);
 
@@ -254,42 +245,6 @@ function TgtgReservaPopupInner() {
             <span className="font-semibold text-foreground text-sm">TooGoodToGo</span>
           </div>
           <div className="flex items-center gap-2">
-            {/* Language selector */}
-            <div className="relative">
-              <button
-                onClick={() => setShowLangDropdown(!showLangDropdown)}
-                className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                aria-label={t("selectLanguage", effectiveLang)}
-              >
-                <Globe className="w-4 h-4" />
-                <span className="uppercase font-medium">{effectiveLang}</span>
-              </button>
-              {showLangDropdown && (
-                <>
-                  <div
-                    className="fixed inset-0 z-10"
-                    onClick={() => setShowLangDropdown(false)}
-                  />
-                  <div className="absolute right-0 top-full mt-1 bg-card border border-border rounded-lg shadow-lg overflow-hidden z-20 min-w-[140px]">
-                    {SUPPORTED_LANGUAGES.map((lang) => (
-                      <button
-                        key={lang.code}
-                        onClick={() => {
-                          setEffectiveLang(lang.code);
-                          setShowLangDropdown(false);
-                        }}
-                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-muted transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                          effectiveLang === lang.code ? "bg-muted font-medium" : ""
-                        }`}
-                      >
-                        <span>{lang.flag}</span>
-                        <span>{lang.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
             <button
               onClick={handleDismiss}
               aria-label={t("tgtgCancelButton", effectiveLang)}
