@@ -18,6 +18,82 @@ const createPromocionSchema = z.object({
   fecha_fin: z.string().datetime({ offset: true }),
 });
 
+// Textos del email de promociones por idioma
+const PROMO_EMAIL_TEXTS: Record<string, {
+  badge: string;
+  title: string;
+  subtitle: string;
+  validUntil: string;
+  viewWebsite: string;
+  unsubscribeQuestion: string;
+  unsubscribeLink: string;
+  resubscribeQuestion: string;
+  resubscribeLink: string;
+}> = {
+  es: {
+    badge: "Promocion",
+    title: "Nueva oferta especial",
+    subtitle: "No te pierdas nuestras mejores promociones",
+    validUntil: "Oferta valida hasta",
+    viewWebsite: "Ver nuestra web",
+    unsubscribeQuestion: "¿No quieres recibir mas ofertas?",
+    unsubscribeLink: "Darse de baja",
+    resubscribeQuestion: "¿Cambiaste de opinion?",
+    resubscribeLink: "Volver a suscribirse",
+  },
+  en: {
+    badge: "Promotion",
+    title: "New special offer",
+    subtitle: "Don't miss our best promotions",
+    validUntil: "Offer valid until",
+    viewWebsite: "View our website",
+    unsubscribeQuestion: "Don't want to receive more offers?",
+    unsubscribeLink: "Unsubscribe",
+    resubscribeQuestion: "Changed your mind?",
+    resubscribeLink: "Subscribe again",
+  },
+  fr: {
+    badge: "Promotion",
+    title: "Nouvelle offre speciale",
+    subtitle: "Ne manquez pas nos meilleures promotions",
+    validUntil: "Offre valable jusqu'au",
+    viewWebsite: "Voir notre site",
+    unsubscribeQuestion: "Vous ne souhaitez plus recevoir d'offres?",
+    unsubscribeLink: "Se desinscrire",
+    resubscribeQuestion: "Vous avez change d'avis?",
+    resubscribeLink: "Se reinscrire",
+  },
+  it: {
+    badge: "Promozione",
+    title: "Nuova offerta speciale",
+    subtitle: "Non perderti le nostre migliori promozioni",
+    validUntil: "Offerta valida fino al",
+    viewWebsite: "Vedi il nostro sito",
+    unsubscribeQuestion: "Non vuoi piu ricevere offerte?",
+    unsubscribeLink: "Annulla iscrizione",
+    resubscribeQuestion: "Hai cambiato idea?",
+    resubscribeLink: "Riiscriviti",
+  },
+  de: {
+    badge: "Aktion",
+    title: "Neues Sonderangebot",
+    subtitle: "Verpassen Sie nicht unsere besten Angebote",
+    validUntil: "Angebot gultig bis",
+    viewWebsite: "Unsere Website ansehen",
+    unsubscribeQuestion: "Keine weiteren Angebote mehr erhalten?",
+    unsubscribeLink: "Abmelden",
+    resubscribeQuestion: "Meinung geandert?",
+    resubscribeLink: "Erneut anmelden",
+  },
+};
+
+function getLocaleForLang(lang: string): string {
+  const locales: Record<string, string> = {
+    es: 'es-ES', en: 'en-GB', fr: 'fr-FR', it: 'it-IT', de: 'de-DE',
+  };
+  return locales[lang] || 'es-ES';
+}
+
 function buildEmailHtml(params: {
   empresaLogoUrl: string;
   empresaNombre: string;
@@ -29,11 +105,14 @@ function buildEmailHtml(params: {
   recipientEmail: string;
   primaryColor: string;
   primaryForeground: string;
+  lang?: string;
 }): string {
-  const { empresaLogoUrl, empresaNombre, textoEscapado, imagen_url, fecha_fin, baseUrl, empresaId, recipientEmail, primaryColor, primaryForeground } = params;
+  const { empresaLogoUrl, empresaNombre, textoEscapado, imagen_url, fecha_fin, baseUrl, empresaId, recipientEmail, primaryColor, primaryForeground, lang = 'es' } = params;
+  const texts = PROMO_EMAIL_TEXTS[lang] || PROMO_EMAIL_TEXTS.es;
+  const locale = getLocaleForLang(lang);
 
   const fechaFinFormatted = fecha_fin
-    ? new Date(fecha_fin).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })
+    ? new Date(fecha_fin).toLocaleDateString(locale, { day: '2-digit', month: 'long', year: 'numeric' })
     : null;
   const encodedEmail = encodeURIComponent(recipientEmail);
   const tokenBaja = generateUnsubscribeToken(recipientEmail, empresaId, 'baja');
@@ -54,10 +133,10 @@ function buildEmailHtml(params: {
     <div style="background: linear-gradient(135deg, ${primaryColor} 0%, ${primaryDarker} 100%); padding: 30px 24px 26px; text-align: center;">
       ${empresaLogoUrl ? `<div style="margin-bottom: 16px;"><img src="${escapeHtml(empresaLogoUrl)}" alt="${escapeHtml(empresaNombre)}" style="max-width: 110px; max-height: 48px; object-fit: contain;"></div>` : ''}
       <div style="display: inline-block; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); border-radius: 20px; padding: 5px 16px; margin-bottom: 14px;">
-        <span style="font-size: 11px; font-weight: 700; color: ${primaryForeground}; letter-spacing: 1.5px; text-transform: uppercase;">Promocion</span>
+        <span style="font-size: 11px; font-weight: 700; color: ${primaryForeground}; letter-spacing: 1.5px; text-transform: uppercase;">${texts.badge}</span>
       </div>
-      <h1 style="margin: 0 0 8px; font-size: 28px; font-weight: 800; color: ${primaryForeground}; line-height: 1.2;">Nueva oferta especial</h1>
-      <p style="margin: 0; font-size: 14px; color: rgba(255,255,255,0.85); font-weight: 500;">No te pierdas nuestras mejores promociones</p>
+      <h1 style="margin: 0 0 8px; font-size: 28px; font-weight: 800; color: ${primaryForeground}; line-height: 1.2;">${texts.title}</h1>
+      <p style="margin: 0; font-size: 14px; color: rgba(255,255,255,0.85); font-weight: 500;">${texts.subtitle}</p>
     </div>
 
     <!-- Contenido -->
@@ -76,7 +155,7 @@ function buildEmailHtml(params: {
         <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
           <span style="font-size: 20px;">⏰</span>
           <div>
-            <p style="margin: 0; font-size: 12px; color: #92400e; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Oferta valida hasta</p>
+            <p style="margin: 0; font-size: 12px; color: #92400e; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">${texts.validUntil}</p>
             <p style="margin: 2px 0 0 0; font-size: 18px; color: #78350f; font-weight: 800;">${escapeHtml(fechaFinFormatted)}</p>
           </div>
         </div>
@@ -85,16 +164,16 @@ function buildEmailHtml(params: {
 
       <!-- CTA para ver menu con icono y color de la empresa -->
       <a href="${escapeHtml(baseUrl)}" style="display: block; width: 100%; box-sizing: border-box; text-align: center; background: linear-gradient(135deg, ${primaryColor} 0%, ${primaryDarker} 100%); color: ${primaryForeground}; font-size: 15px; font-weight: 700; padding: 14px 0; border-radius: 10px; text-decoration: none; letter-spacing: 0.2px; margin-bottom: 24px;">
-        🌐 Ver nuestra web
+        🌐 ${texts.viewWebsite}
       </a>
 
       <!-- Links de suscripcion -->
       <div style="border-top: 1px solid #f3f4f6; padding-top: 20px; padding-bottom: 8px; text-align: center;">
         <p style="margin: 0 0 10px; font-size: 13px; color: #6b7280;">
-          <span style="color: #dc2626;">❌</span> No quieres recibir mas ofertas? <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=baja&token=${tokenBaja}" style="color: ${primaryColor}; text-decoration: underline;">Darse de baja</a>
+          <span style="color: #dc2626;">❌</span> ${texts.unsubscribeQuestion} <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=baja&token=${tokenBaja}" style="color: ${primaryColor}; text-decoration: underline;">${texts.unsubscribeLink}</a>
         </p>
         <p style="margin: 0; font-size: 13px; color: #6b7280;">
-          <span style="color: ${primaryColor};">🔄</span> Cambiaste de opinion? <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=alta&token=${tokenAlta}" style="color: ${primaryColor}; text-decoration: underline;">Volver a suscribirse</a>
+          <span style="color: ${primaryColor};">🔄</span> ${texts.resubscribeQuestion} <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=alta&token=${tokenAlta}" style="color: ${primaryColor}; text-decoration: underline;">${texts.resubscribeLink}</a>
         </p>
       </div>
     </div>
@@ -201,8 +280,18 @@ export async function POST(request: NextRequest) {
         const requestOrigin = new URL(request.url).origin;
         const baseUrl = empresa.dominio ? `https://${empresa.dominio}` : requestOrigin;
 
-        for (const email of emailTargets) {
+        // Subjects por idioma
+        const subjects: Record<string, string> = {
+          es: 'Nueva promocion disponible',
+          en: 'New promotion available',
+          fr: 'Nouvelle promotion disponible',
+          it: 'Nuova promozione disponibile',
+          de: 'Neues Angebot verfugbar',
+        };
+
+        for (const target of emailTargets) {
           try {
+            const lang = target.idioma || 'es';
             const personalizedHtml = buildEmailHtml({
               empresaLogoUrl,
               empresaNombre: empresa.nombre || 'Empresa',
@@ -211,13 +300,14 @@ export async function POST(request: NextRequest) {
               fecha_fin: fecha_fin ?? null,
               baseUrl,
               empresaId: empresaId!,
-              recipientEmail: email,
+              recipientEmail: target.email,
               primaryColor: empresa.colores?.primary || '#7c3aed',
               primaryForeground: empresa.colores?.primaryForeground || '#FFFFFF',
+              lang,
             });
             await sendEmail({
-              to: [email],
-              subject: 'Nueva promocion disponible',
+              to: [target.email],
+              subject: subjects[lang] || subjects.es,
               htmlContent: personalizedHtml,
               senderName: empresa.nombre || 'Promociones',
               senderEmail,

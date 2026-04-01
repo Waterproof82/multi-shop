@@ -6,7 +6,7 @@ import { logger } from "@/core/infrastructure/logging/logger";
 export interface CreatePromocionResult {
   promo: Promocion;
   oldImageUrl: string | null;
-  emailTargets: string[];
+  emailTargets: Array<{ email: string; idioma: string | null }>;
 }
 
 export class PromocionUseCase {
@@ -42,7 +42,7 @@ export class PromocionUseCase {
       const clientes = clientesResult.data;
       const emailTargets = clientes
         .filter(c => c.aceptar_promociones && c.email)
-        .map(c => c.email as string);
+        .map(c => ({ email: c.email as string, idioma: c.idioma }));
 
       const oldImageUrl = oldPromosResult.success && oldPromosResult.data[0] ? oldPromosResult.data[0].imagen_url : null;
 
