@@ -95,7 +95,7 @@ export class PedidoUseCase {
         const updateResult = await this.clienteRepo.update(existingCliente.id, empresaId, {
           nombre: data.nombre,
           email: data.email || null,
-          idioma: data.idioma || null,
+          idioma: data.idioma,
         });
         if (!updateResult.success) {
           return { success: false, error: updateResult.error };

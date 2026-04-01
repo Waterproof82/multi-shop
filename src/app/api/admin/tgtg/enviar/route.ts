@@ -313,12 +313,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Mark all promos as sent
+    // Mark all promos as sent — only if at least one email was delivered
     const updatedPromos: Array<{ id: string; emailEnviado: boolean; numeroEnvios: number }> = [];
-    for (const c of campaignsToSend) {
-      const markResult = await tgtgUseCase.markEmailSent(empresaId!, c.promoId, emailsSent);
-      if (markResult.success) {
-        updatedPromos.push({ id: markResult.data.id, emailEnviado: markResult.data.emailEnviado, numeroEnvios: markResult.data.numeroEnvios });
+    if (emailsSent > 0) {
+      for (const c of campaignsToSend) {
+        const markResult = await tgtgUseCase.markEmailSent(empresaId!, c.promoId, emailsSent);
+        if (markResult.success) {
+          updatedPromos.push({ id: markResult.data.id, emailEnviado: markResult.data.emailEnviado, numeroEnvios: markResult.data.numeroEnvios });
+        }
       }
     }
 
