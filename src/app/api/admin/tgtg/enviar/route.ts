@@ -294,6 +294,20 @@ export async function POST(request: NextRequest) {
         const subjectText = subjects[lang] || subjects.es;
         const subject = campaigns.length === 1 ? subjectText.single : subjectText.multiple;
 
+        const texts = TGTG_EMAIL_TEXTS[lang] || TGTG_EMAIL_TEXTS.es;
+        const locale = getLocaleForLang(lang);
+        const plainLines: string[] = [`${empresa.nombre || 'Empresa'} — ${texts.title}`, ''];
+        for (const c of campaigns) {
+          const dateLabel = new Date(c.fechaActivacion + 'T00:00:00').toLocaleDateString(locale, { weekday: 'long', day: '2-digit', month: 'long' });
+          plainLines.push(`${dateLabel} | ${texts.pickupTime}: ${c.horaInicio}–${c.horaFin}`);
+          for (const item of c.items) {
+            plainLines.push(`  - ${item.titulo}: €${Number(item.precioDescuento).toFixed(2)} (${item.cuponesDisponibles} ${texts.disponible})`);
+            plainLines.push(`    ${item.reservaUrl}`);
+          }
+          plainLines.push('');
+        }
+        plainLines.push(`${baseUrl}/api/unsubscribe?email=${encodeURIComponent(target.email)}&empresa=${empresaId}&action=baja`);
+
         await sendEmail({
           to: [target.email],
           subject,
@@ -306,6 +320,7 @@ export async function POST(request: NextRequest) {
             recipientEmail: target.email,
             lang,
           }),
+          textContent: plainLines.join('\n'),
           senderName: empresa.nombre || 'Promociones',
           senderEmail,
         });

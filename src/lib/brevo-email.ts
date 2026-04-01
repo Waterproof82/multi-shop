@@ -12,11 +12,12 @@ export interface SendEmailParams {
   to: string | string[];
   subject: string;
   htmlContent: string;
+  textContent?: string;
   senderName?: string;
   senderEmail?: string;
 }
 
-export async function sendEmail({ to, subject, htmlContent, senderName = 'Pedidos', senderEmail }: SendEmailParams) {
+export async function sendEmail({ to, subject, htmlContent, textContent, senderName = 'Pedidos', senderEmail }: SendEmailParams) {
   const apiKey = getBrevoApiKey();
 
   const resolvedSenderEmail = senderEmail || process.env.BREVO_DEFAULT_SENDER_EMAIL;
@@ -28,12 +29,16 @@ export async function sendEmail({ to, subject, htmlContent, senderName = 'Pedido
     ? to.map(email => ({ email }))
     : [{ email: to }];
 
-  const payload = {
+  const payload: Record<string, unknown> = {
     subject,
     htmlContent,
     sender: { name: senderName, email: resolvedSenderEmail },
     to: recipients,
   };
+
+  if (textContent) {
+    payload.textContent = textContent;
+  }
 
   try {
     const response = await fetch('https://api.brevo.com/v3/smtp/email', {

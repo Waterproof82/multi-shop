@@ -305,10 +305,26 @@ export async function POST(request: NextRequest) {
               primaryForeground: empresa.colores?.primaryForeground || '#FFFFFF',
               lang,
             });
+            const texts = PROMO_EMAIL_TEXTS[lang] || PROMO_EMAIL_TEXTS.es;
+            const locale = getLocaleForLang(lang);
+            const fechaFinPlain = fecha_fin
+              ? new Date(fecha_fin).toLocaleDateString(locale, { day: '2-digit', month: 'long', year: 'numeric' })
+              : null;
+            const plainLines = [
+              `${empresa.nombre || 'Empresa'} — ${texts.title}`,
+              '',
+              texto_promocion,
+              ...(fechaFinPlain ? ['', `${texts.validUntil}: ${fechaFinPlain}`] : []),
+              '',
+              `${texts.viewWebsite}: ${baseUrl}`,
+              '',
+              `${texts.unsubscribeLink}: ${baseUrl}/api/unsubscribe?email=${encodeURIComponent(target.email)}&empresa=${empresaId}&action=baja`,
+            ];
             await sendEmail({
               to: [target.email],
               subject: subjects[lang] || subjects.es,
               htmlContent: personalizedHtml,
+              textContent: plainLines.join('\n'),
               senderName: empresa.nombre || 'Promociones',
               senderEmail,
             });
