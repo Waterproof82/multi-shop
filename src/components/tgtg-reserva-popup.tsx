@@ -2,7 +2,7 @@
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense, useEffect, useState, useCallback } from "react";
-import { useLanguage } from "@/lib/language-context";
+import { useLanguage, type Language } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { CheckCircle, XCircle, ShoppingBag, X, Loader2 } from "lucide-react";
 
@@ -27,12 +27,40 @@ type PopupState =
   | { mode: "loading" }
   | null;
 
+// Detect browser language
+function detectBrowserLanguage(): Language {
+  if (typeof navigator === "undefined") return "es";
+  const browserLang = navigator.language || (navigator as unknown as { userLanguage?: string }).userLanguage || "es";
+  const lang = browserLang.split("-")[0].toLowerCase();
+  if (["es", "en", "fr", "it", "de"].includes(lang)) {
+    return lang as Language;
+  }
+  return "es";
+}
+
+// Get effective language (context, localStorage, or browser)
+function getEffectiveLanguage(contextLanguage: Language): Language {
+  // If context has a saved preference, use it
+  const storedLang = localStorage.getItem("preferred-language");
+  if (storedLang && ["es", "en", "fr", "it", "de"].includes(storedLang)) {
+    return storedLang as Language;
+  }
+  // If no preference saved, detect browser language
+  return detectBrowserLanguage();
+}
+
 function TgtgReservaPopupInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { language } = useLanguage();
+  const { language: contextLanguage } = useLanguage();
   const [state, setState] = useState<PopupState>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [effectiveLang, setEffectiveLang] = useState<Language>("es");
+
+  // Determine effective language on mount (after context is ready)
+  useEffect(() => {
+    setEffectiveLang(getEffectiveLanguage(contextLanguage));
+  }, [contextLanguage]);
 
   const cleanUrl = useCallback(() => {
     const url = new URL(globalThis.location.href);
@@ -170,7 +198,7 @@ function TgtgReservaPopupInner() {
       <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
         <div className="bg-card rounded-2xl shadow-elegant-lg p-8 flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">{t("tgtgLoading", language)}</p>
+          <p className="text-sm text-muted-foreground">{t("tgtgLoading", effectiveLang)}</p>
         </div>
       </div>
     );
@@ -194,7 +222,7 @@ function TgtgReservaPopupInner() {
           isSuccess ? "bg-primary text-primary-foreground" : "bg-destructive text-destructive-foreground"
         }`}
       >
-        {t(msgKey, language)}
+        {t(msgKey, effectiveLang)}
       </div>
     );
   }
@@ -218,7 +246,7 @@ function TgtgReservaPopupInner() {
           </div>
           <button
             onClick={handleDismiss}
-            aria-label={t("tgtgCancelButton", language)}
+            aria-label={t("tgtgCancelButton", effectiveLang)}
             className="p-1 rounded-full text-muted-foreground hover:text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
           >
             <X className="w-4 h-4" />
@@ -255,7 +283,7 @@ function TgtgReservaPopupInner() {
               €{Number(item.precioDescuento).toFixed(2)}
             </span>
             <span className="text-xs text-muted-foreground ml-auto">
-              {item.cuponesDisponibles} {t("tgtgCouponsLeft", language)}
+              {item.cuponesDisponibles} {t("tgtgCouponsLeft", effectiveLang)}
             </span>
           </div>
 
@@ -264,7 +292,7 @@ function TgtgReservaPopupInner() {
             <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 text-sm">
               <span>🕐</span>
               <span className="font-medium text-foreground">
-                {t("tgtgPickupWindow", language)}: {horaInicio} – {horaFin}
+                {t("tgtgPickupWindow", effectiveLang)}: {horaInicio} – {horaFin}
               </span>
             </div>
           )}
@@ -276,7 +304,7 @@ function TgtgReservaPopupInner() {
             onClick={handleDismiss}
             className="flex-1 min-h-[44px] rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98]"
           >
-            {t("tgtgCancelButton", language)}
+            {t("tgtgCancelButton", effectiveLang)}
           </button>
           <button
             onClick={handleConfirm}
@@ -288,7 +316,7 @@ function TgtgReservaPopupInner() {
             ) : (
               <CheckCircle className="w-4 h-4" />
             )}
-            {t("tgtgConfirmButton", language)}
+            {t("tgtgConfirmButton", effectiveLang)}
           </button>
         </div>
       </div>
