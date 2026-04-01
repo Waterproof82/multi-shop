@@ -55,11 +55,20 @@ function TgtgReservaPopupInner() {
   const [submitting, setSubmitting] = useState(false);
   const [effectiveLang, setEffectiveLang] = useState<Language>("es");
 
-  // Determine effective language — URL param from email takes priority
+  // Initialize once from localStorage / browser (runs on mount only)
+  useEffect(() => {
+    setEffectiveLang(resolveLanguage(null, contextLanguage));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // When the email link provides a lang param, apply it — but do NOT reset when
+  // cleanUrl() removes the param (that would flip back to the wrong language mid-toast)
   useEffect(() => {
     const urlLang = searchParams.get("lang");
-    setEffectiveLang(resolveLanguage(urlLang, contextLanguage));
-  }, [searchParams, contextLanguage]);
+    if (urlLang && SUPPORTED_LANGS.includes(urlLang as Language)) {
+      setEffectiveLang(urlLang as Language);
+    }
+  }, [searchParams]);
 
   const cleanUrl = useCallback(() => {
     const url = new URL(globalThis.location.href);

@@ -136,6 +136,8 @@ export default function TooGoodToGoPage() {
   const [loadingAllReservas, setLoadingAllReservas] = useState<string | null>(null);
   const [showAllReservasId, setShowAllReservasId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pendingOpen, setPendingOpen] = useState(false);
+  const [activeOpen, setActiveOpen] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [selectedPromoIds, setSelectedPromoIds] = useState<Set<string>>(new Set());
   const [sendingEmails, setSendingEmails] = useState(false);
@@ -153,7 +155,8 @@ export default function TooGoodToGoPage() {
         }
         if (tgtgRes.ok) {
           const data = await tgtgRes.json() as { campaigns?: TgtgPromo[] };
-          setTgtgCampaigns(data.campaigns || []);
+          const campaigns = data.campaigns || [];
+          setTgtgCampaigns(campaigns);
         }
       } catch (error) {
         logClientError(error, 'fetchTgtgData');
@@ -493,6 +496,8 @@ export default function TooGoodToGoPage() {
     return { campaign, isClosed: isExpired || allCuponesAgotados };
   });
   const activeCampaigns = withStatus.filter(c => !c.isClosed);
+  const pendingCampaigns = activeCampaigns.filter(c => !c.campaign.emailEnviado);
+  const sentCampaigns = activeCampaigns.filter(c => c.campaign.emailEnviado);
   const closedCampaigns = withStatus.filter(c => c.isClosed);
 
   const selectedActiveCampaigns = activeCampaigns.filter(({ campaign }) => selectedPromoIds.has(campaign.id));
@@ -624,134 +629,254 @@ export default function TooGoodToGoPage() {
         </div>
       ) : (
         <>
-          {/* Active campaigns */}
-          {activeCampaigns.map(({ campaign }, index) => {
-            const displayInicio = campaign.horaRecogidaInicio.slice(0, 5);
-            const displayFin = campaign.horaRecogidaFin.slice(0, 5);
-            const editingThis = editingHorasId === campaign.id;
-            const campaignNumber = activeCampaigns.length - index;
-            const isSelected = selectedPromoIds.has(campaign.id);
-            return (
-              <div key={campaign.id} className={`bg-card rounded-lg border shadow-elegant p-6 space-y-4 transition-colors ${isSelected ? 'ring-2 ring-green-500' : ''}`}>
-                <div className="flex items-center justify-between flex-wrap gap-3">
-                  <div className="flex items-center gap-3">
-                    {/* Checkbox or sent badge */}
-                    {campaign.emailEnviado ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 dark:bg-green-900/30 dark:text-green-400 px-2 py-1 rounded-full">
-                        <CheckCircle className="w-3.5 h-3.5" />
-                        Enviada ✓
-                      </span>
-                    ) : (
-                      <input
-                        type="checkbox"
-                        id={`select-promo-${campaign.id}`}
-                        checked={isSelected}
-                        onChange={() => handleToggleSelectPromo(campaign.id)}
-                        aria-label={`Seleccionar campaña #${campaignNumber}`}
-                        className="w-5 h-5 rounded border-border accent-green-600 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 flex-shrink-0"
-                      />
-                    )}
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                        <ShoppingBag className="w-5 h-5 text-green-600" />
-                        {t("tgtgActiveCampaign", language)}
-                        <span className="text-sm font-normal text-muted-foreground">#{campaignNumber}</span>
-                      </h2>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(campaign.fechaActivacion + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {editingThis ? (
-                      <>
-                        <input type="time" value={editHoraInicio} onChange={e => setEditHoraInicio(e.target.value)} aria-label={t("tgtgPickupFrom", language)} className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
-                        <span className="text-muted-foreground text-sm">–</span>
-                        <input type="time" value={editHoraFin} onChange={e => setEditHoraFin(e.target.value)} aria-label={t("tgtgPickupTo", language)} className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
-                        <button onClick={() => handleSaveHoras(campaign.id)} disabled={savingHoras} aria-label={t("save", language)} className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 flex items-center gap-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 min-h-[44px]">
-                          {savingHoras ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
-                          {t("save", language)}
-                        </button>
-                        <button onClick={handleCancelEditHoras} disabled={savingHoras} aria-label={t("cancel", language)} className="h-8 px-2 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted flex items-center outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 min-h-[44px]">
-                          <X className="w-4 h-4" />
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-xs flex items-center gap-1 text-muted-foreground">
-                          <Clock className="w-3.5 h-3.5" />{displayInicio} – {displayFin}
-                        </span>
-                        <button onClick={() => handleStartEditHoras(campaign)} aria-label="Editar horas de recogida" className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center">
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                      </>
-                    )}
-                    {(() => {
-                      const totalReservas = campaign.items.reduce((acc, i) => acc + i.reservasCount, 0);
-                      const cannotDelete = campaign.emailEnviado || totalReservas > 0;
-                      const deleteTitle = campaign.emailEnviado
-                        ? 'No se puede eliminar una campaña ya enviada'
-                        : totalReservas > 0
-                          ? `No se puede eliminar: hay ${totalReservas} reserva${totalReservas > 1 ? 's' : ''} activa${totalReservas > 1 ? 's' : ''}`
-                          : 'Eliminar campaña';
-                      return (
-                        <button
-                          onClick={() => !cannotDelete && handleDeleteCampaign(campaign.id)}
-                          disabled={deletingId === campaign.id || cannotDelete}
-                          aria-label={deleteTitle}
-                          title={deleteTitle}
-                          className="p-1 rounded-md text-destructive hover:bg-destructive/10 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                          {deletingId === campaign.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                        </button>
-                      );
-                    })()}
-                  </div>
-                </div>
+          {/* Pending campaigns section */}
+          {pendingCampaigns.length > 0 && (
+            <div className="space-y-3">
+              <button
+                onClick={() => setPendingOpen(o => !o)}
+                aria-expanded={pendingOpen}
+                className="w-full flex items-center justify-between px-4 py-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 hover:bg-amber-100 dark:hover:bg-amber-950/30 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px]"
+              >
+                <span className="flex items-center gap-2 font-semibold text-sm text-amber-800 dark:text-amber-300">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
+                  {t("tgtgPendingCampaign", language)}
+                  <span className="bg-amber-200 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 text-xs px-2 py-0.5 rounded-full font-medium">
+                    {pendingCampaigns.length}
+                  </span>
+                </span>
+                {pendingOpen ? <ChevronUp className="w-4 h-4 text-amber-600 dark:text-amber-400" /> : <ChevronDown className="w-4 h-4 text-amber-600 dark:text-amber-400" />}
+              </button>
+              {pendingOpen && (
                 <div className="space-y-4">
-                  {campaign.items.map(item => (
-                    <TgtgItemAdminCard key={item.id} item={item} language={language} adjusting={adjustingItem === item.id} closed={false} reservas={reservasByItem[item.id] ?? null} expanded={expandedReservas.has(item.id)} onAdjust={handleAdjustCupones} onToggleReservas={(id) => handleToggleReservas(id, campaign.id)} />
-                  ))}
-                </div>
-                <div className="border-t pt-4">
-                  <button onClick={() => handleToggleAllReservas(campaign.id)} className="w-full flex items-center justify-between text-sm font-medium text-foreground hover:text-primary transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] px-1">
-                    <span className="flex items-center gap-2">
-                      <ReceiptText className="w-4 h-4" />
-                      {t("tgtgCouponsValidated", language)}
-                      <span className="bg-primary/10 text-primary text-xs px-1.5 py-0.5 rounded-full font-medium">
-                        {campaign.items.reduce((acc, item) => acc + (item.cuponesTotal - item.cuponesDisponibles), 0)}
-                      </span>
-                    </span>
-                    {loadingAllReservas === campaign.id ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /> : showAllReservasId === campaign.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  </button>
-                  {showAllReservasId === campaign.id && (
-                    <div className="mt-3 rounded-lg border border-border overflow-hidden">
-                      {(allReservas[campaign.id] ?? []).length > 0 ? (
-                        <table className="w-full text-sm">
-                          <thead><tr className="bg-muted text-left"><th className="px-4 py-2 text-xs font-medium text-muted-foreground">Oferta</th><th className="px-4 py-2 text-xs font-medium text-muted-foreground">Cliente</th><th className="px-4 py-2 text-xs font-medium text-muted-foreground text-right">Precio</th><th className="px-4 py-2 text-xs font-medium text-muted-foreground text-right hidden sm:table-cell">Fecha</th></tr></thead>
-                          <tbody className="divide-y divide-border">
-                            {(allReservas[campaign.id] ?? []).map(r => {
-                              const item = campaign.items.find(i => i.id === r.itemId);
+                  {pendingCampaigns.map(({ campaign }, index) => {
+                    const displayInicio = campaign.horaRecogidaInicio.slice(0, 5);
+                    const displayFin = campaign.horaRecogidaFin.slice(0, 5);
+                    const editingThis = editingHorasId === campaign.id;
+                    const campaignNumber = pendingCampaigns.length - index;
+                    const isSelected = selectedPromoIds.has(campaign.id);
+                    return (
+                      <div key={campaign.id} className={`rounded-lg border shadow-elegant p-6 space-y-4 bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800 ${isSelected ? 'ring-2 ring-green-500' : ''}`}>
+                        <div className="flex items-center justify-between flex-wrap gap-3">
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="checkbox"
+                              id={`select-promo-${campaign.id}`}
+                              checked={isSelected}
+                              onChange={() => handleToggleSelectPromo(campaign.id)}
+                              aria-label={`Seleccionar campaña #${campaignNumber}`}
+                              className="w-5 h-5 rounded border-border accent-green-600 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 flex-shrink-0"
+                            />
+                            <div className="flex items-center gap-2">
+                              <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                                <ShoppingBag className="w-5 h-5 text-amber-500" />
+                                {t("tgtgPendingCampaign", language)}
+                                <span className="text-sm font-normal text-muted-foreground">#{campaignNumber}</span>
+                              </h2>
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(campaign.fechaActivacion + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {editingThis ? (
+                              <>
+                                <input type="time" value={editHoraInicio} onChange={e => setEditHoraInicio(e.target.value)} aria-label={t("tgtgPickupFrom", language)} className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
+                                <span className="text-muted-foreground text-sm">–</span>
+                                <input type="time" value={editHoraFin} onChange={e => setEditHoraFin(e.target.value)} aria-label={t("tgtgPickupTo", language)} className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
+                                <button onClick={() => handleSaveHoras(campaign.id)} disabled={savingHoras} aria-label={t("save", language)} className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 flex items-center gap-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 min-h-[44px]">
+                                  {savingHoras ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                                  {t("save", language)}
+                                </button>
+                                <button onClick={handleCancelEditHoras} disabled={savingHoras} aria-label={t("cancel", language)} className="h-8 px-2 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted flex items-center outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 min-h-[44px]">
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-xs flex items-center gap-1 text-muted-foreground">
+                                  <Clock className="w-3.5 h-3.5" />{displayInicio} – {displayFin}
+                                </span>
+                                <button onClick={() => handleStartEditHoras(campaign)} aria-label="Editar horas de recogida" className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center">
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            )}
+                            {(() => {
+                              const totalReservas = campaign.items.reduce((acc, i) => acc + i.reservasCount, 0);
+                              const cannotDelete = totalReservas > 0;
+                              const deleteTitle = totalReservas > 0
+                                ? `No se puede eliminar: hay ${totalReservas} reserva${totalReservas > 1 ? 's' : ''} activa${totalReservas > 1 ? 's' : ''}`
+                                : 'Eliminar campaña';
                               return (
-                                <tr key={r.id} className="bg-card hover:bg-muted/40 transition-colors">
-                                  <td className="px-4 py-3"><p className="font-medium text-foreground truncate max-w-[120px]">{item?.titulo ?? '—'}</p></td>
-                                  <td className="px-4 py-3"><p className="text-foreground">{r.nombre ?? r.email}</p>{r.nombre && <p className="text-xs text-muted-foreground">{r.email}</p>}</td>
-                                  <td className="px-4 py-3 text-right"><span className="font-semibold text-green-600">{item ? `€${Number(item.precioDescuento).toFixed(2)}` : '—'}</span>{item && <p className="text-xs text-muted-foreground line-through">€{Number(item.precioOriginal).toFixed(2)}</p>}</td>
-                                  <td className="px-4 py-3 text-right text-xs text-muted-foreground whitespace-nowrap hidden sm:table-cell">{new Date(r.createdAt).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
-                                </tr>
+                                <button
+                                  onClick={() => !cannotDelete && handleDeleteCampaign(campaign.id)}
+                                  disabled={deletingId === campaign.id || cannotDelete}
+                                  aria-label={deleteTitle}
+                                  title={deleteTitle}
+                                  className="p-1 rounded-md text-destructive hover:bg-destructive/10 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
+                                >
+                                  {deletingId === campaign.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                                </button>
                               );
-                            })}
-                          </tbody>
-                        </table>
-                      ) : (
-                        <div className="px-4 py-8 text-center"><ReceiptText className="w-8 h-8 text-muted-foreground mx-auto mb-2" /><p className="text-sm text-muted-foreground">{t("tgtgNoReservas", language)}</p></div>
-                      )}
-                    </div>
-                  )}
+                            })()}
+                          </div>
+                        </div>
+                        <div className="space-y-4">
+                          {campaign.items.map(item => (
+                            <TgtgItemAdminCard key={item.id} item={item} language={language} adjusting={adjustingItem === item.id} closed={false} reservas={reservasByItem[item.id] ?? null} expanded={expandedReservas.has(item.id)} onAdjust={handleAdjustCupones} onToggleReservas={(id) => handleToggleReservas(id, campaign.id)} />
+                          ))}
+                        </div>
+                        <div className="border-t pt-4">
+                          <button onClick={() => handleToggleAllReservas(campaign.id)} className="w-full flex items-center justify-between text-sm font-medium text-foreground hover:text-primary transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] px-1">
+                            <span className="flex items-center gap-2">
+                              <ReceiptText className="w-4 h-4" />
+                              {t("tgtgCouponsValidated", language)}
+                              <span className="bg-primary/10 text-primary text-xs px-1.5 py-0.5 rounded-full font-medium">
+                                {campaign.items.reduce((acc, item) => acc + (item.cuponesTotal - item.cuponesDisponibles), 0)}
+                              </span>
+                            </span>
+                            {loadingAllReservas === campaign.id ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /> : showAllReservasId === campaign.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          </button>
+                          {showAllReservasId === campaign.id && (
+                            <div className="mt-3 rounded-lg border border-border overflow-hidden">
+                              {(allReservas[campaign.id] ?? []).length > 0 ? (
+                                <table className="w-full text-sm">
+                                  <thead><tr className="bg-muted text-left"><th className="px-4 py-2 text-xs font-medium text-muted-foreground">Oferta</th><th className="px-4 py-2 text-xs font-medium text-muted-foreground">Cliente</th><th className="px-4 py-2 text-xs font-medium text-muted-foreground text-right">Precio</th><th className="px-4 py-2 text-xs font-medium text-muted-foreground text-right hidden sm:table-cell">Fecha</th></tr></thead>
+                                  <tbody className="divide-y divide-border">
+                                    {(allReservas[campaign.id] ?? []).map(r => {
+                                      const item = campaign.items.find(i => i.id === r.itemId);
+                                      return (
+                                        <tr key={r.id} className="bg-card hover:bg-muted/40 transition-colors">
+                                          <td className="px-4 py-3"><p className="font-medium text-foreground truncate max-w-[120px]">{item?.titulo ?? '—'}</p></td>
+                                          <td className="px-4 py-3"><p className="text-foreground">{r.nombre ?? r.email}</p>{r.nombre && <p className="text-xs text-muted-foreground">{r.email}</p>}</td>
+                                          <td className="px-4 py-3 text-right"><span className="font-semibold text-green-600">{item ? `€${Number(item.precioDescuento).toFixed(2)}` : '—'}</span>{item && <p className="text-xs text-muted-foreground line-through">€{Number(item.precioOriginal).toFixed(2)}</p>}</td>
+                                          <td className="px-4 py-3 text-right text-xs text-muted-foreground whitespace-nowrap hidden sm:table-cell">{new Date(r.createdAt).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              ) : (
+                                <div className="px-4 py-8 text-center"><ReceiptText className="w-8 h-8 text-muted-foreground mx-auto mb-2" /><p className="text-sm text-muted-foreground">{t("tgtgNoReservas", language)}</p></div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              </div>
-            );
-          })}
+              )}
+            </div>
+          )}
+
+          {/* Active/sent campaigns section */}
+          {sentCampaigns.length > 0 && (
+            <div className="space-y-3">
+              <button
+                onClick={() => setActiveOpen(o => !o)}
+                aria-expanded={activeOpen}
+                className="w-full flex items-center justify-between px-4 py-3 rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-950/30 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px]"
+              >
+                <span className="flex items-center gap-2 font-semibold text-sm text-green-800 dark:text-green-300">
+                  <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                  {t("tgtgActiveCampaign", language)}
+                  <span className="bg-green-200 dark:bg-green-900/40 text-green-700 dark:text-green-400 text-xs px-2 py-0.5 rounded-full font-medium">
+                    {sentCampaigns.length}
+                  </span>
+                </span>
+                {activeOpen ? <ChevronUp className="w-4 h-4 text-green-600 dark:text-green-400" /> : <ChevronDown className="w-4 h-4 text-green-600 dark:text-green-400" />}
+              </button>
+              {activeOpen && (
+                <div className="space-y-4">
+                  {sentCampaigns.map(({ campaign }, index) => {
+                    const displayInicio = campaign.horaRecogidaInicio.slice(0, 5);
+                    const displayFin = campaign.horaRecogidaFin.slice(0, 5);
+                    const campaignNumber = sentCampaigns.length - index;
+                    return (
+                      <div key={campaign.id} className="rounded-lg border shadow-elegant p-6 space-y-4 bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
+                        <div className="flex items-center justify-between flex-wrap gap-3">
+                          <div className="flex items-center gap-3">
+                            <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 dark:bg-green-900/30 dark:text-green-400 px-2 py-1 rounded-full">
+                              <CheckCircle className="w-3.5 h-3.5" />
+                              Enviada ✓
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                                <ShoppingBag className="w-5 h-5 text-green-600" />
+                                {t("tgtgActiveCampaign", language)}
+                                <span className="text-sm font-normal text-muted-foreground">#{campaignNumber}</span>
+                              </h2>
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(campaign.fechaActivacion + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs flex items-center gap-1 text-muted-foreground">
+                              <Clock className="w-3.5 h-3.5" />{displayInicio} – {displayFin}
+                            </span>
+                            <span className="text-xs flex items-center gap-1 text-muted-foreground" title="Emails enviados">
+                              <Send className="w-3.5 h-3.5" />{campaign.numeroEnvios}
+                            </span>
+                            <button
+                              disabled
+                              aria-label="No se puede eliminar una campaña ya enviada"
+                              title="No se puede eliminar una campaña ya enviada"
+                              className="p-1 rounded-md text-destructive opacity-30 cursor-not-allowed min-h-[44px] min-w-[44px] flex items-center justify-center"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="space-y-4">
+                          {campaign.items.map(item => (
+                            <TgtgItemAdminCard key={item.id} item={item} language={language} adjusting={adjustingItem === item.id} closed={false} reservas={reservasByItem[item.id] ?? null} expanded={expandedReservas.has(item.id)} onAdjust={handleAdjustCupones} onToggleReservas={(id) => handleToggleReservas(id, campaign.id)} />
+                          ))}
+                        </div>
+                        <div className="border-t pt-4">
+                          <button onClick={() => handleToggleAllReservas(campaign.id)} className="w-full flex items-center justify-between text-sm font-medium text-foreground hover:text-primary transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] px-1">
+                            <span className="flex items-center gap-2">
+                              <ReceiptText className="w-4 h-4" />
+                              {t("tgtgCouponsValidated", language)}
+                              <span className="bg-primary/10 text-primary text-xs px-1.5 py-0.5 rounded-full font-medium">
+                                {campaign.items.reduce((acc, item) => acc + (item.cuponesTotal - item.cuponesDisponibles), 0)}
+                              </span>
+                            </span>
+                            {loadingAllReservas === campaign.id ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /> : showAllReservasId === campaign.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          </button>
+                          {showAllReservasId === campaign.id && (
+                            <div className="mt-3 rounded-lg border border-border overflow-hidden">
+                              {(allReservas[campaign.id] ?? []).length > 0 ? (
+                                <table className="w-full text-sm">
+                                  <thead><tr className="bg-muted text-left"><th className="px-4 py-2 text-xs font-medium text-muted-foreground">Oferta</th><th className="px-4 py-2 text-xs font-medium text-muted-foreground">Cliente</th><th className="px-4 py-2 text-xs font-medium text-muted-foreground text-right">Precio</th><th className="px-4 py-2 text-xs font-medium text-muted-foreground text-right hidden sm:table-cell">Fecha</th></tr></thead>
+                                  <tbody className="divide-y divide-border">
+                                    {(allReservas[campaign.id] ?? []).map(r => {
+                                      const item = campaign.items.find(i => i.id === r.itemId);
+                                      return (
+                                        <tr key={r.id} className="bg-card hover:bg-muted/40 transition-colors">
+                                          <td className="px-4 py-3"><p className="font-medium text-foreground truncate max-w-[120px]">{item?.titulo ?? '—'}</p></td>
+                                          <td className="px-4 py-3"><p className="text-foreground">{r.nombre ?? r.email}</p>{r.nombre && <p className="text-xs text-muted-foreground">{r.email}</p>}</td>
+                                          <td className="px-4 py-3 text-right"><span className="font-semibold text-green-600">{item ? `€${Number(item.precioDescuento).toFixed(2)}` : '—'}</span>{item && <p className="text-xs text-muted-foreground line-through">€{Number(item.precioOriginal).toFixed(2)}</p>}</td>
+                                          <td className="px-4 py-3 text-right text-xs text-muted-foreground whitespace-nowrap hidden sm:table-cell">{new Date(r.createdAt).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              ) : (
+                                <div className="px-4 py-8 text-center"><ReceiptText className="w-8 h-8 text-muted-foreground mx-auto mb-2" /><p className="text-sm text-muted-foreground">{t("tgtgNoReservas", language)}</p></div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* History (closed campaigns) */}
           {closedCampaigns.length > 0 && (
