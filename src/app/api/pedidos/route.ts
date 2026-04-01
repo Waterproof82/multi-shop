@@ -22,6 +22,7 @@ const createPedidoSchema = z.object({
   nombre: z.string().min(2).max(100),
   telefono: z.string().min(9).max(20).regex(/^\+?[0-9\s\-()+]+$/, 'Formato de teléfono no válido'),
   email: z.string().email().optional().or(z.literal('')),
+  idioma: z.enum(['es', 'en', 'fr', 'it', 'de']).optional(),
 });
 
 type OrderItem = z.infer<typeof createPedidoSchema>['items'][number];
@@ -78,13 +79,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
     }
 
-    const { items, nombre, telefono, email } = parsed.data;
+    const { items, nombre, telefono, email, idioma } = parsed.data;
 
     const pedidoResult = await pedidoUseCase.create(empresa.id, {
       items,
       nombre,
       telefono,
       email: email || undefined,
+      idioma,
     });
 
     if (!pedidoResult.success) {

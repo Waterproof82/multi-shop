@@ -4,7 +4,15 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense, useEffect, useState, useCallback } from "react";
 import { useLanguage, type Language } from "@/lib/language-context";
 import { t } from "@/lib/translations";
-import { CheckCircle, XCircle, ShoppingBag, X, Loader2 } from "lucide-react";
+import { CheckCircle, XCircle, ShoppingBag, X, Loader2, Globe } from "lucide-react";
+
+const SUPPORTED_LANGUAGES: { code: Language; label: string; flag: string }[] = [
+  { code: "es", label: "Español", flag: "🇪🇸" },
+  { code: "en", label: "English", flag: "🇬🇧" },
+  { code: "fr", label: "Français", flag: "🇫🇷" },
+  { code: "it", label: "Italiano", flag: "🇮🇹" },
+  { code: "de", label: "Deutsch", flag: "🇩🇪" },
+];
 
 interface TgtgItemPublic {
   id: string;
@@ -56,6 +64,7 @@ function TgtgReservaPopupInner() {
   const [state, setState] = useState<PopupState>(null);
   const [submitting, setSubmitting] = useState(false);
   const [effectiveLang, setEffectiveLang] = useState<Language>("es");
+  const [showLangDropdown, setShowLangDropdown] = useState(false);
 
   // Determine effective language on mount (after context is ready)
   useEffect(() => {
@@ -244,13 +253,51 @@ function TgtgReservaPopupInner() {
             <ShoppingBag className="w-5 h-5 text-primary" />
             <span className="font-semibold text-foreground text-sm">TooGoodToGo</span>
           </div>
-          <button
-            onClick={handleDismiss}
-            aria-label={t("tgtgCancelButton", effectiveLang)}
-            className="p-1 rounded-full text-muted-foreground hover:text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Language selector */}
+            <div className="relative">
+              <button
+                onClick={() => setShowLangDropdown(!showLangDropdown)}
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                aria-label={t("selectLanguage", effectiveLang)}
+              >
+                <Globe className="w-4 h-4" />
+                <span className="uppercase font-medium">{effectiveLang}</span>
+              </button>
+              {showLangDropdown && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setShowLangDropdown(false)}
+                  />
+                  <div className="absolute right-0 top-full mt-1 bg-card border border-border rounded-lg shadow-lg overflow-hidden z-20 min-w-[140px]">
+                    {SUPPORTED_LANGUAGES.map((lang) => (
+                      <button
+                        key={lang.code}
+                        onClick={() => {
+                          setEffectiveLang(lang.code);
+                          setShowLangDropdown(false);
+                        }}
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-muted transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                          effectiveLang === lang.code ? "bg-muted font-medium" : ""
+                        }`}
+                      >
+                        <span>{lang.flag}</span>
+                        <span>{lang.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+            <button
+              onClick={handleDismiss}
+              aria-label={t("tgtgCancelButton", effectiveLang)}
+              className="p-1 rounded-full text-muted-foreground hover:text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Image */}

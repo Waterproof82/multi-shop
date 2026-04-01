@@ -15,6 +15,7 @@ export interface CreatePedidoDTO {
   nombre: string;
   telefono: string;
   email?: string;
+  idioma?: string;
 }
 
 export interface PedidoStats {
@@ -94,6 +95,7 @@ export class PedidoUseCase {
         const updateResult = await this.clienteRepo.update(existingCliente.id, empresaId, {
           nombre: data.nombre,
           email: data.email || null,
+          idioma: data.idioma || null,
         });
         if (!updateResult.success) {
           return { success: false, error: updateResult.error };
@@ -105,6 +107,7 @@ export class PedidoUseCase {
           nombre: data.nombre,
           telefono: data.telefono,
           email: data.email || null,
+          idioma: data.idioma || 'es',
         });
         if (!createResult.success) {
           return { success: false, error: createResult.error };

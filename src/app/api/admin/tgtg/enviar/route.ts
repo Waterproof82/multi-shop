@@ -14,6 +14,82 @@ const enviarSchema = z.object({
   promoIds: z.array(z.string().uuid()).min(1).max(10),
 });
 
+// Textos del email por idioma
+const TGTG_EMAIL_TEXTS: Record<string, {
+  title: string;
+  subtitle: string;
+  disponible: string;
+  pickupTime: string;
+  reserveButton: string;
+  unsubscribeQuestion: string;
+  unsubscribeLink: string;
+  resubscribeQuestion: string;
+  resubscribeLink: string;
+}> = {
+  es: {
+    title: "¡Ofertas de hoy!",
+    subtitle: "Aprovecha antes de que se agoten 🌱",
+    disponible: "disponibles",
+    pickupTime: "Recogida",
+    reserveButton: "🛍️ Reservar ahora",
+    unsubscribeQuestion: "¿No quieres recibir más ofertas?",
+    unsubscribeLink: "Darse de baja",
+    resubscribeQuestion: "¿Cambiaste de opinión?",
+    resubscribeLink: "Volver a suscribirse",
+  },
+  en: {
+    title: "Today's deals!",
+    subtitle: "Grab them before they're gone 🌱",
+    disponible: "available",
+    pickupTime: "Pickup",
+    reserveButton: "🛍️ Reserve now",
+    unsubscribeQuestion: "Don't want to receive more offers?",
+    unsubscribeLink: "Unsubscribe",
+    resubscribeQuestion: "Changed your mind?",
+    resubscribeLink: "Subscribe again",
+  },
+  fr: {
+    title: "Offres du jour!",
+    subtitle: "Profitez-en avant qu'elles ne disparaissent 🌱",
+    disponible: "disponibles",
+    pickupTime: "Retrait",
+    reserveButton: "🛍️ Réserver maintenant",
+    unsubscribeQuestion: "Vous ne souhaitez plus recevoir d'offres?",
+    unsubscribeLink: "Se désinscrire",
+    resubscribeQuestion: "Vous avez changé d'avis?",
+    resubscribeLink: "Se réinscrire",
+  },
+  it: {
+    title: "Offerte di oggi!",
+    subtitle: "Approfittane prima che finiscano 🌱",
+    disponible: "disponibili",
+    pickupTime: "Ritiro",
+    reserveButton: "🛍️ Prenota ora",
+    unsubscribeQuestion: "Non vuoi più ricevere offerte?",
+    unsubscribeLink: "Annulla iscrizione",
+    resubscribeQuestion: "Hai cambiato idea?",
+    resubscribeLink: "Riiscriviti",
+  },
+  de: {
+    title: "Angebote von heute!",
+    subtitle: "Greifen Sie zu, bevor sie weg sind 🌱",
+    disponible: "verfügbar",
+    pickupTime: "Abholung",
+    reserveButton: "🛍️ Jetzt reservieren",
+    unsubscribeQuestion: "Keine weiteren Angebote mehr erhalten?",
+    unsubscribeLink: "Abmelden",
+    resubscribeQuestion: "Meinung geändert?",
+    resubscribeLink: "Erneut anmelden",
+  },
+};
+
+function getLocaleForLang(lang: string): string {
+  const locales: Record<string, string> = {
+    es: 'es-ES', en: 'en-GB', fr: 'fr-FR', it: 'it-IT', de: 'de-DE',
+  };
+  return locales[lang] || 'es-ES';
+}
+
 function buildTgtgEmailHtml(params: {
   empresaLogoUrl: string;
   empresaNombre: string;
@@ -27,14 +103,18 @@ function buildTgtgEmailHtml(params: {
   baseUrl: string;
   empresaId: string;
   recipientEmail: string;
+  lang?: string;
 }): string {
-  const { empresaLogoUrl, empresaNombre, campaigns, baseUrl, empresaId, recipientEmail } = params;
+  const { empresaLogoUrl, empresaNombre, campaigns, baseUrl, empresaId, recipientEmail, lang = 'es' } = params;
+  const texts = TGTG_EMAIL_TEXTS[lang] || TGTG_EMAIL_TEXTS.es;
+  const locale = getLocaleForLang(lang);
   const encodedEmail = encodeURIComponent(recipientEmail);
   const tokenBaja = generateUnsubscribeToken(recipientEmail, empresaId, 'baja');
   const tokenAlta = generateUnsubscribeToken(recipientEmail, empresaId, 'alta');
 
   const campaignSections = campaigns.map((c) => {
-    const dateLabel = new Date(c.fechaActivacion + 'T00:00:00').toLocaleDateString('es-ES', {
+    const dateObj = new Date(c.fechaActivacion + 'T00:00:00');
+    const dateLabel = dateObj.toLocaleDateString(locale, {
       weekday: 'long', day: '2-digit', month: 'long',
     });
 
@@ -47,10 +127,10 @@ function buildTgtgEmailHtml(params: {
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
             <span style="font-size:14px;color:#9ca3af;text-decoration:line-through;">€${Number(item.precioOriginal).toFixed(2)}</span>
             <span style="font-size:24px;font-weight:800;color:#16a34a;">€${Number(item.precioDescuento).toFixed(2)}</span>
-            <span style="margin-left:auto;font-size:12px;font-weight:600;color:#15803d;background:#f0fdf4;border:1px solid #bbf7d0;padding:3px 10px;border-radius:20px;">${item.cuponesDisponibles} disponibles</span>
+            <span style="margin-left:auto;font-size:12px;font-weight:600;color:#15803d;background:#f0fdf4;border:1px solid #bbf7d0;padding:3px 10px;border-radius:20px;">${item.cuponesDisponibles} ${texts.disponible}</span>
           </div>
           <a href="${escapeHtml(item.reservaUrl)}" style="display:block;width:100%;box-sizing:border-box;text-align:center;background:linear-gradient(135deg,#16a34a 0%,#15803d 100%);color:#fff;font-size:15px;font-weight:700;padding:13px 0;border-radius:10px;text-decoration:none;letter-spacing:0.2px;">
-            🛍️ Reservar ahora
+            ${texts.reserveButton}
           </a>
         </div>
       </div>`).join('');
@@ -59,7 +139,7 @@ function buildTgtgEmailHtml(params: {
       <div style="margin-bottom:30px;">
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;padding-bottom:14px;border-bottom:2px solid #f3f4f6;">
           <span style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:700;color:#15803d;text-transform:capitalize;">📅 ${escapeHtml(dateLabel)}</span>
-          <span style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;color:#374151;">🕐 Recogida: ${escapeHtml(c.horaInicio)} – ${escapeHtml(c.horaFin)}</span>
+          <span style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;color:#374151;">🕐 ${texts.pickupTime}: ${escapeHtml(c.horaInicio)} – ${escapeHtml(c.horaFin)}</span>
         </div>
         ${itemCards}
       </div>`;
@@ -78,17 +158,17 @@ function buildTgtgEmailHtml(params: {
       <div style="display:inline-block;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);border-radius:20px;padding:5px 16px;margin-bottom:14px;">
         <span style="font-size:11px;font-weight:700;color:#fff;letter-spacing:1.5px;text-transform:uppercase;">TooGoodToGo</span>
       </div>
-      <h1 style="margin:0 0 8px;font-size:28px;font-weight:800;color:#fff;line-height:1.2;">¡Ofertas de hoy!</h1>
-      <p style="margin:0;font-size:14px;color:rgba(255,255,255,0.85);font-weight:500;">Aprovecha antes de que se agoten 🌱</p>
+      <h1 style="margin:0 0 8px;font-size:28px;font-weight:800;color:#fff;line-height:1.2;">${texts.title}</h1>
+      <p style="margin:0;font-size:14px;color:rgba(255,255,255,0.85);font-weight:500;">${texts.subtitle}</p>
     </div>
     <div style="padding:24px 24px 20px;">
       ${campaignSections}
       <div style="border-top:1px solid #f3f4f6;padding-top:20px;padding-bottom:8px;text-align:center;">
         <p style="margin:0 0 10px;font-size:13px;color:#6b7280;">
-          <span style="color:#dc2626;">❌</span> ¿No quieres recibir más ofertas? <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=baja&token=${tokenBaja}" style="color:#dc2626;text-decoration:underline;">Darse de baja</a>
+          <span style="color:#dc2626;">❌</span> ${texts.unsubscribeQuestion} <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=baja&token=${tokenBaja}" style="color:#dc2626;text-decoration:underline;">${texts.unsubscribeLink}</a>
         </p>
         <p style="margin:0;font-size:13px;color:#6b7280;">
-          <span style="color:#16a34a;">🔄</span> ¿Cambiaste de opinión? <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=alta&token=${tokenAlta}" style="color:#16a34a;text-decoration:underline;">Volver a suscribirse</a>
+          <span style="color:#16a34a;">🔄</span> ${texts.resubscribeQuestion} <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=alta&token=${tokenAlta}" style="color:#16a34a;text-decoration:underline;">${texts.resubscribeLink}</a>
         </p>
       </div>
     </div>
@@ -140,7 +220,7 @@ export async function POST(request: NextRequest) {
     const recentByPromoId = new Map(allRecentResult.data.map(d => [d.promo.id, d]));
 
     // Validate each requested promo
-    let emailTargets: Array<{ email: string; nombre: string | null }> = [];
+    let emailTargets: Array<{ email: string; nombre: string | null; idioma: string | null }> = [];
     const campaignsToSend: Array<{ promoId: string; horaInicio: string; horaFin: string; fechaActivacion: string; items: TgtgItem[] }> = [];
 
     for (const promoId of promoIds) {
@@ -184,6 +264,7 @@ export async function POST(request: NextRequest) {
 
     for (const target of emailTargets) {
       try {
+        const lang = target.idioma || 'es';
         const campaigns = campaignsToSend.map((c) => ({
           promoId: c.promoId,
           horaInicio: c.horaInicio,
@@ -198,9 +279,15 @@ export async function POST(request: NextRequest) {
           }),
         }));
 
-        const subject = campaigns.length === 1
-          ? `¡Ofertas TooGoodToGo! Recogida ${campaigns[0].horaInicio}–${campaigns[0].horaFin}`
-          : `¡${campaigns.length} campañas TooGoodToGo disponibles hoy!`;
+        const subjects: Record<string, { single: string; multiple: string }> = {
+          es: { single: `¡Ofertas TooGoodToGo! Recogida ${campaigns[0].horaInicio}–${campaigns[0].horaFin}`, multiple: `¡${campaigns.length} campañas TooGoodToGo disponibles hoy!` },
+          en: { single: `TooGoodToGo offers! Pickup ${campaigns[0].horaInicio}–${campaigns[0].horaFin}`, multiple: `¡${campaigns.length} TooGoodToGo campaigns available today!` },
+          fr: { single: `Offres TooGoodToGo! Retrait ${campaigns[0].horaInicio}–${campaigns[0].horaFin}`, multiple: `¡${campaigns.length} campagnes TooGoodToGo disponibles aujourd'hui!` },
+          it: { single: `Offerte TooGoodToGo! Ritiro ${campaigns[0].horaInicio}–${campaigns[0].horaFin}`, multiple: `¡${campaigns.length} campagne TooGoodToGo disponibili oggi!` },
+          de: { single: `TooGoodToGo Angebote! Abholung ${campaigns[0].horaInicio}–${campaigns[0].horaFin}`, multiple: `¡${campaigns.length} TooGoodToGo-Kampagnen heute verfügbar!` },
+        };
+        const subjectText = subjects[lang] || subjects.es;
+        const subject = campaigns.length === 1 ? subjectText.single : subjectText.multiple;
 
         await sendEmail({
           to: [target.email],
@@ -212,6 +299,7 @@ export async function POST(request: NextRequest) {
             baseUrl,
             empresaId: empresaId!,
             recipientEmail: target.email,
+            lang,
           }),
           senderName: empresa.nombre || 'Promociones',
           senderEmail,

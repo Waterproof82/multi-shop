@@ -9,7 +9,7 @@ export interface CreateTgtgResult {
 
 export interface SendEmailsResult {
   promo: TgtgPromocion;
-  emailTargets: Array<{ email: string; nombre: string | null }>;
+  emailTargets: Array<{ email: string; nombre: string | null; idioma: string | null }>;
 }
 
 export interface TgtgWithItems {
@@ -116,7 +116,7 @@ export class TgtgUseCase {
 
       const emailTargets = clientesResult.data
         .filter((c) => c.aceptar_promociones && c.email)
-        .map((c) => ({ email: c.email as string, nombre: c.nombre }));
+        .map((c) => ({ email: c.email as string, nombre: c.nombre, idioma: c.idioma }));
 
       return { success: true, data: { promo: promoResult.data, emailTargets } };
     } catch (e) {

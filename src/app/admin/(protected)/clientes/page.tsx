@@ -25,10 +25,19 @@ interface Cliente {
   email: string | null;
   telefono: string | null;
   direccion: string | null;
+  idioma: string | null;
   aceptar_promociones: boolean | null;
   numero_pedidos?: number;
   created_at: string;
 }
+
+const LANGUAGES = [
+  { code: 'es', label: 'Español', flag: '🇪🇸' },
+  { code: 'en', label: 'English', flag: '🇬🇧' },
+  { code: 'fr', label: 'Français', flag: '🇫🇷' },
+  { code: 'it', label: 'Italiano', flag: '🇮🇹' },
+  { code: 'de', label: 'Deutsch', flag: '🇩🇪' },
+];
 
 export default function ClientesPage() {
   const { language } = useLanguage();
@@ -40,7 +49,7 @@ export default function ClientesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [editingCliente, setEditingCliente] = useState<Cliente | null>(null);
   const [creatingCliente, setCreatingCliente] = useState(false);
-  const [editForm, setEditForm] = useState({ nombre: '', email: '', telefono: '', direccion: '' });
+  const [editForm, setEditForm] = useState({ nombre: '', email: '', telefono: '', direccion: '', idioma: 'es' });
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; id: string | null; nombre: string | null }>({ show: false, id: null, nombre: null });
 
@@ -113,22 +122,23 @@ export default function ClientesPage() {
       email: cliente.email || '',
       telefono: cliente.telefono || '',
       direccion: cliente.direccion || '',
+      idioma: cliente.idioma || 'es',
     });
   };
 
   const closeEditModal = () => {
     setEditingCliente(null);
-    setEditForm({ nombre: '', email: '', telefono: '', direccion: '' });
+    setEditForm({ nombre: '', email: '', telefono: '', direccion: '', idioma: 'es' });
   };
 
   const openCreateModal = () => {
     setCreatingCliente(true);
-    setEditForm({ nombre: '', email: '', telefono: '', direccion: '' });
+    setEditForm({ nombre: '', email: '', telefono: '', direccion: '', idioma: 'es' });
   };
 
   const closeCreateModal = () => {
     setCreatingCliente(false);
-    setEditForm({ nombre: '', email: '', telefono: '', direccion: '' });
+    setEditForm({ nombre: '', email: '', telefono: '', direccion: '', idioma: 'es' });
   };
 
   const handleSaveEdit = async () => {
@@ -144,6 +154,7 @@ export default function ClientesPage() {
           email: editForm.email || null,
           telefono: editForm.telefono || null,
           direccion: editForm.direccion || null,
+          idioma: editForm.idioma,
         }),
       }, {
         maxRetries: 2,
@@ -159,6 +170,7 @@ export default function ClientesPage() {
             email: editForm.email || null,
             telefono: editForm.telefono || null,
             direccion: editForm.direccion || null,
+            idioma: editForm.idioma,
           } : c
         ));
         closeEditModal();
@@ -182,6 +194,7 @@ export default function ClientesPage() {
           email: editForm.email || null,
           telefono: editForm.telefono || null,
           direccion: editForm.direccion || null,
+          idioma: editForm.idioma,
         }),
       }, {
         maxRetries: 2,
@@ -319,6 +332,7 @@ export default function ClientesPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t("email", language)}</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t("phone", language)}</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t("address", language)}</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">{t("languageLabel", language) || 'Lang'}</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t("ordersLabel", language)}</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t("date", language)}</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">{t("promotionsLabel", language)}</th>
@@ -359,6 +373,11 @@ export default function ClientesPage() {
                           {cliente.direccion || '-'}
                         </span>
                       </div>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="inline-flex items-center justify-center px-2 py-1 bg-muted text-foreground rounded-full text-sm font-medium uppercase">
+                        {cliente.idioma || 'es'}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className="inline-flex items-center justify-center px-2 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium">
@@ -471,6 +490,23 @@ export default function ClientesPage() {
                 placeholder={t("addressPlaceholder", language)}
               />
             </div>
+            <div>
+              <label htmlFor="edit_idioma" className="block text-sm font-medium text-foreground mb-1">
+                {t("languageLabel", language) || 'Idioma'} <span className="text-muted-foreground font-normal">({t("emailLanguage", language) || 'para emails'})</span>
+              </label>
+              <select
+                id="edit_idioma"
+                value={editForm.idioma}
+                onChange={(e) => setEditForm(prev => ({ ...prev, idioma: e.target.value }))}
+                className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {LANGUAGES.map(lang => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.flag} {lang.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="outline" onClick={closeEditModal}>
@@ -540,6 +576,23 @@ export default function ClientesPage() {
                 onChange={(e) => setEditForm(prev => ({ ...prev, direccion: e.target.value }))}
                 placeholder={t("addressPlaceholder", language)}
               />
+            </div>
+            <div>
+              <label htmlFor="create_idioma" className="block text-sm font-medium text-foreground mb-1">
+                {t("languageLabel", language)} <span className="text-muted-foreground font-normal">({t("emailLanguage", language)})</span>
+              </label>
+              <select
+                id="create_idioma"
+                value={editForm.idioma}
+                onChange={(e) => setEditForm(prev => ({ ...prev, idioma: e.target.value }))}
+                className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {LANGUAGES.map(lang => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.flag} {lang.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-4">

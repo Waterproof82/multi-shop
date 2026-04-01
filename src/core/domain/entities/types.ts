@@ -117,6 +117,7 @@ export interface Cliente {
   email: string | null;
   telefono: string | null;
   direccion: string | null;
+  idioma: string | null;
   aceptar_promociones: boolean | null;
   created_at: string;
 }

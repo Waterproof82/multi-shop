@@ -44,6 +44,7 @@ export class SupabaseClienteRepository implements IClienteRepository {
       const mapped = clientes?.map(c => ({
         ...c,
         empresaId: c.empresa_id as string,
+        idioma: (c as Record<string, unknown>).idioma as string | null,
         numero_pedidos: pedidosCount[c.id] || 0,
       })) ?? [];
 
@@ -66,7 +67,7 @@ export class SupabaseClienteRepository implements IClienteRepository {
         .single();
 
       if (!cliente) return { success: true, data: null };
-      return { success: true, data: { ...cliente, empresaId: cliente.empresa_id } };
+      return { success: true, data: { ...cliente, empresaId: cliente.empresa_id, idioma: (cliente as Record<string, unknown>).idioma as string | null } };
     } catch (e) {
       // Not found is not an error
       if (e instanceof Object && 'code' in e && e.code === 'PGRST116') {
@@ -99,7 +100,7 @@ export class SupabaseClienteRepository implements IClienteRepository {
         );
         return { success: false, error: { code: 'DB_ERROR', message: 'Error al buscar cliente', module: 'repository', method: 'findByTelefono' } };
       }
-      return { success: true, data: { ...cliente, empresaId: cliente.empresa_id } };
+      return { success: true, data: { ...cliente, empresaId: cliente.empresa_id, idioma: (cliente as Record<string, unknown>).idioma as string | null } };
     } catch (e) {
       if (e instanceof Object && 'code' in e && e.code === 'PGRST116') {
         return { success: true, data: null };
@@ -119,6 +120,7 @@ export class SupabaseClienteRepository implements IClienteRepository {
           email: data.email || null,
           telefono: data.telefono || null,
           direccion: data.direccion || null,
+          idioma: data.idioma || 'es',
           aceptar_promociones: false,
         })
         .select()
@@ -134,7 +136,7 @@ export class SupabaseClienteRepository implements IClienteRepository {
         );
         return { success: false, error: { code: 'DB_ERROR', message: 'Error al crear cliente', module: 'repository', method: 'create' } };
       }
-      return { success: true, data: { ...cliente, empresaId: cliente.empresa_id } };
+      return { success: true, data: { ...cliente, empresaId: cliente.empresa_id, idioma: (cliente as Record<string, unknown>).idioma as string | null } };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabaseClienteRepository.create', { empresaId: data.empresaId });
       return { success: false, error: appError };
@@ -149,6 +151,7 @@ export class SupabaseClienteRepository implements IClienteRepository {
       if (data.telefono !== undefined) updatePayload.telefono = data.telefono;
       if (data.direccion !== undefined) updatePayload.direccion = data.direccion;
       if (data.aceptar_promociones !== undefined) updatePayload.aceptar_promociones = data.aceptar_promociones;
+      if (data.idioma !== undefined) updatePayload.idioma = data.idioma;
 
       const { data: updated, error } = await this.supabase
         .from('clientes')

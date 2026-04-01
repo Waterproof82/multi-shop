@@ -107,6 +107,7 @@ function validateAndBuildOrderData(
       nombre: nombre.trim().slice(0, 100),
       telefono: dialCode + telefono.replaceAll(/\D/g, '').slice(0, 15),
       email: email.trim().toLowerCase().slice(0, 100),
+      idioma: language,
     },
   };
 }

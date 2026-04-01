@@ -6,6 +6,7 @@ export interface CreateClienteData {
   email?: string | null;
   telefono?: string | null;
   direccion?: string | null;
+  idioma?: string | null;
 }
 
 export interface UpdateClienteData {
@@ -14,6 +15,7 @@ export interface UpdateClienteData {
   telefono?: string | null;
   direccion?: string | null;
   aceptar_promociones?: boolean | null;
+  idioma?: string | null;
 }
 
 export interface IClienteRepository {

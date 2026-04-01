@@ -298,7 +298,7 @@ export default function PromocionesPage() {
               className="bg-primary hover:bg-primary/90"
             >
               {savingPromo ? (
-                <><Loader2 className="w-4 h-4 animate-spin" />{uploadingImage ? t("uploadingImageProgress", language) : t("sendingProgress", language)}</>
+                <><Loader2 className="w-4 h-4 animate-spin" />{uploadingImage ? t("uploadingImageProgress", language) : t("savingProgress", language)}</>
               ) : (
                 <><Send className="w-4 h-4" />{t("saveAndSend", language)}</>
               )}
