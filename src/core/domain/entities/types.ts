@@ -181,6 +181,7 @@ export interface TgtgPromocion {
   horaRecogidaFin: string;   // HH:MM
   fechaActivacion: string;   // YYYY-MM-DD
   numeroEnvios: number;
+  emailEnviado: boolean;
   createdAt: string;
   items?: TgtgItem[];
 }

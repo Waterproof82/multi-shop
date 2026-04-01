@@ -21,9 +21,11 @@ export interface CreateTgtgPromocionData {
 
 export interface ITgtgRepository {
   findLatestByTenant(empresaId: string): Promise<Result<TgtgPromocion | null>>;
+  findRecentByTenant(empresaId: string, limit: number): Promise<Result<TgtgPromocion[]>>;
   findItemsByPromo(tgtgPromoId: string): Promise<Result<TgtgItem[]>>;
   create(data: CreateTgtgPromocionData): Promise<Result<TgtgPromocion>>;
   deleteAllByTenant(empresaId: string): Promise<Result<void>>;
+  deleteById(promoId: string, empresaId: string): Promise<Result<void>>;
   adjustCupones(itemId: string, delta: number): Promise<Result<TgtgItem>>;
   findReservasByPromo(tgtgPromoId: string, empresaId: string): Promise<Result<TgtgReserva[]>>;
   claimCupon(params: {
@@ -38,4 +40,5 @@ export interface ITgtgRepository {
   findItemById(itemId: string): Promise<Result<TgtgItem | null>>;
   findPromoById(tgtgPromoId: string): Promise<Result<TgtgPromocion | null>>;
   updateHoras(tgtgPromoId: string, empresaId: string, horaRecogidaInicio: string, horaRecogidaFin: string): Promise<Result<TgtgPromocion>>;
+  markEmailSent(promoId: string, empresaId: string, emailCount: number): Promise<Result<TgtgPromocion>>;
 }

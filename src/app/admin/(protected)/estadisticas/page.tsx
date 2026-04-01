@@ -56,6 +56,7 @@ interface TgtgPromoStat {
   horaRecogidaInicio: string;
   horaRecogidaFin: string;
   numeroEnvios: number;
+  emailEnviado: boolean;
   items: TgtgItemStat[];
 }
 
@@ -157,7 +158,7 @@ function useStatsFetching(empresaId: string, selectedMonth: { mes: number; año:
 // Custom hook for promo + TGTG stats
 function usePromoStats(empresaId: string) {
   const [promos, setPromos] = useState<PromoStat[]>([]);
-  const [tgtgPromo, setTgtgPromo] = useState<TgtgPromoStat | null>(null);
+  const [tgtgCampaigns, setTgtgCampaigns] = useState<TgtgPromoStat[]>([]);
 
   useEffect(() => {
     async function fetchData() {
@@ -171,15 +172,15 @@ function usePromoStats(empresaId: string) {
           setPromos(data.promociones ?? []);
         }
         if (tgtgRes.ok) {
-          const data = await tgtgRes.json() as { tgtgPromo?: TgtgPromoStat | null };
-          setTgtgPromo(data.tgtgPromo ?? null);
+          const data = await tgtgRes.json() as { campaigns?: TgtgPromoStat[] };
+          setTgtgCampaigns(data.campaigns ?? []);
         }
       } catch { /* silent */ }
     }
     fetchData();
   }, [empresaId]);
 
-  return { promos, tgtgPromo };
+  return { promos, tgtgCampaigns };
 }
 
 // Custom hook for chart theme
@@ -380,7 +381,7 @@ export default function EstadisticasPage() {
   const [selectedMonth, setSelectedMonth] = useState({ mes: new Date().getMonth(), año: new Date().getFullYear() });
   
   const { stats, loading } = useStatsFetching(effectiveEmpresaId, selectedMonth);
-  const { promos, tgtgPromo } = usePromoStats(effectiveEmpresaId);
+  const { promos, tgtgCampaigns } = usePromoStats(effectiveEmpresaId);
   const chartTheme = useChartTheme();
   const { motionProps, shouldReduceMotion } = useMotionProps();
 
@@ -602,19 +603,70 @@ export default function EstadisticasPage() {
         className="bg-card rounded-lg border border-border p-6 space-y-4"
       >
         <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-          <Send className="w-5 h-5" />
+          <Send className="w-5 h-5 text-primary" />
           Envíos de Promociones
         </h2>
-        {promos.length > 0 ? (
-          <>
-            {(() => {
-              const byMonth: Record<string, number> = {};
-              for (const p of promos) {
-                const key = new Date(p.fecha_hora).toLocaleDateString('es-ES', { month: 'short', year: '2-digit' });
-                byMonth[key] = (byMonth[key] ?? 0) + p.numero_envios;
-              }
-              const chartData = Object.entries(byMonth).map(([mes, envios]) => ({ mes, envios })).slice(-12);
-              return (
+        {promos.length > 0 ? (() => {
+          const now = new Date();
+          const cy = now.getFullYear();
+          const cm = now.getMonth();
+
+          const thisMonthPromos = promos.filter(p => {
+            const d = new Date(p.fecha_hora);
+            return d.getFullYear() === cy && d.getMonth() === cm;
+          });
+
+          const totalEnvios = promos.reduce((acc, p) => acc + p.numero_envios, 0);
+          const mesEnvios = thisMonthPromos.reduce((acc, p) => acc + p.numero_envios, 0);
+          const maxEnvios = Math.max(...promos.map(p => p.numero_envios));
+          const topPromo = promos.find(p => p.numero_envios === maxEnvios);
+
+          const byMonth: Record<string, number> = {};
+          for (const p of promos) {
+            const key = new Date(p.fecha_hora).toLocaleDateString('es-ES', { month: 'short', year: '2-digit' });
+            byMonth[key] = (byMonth[key] ?? 0) + p.numero_envios;
+          }
+          const chartData = Object.entries(byMonth).map(([mes, envios]) => ({ mes, envios })).slice(-12);
+
+          return (
+            <>
+              {/* KPI cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-primary/5 border border-primary/20 rounded-lg px-4 py-3 text-center">
+                  <p className="text-2xl font-bold text-primary">{promos.length}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Promociones enviadas</p>
+                </div>
+                <div className="bg-muted rounded-lg px-4 py-3 text-center">
+                  <p className="text-2xl font-bold text-foreground">{thisMonthPromos.length}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Enviadas este mes</p>
+                </div>
+                <div className="bg-muted rounded-lg px-4 py-3 text-center">
+                  <p className="text-2xl font-bold text-foreground">{totalEnvios.toLocaleString('es-ES')}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Emails totales</p>
+                </div>
+                <div className="bg-muted rounded-lg px-4 py-3 text-center">
+                  <p className="text-2xl font-bold text-foreground">{mesEnvios.toLocaleString('es-ES')}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Emails este mes</p>
+                </div>
+              </div>
+
+              {/* Top promo highlight */}
+              {topPromo && (
+                <div className="bg-muted/50 border border-border rounded-lg px-4 py-3 flex items-start gap-3">
+                  <span className="text-xl flex-shrink-0 mt-0.5">🏆</span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-muted-foreground mb-0.5">Promoción con más alcance</p>
+                    <p className="text-sm font-semibold text-foreground truncate">{topPromo.texto_promocion}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {new Date(topPromo.fecha_hora).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })} · <span className="font-medium text-primary">{topPromo.numero_envios} emails</span>
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Chart: envíos by month */}
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2">Emails enviados por mes</p>
                 <div className="h-40 w-full">
                   <ResponsiveContainer width="100%" height={160} minWidth={0}>
                     <BarChart data={chartData}>
@@ -625,40 +677,42 @@ export default function EstadisticasPage() {
                         contentStyle={{ backgroundColor: chartTheme.tooltipBg, border: `1px solid ${chartTheme.tooltipBorder}`, borderRadius: '8px' }}
                         labelStyle={{ color: chartTheme.tooltipColor }}
                         itemStyle={{ color: chartTheme.tooltipColor }}
-                        formatter={(value: number) => [`${value} envíos`, 'Envíos']}
+                        formatter={(value: number) => [`${value.toLocaleString('es-ES')} emails`, 'Envíos']}
                       />
                       <Bar dataKey="envios" fill={chartTheme.colors[1]} radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-              );
-            })()}
-            <div className="rounded-lg border border-border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-muted">
-                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Fecha</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">Mensaje</th>
-                    <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Envíos</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {promos.map(p => (
-                    <tr key={p.id} className="bg-card hover:bg-muted/40 transition-colors">
-                      <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
-                        {new Date(p.fecha_hora).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' })}
-                      </td>
-                      <td className="px-4 py-3 hidden sm:table-cell">
-                        <p className="text-foreground truncate max-w-xs">{p.texto_promocion}</p>
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold text-primary">{p.numero_envios}</td>
+              </div>
+
+              {/* Table */}
+              <div className="rounded-lg border border-border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-muted">
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Fecha</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">Mensaje</th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Emails</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        ) : (
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {promos.map(p => (
+                      <tr key={p.id} className="bg-card hover:bg-muted/40 transition-colors">
+                        <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                          {new Date(p.fecha_hora).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                        </td>
+                        <td className="px-4 py-3 hidden sm:table-cell">
+                          <p className="text-foreground text-sm truncate max-w-xs">{p.texto_promocion}</p>
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold text-primary">{p.numero_envios.toLocaleString('es-ES')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          );
+        })() : (
           <div className="py-8 text-center">
             <Send className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
             <p className="text-sm text-muted-foreground">No hay promociones enviadas</p>
@@ -676,69 +730,150 @@ export default function EstadisticasPage() {
           <ShoppingBag className="w-5 h-5 text-green-600" />
           TooGoodToGo
         </h2>
-        {tgtgPromo ? (() => {
-          const totalClaimed = tgtgPromo.items.reduce((acc, i) => acc + (i.cuponesTotal - i.cuponesDisponibles), 0);
-          const totalCoupons = tgtgPromo.items.reduce((acc, i) => acc + i.cuponesTotal, 0);
-          const totalRevenue = tgtgPromo.items.reduce((acc, i) => acc + i.precioDescuento * (i.cuponesTotal - i.cuponesDisponibles), 0);
-          const savedAmount = tgtgPromo.items.reduce((acc, i) => acc + (i.precioOriginal - i.precioDescuento) * (i.cuponesTotal - i.cuponesDisponibles), 0);
+        {tgtgCampaigns.length > 0 ? (() => {
+          const now = new Date();
+          const cy = now.getFullYear();
+          const cm = now.getMonth();
+
+          const sentCampaigns = tgtgCampaigns.filter(c => c.emailEnviado);
+          const thisMonthCampaigns = sentCampaigns.filter(c => {
+            const d = new Date(c.fechaActivacion + 'T00:00:00');
+            return d.getFullYear() === cy && d.getMonth() === cm;
+          });
+
+          const sumStats = (cams: TgtgPromoStat[]) => ({
+            reservas: cams.reduce((acc, c) => acc + c.items.reduce((a, i) => a + i.reservasCount, 0), 0),
+            revenue: cams.reduce((acc, c) => acc + c.items.reduce((a, i) => a + i.precioDescuento * i.reservasCount, 0), 0),
+            saved: cams.reduce((acc, c) => acc + c.items.reduce((a, i) => a + (i.precioOriginal - i.precioDescuento) * i.reservasCount, 0), 0),
+          });
+
+          const allStats = sumStats(sentCampaigns);
+          const monthStats = sumStats(thisMonthCampaigns);
+
+          const totalCampaigns = tgtgCampaigns.length;
+          // reversed = oldest first → #1 = oldest
+          const chartData = [...tgtgCampaigns].reverse().slice(0, 6).map((c, idx) => ({
+            label: `#${idx + 1}`,
+            fecha: new Date(c.fechaActivacion + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }),
+            reservas: c.items.reduce((acc, i) => acc + i.reservasCount, 0),
+            ingresos: Number(c.items.reduce((acc, i) => acc + i.precioDescuento * i.reservasCount, 0).toFixed(2)),
+          }));
+
           return (
             <>
-              <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4" />
-                  {new Date(tgtgPromo.fechaActivacion).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}
-                </span>
-                <span>·</span>
-                <span>{tgtgPromo.horaRecogidaInicio.slice(0, 5)} – {tgtgPromo.horaRecogidaFin.slice(0, 5)}</span>
-                <span>·</span>
-                <span>{tgtgPromo.numeroEnvios} emails enviados</span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="bg-muted rounded-lg px-4 py-3 text-center">
-                  <p className="text-2xl font-bold text-foreground">{totalClaimed}<span className="text-sm font-normal text-muted-foreground"> / {totalCoupons}</span></p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Cupones reclamados</p>
+              {/* KPI cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900 rounded-lg px-4 py-3 text-center">
+                  <p className="text-2xl font-bold text-green-700 dark:text-green-400">{sentCampaigns.length}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Campañas enviadas</p>
                 </div>
                 <div className="bg-muted rounded-lg px-4 py-3 text-center">
-                  <p className="text-2xl font-bold text-green-600">€{totalRevenue.toFixed(2)}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Ingresos</p>
+                  <p className="text-2xl font-bold text-foreground">{thisMonthCampaigns.length}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Enviadas este mes</p>
                 </div>
                 <div className="bg-muted rounded-lg px-4 py-3 text-center">
-                  <p className="text-2xl font-bold text-primary">€{savedAmount.toFixed(2)}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Ahorro clientes</p>
+                  <p className="text-2xl font-bold text-foreground">{allStats.reservas}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Reservas totales</p>
                 </div>
                 <div className="bg-muted rounded-lg px-4 py-3 text-center">
-                  <p className="text-2xl font-bold text-foreground">{tgtgPromo.items.length}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Ofertas</p>
+                  <p className="text-2xl font-bold text-green-600">€{monthStats.revenue.toFixed(2)}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Ingreso este mes</p>
+                </div>
+                <div className="bg-muted rounded-lg px-4 py-3 text-center">
+                  <p className="text-2xl font-bold text-foreground">€{allStats.revenue.toFixed(2)}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Ingreso total</p>
                 </div>
               </div>
+
+              {/* Savings highlight */}
+              {allStats.saved > 0 && (
+                <div className="bg-primary/5 border border-primary/20 rounded-lg px-4 py-3 flex items-center gap-3">
+                  <span className="text-xl flex-shrink-0">🌱</span>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">€{allStats.saved.toFixed(2)} ahorrados por los clientes</p>
+                    <p className="text-xs text-muted-foreground">Diferencia precio original vs descuento × reservas realizadas</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Chart: reservas + ingresos por campaña */}
+              {chartData.some(d => d.reservas > 0 || d.ingresos > 0) && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Reservas e ingresos por campaña (últimas 6)</p>
+                  <div className="h-40 w-full">
+                    <ResponsiveContainer width="100%" height={160} minWidth={0}>
+                      <BarChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartTheme.gridStroke} />
+                        <XAxis dataKey="label" tick={{ fontSize: 11, fill: chartTheme.tickFill }} axisLine={false} tickLine={false} />
+                        <YAxis hide />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: chartTheme.tooltipBg, border: `1px solid ${chartTheme.tooltipBorder}`, borderRadius: '8px' }}
+                          labelStyle={{ color: chartTheme.tooltipColor, fontWeight: 600 }}
+                          itemStyle={{ color: chartTheme.tooltipColor }}
+                          labelFormatter={(label: string) => {
+                            const entry = chartData.find(d => d.label === label);
+                            return entry ? `${label} · ${entry.fecha}` : label;
+                          }}
+                          formatter={(value: number, name: string) => [
+                            name === 'reservas' ? `${value} reservas` : `€${value.toFixed(2)}`,
+                            name === 'reservas' ? 'Reservas' : 'Ingresos',
+                          ]}
+                        />
+                        <Bar dataKey="reservas" fill={chartTheme.colors[2]} radius={[4, 4, 0, 0]} name="reservas" />
+                        <Bar dataKey="ingresos" fill={chartTheme.colors[3]} radius={[4, 4, 0, 0]} name="ingresos" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+
+              {/* Table */}
               <div className="rounded-lg border border-border overflow-hidden">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-muted">
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Oferta</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Precio</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Reclamados</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground hidden sm:table-cell">Ingresos</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-8">#</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Campaña</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden lg:table-cell">Horario</th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Emails</th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Reservas</th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground hidden md:table-cell">Ingresos</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {tgtgPromo.items.map(item => {
-                      const claimed = item.cuponesTotal - item.cuponesDisponibles;
+                    {tgtgCampaigns.map((c, idx) => {
+                      const num = totalCampaigns - idx;
+                      const reservas = c.items.reduce((acc, i) => acc + i.reservasCount, 0);
+                      const revenue = c.items.reduce((acc, i) => acc + i.precioDescuento * i.reservasCount, 0);
+                      const firstTitle = c.items[0]?.titulo ?? '—';
+                      const extraItems = c.items.length - 1;
                       return (
-                        <tr key={item.id} className="bg-card hover:bg-muted/40 transition-colors">
-                          <td className="px-4 py-3">
-                            <p className="font-medium text-foreground truncate max-w-[160px]">{item.titulo}</p>
+                        <tr key={c.id} className="bg-card hover:bg-muted/40 transition-colors">
+                          <td className="px-4 py-3 text-xs font-mono text-muted-foreground">
+                            #{num}
                           </td>
-                          <td className="px-4 py-3 text-right">
-                            <span className="font-semibold text-green-600">€{Number(item.precioDescuento).toFixed(2)}</span>
-                            <p className="text-xs text-muted-foreground line-through">€{Number(item.precioOriginal).toFixed(2)}</p>
+                          <td className="px-4 py-3 min-w-0">
+                            <p className="font-medium text-foreground text-sm truncate max-w-[180px]">{firstTitle}</p>
+                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                {new Date(c.fechaActivacion + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                              </span>
+                              {extraItems > 0 && (
+                                <span className="text-xs text-muted-foreground">+{extraItems} oferta{extraItems > 1 ? 's' : ''}</span>
+                              )}
+                              {c.emailEnviado
+                                ? <span className="text-xs font-medium text-green-600 bg-green-50 dark:bg-green-950/30 px-1.5 py-0.5 rounded-full">Enviada</span>
+                                : <span className="text-xs font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">Borrador</span>
+                              }
+                            </div>
                           </td>
-                          <td className="px-4 py-3 text-right">
-                            <span className="font-bold text-foreground">{claimed}</span>
-                            <span className="text-muted-foreground"> / {item.cuponesTotal}</span>
+                          <td className="px-4 py-3 text-xs text-muted-foreground hidden lg:table-cell whitespace-nowrap">
+                            {c.horaRecogidaInicio.slice(0, 5)} – {c.horaRecogidaFin.slice(0, 5)}
                           </td>
-                          <td className="px-4 py-3 text-right font-medium text-foreground hidden sm:table-cell">
-                            €{(item.precioDescuento * claimed).toFixed(2)}
+                          <td className="px-4 py-3 text-right font-semibold text-primary">{c.numeroEnvios}</td>
+                          <td className="px-4 py-3 text-right font-bold text-foreground">{reservas}</td>
+                          <td className="px-4 py-3 text-right font-medium text-green-600 hidden md:table-cell">
+                            €{revenue.toFixed(2)}
                           </td>
                         </tr>
                       );
@@ -751,7 +886,7 @@ export default function EstadisticasPage() {
         })() : (
           <div className="py-8 text-center">
             <ReceiptText className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">No hay campaña TooGoodToGo activa</p>
+            <p className="text-sm text-muted-foreground">No hay campañas TooGoodToGo</p>
           </div>
         )}
       </motion.div>

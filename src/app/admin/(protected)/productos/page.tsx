@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Image from 'next/image';
-import { Plus, Pencil, Trash2, Image as ImageIcon, Search, ArrowUpDown, ArrowUp, ArrowDown, Utensils, Star, Video } from 'lucide-react';
+import { Plus, Pencil, Trash2, Image as ImageIcon, Search, ArrowUpDown, ArrowUp, ArrowDown, Package, Star, Video } from 'lucide-react';
 
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.avif'];
 
@@ -371,7 +371,7 @@ export default function ProductosPage() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
-              <Utensils className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
+              <Package className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
               <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{productos.length}</span>
               <p className="text-primary-foreground/80 text-[10px] sm:text-xs">{t("total", language)}</p>
             </div>

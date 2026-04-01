@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Utensils, Tags, LogOut, Menu, X, ShoppingCart, BarChart3, Users, Megaphone, Settings, ExternalLink } from 'lucide-react';
+import { LayoutDashboard, Package, Tags, LogOut, Menu, X, ShoppingCart, BarChart3, Users, Megaphone, Settings, ExternalLink, ShoppingBag } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useAdmin } from '@/lib/admin-context';
 import { useLanguage } from '@/lib/language-context';
@@ -19,10 +19,11 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: '/admin', labelKey: 'sidebarDashboard', icon: LayoutDashboard },
   { href: '/admin/categorias', labelKey: 'sidebarCategories', icon: Tags },
-  { href: '/admin/productos', labelKey: 'sidebarProducts', icon: Utensils },
+  { href: '/admin/productos', labelKey: 'sidebarProducts', icon: Package },
   { href: '/admin/pedidos', labelKey: 'sidebarOrders', icon: ShoppingCart },
   { href: '/admin/clientes', labelKey: 'sidebarClients', icon: Users },
   { href: '/admin/promociones', labelKey: 'sidebarPromotions', icon: Megaphone },
+  { href: '/admin/toogoodtogo', labelKey: 'sidebarTooGoodToGo', icon: ShoppingBag },
   { href: '/admin/estadisticas', labelKey: 'sidebarStatistics', icon: BarChart3 },
   { href: '/admin/configuracion', labelKey: 'sidebarSettings', icon: Settings },
 ];

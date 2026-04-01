@@ -34,7 +34,7 @@ Plataforma multi-tenant de menú digital con sistema de pedidos online, panel de
 │               Use Cases (Aplicación)                    │
 │  - ProductUseCase, CategoryUseCase, ClienteUseCase      │
 │  - EmpresaUseCase, PedidoUseCase, PromocionUseCase      │
-│  - AuthAdminUseCase                                     │
+│  - AuthAdminUseCase, TgtgUseCase                        │
 └─────────────────────────────────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────┐
@@ -70,6 +70,7 @@ src/
 │   │       ├── pedidos/
 │   │       ├── clientes/
 │   │       ├── promociones/
+│   │       ├── toogoodtogo/             # Campañas TGTG (crear, enviar, gestionar)
 │   │       ├── estadisticas/
 │   │       └── configuracion/
 │   ├── superadmin/                  # Panel Super Admin
@@ -88,6 +89,9 @@ src/
 │       │   ├── clientes/            # CRUD clientes
 │       │   ├── empresa/             # GET/PUT datos empresa
 │       │   ├── update-colores/      # POST colores del tema
+│       │   ├── tgtg/                # GET all, POST crear campaña
+│       │   │   ├── [id]/            # DELETE campaña (guarda vs emailEnviado/reservas)
+│       │   │   └── enviar/          # POST — enviar emails campaña activa
 │       │   └── promociones/
 │       │       └── unsubscribe/     # POST — pública, toggle suscripción
 │       ├── superadmin/              # Protegidas, rol superadmin
@@ -240,7 +244,7 @@ return NextResponse.json(createErrorResponse(AUTH_ERRORS.UNAUTHORIZED), { status
 import {
   productUseCase, categoryUseCase, clienteUseCase,
   empresaUseCase, pedidoUseCase, promocionUseCase,
-  authAdminUseCase, empresaRepository,
+  authAdminUseCase, tgtgUseCase, empresaRepository,
 } from '@/core/infrastructure/database';
 ```
 
@@ -253,6 +257,7 @@ import {
 | **PedidoUseCase** | `getAll`, `create`, `updateStatus`, `getStats`, `delete` |
 | **PromocionUseCase** | `getAll`, `create` |
 | **AuthAdminUseCase** | `login`, `verifyToken` |
+| **TgtgUseCase** | `getWithItems`, `getAllRecent`, `create`, `sendCampaignEmails`, `markEmailSent`, `getHistory`, `getReservas`, `adjustCupones`, `claimCupon`, `updateHoras`, `deletePromo`, `isTokenUsed`, `getPublicItem`, `getPublicPromo` |
 | **SuperAdminUseCase** | `getAllEmpresas`, `getEmpresaById`, `updateEmpresa` |
 
 ### Repositories — métodos
@@ -268,6 +273,7 @@ import {
 | **IProductRepository** | `findAllByTenant`, `findByIds`, `create`, `update`, `delete` |
 | **ICategoryRepository** | `findAllByTenant`, `create`, `update`, `delete` |
 | **ILogErrorRepository** | `log` |
+| **ITgtgRepository** | `findWithItems`, `findAllRecent`, `create`, `sendEmails`, `markEmailSent`, `findHistory`, `findReservas`, `adjustCupones`, `claimCupon`, `updateHoras`, `delete`, `isTokenUsed`, `findPublicItem`, `findPublicPromo` |
 
 ---
 
@@ -429,6 +435,9 @@ const main = parseMainDomain(domain); // elimina subdominio pedidos
 | `clientes` | id (uuid) | empresa_id | telefono único por empresa |
 | `pedidos` | id (uuid) | empresa_id, cliente_id | numero_pedido (atómico por tenant), detalle_pedido: JSON (PedidoItem[]) |
 | `promociones` | id (uuid) | empresa_id | imagen_url, numero_envios |
+| `tgtg_promociones` | id (uuid) | empresa_id | fechaActivacion, horaRecogidaInicio/Fin, emailEnviado, numeroEnvios |
+| `tgtg_items` | id (uuid) | tgtg_promo_id, empresa_id | titulo, precioOriginal, precioDescuento, cuponesTotal, cuponesDisponibles |
+| `tgtg_reservas` | id (uuid) | tgtg_item_id, empresa_id | token único, estado (pendiente/confirmado/cancelado), fechaReserva |
 | `log_errors` | id (uuid) | empresa_id | logging centralizado con severity y metadata JSONB |
 
 > `pedidos` NO tiene columna `telefono` — el teléfono está en `clientes`
@@ -592,6 +601,7 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 - [`docs/context/bbdd.md`](docs/context/bbdd.md) — Esquema de base de datos
 - [`docs/context/cart_flow.md`](docs/context/cart_flow.md) — Flujo del carrito
 - [`docs/context/context.md`](docs/context/context.md) — Contexto general del proyecto
+- [`docs/context/toogoodtogo.md`](docs/context/toogoodtogo.md) — Flujo completo TGTG (campañas, reservas, emails, reglas de negocio)
 
 ---
 

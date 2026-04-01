@@ -12,7 +12,7 @@ export default function NotFound() {
           href="/"
           className="inline-flex items-center justify-center rounded-md bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
-          Volver al menú
+          Volver al inicio
         </Link>
       </div>
     </div>

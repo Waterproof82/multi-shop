@@ -5,6 +5,10 @@ import { logger } from '@/core/infrastructure/logging/logger';
 
 export interface CreateTgtgResult {
   promo: TgtgPromocion;
+}
+
+export interface SendEmailsResult {
+  promo: TgtgPromocion;
   emailTargets: Array<{ email: string; nombre: string | null }>;
 }
 
@@ -37,6 +41,23 @@ export class TgtgUseCase {
     }
   }
 
+  async getAllRecent(empresaId: string): Promise<Result<TgtgWithItems[]>> {
+    try {
+      const recentResult = await this.tgtgRepo.findRecentByTenant(empresaId, 6);
+      if (!recentResult.success) return recentResult;
+
+      const all = await Promise.all(
+        recentResult.data.map(async (promo) => {
+          const itemsResult = await this.tgtgRepo.findItemsByPromo(promo.id);
+          return { promo, items: itemsResult.success ? itemsResult.data : [] };
+        })
+      );
+      return { success: true, data: all };
+    } catch (e) {
+      return { success: false, error: await logger.logFromCatch(e, 'use-case', 'TgtgUseCase.getAllRecent', { empresaId }) };
+    }
+  }
+
   async create(
     empresaId: string,
     horaRecogidaInicio: string,
@@ -53,31 +74,75 @@ export class TgtgUseCase {
     }>,
   ): Promise<Result<CreateTgtgResult>> {
     try {
-      const clientesResult = await this.clienteRepo.findAllByTenant(empresaId);
+      const createResult = await this.tgtgRepo.create({
+        empresaId,
+        horaRecogidaInicio,
+        horaRecogidaFin,
+        fechaActivacion,
+        numeroEnvios: 0,
+        items,
+      });
 
+      if (!createResult.success) return { success: false, error: createResult.error };
+
+      // Keep only the 6 most recent (delete older ones)
+      const recentResult = await this.tgtgRepo.findRecentByTenant(empresaId, 7);
+      if (recentResult.success && recentResult.data.length > 6) {
+        const toDelete = recentResult.data.slice(6);
+        for (const old of toDelete) {
+          await this.tgtgRepo.deleteById(old.id, empresaId);
+        }
+      }
+
+      return { success: true, data: { promo: createResult.data } };
+    } catch (e) {
+      return { success: false, error: await logger.logFromCatch(e, 'use-case', 'TgtgUseCase.create', { empresaId }) };
+    }
+  }
+
+  async sendCampaignEmails(empresaId: string, promoId: string): Promise<Result<SendEmailsResult>> {
+    try {
+      const promoResult = await this.tgtgRepo.findPromoById(promoId);
+      if (!promoResult.success) return promoResult;
+      if (!promoResult.data || promoResult.data.empresaId !== empresaId) {
+        return { success: false, error: { code: 'NOT_FOUND', message: 'Campaña no encontrada', module: 'use-case' } };
+      }
+      if (promoResult.data.emailEnviado) {
+        return { success: false, error: { code: 'ALREADY_SENT', message: 'La campaña ya fue enviada', module: 'use-case' } };
+      }
+
+      const clientesResult = await this.clienteRepo.findAllByTenant(empresaId);
       if (!clientesResult.success) return { success: false, error: clientesResult.error };
 
       const emailTargets = clientesResult.data
         .filter((c) => c.aceptar_promociones && c.email)
         .map((c) => ({ email: c.email as string, nombre: c.nombre }));
 
-      const deleteResult = await this.tgtgRepo.deleteAllByTenant(empresaId);
-      if (!deleteResult.success) return { success: false, error: deleteResult.error };
-
-      const createResult = await this.tgtgRepo.create({
-        empresaId,
-        horaRecogidaInicio,
-        horaRecogidaFin,
-        fechaActivacion,
-        numeroEnvios: emailTargets.length,
-        items,
-      });
-
-      if (!createResult.success) return { success: false, error: createResult.error };
-
-      return { success: true, data: { promo: createResult.data, emailTargets } };
+      return { success: true, data: { promo: promoResult.data, emailTargets } };
     } catch (e) {
-      return { success: false, error: await logger.logFromCatch(e, 'use-case', 'TgtgUseCase.create', { empresaId }) };
+      return { success: false, error: await logger.logFromCatch(e, 'use-case', 'TgtgUseCase.sendCampaignEmails', { empresaId, details: { promoId } }) };
+    }
+  }
+
+  async markEmailSent(empresaId: string, promoId: string, emailCount: number): Promise<Result<TgtgPromocion>> {
+    return this.tgtgRepo.markEmailSent(promoId, empresaId, emailCount);
+  }
+
+  async getHistory(empresaId: string, excludeId: string): Promise<Result<Array<{ promo: TgtgPromocion; items: TgtgItem[] }>>> {
+    try {
+      const recentResult = await this.tgtgRepo.findRecentByTenant(empresaId, 6);
+      if (!recentResult.success) return recentResult;
+
+      const history = recentResult.data.filter(p => p.id !== excludeId).slice(0, 5);
+      const result = await Promise.all(
+        history.map(async (promo) => {
+          const itemsResult = await this.tgtgRepo.findItemsByPromo(promo.id);
+          return { promo, items: itemsResult.success ? itemsResult.data : [] };
+        })
+      );
+      return { success: true, data: result };
+    } catch (e) {
+      return { success: false, error: await logger.logFromCatch(e, 'use-case', 'TgtgUseCase.getHistory', { empresaId }) };
     }
   }
 
@@ -157,6 +222,26 @@ export class TgtgUseCase {
       return await this.tgtgRepo.updateHoras(tgtgPromoId, empresaId, horaRecogidaInicio, horaRecogidaFin);
     } catch (e) {
       return { success: false, error: await logger.logFromCatch(e, 'use-case', 'TgtgUseCase.updateHoras', { empresaId, details: { tgtgPromoId } }) };
+    }
+  }
+
+  async deletePromo(empresaId: string, promoId: string): Promise<Result<void>> {
+    try {
+      const promoResult = await this.tgtgRepo.findPromoById(promoId);
+      if (!promoResult.success) return promoResult;
+      if (!promoResult.data || promoResult.data.empresaId !== empresaId) {
+        return { success: false, error: { code: 'NOT_FOUND', message: 'Campaña no encontrada', module: 'use-case' } };
+      }
+      if (promoResult.data.emailEnviado) {
+        return { success: false, error: { code: 'ALREADY_SENT', message: 'No se puede eliminar una campaña ya enviada', module: 'use-case' } };
+      }
+      const reservasResult = await this.tgtgRepo.findReservasByPromo(promoId, empresaId);
+      if (reservasResult.success && reservasResult.data.length > 0) {
+        return { success: false, error: { code: 'HAS_RESERVAS', message: 'No se puede eliminar una campaña con reservas activas', module: 'use-case' } };
+      }
+      return await this.tgtgRepo.deleteById(promoId, empresaId);
+    } catch (e) {
+      return { success: false, error: await logger.logFromCatch(e, 'use-case', 'TgtgUseCase.deletePromo', { empresaId, details: { promoId } }) };
     }
   }
 

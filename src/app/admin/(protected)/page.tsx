@@ -1,11 +1,11 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { authAdminUseCase, pedidoUseCase, empresaUseCase } from '@/core/infrastructure/database';
+import { authAdminUseCase, pedidoUseCase, empresaUseCase, tgtgUseCase, promocionUseCase } from '@/core/infrastructure/database';
 import { getMenuUseCase } from '@/lib/server-services';
 import { AdminDashboardClient } from '@/components/admin/admin-dashboard-client';
 import { SUPERADMIN_ROLE } from '@/core/domain/repositories/IAdminRepository';
 import type { MenuCategoryVM } from '@/core/application/dtos/menu-view-model';
-import type { DashboardPedido, DashboardStats } from '@/components/admin/admin-dashboard-client';
+import type { DashboardPedido, DashboardStats, DashboardPromoSummary, DashboardTgtgSummary } from '@/components/admin/admin-dashboard-client';
 
 export default async function AdminDashboard() {
   const cookieStore = await cookies();
@@ -43,10 +43,12 @@ export default async function AdminDashboard() {
     }
   }
 
-  const [menuResult, pedidosResult, statsResult] = await Promise.all([
+  const [menuResult, pedidosResult, statsResult, promosResult, tgtgResult] = await Promise.all([
     getMenuUseCase.execute(empresaId),
     pedidoUseCase.getAll(empresaId),
     pedidoUseCase.getStats(empresaId, new Date().getMonth(), new Date().getFullYear()),
+    promocionUseCase.getAll(empresaId),
+    tgtgUseCase.getAllRecent(empresaId),
   ]);
 
   const menu: MenuCategoryVM[] = menuResult.data || [];
@@ -55,6 +57,27 @@ export default async function AdminDashboard() {
   const pedidos: DashboardPedido[] = pedidosResult.success ? (pedidosResult.data || []) as DashboardPedido[] : [];
   const stats: DashboardStats | null = statsResult.success ? statsResult.data as DashboardStats : null;
 
+  const promos = promosResult.success ? promosResult.data : [];
+  const sortedPromos = [...promos].sort((a, b) => new Date(b.fecha_hora).getTime() - new Date(a.fecha_hora).getTime());
+  const promoSummary: DashboardPromoSummary = {
+    total: promos.length,
+    lastDate: sortedPromos[0]?.fecha_hora ?? null,
+    totalEmails: promos.reduce((acc, p) => acc + p.numero_envios, 0),
+  };
+
+  const tgtgCampaigns = tgtgResult.success ? tgtgResult.data : [];
+  const nowTs = new Date();
+  const tgtgSummary: DashboardTgtgSummary = {
+    activeCampaigns: tgtgCampaigns.filter(({ promo, items }) => {
+      const horaFin = promo.horaRecogidaFin.length === 5 ? `${promo.horaRecogidaFin}:00` : promo.horaRecogidaFin;
+      const end = new Date(`${promo.fechaActivacion}T${horaFin}`);
+      return !isNaN(end.getTime()) && nowTs <= end && items.some(i => i.cuponesDisponibles > 0);
+    }).length,
+    sentCampaigns: tgtgCampaigns.filter(({ promo }) => promo.emailEnviado).length,
+    claimedCoupons: tgtgCampaigns.reduce((acc, { items }) =>
+      acc + items.reduce((a, i) => a + (i.cuponesTotal - i.cuponesDisponibles), 0), 0),
+  };
+
   return (
     <AdminDashboardClient
       empresaNombre={empresaNombre}
@@ -62,6 +85,8 @@ export default async function AdminDashboard() {
       pedidos={pedidos}
       stats={stats}
       menuError={menuError}
+      promoSummary={promoSummary}
+      tgtgSummary={tgtgSummary}
     />
   );
 }

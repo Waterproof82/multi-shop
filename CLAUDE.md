@@ -110,7 +110,7 @@ Imports principales
 // Use Cases y repos
 import {
   productUseCase, categoryUseCase, clienteUseCase, empresaUseCase,
-  pedidoUseCase, promocionUseCase, authAdminUseCase, superAdminUseCase,
+  pedidoUseCase, promocionUseCase, authAdminUseCase, tgtgUseCase, superAdminUseCase,
   empresaRepository,        // service role (admin)
   empresaPublicRepository,  // anon key (paginas publicas)
 } from '@/core/infrastructure/database';
@@ -157,6 +157,7 @@ EmpresaUseCase	`getById`, `update`, `updateColores`
 PedidoUseCase	`getAll`, `create`, `updateStatus`, `getStats`, `delete`
 PromocionUseCase	`getAll`, `create`
 AuthAdminUseCase	`login`, `verifyToken`
+TgtgUseCase	`getWithItems`, `getAllRecent`, `create`, `sendCampaignEmails`, `markEmailSent`, `getHistory`, `getReservas`, `adjustCupones`, `claimCupon`, `updateHoras`, `deletePromo`, `isTokenUsed`, `getPublicItem`, `getPublicPromo`
 GetMenuUseCase	`execute` (menu publico con productos y categorias)
 SuperAdminUseCase	`getAllEmpresas`, `getGlobalStats`, `getEmpresaStats`
 ---
@@ -176,6 +177,9 @@ Tabla	Claves	Notas
 `clientes`	PK: id, FK: empresa_id	telefono unico por empresa
 `pedidos`	PK: id, FK: empresa_id, cliente_id	detalle_pedido: JSON array de PedidoItem; numero_pedido: entero atomico por tenant (via `get_next_pedido_number()`)
 `promociones`	PK: id, FK: empresa_id	imagen_url, numero_envios
+`tgtg_promociones`	PK: id, FK: empresa_id	fechaActivacion, horaRecogidaInicio, horaRecogidaFin, emailEnviado (bool, inmutable una vez true), numeroEnvios
+`tgtg_items`	PK: id, FK: tgtg_promo_id + empresa_id	titulo, precioOriginal, precioDescuento, cuponesTotal, cuponesDisponibles
+`tgtg_reservas`	PK: id, FK: tgtg_item_id + empresa_id	token unico (JWT link cliente), estado (pendiente/confirmado/cancelado), fechaReserva
 `log_errors`	PK: id, FK: empresa_id	logging centralizado (codigo, mensaje, modulo, metodo, severity, metadata JSONB)
 Trampas de datos:
 `pedidos` NO tiene columna `telefono` — el telefono esta en `clientes`
@@ -274,6 +278,14 @@ Promociones
 POST crea promo y envia emails a clientes suscritos
 Imagen se sube a R2, al crear nueva promo se borra la anterior con `deleteImageFromR2`
 `texto_promocion` se escapa con `escapeHtml()`
+TooGoodToGo (TGTG)
+Flujo completo en `docs/context/toogoodtogo.md`
+Admin crea campaña con items → envía email a clientes suscritos → clientes reservan via link con token JWT
+`emailEnviado` es inmutable una vez `true` — no se puede eliminar ni re-enviar una campaña enviada
+Borrar campaña bloqueado si `emailEnviado=true` O si hay reservas (`reservasCount > 0`) — HTTP 409
+Codigos de error especificos: `ALREADY_SENT` (409), `HAS_RESERVAS` (409)
+Reserva cliente: token de un solo uso (JWT con `jti` almacenado en `tgtg_reservas.token`), validado con `isTokenUsed()`
+`claimCupon` es atomico — decrementa `cuponesDisponibles` solo si > 0, retorna `NO_COUPONS` si agotado
 Pedidos (flujo publico)
 `POST /api/pedidos` — crea pedido + registra/actualiza cliente (sin auth)
 `POST /api/admin/pedidos/enviar-email` — email de confirmacion (con auth)
@@ -325,6 +337,9 @@ Agregar `/api/admin/logout` a `isPublicRoute` — logout requiere JWT + CSRF par
 Leer `process.env.BREVO_API_KEY` directamente en routes — usar `sendEmail()` que llama `getBrevoApiKey()` internamente
 Crear tokens JWT sin claim `jti` — son irrevocables permanentemente; el proxy y `verifyToken` rechazan tokens sin `jti`
 Generar tokens de unsubscribe con `CSRF_HMAC_SECRET` — usar `UNSUBSCRIBE_HMAC_SECRET` (aislamiento de contexto criptografico)
+Eliminar campana TGTG sin verificar `emailEnviado` y `reservasCount` — ambas condiciones bloquean el borrado (HTTP 409)
+Permitir re-envio de emails a una campana con `emailEnviado=true` — una vez enviado es inmutable
+Reutilizar el mismo token de reserva TGTG — cada token es de un solo uso, validado con `isTokenUsed()` antes de `claimCupon`
 ---
 Proceso de revision — Orden de prioridad
 Cuando revises o modifiques codigo, seguir este orden antes de dar la tarea por completada:

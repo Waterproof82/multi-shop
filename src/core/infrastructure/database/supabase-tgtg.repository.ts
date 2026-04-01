@@ -15,6 +15,7 @@ function mapPromo(row: Record<string, unknown>): TgtgPromocion {
     horaRecogidaFin: row.hora_recogida_fin as string,
     fechaActivacion: (row.fecha_activacion as string | null) ?? today,
     numeroEnvios: row.numero_envios as number,
+    emailEnviado: Boolean(row.email_enviado),
     createdAt: row.created_at as string,
   };
 }
@@ -139,6 +140,43 @@ export class SupabaseTgtgRepository implements ITgtgRepository {
       return { success: true, data: mapPromo(promoData) };
     } catch (e) {
       return { success: false, error: await logger.logFromCatch(e, 'repository', 'TgtgRepo.create', { empresaId: data.empresaId }) };
+    }
+  }
+
+  async findRecentByTenant(empresaId: string, limit: number): Promise<Result<TgtgPromocion[]>> {
+    try {
+      const { data, error } = await this.supabase
+        .from('tgtg_promociones')
+        .select('*')
+        .eq('empresa_id', empresaId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', error.message, 'repository', 'TgtgRepo.findRecentByTenant', { empresaId });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener historial TGTG', module: 'repository' } };
+      }
+      return { success: true, data: (data || []).map(r => mapPromo(r as Record<string, unknown>)) };
+    } catch (e) {
+      return { success: false, error: await logger.logFromCatch(e, 'repository', 'TgtgRepo.findRecentByTenant', { empresaId }) };
+    }
+  }
+
+  async deleteById(promoId: string, empresaId: string): Promise<Result<void>> {
+    try {
+      const { error } = await this.supabase
+        .from('tgtg_promociones')
+        .delete()
+        .eq('id', promoId)
+        .eq('empresa_id', empresaId);
+
+      if (error) {
+        await logger.logAndReturnError('DB_DELETE_ERROR', error.message, 'repository', 'TgtgRepo.deleteById', { empresaId, details: { promoId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al eliminar promo', module: 'repository' } };
+      }
+      return { success: true, data: undefined };
+    } catch (e) {
+      return { success: false, error: await logger.logFromCatch(e, 'repository', 'TgtgRepo.deleteById', { empresaId, details: { promoId } }) };
     }
   }
 
@@ -302,6 +340,26 @@ export class SupabaseTgtgRepository implements ITgtgRepository {
       return { success: true, data: mapPromo(data as Record<string, unknown>) };
     } catch (e) {
       return { success: false, error: await logger.logFromCatch(e, 'repository', 'TgtgRepo.updateHoras', { empresaId, details: { tgtgPromoId } }) };
+    }
+  }
+
+  async markEmailSent(promoId: string, empresaId: string, emailCount: number): Promise<Result<TgtgPromocion>> {
+    try {
+      const { data, error } = await this.supabase
+        .from('tgtg_promociones')
+        .update({ email_enviado: true, numero_envios: emailCount })
+        .eq('id', promoId)
+        .eq('empresa_id', empresaId)
+        .select()
+        .single();
+
+      if (error || !data) {
+        await logger.logAndReturnError('DB_UPDATE_ERROR', error?.message ?? 'No data', 'repository', 'TgtgRepo.markEmailSent', { empresaId, details: { promoId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al marcar campaña como enviada', module: 'repository' } };
+      }
+      return { success: true, data: mapPromo(data as Record<string, unknown>) };
+    } catch (e) {
+      return { success: false, error: await logger.logFromCatch(e, 'repository', 'TgtgRepo.markEmailSent', { empresaId, details: { promoId } }) };
     }
   }
 

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ShoppingBag, Package, ArrowRight, Clock } from 'lucide-react';
+import { ShoppingBag, Package, ArrowRight, Clock, Send, Tag } from 'lucide-react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
@@ -26,15 +26,29 @@ export interface DashboardStats {
   totalMes: number;
 }
 
+export interface DashboardPromoSummary {
+  total: number;
+  lastDate: string | null;
+  totalEmails: number;
+}
+
+export interface DashboardTgtgSummary {
+  activeCampaigns: number;
+  sentCampaigns: number;
+  claimedCoupons: number;
+}
+
 interface AdminDashboardClientProps {
   readonly empresaNombre: string;
   readonly menu: MenuCategoryVM[];
   readonly pedidos: DashboardPedido[];
   readonly stats: DashboardStats | null;
   readonly menuError?: string;
+  readonly promoSummary: DashboardPromoSummary;
+  readonly tgtgSummary: DashboardTgtgSummary;
 }
 
-export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menuError }: AdminDashboardClientProps) {
+export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menuError, promoSummary, tgtgSummary }: AdminDashboardClientProps) {
   const { language } = useLanguage();
   const shouldReduceMotion = useReducedMotion() ?? false;
 
@@ -91,6 +105,57 @@ export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menu
               <p className="text-primary-foreground/80 text-xs leading-tight mt-1">{t("destacados", language)}</p>
             </div>
           </div>
+        </div>
+
+        {/* Marketing row */}
+        <div className="mt-4 pt-4 border-t border-primary-foreground/20 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Link
+            href="/admin/promociones"
+            className="bg-primary-foreground/10 hover:bg-primary-foreground/20 rounded-lg px-4 py-3 flex items-center gap-4 transition-colors group outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/50 focus-visible:ring-offset-2 focus-visible:ring-offset-primary min-h-[44px]"
+          >
+            <div className="w-9 h-9 rounded-lg bg-primary-foreground/20 flex items-center justify-center flex-shrink-0 group-hover:scale-110 motion-reduce:group-hover:scale-100 transition-transform duration-300">
+              <Send className="w-4 h-4 text-primary-foreground" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-medium text-primary-foreground/70 uppercase tracking-wide">Promociones</p>
+                {promoSummary.lastDate && (
+                  <span className="text-xs text-primary-foreground/50 whitespace-nowrap">
+                    {new Date(promoSummary.lastDate).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
+                  </span>
+                )}
+              </div>
+              <p className="text-base font-semibold text-primary-foreground leading-tight">
+                {promoSummary.total} enviadas
+              </p>
+              <p className="text-xs text-primary-foreground/60 mt-0.5">
+                {promoSummary.totalEmails.toLocaleString('es-ES')} emails en total
+              </p>
+            </div>
+            <ArrowRight className="w-4 h-4 text-primary-foreground/40 flex-shrink-0 group-hover:text-primary-foreground/70 transition-colors" />
+          </Link>
+
+          <Link
+            href="/admin/toogoodtogo"
+            className="bg-primary-foreground/10 hover:bg-primary-foreground/20 rounded-lg px-4 py-3 flex items-center gap-4 transition-colors group outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/50 focus-visible:ring-offset-2 focus-visible:ring-offset-primary min-h-[44px]"
+          >
+            <div className="w-9 h-9 rounded-lg bg-primary-foreground/20 flex items-center justify-center flex-shrink-0 group-hover:scale-110 motion-reduce:group-hover:scale-100 transition-transform duration-300">
+              <Tag className="w-4 h-4 text-primary-foreground" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium text-primary-foreground/70 uppercase tracking-wide">TooGoodToGo</p>
+              <p className="text-base font-semibold text-primary-foreground leading-tight">
+                {tgtgSummary.activeCampaigns > 0
+                  ? `${tgtgSummary.activeCampaigns} activa${tgtgSummary.activeCampaigns > 1 ? 's' : ''}`
+                  : `${tgtgSummary.sentCampaigns} campaña${tgtgSummary.sentCampaigns !== 1 ? 's' : ''}`
+                }
+              </p>
+              <p className="text-xs text-primary-foreground/60 mt-0.5">
+                {tgtgSummary.claimedCoupons} cupones canjeados · {tgtgSummary.sentCampaigns} enviadas
+              </p>
+            </div>
+            <ArrowRight className="w-4 h-4 text-primary-foreground/40 flex-shrink-0 group-hover:text-primary-foreground/70 transition-colors" />
+          </Link>
         </div>
       </div>
 
