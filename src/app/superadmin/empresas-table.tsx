@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Building2, AlertCircle, CheckCircle } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
@@ -39,7 +38,6 @@ interface ModuloSwitchProps {
 function ModuloSwitch({ empresaId, field, checked: initialChecked, label }: ModuloSwitchProps) {
   const [checked, setChecked] = useState(initialChecked);
   const [saving, setSaving] = useState(false);
-  const router = useRouter();
 
   const handleToggle = async () => {
     if (saving) return;
@@ -52,11 +50,7 @@ function ModuloSwitch({ empresaId, field, checked: initialChecked, label }: Modu
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ [field]: next }),
       });
-      if (!res.ok) {
-        setChecked(!next);
-      } else {
-        router.refresh();
-      }
+      if (!res.ok) setChecked(!next);
     } catch {
       setChecked(!next);
     } finally {
