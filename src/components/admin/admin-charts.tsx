@@ -95,8 +95,8 @@ function DailyOrdersChart({
         </svg>
         {t("ordersByDay", language)} ({meses[mesActual]})
       </h2>
-      <div className="h-48 w-full">
-        <ResponsiveContainer width="100%" height={192} minWidth={0}>
+      <div className="h-40 sm:h-48 w-full">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <LineChart data={pedidosPorDia}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartTheme.gridStroke} />
             <XAxis
@@ -175,8 +175,8 @@ function TopDishesChart({
         </svg>
         {t("topDishes", language)} ({t("thisMonthLabel", language)})
       </h2>
-      <div className="h-64 w-full">
-        <ResponsiveContainer width="100%" height={256} minWidth={0}>
+      <div className="h-56 sm:h-64 w-full">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <BarChart data={topPlatos.slice(0, 8)} layout="vertical">
             <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={chartTheme.gridStroke} />
             <XAxis type="number" hide axisLine={false} tickLine={false} />
@@ -248,8 +248,8 @@ function RevenuePieChart({
         </svg>
         {t("revenueByDish", language)} ({t("thisMonthLabel", language)})
       </h2>
-      <div className="h-64 w-full">
-        <ResponsiveContainer width="100%" height={256} minWidth={0}>
+      <div className="h-56 sm:h-64 w-full">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <PieChart key="pie-chart">
             <Pie
               data={topPlatos.slice(0, 8)}

@@ -132,7 +132,7 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
                       onClick={closeMenu}
                       aria-current={isActive ? 'page' : undefined}
                       className={`
-                        flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 group
+                        flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-[background-color,color,transform] duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 group
                         ${isActive
                           ? 'bg-primary text-primary-foreground shadow-sm scale-[1.02]'
                           : 'text-muted-foreground hover:bg-muted hover:text-foreground hover:scale-[1.01] hover:shadow-sm'

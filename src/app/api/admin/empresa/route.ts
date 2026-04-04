@@ -4,15 +4,22 @@ import { updateEmpresaSchema } from '@/core/application/dtos/empresa.dto';
 import { requireAuth, requireRole, handleResult, errorResponse, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function GET(request: NextRequest) {
   const rateLimited = await rateLimitAdmin(request);
   if (rateLimited) return rateLimited;
 
-  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request) as any;
+  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request);
   if (authError) return authError;
+  const roleError = requireRole(request, ['admin', 'superadmin']);
+  if (roleError) return roleError;
 
   const { searchParams } = new URL(request.url);
   const queryEmpresaId = searchParams.get('empresaId');
+  if (isSuperAdmin && queryEmpresaId && !UUID_RE.test(queryEmpresaId)) {
+    return errorResponse('Invalid empresaId format', 400);
+  }
   const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
 
   const result = await empresaUseCase.getById(empresaId!);
@@ -53,13 +60,16 @@ export async function PUT(request: NextRequest) {
   const rateLimited = await rateLimitAdmin(request);
   if (rateLimited) return rateLimited;
 
-  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request) as any;
+  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request);
   if (authError) return authError;
   const roleError = requireRole(request, ['admin', 'superadmin']);
   if (roleError) return roleError;
 
   const { searchParams } = new URL(request.url);
   const queryEmpresaId = searchParams.get('empresaId');
+  if (isSuperAdmin && queryEmpresaId && !UUID_RE.test(queryEmpresaId)) {
+    return errorResponse('Invalid empresaId format', 400);
+  }
   const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
 
   let body: unknown;

@@ -13,10 +13,6 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-function getEmpresaIdFromRequest(): string | null {
-  return null;
-}
-
 export default async function AdminProtectedLayout({
   children,
 }: Readonly<{

@@ -94,15 +94,13 @@ export class SupabaseSuperAdminRepository implements ISuperAdminRepository {
           totalClientes: 0,
           totalProductos: 0,
           pedidosHoy: 0,
-          pedidosMes: 0
+          pedidosMes: 0,
+          cuponesPromoValidados: 0,
+          cuponesTgtgValidados: 0,
+          cuponesTgtgTotales: 0,
         };
 
-        const { count: adminCount } = await this.supabase
-          .from("perfiles_admin")
-          .select("*", { count: 'exact', head: true })
-          .eq("empresa_id", empresa.id);
-
-        empresasWithStats.push(this.mapEmpresaToStats(empresa, stats, adminCount || 0));
+        empresasWithStats.push(this.mapEmpresaToStats(empresa, stats));
       }
 
       return { success: true, data: empresasWithStats };
@@ -149,17 +147,15 @@ export class SupabaseSuperAdminRepository implements ISuperAdminRepository {
         totalClientes: 0,
         totalProductos: 0,
         pedidosHoy: 0,
-        pedidosMes: 0
+        pedidosMes: 0,
+        cuponesPromoValidados: 0,
+        cuponesTgtgValidados: 0,
+        cuponesTgtgTotales: 0,
       };
-
-      const { count: adminCount } = await this.supabase
-        .from("perfiles_admin")
-        .select("*", { count: 'exact', head: true })
-        .eq("empresa_id", id);
 
       return {
         success: true,
-        data: this.mapEmpresaToStats(empresa as unknown as EmpresaRow, stats, adminCount || 0)
+        data: this.mapEmpresaToStats(empresa as unknown as EmpresaRow, stats)
       };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabaseSuperAdminRepository.findEmpresaById', { empresaId: id });
@@ -206,12 +202,14 @@ export class SupabaseSuperAdminRepository implements ISuperAdminRepository {
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-      const [pedidosResult, clientesResult, productosResult, pedidosHoyResult, pedidosMesResult] = await Promise.all([
+      const [pedidosResult, clientesResult, productosResult, pedidosHoyResult, pedidosMesResult, promosResult, tgtgItemsResult] = await Promise.all([
         this.supabase.from("pedidos").select("id, estado", { count: 'exact' }).eq("empresa_id", empresaId),
         this.supabase.from("clientes").select("id", { count: 'exact' }).eq("empresa_id", empresaId),
         this.supabase.from("productos").select("id", { count: 'exact' }).eq("empresa_id", empresaId),
         this.supabase.from("pedidos").select("id", { count: 'exact' }).eq("empresa_id", empresaId).gte("created_at", startOfDay),
         this.supabase.from("pedidos").select("id", { count: 'exact' }).eq("empresa_id", empresaId).gte("created_at", startOfMonth),
+        this.supabase.from("promociones").select("numero_envios").eq("empresa_id", empresaId),
+        this.supabase.from("tgtg_items").select("cupones_total, cupones_disponibles").eq("empresa_id", empresaId),
       ]);
 
       const totalPedidos = pedidosResult.count || 0;
@@ -221,6 +219,11 @@ export class SupabaseSuperAdminRepository implements ISuperAdminRepository {
       const pedidosHoy = pedidosHoyResult.count || 0;
       const pedidosMes = pedidosMesResult.count || 0;
 
+      const cuponesPromoValidados = (promosResult.data || []).reduce((sum, p) => sum + (p.numero_envios || 0), 0);
+      const cuponesTgtgTotales = (tgtgItemsResult.data || []).reduce((sum, i) => sum + (i.cupones_total || 0), 0);
+      const cuponesTgtgDisponibles = (tgtgItemsResult.data || []).reduce((sum, i) => sum + (i.cupones_disponibles || 0), 0);
+      const cuponesTgtgValidados = cuponesTgtgTotales - cuponesTgtgDisponibles;
+
       return {
         success: true,
         data: {
@@ -229,7 +232,10 @@ export class SupabaseSuperAdminRepository implements ISuperAdminRepository {
           totalClientes,
           totalProductos,
           pedidosHoy,
-          pedidosMes
+          pedidosMes,
+          cuponesPromoValidados,
+          cuponesTgtgValidados,
+          cuponesTgtgTotales,
         }
       };
     } catch (e) {
@@ -324,7 +330,7 @@ export class SupabaseSuperAdminRepository implements ISuperAdminRepository {
     }
   }
 
-  private mapEmpresaToStats(row: EmpresaRow, stats: EmpresaStats, adminCount: number): EmpresaWithStats {
+  private mapEmpresaToStats(row: EmpresaRow, stats: EmpresaStats): EmpresaWithStats {
     const hasDescripcion = row.descripcion_es || row.descripcion_en || row.descripcion_fr || row.descripcion_it || row.descripcion_de;
     const descripcion = hasDescripcion
       ? {
@@ -393,7 +399,6 @@ export class SupabaseSuperAdminRepository implements ISuperAdminRepository {
         de: row.footer2_de,
       },
       stats,
-      adminCount,
       createdAt: row.created_at
     };
   }

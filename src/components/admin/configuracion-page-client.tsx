@@ -37,6 +37,7 @@ interface ConfiguracionPageClientProps {
   colores: EmpresaColores | null;
   mostrarPromociones: boolean;
   mostrarTgtg: boolean;
+  isSuperAdmin: boolean;
 }
 
 export function ConfiguracionPageClient({
@@ -48,6 +49,7 @@ export function ConfiguracionPageClient({
   colores,
   mostrarPromociones,
   mostrarTgtg,
+  isSuperAdmin,
 }: Readonly<ConfiguracionPageClientProps>) {
   const { language } = useLanguage();
 
@@ -96,21 +98,23 @@ export function ConfiguracionPageClient({
         <EmpresaAparienciaForm initialData={empresaApariencia} empresaSlug={empresaSlug} />
       </div>
 
-      {/* Módulos */}
-      <div className="bg-card rounded-lg shadow-elegant border border-border p-6 mb-6">
-        <h2 className="text-lg font-semibold mb-6 text-foreground flex items-center gap-2">
-          <ToggleLeft className="w-5 h-5" />
-          {t("configModulosTitle", language)}
-        </h2>
-        <p className="text-sm text-muted-foreground mb-6">
-          {t("configModulosHelp", language)}
-        </p>
-        <ModulosForm
-          empresaId={empresaId}
-          mostrarPromociones={mostrarPromociones}
-          mostrarTgtg={mostrarTgtg}
-        />
-      </div>
+      {/* Módulos — solo superadmin */}
+      {isSuperAdmin && (
+        <div className="bg-card rounded-lg shadow-elegant border border-border p-6 mb-6">
+          <h2 className="text-lg font-semibold mb-6 text-foreground flex items-center gap-2">
+            <ToggleLeft className="w-5 h-5" />
+            {t("configModulosTitle", language)}
+          </h2>
+          <p className="text-sm text-muted-foreground mb-6">
+            {t("configModulosHelp", language)}
+          </p>
+          <ModulosForm
+            empresaId={empresaId}
+            mostrarPromociones={mostrarPromociones}
+            mostrarTgtg={mostrarTgtg}
+          />
+        </div>
+      )}
 
       {/* Colores */}
       <div className="bg-card rounded-lg shadow-elegant border border-border p-6">

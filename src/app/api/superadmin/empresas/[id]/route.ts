@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { superAdminUseCase } from '@/core/infrastructure/database';
-import { handleResult, errorResponse, validationErrorResponse } from '@/core/infrastructure/api/helpers';
+import { requireRole, handleResult, errorResponse, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import { updateEmpresaSchema } from '@/core/application/dtos/empresa.dto';
 
@@ -12,10 +12,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   const rateLimited = await rateLimitAdmin(request);
   if (rateLimited) return rateLimited;
 
-  const adminRol = request.headers.get('x-admin-rol');
-  if (adminRol !== 'superadmin') {
-    return errorResponse('Acceso denegado', 403);
-  }
+  const roleError = requireRole(request, ['superadmin']);
+  if (roleError) return roleError;
 
   const { id } = await params;
   const result = await superAdminUseCase.getEmpresaById(id);
@@ -35,10 +33,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   const rateLimited = await rateLimitAdmin(request);
   if (rateLimited) return rateLimited;
 
-  const adminRol = request.headers.get('x-admin-rol');
-  if (adminRol !== 'superadmin') {
-    return errorResponse('Acceso denegado', 403);
-  }
+  const roleError = requireRole(request, ['superadmin']);
+  if (roleError) return roleError;
 
   const { id } = await params;
 

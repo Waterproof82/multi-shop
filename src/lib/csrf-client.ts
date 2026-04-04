@@ -151,6 +151,14 @@ export async function fetchWithCsrf(
   const isMutative = ['POST', 'PUT', 'PATCH', 'DELETE'].includes((options.method ?? 'GET').toUpperCase());
 
   const csrfToken = await getCsrfTokenWithFallback();
+
+  if (!csrfToken && isMutative) {
+    return new Response(JSON.stringify({ error: 'CSRF token unavailable' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   const headers = buildCsrfHeaders(csrfToken, options.headers);
   const requestOptions = { ...options, headers };
 

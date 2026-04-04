@@ -60,6 +60,12 @@
   --color-chart-rose: var(--chart-rose);
   --color-chart-lime: var(--chart-lime);
 
+  --color-switch-active: var(--switch-active);
+  --color-switch-inactive: var(--switch-inactive);
+
+  --color-footer-bg: var(--footer-bg);
+  --color-footer-fg: var(--footer-fg);
+
   --color-status-pending-bg: var(--status-pending-bg);
   --color-status-pending-text: var(--status-pending-text);
   --color-status-pending-hover: var(--status-pending-hover);
@@ -147,6 +153,10 @@
   --chart-teal: #14B8A6;
   --chart-rose: #F43F5E;
   --chart-lime: #84CC16;
+  --switch-active: #10b981;
+  --switch-inactive: #d4d4d8;
+  --footer-bg: var(--foreground);
+  --footer-fg: var(--background);
   --status-pending-bg: #FEF3C7;
   --status-pending-text: #92400E;
   --status-pending-hover: #FDE68A;
@@ -226,6 +236,8 @@
   --chart-teal: #2DD4BF;
   --chart-rose: #FB7185;
   --chart-lime: #A3E635;
+  --switch-active: #059669;
+  --switch-inactive: #52525b;
   --status-pending-bg: #433314;
   --status-pending-text: #FDE68A;
   --status-pending-hover: #524118;

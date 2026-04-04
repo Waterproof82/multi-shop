@@ -10,6 +10,9 @@ interface EmpresaStats {
   totalProductos: number;
   pedidosHoy: number;
   pedidosMes: number;
+  cuponesPromoValidados: number;
+  cuponesTgtgValidados: number;
+  cuponesTgtgTotales: number;
 }
 
 interface Empresa {
@@ -22,7 +25,6 @@ interface Empresa {
   mostrarTgtg: boolean;
   createdAt: string;
   stats: EmpresaStats;
-  adminCount: number;
 }
 
 interface GlobalStats {
@@ -251,7 +253,6 @@ export default async function SuperAdminPage() {
               mostrarPromociones: e.mostrarPromociones,
               mostrarTgtg: e.mostrarTgtg,
               stats: e.stats,
-              adminCount: e.adminCount,
             }))}
           />
         )}

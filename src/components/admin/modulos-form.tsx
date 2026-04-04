@@ -6,6 +6,7 @@ import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import { useAdmin } from '@/lib/admin-context';
+import { PillSwitch } from '@/components/ui/pill-switch';
 
 interface ModulosFormProps {
   readonly empresaId: string;
@@ -34,19 +35,12 @@ function ModuloToggle({ icon: Icon, label, description, checked, disabled, onCha
           <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
         </div>
       </div>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
+      <PillSwitch
+        checked={checked}
         disabled={disabled}
-        onClick={() => !disabled && onChange(!checked)}
-        className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full p-0.5 transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${checked ? 'bg-emerald-500 dark:bg-emerald-600' : 'bg-zinc-300 dark:bg-zinc-600'}`}
-      >
-        <span
-          aria-hidden="true"
-          className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transform transition-transform duration-200 ${checked ? 'translate-x-5' : 'translate-x-0'}`}
-        />
-      </button>
+        onChange={() => !disabled && onChange(!checked)}
+        size="md"
+      />
     </label>
   );
 }

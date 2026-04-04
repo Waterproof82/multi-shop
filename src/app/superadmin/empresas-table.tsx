@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Building2, AlertCircle, CheckCircle, Megaphone, ShoppingBag } from 'lucide-react';
+import { Building2, AlertCircle, CheckCircle } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
+import { PillSwitch } from '@/components/ui/pill-switch';
 
 interface EmpresaStats {
   totalPedidos: number;
@@ -13,6 +14,9 @@ interface EmpresaStats {
   totalProductos: number;
   pedidosHoy: number;
   pedidosMes: number;
+  cuponesPromoValidados: number;
+  cuponesTgtgValidados: number;
+  cuponesTgtgTotales: number;
 }
 
 interface EmpresaRow {
@@ -23,18 +27,16 @@ interface EmpresaRow {
   mostrarPromociones: boolean;
   mostrarTgtg: boolean;
   stats: EmpresaStats;
-  adminCount: number;
 }
 
 interface ModuloSwitchProps {
   readonly empresaId: string;
   readonly field: 'mostrar_promociones' | 'mostrar_tgtg';
   readonly checked: boolean;
-  readonly icon: React.ComponentType<{ className?: string }>;
   readonly label: string;
 }
 
-function ModuloSwitch({ empresaId, field, checked: initialChecked, icon: Icon, label }: ModuloSwitchProps) {
+function ModuloSwitch({ empresaId, field, checked: initialChecked, label }: ModuloSwitchProps) {
   const [checked, setChecked] = useState(initialChecked);
   const [saving, setSaving] = useState(false);
 
@@ -49,7 +51,7 @@ function ModuloSwitch({ empresaId, field, checked: initialChecked, icon: Icon, l
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ [field]: next }),
       });
-      if (!res.ok) setChecked(!next); // revert on error
+      if (!res.ok) setChecked(!next);
     } catch {
       setChecked(!next);
     } finally {
@@ -58,23 +60,13 @@ function ModuloSwitch({ empresaId, field, checked: initialChecked, icon: Icon, l
   };
 
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
+    <PillSwitch
+      checked={checked}
       disabled={saving}
-      onClick={handleToggle}
-      className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full p-0.5 transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-60 ${checked ? 'bg-emerald-500 dark:bg-emerald-600' : 'bg-zinc-300 dark:bg-zinc-600'}`}
-    >
-      <span
-        aria-hidden="true"
-        className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transform transition-transform duration-200 ${checked ? 'translate-x-4' : 'translate-x-0'}`}
-      />
-      <span className="sr-only">
-        <Icon className="w-3 h-3" />
-      </span>
-    </button>
+      onChange={handleToggle}
+      ariaLabel={label}
+      size="sm"
+    />
   );
 }
 
@@ -95,7 +87,7 @@ export function EmpresasTable({ empresas }: EmpresasTableProps) {
   return (
     <div className="bg-card border border-border rounded-lg overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[800px]" aria-label="Listado de empresas">
+        <table className="w-full min-w-[900px]" aria-label="Listado de empresas">
           <thead className="bg-muted/50">
             <tr>
               <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Empresa</th>
@@ -105,17 +97,16 @@ export function EmpresasTable({ empresas }: EmpresasTableProps) {
               <th className="text-center px-4 py-3 text-sm font-medium text-muted-foreground">Total</th>
               <th className="text-center px-4 py-3 text-sm font-medium text-muted-foreground">Pendientes</th>
               <th className="text-center px-4 py-3 text-sm font-medium text-muted-foreground">Clientes</th>
-              <th className="text-center px-4 py-3 text-sm font-medium text-muted-foreground">Admins</th>
               <th className="text-center px-4 py-3 text-sm font-medium text-muted-foreground">
-                <span className="flex items-center justify-center gap-1">
-                  <Megaphone className="h-3.5 w-3.5" />
-                  Promos
+                <span className="flex flex-col items-center gap-0.5">
+                  <span>Promos</span>
+                  <span className="text-xs font-normal text-muted-foreground/70">envios</span>
                 </span>
               </th>
               <th className="text-center px-4 py-3 text-sm font-medium text-muted-foreground">
-                <span className="flex items-center justify-center gap-1">
-                  <ShoppingBag className="h-3.5 w-3.5" />
-                  TGTG
+                <span className="flex flex-col items-center gap-0.5">
+                  <span>TGTG</span>
+                  <span className="text-xs font-normal text-muted-foreground/70">validados</span>
                 </span>
               </th>
               <th className="text-right px-4 py-3 text-sm font-medium text-muted-foreground">Acciones</th>
@@ -177,26 +168,33 @@ export function EmpresasTable({ empresas }: EmpresasTableProps) {
                 <td className="px-4 py-4 text-center text-foreground">
                   {empresa.stats.totalClientes}
                 </td>
-                <td className="px-4 py-4 text-center text-foreground">
-                  {empresa.adminCount}
+                <td className="px-4 py-4">
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-sm font-medium text-primary">
+                      {empresa.stats.cuponesPromoValidados > 0 ? `${empresa.stats.cuponesPromoValidados}` : '0'}
+                    </span>
+                    <ModuloSwitch
+                      empresaId={empresa.id}
+                      field="mostrar_promociones"
+                      checked={empresa.mostrarPromociones}
+                      label={`Activar Promociones para ${empresa.nombre}`}
+                    />
+                  </div>
                 </td>
-                <td className="px-4 py-4 text-center">
-                  <ModuloSwitch
-                    empresaId={empresa.id}
-                    field="mostrar_promociones"
-                    checked={empresa.mostrarPromociones}
-                    icon={Megaphone}
-                    label={`Activar Promociones para ${empresa.nombre}`}
-                  />
-                </td>
-                <td className="px-4 py-4 text-center">
-                  <ModuloSwitch
-                    empresaId={empresa.id}
-                    field="mostrar_tgtg"
-                    checked={empresa.mostrarTgtg}
-                    icon={ShoppingBag}
-                    label={`Activar TooGoodToGo para ${empresa.nombre}`}
-                  />
+                <td className="px-4 py-4">
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-sm font-medium text-primary">
+                      {empresa.stats.cuponesTgtgTotales > 0
+                        ? `${empresa.stats.cuponesTgtgValidados}/${empresa.stats.cuponesTgtgTotales}`
+                        : '—'}
+                    </span>
+                    <ModuloSwitch
+                      empresaId={empresa.id}
+                      field="mostrar_tgtg"
+                      checked={empresa.mostrarTgtg}
+                      label={`Activar TooGoodToGo para ${empresa.nombre}`}
+                    />
+                  </div>
                 </td>
                 <td className="px-4 py-4 text-right">
                   <Link
