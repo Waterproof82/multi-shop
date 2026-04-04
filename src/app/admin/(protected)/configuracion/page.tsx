@@ -4,6 +4,8 @@ import { authAdminUseCase, empresaUseCase } from '@/core/infrastructure/database
 import { SUPERADMIN_ROLE } from '@/core/domain/repositories/IAdminRepository';
 import { ConfiguracionPageClient } from '@/components/admin/configuracion-page-client';
 
+export const dynamic = 'force-dynamic';
+
 export default async function ConfiguracionPage() {
   const cookieStore = await cookies();
   const token = cookieStore.get('admin_token')?.value;
