@@ -220,12 +220,12 @@ export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menu
                 </div>
                 <div className="text-right ml-4">
                   <p className="font-semibold text-foreground text-lg">{formatPrice(pedido.total, 'EUR', language)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{formatDate(pedido.created_at, { 
-                    day: '2-digit', 
-                    month: '2-digit', 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                  })}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{formatDate(pedido.created_at, {
+                    day: '2-digit',
+                    month: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  }, language)}</p>
                 </div>
               </div>
             ))}

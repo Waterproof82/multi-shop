@@ -322,7 +322,7 @@ export default function PromocionesPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <p className="font-medium text-foreground">{promo.texto_promocion}</p>
-                    <p className="text-sm text-muted-foreground">{formatDateTime(promo.fecha_hora)}</p>
+                    <p className="text-sm text-muted-foreground">{formatDateTime(promo.fecha_hora, language)}</p>
                     {promo.fecha_fin && (
                       <p className="text-xs text-amber-600 mt-0.5">
                         ⏰ {t("promoFechaFinEmail", language)}: {new Date(promo.fecha_fin).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}

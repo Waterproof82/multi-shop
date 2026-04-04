@@ -385,7 +385,7 @@ export default function ClientesPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground text-sm">
-                      {cliente.created_at ? formatDate(cliente.created_at) : '-'}
+                      {cliente.created_at ? formatDate(cliente.created_at, undefined, language) : '-'}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex justify-center">

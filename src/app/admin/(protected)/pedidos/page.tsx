@@ -364,10 +364,10 @@ export default function PedidosPage() {
                         {getEstadoBadge(pedido.estado, pedido.id)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-muted-foreground text-sm">
-                        {formatDate(pedido.created_at, { 
+                        {formatDate(pedido.created_at, {
                           day: '2-digit', month: '2-digit', year: 'numeric',
                           hour: '2-digit', minute: '2-digit'
-                        })}
+                        }, language)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <button
