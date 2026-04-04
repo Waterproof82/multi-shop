@@ -14,6 +14,8 @@ export interface UpdateEmpresaData {
   descripcion_fr?: string | null;
   descripcion_it?: string | null;
   descripcion_de?: string | null;
+  mostrar_promociones?: boolean;
+  mostrar_tgtg?: boolean;
 }
 
 export interface IEmpresaRepository {

@@ -60,6 +60,12 @@
   --color-chart-rose: var(--chart-rose);
   --color-chart-lime: var(--chart-lime);
 
+  --color-switch-active: var(--switch-active);
+  --color-switch-inactive: var(--switch-inactive);
+
+  --color-footer-bg: var(--footer-bg);
+  --color-footer-fg: var(--footer-fg);
+
   --color-status-pending-bg: var(--status-pending-bg);
   --color-status-pending-text: var(--status-pending-text);
   --color-status-pending-hover: var(--status-pending-hover);
@@ -78,6 +84,21 @@
   --color-status-cancelled-bg: var(--status-cancelled-bg);
   --color-status-cancelled-text: var(--status-cancelled-text);
   --color-status-cancelled-hover: var(--status-cancelled-hover);
+
+  /* Campaign status colors for TGTG */
+  --color-campaign-pending-bg: var(--campaign-pending-bg);
+  --color-campaign-pending-border: var(--campaign-pending-border);
+  --color-campaign-pending-text: var(--campaign-pending-text);
+  --color-campaign-pending-accent: var(--campaign-pending-accent);
+  --color-campaign-pending-hover: var(--campaign-pending-hover);
+  --color-campaign-active-bg: var(--campaign-active-bg);
+  --color-campaign-active-border: var(--campaign-active-border);
+  --color-campaign-active-text: var(--campaign-active-text);
+  --color-campaign-active-accent: var(--campaign-active-accent);
+  --color-campaign-active-hover: var(--campaign-active-hover);
+
+  /* Primary subtle tint for badges and highlights */
+  --color-primary-subtle: color-mix(in oklch, var(--primary) 10%, transparent);
 }
 
 :root {
@@ -132,6 +153,10 @@
   --chart-teal: #14B8A6;
   --chart-rose: #F43F5E;
   --chart-lime: #84CC16;
+  --switch-active: #10b981;
+  --switch-inactive: #d4d4d8;
+  --footer-bg: var(--foreground);
+  --footer-fg: var(--background);
   --status-pending-bg: #FEF3C7;
   --status-pending-text: #92400E;
   --status-pending-hover: #FDE68A;
@@ -150,6 +175,17 @@
   --status-cancelled-bg: #FEE2E2;
   --status-cancelled-text: #991B1B;
   --status-cancelled-hover: #FECACA;
+  /* Campaign status colors for TGTG */
+  --campaign-pending-bg: #FFFBEB;
+  --campaign-pending-border: #FDE68A;
+  --campaign-pending-text: #92400E;
+  --campaign-pending-accent: #FCD34D;
+  --campaign-pending-hover: #FEF3C7;
+  --campaign-active-bg: #F0FDF4;
+  --campaign-active-border: #BBF7D0;
+  --campaign-active-text: #166534;
+  --campaign-active-accent: #22C55E;
+  --campaign-active-hover: #DCFCE7;
 }
 
 .dark {
@@ -200,6 +236,8 @@
   --chart-teal: #2DD4BF;
   --chart-rose: #FB7185;
   --chart-lime: #A3E635;
+  --switch-active: #059669;
+  --switch-inactive: #52525b;
   --status-pending-bg: #433314;
   --status-pending-text: #FDE68A;
   --status-pending-hover: #524118;
@@ -218,6 +256,19 @@
   --status-cancelled-bg: #450A0A;
   --status-cancelled-text: #FCA5A5;
   --status-cancelled-hover: #5C1010;
+  /* Campaign status colors for TGTG - Dark */
+  --campaign-pending-bg: #451a03;
+  --campaign-pending-border: #78350f;
+  --campaign-pending-text: #fde047;
+  --campaign-pending-accent: #ca8a04;
+  --campaign-pending-hover: #713f12;
+  --campaign-active-bg: #052e16;
+  --campaign-active-border: #14532d;
+  --campaign-active-text: #4ade80;
+  --campaign-active-accent: #22c55e;
+  --campaign-active-hover: #064e3b;
+  /* Primary subtle tint for badges and highlights - Dark */
+  --color-primary-subtle: color-mix(in oklch, var(--primary) 15%, transparent);
 }
 
 @keyframes badge-pop {

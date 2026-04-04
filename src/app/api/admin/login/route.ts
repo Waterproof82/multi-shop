@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   response.headers.set('Cache-Control', 'no-store, private');
 
   response.cookies.set('csrf_token', cookieValue, {
-    httpOnly: true,
+    httpOnly: false, // JS must read this to stay in sync across tabs; JWT stays httpOnly
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
     maxAge: 60 * 60 * 24, // 24h — matches JWT lifetime so it never expires mid-session
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
     path: '/',
   });
   response.cookies.set('csrf_token', csrfCookieValue, {
-    httpOnly: true,
+    httpOnly: false, // JS must read this to stay in sync across tabs; JWT stays httpOnly
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
     maxAge: 60 * 60 * 24, // 24h — matches JWT lifetime

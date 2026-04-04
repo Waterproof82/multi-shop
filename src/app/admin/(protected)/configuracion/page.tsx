@@ -64,6 +64,9 @@ export default async function ConfiguracionPage() {
       empresaDatos={empresaDatos}
       empresaApariencia={empresaApariencia}
       colores={empresaData?.colores ?? null}
+      mostrarPromociones={empresaData?.mostrarPromociones ?? true}
+      mostrarTgtg={empresaData?.mostrarTgtg ?? true}
+      isSuperAdmin={admin.rol === SUPERADMIN_ROLE}
     />
   );
 }

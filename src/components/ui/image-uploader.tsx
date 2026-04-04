@@ -6,6 +6,7 @@ import { Upload, Loader2, Pencil, Trash2 } from 'lucide-react';
 import { getCsrfToken } from '@/lib/csrf-client';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
+import { optimizeImage } from '@/lib/image-utils';
 
 interface ImageUploaderProps {
   readonly value: string;
@@ -16,57 +17,6 @@ interface ImageUploaderProps {
   readonly previewStyle?: React.CSSProperties;
 }
 
-const MAX_WIDTH = 480;
-const MAX_HEIGHT = 480;
-const QUALITY = 0.8;
-
-async function optimizeImage(file: File): Promise<{ file: File; type: string }> {
-  return new Promise((resolve, reject) => {
-    const img = document.createElement('img');
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      let width = img.width;
-      let height = img.height;
-
-      if (width > MAX_WIDTH) {
-        height = (height * MAX_WIDTH) / width;
-        width = MAX_WIDTH;
-      }
-      if (height > MAX_HEIGHT) {
-        width = (width * MAX_HEIGHT) / height;
-        height = MAX_HEIGHT;
-      }
-
-      canvas.width = width;
-      canvas.height = height;
-
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        reject(new Error('No se pudo crear el contexto de canvas'));
-        return;
-      }
-
-      ctx.drawImage(img, 0, 0, width, height);
-
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) {
-            reject(new Error('Error al comprimir imagen'));
-            return;
-          }
-          const optimizedFile = new File([blob], file.name, {
-            type: 'image/webp',
-          });
-          resolve({ file: optimizedFile, type: 'image/webp' });
-        },
-        'image/webp',
-        QUALITY
-      );
-    };
-    img.onerror = () => reject(new Error('Error al cargar imagen'));
-    img.src = URL.createObjectURL(file);
-  });
-}
 
 export function ImageUploader({
   value,

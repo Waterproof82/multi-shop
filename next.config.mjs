@@ -4,6 +4,11 @@ import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Bundle analyzer - only run when ANALYZE=true
+const withBundleAnalyzer = process.env.ANALYZE === 'true'
+  ? (await import('@next/bundle-analyzer')).default
+  : (config) => config;
+
 // Build CSP fallback for static assets (pages get a nonce-based CSP from middleware)
 function normalizeR2Origin(raw) {
   if (!raw) return '';
@@ -33,7 +38,7 @@ const cspFallback = [
   "report-uri /api/csp-report",
 ].join('; ') + ';';
 
-const nextConfig = {
+const nextConfig = withBundleAnalyzer({
   typescript: {
     ignoreBuildErrors: false,
   },
@@ -85,6 +90,6 @@ const nextConfig = {
       },
     ];
   },
-}
+});
 
 export default nextConfig

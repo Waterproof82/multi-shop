@@ -6,6 +6,7 @@ import { AdminDashboardClient } from '@/components/admin/admin-dashboard-client'
 import { SUPERADMIN_ROLE } from '@/core/domain/repositories/IAdminRepository';
 import type { MenuCategoryVM } from '@/core/application/dtos/menu-view-model';
 import type { DashboardPedido, DashboardStats, DashboardPromoSummary, DashboardTgtgSummary } from '@/components/admin/admin-dashboard-client';
+import type { TgtgWithItems } from '@/core/application/use-cases/tgtg.use-case';
 
 export default async function AdminDashboard() {
   const cookieStore = await cookies();
@@ -36,19 +37,27 @@ export default async function AdminDashboard() {
   }
 
   let empresaNombre = admin.empresa?.nombre ?? 'default';
-  if (admin.rol === SUPERADMIN_ROLE) {
+  let mostrarPromociones = admin.empresa?.mostrarPromociones ?? true;
+  let mostrarTgtg = admin.empresa?.mostrarTgtg ?? true;
+
+  if (admin.rol === SUPERADMIN_ROLE || !admin.empresa) {
     const empresaResult = await empresaUseCase.getById(empresaId);
     if (empresaResult.success && empresaResult.data) {
       empresaNombre = empresaResult.data.nombre || 'default';
+      mostrarPromociones = empresaResult.data.mostrarPromociones ?? true;
+      mostrarTgtg = empresaResult.data.mostrarTgtg ?? true;
     }
   }
+
+  const emptyPromos: { success: true; data: { fecha_hora: string; numero_envios: number }[] } = { success: true, data: [] };
+  const emptyTgtg: { success: true; data: TgtgWithItems[] } = { success: true, data: [] };
 
   const [menuResult, pedidosResult, statsResult, promosResult, tgtgResult] = await Promise.all([
     getMenuUseCase.execute(empresaId),
     pedidoUseCase.getAll(empresaId),
     pedidoUseCase.getStats(empresaId, new Date().getMonth(), new Date().getFullYear()),
-    promocionUseCase.getAll(empresaId),
-    tgtgUseCase.getAllRecent(empresaId),
+    mostrarPromociones ? promocionUseCase.getAll(empresaId) : Promise.resolve(emptyPromos),
+    mostrarTgtg ? tgtgUseCase.getAllRecent(empresaId) : Promise.resolve(emptyTgtg),
   ]);
 
   const menu: MenuCategoryVM[] = menuResult.data || [];
@@ -87,6 +96,8 @@ export default async function AdminDashboard() {
       menuError={menuError}
       promoSummary={promoSummary}
       tgtgSummary={tgtgSummary}
+      mostrarPromociones={mostrarPromociones}
+      mostrarTgtg={mostrarTgtg}
     />
   );
 }

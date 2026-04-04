@@ -7,6 +7,9 @@ export interface EmpresaStats {
   totalProductos: number;
   pedidosHoy: number;
   pedidosMes: number;
+  cuponesPromoValidados: number;
+  cuponesTgtgValidados: number;
+  cuponesTgtgTotales: number;
 }
 
 export interface SuperAdminGlobalStats {
@@ -33,6 +36,8 @@ export interface EmpresaWithStats {
   slug: string | null;
   logoUrl: string | null;
   mostrarCarrito: boolean;
+  mostrarPromociones: boolean;
+  mostrarTgtg: boolean;
   moneda: string;
   emailNotification: string | null;
   urlImage: string | null;
@@ -74,7 +79,6 @@ export interface EmpresaWithStats {
     de?: string | null;
   } | null;
   stats: EmpresaStats;
-  adminCount: number;
   createdAt: string;
 }
 

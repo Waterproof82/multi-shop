@@ -46,9 +46,11 @@ interface AdminDashboardClientProps {
   readonly menuError?: string;
   readonly promoSummary: DashboardPromoSummary;
   readonly tgtgSummary: DashboardTgtgSummary;
+  readonly mostrarPromociones: boolean;
+  readonly mostrarTgtg: boolean;
 }
 
-export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menuError, promoSummary, tgtgSummary }: AdminDashboardClientProps) {
+export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menuError, promoSummary, tgtgSummary, mostrarPromociones, mostrarTgtg }: AdminDashboardClientProps) {
   const { language } = useLanguage();
   const shouldReduceMotion = useReducedMotion() ?? false;
 
@@ -86,21 +88,21 @@ export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menu
             <p className="text-primary-foreground/80 text-sm mt-1">{empresaNombre}</p>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="bg-primary-foreground/20 rounded-lg px-4 py-3 text-center min-h-[72px] flex flex-col justify-center group hover:bg-primary-foreground/30 transition-all duration-300 hover:scale-[1.02] motion-reduce:hover:scale-100 hover:shadow-elegant">
+            <div className="bg-primary-foreground/20 rounded-lg px-4 py-3 text-center min-h-[72px] flex flex-col justify-center group hover:bg-primary-foreground/30 transition-[background-color,transform] duration-150 hover:scale-[1.02] motion-reduce:hover:scale-100 hover:shadow-elegant">
               <ShoppingBag className="w-5 h-5 text-primary-foreground mx-auto mb-2 group-hover:scale-110 motion-reduce:group-hover:scale-100 transition-transform duration-300" />
               <span className="text-xl font-semibold text-primary-foreground">{stats?.pedidosHoy || 0}</span>
               <p className="text-primary-foreground/80 text-xs leading-tight mt-1">{t("pedidosHoy", language)}</p>
             </div>
-            <div className="bg-primary-foreground/20 rounded-lg px-4 py-3 text-center min-h-[72px] flex flex-col justify-center group hover:bg-primary-foreground/30 transition-all duration-300 hover:scale-[1.02] motion-reduce:hover:scale-100 hover:shadow-elegant">
+            <div className="bg-primary-foreground/20 rounded-lg px-4 py-3 text-center min-h-[72px] flex flex-col justify-center group hover:bg-primary-foreground/30 transition-[background-color,transform] duration-150 hover:scale-[1.02] motion-reduce:hover:scale-100 hover:shadow-elegant">
               <span className="text-xl font-semibold text-primary-foreground">{formatPrice(stats?.totalMes || 0, 'EUR', language)}</span>
               <p className="text-primary-foreground/80 text-xs leading-tight mt-1">{t("ventasDelMes", language)}</p>
             </div>
-            <div className="bg-primary-foreground/20 rounded-lg px-4 py-3 text-center min-h-[72px] flex flex-col justify-center group hover:bg-primary-foreground/30 transition-all duration-300 hover:scale-[1.02] motion-reduce:hover:scale-100 hover:shadow-elegant">
+            <div className="bg-primary-foreground/20 rounded-lg px-4 py-3 text-center min-h-[72px] flex flex-col justify-center group hover:bg-primary-foreground/30 transition-[background-color,transform] duration-150 hover:scale-[1.02] motion-reduce:hover:scale-100 hover:shadow-elegant">
               <Package className="w-5 h-5 text-primary-foreground mx-auto mb-2 group-hover:scale-110 motion-reduce:group-hover:scale-100 transition-transform duration-300" />
               <span className="text-xl font-semibold text-primary-foreground">{totalProductos}</span>
               <p className="text-primary-foreground/80 text-xs leading-tight mt-1">{t("products", language)}</p>
             </div>
-            <div className="bg-primary-foreground/20 rounded-lg px-4 py-3 text-center min-h-[72px] flex flex-col justify-center group hover:bg-primary-foreground/30 transition-all duration-300 hover:scale-[1.02] motion-reduce:hover:scale-100 hover:shadow-elegant">
+            <div className="bg-primary-foreground/20 rounded-lg px-4 py-3 text-center min-h-[72px] flex flex-col justify-center group hover:bg-primary-foreground/30 transition-[background-color,transform] duration-150 hover:scale-[1.02] motion-reduce:hover:scale-100 hover:shadow-elegant">
               <span className="text-xl font-semibold text-primary-foreground">{productosEspeciales}</span>
               <p className="text-primary-foreground/80 text-xs leading-tight mt-1">{t("destacados", language)}</p>
             </div>
@@ -108,8 +110,9 @@ export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menu
         </div>
 
         {/* Marketing row */}
+        {(mostrarPromociones || mostrarTgtg) && (
         <div className="mt-4 pt-4 border-t border-primary-foreground/20 grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Link
+          {mostrarPromociones && <Link
             href="/admin/promociones"
             className="bg-primary-foreground/10 hover:bg-primary-foreground/20 rounded-lg px-4 py-3 flex items-center gap-4 transition-colors group outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/50 focus-visible:ring-offset-2 focus-visible:ring-offset-primary min-h-[44px]"
           >
@@ -133,9 +136,9 @@ export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menu
               </p>
             </div>
             <ArrowRight className="w-4 h-4 text-primary-foreground/40 flex-shrink-0 group-hover:text-primary-foreground/70 transition-colors" />
-          </Link>
+          </Link>}
 
-          <Link
+          {mostrarTgtg && <Link
             href="/admin/toogoodtogo"
             className="bg-primary-foreground/10 hover:bg-primary-foreground/20 rounded-lg px-4 py-3 flex items-center gap-4 transition-colors group outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/50 focus-visible:ring-offset-2 focus-visible:ring-offset-primary min-h-[44px]"
           >
@@ -155,8 +158,9 @@ export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menu
               </p>
             </div>
             <ArrowRight className="w-4 h-4 text-primary-foreground/40 flex-shrink-0 group-hover:text-primary-foreground/70 transition-colors" />
-          </Link>
+          </Link>}
         </div>
+        )}
       </div>
 
       {/* Quick Actions */}

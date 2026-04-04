@@ -93,11 +93,15 @@ export function ColoresForm({ coloresIniciales, empresaId }: ColoresFormProps) {
                 onChange={(e) => handleChange(key, e.target.value)}
                 className="w-12 h-10 rounded cursor-pointer border border-border"
               />
+              <span id={`color-format-${key}`} className="sr-only">
+                {t('colorHexFormatHelp', language)}
+              </span>
               <input
                 id={`color-text-${key}`}
                 name={`color-text-${key}`}
                 type="text"
                 value={colores[key]}
+                aria-describedby={`color-format-${key}`}
                 onChange={(e) => {
                   const val = e.target.value;
                   if (val === '' || /^#[0-9A-Fa-f]{0,6}$/.test(val)) {

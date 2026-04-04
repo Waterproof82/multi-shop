@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { BarChart3, ShoppingCart, Euro, TrendingUp, Users, Calendar, ArrowUpRight, ArrowDownRight, ChevronLeft, ChevronRight, Loader2, Send, ShoppingBag, ReceiptText } from 'lucide-react';
+import dynamic from 'next/dynamic';
+import { BarChart3, ShoppingCart, Euro, TrendingUp, Users, Calendar, ArrowUpRight, ArrowDownRight, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { logClientError } from '@/lib/client-error';
@@ -9,11 +10,19 @@ import { useLanguage } from '@/lib/language-context';
 import { useAdmin } from '@/lib/admin-context';
 import { t } from '@/lib/translations';
 import { formatPrice } from '@/lib/format-price';
-import {
-  BarChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Cell, PieChart, LineChart, Line, Bar, Pie,
-  type TooltipProps,
-} from 'recharts';
+
+// Lazy load all Recharts visualizations (~100KB) to reduce initial bundle
+const AdminCharts = dynamic(
+  () => import('@/components/admin/admin-charts').then(mod => mod.AdminCharts),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+);
 
 
 interface Stats {
@@ -157,29 +166,33 @@ function useStatsFetching(empresaId: string, selectedMonth: { mes: number; año:
 }
 
 // Custom hook for promo + TGTG stats
-function usePromoStats(empresaId: string) {
+function usePromoStats(empresaId: string, mostrarPromociones: boolean, mostrarTgtg: boolean) {
   const [promos, setPromos] = useState<PromoStat[]>([]);
   const [tgtgCampaigns, setTgtgCampaigns] = useState<TgtgPromoStat[]>([]);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [promoRes, tgtgRes] = await Promise.all([
-          fetch(`/api/admin/promociones?empresaId=${empresaId}`),
-          fetch(`/api/admin/tgtg?empresaId=${empresaId}`),
-        ]);
-        if (promoRes.ok) {
-          const data = await promoRes.json() as { promociones?: PromoStat[] };
-          setPromos(data.promociones ?? []);
+        const fetches: Promise<void>[] = [];
+        if (mostrarPromociones) {
+          fetches.push(
+            fetch(`/api/admin/promociones?empresaId=${empresaId}`)
+              .then(res => res.ok ? res.json() : null)
+              .then((data: { promociones?: PromoStat[] } | null) => { if (data) setPromos(data.promociones ?? []); })
+          );
         }
-        if (tgtgRes.ok) {
-          const data = await tgtgRes.json() as { campaigns?: TgtgPromoStat[] };
-          setTgtgCampaigns(data.campaigns ?? []);
+        if (mostrarTgtg) {
+          fetches.push(
+            fetch(`/api/admin/tgtg?empresaId=${empresaId}`)
+              .then(res => res.ok ? res.json() : null)
+              .then((data: { campaigns?: TgtgPromoStat[] } | null) => { if (data) setTgtgCampaigns(data.campaigns ?? []); })
+          );
         }
+        await Promise.all(fetches);
       } catch { /* silent */ }
     }
     fetchData();
-  }, [empresaId]);
+  }, [empresaId, mostrarPromociones, mostrarTgtg]);
 
   return { promos, tgtgCampaigns };
 }
@@ -341,7 +354,7 @@ function StatsHeader({ language, meses, mesActual, añoActual, esMesActual, onMo
           <button
             onClick={() => onMonthChange(-1)}
             aria-label={t("previousMonth", lang)}
-            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-primary-foreground/20 hover:bg-primary-foreground/30 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/50 focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-primary-foreground/20 hover:bg-primary-foreground/30 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
           >
             <ChevronLeft className="w-5 h-5 text-primary-foreground" />
           </button>
@@ -354,7 +367,7 @@ function StatsHeader({ language, meses, mesActual, añoActual, esMesActual, onMo
             onClick={() => onMonthChange(1)}
             disabled={esMesActual}
             aria-label={t("nextMonth", lang)}
-            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-primary-foreground/20 hover:bg-primary-foreground/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/50 focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-primary-foreground/20 hover:bg-primary-foreground/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
           >
             <ChevronRight className="w-5 h-5 text-primary-foreground" />
           </button>
@@ -375,16 +388,16 @@ function LoadingSkeleton() {
 
 export default function EstadisticasPage() {
   const { language } = useLanguage();
-  const { empresaId, overrideEmpresaId } = useAdmin();
+  const { empresaId, overrideEmpresaId, mostrarPromociones, mostrarTgtg } = useAdmin();
   const effectiveEmpresaId = overrideEmpresaId || empresaId;
   const lang = language;
   const localeMap: Record<string, string> = { es: 'es-ES', en: 'en-US', fr: 'fr-FR', it: 'it-IT', de: 'de-DE' };
   const dateLocale = localeMap[language] ?? 'es-ES';
   const meses = [t("monthJan", lang), t("monthFeb", lang), t("monthMar", lang), t("monthApr", lang), t("monthMay", lang), t("monthJun", lang), t("monthJul", lang), t("monthAug", lang), t("monthSep", lang), t("monthOct", lang), t("monthNov", lang), t("monthDec", lang)];
   const [selectedMonth, setSelectedMonth] = useState({ mes: new Date().getMonth(), año: new Date().getFullYear() });
-  
+
   const { stats, loading } = useStatsFetching(effectiveEmpresaId, selectedMonth);
-  const { promos, tgtgCampaigns } = usePromoStats(effectiveEmpresaId);
+  const { promos, tgtgCampaigns } = usePromoStats(effectiveEmpresaId, mostrarPromociones, mostrarTgtg);
   const chartTheme = useChartTheme();
   const { motionProps, shouldReduceMotion } = useMotionProps();
 
@@ -425,474 +438,20 @@ export default function EstadisticasPage() {
         <ClientsCard stats={stats} language={lang} motionProps={motionProps} shouldReduceMotion={shouldReduceMotion} />
       </div>
 
-      {/* Daily Orders Chart */}
-      {stats?.pedidosPorDia && stats.pedidosPorDia.length > 0 && (
-        <motion.div
-          {...motionProps}
-          transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.35 }}
-          className="bg-card rounded-lg border border-border p-6 mb-6"
-        >
-          <h2 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
-            <Calendar className="w-5 h-5" />
-            {t("ordersByDay", language)} ({meses[mesActual]})
-          </h2>
-          <div className="h-48 w-full">
-                <ResponsiveContainer width="100%" height={192} minWidth={0}>
-                  <LineChart data={stats.pedidosPorDia}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartTheme.gridStroke} />
-                  <XAxis
-                    dataKey="dia"
-                    tick={{ fontSize: 12, fill: chartTheme.tickFill }}
-                    tickFormatter={(value) => `${value}`}
-                    axisLine={{ stroke: chartTheme.gridStroke }}
-                    tickLine={{ stroke: chartTheme.gridStroke }}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 12, fill: chartTheme.tickFill }}
-                    axisLine={{ stroke: chartTheme.gridStroke }}
-                    tickLine={{ stroke: chartTheme.gridStroke }}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: chartTheme.tooltipBg,
-                      border: `1px solid ${chartTheme.tooltipBorder}`,
-                      borderRadius: '8px',
-                    }}
-                    labelStyle={{ color: chartTheme.tooltipColor }}
-                    itemStyle={{ color: chartTheme.tooltipColor }}
-                    formatter={((value: number, name: string) => [
-                      name === 'pedidos' ? `${value} ${t("xOrders", language)}` : formatPrice(value, 'EUR', language),
-                      name === 'pedidos' ? t("xOrders", language) : t("revenueLabel", language)
-                    ]) as TooltipProps<number, string>['formatter']}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="pedidos"
-                    stroke={chartTheme.colors[0]}
-                    strokeWidth={2}
-                    dot={{ fill: chartTheme.colors[0], r: 3 }}
-                    activeDot={{ r: 5 }}
-                  />
-                </LineChart>
-                </ResponsiveContainer>
-          </div>
-        </motion.div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <motion.div
-          key="chart-bar"
-          {...motionProps}
-          transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.25 }}
-          className="bg-card rounded-lg shadow-elegant border border-border p-6"
-        >
-          <h2 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
-            <ShoppingCart className="w-5 h-5" />
-            {t("topDishes", language)} ({t("thisMonthLabel", language)})
-          </h2>
-          
-          {stats?.topPlatos && stats.topPlatos.length > 0 ? (
-            <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height={256} minWidth={0}>
-                  <BarChart data={stats.topPlatos.slice(0, 8)} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={chartTheme.gridStroke} />
-                    <XAxis type="number" hide axisLine={false} tickLine={false} />
-                    <YAxis
-                      type="category"
-                      dataKey="nombre"
-                      width={100}
-                      tick={{ fontSize: 12, fill: chartTheme.tickFill }}
-                      axisLine={{ stroke: chartTheme.gridStroke }}
-                      tickLine={false}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: chartTheme.tooltipBg,
-                        border: `1px solid ${chartTheme.tooltipBorder}`,
-                        borderRadius: '8px',
-                      }}
-                      labelStyle={{ color: chartTheme.tooltipColor }}
-                      itemStyle={{ color: chartTheme.tooltipColor }}
-                    />
-                    <Bar dataKey="cantidad" radius={[0, 4, 4, 0]} animationDuration={800}>
-                      {stats.topPlatos.slice(0, 8).map((plato, index) => (
-                        <Cell
-                          key={`${plato.nombre}-bar`}
-                          fill={chartTheme.colors[index % chartTheme.colors.length]}
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                  </ResponsiveContainer>
-            </div>
-          ) : (
-            <p className="text-muted-foreground text-center py-8">
-              {t("noStatsData", language)}
-            </p>
-          )}
-        </motion.div>
-
-        <motion.div
-          key="chart-pie"
-          {...motionProps}
-          transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.3 }}
-          className="bg-card rounded-lg shadow-elegant border border-border p-6"
-        >
-          <h2 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
-            <Euro className="w-5 h-5" />
-            {t("revenueByDish", language)} ({t("thisMonthLabel", language)})
-          </h2>
-          
-          {stats?.topPlatos && stats.topPlatos.length > 0 ? (
-            <>
-              <div className="h-64 w-full">
-                  <ResponsiveContainer width="100%" height={256} minWidth={0}>
-                    <PieChart key="pie-chart">
-                      <Pie
-                        data={stats.topPlatos.slice(0, 8)}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={50}
-                        outerRadius={80}
-                        paddingAngle={2}
-                        dataKey="total"
-                        nameKey="nombre"
-                        animationDuration={800}
-                      >
-                        {stats.topPlatos.slice(0, 8).map((plato, index) => (
-                          <Cell
-                            key={`${plato.nombre}-pie`}
-                            fill={chartTheme.colors[index % chartTheme.colors.length]}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={((value: number) => formatPrice(value, 'EUR', language)) as TooltipProps<number, string>['formatter']}
-                        contentStyle={{
-                          backgroundColor: chartTheme.tooltipBg,
-                          border: `1px solid ${chartTheme.tooltipBorder}`,
-                          borderRadius: '8px',
-                        }}
-                        labelStyle={{ color: chartTheme.tooltipColor }}
-                        itemStyle={{ color: chartTheme.tooltipColor }}
-                      />
-                    </PieChart>
-                    </ResponsiveContainer>
-              </div>
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                {stats.topPlatos.slice(0, 6).map((plato, index) => (
-                  <div key={plato.nombre} className="flex items-center gap-2 text-sm">
-                    <div
-                      className="w-3 h-3 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: chartTheme.colors[index % chartTheme.colors.length] }}
-                    />
-                    <span className="truncate text-muted-foreground">{plato.nombre}</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <p className="text-muted-foreground text-center py-8">
-              {t("noStatsData", language)}
-            </p>
-          )}
-        </motion.div>
-      </div>
-
-      {/* ── Promo send stats ─────────────────────────────────── */}
-      <motion.div
-        {...motionProps}
-        transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.4 }}
-        className="bg-card rounded-lg border border-border p-6 space-y-4"
-      >
-        <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-          <Send className="w-5 h-5 text-primary" />
-          {t("statsPromoSends", language)}
-        </h2>
-        {promos.length > 0 ? (() => {
-          const now = new Date();
-          const cy = now.getFullYear();
-          const cm = now.getMonth();
-
-          const thisMonthPromos = promos.filter(p => {
-            const d = new Date(p.fecha_hora);
-            return d.getFullYear() === cy && d.getMonth() === cm;
-          });
-
-          const totalEnvios = promos.reduce((acc, p) => acc + p.numero_envios, 0);
-          const mesEnvios = thisMonthPromos.reduce((acc, p) => acc + p.numero_envios, 0);
-          const maxEnvios = Math.max(...promos.map(p => p.numero_envios));
-          const topPromo = promos.find(p => p.numero_envios === maxEnvios);
-
-          const byMonth: Record<string, number> = {};
-          for (const p of promos) {
-            const key = new Date(p.fecha_hora).toLocaleDateString(dateLocale, { month: 'short', year: '2-digit' });
-            byMonth[key] = (byMonth[key] ?? 0) + p.numero_envios;
-          }
-          const chartData = Object.entries(byMonth).map(([mes, envios]) => ({ mes, envios })).slice(-12);
-
-          return (
-            <>
-              {/* KPI cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="bg-primary/5 border border-primary/20 rounded-lg px-4 py-3 text-center">
-                  <p className="text-2xl font-bold text-primary">{promos.length}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{t("statsPromosSent", language)}</p>
-                </div>
-                <div className="bg-muted rounded-lg px-4 py-3 text-center">
-                  <p className="text-2xl font-bold text-foreground">{thisMonthPromos.length}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{t("statsSentThisMonth", language)}</p>
-                </div>
-                <div className="bg-muted rounded-lg px-4 py-3 text-center">
-                  <p className="text-2xl font-bold text-foreground">{totalEnvios.toLocaleString()}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{t("statsTotalEmails", language)}</p>
-                </div>
-                <div className="bg-muted rounded-lg px-4 py-3 text-center">
-                  <p className="text-2xl font-bold text-foreground">{mesEnvios.toLocaleString()}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{t("statsEmailsThisMonth", language)}</p>
-                </div>
-              </div>
-
-              {/* Top promo highlight */}
-              {topPromo && (
-                <div className="bg-muted/50 border border-border rounded-lg px-4 py-3 flex items-start gap-3">
-                  <span className="text-xl flex-shrink-0 mt-0.5">🏆</span>
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-muted-foreground mb-0.5">{t("statsTopPromo", language)}</p>
-                    <p className="text-sm font-semibold text-foreground truncate">{topPromo.texto_promocion}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {new Date(topPromo.fecha_hora).toLocaleDateString(dateLocale, { day: '2-digit', month: 'long', year: 'numeric' })} · <span className="font-medium text-primary">{topPromo.numero_envios} emails</span>
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Chart: envíos by month */}
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2">{t("statsEmailsByMonth", language)}</p>
-                <div className="h-40 w-full">
-                  <ResponsiveContainer width="100%" height={160} minWidth={0}>
-                    <BarChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartTheme.gridStroke} />
-                      <XAxis dataKey="mes" tick={{ fontSize: 11, fill: chartTheme.tickFill }} axisLine={false} tickLine={false} />
-                      <YAxis hide />
-                      <Tooltip
-                        contentStyle={{ backgroundColor: chartTheme.tooltipBg, border: `1px solid ${chartTheme.tooltipBorder}`, borderRadius: '8px' }}
-                        labelStyle={{ color: chartTheme.tooltipColor }}
-                        itemStyle={{ color: chartTheme.tooltipColor }}
-                        formatter={(value: number) => [`${value.toLocaleString()} emails`, t("statsSendCountLabel", language)]}
-                      />
-                      <Bar dataKey="envios" fill={chartTheme.colors[1]} radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Table */}
-              <div className="rounded-lg border border-border overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-muted">
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">{t("date", language)}</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">{t("statsMessageLabel", language)}</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Emails</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {promos.map(p => (
-                      <tr key={p.id} className="bg-card hover:bg-muted/40 transition-colors">
-                        <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
-                          {new Date(p.fecha_hora).toLocaleDateString(dateLocale, { day: '2-digit', month: '2-digit', year: '2-digit' })}
-                        </td>
-                        <td className="px-4 py-3 hidden sm:table-cell">
-                          <p className="text-foreground text-sm truncate max-w-xs">{p.texto_promocion}</p>
-                        </td>
-                        <td className="px-4 py-3 text-right font-semibold text-primary">{p.numero_envios.toLocaleString(dateLocale)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          );
-        })() : (
-          <div className="py-8 text-center">
-            <Send className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">{t("statsNoPromosSent", language)}</p>
-          </div>
-        )}
-      </motion.div>
-
-      {/* ── TooGoodToGo stats ─────────────────────────────────── */}
-      <motion.div
-        {...motionProps}
-        transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.45 }}
-        className="bg-card rounded-lg border border-border p-6 space-y-4"
-      >
-        <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-          <ShoppingBag className="w-5 h-5 text-green-600" />
-          TooGoodToGo
-        </h2>
-        {tgtgCampaigns.length > 0 ? (() => {
-          const now = new Date();
-          const cy = now.getFullYear();
-          const cm = now.getMonth();
-
-          const sentCampaigns = tgtgCampaigns.filter(c => c.emailEnviado);
-          const thisMonthCampaigns = sentCampaigns.filter(c => {
-            const d = new Date(c.fechaActivacion + 'T00:00:00');
-            return d.getFullYear() === cy && d.getMonth() === cm;
-          });
-
-          const sumStats = (cams: TgtgPromoStat[]) => ({
-            reservas: cams.reduce((acc, c) => acc + c.items.reduce((a, i) => a + i.reservasCount, 0), 0),
-            revenue: cams.reduce((acc, c) => acc + c.items.reduce((a, i) => a + i.precioDescuento * i.reservasCount, 0), 0),
-            saved: cams.reduce((acc, c) => acc + c.items.reduce((a, i) => a + (i.precioOriginal - i.precioDescuento) * i.reservasCount, 0), 0),
-          });
-
-          const allStats = sumStats(sentCampaigns);
-          const monthStats = sumStats(thisMonthCampaigns);
-
-          const totalCampaigns = tgtgCampaigns.length;
-          // reversed = oldest first → #1 = oldest
-          const chartData = [...tgtgCampaigns].reverse().slice(0, 6).map((c, idx) => ({
-            label: `#${idx + 1}`,
-            fecha: new Date(c.fechaActivacion + 'T00:00:00').toLocaleDateString(dateLocale, { day: '2-digit', month: 'short' }),
-            reservas: c.items.reduce((acc, i) => acc + i.reservasCount, 0),
-            ingresos: Number(c.items.reduce((acc, i) => acc + i.precioDescuento * i.reservasCount, 0).toFixed(2)),
-          }));
-
-          return (
-            <>
-              {/* KPI cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900 rounded-lg px-4 py-3 text-center">
-                  <p className="text-2xl font-bold text-green-700 dark:text-green-400">{sentCampaigns.length}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{t("statsTgtgCampaignsSent", language)}</p>
-                </div>
-                <div className="bg-muted rounded-lg px-4 py-3 text-center">
-                  <p className="text-2xl font-bold text-foreground">{thisMonthCampaigns.length}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{t("statsSentThisMonth", language)}</p>
-                </div>
-                <div className="bg-muted rounded-lg px-4 py-3 text-center">
-                  <p className="text-2xl font-bold text-foreground">{allStats.reservas}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{t("statsTgtgReservasTotal", language)}</p>
-                </div>
-                <div className="bg-muted rounded-lg px-4 py-3 text-center">
-                  <p className="text-2xl font-bold text-green-600">{formatPrice(monthStats.revenue, 'EUR', language)}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{t("statsTgtgRevenueMonth", language)}</p>
-                </div>
-                <div className="bg-muted rounded-lg px-4 py-3 text-center">
-                  <p className="text-2xl font-bold text-foreground">{formatPrice(allStats.revenue, 'EUR', language)}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{t("statsTgtgRevenueTotal", language)}</p>
-                </div>
-              </div>
-
-              {/* Savings highlight */}
-              {allStats.saved > 0 && (
-                <div className="bg-primary/5 border border-primary/20 rounded-lg px-4 py-3 flex items-center gap-3">
-                  <span className="text-xl flex-shrink-0">🌱</span>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{formatPrice(allStats.saved, 'EUR', language)} {t("statsTgtgSavedBy", language)}</p>
-                    <p className="text-xs text-muted-foreground">{t("statsTgtgSavingsHelp", language)}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Chart: reservas + ingresos por campaña */}
-              {chartData.some(d => d.reservas > 0 || d.ingresos > 0) && (
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground mb-2">{t("statsTgtgChartTitle", language)}</p>
-                  <div className="h-40 w-full">
-                    <ResponsiveContainer width="100%" height={160} minWidth={0}>
-                      <BarChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartTheme.gridStroke} />
-                        <XAxis dataKey="label" tick={{ fontSize: 11, fill: chartTheme.tickFill }} axisLine={false} tickLine={false} />
-                        <YAxis hide />
-                        <Tooltip
-                          contentStyle={{ backgroundColor: chartTheme.tooltipBg, border: `1px solid ${chartTheme.tooltipBorder}`, borderRadius: '8px' }}
-                          labelStyle={{ color: chartTheme.tooltipColor, fontWeight: 600 }}
-                          itemStyle={{ color: chartTheme.tooltipColor }}
-                          labelFormatter={(label: string) => {
-                            const entry = chartData.find(d => d.label === label);
-                            return entry ? `${label} · ${entry.fecha}` : label;
-                          }}
-                          formatter={(value: number, name: string) => [
-                            name === 'reservas' ? `${value} ${t("tgtgReservas", language)}` : formatPrice(value, 'EUR', language),
-                            name === 'reservas' ? t("tgtgReservas", language) : t("revenueLabel", language),
-                          ]}
-                        />
-                        <Bar dataKey="reservas" fill={chartTheme.colors[2]} radius={[4, 4, 0, 0]} name="reservas" />
-                        <Bar dataKey="ingresos" fill={chartTheme.colors[3]} radius={[4, 4, 0, 0]} name="ingresos" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              )}
-
-              {/* Table */}
-              <div className="rounded-lg border border-border overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-muted">
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-8">#</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">{t("statsTgtgCampaignHeader", language)}</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground hidden lg:table-cell">{t("statsTgtgScheduleHeader", language)}</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Emails</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">{t("tgtgReservas", language)}</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground hidden md:table-cell">{t("revenueLabel", language)}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {tgtgCampaigns.map((c, idx) => {
-                      const num = totalCampaigns - idx;
-                      const reservas = c.items.reduce((acc, i) => acc + i.reservasCount, 0);
-                      const revenue = c.items.reduce((acc, i) => acc + i.precioDescuento * i.reservasCount, 0);
-                      const firstTitle = c.items[0]?.titulo ?? '—';
-                      const extraItems = c.items.length - 1;
-                      return (
-                        <tr key={c.id} className="bg-card hover:bg-muted/40 transition-colors">
-                          <td className="px-4 py-3 text-xs font-mono text-muted-foreground">
-                            #{num}
-                          </td>
-                          <td className="px-4 py-3 min-w-0">
-                            <p className="font-medium text-foreground text-sm truncate max-w-[180px]">{firstTitle}</p>
-                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                              <span className="text-xs text-muted-foreground whitespace-nowrap">
-                                {new Date(c.fechaActivacion + 'T00:00:00').toLocaleDateString(dateLocale, { day: '2-digit', month: '2-digit', year: '2-digit' })}
-                              </span>
-                              {extraItems > 0 && (
-                                <span className="text-xs text-muted-foreground">+{extraItems} {extraItems > 1 ? t("statsExtraOffers", language) : t("statsExtraOffer", language)}</span>
-                              )}
-                              {c.emailEnviado
-                                ? <span className="text-xs font-medium text-green-600 bg-green-50 dark:bg-green-950/30 px-1.5 py-0.5 rounded-full">{t("statsTgtgStatusSent", language)}</span>
-                                : <span className="text-xs font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">{t("statsTgtgStatusDraft", language)}</span>
-                              }
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-xs text-muted-foreground hidden lg:table-cell whitespace-nowrap">
-                            {c.horaRecogidaInicio.slice(0, 5)} – {c.horaRecogidaFin.slice(0, 5)}
-                          </td>
-                          <td className="px-4 py-3 text-right font-semibold text-primary">{c.numeroEnvios}</td>
-                          <td className="px-4 py-3 text-right font-bold text-foreground">{reservas}</td>
-                          <td className="px-4 py-3 text-right font-medium text-green-600 hidden md:table-cell">
-                            {formatPrice(revenue, 'EUR', language)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          );
-        })() : (
-          <div className="py-8 text-center">
-            <ReceiptText className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">{t("statsNoCampaigns", language)}</p>
-          </div>
-        )}
-      </motion.div>
+      {/* ── All Charts (lazy loaded) ──────────────────────────────── */}
+      <AdminCharts
+        stats={stats}
+        promos={promos}
+        tgtgCampaigns={tgtgCampaigns}
+        chartTheme={chartTheme}
+        language={language}
+        dateLocale={dateLocale}
+        meses={meses}
+        mesActual={mesActual}
+        t={t}
+        mostrarPromociones={mostrarPromociones}
+        mostrarTgtg={mostrarTgtg}
+      />
     </div>
   );
 }

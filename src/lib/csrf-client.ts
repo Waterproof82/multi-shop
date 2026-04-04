@@ -8,6 +8,15 @@ export function saveCsrfToken(token: string): void {
 
 export function getCsrfToken(): string | null {
   if (globalThis.window !== undefined) {
+    // Prefer reading from the cookie — it is always in sync across tabs.
+    // Cookie format: "token:signature"; we only need the token part for the header.
+    const cookieEntry = document.cookie.split(';').find(c => c.trim().startsWith('csrf_token='));
+    if (cookieEntry) {
+      const raw = decodeURIComponent(cookieEntry.split('=').slice(1).join('='));
+      const token = raw.split(':')[0];
+      if (token) return token;
+    }
+    // Fallback: sessionStorage (populated right after login before cookie is readable)
     return sessionStorage.getItem(CSRF_STORAGE_KEY);
   }
   return null;
@@ -142,6 +151,14 @@ export async function fetchWithCsrf(
   const isMutative = ['POST', 'PUT', 'PATCH', 'DELETE'].includes((options.method ?? 'GET').toUpperCase());
 
   const csrfToken = await getCsrfTokenWithFallback();
+
+  if (!csrfToken && isMutative) {
+    return new Response(JSON.stringify({ error: 'CSRF token unavailable' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   const headers = buildCsrfHeaders(csrfToken, options.headers);
   const requestOptions = { ...options, headers };
 
