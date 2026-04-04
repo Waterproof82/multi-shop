@@ -1,6 +1,5 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { Suspense } from 'react';
 import { authAdminUseCase, pedidoUseCase, empresaUseCase, tgtgUseCase, promocionUseCase } from '@/core/infrastructure/database';
 import { getMenuUseCase } from '@/lib/server-services';
 import { AdminDashboardClient } from '@/components/admin/admin-dashboard-client';
@@ -8,12 +7,11 @@ import { SUPERADMIN_ROLE } from '@/core/domain/repositories/IAdminRepository';
 import type { MenuCategoryVM } from '@/core/application/dtos/menu-view-model';
 import type { DashboardPedido, DashboardStats, DashboardPromoSummary, DashboardTgtgSummary } from '@/components/admin/admin-dashboard-client';
 import type { TgtgWithItems } from '@/core/application/use-cases/tgtg.use-case';
-import { UrlCleanup } from '@/components/admin/url-cleanup';
-import { ScrollToTop } from '@/components/admin/scroll-to-top';
+import { ScrollOnMount } from '@/components/scroll-on-mount';
 
 export const dynamic = 'force-dynamic';
 
-async function AdminDashboardContent() {
+export default async function AdminDashboard() {
   const cookieStore = await cookies();
   const token = cookieStore.get('admin_token')?.value;
 
@@ -94,7 +92,7 @@ async function AdminDashboardContent() {
 
   return (
     <>
-      <ScrollToTop />
+      <ScrollOnMount />
       <AdminDashboardClient
         empresaNombre={empresaNombre}
         menu={menu}
@@ -107,14 +105,5 @@ async function AdminDashboardContent() {
         mostrarTgtg={mostrarTgtg}
       />
     </>
-  );
-}
-
-export default function AdminDashboard() {
-  return (
-    <Suspense fallback={<div className="p-6">Cargando...</div>}>
-      <UrlCleanup />
-      <AdminDashboardContent />
-    </Suspense>
   );
 }

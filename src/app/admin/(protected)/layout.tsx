@@ -8,7 +8,6 @@ import { AdminThemeProvider } from '@/components/admin-theme-provider';
 import { EmpresaThemeProvider } from '@/components/empresa-theme-provider';
 import { SUPERADMIN_ROLE } from '@/core/domain/repositories/IAdminRepository';
 import { SuperadminBanner } from '@/components/superadmin-banner';
-import { ScrollToTop } from '@/components/admin/scroll-to-top';
 
 export const dynamic = 'force-dynamic';
 
@@ -82,7 +81,6 @@ export default async function AdminProtectedLayout({
             </a>
             <AdminSidebar empresaId={empresaId} />
             <main id="main-content" className={`lg:ml-64 min-h-screen ${isSuperAdminView ? 'pt-20' : 'pt-16'}`}>
-              <ScrollToTop />
               {children}
             </main>
           </div>

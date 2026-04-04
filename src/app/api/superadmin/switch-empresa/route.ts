@@ -23,10 +23,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/superadmin', request.url));
   }
 
-  const redirectUrl = new URL('/admin', request.url);
-  redirectUrl.searchParams.set('t', Date.now().toString());
-  
-  const response = NextResponse.redirect(redirectUrl);
+  const response = NextResponse.redirect(new URL('/admin', request.url));
   
   response.cookies.set('superadmin_empresa_id', empresaId, {
     httpOnly: true,
