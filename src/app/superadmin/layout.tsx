@@ -5,6 +5,8 @@ import { authAdminUseCase } from '@/core/infrastructure/database';
 import { AdminThemeProvider } from '@/components/admin-theme-provider';
 import SuperAdminHeader from './super-admin-header';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };

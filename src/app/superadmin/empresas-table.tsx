@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Building2, AlertCircle, CheckCircle } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
@@ -39,6 +39,7 @@ interface ModuloSwitchProps {
 function ModuloSwitch({ empresaId, field, checked: initialChecked, label }: ModuloSwitchProps) {
   const [checked, setChecked] = useState(initialChecked);
   const [saving, setSaving] = useState(false);
+  const router = useRouter();
 
   const handleToggle = async () => {
     if (saving) return;
@@ -51,7 +52,11 @@ function ModuloSwitch({ empresaId, field, checked: initialChecked, label }: Modu
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ [field]: next }),
       });
-      if (!res.ok) setChecked(!next);
+      if (!res.ok) {
+        setChecked(!next);
+      } else {
+        router.refresh();
+      }
     } catch {
       setChecked(!next);
     } finally {
@@ -197,12 +202,12 @@ export function EmpresasTable({ empresas }: EmpresasTableProps) {
                   </div>
                 </td>
                 <td className="px-4 py-4 text-right">
-                  <Link
+                  <a
                     href={`/api/superadmin/switch-empresa?empresaId=${empresa.id}`}
                     className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     Editar
-                  </Link>
+                  </a>
                 </td>
               </tr>
             ))}
