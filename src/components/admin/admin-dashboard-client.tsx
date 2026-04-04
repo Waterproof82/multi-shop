@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ShoppingBag, Package, ArrowRight, Clock, Send, Tag } from 'lucide-react';
 import { motion, useReducedMotion } from 'framer-motion';
@@ -79,9 +80,9 @@ export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menu
   }
 
   return (
-    <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
+    <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6" suppressHydrationWarning>
       {/* Header con stats */}
-      <div className="bg-primary rounded-lg p-4 sm:p-6">
+      <div className="bg-primary rounded-lg p-4 sm:p-6" suppressHydrationWarning>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">{t("dashboard", language)}</h1>
