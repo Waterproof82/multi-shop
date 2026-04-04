@@ -11,6 +11,8 @@ interface EmpresaRow {
   slug: string | null;
   logo_url: string | null;
   mostrar_carrito: boolean;
+  mostrar_promociones: boolean;
+  mostrar_tgtg: boolean;
   moneda: string;
   email_notification: string | null;
   url_image: string | null;
@@ -354,6 +356,8 @@ export class SupabaseSuperAdminRepository implements ISuperAdminRepository {
       slug: row.slug,
       logoUrl: row.logo_url,
       mostrarCarrito: row.mostrar_carrito,
+      mostrarPromociones: row.mostrar_promociones ?? true,
+      mostrarTgtg: row.mostrar_tgtg ?? true,
       moneda: row.moneda,
       emailNotification: row.email_notification,
       urlImage: row.url_image,

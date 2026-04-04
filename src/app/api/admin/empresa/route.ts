@@ -43,6 +43,8 @@ export async function GET(request: NextRequest) {
       descripcion_fr: empresa.descripcion?.fr || '',
       descripcion_it: empresa.descripcion?.it || '',
       descripcion_de: empresa.descripcion?.de || '',
+      mostrar_promociones: empresa.mostrarPromociones ?? true,
+      mostrar_tgtg: empresa.mostrarTgtg ?? true,
     }
   });
 }

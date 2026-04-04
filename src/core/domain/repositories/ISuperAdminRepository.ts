@@ -33,6 +33,8 @@ export interface EmpresaWithStats {
   slug: string | null;
   logoUrl: string | null;
   mostrarCarrito: boolean;
+  mostrarPromociones: boolean;
+  mostrarTgtg: boolean;
   moneda: string;
   emailNotification: string | null;
   urlImage: string | null;

@@ -1,9 +1,10 @@
 'use client';
 
-import { Settings, Palette, Building2 } from 'lucide-react';
+import { Settings, Palette, Building2, ToggleLeft } from 'lucide-react';
 import { ColoresForm } from '@/components/admin/colores-form';
 import { EmpresaDatosForm } from '@/components/admin/empresa-datos-form';
 import { EmpresaAparienciaForm } from '@/components/admin/empresa-apariencia-form';
+import { ModulosForm } from '@/components/admin/modulos-form';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import type { EmpresaColores } from '@/core/domain/entities/types';
@@ -34,6 +35,8 @@ interface ConfiguracionPageClientProps {
   empresaDatos: EmpresaDatos;
   empresaApariencia: EmpresaApariencia;
   colores: EmpresaColores | null;
+  mostrarPromociones: boolean;
+  mostrarTgtg: boolean;
 }
 
 export function ConfiguracionPageClient({
@@ -43,6 +46,8 @@ export function ConfiguracionPageClient({
   empresaDatos,
   empresaApariencia,
   colores,
+  mostrarPromociones,
+  mostrarTgtg,
 }: Readonly<ConfiguracionPageClientProps>) {
   const { language } = useLanguage();
 
@@ -89,6 +94,22 @@ export function ConfiguracionPageClient({
           {t("configAparienciaHelp", language)}
         </p>
         <EmpresaAparienciaForm initialData={empresaApariencia} empresaSlug={empresaSlug} />
+      </div>
+
+      {/* Módulos */}
+      <div className="bg-card rounded-lg shadow-elegant border border-border p-6 mb-6">
+        <h2 className="text-lg font-semibold mb-6 text-foreground flex items-center gap-2">
+          <ToggleLeft className="w-5 h-5" />
+          {t("configModulosTitle", language)}
+        </h2>
+        <p className="text-sm text-muted-foreground mb-6">
+          {t("configModulosHelp", language)}
+        </p>
+        <ModulosForm
+          empresaId={empresaId}
+          mostrarPromociones={mostrarPromociones}
+          mostrarTgtg={mostrarTgtg}
+        />
       </div>
 
       {/* Colores */}

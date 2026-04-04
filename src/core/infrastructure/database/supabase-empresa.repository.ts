@@ -11,7 +11,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
     try {
       const { data: empresa } = await this.supabase
         .from('empresas')
-        .select('email_notification, telefono_whatsapp, nombre, logo_url, fb, instagram, url_mapa, direccion, dominio, slug, url_image, descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de, mostrar_carrito, moneda, subdomain_pedidos, color_primary, color_primary_foreground, color_secondary, color_secondary_foreground, color_accent, color_accent_foreground, color_background, color_foreground')
+        .select('email_notification, telefono_whatsapp, nombre, logo_url, fb, instagram, url_mapa, direccion, dominio, slug, url_image, descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de, mostrar_carrito, mostrar_promociones, mostrar_tgtg, moneda, subdomain_pedidos, color_primary, color_primary_foreground, color_secondary, color_secondary_foreground, color_accent, color_accent_foreground, color_background, color_foreground')
         .eq('id', empresaId)
         .single();
 
@@ -37,6 +37,8 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
           slug: (empresa.slug as string | null) ?? null,
           logoUrl: empresa.logo_url,
           mostrarCarrito: empresa.mostrar_carrito ?? false,
+          mostrarPromociones: empresa.mostrar_promociones ?? true,
+          mostrarTgtg: empresa.mostrar_tgtg ?? true,
           moneda: empresa.moneda ?? 'EUR',
           emailNotification: empresa.email_notification,
           colores,
@@ -77,6 +79,8 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
       if (data.descripcion_fr !== undefined) updatePayload.descripcion_fr = data.descripcion_fr || null;
       if (data.descripcion_it !== undefined) updatePayload.descripcion_it = data.descripcion_it || null;
       if (data.descripcion_de !== undefined) updatePayload.descripcion_de = data.descripcion_de || null;
+      if (data.mostrar_promociones !== undefined) updatePayload.mostrar_promociones = data.mostrar_promociones;
+      if (data.mostrar_tgtg !== undefined) updatePayload.mostrar_tgtg = data.mostrar_tgtg;
 
       const { error } = await this.supabase
         .from('empresas')

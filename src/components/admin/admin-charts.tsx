@@ -65,6 +65,8 @@ interface AdminChartsProps {
   meses: string[];
   mesActual: number;
   t: TranslateFn;
+  mostrarPromociones?: boolean;
+  mostrarTgtg?: boolean;
 }
 
 // ─── Daily Orders Chart ────────────────────────────────────────
@@ -648,21 +650,25 @@ export function AdminCharts(props: AdminChartsProps) {
         />
       </div>
 
-      <PromoStatsChart 
-        promos={props.promos}
-        chartTheme={props.chartTheme}
-        language={props.language}
-        dateLocale={props.dateLocale}
-        t={props.t}
-      />
+      {(props.mostrarPromociones ?? true) && (
+        <PromoStatsChart
+          promos={props.promos}
+          chartTheme={props.chartTheme}
+          language={props.language}
+          dateLocale={props.dateLocale}
+          t={props.t}
+        />
+      )}
 
-      <TgtgStatsChart 
-        tgtgCampaigns={props.tgtgCampaigns}
-        chartTheme={props.chartTheme}
-        language={props.language}
-        dateLocale={props.dateLocale}
-        t={props.t}
-      />
+      {(props.mostrarTgtg ?? true) && (
+        <TgtgStatsChart
+          tgtgCampaigns={props.tgtgCampaigns}
+          chartTheme={props.chartTheme}
+          language={props.language}
+          dateLocale={props.dateLocale}
+          t={props.t}
+        />
+      )}
     </>
   );
 }

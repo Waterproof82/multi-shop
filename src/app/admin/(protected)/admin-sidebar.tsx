@@ -16,14 +16,14 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
 }
 
-const navItems: NavItem[] = [
+const BASE_NAV_ITEMS: (NavItem & { requiresPromo?: boolean; requiresTgtg?: boolean })[] = [
   { href: '/admin', labelKey: 'sidebarDashboard', icon: LayoutDashboard },
   { href: '/admin/categorias', labelKey: 'sidebarCategories', icon: Tags },
   { href: '/admin/productos', labelKey: 'sidebarProducts', icon: Package },
   { href: '/admin/pedidos', labelKey: 'sidebarOrders', icon: ShoppingCart },
   { href: '/admin/clientes', labelKey: 'sidebarClients', icon: Users },
-  { href: '/admin/promociones', labelKey: 'sidebarPromotions', icon: Megaphone },
-  { href: '/admin/toogoodtogo', labelKey: 'sidebarTooGoodToGo', icon: ShoppingBag },
+  { href: '/admin/promociones', labelKey: 'sidebarPromotions', icon: Megaphone, requiresPromo: true },
+  { href: '/admin/toogoodtogo', labelKey: 'sidebarTooGoodToGo', icon: ShoppingBag, requiresTgtg: true },
   { href: '/admin/estadisticas', labelKey: 'sidebarStatistics', icon: BarChart3 },
   { href: '/admin/configuracion', labelKey: 'sidebarSettings', icon: Settings },
 ];
@@ -35,8 +35,14 @@ interface AdminSidebarProps {
 export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
-  const { empresaLogo } = useAdmin();
+  const { empresaLogo, mostrarPromociones, mostrarTgtg } = useAdmin();
   const { language } = useLanguage();
+
+  const navItems = BASE_NAV_ITEMS.filter(
+    (item) =>
+      (!item.requiresPromo || mostrarPromociones) &&
+      (!item.requiresTgtg || mostrarTgtg)
+  );
 
   const closeMenu = () => setIsOpen(false);
 

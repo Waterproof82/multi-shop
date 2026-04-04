@@ -46,9 +46,11 @@ interface AdminDashboardClientProps {
   readonly menuError?: string;
   readonly promoSummary: DashboardPromoSummary;
   readonly tgtgSummary: DashboardTgtgSummary;
+  readonly mostrarPromociones: boolean;
+  readonly mostrarTgtg: boolean;
 }
 
-export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menuError, promoSummary, tgtgSummary }: AdminDashboardClientProps) {
+export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menuError, promoSummary, tgtgSummary, mostrarPromociones, mostrarTgtg }: AdminDashboardClientProps) {
   const { language } = useLanguage();
   const shouldReduceMotion = useReducedMotion() ?? false;
 
@@ -108,8 +110,9 @@ export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menu
         </div>
 
         {/* Marketing row */}
+        {(mostrarPromociones || mostrarTgtg) && (
         <div className="mt-4 pt-4 border-t border-primary-foreground/20 grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Link
+          {mostrarPromociones && <Link
             href="/admin/promociones"
             className="bg-primary-foreground/10 hover:bg-primary-foreground/20 rounded-lg px-4 py-3 flex items-center gap-4 transition-colors group outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/50 focus-visible:ring-offset-2 focus-visible:ring-offset-primary min-h-[44px]"
           >
@@ -133,9 +136,9 @@ export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menu
               </p>
             </div>
             <ArrowRight className="w-4 h-4 text-primary-foreground/40 flex-shrink-0 group-hover:text-primary-foreground/70 transition-colors" />
-          </Link>
+          </Link>}
 
-          <Link
+          {mostrarTgtg && <Link
             href="/admin/toogoodtogo"
             className="bg-primary-foreground/10 hover:bg-primary-foreground/20 rounded-lg px-4 py-3 flex items-center gap-4 transition-colors group outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/50 focus-visible:ring-offset-2 focus-visible:ring-offset-primary min-h-[44px]"
           >
@@ -155,8 +158,9 @@ export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menu
               </p>
             </div>
             <ArrowRight className="w-4 h-4 text-primary-foreground/40 flex-shrink-0 group-hover:text-primary-foreground/70 transition-colors" />
-          </Link>
+          </Link>}
         </div>
+        )}
       </div>
 
       {/* Quick Actions */}

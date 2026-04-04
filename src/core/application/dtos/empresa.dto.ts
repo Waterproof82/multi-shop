@@ -18,6 +18,8 @@ export const updateEmpresaSchema = z.object({
   descripcion_fr: z.string().max(1000).optional().nullable(),
   descripcion_it: z.string().max(1000).optional().nullable(),
   descripcion_de: z.string().max(1000).optional().nullable(),
+  mostrar_promociones: z.boolean().optional(),
+  mostrar_tgtg: z.boolean().optional(),
 });
 
 export type UpdateEmpresaDTO = z.infer<typeof updateEmpresaSchema>;

@@ -1,7 +1,7 @@
-import Link from 'next/link';
 import Image from 'next/image';
-import { Building2, Users, ShoppingCart, Package, AlertCircle, CheckCircle, TrendingUp, Calendar, Trophy } from 'lucide-react';
+import { Building2, Users, ShoppingCart, Package, AlertCircle, TrendingUp, Calendar, Trophy } from 'lucide-react';
 import { superAdminUseCase } from '@/core/infrastructure/database';
+import { EmpresasTable } from './empresas-table';
 
 interface EmpresaStats {
   totalPedidos: number;
@@ -18,6 +18,8 @@ interface Empresa {
   dominio: string;
   logoUrl: string | null;
   emailNotification: string | null;
+  mostrarPromociones: boolean;
+  mostrarTgtg: boolean;
   createdAt: string;
   stats: EmpresaStats;
   adminCount: number;
@@ -234,115 +236,25 @@ export default async function SuperAdminPage() {
 
       <div>
         <h3 className="text-lg font-semibold text-foreground mb-4">Empresas</h3>
-        
-        {(() => {
-          if (fetchError) {
-            return (
-              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-6 text-center">
-                <p className="text-destructive">Error al cargar: {fetchError}</p>
-              </div>
-            );
-          } else if (empresas.length === 0) {
-            return (
-              <div className="bg-card border border-border rounded-lg p-6 text-center">
-                <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">No hay empresas registradas</p>
-              </div>
-            );
-          } else {
-            return (
-              <div className="bg-card border border-border rounded-lg overflow-hidden">
-                <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px]" aria-label="Listado de empresas">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Empresa</th>
-                      <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Dominio</th>
-                      <th className="text-center px-4 py-3 text-sm font-medium text-muted-foreground">Hoy</th>
-                      <th className="text-center px-4 py-3 text-sm font-medium text-muted-foreground">Mes</th>
-                      <th className="text-center px-4 py-3 text-sm font-medium text-muted-foreground">Total</th>
-                      <th className="text-center px-4 py-3 text-sm font-medium text-muted-foreground">Pendientes</th>
-                      <th className="text-center px-4 py-3 text-sm font-medium text-muted-foreground">Clientes</th>
-                      <th className="text-center px-4 py-3 text-sm font-medium text-muted-foreground">Admins</th>
-                      <th className="text-right px-4 py-3 text-sm font-medium text-muted-foreground">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {empresas.map((empresa) => (
-                      <tr key={empresa.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="px-4 py-4">
-                          <div className="flex items-center gap-3">
-                            {empresa.logoUrl ? (
-                              <Image
-                                src={empresa.logoUrl}
-                                alt={empresa.nombre}
-                                width={40}
-                                height={40}
-                                className="h-10 w-10 rounded-lg object-contain bg-white border border-border"
-                              />
-                            ) : (
-                              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                                <Building2 className="h-5 w-5 text-primary" />
-                              </div>
-                            )}
-                            <span className="font-medium text-foreground">{empresa.nombre}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-4">
-                          <a
-                            href={`https://${empresa.dominio}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-primary hover:underline"
-                          >
-                            {empresa.dominio}
-                          </a>
-                        </td>
-                        <td className="px-4 py-4 text-center">
-                          <span className="text-sm font-medium text-primary">{empresa.stats.pedidosHoy}</span>
-                        </td>
-                        <td className="px-4 py-4 text-center">
-                          <span className="text-sm font-medium text-primary">{empresa.stats.pedidosMes}</span>
-                        </td>
-                        <td className="px-4 py-4 text-center text-foreground">
-                          {empresa.stats.totalPedidos}
-                        </td>
-                        <td className="px-4 py-4 text-center">
-                          {empresa.stats.pedidosPendientes > 0 ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 text-sm">
-                              <AlertCircle className="h-3 w-3" aria-hidden="true" />
-                              {empresa.stats.pedidosPendientes}
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-muted-foreground text-sm">
-                              <CheckCircle className="h-3 w-3" aria-hidden="true" />
-                              0
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-4 text-center text-foreground">
-                          {empresa.stats.totalClientes}
-                        </td>
-                        <td className="px-4 py-4 text-center text-foreground">
-                          {empresa.adminCount}
-                        </td>
-                        <td className="px-4 py-4 text-right">
-                          <Link
-                            href={`/api/superadmin/switch-empresa?empresaId=${empresa.id}`}
-                            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                          >
-                            Editar
-                          </Link>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                </div>
-              </div>
-            );
-          }
-        })()}
+
+        {fetchError ? (
+          <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-6 text-center">
+            <p className="text-destructive">Error al cargar: {fetchError}</p>
+          </div>
+        ) : (
+          <EmpresasTable
+            empresas={empresas.map(e => ({
+              id: e.id,
+              nombre: e.nombre,
+              dominio: e.dominio,
+              logoUrl: e.logoUrl,
+              mostrarPromociones: e.mostrarPromociones,
+              mostrarTgtg: e.mostrarTgtg,
+              stats: e.stats,
+              adminCount: e.adminCount,
+            }))}
+          />
+        )}
       </div>
     </div>
   );

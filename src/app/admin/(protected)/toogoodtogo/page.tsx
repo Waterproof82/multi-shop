@@ -498,7 +498,9 @@ export default function TooGoodToGoPage() {
   const activeCampaigns = withStatus.filter(c => !c.isClosed);
   const pendingCampaigns = activeCampaigns.filter(c => !c.campaign.emailEnviado);
   const sentCampaigns = activeCampaigns.filter(c => c.campaign.emailEnviado);
-  const closedCampaigns = withStatus.filter(c => c.isClosed);
+  // All sent campaigns appear in "Anteriores" permanently so they can be reused.
+  // Expired/exhausted campaigns that haven't been sent yet also appear here.
+  const closedCampaigns = withStatus.filter(c => c.campaign.emailEnviado || c.isClosed);
 
   const selectedActiveCampaigns = activeCampaigns.filter(({ campaign }) => selectedPromoIds.has(campaign.id));
   const totalSelectedItems = selectedActiveCampaigns.reduce((acc, { campaign }) => acc + campaign.items.length, 0);

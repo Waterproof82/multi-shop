@@ -166,29 +166,33 @@ function useStatsFetching(empresaId: string, selectedMonth: { mes: number; año:
 }
 
 // Custom hook for promo + TGTG stats
-function usePromoStats(empresaId: string) {
+function usePromoStats(empresaId: string, mostrarPromociones: boolean, mostrarTgtg: boolean) {
   const [promos, setPromos] = useState<PromoStat[]>([]);
   const [tgtgCampaigns, setTgtgCampaigns] = useState<TgtgPromoStat[]>([]);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [promoRes, tgtgRes] = await Promise.all([
-          fetch(`/api/admin/promociones?empresaId=${empresaId}`),
-          fetch(`/api/admin/tgtg?empresaId=${empresaId}`),
-        ]);
-        if (promoRes.ok) {
-          const data = await promoRes.json() as { promociones?: PromoStat[] };
-          setPromos(data.promociones ?? []);
+        const fetches: Promise<void>[] = [];
+        if (mostrarPromociones) {
+          fetches.push(
+            fetch(`/api/admin/promociones?empresaId=${empresaId}`)
+              .then(res => res.ok ? res.json() : null)
+              .then((data: { promociones?: PromoStat[] } | null) => { if (data) setPromos(data.promociones ?? []); })
+          );
         }
-        if (tgtgRes.ok) {
-          const data = await tgtgRes.json() as { campaigns?: TgtgPromoStat[] };
-          setTgtgCampaigns(data.campaigns ?? []);
+        if (mostrarTgtg) {
+          fetches.push(
+            fetch(`/api/admin/tgtg?empresaId=${empresaId}`)
+              .then(res => res.ok ? res.json() : null)
+              .then((data: { campaigns?: TgtgPromoStat[] } | null) => { if (data) setTgtgCampaigns(data.campaigns ?? []); })
+          );
         }
+        await Promise.all(fetches);
       } catch { /* silent */ }
     }
     fetchData();
-  }, [empresaId]);
+  }, [empresaId, mostrarPromociones, mostrarTgtg]);
 
   return { promos, tgtgCampaigns };
 }
@@ -384,16 +388,16 @@ function LoadingSkeleton() {
 
 export default function EstadisticasPage() {
   const { language } = useLanguage();
-  const { empresaId, overrideEmpresaId } = useAdmin();
+  const { empresaId, overrideEmpresaId, mostrarPromociones, mostrarTgtg } = useAdmin();
   const effectiveEmpresaId = overrideEmpresaId || empresaId;
   const lang = language;
   const localeMap: Record<string, string> = { es: 'es-ES', en: 'en-US', fr: 'fr-FR', it: 'it-IT', de: 'de-DE' };
   const dateLocale = localeMap[language] ?? 'es-ES';
   const meses = [t("monthJan", lang), t("monthFeb", lang), t("monthMar", lang), t("monthApr", lang), t("monthMay", lang), t("monthJun", lang), t("monthJul", lang), t("monthAug", lang), t("monthSep", lang), t("monthOct", lang), t("monthNov", lang), t("monthDec", lang)];
   const [selectedMonth, setSelectedMonth] = useState({ mes: new Date().getMonth(), año: new Date().getFullYear() });
-  
+
   const { stats, loading } = useStatsFetching(effectiveEmpresaId, selectedMonth);
-  const { promos, tgtgCampaigns } = usePromoStats(effectiveEmpresaId);
+  const { promos, tgtgCampaigns } = usePromoStats(effectiveEmpresaId, mostrarPromociones, mostrarTgtg);
   const chartTheme = useChartTheme();
   const { motionProps, shouldReduceMotion } = useMotionProps();
 
@@ -445,6 +449,8 @@ export default function EstadisticasPage() {
         meses={meses}
         mesActual={mesActual}
         t={t}
+        mostrarPromociones={mostrarPromociones}
+        mostrarTgtg={mostrarTgtg}
       />
     </div>
   );

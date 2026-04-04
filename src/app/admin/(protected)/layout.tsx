@@ -38,11 +38,13 @@ export default async function AdminProtectedLayout({
   let empresaId: string;
   let empresa = admin.empresa;
   let isSuperAdminView = false;
+  let mostrarPromociones = empresa?.mostrarPromociones ?? true;
+  let mostrarTgtg = empresa?.mostrarTgtg ?? true;
 
   if (admin.rol === SUPERADMIN_ROLE) {
     const cookieList = await cookies();
     const superadminEmpresaId = cookieList.get('superadmin_empresa_id')?.value;
-    
+
     if (!superadminEmpresaId) {
       redirect('/superadmin');
     }
@@ -50,7 +52,9 @@ export default async function AdminProtectedLayout({
     isSuperAdminView = true;
     const empresaResult = await empresaUseCase.getById(empresaId);
     if (empresaResult.success && empresaResult.data) {
-      empresa = empresaResult.data as typeof empresa;
+      empresa = empresaResult.data as unknown as typeof empresa;
+      mostrarPromociones = empresaResult.data.mostrarPromociones ?? true;
+      mostrarTgtg = empresaResult.data.mostrarTgtg ?? true;
     }
   } else {
     empresaId = admin.empresaId!;
@@ -59,10 +63,12 @@ export default async function AdminProtectedLayout({
   return (
     <AdminThemeProvider>
       <EmpresaThemeProvider colores={empresa?.colores ?? null}>
-        <AdminProvider 
-          empresaId={empresaId} 
-          empresaNombre={empresa?.nombre ?? 'default'} 
+        <AdminProvider
+          empresaId={empresaId}
+          empresaNombre={empresa?.nombre ?? 'default'}
           empresaLogo={empresa?.logoUrl ?? undefined}
+          mostrarPromociones={mostrarPromociones}
+          mostrarTgtg={mostrarTgtg}
           overrideEmpresaId={isSuperAdminView ? empresaId : undefined}
         >
           <div className="min-h-screen bg-muted">
