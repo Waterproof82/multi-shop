@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Building2, AlertCircle, CheckCircle } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
@@ -36,8 +36,13 @@ interface ModuloSwitchProps {
 }
 
 function ModuloSwitch({ empresaId, field, checked: initialChecked, label }: ModuloSwitchProps) {
+  const [mounted, setMounted] = useState(false);
   const [checked, setChecked] = useState(initialChecked);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleToggle = async () => {
     if (saving) return;
@@ -57,6 +62,22 @@ function ModuloSwitch({ empresaId, field, checked: initialChecked, label }: Modu
       setSaving(false);
     }
   };
+
+  // Prevent hydration mismatch by rendering a neutral state until mounted
+  if (!mounted) {
+    return (
+      <button
+        type="button"
+        role="switch"
+        aria-checked={initialChecked}
+        aria-label={label}
+        disabled
+        className="relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full p-0.5 bg-switch-inactive opacity-60 cursor-not-allowed"
+      >
+        <span aria-hidden="true" className="pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transform translate-x-0" />
+      </button>
+    );
+  }
 
   return (
     <PillSwitch

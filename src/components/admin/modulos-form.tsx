@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Megaphone, ShoppingBag } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useLanguage } from '@/lib/language-context';
@@ -24,10 +24,19 @@ interface ModuloToggleProps {
 }
 
 function ModuloToggle({ icon: Icon, label, description, checked, disabled, onChange }: ModuloToggleProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Prevent hydration mismatch
+  const displayChecked = mounted ? checked : false;
+
   return (
-    <label className={`flex items-center justify-between gap-4 p-4 rounded-lg border transition-colors cursor-pointer ${checked ? 'border-primary/40 bg-primary/5' : 'border-border bg-muted/30'} ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-primary/30'}`}>
+    <label className={`flex items-center justify-between gap-4 p-4 rounded-lg border transition-colors cursor-pointer ${displayChecked ? 'border-primary/40 bg-primary/5' : 'border-border bg-muted/30'} ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-primary/30'}`}>
       <div className="flex items-center gap-3 min-w-0">
-        <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${checked ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
+        <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${displayChecked ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
           <Icon className="w-4 h-4" />
         </div>
         <div className="min-w-0">
@@ -36,7 +45,7 @@ function ModuloToggle({ icon: Icon, label, description, checked, disabled, onCha
         </div>
       </div>
       <PillSwitch
-        checked={checked}
+        checked={displayChecked}
         disabled={disabled}
         onChange={() => !disabled && onChange(!checked)}
         size="md"
