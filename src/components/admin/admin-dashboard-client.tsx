@@ -67,8 +67,8 @@ export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menu
 
   if (menuError) {
     return (
-      <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
-        <div className="bg-primary rounded-lg p-4 sm:p-6">
+      <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6" suppressHydrationWarning>
+        <div className="bg-primary rounded-lg p-4 sm:p-6" suppressHydrationWarning>
           <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">{t("dashboard", language)}</h1>
           <p className="text-primary-foreground/80 text-sm mt-1">{empresaNombre}</p>
         </div>
@@ -83,19 +83,19 @@ export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menu
     <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6" suppressHydrationWarning>
       {/* Header con stats */}
       <div className="bg-primary rounded-lg p-4 sm:p-6" suppressHydrationWarning>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" suppressHydrationWarning>
+          <div suppressHydrationWarning>
             <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">{t("dashboard", language)}</h1>
             <p className="text-primary-foreground/80 text-sm mt-1">{empresaNombre}</p>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="bg-primary-foreground/20 rounded-lg px-4 py-3 text-center min-h-[72px] flex flex-col justify-center group hover:bg-primary-foreground/30 transition-[background-color,transform] duration-150 hover:scale-[1.02] motion-reduce:hover:scale-100 hover:shadow-elegant">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4" suppressHydrationWarning>
+            <div className="bg-primary-foreground/20 rounded-lg px-4 py-3 text-center min-h-[72px] flex flex-col justify-center group hover:bg-primary-foreground/30 transition-[background-color,transform] duration-150 hover:scale-[1.02] motion-reduce:hover:scale-100 hover:shadow-elegant" suppressHydrationWarning>
               <ShoppingBag className="w-5 h-5 text-primary-foreground mx-auto mb-2 group-hover:scale-110 motion-reduce:group-hover:scale-100 transition-transform duration-300" />
               <span className="text-xl font-semibold text-primary-foreground">{stats?.pedidosHoy || 0}</span>
               <p className="text-primary-foreground/80 text-xs leading-tight mt-1">{t("pedidosHoy", language)}</p>
             </div>
             <div className="bg-primary-foreground/20 rounded-lg px-4 py-3 text-center min-h-[72px] flex flex-col justify-center group hover:bg-primary-foreground/30 transition-[background-color,transform] duration-150 hover:scale-[1.02] motion-reduce:hover:scale-100 hover:shadow-elegant">
-              <span className="text-xl font-semibold text-primary-foreground">{formatPrice(stats?.totalMes || 0, 'EUR', language)}</span>
+              <span suppressHydrationWarning className="text-xl font-semibold text-primary-foreground">{formatPrice(stats?.totalMes || 0, 'EUR', language)}</span>
               <p className="text-primary-foreground/80 text-xs leading-tight mt-1">{t("ventasDelMes", language)}</p>
             </div>
             <div className="bg-primary-foreground/20 rounded-lg px-4 py-3 text-center min-h-[72px] flex flex-col justify-center group hover:bg-primary-foreground/30 transition-[background-color,transform] duration-150 hover:scale-[1.02] motion-reduce:hover:scale-100 hover:shadow-elegant">
@@ -124,7 +124,7 @@ export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menu
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-medium text-primary-foreground/70 uppercase tracking-wide">{t("sidebarPromotions", language)}</p>
                 {promoSummary.lastDate && (
-                  <span className="text-xs text-primary-foreground/50 whitespace-nowrap">
+                  <span suppressHydrationWarning className="text-xs text-primary-foreground/50 whitespace-nowrap">
                     {new Date(promoSummary.lastDate).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
                   </span>
                 )}
@@ -132,7 +132,7 @@ export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menu
               <p className="text-base font-semibold text-primary-foreground leading-tight">
                 {promoSummary.total} {t("promotionsSent", language)}
               </p>
-              <p className="text-xs text-primary-foreground/60 mt-0.5">
+              <p suppressHydrationWarning className="text-xs text-primary-foreground/60 mt-0.5">
                 {promoSummary.totalEmails.toLocaleString('es-ES')} {t("totalEmails", language)}
               </p>
             </div>
@@ -220,8 +220,8 @@ export function AdminDashboardClient({ empresaNombre, menu, pedidos, stats, menu
                   </p>
                 </div>
                 <div className="text-right ml-4">
-                  <p className="font-semibold text-foreground text-lg">{formatPrice(pedido.total, 'EUR', language)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{formatDate(pedido.created_at, {
+                  <p suppressHydrationWarning className="font-semibold text-foreground text-lg">{formatPrice(pedido.total, 'EUR', language)}</p>
+                  <p suppressHydrationWarning className="text-xs text-muted-foreground mt-1">{formatDate(pedido.created_at, {
                     day: '2-digit',
                     month: '2-digit',
                     hour: '2-digit',
