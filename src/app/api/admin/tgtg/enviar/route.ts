@@ -106,6 +106,8 @@ function buildTgtgEmailHtml(params: {
   lang?: string;
 }): string {
   const { empresaLogoUrl, empresaNombre, campaigns, baseUrl, empresaId, recipientEmail, lang = 'es' } = params;
+  // Escape baseUrl for safe injection into HTML href attributes
+  const safeBaseUrl = escapeHtml(baseUrl);
   const texts = TGTG_EMAIL_TEXTS[lang] || TGTG_EMAIL_TEXTS.es;
   const locale = getLocaleForLang(lang);
   const encodedEmail = encodeURIComponent(recipientEmail);
@@ -165,10 +167,10 @@ function buildTgtgEmailHtml(params: {
       ${campaignSections}
       <div style="border-top:1px solid #f3f4f6;padding-top:20px;padding-bottom:8px;text-align:center;">
         <p style="margin:0 0 10px;font-size:13px;color:#6b7280;">
-          <span style="color:#dc2626;">❌</span> ${texts.unsubscribeQuestion} <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=baja&token=${tokenBaja}" style="color:#dc2626;text-decoration:underline;">${texts.unsubscribeLink}</a>
+          <span style="color:#dc2626;">❌</span> ${texts.unsubscribeQuestion} <a href="${safeBaseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=baja&token=${tokenBaja}" style="color:#dc2626;text-decoration:underline;">${texts.unsubscribeLink}</a>
         </p>
         <p style="margin:0;font-size:13px;color:#6b7280;">
-          <span style="color:#16a34a;">🔄</span> ${texts.resubscribeQuestion} <a href="${baseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=alta&token=${tokenAlta}" style="color:#16a34a;text-decoration:underline;">${texts.resubscribeLink}</a>
+          <span style="color:#16a34a;">🔄</span> ${texts.resubscribeQuestion} <a href="${safeBaseUrl}/api/unsubscribe?email=${encodedEmail}&empresa=${empresaId}&action=alta&token=${tokenAlta}" style="color:#16a34a;text-decoration:underline;">${texts.resubscribeLink}</a>
         </p>
       </div>
     </div>
@@ -262,7 +264,10 @@ export async function POST(request: NextRequest) {
     }
 
     const requestOrigin = new URL(request.url).origin;
-    const baseUrl = empresa.dominio ? `https://${empresa.dominio}` : requestOrigin;
+    // Validate dominio is a safe hostname before using it in email URLs.
+    // A malicious value could inject content into HTML href attributes.
+    const dominioSafe = empresa.dominio && /^[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,}$/.test(empresa.dominio);
+    const baseUrl = dominioSafe ? `https://${empresa.dominio}` : requestOrigin;
 
     let emailsSent = 0;
     let emailError: string | null = null;

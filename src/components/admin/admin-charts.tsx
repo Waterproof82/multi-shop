@@ -491,7 +491,7 @@ function TgtgStatsChart({
   return (
     <div className="bg-card rounded-lg border border-border p-6 space-y-4">
       <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-        <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
         </svg>
         TooGoodToGo
@@ -499,8 +499,8 @@ function TgtgStatsChart({
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900 rounded-lg px-4 py-3 text-center">
-          <p className="text-2xl font-bold text-green-700 dark:text-green-400">{sentCampaigns.length}</p>
+        <div className="bg-primary/10 border border-primary/20 rounded-lg px-4 py-3 text-center">
+          <p className="text-2xl font-bold text-primary">{sentCampaigns.length}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{t("statsTgtgCampaignsSent", language)}</p>
         </div>
         <div className="bg-muted rounded-lg px-4 py-3 text-center">
@@ -512,7 +512,7 @@ function TgtgStatsChart({
           <p className="text-xs text-muted-foreground mt-0.5">{t("statsTgtgReservasTotal", language)}</p>
         </div>
         <div className="bg-muted rounded-lg px-4 py-3 text-center">
-          <p className="text-2xl font-bold text-green-600">{formatPrice(monthStats.revenue, 'EUR', language)}</p>
+          <p className="text-2xl font-bold text-primary">{formatPrice(monthStats.revenue, 'EUR', language)}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{t("statsTgtgRevenueMonth", language)}</p>
         </div>
         <div className="bg-muted rounded-lg px-4 py-3 text-center">

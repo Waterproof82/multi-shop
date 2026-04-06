@@ -5,6 +5,7 @@ import { Suspense, useEffect, useState, useCallback } from "react";
 import { useLanguage, type Language } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { CheckCircle, ShoppingBag, X, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface TgtgItemPublic {
   id: string;
@@ -305,7 +306,7 @@ function TgtgReservaPopupInner() {
             <span className="text-sm text-muted-foreground line-through">
               €{Number(item.precioOriginal).toFixed(2)}
             </span>
-            <span className="text-2xl font-bold text-green-600">
+            <span className="text-2xl font-bold text-primary">
               €{Number(item.precioDescuento).toFixed(2)}
             </span>
             <span className="text-xs text-muted-foreground ml-auto">
@@ -326,24 +327,13 @@ function TgtgReservaPopupInner() {
 
         {/* Actions */}
         <div className="px-5 pb-5 flex gap-3">
-          <button
-            onClick={handleDismiss}
-            className="flex-1 min-h-[44px] rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98]"
-          >
+          <Button variant="outline" className="flex-1" onClick={handleDismiss}>
             {t("tgtgCancelButton", effectiveLang)}
-          </button>
-          <button
-            onClick={handleConfirm}
-            disabled={submitting}
-            className="flex-1 min-h-[44px] rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold flex items-center justify-center gap-2 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none"
-          >
-            {submitting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <CheckCircle className="w-4 h-4" />
-            )}
+          </Button>
+          <Button className="flex-1" onClick={handleConfirm} disabled={submitting}>
+            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
             {t("tgtgConfirmButton", effectiveLang)}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
