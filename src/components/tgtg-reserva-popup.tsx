@@ -117,13 +117,28 @@ function TgtgReservaPopupInner() {
       fetch(`/api/promo/item/${encodeURIComponent(itemId)}?promoId=${encodeURIComponent(promoId)}&token=${encodeURIComponent(token)}`)
         .then(async (res) => {
           if (!res.ok) throw new Error("not_found");
-          const data = await res.json() as { item: TgtgItemPublic; horaRecogidaInicio: string | null; horaRecogidaFin: string | null; tokenUsed: boolean };
+          const data = await res.json() as { item: TgtgItemPublic; horaRecogidaInicio: string | null; horaRecogidaFin: string | null; fechaActivacion: string | null; tokenUsed: boolean };
 
           if (data.tokenUsed) {
             setState({ mode: "token_used" });
             cleanUrl();
             setTimeout(() => setState(null), 7000);
             return;
+          }
+
+          // Check expiry client-side using browser local time (= restaurant's timezone)
+          if (data.fechaActivacion && data.horaRecogidaFin) {
+            const horaFinNorm = data.horaRecogidaFin.length === 5
+              ? `${data.horaRecogidaFin}:00`
+              : data.horaRecogidaFin;
+            // Parsed as LOCAL time by browsers (ES2015+ spec for datetime without timezone)
+            const pickupEnd = new Date(`${data.fechaActivacion}T${horaFinNorm}`);
+            if (new Date() > pickupEnd) {
+              setState({ mode: "expired" });
+              cleanUrl();
+              setTimeout(() => setState(null), 7000);
+              return;
+            }
           }
 
           if (data.item.cuponesDisponibles <= 0) {

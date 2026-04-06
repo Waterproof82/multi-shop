@@ -37,6 +37,7 @@ export async function GET(
 
     const horaRecogidaInicio = promoResult?.success && promoResult.data ? promoResult.data.horaRecogidaInicio : null;
     const horaRecogidaFin = promoResult?.success && promoResult.data ? promoResult.data.horaRecogidaFin : null;
+    const fechaActivacion = promoResult?.success && promoResult.data ? promoResult.data.fechaActivacion : null;
     const tokenUsed = tokenUsedResult?.success ? tokenUsedResult.data : false;
 
     // Return only public-safe fields (no empresaId internal details)
@@ -53,6 +54,7 @@ export async function GET(
       },
       horaRecogidaInicio,
       horaRecogidaFin,
+      fechaActivacion,
       tokenUsed,
     });
   } catch (error) {

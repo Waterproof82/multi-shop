@@ -36,20 +36,26 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Check if pickup window has passed: combine promo creation date + hora_recogida_fin
+    // Check if pickup window has passed
     const promoResult = await tgtgUseCase.getPublicPromo(tgtgPromoId);
     if (!promoResult.success || !promoResult.data) {
       return NextResponse.json({ error: 'not_found' }, { status: 404 });
     }
     const promo = promoResult.data;
-    // Use fechaActivacion (set by admin) as the reference date, fall back to createdAt for legacy rows
-    const promoDate = promo.fechaActivacion || new Date(promo.createdAt).toISOString().split('T')[0];
     // Normalize horaRecogidaFin: DB may return "HH:MM:SS" or "HH:MM"
     const horaFinNorm = promo.horaRecogidaFin.length === 5
       ? `${promo.horaRecogidaFin}:00`
       : promo.horaRecogidaFin;
-    const pickupEndIso = `${promoDate}T${horaFinNorm}`;
-    if (new Date() > new Date(pickupEndIso)) {
+    // Compare date and time components against current UTC.
+    // NOTE: The primary expiry gating is done client-side (browser local time = restaurant timezone).
+    // This server check is defense-in-depth; it uses UTC so may have up to ~2h tolerance
+    // depending on the restaurant's timezone. A proper fix requires storing empresa timezone.
+    const nowUtc = new Date();
+    const nowDateStr = nowUtc.toISOString().split('T')[0]; // YYYY-MM-DD in UTC
+    const nowTimeStr = nowUtc.toISOString().split('T')[1].slice(0, 8); // HH:MM:SS in UTC
+    const isDatePast = nowDateStr > promo.fechaActivacion;
+    const isSameDateTimePast = nowDateStr === promo.fechaActivacion && nowTimeStr > horaFinNorm;
+    if (isDatePast || isSameDateTimePast) {
       return NextResponse.json({ result: 'expired' }, { status: 200 });
     }
 
