@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useRef, useEffect } from "react"
-import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, Check } from "lucide-react"
+import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, Check, Gift } from "lucide-react"
 import { useReducedMotion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -576,7 +576,9 @@ export function CartDrawer() {
                       autoComplete="email"
                     />
                   </div>
-                  <p className="text-xs mt-1 ml-6 text-muted-foreground">{t("promoMessage", language)}</p>
+                  <p className="text-xs mt-1 ml-6 text-primary font-medium flex items-center gap-1">
+                    {t("promoMessage", language)} <Gift className="size-3.5" />
+                  </p>
                 </div>
               </div>
 
@@ -621,7 +623,13 @@ export function CartDrawer() {
                         });
                         const data = await res.json();
                         if (!res.ok) {
-                          setDiscountError(data.error || t("discountCodeInvalid", language));
+                          const errorTranslations: Record<string, string> = {
+                            CODE_NOT_FOUND: t("discountCodeInvalid", language),
+                            CODE_EXPIRED: t("discountCodeExpired", language),
+                            CODE_ALREADY_USED: t("discountCodeUsed", language),
+                            EMAIL_MISMATCH: t("discountCodeEmailMismatch", language),
+                          };
+                          setDiscountError(data.error && data.code ? (errorTranslations[data.code] || t("discountCodeInvalid", language)) : (data.error || t("discountCodeInvalid", language)));
                           setDiscountValid(null);
                         } else {
                           setDiscountValid({ valid: true, porcentaje: data.porcentaje });
