@@ -130,6 +130,7 @@ export class DescuentoUseCase {
 
       const empresa = empresaResult.data;
       const porcentaje = empresa?.descuentoBienvenidaPorcentaje ?? 5;
+      const senderEmail = empresa?.emailNotification || undefined;
 
       const codigo = generateCodigo();
       const fechaExpiracion = new Date();
@@ -147,15 +148,19 @@ export class DescuentoUseCase {
 
       // Send email (best-effort — don't fail the subscription if email fails)
       try {
+        console.log('[Descuento] Sending email to:', email, 'subject:', getEmailSubject(idioma, empresaNombre, porcentaje));
         const { htmlContent, textContent } = buildEmailHtml(empresaNombre, codigo, porcentaje, fechaExpiracion, idioma);
-        await sendEmail({
+        const emailResult = await sendEmail({
           to: email,
           subject: getEmailSubject(idioma, empresaNombre, porcentaje),
           htmlContent,
           textContent,
           senderName: empresaNombre,
+          senderEmail,
         });
+        console.log('[Descuento] Email sent successfully:', emailResult);
       } catch (emailErr) {
+        console.error('[Descuento] Email send failed:', emailErr);
         await logger.logFromCatch(emailErr, 'use-case', 'DescuentoUseCase.subscribe.sendEmail', { details: { empresaId } });
         // Continue — code was saved, email delivery failure is non-fatal
       }
