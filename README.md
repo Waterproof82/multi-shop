@@ -597,7 +597,7 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 | **Logging** | Tabla log_errors + ErrorLogger singleton |
 | **UI/UX** | Audit 8.5/10 — WCAG AA, focus states, reduced-motion, ARIA, mobile-first, 44px touch targets |
 | **i18n** | es/en/fr/it/de en productos + panel admin + componentes públicos |
-| **Welcome Discount** | Popup 30s, código único, email Brevo, validación server-side, aplicación en checkout |
+| **Welcome Discount** | Popup 30s en subdomain pedidos, código único BIENVENIDO-XXXXXX, email con idioma del cliente, porcentaje configurable (1-50%), duración configurable (7/14/30/60/90 días), validación server-side (existencia, usado, expirado, email match), aplicación en checkout, persists en pedido |
 
 ## Documentación
 

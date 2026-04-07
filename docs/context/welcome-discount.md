@@ -18,6 +18,7 @@ El sistema de descuento de bienvenida captura emails de nuevos visitantes despu�
 ```sql
 descuento_bienvenida_activo boolean NOT NULL DEFAULT false
 descuento_bienvenida_porcentaje numeric(5,2) NOT NULL DEFAULT 5.00
+descuento_bienvenida_duracion integer NOT NULL DEFAULT 30  -- días de validez del código
 ```
 
 ### Tabla `codigos_descuento` (nueva)
@@ -27,13 +28,15 @@ empresa_id uuid REFERENCES empresas(id)
 cliente_email text
 codigo text UNIQUE por empresa
 porcentaje_descuento numeric(5,2)
-fecha_expiracion timestamptz (30 días desde creación)
+fecha_expiracion timestamptz (calculado: NOW + empresa.descuento_bienvenida_duracion)
 usado boolean DEFAULT false
 pedido_id uuid REFERENCES pedidos(id)
 created_at timestamptz
 UNIQUE(empresa_id, codigo)
 UNIQUE(empresa_id, cliente_email) -- un código por email por empresa
 ```
+
+> **Nota**: `fecha_expiracion` se calcula en el momento de crear el código usando el valor de `descuento_bienvenida_duracion` configurado en la empresa. Por defecto 30 días si no se especifica.
 
 ### Tabla `pedidos` (extensiones)
 ```sql
@@ -83,7 +86,18 @@ total_sin_descuento numeric(10,2)
 En `/admin/configuracion`:
 - Toggle para activar/desactivar
 - Input numérico para porcentaje (1-50%)
+- Select dropdown para duración del código: 7, 14, 30, 60, 90 días
 - Se guarda en `empresas` table
+
+## Validación de Códigos
+
+Cuando el cliente introduce un código de descuento en el carrito, se validan server-side:
+1. ✅ Código existe en la base de datos
+2. ✅ No está marcado como `usado`
+3. ✅ **No ha expirado** (`fecha_expiracion` > momento actual)
+4. ✅ El email del cliente coincide con el email que solicitó el código
+
+La validación ocurre en `descuentoUseCase.validateCode()` tanto al aplicar el código en el carrito como al crear el pedido.
 
 ## Componentes
 

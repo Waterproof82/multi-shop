@@ -312,7 +312,7 @@ Logo y Favicon
 Favicon dinamico generado desde `logo_url` en `app/layout.tsx`
 Cache con `unstable_cache` TTL 5 min
 Welcome Discount
-Sistema de descuento de bienvenida. Popup aparece a los 30s en subdomain pedidos → captura email → genera código `BIENVENIDO-XXXXXX` → envía email via Brevo → usuario canjea en checkout.
+Sistema de descuento de bienvenida. Popup aparece a los 30s en subdomain pedidos → captura email → genera código `BIENVENIDO-XXXXXX` → envía email via Brevo (usa idioma del cliente) → usuario canjea en checkout (valida: existe, no usado, no expirado, email coincide). Configurable: porcentaje (1-50%), duración (7/14/30/60/90 días).
 Detalle en `docs/context/welcome-discount.md`
 ---
 Componentes clave
