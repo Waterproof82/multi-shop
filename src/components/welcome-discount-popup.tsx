@@ -30,17 +30,13 @@ export function WelcomeDiscountPopup({ empresaId, empresaNombre, porcentaje, idi
     // Check if user has already dismissed the popup for this empresa
     const dismissedKey = `welcome_discount_dismissed_${empresaId}`;
     const alreadyDismissed = localStorage.getItem(dismissedKey);
-    console.log('[WelcomeDiscount] Checking popup conditions:', { empresaId, alreadyDismissed });
     
     if (alreadyDismissed) {
-      console.log('[WelcomeDiscount] Already dismissed, not showing');
       return;
     }
 
-    // Show popup after 30 seconds (use 5 seconds for testing)
-    console.log('[WelcomeDiscount] Setting timer for 30 seconds...');
+    // Show popup after 30 seconds
     const timer = setTimeout(() => {
-      console.log('[WelcomeDiscount] Timer fired, showing popup');
       setIsOpen(true);
     }, 30000); // 30000 = 30s, change to 5000 for 5s testing
 

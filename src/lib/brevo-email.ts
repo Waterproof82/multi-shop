@@ -41,7 +41,6 @@ export async function sendEmail({ to, subject, htmlContent, textContent, senderN
   }
 
   try {
-    console.log('[Brevo] Sending email with payload:', JSON.stringify(payload, null, 2).slice(0, 500));
     const response = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: {
@@ -53,7 +52,6 @@ export async function sendEmail({ to, subject, htmlContent, textContent, senderN
     });
 
     const result = await response.json();
-    console.log('[Brevo] Response status:', response.status, 'result:', JSON.stringify(result).slice(0, 500));
 
     if (!response.ok) {
       await logger.logAndReturnError(
