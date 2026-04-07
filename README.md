@@ -259,6 +259,7 @@ import {
 | **AuthAdminUseCase** | `login`, `verifyToken` |
 | **TgtgUseCase** | `getWithItems`, `getAllRecent`, `create`, `sendCampaignEmails`, `markEmailSent`, `getHistory`, `getReservas`, `adjustCupones`, `claimCupon`, `updateHoras`, `deletePromo`, `isTokenUsed`, `getPublicItem`, `getPublicPromo` |
 | **SuperAdminUseCase** | `getAllEmpresas`, `getEmpresaById`, `updateEmpresa` |
+| **DescuentoUseCase** | `subscribe`, `validateCode`, `markAsUsed` |
 
 ### Repositories — métodos
 
@@ -274,6 +275,7 @@ import {
 | **ICategoryRepository** | `findAllByTenant`, `create`, `update`, `delete` |
 | **ILogErrorRepository** | `log` |
 | **ITgtgRepository** | `findWithItems`, `findAllRecent`, `create`, `sendEmails`, `markEmailSent`, `findHistory`, `findReservas`, `adjustCupones`, `claimCupon`, `updateHoras`, `delete`, `isTokenUsed`, `findPublicItem`, `findPublicPromo` |
+| **ICodigoDescuentoRepository** | `create`, `findByCodigo`, `findByEmail`, `markAsUsed` |
 
 ---
 
@@ -428,13 +430,14 @@ const main = parseMainDomain(domain); // elimina subdominio pedidos
 
 | Tabla | PK | FK | Notas |
 |-------|----|----|-------|
-| `empresas` | id (uuid) | — | dominio, subdomain_pedidos, colores, fb, instagram, url_mapa, telefono_whatsapp |
+| `empresas` | id (uuid) | — | dominio, subdomain_pedidos, colores, fb, instagram, url_mapa, telefono_whatsapp, **descuento_bienvenida_activo/porcentaje** |
 | `perfiles_admin` | id (uuid) | empresa_id → empresas (nullable) | → auth.users, `rol` = 'admin' o 'superadmin' |
 | `categorias` | id (uuid) | empresa_id → empresas | categoria_padre_id, categoriaComplementoDe |
 | `productos` | id (uuid) | empresa_id, categoria_id | i18n: titulo_es/en/fr/it/de |
 | `clientes` | id (uuid) | empresa_id | telefono único por empresa |
-| `pedidos` | id (uuid) | empresa_id, cliente_id | numero_pedido (atómico por tenant), detalle_pedido: JSON (PedidoItem[]) |
+| `pedidos` | id (uuid) | empresa_id, cliente_id | numero_pedido (atómico por tenant), detalle_pedido: JSON (PedidoItem[]), **codigo_descuento_id, descuento_porcentaje, total_sin_descuento** |
 | `promociones` | id (uuid) | empresa_id | imagen_url, numero_envios |
+| `codigos_descuento` | id (uuid) | empresa_id | codigo unik por empresa + email, usado boolean, pedido_id FK |
 | `tgtg_promociones` | id (uuid) | empresa_id | fechaActivacion, horaRecogidaInicio/Fin, emailEnviado, numeroEnvios |
 | `tgtg_items` | id (uuid) | tgtg_promo_id, empresa_id | titulo, precioOriginal, precioDescuento, cuponesTotal, cuponesDisponibles |
 | `tgtg_reservas` | id (uuid) | tgtg_item_id, empresa_id | token único, estado (pendiente/confirmado/cancelado), fechaReserva |
@@ -590,10 +593,11 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 | **Seguridad** | Auditoría completa — JWT revocation (fail-closed), RBAC `requireRole`, env validation startup, rate limiting (fail-closed login), CSP nonces + report-uri, CSRF timing-safe, price tampering + product rejection, anti-enumeración, mínimo privilegio, cart token audience, JSON-LD sanitización |
 | **Tipos TypeScript** | Sin `any` en core ni API routes |
 | **Error Handling** | 100% — Result<T, E> en todos los módulos |
-| **API Error Codes** | Códigos centralizados en `core/domain/constants/api-errors.ts` |
+| **API Error Codes** | Códigos centralizados en `core/domain/constants/api-errors.ts` + **DISCOUNT_ERRORS** |
 | **Logging** | Tabla log_errors + ErrorLogger singleton |
 | **UI/UX** | Audit 8.5/10 — WCAG AA, focus states, reduced-motion, ARIA, mobile-first, 44px touch targets |
 | **i18n** | es/en/fr/it/de en productos + panel admin + componentes públicos |
+| **Welcome Discount** | Popup 30s, código único, email Brevo, validación server-side, aplicación en checkout |
 
 ## Documentación
 
@@ -602,6 +606,7 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 - [`docs/context/cart_flow.md`](docs/context/cart_flow.md) — Flujo del carrito
 - [`docs/context/context.md`](docs/context/context.md) — Contexto general del proyecto
 - [`docs/context/toogoodtogo.md`](docs/context/toogoodtogo.md) — Flujo completo TGTG (campañas, reservas, emails, reglas de negocio)
+- [`docs/context/welcome-discount.md`](docs/context/welcome-discount.md) — Sistema de descuento de bienvenida
 
 ---
 

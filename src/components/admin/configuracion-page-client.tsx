@@ -1,10 +1,11 @@
 'use client';
 
-import { Settings, Palette, Building2, ToggleLeft } from 'lucide-react';
+import { Settings, Palette, Building2, ToggleLeft, Gift } from 'lucide-react';
 import { ColoresForm } from '@/components/admin/colores-form';
 import { EmpresaDatosForm } from '@/components/admin/empresa-datos-form';
 import { EmpresaAparienciaForm } from '@/components/admin/empresa-apariencia-form';
 import { ModulosForm } from '@/components/admin/modulos-form';
+import { DescuentoBienvenidaForm } from '@/components/admin/descuento-bienvenida-form';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import type { EmpresaColores } from '@/core/domain/entities/types';
@@ -38,6 +39,8 @@ interface ConfiguracionPageClientProps {
   mostrarPromociones: boolean;
   mostrarTgtg: boolean;
   isSuperAdmin: boolean;
+  descuentoBienvenidaActivo: boolean;
+  descuentoBienvenidaPorcentaje: number;
 }
 
 export function ConfiguracionPageClient({
@@ -50,6 +53,8 @@ export function ConfiguracionPageClient({
   mostrarPromociones,
   mostrarTgtg,
   isSuperAdmin,
+  descuentoBienvenidaActivo,
+  descuentoBienvenidaPorcentaje,
 }: Readonly<ConfiguracionPageClientProps>) {
   const { language } = useLanguage();
 
@@ -115,6 +120,22 @@ export function ConfiguracionPageClient({
           />
         </div>
       )}
+
+      {/* Descuento de bienvenida */}
+      <div className="bg-card rounded-lg shadow-elegant border border-border p-6 mb-6">
+        <h2 className="text-lg font-semibold mb-6 text-foreground flex items-center gap-2">
+          <Gift className="w-5 h-5" />
+          {t('adminWelcomeDiscountTitle', language)}
+        </h2>
+        <p className="text-sm text-muted-foreground mb-6">
+          {t('adminWelcomeDiscountHelp', language)}
+        </p>
+        <DescuentoBienvenidaForm
+          empresaId={empresaId}
+          descuentoBienvenidaActivo={descuentoBienvenidaActivo}
+          descuentoBienvenidaPorcentaje={descuentoBienvenidaPorcentaje}
+        />
+      </div>
 
       {/* Colores */}
       <div className="bg-card rounded-lg shadow-elegant border border-border p-6">

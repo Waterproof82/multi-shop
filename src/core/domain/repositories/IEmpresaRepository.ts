@@ -16,6 +16,8 @@ export interface UpdateEmpresaData {
   descripcion_de?: string | null;
   mostrar_promociones?: boolean;
   mostrar_tgtg?: boolean;
+  descuento_bienvenida_activo?: boolean;
+  descuento_bienvenida_porcentaje?: number;
 }
 
 export interface IEmpresaRepository {

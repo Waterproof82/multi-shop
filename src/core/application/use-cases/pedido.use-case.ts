@@ -1,6 +1,7 @@
 import { IPedidoRepository } from "@/core/domain/repositories/IPedidoRepository";
 import { IClienteRepository } from "@/core/domain/repositories/IClienteRepository";
 import { IProductRepository } from "@/core/domain/repositories/IProductRepository";
+import { ICodigoDescuentoRepository } from "@/core/domain/repositories/ICodigoDescuentoRepository";
 import { Pedido, Result } from "@/core/domain/entities/types";
 import { logger } from "@/core/infrastructure/logging/logger";
 
@@ -16,6 +17,7 @@ export interface CreatePedidoDTO {
   telefono: string;
   email?: string;
   idioma?: string;
+  codigoDescuento?: string;
 }
 
 export interface PedidoStats {
@@ -39,7 +41,8 @@ export class PedidoUseCase {
   constructor(
     private readonly pedidoRepo: IPedidoRepository,
     private readonly clienteRepo: IClienteRepository,
-    private readonly productRepo: IProductRepository
+    private readonly productRepo: IProductRepository,
+    private readonly descuentoRepo: ICodigoDescuentoRepository
   ) {}
 
   async getAll(empresaId: string): Promise<Result<Pedido[]>> {
@@ -175,9 +178,42 @@ export class PedidoUseCase {
         return sum + (unitPrice + complementsTotal) * ci.quantity;
       }, 0);
 
-      const pedidoResult = await this.pedidoRepo.create(empresaId, clienteId, data.items, serverTotal);
+      // Apply discount if a code was provided
+      let finalTotal = serverTotal;
+      let discountData: { codigoDescuentoId: string; descuentoPorcentaje: number; totalSinDescuento: number } | undefined;
+
+      if (data.codigoDescuento && data.email) {
+        const codigoResult = await this.descuentoRepo.findByCodigo(data.codigoDescuento.toUpperCase(), empresaId);
+        if (!codigoResult.success) return { success: false, error: codigoResult.error };
+
+        const codigo = codigoResult.data;
+        if (codigo) {
+          if (codigo.usado) {
+            return { success: false, error: { code: 'CODE_ALREADY_USED', message: 'Discount code has already been used', module: 'use-case', method: 'PedidoUseCase.create' } };
+          }
+          if (new Date(codigo.fechaExpiracion) < new Date()) {
+            return { success: false, error: { code: 'CODE_EXPIRED', message: 'Discount code has expired', module: 'use-case', method: 'PedidoUseCase.create' } };
+          }
+          if (codigo.clienteEmail.toLowerCase() !== data.email.toLowerCase()) {
+            return { success: false, error: { code: 'EMAIL_MISMATCH', message: 'Email does not match discount code', module: 'use-case', method: 'PedidoUseCase.create' } };
+          }
+          discountData = {
+            codigoDescuentoId: codigo.id,
+            descuentoPorcentaje: codigo.porcentajeDescuento,
+            totalSinDescuento: serverTotal,
+          };
+          finalTotal = Math.round(serverTotal * (1 - codigo.porcentajeDescuento / 100) * 100) / 100;
+        }
+      }
+
+      const pedidoResult = await this.pedidoRepo.create(empresaId, clienteId, data.items, finalTotal, discountData);
       if (!pedidoResult.success) {
         return { success: false, error: pedidoResult.error };
+      }
+
+      // Mark discount code as used after pedido is created
+      if (discountData) {
+        await this.descuentoRepo.markAsUsed(discountData.codigoDescuentoId, pedidoResult.data.id);
       }
 
       return { success: true, data: pedidoResult.data };

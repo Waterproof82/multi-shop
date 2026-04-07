@@ -99,6 +99,15 @@ SERVER_ERRORS.CONFIG_ERROR   → { code: 'SRV_002', message: 'Server configurati
 SERVER_ERRORS.STORAGE_ERROR  → { code: 'SRV_003', message: 'Storage configuration error' }
 SERVER_ERRORS.DATABASE_ERROR → { code: 'SRV_004', message: 'Database error' }
 SERVER_ERRORS.UPLOAD_ERROR   → { code: 'SRV_005', message: 'Error processing upload' }
+SERVER_ERRORS.FORM_DATA_ERROR → { code: 'SRV_006', message: 'Error reading form data' }
+
+// Discount errors
+DISCOUNT_ERRORS.ALREADY_SUBSCRIBED → { code: 'DSC_001', message: 'Email already has a discount code' }
+DISCOUNT_ERRORS.CODE_NOT_FOUND → { code: 'DSC_002', message: 'Discount code not found' }
+DISCOUNT_ERRORS.CODE_EXPIRED → { code: 'DSC_003', message: 'Discount code has expired' }
+DISCOUNT_ERRORS.CODE_ALREADY_USED → { code: 'DSC_004', message: 'Discount code has already been used' }
+DISCOUNT_ERRORS.EMAIL_MISMATCH → { code: 'DSC_005', message: 'Email does not match discount code' }
+DISCOUNT_ERRORS.FEATURE_DISABLED → { code: 'DSC_006', message: 'Welcome discount not enabled' }
 
 // Usage:
 import { createErrorResponse } from '@/core/domain/constants/api-errors';
@@ -111,6 +120,7 @@ Imports principales
 import {
   productUseCase, categoryUseCase, clienteUseCase, empresaUseCase,
   pedidoUseCase, promocionUseCase, authAdminUseCase, tgtgUseCase, superAdminUseCase,
+  descuentoUseCase,
   empresaRepository,        // service role (admin)
   empresaPublicRepository,  // anon key (paginas publicas)
 } from '@/core/infrastructure/database';
@@ -160,6 +170,7 @@ AuthAdminUseCase	`login`, `verifyToken`
 TgtgUseCase	`getWithItems`, `getAllRecent`, `create`, `sendCampaignEmails`, `markEmailSent`, `getHistory`, `getReservas`, `adjustCupones`, `claimCupon`, `updateHoras`, `deletePromo`, `isTokenUsed`, `getPublicItem`, `getPublicPromo`
 GetMenuUseCase	`execute` (menu publico con productos y categorias)
 SuperAdminUseCase	`getAllEmpresas`, `getGlobalStats`, `getEmpresaStats`
+DescuentoUseCase	`subscribe`, `validateCode`, `markAsUsed`
 ---
 Logger
 ```typescript
@@ -300,6 +311,9 @@ Logo y Favicon
 `logo_url` en tabla `empresas`, gestionado desde `/admin/configuracion`
 Favicon dinamico generado desde `logo_url` en `app/layout.tsx`
 Cache con `unstable_cache` TTL 5 min
+Welcome Discount
+Sistema de descuento de bienvenida. Popup aparece a los 30s en subdomain pedidos → captura email → genera código `BIENVENIDO-XXXXXX` → envía email via Brevo → usuario canjea en checkout.
+Detalle en `docs/context/welcome-discount.md`
 ---
 Componentes clave
 Componente	Ubicacion	Funcion
@@ -311,6 +325,8 @@ PromoNotification	`components/`	Banner unsub/sub (query params)
 AdminSidebar	`app/admin/(protected)/`	Navegacion lateral admin
 EmpresaDatosForm	`components/admin/`	Formulario datos empresa
 ColoresForm	`components/admin/`	Formulario colores con preview
+WelcomeDiscountPopup	`components/welcome-discount-popup.tsx`	Popup de suscripcion (30s delay)
+DescuentoBienvenidaForm	`components/admin/descuento-bienvenida-form.tsx`	Admin config
 ---
 Antipatrones — NO hacer
 `createClient()` fuera de `supabase-client.ts`

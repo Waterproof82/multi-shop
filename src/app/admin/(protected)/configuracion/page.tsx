@@ -69,6 +69,8 @@ export default async function ConfiguracionPage() {
       mostrarPromociones={empresaData?.mostrarPromociones ?? true}
       mostrarTgtg={empresaData?.mostrarTgtg ?? true}
       isSuperAdmin={admin.rol === SUPERADMIN_ROLE}
+      descuentoBienvenidaActivo={empresaData?.descuentoBienvenidaActivo ?? false}
+      descuentoBienvenidaPorcentaje={empresaData?.descuentoBienvenidaPorcentaje ?? 5}
     />
   );
 }

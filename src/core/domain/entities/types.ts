@@ -78,6 +78,8 @@ export interface Empresa {
   urlMapa?: string | null;
   direccion?: string | null;
   telefonoWhatsapp?: string | null;
+  descuentoBienvenidaActivo: boolean;
+  descuentoBienvenidaPorcentaje: number;
 }
 
 interface TranslatableText {
@@ -110,6 +112,8 @@ export interface EmpresaPublic {
   direccion: string | null;
   telefono: string | null;
   emailNotification: string | null;
+  descuentoBienvenidaActivo: boolean;
+  descuentoBienvenidaPorcentaje: number;
 }
 
 export interface Cliente {
@@ -213,6 +217,18 @@ export interface TgtgReserva {
   email: string;
   nombre: string | null;
   token: string;
+  createdAt: string;
+}
+
+export interface CodigoDescuento {
+  id: string;
+  empresaId: string;
+  clienteEmail: string;
+  codigo: string;
+  porcentajeDescuento: number;
+  fechaExpiracion: string;
+  usado: boolean;
+  pedidoId: string | null;
   createdAt: string;
 }
 

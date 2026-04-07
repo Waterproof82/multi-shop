@@ -195,6 +195,8 @@ export class SupabaseAdminRepository implements IAdminRepository {
       urlMapa: (row.url_mapa as string | null) ?? null,
       direccion: (row.direccion as string | null) ?? null,
       telefonoWhatsapp: (row.telefono_whatsapp as string | null) ?? null,
+      descuentoBienvenidaActivo: (row.descuento_bienvenida_activo as boolean) ?? false,
+      descuentoBienvenidaPorcentaje: Number(row.descuento_bienvenida_porcentaje ?? 5),
     };
   }
 }

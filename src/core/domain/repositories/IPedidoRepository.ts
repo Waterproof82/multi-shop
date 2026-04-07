@@ -4,7 +4,13 @@ export interface IPedidoRepository {
   findAllByTenant(empresaId: string): Promise<Result<Pedido[]>>;
   updateStatus(id: string, empresaId: string, estado: string): Promise<Result<void>>;
   delete(id: string, empresaId: string): Promise<Result<void>>;
-  create(empresaId: string, clienteId: string | null, items: CartItem[], total: number): Promise<Result<{ id: string; numero_pedido: number; total: number }>>;
+  create(
+    empresaId: string,
+    clienteId: string | null,
+    items: CartItem[],
+    total: number,
+    discountData?: { codigoDescuentoId: string; descuentoPorcentaje: number; totalSinDescuento: number }
+  ): Promise<Result<{ id: string; numero_pedido: number; total: number }>>;
   getStats(empresaId: string, mes: number, año: number): Promise<Result<{
     pedidosHoy: number;
     pedidosMes: number;

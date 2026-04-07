@@ -203,6 +203,12 @@ function buildCsp(nonce: string, path: string): string {
   // set in next.config.mjs for /admin/* routes.
   const frameAncestors = path.startsWith('/admin') ? "frame-ancestors 'none'" : "frame-ancestors 'self'";
 
+  // In dev: allow localhost for API calls and hot module reloading
+  const devConnectSrc = isDev ? " http://localhost:* https://localhost:*" : "";
+
+  // Allow R2 origin in connect-src for fetching images via fetch()
+  const connectR2 = r2Origin ? ` ${r2Origin}` : "";
+
   return [
     "default-src 'self'",
     scriptSrc,
@@ -210,7 +216,7 @@ function buildCsp(nonce: string, path: string): string {
     `img-src ${imgSources}`,
     `media-src ${mediaSources}`,
     "font-src 'self'",
-    "connect-src 'self' https://*.supabase.co https://api.brevo.com https://*.upstash.io",
+    `connect-src 'self' https://*.supabase.co https://api.brevo.com https://*.upstash.io${connectR2}${devConnectSrc}`,
     "frame-src 'self' https://www.google.com https://maps.google.com",
     "object-src 'none'",
     "base-uri 'self'",
