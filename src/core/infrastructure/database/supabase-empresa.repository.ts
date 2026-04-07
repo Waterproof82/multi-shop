@@ -11,7 +11,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
     try {
       const { data: empresa } = await this.supabase
         .from('empresas')
-        .select('email_notification, telefono_whatsapp, nombre, logo_url, fb, instagram, url_mapa, direccion, dominio, slug, url_image, descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de, mostrar_carrito, mostrar_promociones, mostrar_tgtg, moneda, subdomain_pedidos, color_primary, color_primary_foreground, color_secondary, color_secondary_foreground, color_accent, color_accent_foreground, color_background, color_foreground, descuento_bienvenida_activo, descuento_bienvenida_porcentaje')
+        .select('email_notification, telefono_whatsapp, nombre, logo_url, fb, instagram, url_mapa, direccion, dominio, slug, url_image, descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de, mostrar_carrito, mostrar_promociones, mostrar_tgtg, moneda, subdomain_pedidos, color_primary, color_primary_foreground, color_secondary, color_secondary_foreground, color_accent, color_accent_foreground, color_background, color_foreground, descuento_bienvenida_activo, descuento_bienvenida_porcentaje, descuento_bienvenida_duracion')
         .eq('id', empresaId)
         .single();
 
@@ -50,6 +50,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
           urlImage: empresa.url_image ?? null,
           descuentoBienvenidaActivo: empresa.descuento_bienvenida_activo ?? false,
           descuentoBienvenidaPorcentaje: empresa.descuento_bienvenida_porcentaje ?? 5,
+          descuentoBienvenidaDuracion: empresa.descuento_bienvenida_duracion ?? 30,
           descripcion: {
             es: empresa.descripcion_es as string | null,
             en: empresa.descripcion_en as string | null,
@@ -86,6 +87,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
       if (data.mostrar_tgtg !== undefined) updatePayload.mostrar_tgtg = data.mostrar_tgtg;
       if (data.descuento_bienvenida_activo !== undefined) updatePayload.descuento_bienvenida_activo = data.descuento_bienvenida_activo;
       if (data.descuento_bienvenida_porcentaje !== undefined) updatePayload.descuento_bienvenida_porcentaje = data.descuento_bienvenida_porcentaje;
+      if (data.descuento_bienvenida_duracion !== undefined) updatePayload.descuento_bienvenida_duracion = data.descuento_bienvenida_duracion;
 
       const { error } = await this.supabase
         .from('empresas')
@@ -155,7 +157,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
     footer2_es, footer2_en, footer2_fr, footer2_it, footer2_de,
     fb, instagram, url_mapa,
     direccion, telefono_whatsapp, email_notification,
-    descuento_bienvenida_activo, descuento_bienvenida_porcentaje
+    descuento_bienvenida_activo, descuento_bienvenida_porcentaje, descuento_bienvenida_duracion
   `;
 
   private static mapTranslations(data: Record<string, unknown>, prefix: string): { es?: string | null; en?: string | null; fr?: string | null; it?: string | null; de?: string | null } | null {
@@ -205,6 +207,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
       emailNotification: (data.email_notification as string | null) ?? null,
       descuentoBienvenidaActivo: (data.descuento_bienvenida_activo as boolean) ?? false,
       descuentoBienvenidaPorcentaje: Number(data.descuento_bienvenida_porcentaje ?? 5),
+      descuentoBienvenidaDuracion: Number(data.descuento_bienvenida_duracion ?? 30),
     };
   }
 

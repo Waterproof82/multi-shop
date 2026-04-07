@@ -4,7 +4,6 @@ import { CodigoDescuento, Result } from '@/core/domain/entities/types';
 import { logger } from '@/core/infrastructure/logging/logger';
 import { sendEmail } from '@/lib/brevo-email';
 import { escapeHtml } from '@/lib/html-utils';
-import { DESCUENTO_EXPIRACION_DIAS } from '@/core/domain/constants/empresa-defaults';
 
 function generateCodigo(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -110,7 +109,8 @@ export class DescuentoUseCase {
     empresaId: string,
     email: string,
     empresaNombre: string,
-    idioma: string
+    idioma: string,
+    duracionDias: number = 30
   ): Promise<Result<{ codigo: string }>> {
     try {
       // Check for existing code for this email
@@ -134,7 +134,7 @@ export class DescuentoUseCase {
 
       const codigo = generateCodigo();
       const fechaExpiracion = new Date();
-      fechaExpiracion.setDate(fechaExpiracion.getDate() + DESCUENTO_EXPIRACION_DIAS);
+      fechaExpiracion.setDate(fechaExpiracion.getDate() + duracionDias);
 
       const createResult = await this.descuentoRepo.create({
         empresaId,

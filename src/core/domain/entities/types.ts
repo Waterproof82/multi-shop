@@ -80,6 +80,7 @@ export interface Empresa {
   telefonoWhatsapp?: string | null;
   descuentoBienvenidaActivo: boolean;
   descuentoBienvenidaPorcentaje: number;
+  descuentoBienvenidaDuracion?: number | null;
 }
 
 interface TranslatableText {
@@ -114,6 +115,7 @@ export interface EmpresaPublic {
   emailNotification: string | null;
   descuentoBienvenidaActivo: boolean;
   descuentoBienvenidaPorcentaje: number;
+  descuentoBienvenidaDuracion?: number | null;
 }
 
 export interface Cliente {

@@ -23,6 +23,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Descuento de bienvenida no activo' }, { status: 403 });
   }
 
+  // Pass duration from empresa config (default 30 days)
+  const duracion = empresa.descuentoBienvenidaDuracion || 30;
+
   let body: unknown;
   try {
     body = await request.json();
@@ -40,7 +43,7 @@ export async function POST(request: Request) {
   const validIdiomas = ['es', 'en', 'fr', 'it', 'de'];
   const resolvedIdioma = validIdiomas.includes(idioma) ? idioma : 'es';
 
-  const result = await descuentoUseCase.subscribe(empresa.id, email, empresa.nombre, resolvedIdioma);
+  const result = await descuentoUseCase.subscribe(empresa.id, email, empresa.nombre, resolvedIdioma, duracion);
 
   if (!result.success) {
     if (result.error.code === 'ALREADY_SUBSCRIBED') {

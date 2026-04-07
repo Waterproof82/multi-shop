@@ -41,6 +41,7 @@ interface ConfiguracionPageClientProps {
   isSuperAdmin: boolean;
   descuentoBienvenidaActivo: boolean;
   descuentoBienvenidaPorcentaje: number;
+  descuentoBienvenidaDuracion?: number | null;
 }
 
 export function ConfiguracionPageClient({
@@ -55,6 +56,7 @@ export function ConfiguracionPageClient({
   isSuperAdmin,
   descuentoBienvenidaActivo,
   descuentoBienvenidaPorcentaje,
+  descuentoBienvenidaDuracion,
 }: Readonly<ConfiguracionPageClientProps>) {
   const { language } = useLanguage();
 
@@ -134,6 +136,7 @@ export function ConfiguracionPageClient({
           empresaId={empresaId}
           descuentoBienvenidaActivo={descuentoBienvenidaActivo}
           descuentoBienvenidaPorcentaje={descuentoBienvenidaPorcentaje}
+          descuentoBienvenidaDuracion={descuentoBienvenidaDuracion}
         />
       </div>
 

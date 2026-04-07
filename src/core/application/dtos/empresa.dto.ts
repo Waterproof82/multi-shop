@@ -22,6 +22,7 @@ export const updateEmpresaSchema = z.object({
   mostrar_tgtg: z.boolean().optional(),
   descuento_bienvenida_activo: z.boolean().optional(),
   descuento_bienvenida_porcentaje: z.number().min(1).max(50).optional(),
+  descuento_bienvenida_duracion: z.number().min(1).max(365).optional(),
 });
 
 export type UpdateEmpresaDTO = z.infer<typeof updateEmpresaSchema>;

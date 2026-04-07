@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Gift } from 'lucide-react';
+import { Gift, Clock } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
@@ -13,17 +13,28 @@ interface DescuentoBienvenidaFormProps {
   readonly empresaId: string;
   readonly descuentoBienvenidaActivo: boolean;
   readonly descuentoBienvenidaPorcentaje: number;
+  readonly descuentoBienvenidaDuracion?: number | null;
 }
+
+const DURACION_OPTIONS: { value: number; labelKey: 'adminWelcomeDiscountDuracion7' | 'adminWelcomeDiscountDuracion14' | 'adminWelcomeDiscountDuracion30' | 'adminWelcomeDiscountDuracion60' | 'adminWelcomeDiscountDuracion90' }[] = [
+  { value: 7, labelKey: 'adminWelcomeDiscountDuracion7' },
+  { value: 14, labelKey: 'adminWelcomeDiscountDuracion14' },
+  { value: 30, labelKey: 'adminWelcomeDiscountDuracion30' },
+  { value: 60, labelKey: 'adminWelcomeDiscountDuracion60' },
+  { value: 90, labelKey: 'adminWelcomeDiscountDuracion90' },
+];
 
 export function DescuentoBienvenidaForm({
   empresaId: _empresaId,
   descuentoBienvenidaActivo: initialActivo,
   descuentoBienvenidaPorcentaje: initialPorcentaje,
+  descuentoBienvenidaDuracion: initialDuracion,
 }: DescuentoBienvenidaFormProps) {
   const { language } = useLanguage();
   const { overrideEmpresaId } = useAdmin();
   const [activo, setActivo] = useState(initialActivo);
   const [porcentaje, setPorcentaje] = useState(String(initialPorcentaje));
+  const [duracion, setDuracion] = useState(initialDuracion || 30);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -35,7 +46,7 @@ export function DescuentoBienvenidaForm({
 
   const displayActivo = mounted ? activo : false;
 
-  const save = async (newActivo: boolean, newPorcentaje: string) => {
+  const save = async (newActivo: boolean, newPorcentaje: string, newDuracion: number) => {
     const numPorcentaje = parseFloat(newPorcentaje);
     if (isNaN(numPorcentaje) || numPorcentaje < 1 || numPorcentaje > 50) {
       setError(t('adminWelcomeDiscountPercentageError', language));
@@ -56,6 +67,7 @@ export function DescuentoBienvenidaForm({
       body: JSON.stringify({
         descuento_bienvenida_activo: newActivo,
         descuento_bienvenida_porcentaje: numPorcentaje,
+        descuento_bienvenida_duracion: newDuracion,
       }),
     });
 
@@ -68,18 +80,24 @@ export function DescuentoBienvenidaForm({
 
     setActivo(newActivo);
     setPorcentaje(String(numPorcentaje));
+    setDuracion(newDuracion);
     setSuccess(true);
     setTimeout(() => setSuccess(false), 3000);
   };
 
   const handleToggle = (value: boolean) => {
     if (saving) return;
-    save(value, porcentaje);
+    save(value, porcentaje, duracion);
   };
 
   const handlePorcentajeBlur = () => {
     if (saving) return;
-    save(activo, porcentaje);
+    save(activo, porcentaje, duracion);
+  };
+
+  const handleDuracionChange = (value: number) => {
+    if (saving) return;
+    save(activo, porcentaje, value);
   };
 
   return (
@@ -105,24 +123,49 @@ export function DescuentoBienvenidaForm({
       </label>
 
       {displayActivo && (
-        <div className="pl-2">
-          <label className="block text-sm font-medium text-foreground mb-1">
-            {t('adminWelcomeDiscountPercentage', language)}
-          </label>
-          <div className="flex items-center gap-2 max-w-[180px]">
-            <Input
-              type="number"
-              min={1}
-              max={50}
-              step={0.5}
-              value={porcentaje}
-              onChange={(e) => setPorcentaje(e.target.value)}
-              onBlur={handlePorcentajeBlur}
+        <div className="pl-2 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1">
+              {t('adminWelcomeDiscountPercentage', language)}
+            </label>
+            <div className="flex items-center gap-2 max-w-[180px]">
+              <Input
+                type="number"
+                min={1}
+                max={50}
+                step={0.5}
+                value={porcentaje}
+                onChange={(e) => setPorcentaje(e.target.value)}
+                onBlur={handlePorcentajeBlur}
+                disabled={saving}
+                className="h-9 text-sm"
+                aria-label={t('adminWelcomeDiscountPercentage', language)}
+              />
+              <span className="text-sm text-muted-foreground">%</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {t('adminWelcomeDiscountPercentageHelp', language)}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1 flex items-center gap-1">
+              <Clock className="w-4 h-4" />
+              {t('adminWelcomeDiscountDuracion', language)}
+            </label>
+            <select
+              value={duracion}
+              onChange={(e) => handleDuracionChange(Number(e.target.value))}
               disabled={saving}
-              className="h-9 text-sm"
-              aria-label={t('adminWelcomeDiscountPercentage', language)}
-            />
-            <span className="text-sm text-muted-foreground">%</span>
+              className="h-9 text-sm max-w-[200px] rounded-md border border-input bg-background px-3 py-1"
+              aria-label={t('adminWelcomeDiscountDuracion', language)}
+            >
+              {DURACION_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {t(opt.labelKey, language)}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       )}

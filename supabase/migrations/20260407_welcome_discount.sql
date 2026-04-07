@@ -2,6 +2,7 @@
 -- Empresa config columns
 ALTER TABLE empresas ADD COLUMN descuento_bienvenida_activo boolean NOT NULL DEFAULT false;
 ALTER TABLE empresas ADD COLUMN descuento_bienvenida_porcentaje numeric(5,2) NOT NULL DEFAULT 5.00;
+ALTER TABLE empresas ADD COLUMN descuento_bienvenida_duracion integer NOT NULL DEFAULT 30;
 
 -- Discount codes table
 CREATE TABLE codigos_descuento (

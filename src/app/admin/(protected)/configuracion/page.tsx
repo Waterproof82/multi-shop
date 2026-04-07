@@ -71,6 +71,7 @@ export default async function ConfiguracionPage() {
       isSuperAdmin={admin.rol === SUPERADMIN_ROLE}
       descuentoBienvenidaActivo={empresaData?.descuentoBienvenidaActivo ?? false}
       descuentoBienvenidaPorcentaje={empresaData?.descuentoBienvenidaPorcentaje ?? 5}
+      descuentoBienvenidaDuracion={empresaData?.descuentoBienvenidaDuracion ?? 30}
     />
   );
 }

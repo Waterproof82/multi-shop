@@ -197,6 +197,7 @@ export class SupabaseAdminRepository implements IAdminRepository {
       telefonoWhatsapp: (row.telefono_whatsapp as string | null) ?? null,
       descuentoBienvenidaActivo: (row.descuento_bienvenida_activo as boolean) ?? false,
       descuentoBienvenidaPorcentaje: Number(row.descuento_bienvenida_porcentaje ?? 5),
+      descuentoBienvenidaDuracion: Number(row.descuento_bienvenida_duracion ?? 30),
     };
   }
 }

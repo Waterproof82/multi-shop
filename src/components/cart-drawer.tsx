@@ -275,6 +275,9 @@ export function CartDrawer() {
         setNombre('');
         setTelefono('');
         setEmail('');
+        setDiscountCode('');
+        setDiscountValid(null);
+        setDiscountError(null);
         setCompanyPhone(data.companyPhone || null);
         
         if (data.whatsappLink) {
