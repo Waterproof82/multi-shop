@@ -23,6 +23,10 @@ const createPedidoSchema = z.object({
   telefono: z.string().min(9).max(20).regex(/^\+?[0-9\s\-()+]+$/, 'Formato de teléfono no válido'),
   email: z.string().email().optional().or(z.literal('')),
   idioma: z.enum(['es', 'en', 'fr', 'it', 'de']).optional(),
+  codigoDescuento: z.string().max(30).optional(),
+}).refine(data => !data.codigoDescuento || data.email, {
+  message: 'Email is required when using a discount code',
+  path: ['email'],
 });
 
 type OrderItem = z.infer<typeof createPedidoSchema>['items'][number];
@@ -79,7 +83,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
     }
 
-    const { items, nombre, telefono, email, idioma } = parsed.data;
+    const { items, nombre, telefono, email, idioma, codigoDescuento } = parsed.data;
 
     const pedidoResult = await pedidoUseCase.create(empresa.id, {
       items,
@@ -87,11 +91,22 @@ export async function POST(request: Request) {
       telefono,
       email: email || undefined,
       idioma,
+      codigoDescuento: codigoDescuento || undefined,
     });
 
     if (!pedidoResult.success) {
-      if (pedidoResult.error.code === 'PRODUCT_NOT_FOUND') {
+      const errorCode = pedidoResult.error.code;
+      if (errorCode === 'PRODUCT_NOT_FOUND') {
         return NextResponse.json({ error: 'Producto no disponible' }, { status: 400 });
+      }
+      if (errorCode === 'CODE_EXPIRED') {
+        return NextResponse.json({ error: 'El código de descuento ha expirado' }, { status: 400 });
+      }
+      if (errorCode === 'CODE_ALREADY_USED') {
+        return NextResponse.json({ error: 'El código de descuento ya fue utilizado' }, { status: 400 });
+      }
+      if (errorCode === 'EMAIL_MISMATCH') {
+        return NextResponse.json({ error: 'El email no coincide con el código de descuento' }, { status: 400 });
       }
       return NextResponse.json({ error: 'Error al crear el pedido' }, { status: 500 });
     }

@@ -12,3 +12,5 @@ export const DEFAULT_EMPRESA_COLORES: EmpresaColores = {
 };
 
 export const DEFAULT_PEDIDOS_SUBDOMAIN = 'pedidos';
+export const DEFAULT_DESCUENTO_BIENVENIDA_PORCENTAJE = 5;
+export const DESCUENTO_EXPIRACION_DIAS = 30;

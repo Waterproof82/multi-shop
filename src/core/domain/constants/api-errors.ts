@@ -31,6 +31,16 @@ export const SERVER_ERRORS = {
   FORM_DATA_ERROR: { code: 'SRV_006', message: 'Error reading form data' },
 } as const;
 
+// Discount errors
+export const DISCOUNT_ERRORS = {
+  ALREADY_SUBSCRIBED: { code: 'DSC_001', message: 'Email already has a discount code for this store' },
+  CODE_NOT_FOUND: { code: 'DSC_002', message: 'Discount code not found' },
+  CODE_EXPIRED: { code: 'DSC_003', message: 'Discount code has expired' },
+  CODE_ALREADY_USED: { code: 'DSC_004', message: 'Discount code has already been used' },
+  EMAIL_MISMATCH: { code: 'DSC_005', message: 'Email does not match discount code' },
+  FEATURE_DISABLED: { code: 'DSC_006', message: 'Welcome discount is not enabled for this store' },
+} as const;
+
 // API Error response type
 export interface ApiErrorResponse {
   code: string;

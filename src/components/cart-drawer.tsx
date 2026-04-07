@@ -72,7 +72,8 @@ interface OrderFormData {
 
 function validateAndBuildOrderData(
   formData: OrderFormData,
-  translate: TranslateFn
+  translate: TranslateFn,
+  discountData?: { valid: boolean; porcentaje: number; code: string }
 ): { valid: true; data: Record<string, unknown> } | { valid: false; errors: { nombre?: string; telefono?: string } } {
   const { nombre, telefono, countryCode, email, items, totalPrice, language } = formData;
   
@@ -108,6 +109,7 @@ function validateAndBuildOrderData(
       telefono: dialCode + telefono.replaceAll(/\D/g, '').slice(0, 15),
       email: email.trim().toLowerCase().slice(0, 100),
       idioma: language,
+      ...(discountData && { codigoDescuento: discountData.code }),
     },
   };
 }
@@ -127,6 +129,10 @@ export function CartDrawer() {
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const [discountCode, setDiscountCode] = useState('')
+  const [discountValid, setDiscountValid] = useState<{ valid: boolean; porcentaje: number } | null>(null)
+  const [discountError, setDiscountError] = useState<string | null>(null)
+  const [validatingDiscount, setValidatingDiscount] = useState(false)
   const [companyPhone, setCompanyPhone] = useState<string | null>(null)
   const [messageCopied, setMessageCopied] = useState(false)
   const [retryCountdown, setRetryCountdown] = useState<number | null>(null)
@@ -243,7 +249,11 @@ export function CartDrawer() {
   const handleConfirmOrder = useCallback(async () => {
     setErrors({});
     
-    const validation = validateAndBuildOrderData({ nombre, telefono, countryCode, email, items, totalPrice, language }, t);
+    const validation = validateAndBuildOrderData(
+      { nombre, telefono, countryCode, email, items, totalPrice, language },
+      t,
+      discountValid ? { valid: discountValid.valid, porcentaje: discountValid.porcentaje, code: discountCode } : undefined
+    );
     
     if (!validation.valid) {
       setErrors(validation.errors);
@@ -286,7 +296,7 @@ export function CartDrawer() {
     } finally {
       setSending(false);
     }
-  }, [nombre, telefono, countryCode, email, items, totalPrice, language, closeCart, abrirWhatsApp]);
+  }, [nombre, telefono, countryCode, email, items, totalPrice, language, closeCart, abrirWhatsApp, discountCode, discountValid]);
 
   const handleDialogClose = useCallback((open: boolean) => {
     if (!open) {
@@ -567,11 +577,97 @@ export function CartDrawer() {
                 </div>
               </div>
 
+              {/* Discount Code Section */}
+              <div className="mb-4 px-2">
+                <label htmlFor="discount-code" className="text-xs font-medium text-muted-foreground ml-1 mb-1 block">
+                  {t("discountCodeLabel", language)}
+                </label>
+                <div className="flex gap-2">
+                  <Input
+                    id="discount-code"
+                    type="text"
+                    placeholder={t("discountCodePlaceholder", language)}
+                    value={discountCode}
+                    onChange={(e) => {
+                      setDiscountCode(e.target.value.toUpperCase());
+                      setDiscountValid(null);
+                      setDiscountError(null);
+                    }}
+                    className={`h-9 ${discountError ? 'border-destructive' : discountValid ? 'border-green-500' : ''}`}
+                    disabled={validatingDiscount || items.length === 0}
+                    aria-describedby={discountError ? "discount-error" : discountValid ? "discount-valid" : undefined}
+                    aria-invalid={!!discountError}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 min-h-[44px] px-4"
+                    onClick={async () => {
+                      if (!discountCode.trim()) return;
+                      if (!email.trim()) {
+                        setDiscountError(t("discountCodeEmailRequired", language));
+                        return;
+                      }
+                      setValidatingDiscount(true);
+                      setDiscountError(null);
+                      try {
+                        const res = await fetch('/api/descuento/validate', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ codigo: discountCode, email }),
+                        });
+                        const data = await res.json();
+                        if (!res.ok) {
+                          setDiscountError(data.error || t("discountCodeInvalid", language));
+                          setDiscountValid(null);
+                        } else {
+                          setDiscountValid({ valid: true, porcentaje: data.porcentaje });
+                          setDiscountError(null);
+                        }
+                      } catch {
+                        setDiscountError(t("connectionError", language));
+                      } finally {
+                        setValidatingDiscount(false);
+                      }
+                    }}
+                    disabled={validatingDiscount || items.length === 0}
+                  >
+                    {validatingDiscount ? '...' : t("discountCodeApply", language)}
+                  </Button>
+                </div>
+                {discountError && (
+                  <p id="discount-error" role="alert" className="text-xs text-destructive mt-1 ml-1">
+                    {discountError}
+                  </p>
+                )}
+                {discountValid && discountValid.valid && (
+                  <p id="discount-valid" role="status" className="text-xs text-green-600 dark:text-green-400 mt-1 ml-1 flex items-center gap-1">
+                    <Check className="size-3" />
+                    {t("discountCodeValid", language)} ({discountValid.porcentaje}%)
+                  </p>
+                )}
+              </div>
+
+              {/* Total Section */}
               <div className="mb-4 flex items-center justify-between px-2">
                 <span className="text-lg font-semibold text-foreground">{t("total", language)}</span>
-                <span className="text-2xl font-bold text-foreground tabular-nums animate-price-update" key={totalPrice}>
-                  {formatPrice(totalPrice, 'EUR', language)}
-                </span>
+                <div className="text-right">
+                  {discountValid && discountValid.valid && (
+                    <>
+                      <span className="text-sm text-muted-foreground line-through mr-2">
+                        {formatPrice(totalPrice, 'EUR', language)}
+                      </span>
+                      <span className="text-2xl font-bold text-green-600 dark:text-green-400 tabular-nums animate-price-update" key={`discounted-${totalPrice}`}>
+                        {formatPrice(Math.round(totalPrice * (1 - discountValid.porcentaje / 100) * 100) / 100, 'EUR', language)}
+                      </span>
+                    </>
+                  )}
+                  {(!discountValid || !discountValid.valid) && (
+                    <span className="text-2xl font-bold text-foreground tabular-nums animate-price-update" key={totalPrice}>
+                      {formatPrice(totalPrice, 'EUR', language)}
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="flex flex-col gap-2 px-1">

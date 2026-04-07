@@ -84,7 +84,13 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     }
   }
 
-  async create(empresaId: string, clienteId: string | null, items: CartItem[], total: number): Promise<Result<{ id: string; numero_pedido: number; total: number }>> {
+  async create(
+    empresaId: string,
+    clienteId: string | null,
+    items: CartItem[],
+    total: number,
+    discountData?: { codigoDescuentoId: string; descuentoPorcentaje: number; totalSinDescuento: number }
+  ): Promise<Result<{ id: string; numero_pedido: number; total: number }>> {
     try {
       // Atomically generate next order number using a DB function with row-level lock
       const { data: nextNum, error: rpcError } = await this.supabase
@@ -103,22 +109,30 @@ export class SupabasePedidoRepository implements IPedidoRepository {
 
       const nuevoNumeroPedido = nextNum as number;
 
+      const insertPayload: Record<string, unknown> = {
+        empresa_id: empresaId,
+        numero_pedido: nuevoNumeroPedido,
+        cliente_id: clienteId,
+        detalle_pedido: items.map(ci => ({
+          producto_id: ci.item?.id,
+          nombre: ci.item?.name,
+          precio: ci.item?.price,
+          cantidad: ci.quantity,
+          complementos: ci.selectedComplements || [],
+        })),
+        total: total,
+        estado: 'pendiente',
+      };
+
+      if (discountData) {
+        insertPayload.codigo_descuento_id = discountData.codigoDescuentoId;
+        insertPayload.descuento_porcentaje = discountData.descuentoPorcentaje;
+        insertPayload.total_sin_descuento = discountData.totalSinDescuento;
+      }
+
       const { data: pedido, error } = await this.supabase
         .from('pedidos')
-        .insert({
-          empresa_id: empresaId,
-          numero_pedido: nuevoNumeroPedido,
-          cliente_id: clienteId,
-          detalle_pedido: items.map(ci => ({
-            producto_id: ci.item?.id,
-            nombre: ci.item?.name,
-            precio: ci.item?.price,
-            cantidad: ci.quantity,
-            complementos: ci.selectedComplements || [],
-          })),
-          total: total,
-          estado: 'pendiente',
-        })
+        .insert(insertPayload)
         .select('id, numero_pedido, total')
         .single();
 

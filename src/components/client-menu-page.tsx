@@ -19,6 +19,12 @@ const CartDrawer = dynamic(
   { ssr: false }
 )
 
+// Lazy load welcome discount popup - only needed when feature is enabled
+const WelcomeDiscountPopup = dynamic(
+  () => import("@/components/welcome-discount-popup").then(mod => ({ default: mod.WelcomeDiscountPopup })),
+  { ssr: false }
+)
+
 interface MenuPageProps {
   menuData: MenuCategoryVM[];
   header?: ReactNode;
@@ -62,6 +68,15 @@ export function MenuPage({ menuData, header, showCart = false, empresa }: Readon
         )}
       </div>
       <SiteFooter empresa={empresa} />
+      {/* Welcome discount popup - shows after 30 seconds for empresas with feature enabled */}
+      {showCart && empresa?.descuentoBienvenidaActivo && (
+        <WelcomeDiscountPopup
+          empresaId={empresa.id}
+          empresaNombre={empresa.nombre}
+          porcentaje={empresa.descuentoBienvenidaPorcentaje}
+          idioma={language}
+        />
+      )}
       {/* Only render cart components when needed */}
       {showCart && (
         <>
