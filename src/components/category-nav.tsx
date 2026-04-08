@@ -66,10 +66,6 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
       isManualScrolling.current = true
       setActiveId(id)
 
-      // Temporarily disable content-visibility so getBoundingClientRect returns real positions
-      const sections = document.querySelectorAll<HTMLElement>('section.cv-auto')
-      sections.forEach((s) => { s.style.contentVisibility = 'visible' })
-
       requestAnimationFrame(() => {
         const offset = 140
         const elementPosition = el.getBoundingClientRect().top + window.scrollY
@@ -80,10 +76,9 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
           behavior: shouldReduceMotion ? "instant" : "smooth",
         })
 
-        // Restore content-visibility after scroll settles
+        // Re-enable auto-scroll after scroll settles
         if (timeoutRef.current) clearTimeout(timeoutRef.current)
         timeoutRef.current = setTimeout(() => {
-          sections.forEach((s) => { s.style.contentVisibility = '' })
           isManualScrolling.current = false
         }, 1000)
       })
@@ -93,12 +88,12 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
   return (
     <nav
       ref={navRef}
-      className="sticky top-16 z-40 w-full overflow-x-auto border-b border-border bg-background/95 backdrop-blur-sm md:top-20 [-webkit-overflow-scrolling:touch]"
+      className="sticky top-16 z-40 w-full overflow-x-auto border-b border-border bg-background/95 backdrop-blur-sm md:top-20 lg:top-20 [-webkit-overflow-scrolling:touch]"
       style={{ scrollMarginTop: 'var(--scroll-offset, 4rem)' }}
       aria-label={t("menuCategories", language)}
     >
       <div className="mx-auto max-w-6xl px-4 md:px-6">
-        <div className="flex gap-1 py-2">
+        <div className="flex flex-nowrap gap-1 py-2 items-center min-w-max">
           {categories.map((cat) => (
             <button
               key={cat.id}
