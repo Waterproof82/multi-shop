@@ -6,7 +6,7 @@ import { Upload, Loader2, Pencil, Trash2 } from 'lucide-react';
 import { getCsrfToken } from '@/lib/csrf-client';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
-import { optimizeImage } from '@/lib/image-utils';
+import { optimizeImage, optimizeBannerImage } from '@/lib/image-utils';
 
 interface ImageUploaderProps {
   readonly value: string;
@@ -15,6 +15,9 @@ interface ImageUploaderProps {
   readonly empresaSlug?: string;
   readonly previewClassName?: string;
   readonly previewStyle?: React.CSSProperties;
+  readonly isBannerImage?: boolean;
+  readonly aspectRatio?: string;
+  readonly helpText?: string;
 }
 
 
@@ -25,6 +28,9 @@ export function ImageUploader({
   empresaSlug = 'default',
   previewClassName = 'relative group rounded-lg overflow-hidden border h-48',
   previewStyle,
+  isBannerImage = false,
+  aspectRatio = '16/10',
+  helpText,
 }: ImageUploaderProps) {
   const { language } = useLanguage();
   const [uploading, setUploading] = useState(false);
@@ -49,7 +55,7 @@ export function ImageUploader({
     setError('');
 
     try {
-      const optimized = await optimizeImage(file);
+      const optimized = isBannerImage ? await optimizeBannerImage(file) : await optimizeImage(file);
 
       const formData = new FormData();
       formData.append('file', optimized.file);
@@ -126,7 +132,7 @@ export function ImageUploader({
             src={value}
             alt={`${label} preview`}
             fill
-            className="object-cover"
+            className="object-contain"
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             priority={false}
             loading="lazy"
@@ -208,6 +214,9 @@ export function ImageUploader({
 
       {error && (
         <p className="text-sm text-destructive">{error}</p>
+      )}
+      {helpText && (
+        <p className="text-xs text-muted-foreground mt-1">{helpText}</p>
       )}
     </div>
   );

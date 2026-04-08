@@ -45,7 +45,6 @@ export function HeroBanner({ empresa }: HeroBannerProps) {
             sizes="100vw"
             className="object-cover"
           />
-          <div className="absolute inset-0 bg-foreground/70" />
         </div>
       )}
 

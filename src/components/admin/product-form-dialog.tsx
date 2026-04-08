@@ -231,6 +231,7 @@ export function ProductFormDialog({
                 onChange={(url) => onFormChange({ ...formData, foto_url: url })}
                 label={t("productImage", language)}
                 empresaSlug={empresaSlug}
+                helpText={t("productImageHelp", language)}
               />
             </div>
 

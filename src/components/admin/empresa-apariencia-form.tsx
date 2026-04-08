@@ -143,6 +143,7 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
           label=""
           empresaSlug={empresaSlug}
           previewClassName="relative group rounded-lg overflow-hidden border w-full aspect-video max-h-48"
+          isBannerImage
         />
         <p className="text-xs text-muted-foreground mt-1">
           {t('bannerHelp', language)}
