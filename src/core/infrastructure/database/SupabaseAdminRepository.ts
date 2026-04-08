@@ -188,6 +188,7 @@ export class SupabaseAdminRepository implements IAdminRepository {
       moneda: (row.moneda as string) ?? "EUR",
       emailNotification: (row.email_notification as string | null) ?? null,
       urlImage: (row.url_image as string | null) ?? null,
+      bannerFit: (row.banner_fit as "contain" | "cover" | "fill" | null) ?? "contain",
       descripcion,
       colores,
       fb: (row.fb as string | null) ?? null,

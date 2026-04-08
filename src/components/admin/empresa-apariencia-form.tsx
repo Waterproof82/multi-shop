@@ -22,6 +22,7 @@ interface EmpresaAparienciaFormProps {
   readonly initialData: {
     logo_url: string | null;
     url_image: string | null;
+    banner_fit: "contain" | "cover" | "fill" | null;
     descripcion_es: string;
     descripcion_en: string;
     descripcion_fr: string;
@@ -96,6 +97,18 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
     }
   };
 
+  const handleBannerFitChange = async (fit: "contain" | "cover" | "fill") => {
+    setFormData((prev) => ({ ...prev, banner_fit: fit }));
+    setSaved(false);
+    try {
+      const ok = await saveEmpresa({ banner_fit: fit });
+      if (!ok) setImageError('Error al guardar el ajuste');
+    } catch (error) {
+      logClientError(error, 'handleBannerFitChange');
+      setImageError('Error al guardar el ajuste');
+    }
+  };
+
   const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSaving(true);
@@ -148,6 +161,16 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
         <p className="text-xs text-muted-foreground mt-1">
           {t('bannerHelp', language)}
         </p>
+        <select
+          id="banner_fit"
+          value={formData.banner_fit ?? 'contain'}
+          onChange={(e) => handleBannerFitChange(e.target.value as "contain" | "cover" | "fill")}
+          className="mt-2 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <option value="contain">{t('bannerFitContain', language)}</option>
+          <option value="cover">{t('bannerFitCover', language)}</option>
+          <option value="fill">{t('bannerFitFill', language)}</option>
+        </select>
       </div>
 
       {/* Descripción — idioma principal (ES) siempre visible */}

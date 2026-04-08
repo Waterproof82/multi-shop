@@ -499,6 +499,9 @@ export const translations = {
     saveDescriptions: "Guardar descripciones",
     logoHelp: "Se mostrará en el header y footer. Recomendado: 512×512px (cuadrado).",
     bannerHelp: "Se mostrará como fondo del banner principal. Recomendado: 1920×600px.",
+    bannerFitContain: "Ajustar (respeta proporciones)",
+    bannerFitCover: "Rellenar (recorta si es necesario)",
+    bannerFitFill: "Estirar (deforma si es necesario)",
     savedSuccess: "¡Guardado correctamente!",
     // Welcome Discount
     welcomeDiscountTitle: "¡Bienvenido! Obtén tu descuento",
@@ -1037,6 +1040,9 @@ export const translations = {
     saveDescriptions: "Save descriptions",
     logoHelp: "Shown in the header and footer. Recommended: 512×512px (square).",
     bannerHelp: "Shown as the main banner background. Recommended: 1920×600px.",
+    bannerFitContain: "Fit (keeps proportions)",
+    bannerFitCover: "Fill (crops if needed)",
+    bannerFitFill: "Stretch (stretches if needed)",
     savedSuccess: "Saved successfully!",
     // Welcome Discount
     welcomeDiscountTitle: "Welcome! Get your discount",
@@ -1575,6 +1581,9 @@ export const translations = {
     saveDescriptions: "Enregistrer les descriptions",
     logoHelp: "Affiché dans l'en-tête et le pied de page. Recommandé : 512×512px (carré).",
     bannerHelp: "Affiché comme fond de la bannière principale. Recommandé : 1920×600px.",
+    bannerFitContain: "Ajuster (conserver les proportions)",
+    bannerFitCover: "Remplir (recadrer si nécessaire)",
+    bannerFitFill: "Étirer (déformer si nécessaire)",
     savedSuccess: "Enregistré avec succès !",
     // Welcome Discount
     welcomeDiscountTitle: "Bienvenue ! Obtenez votre réduction",
@@ -2114,6 +2123,9 @@ export const translations = {
     saveDescriptions: "Salva descrizioni",
     logoHelp: "Visualizzato nell'intestazione e nel piè di pagina. Consigliato: 512×512px (quadrato).",
     bannerHelp: "Visualizzato come sfondo del banner principale. Consigliato: 1920×600px.",
+    bannerFitContain: "Adatta (mantiene proporzioni)",
+    bannerFitCover: "Riempi (ritaglia se necessario)",
+    bannerFitFill: "Stira (allunga se necessario)",
     savedSuccess: "Salvato correttamente!",
     // Welcome Discount
     welcomeDiscountTitle: "Benvenuto! Ottieni il tuo sconto",
@@ -2652,6 +2664,9 @@ export const translations = {
     saveDescriptions: "Beschreibungen speichern",
     logoHelp: "Wird in Kopf- und Fußzeile angezeigt. Empfohlen: 512×512px (quadratisch).",
     bannerHelp: "Wird als Hintergrund des Hauptbanners angezeigt. Empfohlen: 1920×600px.",
+    bannerFitContain: "Anpassen (Verhältnisse beibehalten)",
+    bannerFitCover: "Füllen (beschneiden nötig)",
+    bannerFitFill: "Strecken (verzerrt nötig)",
     savedSuccess: "Erfolgreich gespeichert!",
     // Welcome Discount
     welcomeDiscountTitle: "Willkommen! Erhalte deinen Rabatt",

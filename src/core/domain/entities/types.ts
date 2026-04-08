@@ -65,6 +65,7 @@ export interface Empresa {
   moneda: string;
   emailNotification: string | null;
   urlImage: string | null;
+  bannerFit: "contain" | "cover" | "fill" | null;
   colores: EmpresaColores | null;
   descripcion: {
     es?: string | null;
@@ -100,6 +101,7 @@ export interface EmpresaPublic {
   subdomainPedidos: string | null;
   logoUrl: string | null;
   urlImage: string | null;
+  bannerFit: "contain" | "cover" | "fill" | null;
   colores: EmpresaColores | null;
   descripcion: TranslatableText | null;
   titulo: string | null;

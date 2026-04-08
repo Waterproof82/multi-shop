@@ -9,6 +9,7 @@ export interface UpdateEmpresaData {
   direccion?: string | null;
   logo_url?: string | null;
   url_image?: string | null;
+  banner_fit?: string | null;
   descripcion_es?: string | null;
   descripcion_en?: string | null;
   descripcion_fr?: string | null;

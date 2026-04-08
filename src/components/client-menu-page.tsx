@@ -47,7 +47,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa }: Readon
       {header === undefined ? null : header}
       <PromoNotification />
       <div className="flex-1">
-        <HeroBanner empresa={empresa} />
+        <HeroBanner empresa={empresa} bannerFit={empresa?.bannerFit ?? "contain"} />
         {menuData.length > 0 ? (
           <>
             <CategoryNav categories={menuData} />

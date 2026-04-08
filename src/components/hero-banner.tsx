@@ -8,9 +8,15 @@ import type { EmpresaPublic } from "@/core/domain/entities/types"
 
 interface HeroBannerProps {
   readonly empresa?: EmpresaPublic | null;
+  readonly bannerFit?: "contain" | "cover" | "fill";
 }
 
-export function HeroBanner({ empresa }: HeroBannerProps) {
+function getAspectRatioClass(fit: "contain" | "fill"): string {
+  if (fit === "contain") return "aspect-[3/1] min-h-[200px]";
+  return "aspect-[21/9]";
+}
+
+export function HeroBanner({ empresa, bannerFit = "contain" }: HeroBannerProps) {
   const { language } = useLanguage()
   const shouldReduceMotion = useReducedMotion() ?? false
   
@@ -24,6 +30,8 @@ export function HeroBanner({ empresa }: HeroBannerProps) {
 
   const showTitulo = titulo !== null && titulo !== ""
   const showSubtitulo = subtitulo !== null && subtitulo !== ""
+  
+  const aspectClass = bannerFit === "cover" ? "" : getAspectRatioClass(bannerFit)
 
   const titleVariants = shouldReduceMotion
     ? { initial: {}, animate: {} }
@@ -34,8 +42,8 @@ export function HeroBanner({ empresa }: HeroBannerProps) {
     : { initial: { opacity: 0 }, animate: { opacity: 1 } };
 
   return (
-    <div className="relative flex flex-col items-center justify-center overflow-hidden bg-primary px-4 py-16 text-center md:py-24">
-      {urlImage && (
+    <div className={`relative flex flex-col items-center justify-center overflow-hidden bg-primary px-4 py-16 text-center md:py-24 ${bannerFit !== "cover" ? aspectClass : ""}`}>
+      {urlImage && bannerFit === "cover" && (
         <div className="absolute inset-0 z-0">
           <Image
             src={urlImage}
@@ -44,6 +52,18 @@ export function HeroBanner({ empresa }: HeroBannerProps) {
             priority
             sizes="100vw"
             className="object-cover"
+          />
+        </div>
+      )}
+      {urlImage && bannerFit !== "cover" && (
+        <div className="absolute inset-0 z-0 flex items-center justify-center">
+          <Image
+            src={urlImage}
+            alt={empresa?.nombre ?? t("heroBackgroundAlt", language)}
+            fill
+            priority
+            sizes="100vw"
+            className={bannerFit === "contain" ? "object-contain" : "object-fill"}
           />
         </div>
       )}
