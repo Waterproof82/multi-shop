@@ -20,7 +20,7 @@ export function HeroBanner({ empresa, bannerFit = "contain" }: HeroBannerProps) 
   const { language } = useLanguage()
   const shouldReduceMotion = useReducedMotion() ?? false
   
-  const logoUrl = empresa?.logoUrl ?? null
+  const logoUrl = empresa?.mostrarLogo !== false ? (empresa?.logoUrl ?? null) : null
   const urlImage = empresa?.urlImage ?? null
   
   const titulo = empresa?.titulo ?? null

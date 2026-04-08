@@ -48,6 +48,7 @@ export default async function ConfiguracionPage() {
 
   const empresaApariencia = {
     logo_url: empresaData?.logoUrl || null,
+    mostrar_logo: empresaData?.mostrarLogo ?? true,
     url_image: empresaData?.urlImage || null,
     banner_fit: empresaData?.bannerFit ?? 'contain',
     descripcion_es: empresaData?.descripcion?.es || '',

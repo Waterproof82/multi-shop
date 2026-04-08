@@ -12,6 +12,7 @@ export const updateEmpresaSchema = z.object({
   url_mapa: httpsUrlMax500.optional().or(z.literal('')),
   direccion: z.string().max(300).optional().nullable(),
   logo_url: httpsUrl.optional().or(z.literal('')).or(z.null()),
+  mostrar_logo: z.boolean().optional(),
   url_image: httpsUrl.optional().or(z.literal('')).or(z.null()),
   descripcion_es: z.string().max(1000).optional().nullable(),
   descripcion_en: z.string().max(1000).optional().nullable(),

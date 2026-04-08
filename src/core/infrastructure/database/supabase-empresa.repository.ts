@@ -11,7 +11,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
     try {
       const { data: empresa } = await this.supabase
         .from('empresas')
-        .select('email_notification, telefono_whatsapp, nombre, logo_url, fb, instagram, url_mapa, direccion, dominio, slug, url_image, banner_fit, descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de, mostrar_carrito, mostrar_promociones, mostrar_tgtg, moneda, subdomain_pedidos, color_primary, color_primary_foreground, color_secondary, color_secondary_foreground, color_accent, color_accent_foreground, color_background, color_foreground, descuento_bienvenida_activo, descuento_bienvenida_porcentaje, descuento_bienvenida_duracion')
+        .select('email_notification, telefono_whatsapp, nombre, logo_url, mostrar_logo, fb, instagram, url_mapa, direccion, dominio, slug, url_image, banner_fit, descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de, mostrar_carrito, mostrar_promociones, mostrar_tgtg, moneda, subdomain_pedidos, color_primary, color_primary_foreground, color_secondary, color_secondary_foreground, color_accent, color_accent_foreground, color_background, color_foreground, descuento_bienvenida_activo, descuento_bienvenida_porcentaje, descuento_bienvenida_duracion')
         .eq('id', empresaId)
         .single();
 
@@ -36,6 +36,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
           dominio: empresa.dominio || '',
           slug: (empresa.slug as string | null) ?? null,
           logoUrl: empresa.logo_url,
+          mostrarLogo: empresa.mostrar_logo ?? true,
           mostrarCarrito: empresa.mostrar_carrito ?? false,
           mostrarPromociones: empresa.mostrar_promociones ?? true,
           mostrarTgtg: empresa.mostrar_tgtg ?? true,
@@ -77,6 +78,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
       if (data.url_mapa !== undefined) updatePayload.url_mapa = data.url_mapa || null;
       if (data.direccion !== undefined) updatePayload.direccion = data.direccion || null;
       if (data.logo_url !== undefined) updatePayload.logo_url = data.logo_url || null;
+      if (data.mostrar_logo !== undefined) updatePayload.mostrar_logo = data.mostrar_logo;
       if (data.url_image !== undefined) updatePayload.url_image = data.url_image || null;
       if (data.banner_fit !== undefined) updatePayload.banner_fit = data.banner_fit || null;
       if (data.descripcion_es !== undefined) updatePayload.descripcion_es = data.descripcion_es || null;
@@ -149,7 +151,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
 
   private static readonly PUBLIC_SELECT = `
     id, nombre, dominio, mostrar_carrito, moneda, subdomain_pedidos,
-    logo_url, url_image, banner_fit,
+    logo_url, mostrar_logo, url_image, banner_fit,
     color_primary, color_primary_foreground, color_secondary, color_secondary_foreground,
     color_accent, color_accent_foreground, color_background, color_foreground,
     descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de,
@@ -193,6 +195,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
       moneda: (data.moneda as string) ?? 'EUR',
       subdomainPedidos: (data.subdomain_pedidos as string | null) ?? null,
       logoUrl: (data.logo_url as string | null) ?? null,
+      mostrarLogo: (data.mostrar_logo as boolean) ?? true,
       urlImage: (data.url_image as string | null) ?? null,
       bannerFit: (data.banner_fit as "contain" | "cover" | "fill" | null) ?? "contain",
       colores,

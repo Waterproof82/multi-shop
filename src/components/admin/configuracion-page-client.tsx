@@ -21,6 +21,7 @@ interface EmpresaDatos {
 
 interface EmpresaApariencia {
   logo_url: string | null;
+  mostrar_logo: boolean;
   url_image: string | null;
   banner_fit: "contain" | "cover" | "fill" | null;
   descripcion_es: string;

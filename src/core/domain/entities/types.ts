@@ -59,6 +59,7 @@ export interface Empresa {
   dominio: string;
   slug: string | null;
   logoUrl: string | null;
+  mostrarLogo: boolean;
   mostrarCarrito: boolean;
   mostrarPromociones: boolean;
   mostrarTgtg: boolean;
@@ -100,6 +101,7 @@ export interface EmpresaPublic {
   moneda: string;
   subdomainPedidos: string | null;
   logoUrl: string | null;
+  mostrarLogo: boolean;
   urlImage: string | null;
   bannerFit: "contain" | "cover" | "fill" | null;
   colores: EmpresaColores | null;

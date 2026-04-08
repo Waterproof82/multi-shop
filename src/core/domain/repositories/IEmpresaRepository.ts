@@ -8,6 +8,7 @@ export interface UpdateEmpresaData {
   url_mapa?: string;
   direccion?: string | null;
   logo_url?: string | null;
+  mostrar_logo?: boolean;
   url_image?: string | null;
   banner_fit?: string | null;
   descripcion_es?: string | null;

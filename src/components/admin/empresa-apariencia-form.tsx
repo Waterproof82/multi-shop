@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Languages, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 import { ImageUploader } from '@/components/ui/image-uploader';
+import { PillSwitch } from '@/components/ui/pill-switch';
 import { Textarea } from '@/components/ui/textarea';
 import type { UpdateEmpresaDTO } from '@/core/application/dtos/empresa.dto';
 import { fetchWithCsrf } from '@/lib/csrf-client';
@@ -21,6 +22,7 @@ const IDIOMAS = [
 interface EmpresaAparienciaFormProps {
   readonly initialData: {
     logo_url: string | null;
+    mostrar_logo: boolean;
     url_image: string | null;
     banner_fit: "contain" | "cover" | "fill" | null;
     descripcion_es: string;
@@ -141,6 +143,26 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
         <p className="text-xs text-muted-foreground mt-1">
           {t('logoHelp', language)}
         </p>
+        <div className="mt-3 flex items-center gap-3">
+          <PillSwitch
+            checked={formData.mostrar_logo ?? true}
+            onChange={async () => {
+              const newValue = !(formData.mostrar_logo ?? true);
+              setFormData((prev) => ({ ...prev, mostrar_logo: newValue }));
+              setSaved(false);
+              try {
+                const ok = await saveEmpresa({ mostrar_logo: newValue });
+                if (!ok) setLogoError('Error al guardar');
+              } catch (error) {
+                logClientError(error, 'toggleLogo');
+                setLogoError('Error al guardar');
+              }
+            }}
+            ariaLabel="Mostrar logo en el banner"
+            size="sm"
+          />
+          <span className="text-sm text-muted-foreground">Mostrar logo en el banner</span>
+        </div>
       </div>
 
       {/* Imagen de fondo */}
