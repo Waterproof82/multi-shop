@@ -12,8 +12,8 @@ interface HeroBannerProps {
 }
 
 function getAspectRatioClass(fit: "contain" | "fill"): string {
-  if (fit === "contain") return "aspect-[3/1] min-h-[200px]";
-  return "aspect-[21/9]";
+  if (fit === "contain") return "aspect-[3/1] md:aspect-[3/1] min-h-[120px] md:min-h-[200px]";
+  return "aspect-[21/9] md:aspect-[21/9] min-h-[80px] md:min-h-[120px]";
 }
 
 export function HeroBanner({ empresa, bannerFit = "contain" }: HeroBannerProps) {
@@ -42,9 +42,9 @@ export function HeroBanner({ empresa, bannerFit = "contain" }: HeroBannerProps) 
     : { initial: { opacity: 0 }, animate: { opacity: 1 } };
 
   return (
-    <div className={`relative flex flex-col items-center justify-center overflow-hidden bg-primary px-4 py-16 text-center md:py-24 ${bannerFit !== "cover" ? aspectClass : ""}`}>
+    <div className={`relative flex flex-col items-center justify-center overflow-hidden bg-primary px-0 py-16 text-center md:py-24 ${bannerFit !== "cover" ? aspectClass : ""}`}>
       {urlImage && bannerFit === "cover" && (
-        <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 z-0 w-full h-full">
           <Image
             src={urlImage}
             alt={empresa?.nombre ?? t("heroBackgroundAlt", language)}
@@ -56,14 +56,14 @@ export function HeroBanner({ empresa, bannerFit = "contain" }: HeroBannerProps) 
         </div>
       )}
       {urlImage && bannerFit !== "cover" && (
-        <div className="absolute inset-0 z-0 flex items-center justify-center">
+        <div className="absolute inset-0 z-0 w-full h-full">
           <Image
             src={urlImage}
             alt={empresa?.nombre ?? t("heroBackgroundAlt", language)}
             fill
             priority
             sizes="100vw"
-            className={bannerFit === "contain" ? "object-contain" : "object-fill"}
+            className={`w-full h-full ${bannerFit === "contain" ? "object-contain" : "object-fill"}`}
           />
         </div>
       )}
