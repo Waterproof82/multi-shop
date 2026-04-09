@@ -38,22 +38,27 @@ export async function POST(request: NextRequest) {
   const rateLimited = await rateLimitAdmin(request);
   if (rateLimited) return rateLimited;
 
-  const { empresaId, error: authError, isSuperAdmin } = await requireAuth(request);
-  if (authError || !empresaId) {
-    // Allow superadmin without empresaId - they need empresaId from query param
-    if (!isSuperAdmin) {
-      return authError ?? NextResponse.json(createErrorResponse(AUTH_ERRORS.UNAUTHORIZED), { status: 401 });
-    }
-  }
+  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request);
+  if (authError) return authError;
+  
   const roleError = requireRole(request, ['admin', 'superadmin']);
   if (roleError) return roleError;
 
-  // For superadmin, get empresaId from query param
   const url = new URL(request.url);
   const queryEmpresaId = url.searchParams.get('empresaId');
-  const finalEmpresaId = queryEmpresaId || empresaId;
   
-  if (!finalEmpresaId) {
+  // For superadmin, require empresaId from query param
+  let empresaId: string | null;
+  if (isSuperAdmin) {
+    if (!queryEmpresaId) {
+      return NextResponse.json(createErrorResponse(AUTH_ERRORS.UNAUTHORIZED), { status: 401 });
+    }
+    empresaId = queryEmpresaId;
+  } else {
+    empresaId = authEmpresaId;
+  }
+  
+  if (!empresaId) {
     return NextResponse.json(createErrorResponse(AUTH_ERRORS.UNAUTHORIZED), { status: 401 });
   }
 
@@ -63,12 +68,12 @@ export async function POST(request: NextRequest) {
   }
 
   // Derive slug from DB - never from client (OWASP: trust server-side data)
-  const empresaResult = await empresaUseCase.getById(finalEmpresaId);
+  const empresaResult = await empresaUseCase.getById(empresaId);
   if (!empresaResult.success) {
     return errorResponse(SERVER_ERRORS.DATABASE_ERROR.message);
   }
   const empresa = empresaResult.data;
-  const empresaSlug = empresa?.slug ?? empresa?.dominio ?? finalEmpresaId;
+  const empresaSlug = empresa?.slug ?? empresa?.dominio ?? empresaId;
 
   let formData: FormData;
   try {

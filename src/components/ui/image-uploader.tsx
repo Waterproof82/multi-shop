@@ -7,12 +7,14 @@ import { getCsrfToken } from '@/lib/csrf-client';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import { optimizeImage, optimizeBannerImage } from '@/lib/image-utils';
+import { useAdmin } from '@/lib/admin-context';
 
 interface ImageUploaderProps {
   readonly value: string;
   readonly onChange: (url: string) => void;
   readonly label?: string;
   readonly empresaSlug?: string;
+  readonly empresaIdProp?: string;
   readonly previewClassName?: string;
   readonly previewStyle?: React.CSSProperties;
   readonly isBannerImage?: boolean;
@@ -26,6 +28,7 @@ export function ImageUploader({
   onChange,
   label = 'Imagen',
   empresaSlug = 'default',
+  empresaIdProp,
   previewClassName = 'relative group rounded-lg overflow-hidden border h-48',
   previewStyle,
   isBannerImage = false,
@@ -33,6 +36,8 @@ export function ImageUploader({
   helpText,
 }: ImageUploaderProps) {
   const { language } = useLanguage();
+  const { overrideEmpresaId, empresaId: defaultEmpresaId } = useAdmin();
+  const efectivoEmpresaId = empresaIdProp || overrideEmpresaId || defaultEmpresaId;
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [dragOver, setDragOver] = useState(false);
@@ -61,7 +66,10 @@ export function ImageUploader({
       formData.append('file', optimized.file);
 
       const csrfToken = getCsrfToken();
-      const response = await fetch('/api/admin/upload-image', {
+      const uploadUrl = efectivoEmpresaId 
+        ? `/api/admin/upload-image?empresaId=${efectivoEmpresaId}` 
+        : '/api/admin/upload-image';
+      const response = await fetch(uploadUrl, {
         method: 'POST',
         headers: csrfToken ? { 'x-csrf-token': csrfToken } : {},
         body: formData,
