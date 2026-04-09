@@ -30,8 +30,6 @@ export function HeroBanner({ empresa, bannerFit = "contain" }: HeroBannerProps) 
 
   const showTitulo = titulo !== null && titulo !== ""
   const showSubtitulo = subtitulo !== null && subtitulo !== ""
-  
-  const aspectClass = bannerFit === "cover" ? "" : getAspectRatioClass(bannerFit)
 
   const titleVariants = shouldReduceMotion
     ? { initial: {}, animate: {} }
@@ -42,8 +40,8 @@ export function HeroBanner({ empresa, bannerFit = "contain" }: HeroBannerProps) 
     : { initial: { opacity: 0 }, animate: { opacity: 1 } };
 
   return (
-    <div className={`relative flex flex-col items-center justify-center overflow-hidden bg-primary px-0 py-8 md:py-16 text-center ${bannerFit !== "cover" ? aspectClass : "h-[33vh] max-h-[300px] min-h-[150px]"}`}>
-      {urlImage && bannerFit === "cover" && (
+    <div className="relative flex flex-col items-center justify-center overflow-hidden bg-primary px-0 py-8 md:py-16 text-center min-h-[150px] md:min-h-[200px]">
+      {urlImage && (
         <div className="absolute inset-0 z-0 w-full h-full">
           <Image
             src={urlImage}
@@ -51,19 +49,7 @@ export function HeroBanner({ empresa, bannerFit = "contain" }: HeroBannerProps) 
             fill
             priority
             sizes="100vw"
-            className="object-cover"
-          />
-        </div>
-      )}
-      {urlImage && bannerFit !== "cover" && (
-        <div className="absolute inset-0 z-0 w-full h-full">
-          <Image
-            src={urlImage}
-            alt={empresa?.nombre ?? t("heroBackgroundAlt", language)}
-            fill
-            priority
-            sizes="100vw"
-            className={`w-full h-full ${bannerFit === "contain" ? "object-contain" : "object-fill"}`}
+            className="object-contain"
           />
         </div>
       )}
