@@ -22,11 +22,16 @@ export async function GET(request: NextRequest) {
   }
   
   // For superadmin, require empresaId from query param
-  if (isSuperAdmin && !queryEmpresaId) {
-    return errorResponse('empresaId query param required for superadmin', 400);
+  // For regular admin, use authEmpresaId from JWT
+  let empresaId: string | null;
+  if (isSuperAdmin) {
+    if (!queryEmpresaId) {
+      return errorResponse('empresaId query param required for superadmin', 400);
+    }
+    empresaId = queryEmpresaId;
+  } else {
+    empresaId = authEmpresaId;
   }
-  
-  const empresaId = queryEmpresaId || authEmpresaId;
   
   if (!empresaId) {
     return errorResponse('Empresa ID required', 400);
@@ -82,11 +87,16 @@ export async function PUT(request: NextRequest) {
   }
   
   // For superadmin, require empresaId from query param
-  if (isSuperAdmin && !queryEmpresaId) {
-    return errorResponse('empresaId query param required for superadmin', 400);
+  // For regular admin, use authEmpresaId from JWT
+  let empresaId: string | null;
+  if (isSuperAdmin) {
+    if (!queryEmpresaId) {
+      return errorResponse('empresaId query param required for superadmin', 400);
+    }
+    empresaId = queryEmpresaId;
+  } else {
+    empresaId = authEmpresaId;
   }
-  
-  const empresaId = queryEmpresaId || authEmpresaId;
   
   if (!empresaId) {
     return errorResponse('Empresa ID required', 400);

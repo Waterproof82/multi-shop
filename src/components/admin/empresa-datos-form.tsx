@@ -7,6 +7,7 @@ import { fetchWithCsrf } from '@/lib/csrf-client';
 import { logClientError } from '@/lib/client-error';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
+import { useAdmin } from '@/lib/admin-context';
 
 interface EmpresaDatosFormProps {
   readonly initialData: {
@@ -21,6 +22,8 @@ interface EmpresaDatosFormProps {
 
 export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
   const { language } = useLanguage();
+  const { overrideEmpresaId, empresaId: defaultEmpresaId } = useAdmin();
+  const efectivoEmpresaId = overrideEmpresaId || defaultEmpresaId;
   const [formData, setFormData] = useState(initialData);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -39,7 +42,7 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
     setSaving(true);
 
     try {
-      const res = await fetchWithCsrf('/api/admin/empresa', {
+      const res = await fetchWithCsrf(`/api/admin/empresa?empresaId=${efectivoEmpresaId}`, {
         method: 'PUT',
         body: JSON.stringify(formData),
       });

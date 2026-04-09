@@ -10,6 +10,7 @@ import { fetchWithCsrf } from '@/lib/csrf-client';
 import { logClientError } from '@/lib/client-error';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
+import { useAdmin } from '@/lib/admin-context';
 
 const IDIOMAS = [
   { key: 'es', label: 'Español' },
@@ -34,8 +35,8 @@ interface EmpresaAparienciaFormProps {
   readonly empresaSlug: string;
 }
 
-async function saveEmpresa(data: Partial<UpdateEmpresaDTO>) {
-  const res = await fetchWithCsrf('/api/admin/empresa', {
+async function saveEmpresa(data: Partial<UpdateEmpresaDTO>, empresaId: string) {
+  const res = await fetchWithCsrf(`/api/admin/empresa?empresaId=${empresaId}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
@@ -44,6 +45,8 @@ async function saveEmpresa(data: Partial<UpdateEmpresaDTO>) {
 
 export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaAparienciaFormProps) {
   const { language } = useLanguage();
+  const { overrideEmpresaId, empresaId: defaultEmpresaId } = useAdmin();
+  const efectivoEmpresaId = overrideEmpresaId || defaultEmpresaId;
   const [formData, setFormData] = useState(initialData);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -72,7 +75,7 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
     setSavingImage(true);
     setImageError(null);
     try {
-      const ok = await saveEmpresa({ url_image: newUrl });
+      const ok = await saveEmpresa({ url_image: newUrl }, efectivoEmpresaId);
       if (!ok) setImageError('Error al guardar la imagen');
     } catch (error) {
       logClientError(error, 'handleImageChange');
@@ -89,7 +92,7 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
     setSavingLogo(true);
     setLogoError(null);
     try {
-      const ok = await saveEmpresa({ logo_url: newUrl });
+      const ok = await saveEmpresa({ logo_url: newUrl }, efectivoEmpresaId);
       if (!ok) setLogoError('Error al guardar el logo');
     } catch (error) {
       logClientError(error, 'handleLogoChange');
@@ -103,7 +106,7 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
     setFormData((prev) => ({ ...prev, banner_fit: fit }));
     setSaved(false);
     try {
-      const ok = await saveEmpresa({ banner_fit: fit });
+      const ok = await saveEmpresa({ banner_fit: fit }, efectivoEmpresaId);
       if (!ok) setImageError('Error al guardar el ajuste');
     } catch (error) {
       logClientError(error, 'handleBannerFitChange');
@@ -115,7 +118,7 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
     e.preventDefault();
     setSaving(true);
     try {
-      const ok = await saveEmpresa(formData);
+      const ok = await saveEmpresa(formData, efectivoEmpresaId);
       if (ok) setSaved(true);
     } catch (error) {
       logClientError(error, 'handleSubmit');
@@ -151,7 +154,7 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
               setFormData((prev) => ({ ...prev, mostrar_logo: newValue }));
               setSaved(false);
               try {
-                const ok = await saveEmpresa({ mostrar_logo: newValue });
+                const ok = await saveEmpresa({ mostrar_logo: newValue }, efectivoEmpresaId);
                 if (!ok) setLogoError('Error al guardar');
               } catch (error) {
                 logClientError(error, 'toggleLogo');
