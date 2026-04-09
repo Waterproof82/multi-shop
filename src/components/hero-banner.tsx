@@ -42,7 +42,7 @@ export function HeroBanner({ empresa, bannerFit = "contain" }: HeroBannerProps) 
     : { initial: { opacity: 0 }, animate: { opacity: 1 } };
 
   return (
-    <div className={`relative flex flex-col items-center justify-center overflow-hidden bg-primary px-0 py-16 text-center md:py-24 ${bannerFit !== "cover" ? aspectClass : ""}`}>
+    <div className={`relative flex flex-col items-center justify-center overflow-hidden bg-primary px-0 py-8 md:py-16 text-center ${bannerFit !== "cover" ? aspectClass : "h-[33vh] max-h-[300px] min-h-[150px]"}`}>
       {urlImage && bannerFit === "cover" && (
         <div className="absolute inset-0 z-0 w-full h-full">
           <Image
