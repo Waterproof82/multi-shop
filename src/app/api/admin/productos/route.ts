@@ -34,13 +34,23 @@ export async function GET(request: NextRequest) {
 
   const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request) as any;
   if (authError) return authError;
+  const roleError = requireRole(request, ['admin', 'superadmin']);
+  if (roleError) return roleError;
 
   const { searchParams } = new URL(request.url);
   const queryEmpresaId = searchParams.get('empresaId');
   
-  const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
+  if (isSuperAdmin && !queryEmpresaId) {
+    return validationErrorResponse('empresaId query param required for superadmin');
+  }
+  
+  const empresaId = queryEmpresaId || authEmpresaId;
+  
+  if (!empresaId) {
+    return validationErrorResponse('Empresa ID required');
+  }
 
-  const result = await productUseCase.getAll(empresaId!);
+  const result = await productUseCase.getAll(empresaId);
   
   if (!result.success) {
     return handleResult(result);
@@ -62,7 +72,16 @@ export async function POST(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const queryEmpresaId = searchParams.get('empresaId');
-  const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
+  
+  if (isSuperAdmin && !queryEmpresaId) {
+    return validationErrorResponse('empresaId query param required for superadmin');
+  }
+  
+  const empresaId = queryEmpresaId || authEmpresaId;
+  
+  if (!empresaId) {
+    return validationErrorResponse('Empresa ID required');
+  }
 
   let body: unknown;
   try {
@@ -103,7 +122,15 @@ export async function PUT(request: NextRequest) {
     return validationErrorResponse('ID inválido');
   }
 
-  const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
+  if (isSuperAdmin && !queryEmpresaId) {
+    return validationErrorResponse('empresaId query param required for superadmin');
+  }
+  
+  const empresaId = queryEmpresaId || authEmpresaId;
+  
+  if (!empresaId) {
+    return validationErrorResponse('Empresa ID required');
+  }
 
   let body: unknown;
   try {
@@ -148,8 +175,17 @@ export async function DELETE(request: NextRequest) {
     return validationErrorResponse('ID inválido');
   }
 
-  const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
-  const result = await productUseCase.delete(idParsed.data.id, empresaId!);
+  if (isSuperAdmin && !queryEmpresaId) {
+    return validationErrorResponse('empresaId query param required for superadmin');
+  }
+  
+  const empresaId = queryEmpresaId || authEmpresaId;
+  
+  if (!empresaId) {
+    return validationErrorResponse('Empresa ID required');
+  }
+  
+  const result = await productUseCase.delete(idParsed.data.id, empresaId);
   
   if (!result.success) {
     return handleResult(result);

@@ -20,9 +20,19 @@ export async function GET(request: NextRequest) {
   if (isSuperAdmin && queryEmpresaId && !UUID_RE.test(queryEmpresaId)) {
     return errorResponse('Invalid empresaId format', 400);
   }
-  const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
+  
+  // For superadmin, require empresaId from query param
+  if (isSuperAdmin && !queryEmpresaId) {
+    return errorResponse('empresaId query param required for superadmin', 400);
+  }
+  
+  const empresaId = queryEmpresaId || authEmpresaId;
+  
+  if (!empresaId) {
+    return errorResponse('Empresa ID required', 400);
+  }
 
-  const result = await empresaUseCase.getById(empresaId!);
+  const result = await empresaUseCase.getById(empresaId);
   
   if (!result.success) {
     return handleResult(result);
@@ -70,7 +80,17 @@ export async function PUT(request: NextRequest) {
   if (isSuperAdmin && queryEmpresaId && !UUID_RE.test(queryEmpresaId)) {
     return errorResponse('Invalid empresaId format', 400);
   }
-  const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
+  
+  // For superadmin, require empresaId from query param
+  if (isSuperAdmin && !queryEmpresaId) {
+    return errorResponse('empresaId query param required for superadmin', 400);
+  }
+  
+  const empresaId = queryEmpresaId || authEmpresaId;
+  
+  if (!empresaId) {
+    return errorResponse('Empresa ID required', 400);
+  }
 
   let body: unknown;
   try {
@@ -84,7 +104,7 @@ export async function PUT(request: NextRequest) {
     return validationErrorResponse(parsed.error.errors[0].message);
   }
 
-  const result = await empresaUseCase.update(empresaId!, parsed.data);
+  const result = await empresaUseCase.update(empresaId, parsed.data);
   
   if (!result.success) {
     return handleResult(result);
