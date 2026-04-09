@@ -11,8 +11,9 @@ interface HeroBannerProps {
   readonly bannerFit?: "contain" | "cover" | "fill";
 }
 
-function getAspectRatioClass(fit: "contain" | "fill"): string {
-  if (fit === "contain") return "aspect-[3/1] md:aspect-[3/1] min-h-[120px] md:min-h-[200px]";
+function getAspectRatioClass(fit: "contain" | "cover" | "fill"): string {
+  if (fit === "contain") return "min-h-[150px] md:min-h-[200px]";
+  if (fit === "cover") return "h-[33vh] max-h-[300px] min-h-[150px]";
   return "aspect-[21/9] md:aspect-[21/9] min-h-[80px] md:min-h-[120px]";
 }
 
@@ -39,8 +40,10 @@ export function HeroBanner({ empresa, bannerFit = "contain" }: HeroBannerProps) 
     ? { initial: {}, animate: {} }
     : { initial: { opacity: 0 }, animate: { opacity: 1 } };
 
+  const aspectClass = getAspectRatioClass(bannerFit ?? "contain");
+
   return (
-    <div className="relative flex flex-col items-center justify-center overflow-hidden bg-primary px-0 py-8 md:py-16 text-center min-h-[150px] md:min-h-[200px]">
+    <div className={`relative flex flex-col items-center justify-center overflow-hidden bg-primary px-0 py-8 md:py-16 text-center ${aspectClass}`}>
       {urlImage && (
         <div className="absolute inset-0 z-0 w-full h-full">
           <Image
