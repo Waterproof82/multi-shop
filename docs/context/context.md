@@ -29,8 +29,11 @@ Plataforma multi-tenant de pedidos online para restaurantes/tiendas.
 6. Todas las APIs aceptan `empresaId` como query param para superadmin
 
 ### Imágenes
-- Upload: cliente optimiza (WebP 480x480) → `POST /api/admin/upload-image` → Cloudflare R2
+- Upload: cliente optimiza (WebP 480x480 para productos, 1920x1080 para banners) → `POST /api/admin/upload-image` → Cloudflare R2
 - URLs: `https://imagenes.almadearena.es/{slug}/{año}/{mes}/{uuid}.webp`
+- **Banner**: Usa `optimizeBannerImage` - calidad 92%, máx 1920x1080
+- **Productos**: Usa `optimizeImage` - calidad 80%, máx 480x480
+- **Preview**: Usa `object-contain` para mostrar imagen completa sin recortes
 
 ## Stack
 - Next.js 16 (App Router) + React 19
@@ -79,12 +82,23 @@ Plataforma multi-tenant de pedidos online para restaurantes/tiendas.
 6. Las APIs aceptan `empresaId` como query param para superadmin
 
 ### Cambios en APIs para soportar superadmin
-- `requireAuth()` ahora retorna `isSuperAdmin` y permite empresaId vacio
-- `requireRole()` ahora acepta `['admin', 'superadmin']`
-- Todas las APIs de admin leen `empresaId` de query string cuando `isSuperAdmin` es true
-- Ver `src/core/infrastructure/api/helpers.ts`
+- `requireAuth()` retorna `isSuperAdmin` flag
+- `requireRole()` acepta `['admin', 'superadmin']`
+- **APIs que soportan superadmin:**
+  - `/api/admin/empresa` - GET/PUT requieren `empresaId` query param
+  - `/api/admin/upload-image` - POST requiere `empresaId` query param
+  - `/api/admin/productos` - GET/POST/PUT/DELETE requieren `empresaId` query param
+  - `/api/admin/categorias`, `/api/admin/clientes`, etc. - similarly
 
 ### Banner flotante en modo superadmin
 - En `src/app/admin/(protected)/layout.tsx`
 - Banner fixed con z-index alto
 - Muestra empresa actual y botón "Volver al panel"
+
+### Optimización de imágenes (2024)
+- **banner_fit**: opción en empresa para ajustar display (contain/cover/fill)
+- `object-contain` por defecto para mostrar imagen completa sin recortes
+- Diferentes niveles de calidad:
+  - Banner: 1920x1080, 92% quality WebP
+  - Productos: 480x480, 80% quality WebP
+- Ver `src/lib/image-utils.ts` y `src/components/ui/image-uploader.tsx`

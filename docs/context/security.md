@@ -196,6 +196,19 @@ Pages:
 
 El superadmin tiene acceso a través de `SUPABASE_SERVICE_ROLE_KEY` (bypass RLS) para consultar y modificar cualquier empresa.
 
+**APIs admin que soportan superadmin con query param:**
+
+| Route | Handlers | Query param requerido |
+|-------|----------|----------------------|
+| `/api/admin/empresa` | GET, PUT | `empresaId` |
+| `/api/admin/upload-image` | POST | `empresaId` |
+| `/api/admin/productos` | GET, POST, PUT, DELETE | `empresaId` |
+| `/api/admin/categorias` | GET, POST, PUT, DELETE | `empresaId` |
+| `/api/admin/clientes` | GET, POST, PUT, DELETE | `empresaId` |
+| `/api/admin/pedidos` | GET, POST, PUT, DELETE | `empresaId` |
+
+El frontend usa `overrideEmpresaId` del context admin para enviar automáticamente el query param cuando hay un superadmin activo.
+
 ---
 
 ## Protección CSRF
