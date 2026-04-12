@@ -23,6 +23,7 @@ export class SupabaseProductRepository implements IProductRepository {
       descripcion_de: row.descripcion_de as string | null,
       precio: Number.parseFloat(row.precio as string),
       fotoUrl: row.foto_url as string | null,
+      fotoObjectFit: (row.foto_object_fit as string | null) as Product['fotoObjectFit'],
       esEspecial: row.es_especial as boolean,
       activo: row.activo as boolean,
       createdAt: new Date(row.created_at as string),
@@ -48,6 +49,7 @@ export class SupabaseProductRepository implements IProductRepository {
           descripcion_de: data.descripcion_de || null,
           precio: data.precio,
           foto_url: data.foto_url || null,
+          foto_object_fit: data.foto_object_fit || 'contain',
           es_especial: data.es_especial,
           activo: data.activo,
         })
@@ -162,7 +164,7 @@ export class SupabaseProductRepository implements IProductRepository {
     const fieldsToMap = [
       'categoria_id', 'titulo_es', 'titulo_en', 'titulo_fr', 'titulo_it', 'titulo_de',
       'descripcion_es', 'descripcion_en', 'descripcion_fr', 'descripcion_it', 'descripcion_de',
-      'precio', 'es_especial', 'activo'
+      'precio', 'es_especial', 'activo', 'foto_object_fit'
     ];
 
     for (const field of fieldsToMap) {

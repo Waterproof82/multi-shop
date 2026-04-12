@@ -1,3 +1,5 @@
+export type ImageFit = 'contain' | 'cover' | 'fill' | 'none' | 'scale-down';
+
 export interface Product {
   id: string;
   empresaId: string;
@@ -14,6 +16,7 @@ export interface Product {
   descripcion_de: string | null;
   precio: number;
   fotoUrl: string | null;
+  fotoObjectFit: ImageFit | null;
   esEspecial: boolean;
   activo: boolean;
   createdAt: Date;

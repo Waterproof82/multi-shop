@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+const imageFitValues = ['contain', 'cover', 'fill', 'none', 'scale-down'] as const;
+
 // Schema for API validation (with i18n fields)
 export const createProductSchema = z.object({
   empresaId: z.string().uuid(),
@@ -23,6 +25,7 @@ export const createProductSchema = z.object({
     (url) => url.startsWith('https://'),
     { message: 'foto_url must use HTTPS' }
   ).nullable().optional(),
+  foto_object_fit: z.enum(imageFitValues).nullable().optional(),
   categoria_id: z.string().uuid().nullable().optional(),
   es_especial: z.boolean().default(false),
   activo: z.boolean().default(true),

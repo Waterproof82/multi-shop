@@ -19,6 +19,7 @@ import { t } from '@/lib/translations';
 import { ProductFormDialog, DeleteConfirmDialog } from '@/components/admin/product-form-dialog';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import type { ProductoFormData } from '@/components/admin/product-form-dialog';
+import type { ImageFit } from '@/core/application/dtos/menu-view-model';
 import { SkeletonTable, SkeletonStats, Skeleton } from '@/components/ui/skeleton';
 import { formatPrice } from '@/lib/format-price';
 
@@ -42,6 +43,7 @@ interface Producto {
   descripcion_de: string | null;
   precio: number;
   foto_url: string | null;
+  foto_object_fit: ImageFit | null;
   categoria_id: string | null;
   es_especial: boolean;
   activo: boolean;
@@ -60,6 +62,7 @@ const emptyForm: ProductoFormData = {
   descripcion_de: '',
   precio: '',
   foto_url: '',
+  foto_object_fit: 'contain',
   categoria_id: '',
   es_especial: false,
   activo: true,
@@ -153,6 +156,7 @@ export default function ProductosPage() {
         descripcion_it: formData.descripcion_it || null,
         descripcion_de: formData.descripcion_de || null,
         foto_url: formData.foto_url || null,
+        foto_object_fit: formData.foto_object_fit || 'contain',
       };
 
       const res = await fetchWithCsrf(url, {
@@ -194,6 +198,7 @@ export default function ProductosPage() {
       descripcion_de: producto.descripcion_de || '',
       precio: producto.precio.toString(),
       foto_url: producto.foto_url || '',
+      foto_object_fit: producto.foto_object_fit || 'contain',
       categoria_id: producto.categoria_id || '',
       es_especial: producto.es_especial,
       activo: producto.activo,

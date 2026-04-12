@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import { Upload, Loader2, Pencil, Trash2 } from 'lucide-react';
 import { getCsrfToken } from '@/lib/csrf-client';
@@ -8,6 +8,14 @@ import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import { optimizeImage, optimizeBannerImage } from '@/lib/image-utils';
 import { useAdmin } from '@/lib/admin-context';
+import { ImageFit } from '@/core/application/dtos/menu-view-model';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface ImageUploaderProps {
   readonly value: string;
@@ -20,6 +28,8 @@ interface ImageUploaderProps {
   readonly isBannerImage?: boolean;
   readonly aspectRatio?: string;
   readonly helpText?: string;
+  readonly objectFit?: ImageFit;
+  readonly onObjectFitChange?: (fit: ImageFit) => void;
 }
 
 
@@ -34,6 +44,8 @@ export function ImageUploader({
   isBannerImage = false,
   aspectRatio = '16/10',
   helpText,
+  objectFit: propObjectFit,
+  onObjectFitChange,
 }: ImageUploaderProps) {
   const { language } = useLanguage();
   const { overrideEmpresaId, empresaId: defaultEmpresaId } = useAdmin();
@@ -41,7 +53,14 @@ export function ImageUploader({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [dragOver, setDragOver] = useState(false);
+  const [objectFit, setObjectFit] = useState<ImageFit>(propObjectFit || 'contain');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (propObjectFit) {
+      setObjectFit(propObjectFit);
+    }
+  }, [propObjectFit]);
 
   const handleFileSelect = async (file: File) => {
     if (!file) return;
@@ -135,31 +154,56 @@ export function ImageUploader({
       )}
 
       {value ? (
-        <div className={previewClassName} style={previewStyle}>
+        <div 
+          className={previewClassName} 
+          style={{ 
+            ...previewStyle,
+            aspectRatio: aspectRatio 
+          }}
+        >
           <Image
             src={value}
             alt={`${label} preview`}
             fill
-            className="object-contain"
+            className={`object-${objectFit}`}
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             priority={false}
             loading="lazy"
           />
-          <div className="absolute inset-0 bg-overlay opacity-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
-            <button
-              type="button"
-              onClick={handleClick}
-              className="px-3 py-1.5 bg-card text-card-foreground rounded-md text-sm hover:bg-muted"
-            >
-              Cambiar
-            </button>
-            <button
-              type="button"
-              onClick={handleRemove}
-              className="px-3 py-1.5 bg-destructive text-destructive-foreground rounded-md text-sm hover:bg-destructive/90"
-            >
-              Eliminar
-            </button>
+          <div className="absolute inset-0 bg-overlay opacity-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-2">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleClick}
+                className="px-3 py-1.5 bg-card text-card-foreground rounded-md text-sm hover:bg-muted"
+              >
+                Cambiar
+              </button>
+              <button
+                type="button"
+                onClick={handleRemove}
+                className="px-3 py-1.5 bg-destructive text-destructive-foreground rounded-md text-sm hover:bg-destructive/90"
+              >
+                Eliminar
+              </button>
+            </div>
+            {onObjectFitChange && (
+              <Select
+                value={objectFit}
+                onValueChange={(v) => onObjectFitChange(v as ImageFit)}
+              >
+                <SelectTrigger className="w-28 h-8 bg-card/90 backdrop-blur-sm text-card-foreground text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="contain">Contain</SelectItem>
+                  <SelectItem value="cover">Cover</SelectItem>
+                  <SelectItem value="fill">Fill</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
+                  <SelectItem value="scale-down">Scale</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
           </div>
           <div className="md:hidden absolute bottom-2 right-2 flex gap-2">
             <button
