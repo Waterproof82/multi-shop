@@ -34,6 +34,39 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     }
   }
 
+  async findAllByTenantAndMonth(empresaId: string, mes: number, año: number): Promise<Result<Pedido[]>> {
+    try {
+      const startDate = new Date(año, mes, 1).toISOString();
+      const endDate = new Date(año, mes + 1, 0, 23, 59, 59).toISOString();
+
+      const { data, error } = await this.supabase
+        .from('pedidos')
+        .select(`
+          *,
+          clientes:cliente_id (nombre, email, telefono)
+        `)
+        .eq('empresa_id', empresaId)
+        .gte('created_at', startDate)
+        .lte('created_at', endDate)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        await logger.logAndReturnError(
+          'DB_SELECT_ERROR',
+          error.message,
+          'repository',
+          'SupabasePedidoRepository.findAllByTenantAndMonth',
+          { empresaId, details: { code: error.code, mes, año } }
+        );
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pedidos', module: 'repository', method: 'findAllByTenantAndMonth' } };
+      }
+      return { success: true, data: data || [] };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findAllByTenantAndMonth', { empresaId, details: { mes, año } });
+      return { success: false, error: appError };
+    }
+  }
+
   async updateStatus(id: string, empresaId: string, estado: string): Promise<Result<void>> {
     try {
       const { error } = await this.supabase

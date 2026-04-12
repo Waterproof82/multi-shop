@@ -2,6 +2,7 @@ import { Pedido, CartItem, Result } from "../entities/types";
 
 export interface IPedidoRepository {
   findAllByTenant(empresaId: string): Promise<Result<Pedido[]>>;
+  findAllByTenantAndMonth(empresaId: string, mes: number, año: number): Promise<Result<Pedido[]>>;
   updateStatus(id: string, empresaId: string, estado: string): Promise<Result<void>>;
   delete(id: string, empresaId: string): Promise<Result<void>>;
   deleteAllByTenant(empresaId: string): Promise<Result<number>>;
