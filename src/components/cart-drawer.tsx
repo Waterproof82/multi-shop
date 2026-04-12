@@ -475,7 +475,7 @@ export function CartDrawer() {
                         >
                           <Minus className="size-4" />
                         </RippleButton>
-                        <span className="w-6 md:w-6 text-center font-semibold text-foreground animate-quantity-pulse transition-all duration-200 hover:scale-110" key={ci.quantity}>
+                        <span className="w-6 md:w-6 text-center font-semibold text-foreground animate-quantity-pulse">
                           {ci.quantity}
                         </span>
                         <RippleButton

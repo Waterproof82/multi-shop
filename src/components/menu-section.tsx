@@ -446,7 +446,7 @@ function ItemDetailDialog(props: Readonly<{
     || t("complementsAvailable", safeLanguage);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
+    <Dialog open={open} onOpenChange={onOpenChange} modal>
       <DialogContent
         className="sm:max-w-[425px] flex flex-col max-h-[calc(100dvh-2rem)]"
         onPointerDownOutside={() => onOpenChange(false)}
