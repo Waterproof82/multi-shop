@@ -23,6 +23,7 @@ function toAdminProduct(prod: Product) {
     descripcion_de: prod.descripcion_de || null,
     precio: prod.precio,
     foto_url: prod.fotoUrl,
+    foto_object_fit: prod.fotoObjectFit || 'contain',
     es_especial: prod.esEspecial,
     activo: prod.activo,
   };

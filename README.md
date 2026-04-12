@@ -500,8 +500,11 @@ BREVO_DEFAULT_SENDER_EMAIL=noreply@tudominio.com
 
 ### Flujo de upload
 
-1. Cliente optimiza imagen en browser (480×480, WebP, 80%) — `components/ui/image-uploader.tsx`
-2. `POST /api/admin/upload-image` con `FormData`
+1. Cliente optimiza imagen en browser:
+   - **Productos**: 480×480, WebP, 80% (`optimizeImage`)
+   - **Banners**: 1920×1080, WebP, 92% (`optimizeBannerImage`)
+   - `ImageUploader` usa prop `isBannerImage` para seleccionar optimización
+2. `POST /api/admin/upload-image?empresaId=xxx` (superadmin requiere query param)
 3. El API route valida MIME type, magic bytes y tamaño
 4. Deriva `empresaSlug` desde DB — nunca del cliente
 5. Upload a R2 y devuelve `{ publicUrl }`

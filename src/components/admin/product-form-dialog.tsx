@@ -29,6 +29,8 @@ interface Categoria {
   categoria_padre_id: string | null;
 }
 
+type ImageFit = 'contain' | 'cover' | 'fill' | 'none' | 'scale-down';
+
 interface ProductoFormData {
   titulo_es: string;
   titulo_en: string;
@@ -42,6 +44,7 @@ interface ProductoFormData {
   descripcion_de: string;
   precio: string;
   foto_url: string;
+  foto_object_fit: ImageFit;
   categoria_id: string;
   es_especial: boolean;
   activo: boolean;
@@ -229,6 +232,8 @@ export function ProductFormDialog({
               <ImageUploader
                 value={formData.foto_url}
                 onChange={(url) => onFormChange({ ...formData, foto_url: url })}
+                objectFit={formData.foto_object_fit}
+                onObjectFitChange={(fit) => onFormChange({ ...formData, foto_object_fit: fit })}
                 label={t("productImage", language)}
                 empresaSlug={empresaSlug}
                 helpText={t("productImageHelp", language)}

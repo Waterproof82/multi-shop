@@ -284,12 +284,13 @@ function CardMedia({ item, displayName, priority, onError, shouldReduceMotion }:
       />
     );
   }
+  const objectFit = item.imageFit || 'contain';
   return (
     <Image
       src={item.image!}
       alt={displayName}
       fill
-      className="object-contain transition-transform duration-300 md:group-hover:scale-105"
+      className={`object-${objectFit} transition-transform duration-300 md:group-hover:scale-105`}
       loading={priority ? "eager" : "lazy"}
       sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
       onError={onError}
@@ -445,7 +446,7 @@ function ItemDetailDialog(props: Readonly<{
     || t("complementsAvailable", safeLanguage);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
+    <Dialog open={open} onOpenChange={onOpenChange} modal>
       <DialogContent
         className="sm:max-w-[425px] flex flex-col max-h-[calc(100dvh-2rem)]"
         onPointerDownOutside={() => onOpenChange(false)}

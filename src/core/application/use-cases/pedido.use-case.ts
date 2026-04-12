@@ -58,6 +58,19 @@ export class PedidoUseCase {
     }
   }
 
+  async getAllByMonth(empresaId: string, mes: number, año: number): Promise<Result<Pedido[]>> {
+    try {
+      const result = await this.pedidoRepo.findAllByTenantAndMonth(empresaId, mes, año);
+      if (!result.success) {
+        return { success: false, error: { ...result.error, method: 'PedidoUseCase.getAllByMonth' } };
+      }
+      return { success: true, data: result.data };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'use-case', 'PedidoUseCase.getAllByMonth', { empresaId, details: { mes, año } });
+      return { success: false, error: appError };
+    }
+  }
+
   async updateStatus(id: string, empresaId: string, estado: string): Promise<Result<void>> {
     try {
       const result = await this.pedidoRepo.updateStatus(id, empresaId, estado);
@@ -245,6 +258,19 @@ export class PedidoUseCase {
       return { success: true, data: undefined };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'use-case', 'PedidoUseCase.delete', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
+  async deleteAll(empresaId: string): Promise<Result<number>> {
+    try {
+      const result = await this.pedidoRepo.deleteAllByTenant(empresaId);
+      if (!result.success) {
+        return { success: false, error: { ...result.error, method: 'PedidoUseCase.deleteAll' } };
+      }
+      return { success: true, data: result.data };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'use-case', 'PedidoUseCase.deleteAll', { empresaId });
       return { success: false, error: appError };
     }
   }

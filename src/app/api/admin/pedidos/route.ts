@@ -25,7 +25,21 @@ export async function GET(request: NextRequest) {
   const queryEmpresaId = searchParams.get('empresaId');
   const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
 
-  const result = await pedidoUseCase.getAll(empresaId!);
+  const mesParam = searchParams.get('mes');
+  const añoParam = searchParams.get('año');
+
+  let result;
+  if (mesParam !== null && añoParam !== null) {
+    const now = new Date();
+    const mesSchema = z.coerce.number().int().min(0).max(11);
+    const añoSchema = z.coerce.number().int().min(2020).max(2100);
+    const selectedMonth = mesSchema.safeParse(mesParam).data ?? now.getMonth();
+    const selectedYear = añoSchema.safeParse(añoParam).data ?? now.getFullYear();
+    result = await pedidoUseCase.getAllByMonth(empresaId!, selectedMonth, selectedYear);
+  } else {
+    result = await pedidoUseCase.getAll(empresaId!);
+  }
+
   if (!result.success) {
     return handleResult(result);
   }

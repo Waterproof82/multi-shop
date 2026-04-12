@@ -13,6 +13,8 @@ export interface ComplementVM {
   };
 }
 
+export type ImageFit = 'contain' | 'cover' | 'fill' | 'none' | 'scale-down';
+
 export interface MenuItemVM {
   id: string;
   name: string;
@@ -20,6 +22,7 @@ export interface MenuItemVM {
   price: number;
   category: string;
   image?: string;
+  imageFit?: ImageFit;
   highlight?: boolean;
   translations?: {
     en?: TranslationEntry;

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
-import { Search, ChevronDown, ChevronUp, Check, Clock, Trash2, ShoppingCart, Calendar } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, Check, Clock, Trash2, ShoppingCart, Calendar, Trash, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import type { PedidoItem, PedidoComplemento } from '@/core/domain/entities/types';
 import { PEDIDO_ESTADOS, PEDIDO_ESTADO_COLORS, type PedidoEstado } from '@/core/domain/constants/pedido';
@@ -51,7 +51,7 @@ function getAriaSortValue(sortField: string, currentField: string, sortDirection
 }
 
 export default function PedidosPage() {
-  const { empresaId, overrideEmpresaId } = useAdmin();
+  const { empresaId, overrideEmpresaId, isSuperAdmin } = useAdmin();
   const effectiveEmpresaId = overrideEmpresaId || empresaId;
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,13 +60,30 @@ export default function PedidosPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [expandedPedido, setExpandedPedido] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; id: string | null; numero: number | null }>({ show: false, id: null, numero: null });
+  const [deleteAllConfirm, setDeleteAllConfirm] = useState<{ show: boolean; confirmText: string }>({ show: false, confirmText: '' });
+  const [deletingAll, setDeletingAll] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState({ mes: new Date().getMonth(), año: new Date().getFullYear() });
   const { language } = useLanguage();
+
+  const lang = language;
+  const meses = [t("monthJan", lang), t("monthFeb", lang), t("monthMar", lang), t("monthApr", lang), t("monthMay", lang), t("monthJun", lang), t("monthJul", lang), t("monthAug", lang), t("monthSep", lang), t("monthOct", lang), t("monthNov", lang), t("monthDec", lang)];
+
+  const cambiarMes = (delta: number) => {
+    const nuevoMes = selectedMonth.mes + delta;
+    const nuevoAño = selectedMonth.año + Math.floor(nuevoMes / 12);
+    const mesAjustado = ((nuevoMes % 12) + 12) % 12;
+    setSelectedMonth({ mes: mesAjustado, año: nuevoAño });
+  };
+
+  const esMesActual = selectedMonth.mes === new Date().getMonth() && selectedMonth.año === new Date().getFullYear();
 
   useEffect(() => {
     const controller = new AbortController();
     async function fetchPedidos() {
+      setLoading(true);
       try {
-        const res = await fetchWithCsrf(`/api/admin/pedidos?empresaId=${effectiveEmpresaId}`, {
+        const url = `/api/admin/pedidos?empresaId=${effectiveEmpresaId}&mes=${selectedMonth.mes}&año=${selectedMonth.año}`;
+        const res = await fetchWithCsrf(url, {
           signal: controller.signal
         }, {
           maxRetries: 3,
@@ -86,7 +103,7 @@ export default function PedidosPage() {
     }
     fetchPedidos();
     return () => controller.abort();
-  }, [effectiveEmpresaId]);
+  }, [effectiveEmpresaId, selectedMonth.mes, selectedMonth.año]);
 
   const filteredPedidos = useMemo(() => pedidos
     .filter(p =>
@@ -191,21 +208,67 @@ export default function PedidosPage() {
     }
   };
 
+  const confirmDeleteAll = async () => {
+    if (deleteAllConfirm.confirmText.toUpperCase() !== (language === 'es' ? 'ELIMINAR' : language === 'en' ? 'DELETE' : language === 'fr' ? 'SUPPRIMER' : language === 'it' ? 'ELIMINA' : 'LÖSCHEN')) return;
+    setDeletingAll(true);
+    try {
+      const res = await fetchWithCsrf(`/api/admin/pedidos/delete-all?empresaId=${effectiveEmpresaId}`, {
+        method: 'DELETE',
+      }, {
+        maxRetries: 2,
+        baseDelay: 1000,
+        retryOn: (response) => response.status >= 500 || response.status === 429
+      });
+      if (res.ok) {
+        setPedidos([]);
+        setDeleteAllConfirm({ show: false, confirmText: '' });
+      }
+    } catch (error) {
+      logClientError(error, 'confirmDeleteAll');
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
+  const openDeleteAllDialog = () => {
+    setDeleteAllConfirm({ show: true, confirmText: '' });
+  };
+
   const stats = useMemo(() => {
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const selectedMonthStart = new Date(selectedMonth.año, selectedMonth.mes, 1);
+    const selectedMonthEnd = new Date(selectedMonth.año, selectedMonth.mes + 1, 0, 23, 59, 59);
     
-    const pedidosHoy = pedidos.filter(p => new Date(p.created_at) >= today);
-    const pedidosMes = pedidos.filter(p => new Date(p.created_at) >= monthStart);
+    const isCurrentMonth = selectedMonth.mes === today.getMonth() && selectedMonth.año === today.getFullYear();
+    
+    let pedidosHoy: Pedido[] = [];
+    let pedidosDelMes: Pedido[] = [];
+    
+    if (isCurrentMonth) {
+      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      pedidosHoy = pedidos.filter(p => new Date(p.created_at) >= todayStart);
+      pedidosDelMes = pedidos.filter(p => new Date(p.created_at) >= selectedMonthStart);
+    } else {
+      pedidosDelMes = pedidos.filter(p => {
+        const created = new Date(p.created_at);
+        return created >= selectedMonthStart && created <= selectedMonthEnd;
+      });
+      pedidosHoy = [];
+    }
+    
+    const pendientes = pedidosDelMes.filter(p => p.estado === 'pendiente').length;
+    const aceptados = pedidosDelMes.filter(p => p.estado === 'aceptado' || p.estado === 'preparando' || p.estado === 'enviado' || p.estado === 'entregado').length;
     
     return {
       pedidosHoy: pedidosHoy.length,
       totalHoy: pedidosHoy.reduce((sum, p) => sum + p.total, 0),
-      pedidosMes: pedidosMes.length,
-      totalMes: pedidosMes.reduce((sum, p) => sum + p.total, 0),
+      pedidosMes: pedidosDelMes.length,
+      totalMes: pedidosDelMes.reduce((sum, p) => sum + p.total, 0),
+      pendientes,
+      aceptados,
+      isCurrentMonth,
     };
-  }, [pedidos]);
+  }, [pedidos, selectedMonth]);
 
   if (loading) {
     return (
@@ -243,16 +306,20 @@ export default function PedidosPage() {
             <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">{t("ordersTitle", language)}</h1>
             <p className="text-primary-foreground/80 text-sm mt-1">{t("ordersSubtitle", language)}</p>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
-              <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
-              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{stats.pedidosHoy}</span>
-              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">{t("today", language)}</p>
-            </div>
-            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
-              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{formatPrice(stats.totalHoy)}</span>
-              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">{t("salesToday", language)}</p>
-            </div>
+          <div className={`grid gap-3 sm:gap-4 ${stats.isCurrentMonth ? 'grid-cols-2 sm:grid-cols-6' : 'grid-cols-2 sm:grid-cols-4'}`}>
+            {stats.isCurrentMonth && (
+              <>
+                <div className="bg-blue-500/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
+                  <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 text-blue-200 mx-auto mb-1" />
+                  <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{stats.pedidosHoy}</span>
+                  <p className="text-blue-200 text-[10px] sm:text-xs">{t("today", language)}</p>
+                </div>
+                <div className="bg-blue-500/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
+                  <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{formatPrice(stats.totalHoy)}</span>
+                  <p className="text-blue-200 text-[10px] sm:text-xs">{t("salesToday", language)}</p>
+                </div>
+              </>
+            )}
             <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
               <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
               <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{stats.pedidosMes}</span>
@@ -262,9 +329,63 @@ export default function PedidosPage() {
               <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{formatPrice(stats.totalMes)}</span>
               <p className="text-primary-foreground/80 text-[10px] sm:text-xs">{t("salesMonth", language)}</p>
             </div>
+            <div className="rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center bg-status-pending-bg">
+              <span className="text-lg sm:text-2xl font-semibold text-status-pending-text">{stats.pendientes}</span>
+              <p className="text-status-pending-text/80 text-[10px] sm:text-xs">{t("statusPendiente", language)}</p>
+            </div>
+            <div className="rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center bg-status-accepted-bg">
+              <span className="text-lg sm:text-2xl font-semibold text-status-accepted-text">{stats.aceptados}</span>
+              <p className="text-status-accepted-text/80 text-[10px] sm:text-xs">{t("statusAceptado", language)}</p>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Month selector */}
+      <div className="bg-card rounded-lg border border-border p-4">
+        <div className="flex items-center justify-center gap-4">
+          <button
+            onClick={() => cambiarMes(-1)}
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-muted/80 text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            aria-label="Mes anterior"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <div className="text-center min-w-[140px]">
+            <span className="text-lg font-semibold text-foreground">
+              {meses[selectedMonth.mes]} {selectedMonth.año}
+            </span>
+            {!esMesActual && (
+              <button
+                onClick={() => setSelectedMonth({ mes: new Date().getMonth(), año: new Date().getFullYear() })}
+                className="block text-xs text-primary hover:underline mx-auto mt-1"
+              >
+                Ver actual
+              </button>
+            )}
+          </div>
+          <button
+            onClick={() => cambiarMes(1)}
+            disabled={esMesActual}
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-muted/80 text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label={t("nextMonth", language) || "Mes siguiente"}
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      {isSuperAdmin && pedidos.length > 0 && (
+        <div className="flex justify-end">
+          <button
+            onClick={openDeleteAllDialog}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            <Trash className="w-4 h-4" />
+            {t("deleteAllOrders", language)}
+          </button>
+        </div>
+      )}
 
       {/* Buscador */}
       <div className="bg-card rounded-lg shadow-elegant border border-border">
@@ -443,6 +564,57 @@ export default function PedidosPage() {
             >
               {t("delete", language)}
             </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteAllConfirm.show} onOpenChange={(open) => { if (!open) setDeleteAllConfirm({ show: false, confirmText: '' }); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              <div className="p-2 bg-destructive/10 rounded-full">
+                <AlertTriangle className="w-5 h-5 text-destructive" />
+              </div>
+              {t("deleteAllOrders", language)}
+            </DialogTitle>
+            <DialogDescription className="space-y-2">
+              <span>{t("deleteAllOrdersConfirm", language)}</span>
+              <span className="block text-sm text-muted-foreground">
+                {t("deleteAllOrdersWarning", language)} <strong className="text-destructive">{pedidos.length}</strong> {t("deleteAllOrdersWarningEnd", language)}
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="confirmText" className="block text-sm font-medium mb-2">
+                {t("confirmingDeleteAll", language)}
+              </label>
+              <Input
+                id="confirmText"
+                type="text"
+                value={deleteAllConfirm.confirmText}
+                onChange={(e) => setDeleteAllConfirm(prev => ({ ...prev, confirmText: e.target.value }))}
+                placeholder={language === 'es' ? 'ELIMINAR' : language === 'en' ? 'DELETE' : language === 'fr' ? 'SUPPRIMER' : language === 'it' ? 'ELIMINA' : 'LÖSCHEN'}
+                className="w-full"
+                autoComplete="off"
+              />
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setDeleteAllConfirm({ show: false, confirmText: '' })}
+                className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+                disabled={deletingAll}
+              >
+                {t("cancel", language)}
+              </button>
+              <button
+                onClick={confirmDeleteAll}
+                disabled={deleteAllConfirm.confirmText.toUpperCase() !== (language === 'es' ? 'ELIMINAR' : language === 'en' ? 'DELETE' : language === 'fr' ? 'SUPPRIMER' : language === 'it' ? 'ELIMINA' : 'LÖSCHEN') || deletingAll}
+                className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deletingAll ? (language === 'es' ? 'Eliminando...' : language === 'en' ? 'Deleting...' : language === 'fr' ? 'Suppression...' : language === 'it' ? 'Eliminazione...' : 'Wird gelöscht...') : t("delete", language)}
+              </button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

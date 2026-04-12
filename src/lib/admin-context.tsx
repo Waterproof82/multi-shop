@@ -9,6 +9,7 @@ interface AdminContextType {
   mostrarPromociones: boolean;
   mostrarTgtg: boolean;
   overrideEmpresaId?: string;
+  isSuperAdmin: boolean;
 }
 
 const AdminContext = createContext<AdminContextType>({
@@ -17,6 +18,7 @@ const AdminContext = createContext<AdminContextType>({
   empresaLogo: null,
   mostrarPromociones: true,
   mostrarTgtg: true,
+  isSuperAdmin: false,
 });
 
 export function useAdmin() {
@@ -31,9 +33,10 @@ interface AdminProviderProps {
   readonly mostrarPromociones: boolean;
   readonly mostrarTgtg: boolean;
   readonly overrideEmpresaId?: string;
+  readonly isSuperAdmin: boolean;
 }
 
-export function AdminProvider({ children, empresaId, empresaNombre, empresaLogo, mostrarPromociones, mostrarTgtg, overrideEmpresaId }: Readonly<AdminProviderProps>) {
+export function AdminProvider({ children, empresaId, empresaNombre, empresaLogo, mostrarPromociones, mostrarTgtg, overrideEmpresaId, isSuperAdmin }: Readonly<AdminProviderProps>) {
   const empresaSlug = empresaNombre
     .toLowerCase()
     .replaceAll(/[^a-z0-9]+/g, '-')
@@ -47,8 +50,9 @@ export function AdminProvider({ children, empresaId, empresaNombre, empresaLogo,
     empresaLogo: empresaLogo || null,
     mostrarPromociones,
     mostrarTgtg,
-    overrideEmpresaId
-  }), [effectiveEmpresaId, empresaSlug, empresaLogo, mostrarPromociones, mostrarTgtg, overrideEmpresaId]);
+    overrideEmpresaId,
+    isSuperAdmin
+  }), [effectiveEmpresaId, empresaSlug, empresaLogo, mostrarPromociones, mostrarTgtg, overrideEmpresaId, isSuperAdmin]);
 
   return (
     <AdminContext.Provider value={value}>

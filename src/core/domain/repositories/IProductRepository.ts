@@ -1,4 +1,4 @@
-import { Product, Result } from "../entities/types";
+import { Product, Result, ImageFit } from "../entities/types";
 
 export interface CreateProductData {
   empresaId: string;
@@ -14,6 +14,7 @@ export interface CreateProductData {
   descripcion_de?: string | null;
   precio: number;
   foto_url?: string | null;
+  foto_object_fit?: ImageFit | null;
   categoria_id?: string | null;
   es_especial?: boolean;
   activo?: boolean;
