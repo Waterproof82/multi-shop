@@ -248,4 +248,17 @@ export class PedidoUseCase {
       return { success: false, error: appError };
     }
   }
+
+  async deleteAll(empresaId: string): Promise<Result<number>> {
+    try {
+      const result = await this.pedidoRepo.deleteAllByTenant(empresaId);
+      if (!result.success) {
+        return { success: false, error: { ...result.error, method: 'PedidoUseCase.deleteAll' } };
+      }
+      return { success: true, data: result.data };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'use-case', 'PedidoUseCase.deleteAll', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
 }

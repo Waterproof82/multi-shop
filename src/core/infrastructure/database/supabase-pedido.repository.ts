@@ -84,6 +84,53 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     }
   }
 
+  async deleteAllByTenant(empresaId: string): Promise<Result<number>> {
+    try {
+      const { data: pedidosAEliminar, error: countError } = await this.supabase
+        .from('pedidos')
+        .select('id')
+        .eq('empresa_id', empresaId);
+
+      if (countError) {
+        await logger.logAndReturnError(
+          'DB_SELECT_ERROR',
+          countError.message,
+          'repository',
+          'SupabasePedidoRepository.deleteAllByTenant (count)',
+          { empresaId, details: { code: countError.code } }
+        );
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al contar pedidos', module: 'repository', method: 'deleteAllByTenant' } };
+      }
+
+      const count = pedidosAEliminar?.length || 0;
+
+      if (count === 0) {
+        return { success: true, data: 0 };
+      }
+
+      const { error: deleteError } = await this.supabase
+        .from('pedidos')
+        .delete()
+        .eq('empresa_id', empresaId);
+
+      if (deleteError) {
+        await logger.logAndReturnError(
+          'DB_DELETE_ERROR',
+          deleteError.message,
+          'repository',
+          'SupabasePedidoRepository.deleteAllByTenant',
+          { empresaId, details: { code: deleteError.code } }
+        );
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al eliminar todos los pedidos', module: 'repository', method: 'deleteAllByTenant' } };
+      }
+
+      return { success: true, data: count };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.deleteAllByTenant', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
   async create(
     empresaId: string,
     clienteId: string | null,

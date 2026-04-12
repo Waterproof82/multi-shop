@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
-import { Search, ChevronDown, ChevronUp, Check, Clock, Trash2, ShoppingCart, Calendar } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, Check, Clock, Trash2, ShoppingCart, Calendar, Trash, AlertTriangle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import type { PedidoItem, PedidoComplemento } from '@/core/domain/entities/types';
 import { PEDIDO_ESTADOS, PEDIDO_ESTADO_COLORS, type PedidoEstado } from '@/core/domain/constants/pedido';
@@ -51,7 +51,7 @@ function getAriaSortValue(sortField: string, currentField: string, sortDirection
 }
 
 export default function PedidosPage() {
-  const { empresaId, overrideEmpresaId } = useAdmin();
+  const { empresaId, overrideEmpresaId, isSuperAdmin } = useAdmin();
   const effectiveEmpresaId = overrideEmpresaId || empresaId;
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,6 +60,8 @@ export default function PedidosPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [expandedPedido, setExpandedPedido] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; id: string | null; numero: number | null }>({ show: false, id: null, numero: null });
+  const [deleteAllConfirm, setDeleteAllConfirm] = useState<{ show: boolean; confirmText: string }>({ show: false, confirmText: '' });
+  const [deletingAll, setDeletingAll] = useState(false);
   const { language } = useLanguage();
 
   useEffect(() => {
@@ -191,6 +193,32 @@ export default function PedidosPage() {
     }
   };
 
+  const confirmDeleteAll = async () => {
+    if (deleteAllConfirm.confirmText.toUpperCase() !== (language === 'es' ? 'ELIMINAR' : language === 'en' ? 'DELETE' : language === 'fr' ? 'SUPPRIMER' : language === 'it' ? 'ELIMINA' : 'LÖSCHEN')) return;
+    setDeletingAll(true);
+    try {
+      const res = await fetchWithCsrf(`/api/admin/pedidos/delete-all?empresaId=${effectiveEmpresaId}`, {
+        method: 'DELETE',
+      }, {
+        maxRetries: 2,
+        baseDelay: 1000,
+        retryOn: (response) => response.status >= 500 || response.status === 429
+      });
+      if (res.ok) {
+        setPedidos([]);
+        setDeleteAllConfirm({ show: false, confirmText: '' });
+      }
+    } catch (error) {
+      logClientError(error, 'confirmDeleteAll');
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
+  const openDeleteAllDialog = () => {
+    setDeleteAllConfirm({ show: true, confirmText: '' });
+  };
+
   const stats = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -265,6 +293,18 @@ export default function PedidosPage() {
           </div>
         </div>
       </div>
+
+      {isSuperAdmin && pedidos.length > 0 && (
+        <div className="flex justify-end">
+          <button
+            onClick={openDeleteAllDialog}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            <Trash className="w-4 h-4" />
+            {t("deleteAllOrders", language)}
+          </button>
+        </div>
+      )}
 
       {/* Buscador */}
       <div className="bg-card rounded-lg shadow-elegant border border-border">
@@ -443,6 +483,57 @@ export default function PedidosPage() {
             >
               {t("delete", language)}
             </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteAllConfirm.show} onOpenChange={(open) => { if (!open) setDeleteAllConfirm({ show: false, confirmText: '' }); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              <div className="p-2 bg-destructive/10 rounded-full">
+                <AlertTriangle className="w-5 h-5 text-destructive" />
+              </div>
+              {t("deleteAllOrders", language)}
+            </DialogTitle>
+            <DialogDescription className="space-y-2">
+              <p>{t("deleteAllOrdersConfirm", language)}</p>
+              <p className="text-sm text-muted-foreground">
+                {t("deleteAllOrdersWarning", language)} <strong className="text-destructive">{pedidos.length}</strong> {t("deleteAllOrdersWarningEnd", language)}
+              </p>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="confirmText" className="block text-sm font-medium mb-2">
+                {t("confirmingDeleteAll", language)}
+              </label>
+              <Input
+                id="confirmText"
+                type="text"
+                value={deleteAllConfirm.confirmText}
+                onChange={(e) => setDeleteAllConfirm(prev => ({ ...prev, confirmText: e.target.value }))}
+                placeholder={language === 'es' ? 'ELIMINAR' : language === 'en' ? 'DELETE' : language === 'fr' ? 'SUPPRIMER' : language === 'it' ? 'ELIMINA' : 'LÖSCHEN'}
+                className="w-full"
+                autoComplete="off"
+              />
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setDeleteAllConfirm({ show: false, confirmText: '' })}
+                className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+                disabled={deletingAll}
+              >
+                {t("cancel", language)}
+              </button>
+              <button
+                onClick={confirmDeleteAll}
+                disabled={deleteAllConfirm.confirmText.toUpperCase() !== (language === 'es' ? 'ELIMINAR' : language === 'en' ? 'DELETE' : language === 'fr' ? 'SUPPRIMER' : language === 'it' ? 'ELIMINA' : 'LÖSCHEN') || deletingAll}
+                className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deletingAll ? (language === 'es' ? 'Eliminando...' : language === 'en' ? 'Deleting...' : language === 'fr' ? 'Suppression...' : language === 'it' ? 'Eliminazione...' : 'Wird gelöscht...') : t("delete", language)}
+              </button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

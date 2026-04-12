@@ -172,12 +172,15 @@ export default function TooGoodToGoPage() {
       const optimized = await optimizeImage(file);
       const formData = new FormData();
       formData.append('file', optimized.file);
-      const uploadRes = await fetch('/api/admin/upload-image', {
+      const uploadRes = await fetch(`/api/admin/upload-image?empresaId=${effectiveEmpresaId}`, {
         method: 'POST',
         headers: csrfToken ? { 'x-csrf-token': csrfToken } : {},
         body: formData,
       });
-      if (!uploadRes.ok) return null;
+      if (!uploadRes.ok) {
+        console.error('Upload failed:', uploadRes.status, await uploadRes.text());
+        return null;
+      }
       const data = await uploadRes.json() as { publicUrl?: string };
       return data.publicUrl ?? null;
     } finally {

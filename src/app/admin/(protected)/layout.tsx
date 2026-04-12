@@ -68,6 +68,7 @@ export default async function AdminProtectedLayout({
           mostrarPromociones={mostrarPromociones}
           mostrarTgtg={mostrarTgtg}
           overrideEmpresaId={isSuperAdminView ? empresaId : undefined}
+          isSuperAdmin={isSuperAdminView}
         >
           <div className="min-h-screen bg-muted">
             {isSuperAdminView && (
