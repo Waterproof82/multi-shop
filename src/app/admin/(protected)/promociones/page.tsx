@@ -185,15 +185,15 @@ export default function PromocionesPage() {
             <p className="text-slate-300 text-sm mt-1">{t("promotionsSubtitle", language)}</p>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="backdrop-blur-xl bg-gradient-to-br from-cyan-500/20 to-cyan-700/20 border border-cyan-400/30 rounded-xl px-4 py-3 text-center">
-              <Users className="w-6 h-6 text-cyan-300 mx-auto mb-1" />
+            <div className="backdrop-blur-xl bg-gradient-to-br from-violet-500/20 to-violet-700/20 border border-violet-400/30 rounded-xl px-4 py-3 text-center hover:shadow-[0_0_20px_rgba(139,92,246,0.3)] transition-shadow duration-300">
+              <Users className="w-6 h-6 text-violet-300 mx-auto mb-1" />
               <span className="text-2xl font-semibold text-white">{clientes.length}</span>
-              <p className="text-cyan-200 text-xs">{t("total", language)}</p>
+              <p className="text-violet-200 text-xs">{t("total", language)}</p>
             </div>
-            <div className="backdrop-blur-xl bg-gradient-to-br from-teal-500/20 to-teal-700/20 border border-teal-400/30 rounded-xl px-4 py-3 text-center">
-              <Mail className="w-6 h-6 text-teal-300 mx-auto mb-1" />
+            <div className="backdrop-blur-xl bg-gradient-to-br from-emerald-500/20 to-emerald-700/20 border border-emerald-400/30 rounded-xl px-4 py-3 text-center hover:shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-shadow duration-300">
+              <Mail className="w-6 h-6 text-emerald-300 mx-auto mb-1" />
               <span className="text-2xl font-semibold text-white" aria-live="polite">{clientesConPromociones.length}</span>
-              <p className="text-teal-200 text-xs">{t("toSend", language)}</p>
+              <p className="text-emerald-200 text-xs">{t("toSend", language)}</p>
             </div>
           </div>
         </div>
@@ -201,7 +201,7 @@ export default function PromocionesPage() {
 
       <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-4">
         <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-          <Send className="w-5 h-5 text-cyan-300" />
+          <Send className="w-5 h-5 text-violet-400" />
           {t("newPromotion", language)}
         </h2>
 
@@ -296,7 +296,7 @@ export default function PromocionesPage() {
             <Button
               onClick={handleGuardarPromocion}
               disabled={!promoTexto || !promoFechaFin || savingPromo || clientesConPromociones.length === 0}
-              className="bg-gradient-to-r from-cyan-500 to-teal-600 hover:from-cyan-600 hover:to-teal-700 text-white font-bold"
+              className="bg-gradient-to-r from-violet-500 to-violet-600 hover:from-violet-600 hover:to-violet-700 text-white font-bold"
             >
               {savingPromo ? (
                 <><Loader2 className="w-4 h-4 animate-spin" />{uploadingImage ? t("uploadingImageProgress", language) : t("savingProgress", language)}</>

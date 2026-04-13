@@ -484,14 +484,14 @@ export default function TooGoodToGoPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
           <div>
             <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight flex items-center gap-3">
-              <ShoppingBag className="w-7 h-7 text-cyan-300" />
+              <ShoppingBag className="w-7 h-7 text-amber-400" />
               TooGoodToGo
             </h1>
             <p className="text-slate-300 text-sm mt-1">{t("tgtgNewPromo", language)}</p>
           </div>
-          <div className="backdrop-blur-xl bg-gradient-to-br from-cyan-500/20 to-cyan-700/20 border border-cyan-400/30 rounded-xl px-4 py-3 text-center">
+          <div className="backdrop-blur-xl bg-gradient-to-br from-amber-500/20 to-amber-700/20 border border-amber-400/30 rounded-xl px-4 py-3 text-center hover:shadow-[0_0_20px_rgba(245,158,11,0.3)] transition-shadow duration-300">
             <span className="text-2xl font-semibold text-white">{clientesConPromociones.length}</span>
-            <p className="text-cyan-200 text-xs">{t("toSend", language)}</p>
+            <p className="text-amber-200 text-xs">{t("toSend", language)}</p>
           </div>
         </div>
       </div>
@@ -499,7 +499,7 @@ export default function TooGoodToGoPage() {
       {/* New campaign form */}
       <div id="tgtg-campaign-form" className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
         <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-          <ShoppingBag className="w-5 h-5 text-cyan-300" />
+          <ShoppingBag className="w-5 h-5 text-amber-400" />
           {t("tgtgNewPromo", language)}
         </h2>
 
