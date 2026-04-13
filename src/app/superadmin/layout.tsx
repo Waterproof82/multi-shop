@@ -35,15 +35,15 @@ export default async function SuperAdminLayout({
 
   return (
     <AdminThemeProvider>
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         <a
           href="#main-content"
-          className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-foreground focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:rounded-md focus:bg-white/10 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-900"
         >
           Ir al contenido principal
         </a>
         <SuperAdminHeader adminName={admin.nombreCompleto || 'Super Admin'} />
-        <main id="main-content" className="container mx-auto px-4 py-8">
+        <main id="main-content" className="pt-16 px-6 py-8 min-h-screen">
           {children}
         </main>
       </div>
