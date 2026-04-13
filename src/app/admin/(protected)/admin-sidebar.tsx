@@ -54,7 +54,7 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
   return (
     <>
       {/* Mobile header */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-card border-b border-border z-30 flex items-center justify-between px-6">
+      <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b border-white/10 z-30 flex items-center justify-between px-6 backdrop-blur-xl">
         {empresaLogo ? (
           <div className="relative w-10 h-10">
             <Image
@@ -66,17 +66,17 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
             />
           </div>
         ) : (
-          <h1 className="text-lg font-semibold text-foreground">
+          <h1 className="text-lg font-bold text-white">
             {t("administration", language)}
           </h1>
         )}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-muted transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
           aria-label={isOpen ? t("closeMenu", language) : t("openMenu", language)}
           aria-expanded={isOpen}
         >
-          {isOpen ? <X className="h-5 w-5 text-foreground" /> : <Menu className="h-5 w-5 text-foreground" />}
+          {isOpen ? <X className="h-5 w-5 text-white" /> : <Menu className="h-5 w-5 text-white" />}
         </button>
       </header>
 
@@ -84,7 +84,7 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
       {isOpen && (
         <button
           type="button"
-          className="lg:hidden fixed inset-0 bg-overlay z-40"
+          className="lg:hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
           aria-label={t("closeMenu", language)}
           onClick={closeMenu}
         />
@@ -92,14 +92,15 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
 
       {/* Sidebar */}
       <aside className={`
-        fixed top-0 h-full w-64 bg-card border-r border-border z-40
+        fixed top-0 h-full w-64 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 border-r border-white/10 z-40
         transform transition-transform duration-200 ease-in-out motion-reduce:transition-none
         lg:translate-x-0
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+        backdrop-blur-xl
       `}>
         <div className="h-full flex flex-col">
           {/* Desktop header */}
-          <div className="hidden lg:block p-6 border-b border-border">
+          <div className="hidden lg:block p-6 border-b border-white/10 text-center">
             {empresaLogo ? (
               <div className="relative w-20 h-20 mx-auto mb-4">
                 <Image
@@ -111,47 +112,45 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
                 />
               </div>
             ) : (
-              <h1 className="text-lg font-semibold text-foreground text-center mb-2">
+              <h1 className="text-xl font-bold text-white text-center mb-2">
                 {t("administration", language)}
               </h1>
             )}
-            <p className="text-xs text-muted-foreground text-center leading-tight">
+            <p className="text-xs text-slate-400 text-center leading-tight">
               {t("companyConnected", language)}
             </p>
           </div>
 
-          <nav className="flex-1 p-4 overflow-y-auto">
-            <ul className="space-y-2">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = pathname === item.href;
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      onClick={closeMenu}
-                      aria-current={isActive ? 'page' : undefined}
-                      className={`
-                        flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-[background-color,color,transform] duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 group
-                        ${isActive
-                          ? 'bg-primary text-primary-foreground shadow-sm scale-[1.02]'
-                          : 'text-muted-foreground hover:bg-muted hover:text-foreground hover:scale-[1.01] hover:shadow-sm'
-                        }
-                      `}
-                    >
-                      <Icon className={`h-5 w-5 flex-shrink-0 transition-transform duration-200 ${isActive ? 'scale-110' : 'group-hover:scale-105'}`} />
-                      {t(item.labelKey, language)}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+          <nav className="flex-1 p-4 overflow-y-auto space-y-1">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname === item.href;
+              return (
+                <li key={item.href} style={{ listStyle: 'none' }}>
+                  <Link
+                    href={item.href}
+                    onClick={closeMenu}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={`
+                      flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 group
+                      ${isActive
+                        ? 'bg-gradient-to-r from-cyan-500/30 to-teal-600/30 text-white border border-cyan-400/50 shadow-[0_0_15px_rgba(34,211,238,0.2)]'
+                        : 'text-slate-300 hover:bg-white/5 hover:text-white hover:border hover:border-white/10'
+                      }
+                    `}
+                  >
+                    <Icon className={`h-5 w-5 flex-shrink-0 transition-transform duration-200 ${isActive ? 'scale-110 text-cyan-300' : 'text-slate-400 group-hover:scale-105 group-hover:text-slate-200'}`} />
+                    {t(item.labelKey, language)}
+                  </Link>
+                </li>
+              );
+            })}
           </nav>
 
-          <div className="p-4 border-t border-border space-y-2">
+          <div className="p-4 border-t border-white/10 space-y-2">
             <Link
               href="/"
-              className="flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm text-muted-foreground hover:bg-muted hover:text-foreground w-full rounded-lg transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm text-slate-300 hover:bg-white/5 hover:text-white w-full rounded-lg transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
             >
               <ExternalLink className="h-5 w-5 flex-shrink-0" />
               {t("viewStore", language)}
@@ -159,7 +158,7 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
             <button
               type="button"
               onClick={handleLogout}
-              className="flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm text-destructive hover:bg-destructive/10 w-full rounded-lg transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm text-rose-400 hover:bg-rose-500/10 w-full rounded-lg transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-rose-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
             >
               <LogOut className="h-5 w-5 flex-shrink-0" />
               {t("logout", language)}

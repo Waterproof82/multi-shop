@@ -5,7 +5,6 @@ import { AdminSidebar } from './admin-sidebar';
 import { AdminProvider } from '@/lib/admin-context';
 import { authAdminUseCase, empresaUseCase } from '@/core/infrastructure/database';
 import { AdminThemeProvider } from '@/components/admin-theme-provider';
-import { EmpresaThemeProvider } from '@/components/empresa-theme-provider';
 import { SUPERADMIN_ROLE } from '@/core/domain/repositories/IAdminRepository';
 import { SuperadminBanner } from '@/components/superadmin-banner';
 
@@ -60,33 +59,31 @@ export default async function AdminProtectedLayout({
 
   return (
     <AdminThemeProvider>
-      <EmpresaThemeProvider colores={empresa?.colores ?? null}>
-        <AdminProvider
-          empresaId={empresaId}
-          empresaNombre={empresa?.nombre ?? 'default'}
-          empresaLogo={empresa?.logoUrl ?? undefined}
-          mostrarPromociones={mostrarPromociones}
-          mostrarTgtg={mostrarTgtg}
-          overrideEmpresaId={isSuperAdminView ? empresaId : undefined}
-          isSuperAdmin={isSuperAdminView}
-        >
-          <div className="min-h-screen bg-muted">
-            {isSuperAdminView && (
-              <SuperadminBanner empresaNombre={empresa?.nombre ?? ''} />
-            )}
-            <a
-              href="#main-content"
-              className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-4 focus:left-4 focus:bg-primary focus:text-primary-foreground focus:px-4 focus:py-2 focus:rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-            >
-              Saltar al contenido principal
-            </a>
-            <AdminSidebar empresaId={empresaId} />
-            <main id="main-content" className={`lg:ml-64 min-h-screen ${isSuperAdminView ? 'pt-20' : 'pt-16'}`}>
-              {children}
-            </main>
-          </div>
-        </AdminProvider>
-      </EmpresaThemeProvider>
+      <AdminProvider
+        empresaId={empresaId}
+        empresaNombre={empresa?.nombre ?? 'default'}
+        empresaLogo={empresa?.logoUrl ?? undefined}
+        mostrarPromociones={mostrarPromociones}
+        mostrarTgtg={mostrarTgtg}
+        overrideEmpresaId={isSuperAdminView ? empresaId : undefined}
+        isSuperAdmin={isSuperAdminView}
+      >
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+          {isSuperAdminView && (
+            <SuperadminBanner empresaNombre={empresa?.nombre ?? ''} />
+          )}
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-4 focus:left-4 focus:bg-cyan-500 focus:text-white focus:px-4 focus:py-2 focus:rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-900"
+          >
+            Saltar al contenido principal
+          </a>
+          <AdminSidebar empresaId={empresaId} />
+          <main id="main-content" className={`lg:ml-64 min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 ${isSuperAdminView ? 'pt-20' : 'pt-16'}`}>
+            {children}
+          </main>
+        </div>
+      </AdminProvider>
     </AdminThemeProvider>
   );
 }

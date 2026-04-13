@@ -478,28 +478,28 @@ export default function TooGoodToGoPage() {
   const totalSelectedItems = selectedActiveCampaigns.reduce((acc, { campaign }) => acc + campaign.items.length, 0);
 
   return (
-    <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
-      {/* Header */}
-      <div className="bg-primary rounded-lg p-6">
-        <div className="flex items-center justify-between">
+    <div className="pt-16 lg:pt-0 px-6 py-8 space-y-8 min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      {/* Header - Glassmorphic */}
+      <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-6 sm:p-8 shadow-2xl">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
           <div>
-            <h1 className="text-2xl font-semibold text-primary-foreground flex items-center gap-2">
-              <ShoppingBag className="w-6 h-6" />
+            <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight flex items-center gap-3">
+              <ShoppingBag className="w-7 h-7 text-cyan-300" />
               TooGoodToGo
             </h1>
-            <p className="text-primary-foreground/80 text-sm mt-1">{t("tgtgNewPromo", language)}</p>
+            <p className="text-slate-300 text-sm mt-1">{t("tgtgNewPromo", language)}</p>
           </div>
-          <div className="bg-primary-foreground/20 rounded-lg px-4 py-3 text-center">
-            <span className="text-2xl font-semibold text-primary-foreground">{clientesConPromociones.length}</span>
-            <p className="text-primary-foreground/80 text-xs">{t("toSend", language)}</p>
+          <div className="backdrop-blur-xl bg-gradient-to-br from-cyan-500/20 to-cyan-700/20 border border-cyan-400/30 rounded-xl px-4 py-3 text-center">
+            <span className="text-2xl font-semibold text-white">{clientesConPromociones.length}</span>
+            <p className="text-cyan-200 text-xs">{t("toSend", language)}</p>
           </div>
         </div>
       </div>
 
       {/* New campaign form */}
-      <div id="tgtg-campaign-form" className="bg-card rounded-lg border shadow-elegant p-6 space-y-6">
-        <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-          <ShoppingBag className="w-5 h-5" />
+      <div id="tgtg-campaign-form" className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
+        <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+          <ShoppingBag className="w-5 h-5 text-cyan-300" />
           {t("tgtgNewPromo", language)}
         </h2>
 

@@ -237,40 +237,40 @@ export default function CategoriasPage() {
   const subcategoriasCount = categorias.filter(cat => cat.categoria_padre_id !== null).length;
 
   return (
-    <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
+    <div className="pt-16 lg:pt-0 px-6 py-8 space-y-8 min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Header con stats */}
-      <div className="bg-primary rounded-lg p-4 sm:p-6">
+      <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-6 sm:p-8 shadow-2xl">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">{t("categoriesTitle", language)}</h1>
-            <p className="text-primary-foreground/80 text-sm mt-1">{t("categoriesSubtitle", language)}</p>
+            <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">{t("categoriesTitle", language)}</h1>
+            <p className="text-slate-300 text-sm mt-1">{t("categoriesSubtitle", language)}</p>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
-              <Tags className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
-              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{categorias.filter(c => !c.categoria_padre_id).length}</span>
-              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">{t("categoriesLabel", language)}</p>
-            </div>
-            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
-              <FolderTree className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
-              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{subcategoriasCount}</span>
-              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">{t("subcategories", language)}</p>
-            </div>
+            <section className="backdrop-blur-xl bg-gradient-to-br from-cyan-500/20 to-cyan-700/20 border border-cyan-400/30 rounded-xl px-3 sm:px-4 py-3 text-center hover:shadow-[0_0_20px_rgba(34,211,238,0.3)] transition-shadow duration-300">
+              <Tags className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-300 mx-auto mb-2" />
+              <span className="text-lg sm:text-2xl font-semibold text-white">{categorias.filter(c => !c.categoria_padre_id).length}</span>
+              <p className="text-slate-300 text-[10px] sm:text-xs">{t("categoriesLabel", language)}</p>
+            </section>
+            <section className="backdrop-blur-xl bg-gradient-to-br from-teal-500/20 to-teal-700/20 border border-teal-400/30 rounded-xl px-3 sm:px-4 py-3 text-center hover:shadow-[0_0_20px_rgba(13,148,136,0.3)] transition-shadow duration-300">
+              <FolderTree className="w-5 h-5 sm:w-6 sm:h-6 text-teal-300 mx-auto mb-2" />
+              <span className="text-lg sm:text-2xl font-semibold text-white">{subcategoriasCount}</span>
+              <p className="text-slate-300 text-[10px] sm:text-xs">{t("subcategories", language)}</p>
+            </section>
           </div>
         </div>
       </div>
 
       {/* Buscador y acciones */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="relative flex-1 w-full sm:max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <div className="relative flex-1 w-full sm:max-w-xs backdrop-blur-xl bg-white/10 border border-white/20 rounded-xl px-3 py-2">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
             type="text"
             placeholder={t("searchCategories", language)}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             aria-label={t("searchCategories", language)}
-            className="pl-10 w-full"
+            className="pl-10 w-full bg-transparent border-0 text-white placeholder:text-slate-400 focus:outline-none focus:ring-0"
           />
         </div>
         <Button onClick={openCreateModal} className="w-full sm:w-auto">
@@ -285,14 +285,14 @@ export default function CategoriasPage() {
         </div>
       )}
 
-      <div className="bg-card rounded-lg shadow-elegant border border-border overflow-hidden">
+      <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl overflow-hidden">
         {/* Desktop table */}
-        <div className="hidden md:block overflow-x-auto scrollbar scrollbar-thumb-muted-foreground/40 scrollbar-track-transparent scrollbar-thin">
-          <table className="min-w-full divide-y divide-border">
-            <thead className="bg-muted">
+        <div className="hidden md:block overflow-x-auto scrollbar scrollbar-thumb-white/20 scrollbar-track-transparent scrollbar-thin">
+          <table className="min-w-full divide-y divide-white/10">
+            <thead className="bg-white/5 border-b border-white/10">
               <tr>
                 <th 
-                  className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:bg-muted"
+                  className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase cursor-pointer hover:bg-white/10 transition-colors"
                   onClick={() => handleSort('orden')}
                 >
                     <div className="flex items-center gap-1">
@@ -304,7 +304,7 @@ export default function CategoriasPage() {
                     </div>
                 </th>
                 <th 
-                  className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase cursor-pointer hover:bg-muted"
+                  className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase cursor-pointer hover:bg-white/10 transition-colors"
                   onClick={() => handleSort('nombre_es')}
                 >
                     <div className="flex items-center gap-1">
@@ -315,50 +315,50 @@ export default function CategoriasPage() {
                       {sortField !== 'nombre_es' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                     </div>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">
                   {t("typeLabel", language)}
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">
                   {t("subcategories", language)}
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">
                   {t("complementOf", language)}
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">
+                <th className="px-4 py-3 text-right text-xs font-medium text-slate-300 uppercase">
                   {t("actions", language)}
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-card divide-y divide-border">
+            <tbody className="divide-y divide-white/10">
               {filteredCategorias.map((cat) => (
-                <tr key={cat.id} className="hover:bg-muted/50">
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-foreground">
+                <tr key={cat.id} className="hover:bg-white/5 transition-colors border-b border-white/10">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-300">
                     {cat.orden}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-foreground">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-white">
                     {cat.nombre_es}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm">
                     {cat.categoria_padre_id ? (
                       <div className="flex flex-col gap-1">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground text-xs font-medium">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-500/20 border border-teal-400/30 text-teal-300 text-xs font-medium">
                           {t("subcategory", language)}
                         </span>
                         {cat.parentName && (
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-xs text-slate-400">
                             → {cat.parentName}
                           </span>
                         )}
                       </div>
                     ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-foreground text-xs font-medium">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-700/50 border border-slate-600 text-slate-300 text-xs font-medium">
                         {t("mainCategory", language)}
                       </span>
                     )}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm">
                     {cat.hasSubcategories ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 text-xs font-medium">
                         <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
                           <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
@@ -366,10 +366,10 @@ export default function CategoriasPage() {
                         {t("yes", language)}
                       </span>
                     ) : (
-                      <span className="text-muted-foreground">—</span>
+                      <span className="text-slate-400">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-400">
                     {cat.categoria_complemento_de 
                       ? categorias.find(c => c.id === cat.categoria_complemento_de)?.nombre_es || '—'
                       : '—'}
@@ -378,14 +378,14 @@ export default function CategoriasPage() {
                     <button
                       onClick={() => openEditModal(cat)}
                       aria-label={`${t("edit", language)} ${cat.nombre_es}`}
-                      className="p-2 text-primary hover:text-primary/80 mr-1 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
+                      className="p-2 text-cyan-400 hover:text-cyan-300 mr-1 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center transition-colors"
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => handleDelete(cat.id)}
                       aria-label={`${t("delete", language)} ${cat.nombre_es}`}
-                      className="p-2 text-destructive hover:text-destructive/80 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
+                      className="p-2 text-red-400 hover:text-red-300 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center transition-colors"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -394,7 +394,7 @@ export default function CategoriasPage() {
               ))}
               {filteredCategorias.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">
+                  <td colSpan={7} className="px-6 py-8 text-center text-slate-400">
                     {searchTerm ? t("noCategoriesFound", language) : t("noCategoriesYet", language)}
                   </td>
                 </tr>
@@ -404,26 +404,26 @@ export default function CategoriasPage() {
         </div>
 
         {/* Mobile cards */}
-        <div className="md:hidden divide-y divide-border">
+        <div className="md:hidden divide-y divide-white/10">
           {filteredCategorias.map((cat) => (
-            <div key={cat.id} className="p-4 hover:bg-muted/50">
+            <div key={cat.id} className="p-4 hover:bg-white/5 transition-colors">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">#{cat.orden}</span>
-                    <p className="font-medium text-foreground">{cat.nombre_es}</p>
+                    <span className="text-xs text-slate-400">#{cat.orden}</span>
+                    <p className="font-medium text-white">{cat.nombre_es}</p>
                     {cat.categoria_padre_id && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-secondary text-secondary-foreground text-[10px] font-medium">
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-teal-500/20 border border-teal-400/30 text-teal-300 text-[10px] font-medium">
                         Sub
                       </span>
                     )}
                     {!cat.categoria_padre_id && cat.hasSubcategories && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium">
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 text-[10px] font-medium">
                         {t("mainCategory", language)}
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs text-slate-400 mt-1">
                     {cat.categoria_padre_id && cat.parentName ? `${t("subcategoryOf", language)} ${cat.parentName}` : ''}
                   </p>
                 </div>
@@ -431,14 +431,14 @@ export default function CategoriasPage() {
                   <button
                     onClick={() => openEditModal(cat)}
                     aria-label={`${t("edit", language)} ${cat.nombre_es}`}
-                    className="p-2 text-primary hover:bg-primary/10 dark:hover:bg-primary/20 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                    className="p-2 text-cyan-400 hover:bg-cyan-500/20 dark:hover:bg-cyan-500/20 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
                   >
                     <Pencil className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => handleDelete(cat.id)}
                     aria-label={`${t("delete", language)} ${cat.nombre_es}`}
-                    className="p-2 text-destructive hover:bg-destructive/10 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                    className="p-2 text-red-400 hover:bg-red-500/20 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -447,7 +447,7 @@ export default function CategoriasPage() {
             </div>
           ))}
           {filteredCategorias.length === 0 && (
-            <div className="p-8 text-center text-muted-foreground">
+            <div className="p-8 text-center text-slate-400">
               {searchTerm ? t("noCategoriesFound", language) : t("noCategoriesYet", language)}
             </div>
           )}

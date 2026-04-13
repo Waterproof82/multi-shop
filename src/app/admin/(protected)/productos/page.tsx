@@ -332,15 +332,15 @@ export default function ProductosPage() {
 
   if (loading) {
     return (
-      <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
+      <div className="pt-16 lg:pt-0 px-6 py-8 space-y-8 min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         {/* Header con stats skeleton */}
-        <div className="bg-primary rounded-lg p-4 sm:p-6">
+        <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-6 sm:p-8 shadow-2xl">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="space-y-2">
-              <Skeleton className="h-6 w-48 bg-primary-foreground/20" />
-              <Skeleton className="h-4 w-64 bg-primary-foreground/20" />
+              <Skeleton className="h-8 w-48 bg-white/20" />
+              <Skeleton className="h-4 w-64 bg-white/10" />
             </div>
-            <SkeletonStats count={2} itemClassName="bg-primary-foreground/20" />
+            <SkeletonStats count={2} itemClassName="bg-white/10" />
           </div>
         </div>
 
@@ -351,8 +351,8 @@ export default function ProductosPage() {
         </div>
 
         {/* Tabla skeleton */}
-        <div className="bg-card rounded-lg border overflow-hidden">
-          <div className="p-4 border-b">
+        <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl overflow-hidden">
+          <div className="p-4 border-b border-white/10">
             <Skeleton className="h-6 w-32" />
           </div>
           <div className="p-4">
@@ -366,40 +366,40 @@ export default function ProductosPage() {
   const productosEspeciales = productos.filter(p => p.es_especial).length;
 
   return (
-    <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
+    <div className="pt-16 lg:pt-0 px-6 py-8 space-y-8 min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Header con stats */}
-      <div className="bg-primary rounded-lg p-4 sm:p-6">
+      <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-6 sm:p-8 shadow-2xl">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">{t("productsTitle", language)}</h1>
-            <p className="text-primary-foreground/80 text-sm mt-1">{t("productsSubtitle", language)}</p>
+            <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">{t("productsTitle", language)}</h1>
+            <p className="text-slate-300 text-sm mt-1">{t("productsSubtitle", language)}</p>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
-              <Package className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
-              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{productos.length}</span>
-              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">{t("total", language)}</p>
-            </div>
-            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
-              <Star className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
-              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{productosEspeciales}</span>
-              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">{t("destacados", language)}</p>
-            </div>
+            <section className="backdrop-blur-xl bg-gradient-to-br from-cyan-500/20 to-cyan-700/20 border border-cyan-400/30 rounded-xl px-3 sm:px-4 py-3 text-center hover:shadow-[0_0_20px_rgba(34,211,238,0.3)] transition-shadow duration-300">
+              <Package className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-300 mx-auto mb-2" />
+              <span className="text-lg sm:text-2xl font-semibold text-white">{productos.length}</span>
+              <p className="text-cyan-300 text-[10px] sm:text-xs">{t("total", language)}</p>
+            </section>
+            <section className="backdrop-blur-xl bg-gradient-to-br from-amber-500/20 to-amber-700/20 border border-amber-400/30 rounded-xl px-3 sm:px-4 py-3 text-center hover:shadow-[0_0_20px_rgba(217,119,6,0.3)] transition-shadow duration-300">
+              <Star className="w-5 h-5 sm:w-6 sm:h-6 text-amber-300 mx-auto mb-2" />
+              <span className="text-lg sm:text-2xl font-semibold text-white">{productosEspeciales}</span>
+              <p className="text-amber-300 text-[10px] sm:text-xs">{t("destacados", language)}</p>
+            </section>
           </div>
         </div>
       </div>
 
       {/* Buscador y acciones */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="relative flex-1 w-full sm:max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <div className="relative flex-1 w-full sm:max-w-xs backdrop-blur-xl bg-white/10 border border-white/20 rounded-xl px-3 py-2">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
             type="text"
             placeholder={t("searchProducts", language)}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             aria-label={t("searchProducts", language)}
-            className="pl-10 w-full"
+            className="pl-10 w-full bg-transparent border-0 text-white placeholder:text-slate-400 focus:outline-none focus:ring-0"
           />
         </div>
         <Button onClick={openCreateModal} className="w-full sm:w-auto">
@@ -409,24 +409,24 @@ export default function ProductosPage() {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 text-destructive rounded-md">
+        <div className="mb-4 p-3 bg-red-500/20 border border-red-400/30 text-red-300 rounded-md">
           {error}
         </div>
       )}
 
       {categorias.length === 0 && (
-        <div className="mb-4 p-4 bg-secondary border border-border text-secondary-foreground rounded-md">
+        <div className="mb-4 p-4 bg-yellow-500/20 border border-yellow-400/30 text-yellow-300 rounded-md">
           {t("noCategoriesWarning", language)}
         </div>
       )}
 
-      <div className="bg-card rounded-lg shadow-elegant border border-border overflow-hidden">
+      <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl overflow-hidden">
         {/* Desktop table */}
-        <div className="hidden md:block overflow-x-auto scrollbar scrollbar-thumb-muted-foreground/40 scrollbar-track-transparent scrollbar-thin">
-          <table className="min-w-full divide-y divide-border">
-            <thead className="bg-muted">
+        <div className="hidden md:block overflow-x-auto scrollbar scrollbar-thumb-white/20 scrollbar-track-transparent scrollbar-thin">
+          <table className="min-w-full divide-y divide-white/10">
+            <thead className="bg-white/5 border-b border-white/10">
               <tr>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">
                   {t("image", language)}
                 </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase" aria-sort={getAriaSortValue('titulo_es')}>
@@ -474,24 +474,32 @@ export default function ProductosPage() {
               {filteredProductos.map((prod) => (
                 <tr key={prod.id} className="hover:bg-muted/50">
                   <td className="px-4 py-3 whitespace-nowrap">
-                    {isValidImageUrl(prod.foto_url) ? (
-                      <Image 
-                        src={prod.foto_url!} 
-                        alt={prod.titulo_es}
-                        width={40}
-                        height={40}
-                        className="h-10 w-10 rounded-md object-cover"
-                        loading="lazy"
-                      />
-                    ) : prod.foto_url ? (
-                      <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center">
-                        <Video className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                    ) : (
-                      <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center">
-                        <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                    )}
+                    {(() => {
+                      if (isValidImageUrl(prod.foto_url)) {
+                        return (
+                          <Image 
+                            src={prod.foto_url!} 
+                            alt={prod.titulo_es}
+                            width={40}
+                            height={40}
+                            className="h-10 w-10 rounded-md object-cover"
+                            loading="lazy"
+                          />
+                        );
+                      } else if (prod.foto_url) {
+                        return (
+                          <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center">
+                            <Video className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center">
+                            <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                        );
+                      }
+                    })()}
                   </td>
                   <td className="px-4 py-3">
                     <div className="text-sm font-medium text-foreground">
@@ -562,24 +570,32 @@ export default function ProductosPage() {
             <div key={prod.id} className="p-4 hover:bg-muted/50">
               <div className="flex gap-3">
                   <div className="flex-shrink-0">
-                    {isValidImageUrl(prod.foto_url) ? (
-                      <Image 
-                        src={prod.foto_url!} 
-                        alt={prod.titulo_es}
-                        width={64}
-                        height={64}
-                        className="h-16 w-16 rounded-md object-cover"
-                        loading="lazy"
-                      />
-                    ) : prod.foto_url ? (
-                      <div className="h-16 w-16 rounded-md bg-muted flex items-center justify-center">
-                        <Video className="h-8 w-8 text-muted-foreground" />
-                      </div>
-                    ) : (
-                      <div className="h-16 w-16 rounded-md bg-muted flex items-center justify-center">
-                        <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                      </div>
-                    )}
+                    {(() => {
+                      if (isValidImageUrl(prod.foto_url)) {
+                        return (
+                          <Image 
+                            src={prod.foto_url!} 
+                            alt={prod.titulo_es}
+                            width={64}
+                            height={64}
+                            className="h-16 w-16 rounded-md object-cover"
+                            loading="lazy"
+                          />
+                        );
+                      } else if (prod.foto_url) {
+                        return (
+                          <div className="h-16 w-16 rounded-md bg-muted flex items-center justify-center">
+                            <Video className="h-8 w-8 text-muted-foreground" />
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div className="h-16 w-16 rounded-md bg-muted flex items-center justify-center">
+                            <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                          </div>
+                        );
+                      }
+                    })()}
                   </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between">

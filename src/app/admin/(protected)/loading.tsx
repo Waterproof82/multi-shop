@@ -1,23 +1,21 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
-
 export default function AdminLoading() {
   return (
-    <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
+    <div className="pt-16 lg:pt-0 px-6 py-8 space-y-8 min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Header skeleton */}
-      <div className="bg-primary rounded-lg p-4 sm:p-6 animate-pulse">
+      <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-6 sm:p-8 shadow-2xl animate-pulse">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="space-y-2">
-            <div className="h-7 w-32 bg-primary-foreground/20 rounded" />
-            <div className="h-4 w-24 bg-primary-foreground/10 rounded" />
+            <div className="h-8 w-48 bg-white/20 rounded-lg" />
+            <div className="h-4 w-32 bg-white/10 rounded" />
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3">
-                <div className="h-4 w-4 mx-auto mb-1 bg-primary-foreground/10 rounded" />
-                <div className="h-6 w-8 mx-auto bg-primary-foreground/10 rounded" />
-                <div className="h-3 w-12 mx-auto mt-0.5 bg-primary-foreground/10 rounded" />
+            {['stat-metric-revenue', 'stat-metric-today', 'stat-metric-pending', 'stat-metric-total'].map((key) => (
+              <div key={key} className="backdrop-blur-xl bg-white/10 border border-white/10 rounded-xl px-3 sm:px-4 py-3">
+                <div className="h-6 w-6 mx-auto mb-2 bg-white/20 rounded" />
+                <div className="h-7 w-10 mx-auto bg-white/20 rounded" />
+                <div className="h-3 w-14 mx-auto mt-1 bg-white/10 rounded" />
               </div>
             ))}
           </div>
@@ -26,32 +24,31 @@ export default function AdminLoading() {
 
       {/* Quick actions skeleton */}
       <div className="flex flex-wrap gap-3">
-        <div className="h-10 w-32 bg-muted rounded-lg animate-pulse" />
-        <div className="h-10 w-32 bg-muted rounded-lg animate-pulse" />
+        <div className="h-10 w-32 bg-white/10 border border-white/20 rounded-lg animate-pulse" />
+        <div className="h-10 w-32 bg-white/10 border border-white/20 rounded-lg animate-pulse" />
       </div>
 
       {/* Recent orders skeleton */}
-      <div className="bg-card rounded-lg border border-border overflow-hidden">
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-muted rounded animate-pulse" />
-            <div className="h-5 w-32 bg-muted rounded animate-pulse" />
+      <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl overflow-hidden shadow-2xl">
+        <div className="flex items-center justify-between p-6 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-6 h-6 bg-white/20 rounded-lg animate-pulse" />
+            <div className="h-6 w-40 bg-white/20 rounded animate-pulse" />
           </div>
-          <div className="h-4 w-16 bg-muted rounded animate-pulse" />
         </div>
-        <div className="divide-y divide-border">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="p-4 flex items-center justify-between">
-              <div className="flex-1 space-y-1">
+        <div className="divide-y divide-white/10">
+          {['order-recent-one', 'order-recent-two', 'order-recent-three'].map((key) => (
+            <div key={key} className="p-6 flex items-center justify-between">
+              <div className="flex-1 space-y-2">
                 <div className="flex items-center gap-3">
-                  <div className="h-5 w-12 bg-muted rounded animate-pulse" />
-                  <div className="h-4 w-20 bg-muted rounded animate-pulse" />
+                  <div className="h-6 w-16 bg-white/20 rounded animate-pulse" />
+                  <div className="h-5 w-24 bg-white/20 rounded animate-pulse" />
                 </div>
-                <div className="h-4 w-40 bg-muted rounded animate-pulse" />
+                <div className="h-4 w-48 bg-white/10 rounded animate-pulse" />
               </div>
-              <div className="text-right space-y-1">
-                <div className="h-5 w-16 bg-muted rounded animate-pulse" />
-                <div className="h-3 w-20 bg-muted rounded animate-pulse" />
+              <div className="text-right space-y-2">
+                <div className="h-6 w-20 bg-white/20 rounded animate-pulse" />
+                <div className="h-4 w-24 bg-white/10 rounded animate-pulse" />
               </div>
             </div>
           ))}
@@ -59,16 +56,16 @@ export default function AdminLoading() {
       </div>
 
       {/* Menu preview skeleton */}
-      <div className="bg-card rounded-lg border border-border p-4 lg:p-6">
-        <div className="h-6 w-32 bg-muted rounded animate-pulse mb-4" />
+      <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-6 sm:p-8 shadow-2xl">
+        <div className="h-7 w-40 bg-white/20 rounded animate-pulse mb-6" />
         <div className="space-y-3">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
-              <div className="space-y-1">
-                <div className="h-4 w-32 bg-muted rounded animate-pulse" />
-                <div className="h-3 w-16 bg-muted rounded animate-pulse" />
+          {['menu-item-one', 'menu-item-two', 'menu-item-three', 'menu-item-four', 'menu-item-five'].map((key) => (
+            <div key={key} className="flex items-center justify-between py-4 px-4 rounded-lg bg-white/5 border border-white/10">
+              <div className="space-y-1 flex-1">
+                <div className="h-5 w-40 bg-white/20 rounded animate-pulse" />
+                <div className="h-3 w-20 bg-white/10 rounded animate-pulse" />
               </div>
-              <div className="w-4 h-4 bg-muted rounded animate-pulse" />
+              <div className="w-5 h-5 bg-white/20 rounded animate-pulse" />
             </div>
           ))}
         </div>

@@ -598,9 +598,10 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 | **Error Handling** | 100% — Result<T, E> en todos los módulos |
 | **API Error Codes** | Códigos centralizados en `core/domain/constants/api-errors.ts` + **DISCOUNT_ERRORS** |
 | **Logging** | Tabla log_errors + ErrorLogger singleton |
-| **UI/UX** | Audit 8.5/10 — WCAG AA, focus states, reduced-motion, ARIA, mobile-first, 44px touch targets |
+| **UI/UX** | Audit 9/10 — WCAG AA, focus states, reduced-motion, ARIA, mobile-first, 44px touch targets, glassmorphic dark theme, consistent design tokens |
 | **i18n** | es/en/fr/it/de en productos + panel admin + componentes públicos |
 | **Welcome Discount** | Popup 30s en subdomain pedidos, código único BIENVENIDO-XXXXXX, email con idioma del cliente, porcentaje configurable (1-50%), duración configurable (7/14/30/60/90 días), validación server-side (existencia, usado, expirado, email match), aplicación en checkout, persists en pedido |
+| **Admin Panel Design** | Glassmorphic dark theme (backdrop-blur + white/10 opacity), estadoPendiente=Aceptado colores consistentes con badges de tabla (ámbar/azul), diseño unificado sin colores por empresa |
 
 ## Documentación
 
