@@ -311,13 +311,13 @@ function PromoStatsChart({
   dateLocale: string;
   t: TranslateFn;
 }) {
-  if (!promos.length) {
+if (!promos.length) {
     return (
-      <div className="bg-card rounded-lg border border-border p-6 py-8 text-center">
-        <svg className="w-10 h-10 text-muted-foreground mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+      <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-xl p-6 py-8 text-center">
+        <svg className="w-10 h-10 text-slate-500 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v9a2 2 0 002 2z" />
         </svg>
-        <p className="text-sm text-muted-foreground">{t("statsNoPromosSent", language)}</p>
+        <p className="text-sm text-slate-400">{t("statsNoPromosSent", language)}</p>
       </div>
     );
   }
@@ -344,43 +344,43 @@ function PromoStatsChart({
   const chartData = Object.entries(byMonth).map(([mes, envios]) => ({ mes, envios })).slice(-12);
 
   return (
-    <div className="bg-card rounded-lg border border-border p-6 space-y-4">
-      <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-        <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-6 space-y-4">
+      <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+        <svg className="w-5 h-5 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
         </svg>
         {t("statsPromoSends", language)}
       </h2>
 
-      {/* KPI cards */}
+      {/* KPI cards - colorful gradient */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-primary/5 border border-primary/20 rounded-lg px-4 py-3 text-center">
-          <p className="text-2xl font-bold text-primary">{promos.length}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{t("statsPromosSent", language)}</p>
+        <div className="backdrop-blur-xl bg-gradient-to-br from-violet-500/20 to-violet-700/20 border border-violet-400/30 rounded-xl px-4 py-3 text-center">
+          <p className="text-2xl font-bold text-white">{promos.length}</p>
+          <p className="text-xs text-violet-200 mt-0.5">{t("statsPromosSent", language)}</p>
         </div>
-        <div className="bg-muted rounded-lg px-4 py-3 text-center">
-          <p className="text-2xl font-bold text-foreground">{thisMonthPromos.length}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{t("statsSentThisMonth", language)}</p>
+        <div className="backdrop-blur-xl bg-gradient-to-br from-blue-500/20 to-blue-700/20 border border-blue-400/30 rounded-xl px-4 py-3 text-center">
+          <p className="text-2xl font-bold text-white">{thisMonthPromos.length}</p>
+          <p className="text-xs text-blue-200 mt-0.5">{t("statsSentThisMonth", language)}</p>
         </div>
-        <div className="bg-muted rounded-lg px-4 py-3 text-center">
-          <p className="text-2xl font-bold text-foreground">{totalEnvios.toLocaleString()}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{t("statsTotalEmails", language)}</p>
+        <div className="backdrop-blur-xl bg-gradient-to-br from-cyan-500/20 to-cyan-700/20 border border-cyan-400/30 rounded-xl px-4 py-3 text-center">
+          <p className="text-2xl font-bold text-white">{totalEnvios.toLocaleString()}</p>
+          <p className="text-xs text-cyan-200 mt-0.5">{t("statsTotalEmails", language)}</p>
         </div>
-        <div className="bg-muted rounded-lg px-4 py-3 text-center">
-          <p className="text-2xl font-bold text-foreground">{mesEnvios.toLocaleString()}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{t("statsEmailsThisMonth", language)}</p>
+        <div className="backdrop-blur-xl bg-gradient-to-br from-teal-500/20 to-teal-700/20 border border-teal-400/30 rounded-xl px-4 py-3 text-center">
+          <p className="text-2xl font-bold text-white">{mesEnvios.toLocaleString()}</p>
+          <p className="text-xs text-teal-200 mt-0.5">{t("statsEmailsThisMonth", language)}</p>
         </div>
       </div>
 
       {/* Top promo highlight */}
       {topPromo && (
-        <div className="bg-muted/50 border border-border rounded-lg px-4 py-3 flex items-start gap-3">
+        <div className="backdrop-blur-xl bg-gradient-to-br from-amber-500/20 to-amber-700/20 border border-amber-400/30 rounded-xl px-4 py-3 flex items-start gap-3">
           <span className="text-xl flex-shrink-0">🏆</span>
           <div className="min-w-0">
-            <p className="text-xs font-medium text-muted-foreground mb-0.5">{t("statsTopPromo", language)}</p>
-            <p className="text-sm font-semibold text-foreground truncate">{topPromo.texto_promocion}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {new Date(topPromo.fecha_hora).toLocaleDateString(dateLocale, { day: '2-digit', month: 'long', year: 'numeric' })} · <span className="font-medium text-primary">{topPromo.numero_envios} emails</span>
+            <p className="text-xs font-medium text-amber-200 mb-0.5">{t("statsTopPromo", language)}</p>
+            <p className="text-sm font-semibold text-white truncate">{topPromo.texto_promocion}</p>
+            <p className="text-xs text-slate-300 mt-0.5">
+              {new Date(topPromo.fecha_hora).toLocaleDateString(dateLocale, { day: '2-digit', month: 'long', year: 'numeric' })} · <span className="font-medium text-amber-300">{topPromo.numero_envios} emails</span>
             </p>
           </div>
         </div>
@@ -452,11 +452,11 @@ function TgtgStatsChart({
 }) {
   if (!tgtgCampaigns.length) {
     return (
-      <div className="bg-card rounded-lg border border-border p-6 py-8 text-center">
-        <svg className="w-10 h-10 text-muted-foreground mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-xl p-6 py-8 text-center">
+        <svg className="w-10 h-10 text-slate-500 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
         </svg>
-        <p className="text-sm text-muted-foreground">{t("statsNoCampaigns", language)}</p>
+        <p className="text-sm text-slate-400">{t("statsNoCampaigns", language)}</p>
       </div>
     );
   }
@@ -489,45 +489,45 @@ function TgtgStatsChart({
   }));
 
   return (
-    <div className="bg-card rounded-lg border border-border p-6 space-y-4">
-      <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-        <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-6 space-y-4">
+      <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+        <svg className="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
         </svg>
         TooGoodToGo
       </h2>
 
-      {/* KPI cards */}
+      {/* KPI cards - colorful gradient */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <div className="bg-primary/10 border border-primary/20 rounded-lg px-4 py-3 text-center">
-          <p className="text-2xl font-bold text-primary">{sentCampaigns.length}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{t("statsTgtgCampaignsSent", language)}</p>
+        <div className="backdrop-blur-xl bg-gradient-to-br from-amber-500/20 to-amber-700/20 border border-amber-400/30 rounded-xl px-4 py-3 text-center">
+          <p className="text-2xl font-bold text-white">{sentCampaigns.length}</p>
+          <p className="text-xs text-amber-200 mt-0.5">{t("statsTgtgCampaignsSent", language)}</p>
         </div>
-        <div className="bg-muted rounded-lg px-4 py-3 text-center">
-          <p className="text-2xl font-bold text-foreground">{thisMonthCampaigns.length}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{t("statsSentThisMonth", language)}</p>
+        <div className="backdrop-blur-xl bg-gradient-to-br from-orange-500/20 to-orange-700/20 border border-orange-400/30 rounded-xl px-4 py-3 text-center">
+          <p className="text-2xl font-bold text-white">{thisMonthCampaigns.length}</p>
+          <p className="text-xs text-orange-200 mt-0.5">{t("statsSentThisMonth", language)}</p>
         </div>
-        <div className="bg-muted rounded-lg px-4 py-3 text-center">
-          <p className="text-2xl font-bold text-foreground">{allStats.reservas}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{t("statsTgtgReservasTotal", language)}</p>
+        <div className="backdrop-blur-xl bg-gradient-to-br from-rose-500/20 to-rose-700/20 border border-rose-400/30 rounded-xl px-4 py-3 text-center">
+          <p className="text-2xl font-bold text-white">{allStats.reservas}</p>
+          <p className="text-xs text-rose-200 mt-0.5">{t("statsTgtgReservasTotal", language)}</p>
         </div>
-        <div className="bg-muted rounded-lg px-4 py-3 text-center">
-          <p className="text-2xl font-bold text-primary">{formatPrice(monthStats.revenue, 'EUR', language)}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{t("statsTgtgRevenueMonth", language)}</p>
+        <div className="backdrop-blur-xl bg-gradient-to-br from-emerald-500/20 to-emerald-700/20 border border-emerald-400/30 rounded-xl px-4 py-3 text-center">
+          <p className="text-2xl font-bold text-white">{formatPrice(monthStats.revenue, 'EUR', language)}</p>
+          <p className="text-xs text-emerald-200 mt-0.5">{t("statsTgtgRevenueMonth", language)}</p>
         </div>
-        <div className="bg-muted rounded-lg px-4 py-3 text-center">
-          <p className="text-2xl font-bold text-foreground">{formatPrice(allStats.revenue, 'EUR', language)}</p>
+        <div className="backdrop-blur-xl bg-gradient-to-br from-teal-500/20 to-teal-700/20 border border-teal-400/30 rounded-xl px-4 py-3 text-center">
+          <p className="text-2xl font-bold text-white">{formatPrice(allStats.revenue, 'EUR', language)}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{t("statsTgtgRevenueTotal", language)}</p>
         </div>
       </div>
 
       {/* Savings highlight */}
       {allStats.saved > 0 && (
-        <div className="bg-primary/5 border border-primary/20 rounded-lg px-4 py-3 flex items-center gap-3">
+        <div className="backdrop-blur-xl bg-gradient-to-br from-green-500/20 to-green-700/20 border border-green-400/30 rounded-xl px-4 py-3 flex items-center gap-3">
           <span className="text-xl flex-shrink-0">🌱</span>
           <div>
-            <p className="text-sm font-medium text-foreground">{formatPrice(allStats.saved, 'EUR', language)} {t("statsTgtgSavedBy", language)}</p>
-            <p className="text-xs text-muted-foreground">{t("statsTgtgSavingsHelp", language)}</p>
+            <p className="text-sm font-medium text-white">{formatPrice(allStats.saved, 'EUR', language)} {t("statsTgtgSavedBy", language)}</p>
+            <p className="text-xs text-green-200">{t("statsTgtgSavingsHelp", language)}</p>
           </div>
         </div>
       )}
@@ -535,7 +535,7 @@ function TgtgStatsChart({
       {/* Chart */}
       {chartData.some(d => d.reservas > 0 || d.ingresos > 0) && (
         <div>
-          <p className="text-xs font-medium text-muted-foreground mb-2">{t("statsTgtgChartTitle", language)}</p>
+          <p className="text-xs font-medium text-slate-300 mb-2">{t("statsTgtgChartTitle", language)}</p>
           <div className="h-40 w-full">
             <ResponsiveContainer width="100%" height={160} minWidth={0}>
               <BarChart data={chartData}>
