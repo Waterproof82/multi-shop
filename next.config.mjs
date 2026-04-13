@@ -22,9 +22,10 @@ const imgSrc = ["'self'", r2Origin, "https://*.supabase.co", "data:", "blob:"]
 const mediaSrc = ["'self'", r2Origin]
   .filter(Boolean).join(' ');
 
+const isDev = process.env.NODE_ENV !== 'production';
 const cspFallback = [
   "default-src 'self'",
-  `script-src 'self'${process.env.NODE_ENV !== 'production' ? " 'unsafe-eval'" : ''}`,
+  `script-src 'self'${isDev ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline'",
   `img-src ${imgSrc}`,
   `media-src ${mediaSrc}`,

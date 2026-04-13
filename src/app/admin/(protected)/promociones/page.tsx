@@ -176,37 +176,37 @@ export default function PromocionesPage() {
   // ─────────────────────────────────────────────────────────────
 
   return (
-    <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
-      {/* Header */}
-      <div className="bg-primary rounded-lg p-6">
-        <div className="flex items-center justify-between">
+    <div className="pt-16 lg:pt-0 px-6 py-8 space-y-8 min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      {/* Header - Glassmorphic */}
+      <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-6 sm:p-8 shadow-2xl">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
           <div>
-            <h1 className="text-2xl font-semibold text-primary-foreground">{t("promotionsTitle", language)}</h1>
-            <p className="text-primary-foreground/80 text-sm mt-1">{t("promotionsSubtitle", language)}</p>
+            <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">{t("promotionsTitle", language)}</h1>
+            <p className="text-slate-300 text-sm mt-1">{t("promotionsSubtitle", language)}</p>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="bg-primary-foreground/20 rounded-lg px-4 py-3 text-center">
-              <Users className="w-6 h-6 text-primary-foreground mx-auto mb-1" />
-              <span className="text-2xl font-semibold text-primary-foreground">{clientes.length}</span>
-              <p className="text-primary-foreground/80 text-xs">{t("total", language)}</p>
+            <div className="backdrop-blur-xl bg-gradient-to-br from-cyan-500/20 to-cyan-700/20 border border-cyan-400/30 rounded-xl px-4 py-3 text-center">
+              <Users className="w-6 h-6 text-cyan-300 mx-auto mb-1" />
+              <span className="text-2xl font-semibold text-white">{clientes.length}</span>
+              <p className="text-cyan-200 text-xs">{t("total", language)}</p>
             </div>
-            <div className="bg-primary-foreground/20 rounded-lg px-4 py-3 text-center">
-              <Mail className="w-6 h-6 text-primary-foreground mx-auto mb-1" />
-              <span className="text-2xl font-semibold text-primary-foreground" aria-live="polite">{clientesConPromociones.length}</span>
-              <p className="text-primary-foreground/80 text-xs">{t("toSend", language)}</p>
+            <div className="backdrop-blur-xl bg-gradient-to-br from-teal-500/20 to-teal-700/20 border border-teal-400/30 rounded-xl px-4 py-3 text-center">
+              <Mail className="w-6 h-6 text-teal-300 mx-auto mb-1" />
+              <span className="text-2xl font-semibold text-white" aria-live="polite">{clientesConPromociones.length}</span>
+              <p className="text-teal-200 text-xs">{t("toSend", language)}</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="bg-card rounded-lg border shadow-elegant p-6 space-y-4">
-        <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-          <Send className="w-5 h-5" />
+      <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-4">
+        <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+          <Send className="w-5 h-5 text-cyan-300" />
           {t("newPromotion", language)}
         </h2>
 
         <div>
-          <label htmlFor="promo_texto" className="block text-sm font-medium text-foreground mb-1">
+          <label htmlFor="promo_texto" className="block text-sm font-medium text-slate-200 mb-1">
             {t("promoMessageLabel", language)}
           </label>
           <Textarea
@@ -215,13 +215,14 @@ export default function PromocionesPage() {
             value={promoTexto}
             onChange={(e) => setPromoTexto(e.target.value)}
             rows={3}
+            className="bg-white/5 border-white/20 text-white placeholder:text-slate-400 focus:border-cyan-400/50"
           />
         </div>
 
         {/* Fecha fin */}
         <div>
-          <label htmlFor="promo_fecha_fin" className="block text-sm font-medium text-foreground mb-1">
-            {t("promoFechaFin", language)} <span className="text-destructive" aria-hidden="true">*</span>
+          <label htmlFor="promo_fecha_fin" className="block text-sm font-medium text-slate-200 mb-1">
+            {t("promoFechaFin", language)} <span className="text-red-400" aria-hidden="true">*</span>
           </label>
           <input
             id="promo_fecha_fin"
@@ -230,64 +231,64 @@ export default function PromocionesPage() {
             value={promoFechaFin}
             onChange={e => setPromoFechaFin(e.target.value)}
             min={new Date().toISOString().split('T')[0]}
-            className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="w-full h-10 rounded-md border border-white/20 bg-white/5 px-3 text-sm text-white placeholder:text-slate-400 outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 focus-visible:ring-offset-slate-900"
           />
         </div>
 
         {/* Image upload */}
         <div>
-          <label htmlFor="promo-image" className="block text-sm font-medium text-foreground mb-1">
+          <label htmlFor="promo-image" className="block text-sm font-medium text-slate-200 mb-1">
             {t("promoImageLabel", language)}
           </label>
           {previewImage ? (
-            <div className="relative group rounded-lg overflow-hidden border h-48 mb-2">
-              <Image src={previewImage} alt="Vista previa" fill className="object-contain bg-muted" />
-              <div className="absolute inset-0 bg-overlay opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+            <div className="relative group rounded-lg overflow-hidden border border-white/20 h-48 mb-2">
+              <Image src={previewImage} alt="Vista previa" fill className="object-contain bg-white/5" />
+              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                 <button type="button" onClick={handleRemoveImage}
-                  className="px-3 py-1.5 bg-destructive text-destructive-foreground rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                  className="px-3 py-1.5 bg-red-500/80 text-white rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900">
                   {t("delete", language)}
                 </button>
               </div>
             </div>
           ) : (
-            <div className="border-2 border-dashed border-border rounded-lg p-4 text-center hover:border-muted-foreground transition-colors">
+            <div className="border-2 border-dashed border-white/20 rounded-lg p-4 text-center hover:border-cyan-400/50 hover:bg-white/5 transition-colors">
               <input type="file" accept="image/*" onChange={handleImageSelect} className="hidden" id="promo-image" />
               <label htmlFor="promo-image" className="cursor-pointer">
-                <ImageIcon className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                <span className="text-sm text-muted-foreground">{t("clickToSelectImage", language)}</span>
-                <p className="text-xs text-muted-foreground/50 mt-1">JPEG, PNG, WEBP (max 10MB)</p>
+                <ImageIcon className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                <span className="text-sm text-slate-300">{t("clickToSelectImage", language)}</span>
+                <p className="text-xs text-slate-500 mt-1">JPEG, PNG, WEBP (max 10MB)</p>
               </label>
             </div>
           )}
         </div>
 
         {/* Clients preview */}
-        <div className="bg-muted rounded-lg p-4">
+        <div className="bg-white/5 border border-white/10 rounded-lg p-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-foreground">{t("promoSendTo", language)}</span>
-            <span className="text-lg font-bold text-primary">{clientesConPromociones.length} {t("clients", language)}</span>
+            <span className="text-sm font-medium text-slate-300">{t("promoSendTo", language)}</span>
+            <span className="text-lg font-bold text-cyan-300">{clientesConPromociones.length} {t("clients", language)}</span>
           </div>
           {clientesConPromociones.length > 0 ? (
             <div className="flex flex-wrap gap-2 mt-3">
               {clientesConPromociones.slice(0, 10).map((c) => (
-                <span key={c.id} className="inline-flex items-center gap-1 px-2 py-1 bg-card rounded-full text-xs text-foreground">
+                <span key={c.id} className="inline-flex items-center gap-1 px-2 py-1 bg-white/10 rounded-full text-xs text-slate-200">
                   <Mail className="w-3 h-3" />{c.email}
                 </span>
               ))}
               {clientesConPromociones.length > 10 && (
-                <span className="inline-flex items-center px-2 py-1 bg-muted rounded-full text-xs text-foreground">
+                <span className="inline-flex items-center px-2 py-1 bg-white/10 rounded-full text-xs text-slate-300">
                   +{clientesConPromociones.length - 10} {t("moreLabel", language)}
                 </span>
               )}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground mt-2" role="status" aria-live="polite">{t("noClientsWithPromos", language)}</p>
+            <p className="text-sm text-slate-400 mt-2" role="status" aria-live="polite">{t("noClientsWithPromos", language)}</p>
           )}
         </div>
 
         <div className="flex justify-end">
           {showSuccess ? (
-            <div className="flex items-center gap-2 text-primary" role="status" aria-live="polite">
+            <div className="flex items-center gap-2 text-emerald-400" role="status" aria-live="polite">
               <CheckCircle className="w-5 h-5" />
               <span className="font-medium">{t("promoSavedSuccess", language)}</span>
             </div>
@@ -295,7 +296,7 @@ export default function PromocionesPage() {
             <Button
               onClick={handleGuardarPromocion}
               disabled={!promoTexto || !promoFechaFin || savingPromo || clientesConPromociones.length === 0}
-              className="bg-primary hover:bg-primary/90"
+              className="bg-gradient-to-r from-cyan-500 to-teal-600 hover:from-cyan-600 hover:to-teal-700 text-white font-bold"
             >
               {savingPromo ? (
                 <><Loader2 className="w-4 h-4 animate-spin" />{uploadingImage ? t("uploadingImageProgress", language) : t("savingProgress", language)}</>
@@ -308,39 +309,39 @@ export default function PromocionesPage() {
 
         {/* Last promo */}
         {promociones.length > 0 ? (
-          <div className="border-t pt-6 space-y-3">
-            <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-              <FileText className="w-4 h-4" />{t("lastPromotion", language)}
+          <div className="border-t border-white/10 pt-6 space-y-3">
+            <h3 className="text-base font-semibold text-white flex items-center gap-2">
+              <FileText className="w-4 h-4 text-cyan-300" />{t("lastPromotion", language)}
             </h3>
             {promociones.slice(0, 1).map((promo) => (
-              <div key={promo.id} className="p-4 bg-muted rounded-lg">
+              <div key={promo.id} className="p-4 bg-white/5 border border-white/10 rounded-lg">
                 {promo.imagen_url && (
                   <div className="mb-3">
-                    <Image src={promo.imagen_url} alt="Imagen de promoción" width={128} height={128} className="max-h-32 rounded-lg object-contain bg-card" />
+                    <Image src={promo.imagen_url} alt="Imagen de promoción" width={128} height={128} className="max-h-32 rounded-lg object-contain bg-white/10" />
                   </div>
                 )}
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <p className="font-medium text-foreground">{promo.texto_promocion}</p>
-                    <p className="text-sm text-muted-foreground">{formatDateTime(promo.fecha_hora, language)}</p>
+                    <p className="font-medium text-white">{promo.texto_promocion}</p>
+                    <p className="text-sm text-slate-400">{formatDateTime(promo.fecha_hora, language)}</p>
                     {promo.fecha_fin && (
-                      <p className="text-xs text-amber-600 mt-0.5">
+                      <p className="text-xs text-amber-400 mt-0.5">
                         ⏰ {t("promoFechaFinEmail", language)}: {new Date(promo.fecha_fin).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}
                       </p>
                     )}
                   </div>
                   <div className="text-right px-4">
-                    <span className="text-2xl font-bold text-primary">{promo.numero_envios}</span>
-                    <p className="text-xs text-muted-foreground">{t("clients", language)}</p>
+                    <span className="text-2xl font-bold text-cyan-300">{promo.numero_envios}</span>
+                    <p className="text-xs text-slate-400">{t("clients", language)}</p>
                   </div>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="border-t pt-6 text-center" role="status" aria-live="polite">
-            <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">{t("noPromotions", language)}</p>
+          <div className="border-t border-white/10 pt-6 text-center" role="status" aria-live="polite">
+            <FileText className="w-12 h-12 text-slate-500 mx-auto mb-4" />
+            <p className="text-slate-400">{t("noPromotions", language)}</p>
           </div>
         )}
       </div>

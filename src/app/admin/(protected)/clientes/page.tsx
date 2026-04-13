@@ -244,25 +244,25 @@ export default function ClientesPage() {
   };
 
   return (
-    <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
+    <div className="pt-16 lg:pt-0 px-6 py-8 space-y-8 min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Header con contador */}
-      <div className="bg-primary rounded-lg p-4 sm:p-6">
+      <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-6 sm:p-8 shadow-2xl">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-4">
             <div>
-              <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">{t("clientsTitle", language)}</h1>
-              <p className="text-primary-foreground/80 text-sm mt-1">{t("clientsSubtitle", language)}</p>
+              <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">{t("clientsTitle", language)}</h1>
+              <p className="text-slate-300 text-sm mt-1">{t("clientsSubtitle", language)}</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <div className="bg-primary-foreground/20 rounded-lg px-4 py-3 text-center">
-              <Users className="w-6 h-6 sm:w-8 sm:h-8 text-primary-foreground mx-auto mb-1" />
-              <span className="text-xl sm:text-2xl font-semibold text-primary-foreground">{clientes.length}</span>
-              <p className="text-primary-foreground/80 text-xs">{t("totalClients", language)}</p>
-            </div>
+            <section className="backdrop-blur-xl bg-gradient-to-br from-cyan-500/20 to-cyan-700/20 border border-cyan-400/30 rounded-xl px-4 py-3 text-center hover:shadow-[0_0_20px_rgba(34,211,238,0.3)] transition-shadow duration-300">
+              <Users className="w-6 h-6 sm:w-8 sm:h-8 text-cyan-300 mx-auto mb-1" />
+              <span className="text-xl sm:text-2xl font-semibold text-white">{clientes.length}</span>
+              <p className="text-cyan-300 text-xs">{t("totalClients", language)}</p>
+            </section>
             <Button 
               onClick={openCreateModal}
-              className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 font-semibold shrink-0"
+              className="bg-cyan-600 hover:bg-cyan-500 text-white font-semibold shrink-0 transition-colors focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2"
             >
               <Plus className="w-4 h-4 mr-2" />
               <span className="hidden sm:inline">{t("newClient", language)}</span>
@@ -274,23 +274,23 @@ export default function ClientesPage() {
 
       {/* Buscador */}
       <div className="mb-4">
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <div className="relative max-w-md backdrop-blur-xl bg-white/10 border border-white/20 rounded-xl px-3 py-2">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
             type="text"
             placeholder={t("searchClients", language)}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             aria-label={t("searchClients", language)}
-            className="pl-10"
+            className="pl-10 bg-transparent border-0 text-white placeholder:text-slate-400 focus:outline-none focus:ring-0"
           />
         </div>
       </div>
 
       {/* Tabla clientes */}
       {loading && (
-        <div className="bg-card rounded-lg border overflow-hidden">
-          <div className="p-4 border-b">
+        <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl overflow-hidden">
+          <div className="p-4 border-b border-white/10">
             <Skeleton className="h-6 w-32" />
           </div>
           <div className="p-4">
@@ -299,12 +299,12 @@ export default function ClientesPage() {
         </div>
       )}
       {error && (
-        <div className="mb-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-          <p className="text-destructive text-sm font-medium">{error}</p>
+        <div className="mb-4 p-4 bg-red-500/20 border border-red-400/30 rounded-lg">
+          <p className="text-red-300 text-sm font-medium">{error}</p>
           <Button 
             variant="outline" 
             size="sm" 
-            className="mt-2"
+            className="mt-2 bg-red-600/20 hover:bg-red-600/30 text-red-300 border-red-400/30"
             onClick={() => globalThis.location.reload()}
           >
             {t("retry", language)}
@@ -312,9 +312,9 @@ export default function ClientesPage() {
         </div>
       )}
       {!loading && !error && filteredClientes.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+        <div className="flex flex-col items-center justify-center py-12 text-slate-400">
           <Users className="w-12 h-12 opacity-30 mb-3" />
-          <p className="text-base font-medium text-foreground">
+          <p className="text-base font-medium text-slate-300">
             {searchTerm ? t("noClientsFound", language) : t("noClientsYet", language)}
           </p>
           <p className="text-sm mt-1">
@@ -323,37 +323,37 @@ export default function ClientesPage() {
         </div>
       )}
       {!loading && filteredClientes.length > 0 && (
-        <div className="bg-card rounded-lg border overflow-hidden">
-          <div className="overflow-x-auto scrollbar scrollbar-thumb-muted-foreground/40 scrollbar-track-transparent scrollbar-thin">
+        <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl overflow-hidden">
+          <div className="overflow-x-auto scrollbar scrollbar-thumb-white/20 scrollbar-track-transparent scrollbar-thin">
             <table className="w-full">
-              <thead className="bg-muted/50">
+              <thead className="bg-white/5 border-b border-white/10">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t("name", language)}</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t("email", language)}</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t("phone", language)}</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t("address", language)}</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">{t("languageLabel", language) || 'Lang'}</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t("ordersLabel", language)}</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t("date", language)}</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">{t("promotionsLabel", language)}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">{t("name", language)}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">{t("email", language)}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">{t("phone", language)}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">{t("address", language)}</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-slate-300 uppercase">{t("languageLabel", language) || 'Lang'}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">{t("ordersLabel", language)}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">{t("date", language)}</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-slate-300 uppercase">{t("promotionsLabel", language)}</th>
                   <th className="px-4 py-3"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
+              <tbody className="divide-y divide-white/10">
                 {filteredClientes.map((cliente) => (
-                  <tr key={cliente.id} className="hover:bg-muted/30">
+                  <tr key={cliente.id} className="hover:bg-white/5 transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <User className="size-4 text-muted-foreground shrink-0" />
-                        <span className="font-medium text-foreground truncate max-w-[150px]">
+                        <User className="size-4 text-slate-400 shrink-0" />
+                        <span className="font-medium text-white truncate max-w-[150px]">
                           {cliente.nombre || '-'}
                         </span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <Mail className="size-4 text-muted-foreground shrink-0" />
-                        <span className="text-foreground truncate max-w-[180px]">
+                        <Mail className="size-4 text-slate-400 shrink-0" />
+                        <span className="text-slate-300 truncate max-w-[180px]">
                           {cliente.email || '-'}
                         </span>
                       </div>

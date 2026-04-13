@@ -229,15 +229,15 @@ function KpiCard({ kpi, motionProps, shouldReduceMotion, index }: Readonly<{
       key={`kpi-${kpi.label}`}
       {...motionProps}
       transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: index * 0.05 }}
-      className="bg-card rounded-lg shadow-elegant border border-border p-6"
+      className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-xl p-6"
     >
       <div className="flex items-center gap-3">
-        <div className={`p-2 ${kpi.iconClass} rounded-lg`}>
-          <kpi.icon className={`w-5 h-5 ${kpi.iconColor}`} />
+        <div className="p-2 bg-cyan-500/20 rounded-lg">
+          <kpi.icon className="w-5 h-5 text-cyan-300" />
         </div>
         <div>
-          <p className="text-sm text-muted-foreground">{kpi.label}</p>
-          <p className="text-2xl font-bold text-foreground">{kpi.value}</p>
+          <p className="text-sm text-slate-300">{kpi.label}</p>
+          <p className="text-2xl font-bold text-white">{kpi.value}</p>
         </div>
       </div>
     </motion.div>
@@ -256,13 +256,13 @@ function AvgTicketCard({ stats, language, motionProps, shouldReduceMotion }: Rea
     <motion.div
       {...motionProps}
       transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.2 }}
-      className="bg-card rounded-lg border border-border p-4"
+      className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-xl p-4"
     >
       <div className="flex items-center justify-between mb-2">
-        <p className="text-sm text-muted-foreground">{t("avgTicket", lang)}</p>
-        <Euro className="w-4 h-4 text-muted-foreground" />
+        <p className="text-sm text-slate-300">{t("avgTicket", lang)}</p>
+        <Euro className="w-4 h-4 text-cyan-300" />
       </div>
-      <p className="text-2xl font-bold text-foreground">{formatPrice(stats?.ticketMedio || 0, 'EUR', lang)}</p>
+      <p className="text-2xl font-bold text-white">{formatPrice(stats?.ticketMedio || 0, 'EUR', lang)}</p>
     </motion.div>
   );
 }
@@ -285,22 +285,22 @@ function ComparisonCard({ stats, language, motionProps, shouldReduceMotion }: Re
     <motion.div
       {...motionProps}
       transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.25 }}
-      className="bg-card rounded-lg border border-border p-4"
+      className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-xl p-4"
     >
       <div className="flex items-center justify-between mb-2">
-        <p className="text-sm text-muted-foreground">{t("vsPreviousMonth", lang)}</p>
+        <p className="text-sm text-slate-300">{t("vsPreviousMonth", lang)}</p>
         {showComparison && (
-          isPositive ? <ArrowUpRight className="w-4 h-4 text-primary" /> : <ArrowDownRight className="w-4 h-4 text-destructive" />
+          isPositive ? <ArrowUpRight className="w-4 h-4 text-emerald-400" /> : <ArrowDownRight className="w-4 h-4 text-red-400" />
         )}
       </div>
       {showComparison ? (
-        <p className={`text-2xl font-bold ${isPositive ? 'text-primary' : 'text-destructive'}`}>
+        <p className={`text-2xl font-bold ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
           {pedidosChange?.toFixed(1)}%
         </p>
       ) : (
-        <p className="text-2xl font-bold text-muted-foreground">--</p>
+        <p className="text-2xl font-bold text-slate-500">--</p>
       )}
-      <p className="text-xs text-muted-foreground mt-1">
+      <p className="text-xs text-slate-400 mt-1">
         {stats?.pedidosAnterior || 0} {t("ordersPreviousMonth", lang)}
       </p>
     </motion.div>
@@ -319,14 +319,14 @@ function ClientsCard({ stats, language, motionProps, shouldReduceMotion }: Reado
     <motion.div
       {...motionProps}
       transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.3 }}
-      className="bg-card rounded-lg border border-border p-4"
+      className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-xl p-4"
     >
       <div className="flex items-center justify-between mb-2">
-        <p className="text-sm text-muted-foreground">{t("clientsTitle", lang)}</p>
-        <Users className="w-4 h-4 text-muted-foreground" />
+        <p className="text-sm text-slate-300">{t("clientsTitle", lang)}</p>
+        <Users className="w-4 h-4 text-cyan-300" />
       </div>
-      <p className="text-2xl font-bold text-foreground">{(stats?.clientesNuevos || 0) + (stats?.clientesRecurrentes || 0)}</p>
-      <p className="text-xs text-muted-foreground mt-1">
+      <p className="text-2xl font-bold text-white">{(stats?.clientesNuevos || 0) + (stats?.clientesRecurrentes || 0)}</p>
+      <p className="text-xs text-slate-400 mt-1">
         {(stats?.clientesNuevos || 0)} {t("newClientsLabel", lang)}, {(stats?.clientesRecurrentes || 0)} {t("returningClients", lang)}
       </p>
     </motion.div>
@@ -344,22 +344,22 @@ function StatsHeader({ language, meses, mesActual, añoActual, esMesActual, onMo
 }>) {
   const lang = language as Parameters<typeof t>[1];
   return (
-    <div className="bg-primary rounded-lg p-4 sm:p-6">
+    <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">{t("statsTitle", lang)}</h1>
-          <p className="text-primary-foreground/80 text-sm mt-1">{t("statsSubtitle", lang)}</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">{t("statsTitle", lang)}</h1>
+          <p className="text-slate-300 text-sm mt-1">{t("statsSubtitle", lang)}</p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => onMonthChange(-1)}
             aria-label={t("previousMonth", lang)}
-            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-primary-foreground/20 hover:bg-primary-foreground/30 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-slate-300 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2"
           >
-            <ChevronLeft className="w-5 h-5 text-primary-foreground" />
+            <ChevronLeft className="w-5 h-5" />
           </button>
-          <div className="px-4 py-2 bg-primary-foreground/20 rounded-lg min-w-[140px] text-center">
-            <span className="font-medium text-primary-foreground">
+          <div className="px-4 py-2 bg-white/10 border border-white/20 rounded-lg min-w-[140px] text-center">
+            <span className="font-medium text-white">
               {meses[mesActual]} {añoActual}
             </span>
           </div>
@@ -367,9 +367,9 @@ function StatsHeader({ language, meses, mesActual, añoActual, esMesActual, onMo
             onClick={() => onMonthChange(1)}
             disabled={esMesActual}
             aria-label={t("nextMonth", lang)}
-            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-primary-foreground/20 hover:bg-primary-foreground/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-slate-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2"
           >
-            <ChevronRight className="w-5 h-5 text-primary-foreground" />
+            <ChevronRight className="w-5 h-5" />
           </button>
         </div>
       </div>
@@ -414,7 +414,7 @@ export default function EstadisticasPage() {
   }
 
   return (
-    <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
+    <div className="pt-16 lg:pt-0 px-6 py-8 space-y-8 min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Header con stats */}
       <StatsHeader
         language={language}

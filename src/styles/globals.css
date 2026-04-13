@@ -561,3 +561,41 @@
     transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
   }
 }
+
+/* Admin Panel Glassmorphic Styles */
+@layer components {
+  .glass-card {
+    @apply backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl;
+  }
+
+  .glass-card-sm {
+    @apply backdrop-blur-xl bg-white/5 border border-white/10 rounded-xl;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-to-r from-cyan-300 via-teal-300 to-emerald-300 bg-clip-text text-transparent;
+  }
+
+  .admin-glow {
+    @apply shadow-[0_0_2rem_rgba(34,211,238,0.1)];
+  }
+
+  .gradient-bg-admin {
+    @apply bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900;
+  }
+}
+
+/* Smooth transitions for admin UI */
+@layer utilities {
+  .transition-smooth {
+    @apply transition-all duration-300 ease-out;
+  }
+
+  .hover-lift {
+    @apply hover:shadow-lg hover:scale-[1.01] transition-all duration-300;
+  }
+
+  .text-slate-accent {
+    @apply text-cyan-300;
+  }
+}

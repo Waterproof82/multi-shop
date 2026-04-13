@@ -39,6 +39,28 @@ interface Pedido {
   created_at: string;
 }
 
+function getDeleteConfirmationText(language: string): string {
+  const confirmationTexts: Record<string, string> = {
+    es: 'ELIMINAR',
+    en: 'DELETE',
+    fr: 'SUPPRIMER',
+    it: 'ELIMINA',
+    de: 'LÖSCHEN'
+  };
+  return confirmationTexts[language] || 'DELETE';
+}
+
+function getDeletingText(language: string): string {
+  const deletingTexts: Record<string, string> = {
+    es: 'Eliminando...',
+    en: 'Deleting...',
+    fr: 'Suppression...',
+    it: 'Eliminazione...',
+    de: 'Wird gelöscht...'
+  };
+  return deletingTexts[language] || 'Deleting...';
+}
+
 function getAriaSortValue(sortField: string, currentField: string, sortDirection: 'asc' | 'desc') {
   if (sortField === currentField) {
     if (sortDirection === 'asc') {
@@ -209,7 +231,7 @@ export default function PedidosPage() {
   };
 
   const confirmDeleteAll = async () => {
-    if (deleteAllConfirm.confirmText.toUpperCase() !== (language === 'es' ? 'ELIMINAR' : language === 'en' ? 'DELETE' : language === 'fr' ? 'SUPPRIMER' : language === 'it' ? 'ELIMINA' : 'LÖSCHEN')) return;
+    if (deleteAllConfirm.confirmText.toUpperCase() !== getDeleteConfirmationText(language)) return;
     setDeletingAll(true);
     try {
       const res = await fetchWithCsrf(`/api/admin/pedidos/delete-all?empresaId=${effectiveEmpresaId}`, {
@@ -272,21 +294,21 @@ export default function PedidosPage() {
 
   if (loading) {
     return (
-      <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
+      <div className="pt-16 lg:pt-0 px-6 py-8 space-y-8 min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         {/* Header con stats skeleton */}
-        <div className="bg-primary rounded-lg p-4 sm:p-6">
+        <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-6 sm:p-8 shadow-2xl">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="space-y-2">
-              <Skeleton className="h-6 w-48 bg-primary-foreground/20" />
-              <Skeleton className="h-4 w-64 bg-primary-foreground/20" />
+              <Skeleton className="h-8 w-48 bg-white/20" />
+              <Skeleton className="h-4 w-64 bg-white/10" />
             </div>
-            <SkeletonStats count={4} itemClassName="bg-primary-foreground/20" />
+            <SkeletonStats count={4} itemClassName="bg-white/10" />
           </div>
         </div>
 
         {/* Buscador skeleton */}
-        <div className="bg-card rounded-lg shadow-elegant border border-border">
-          <div className="p-4 border-b border-border">
+        <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl">
+          <div className="p-4 border-b border-white/10">
             <Skeleton className="h-10 w-full max-w-md" />
           </div>
           <div className="p-4">
@@ -298,67 +320,67 @@ export default function PedidosPage() {
   }
 
   return (
-    <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
+    <div className="pt-16 lg:pt-0 px-6 py-8 space-y-8 min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Header con stats */}
-      <div className="bg-primary rounded-lg p-4 sm:p-6">
+      <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-6 sm:p-8 shadow-2xl">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">{t("ordersTitle", language)}</h1>
-            <p className="text-primary-foreground/80 text-sm mt-1">{t("ordersSubtitle", language)}</p>
+            <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">{t("ordersTitle", language)}</h1>
+            <p className="text-slate-300 text-sm mt-1">{t("ordersSubtitle", language)}</p>
           </div>
           <div className={`grid gap-3 sm:gap-4 ${stats.isCurrentMonth ? 'grid-cols-2 sm:grid-cols-6' : 'grid-cols-2 sm:grid-cols-4'}`}>
             {stats.isCurrentMonth && (
               <>
-                <div className="bg-blue-500/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
-                  <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 text-blue-200 mx-auto mb-1" />
-                  <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{stats.pedidosHoy}</span>
-                  <p className="text-blue-200 text-[10px] sm:text-xs">{t("today", language)}</p>
-                </div>
-                <div className="bg-blue-500/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
-                  <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{formatPrice(stats.totalHoy)}</span>
-                  <p className="text-blue-200 text-[10px] sm:text-xs">{t("salesToday", language)}</p>
-                </div>
+                <section className="backdrop-blur-xl bg-gradient-to-br from-blue-500/20 to-blue-700/20 border border-blue-400/30 rounded-xl px-3 sm:px-4 py-3 text-center hover:shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-shadow duration-300">
+                  <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6 text-blue-300 mx-auto mb-2" />
+                  <span className="text-lg sm:text-2xl font-semibold text-white">{stats.pedidosHoy}</span>
+                  <p className="text-blue-300 text-[10px] sm:text-xs">{t("today", language)}</p>
+                </section>
+                <section className="backdrop-blur-xl bg-gradient-to-br from-blue-500/20 to-blue-700/20 border border-blue-400/30 rounded-xl px-3 sm:px-4 py-3 text-center hover:shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-shadow duration-300">
+                  <span className="text-lg sm:text-2xl font-semibold text-white">{formatPrice(stats.totalHoy)}</span>
+                  <p className="text-blue-300 text-[10px] sm:text-xs">{t("salesToday", language)}</p>
+                </section>
               </>
             )}
-            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
-              <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
-              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{stats.pedidosMes}</span>
-              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">{t("thisMonth", language)}</p>
-            </div>
-            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
-              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{formatPrice(stats.totalMes)}</span>
-              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">{t("salesMonth", language)}</p>
-            </div>
-            <div className="rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center bg-status-pending-bg">
-              <span className="text-lg sm:text-2xl font-semibold text-status-pending-text">{stats.pendientes}</span>
-              <p className="text-status-pending-text/80 text-[10px] sm:text-xs">{t("statusPendiente", language)}</p>
-            </div>
-            <div className="rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center bg-status-accepted-bg">
-              <span className="text-lg sm:text-2xl font-semibold text-status-accepted-text">{stats.aceptados}</span>
-              <p className="text-status-accepted-text/80 text-[10px] sm:text-xs">{t("statusAceptado", language)}</p>
-            </div>
+            <section className="backdrop-blur-xl bg-gradient-to-br from-cyan-500/20 to-cyan-700/20 border border-cyan-400/30 rounded-xl px-3 sm:px-4 py-3 text-center hover:shadow-[0_0_20px_rgba(34,211,238,0.3)] transition-shadow duration-300">
+              <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-300 mx-auto mb-2" />
+              <span className="text-lg sm:text-2xl font-semibold text-white">{stats.pedidosMes}</span>
+              <p className="text-cyan-300 text-[10px] sm:text-xs">{t("thisMonth", language)}</p>
+            </section>
+            <section className="backdrop-blur-xl bg-gradient-to-br from-emerald-500/20 to-emerald-700/20 border border-emerald-400/30 rounded-xl px-3 sm:px-4 py-3 text-center hover:shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-shadow duration-300">
+              <span className="text-lg sm:text-2xl font-semibold text-white">{formatPrice(stats.totalMes)}</span>
+              <p className="text-emerald-300 text-[10px] sm:text-xs">{t("salesMonth", language)}</p>
+            </section>
+            <section className="backdrop-blur-xl bg-gradient-to-br from-amber-500/20 to-amber-700/20 border border-amber-400/30 rounded-xl px-3 sm:px-4 py-3 text-center hover:shadow-[0_0_20px_rgba(245,158,11,0.3)] transition-shadow duration-300">
+              <span className="text-lg sm:text-2xl font-semibold text-white">{stats.pendientes}</span>
+              <p className="text-amber-300 text-[10px] sm:text-xs">{t("statusPendiente", language)}</p>
+            </section>
+            <section className="backdrop-blur-xl bg-gradient-to-br from-blue-500/20 to-blue-700/20 border border-blue-400/30 rounded-xl px-3 sm:px-4 py-3 text-center hover:shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-shadow duration-300">
+              <span className="text-lg sm:text-2xl font-semibold text-white">{stats.aceptados}</span>
+              <p className="text-blue-300 text-[10px] sm:text-xs">{t("statusAceptado", language)}</p>
+            </section>
           </div>
         </div>
       </div>
 
       {/* Month selector */}
-      <div className="bg-card rounded-lg border border-border p-4">
+      <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-4 shadow-2xl">
         <div className="flex items-center justify-center gap-4">
           <button
             onClick={() => cambiarMes(-1)}
-            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-muted/80 text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2"
             aria-label="Mes anterior"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
           <div className="text-center min-w-[140px]">
-            <span className="text-lg font-semibold text-foreground">
+            <span className="text-lg font-semibold text-white">
               {meses[selectedMonth.mes]} {selectedMonth.año}
             </span>
             {!esMesActual && (
               <button
                 onClick={() => setSelectedMonth({ mes: new Date().getMonth(), año: new Date().getFullYear() })}
-                className="block text-xs text-primary hover:underline mx-auto mt-1"
+                className="block text-xs text-cyan-400 hover:text-cyan-300 underline mx-auto mt-1 transition-colors"
               >
                 Ver actual
               </button>
@@ -367,7 +389,7 @@ export default function PedidosPage() {
           <button
             onClick={() => cambiarMes(1)}
             disabled={esMesActual}
-            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-muted hover:bg-muted/80 text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
             aria-label={t("nextMonth", language) || "Mes siguiente"}
           >
             <ChevronRight className="w-5 h-5" />
@@ -379,7 +401,7 @@ export default function PedidosPage() {
         <div className="flex justify-end">
           <button
             onClick={openDeleteAllDialog}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-red-600/80 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2"
           >
             <Trash className="w-4 h-4" />
             {t("deleteAllOrders", language)}
@@ -388,17 +410,17 @@ export default function PedidosPage() {
       )}
 
       {/* Buscador */}
-      <div className="bg-card rounded-lg shadow-elegant border border-border">
-        <div className="p-4 border-b border-border">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl overflow-hidden">
+        <div className="p-4 border-b border-white/10">
+          <div className="relative max-w-md backdrop-blur-xl bg-white/10 border border-white/20 rounded-xl px-3 py-2">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
               type="text"
               placeholder={t("searchOrders", language)}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               aria-label={t("searchOrders", language)}
-              className="pl-10"
+              className="pl-10 bg-transparent border-0 text-white placeholder:text-slate-400 focus:outline-none focus:ring-0"
             />
           </div>
         </div>
@@ -594,7 +616,7 @@ export default function PedidosPage() {
                 type="text"
                 value={deleteAllConfirm.confirmText}
                 onChange={(e) => setDeleteAllConfirm(prev => ({ ...prev, confirmText: e.target.value }))}
-                placeholder={language === 'es' ? 'ELIMINAR' : language === 'en' ? 'DELETE' : language === 'fr' ? 'SUPPRIMER' : language === 'it' ? 'ELIMINA' : 'LÖSCHEN'}
+                placeholder={getDeleteConfirmationText(language)}
                 className="w-full"
                 autoComplete="off"
               />
@@ -609,10 +631,10 @@ export default function PedidosPage() {
               </button>
               <button
                 onClick={confirmDeleteAll}
-                disabled={deleteAllConfirm.confirmText.toUpperCase() !== (language === 'es' ? 'ELIMINAR' : language === 'en' ? 'DELETE' : language === 'fr' ? 'SUPPRIMER' : language === 'it' ? 'ELIMINA' : 'LÖSCHEN') || deletingAll}
+                disabled={deleteAllConfirm.confirmText.toUpperCase() !== getDeleteConfirmationText(language) || deletingAll}
                 className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {deletingAll ? (language === 'es' ? 'Eliminando...' : language === 'en' ? 'Deleting...' : language === 'fr' ? 'Suppression...' : language === 'it' ? 'Eliminazione...' : 'Wird gelöscht...') : t("delete", language)}
+                {deletingAll ? getDeletingText(language) : t("delete", language)}
               </button>
             </div>
           </div>
