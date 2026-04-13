@@ -603,7 +603,7 @@ export default function ProductosPage() {
                       <p className="text-sm font-medium text-foreground">
                         {prod.titulo_es}
                         {prod.es_especial && (
-                          <span className="ml-2 px-2 py-0.5 text-xs bg-accent/10 text-accent rounded-full">
+                          <span className="ml-2 px-2 py-0.5 text-xs bg-red-500/20 text-red-400 border border-red-400/30 rounded-full">
                             {t("especial", language)}
                           </span>
                         )}
