@@ -97,27 +97,27 @@ interface EmpresasTableProps {
 export function EmpresasTable({ empresas }: EmpresasTableProps) {
   if (empresas.length === 0) {
     return (
-      <div className="bg-card border border-border rounded-lg p-6 text-center">
-        <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-        <p className="text-muted-foreground">No hay empresas registradas</p>
+      <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-xl p-6 text-center">
+        <Building2 className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+        <p className="text-slate-400">No hay empresas registradas</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-card border border-border rounded-lg overflow-hidden">
+    <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-xl overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[900px]" aria-label="Listado de empresas">
-          <thead className="bg-muted/50">
+          <thead className="bg-white/5">
             <tr>
-              <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Empresa</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Dominio</th>
-              <th className="text-center px-4 py-3 text-sm font-medium text-muted-foreground">Hoy</th>
-              <th className="text-center px-4 py-3 text-sm font-medium text-muted-foreground">Mes</th>
-              <th className="text-center px-4 py-3 text-sm font-medium text-muted-foreground">Total</th>
-              <th className="text-center px-4 py-3 text-sm font-medium text-muted-foreground">Pendientes</th>
-              <th className="text-center px-4 py-3 text-sm font-medium text-muted-foreground">Clientes</th>
-              <th className="text-center px-4 py-3 text-sm font-medium text-muted-foreground">
+              <th className="text-left px-4 py-3 text-sm font-medium text-slate-300">Empresa</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-slate-300">Dominio</th>
+              <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Hoy</th>
+              <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Mes</th>
+              <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Total</th>
+              <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Pendientes</th>
+              <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Clientes</th>
+              <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">
                 <span className="flex flex-col items-center gap-0.5">
                   <span>Promos</span>
                   <span className="text-xs font-normal text-muted-foreground/70">envios</span>
