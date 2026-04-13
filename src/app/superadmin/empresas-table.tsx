@@ -120,21 +120,21 @@ export function EmpresasTable({ empresas }: EmpresasTableProps) {
               <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">
                 <span className="flex flex-col items-center gap-0.5">
                   <span>Promos</span>
-                  <span className="text-xs font-normal text-muted-foreground/70">envios</span>
+                  <span className="text-xs font-normal text-slate-500">envíos</span>
                 </span>
               </th>
-              <th className="text-center px-4 py-3 text-sm font-medium text-muted-foreground">
+              <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">
                 <span className="flex flex-col items-center gap-0.5">
                   <span>TGTG</span>
-                  <span className="text-xs font-normal text-muted-foreground/70">validados</span>
+                  <span className="text-xs font-normal text-slate-500">validados</span>
                 </span>
               </th>
-              <th className="text-right px-4 py-3 text-sm font-medium text-muted-foreground">Acciones</th>
+              <th className="text-right px-4 py-3 text-sm font-medium text-slate-300">Acciones</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-border">
+          <tbody className="divide-y divide-white/10">
             {empresas.map((empresa) => (
-              <tr key={empresa.id} className="hover:bg-muted/30 transition-colors">
+              <tr key={empresa.id} className="hover:bg-white/5 transition-colors">
                 <td className="px-4 py-4">
                   <div className="flex items-center gap-3">
                     {empresa.logoUrl ? (
@@ -143,14 +143,14 @@ export function EmpresasTable({ empresas }: EmpresasTableProps) {
                         alt={empresa.nombre}
                         width={40}
                         height={40}
-                        className="h-10 w-10 rounded-lg object-contain bg-white border border-border"
+                        className="h-10 w-10 rounded-lg object-contain bg-white/10 border border-white/20"
                       />
                     ) : (
-                      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <Building2 className="h-5 w-5 text-primary" />
+                      <div className="h-10 w-10 rounded-lg bg-white/10 flex items-center justify-center">
+                        <Building2 className="h-5 w-5 text-white/70" />
                       </div>
                     )}
-                    <span className="font-medium text-foreground">{empresa.nombre}</span>
+                    <span className="font-medium text-white">{empresa.nombre}</span>
                   </div>
                 </td>
                 <td className="px-4 py-4">
@@ -158,39 +158,39 @@ export function EmpresasTable({ empresas }: EmpresasTableProps) {
                     href={`https://${empresa.dominio}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm text-primary hover:underline"
+                    className="text-sm text-cyan-400 hover:text-cyan-300 hover:underline"
                   >
                     {empresa.dominio}
                   </a>
                 </td>
                 <td className="px-4 py-4 text-center">
-                  <span className="text-sm font-medium text-primary">{empresa.stats.pedidosHoy}</span>
+                  <span className="text-sm font-medium text-blue-300">{empresa.stats.pedidosHoy}</span>
                 </td>
                 <td className="px-4 py-4 text-center">
-                  <span className="text-sm font-medium text-primary">{empresa.stats.pedidosMes}</span>
+                  <span className="text-sm font-medium text-cyan-300">{empresa.stats.pedidosMes}</span>
                 </td>
-                <td className="px-4 py-4 text-center text-foreground">
+                <td className="px-4 py-4 text-center text-white">
                   {empresa.stats.totalPedidos}
                 </td>
                 <td className="px-4 py-4 text-center">
                   {empresa.stats.pedidosPendientes > 0 ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 text-sm">
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-300 text-sm">
                       <AlertCircle className="h-3 w-3" aria-hidden="true" />
                       {empresa.stats.pedidosPendientes}
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 text-muted-foreground text-sm">
+                    <span className="inline-flex items-center gap-1 text-emerald-400 text-sm">
                       <CheckCircle className="h-3 w-3" aria-hidden="true" />
                       0
                     </span>
                   )}
                 </td>
-                <td className="px-4 py-4 text-center text-foreground">
+                <td className="px-4 py-4 text-center text-white">
                   {empresa.stats.totalClientes}
                 </td>
                 <td className="px-4 py-4">
                   <div className="flex flex-col items-center gap-1">
-                    <span className="text-sm font-medium text-primary">
+                    <span className="text-sm font-medium text-violet-300">
                       {empresa.stats.cuponesPromoValidados > 0 ? `${empresa.stats.cuponesPromoValidados}` : '0'}
                     </span>
                     <ModuloSwitch
@@ -203,7 +203,7 @@ export function EmpresasTable({ empresas }: EmpresasTableProps) {
                 </td>
                 <td className="px-4 py-4">
                   <div className="flex flex-col items-center gap-1">
-                    <span className="text-sm font-medium text-primary">
+                    <span className="text-sm font-medium text-amber-300">
                       {empresa.stats.cuponesTgtgTotales > 0
                         ? `${empresa.stats.cuponesTgtgValidados}/${empresa.stats.cuponesTgtgTotales}`
                         : '—'}
@@ -219,7 +219,7 @@ export function EmpresasTable({ empresas }: EmpresasTableProps) {
                 <td className="px-4 py-4 text-right">
                   <a
                     href={`/api/superadmin/switch-empresa?empresaId=${empresa.id}`}
-                    className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-4 py-2 text-sm font-medium bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
                   >
                     Editar
                   </a>

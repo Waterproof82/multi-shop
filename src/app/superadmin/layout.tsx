@@ -43,7 +43,7 @@ export default async function SuperAdminLayout({
           Ir al contenido principal
         </a>
         <SuperAdminHeader adminName={admin.nombreCompleto || 'Super Admin'} />
-        <main id="main-content" className="pt-16 px-6 py-8 min-h-screen">
+        <main id="main-content" className="pt-24 px-6 py-8 min-h-screen">
           {children}
         </main>
       </div>

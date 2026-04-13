@@ -1,5 +1,6 @@
 'use client';
 
+import { LogOut } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 
 interface SuperAdminHeaderProps {
@@ -19,14 +20,15 @@ export default function SuperAdminHeader({ adminName }: SuperAdminHeaderProps) {
           Super Admin Panel
         </h1>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-slate-300">
+          <span className="text-sm text-slate-300 hidden sm:inline">
             {adminName || 'Super Admin'}
           </span>
           <button
             onClick={handleLogout}
-            className="min-h-[44px] min-w-[44px] px-3 text-sm text-slate-300 hover:text-white transition-colors outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 rounded-md"
+            aria-label="Cerrar sesión"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 rounded-md"
           >
-            Cerrar sesión
+            <LogOut className="w-5 h-5" />
           </button>
         </div>
       </div>
