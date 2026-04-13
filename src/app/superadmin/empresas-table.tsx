@@ -119,14 +119,14 @@ export function EmpresasTable({ empresas }: EmpresasTableProps) {
               <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Clientes</th>
               <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">
                 <span className="flex flex-col items-center gap-0.5">
-                  <span className="text-violet-300">Promos</span>
-                  <span className="text-xs font-normal text-slate-500">envíos</span>
+                  <span>Promos</span>
+                  <span className="text-xs font-normal">envíos</span>
                 </span>
               </th>
               <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">
                 <span className="flex flex-col items-center gap-0.5">
-                  <span className="text-amber-300">TGTG</span>
-                  <span className="text-xs font-normal text-slate-500">validados</span>
+                  <span>TGTG</span>
+                  <span className="text-xs font-normal">validados</span>
                 </span>
               </th>
               <th className="text-right px-4 py-3 text-sm font-medium text-slate-300">Acciones</th>
