@@ -217,23 +217,43 @@ function useMotionProps() {
   return { motionProps, shouldReduceMotion };
 }
 
-// KPI Card component
+// KPI Card component - color indexed for variety
+const KPI_GRADIENTS = [
+  'from-violet-500/20 to-violet-700/20 border-violet-400/30 hover:shadow-[0_0_20px_rgba(139,92,246,0.3)]',
+  'from-blue-500/20 to-blue-700/20 border-blue-400/30 hover:shadow-[0_0_20px_rgba(59,130,246,0.3)]',
+  'from-cyan-500/20 to-cyan-700/20 border-cyan-400/30 hover:shadow-[0_0_20px_rgba(34,211,238,0.3)]',
+  'from-teal-500/20 to-teal-700/20 border-teal-400/30 hover:shadow-[0_0_20px_rgba(20,184,166,0.3)]',
+  'from-emerald-500/20 to-emerald-700/20 border-emerald-400/30 hover:shadow-[0_0_20px_rgba(16,185,129,0.3)]',
+];
+
+const KPI_ICON_COLORS = [
+  'text-violet-300',
+  'text-blue-300', 
+  'text-cyan-300',
+  'text-teal-300',
+  'text-emerald-300',
+];
+
 function KpiCard({ kpi, motionProps, shouldReduceMotion, index }: Readonly<{ 
   kpi: ReturnType<typeof getKpiData>[number]; 
   motionProps: object;
   shouldReduceMotion: boolean;
   index: number;
 }>) {
+  const colorIndex = index % KPI_GRADIENTS.length;
+  const gradientClass = KPI_GRADIENTS[colorIndex];
+  const iconColorClass = KPI_ICON_COLORS[colorIndex];
+  
   return (
     <motion.div
       key={`kpi-${kpi.label}`}
       {...motionProps}
       transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: index * 0.05 }}
-      className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-xl p-6"
+      className={`backdrop-blur-xl bg-gradient-to-br ${gradientClass} rounded-xl p-6 transition-shadow duration-300`}
     >
       <div className="flex items-center gap-3">
-        <div className="p-2 bg-cyan-500/20 rounded-lg">
-          <kpi.icon className="w-5 h-5 text-cyan-300" />
+        <div className={`p-2 rounded-lg bg-white/10`}>
+          <kpi.icon className={`w-5 h-5 ${iconColorClass}`} />
         </div>
         <div>
           <p className="text-sm text-slate-300">{kpi.label}</p>
@@ -256,18 +276,18 @@ function AvgTicketCard({ stats, language, motionProps, shouldReduceMotion }: Rea
     <motion.div
       {...motionProps}
       transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.2 }}
-      className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-xl p-4"
+      className="backdrop-blur-xl bg-gradient-to-br from-amber-500/20 to-amber-700/20 border border-amber-400/30 rounded-xl p-4"
     >
       <div className="flex items-center justify-between mb-2">
         <p className="text-sm text-slate-300">{t("avgTicket", lang)}</p>
-        <Euro className="w-4 h-4 text-cyan-300" />
+        <Euro className="w-4 h-4 text-amber-300" />
       </div>
       <p className="text-2xl font-bold text-white">{formatPrice(stats?.ticketMedio || 0, 'EUR', lang)}</p>
     </motion.div>
   );
 }
 
-// Comparison card component
+// Comparison card component - pink/red gradient
 function ComparisonCard({ stats, language, motionProps, shouldReduceMotion }: Readonly<{ 
   stats: Stats | null; 
   language: string;
@@ -285,7 +305,7 @@ function ComparisonCard({ stats, language, motionProps, shouldReduceMotion }: Re
     <motion.div
       {...motionProps}
       transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.25 }}
-      className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-xl p-4"
+      className="backdrop-blur-xl bg-gradient-to-br from-pink-500/20 to-pink-700/20 border border-pink-400/30 rounded-xl p-4"
     >
       <div className="flex items-center justify-between mb-2">
         <p className="text-sm text-slate-300">{t("vsPreviousMonth", lang)}</p>
@@ -307,7 +327,7 @@ function ComparisonCard({ stats, language, motionProps, shouldReduceMotion }: Re
   );
 }
 
-// Clients card component
+// Clients card component - purple gradient
 function ClientsCard({ stats, language, motionProps, shouldReduceMotion }: Readonly<{
   stats: Stats | null;
   language: string;
@@ -319,11 +339,11 @@ function ClientsCard({ stats, language, motionProps, shouldReduceMotion }: Reado
     <motion.div
       {...motionProps}
       transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.3 }}
-      className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-xl p-4"
+      className="backdrop-blur-xl bg-gradient-to-br from-purple-500/20 to-purple-700/20 border border-purple-400/30 rounded-xl p-4"
     >
       <div className="flex items-center justify-between mb-2">
         <p className="text-sm text-slate-300">{t("clientsTitle", lang)}</p>
-        <Users className="w-4 h-4 text-cyan-300" />
+        <Users className="w-4 h-4 text-purple-300" />
       </div>
       <p className="text-2xl font-bold text-white">{(stats?.clientesNuevos || 0) + (stats?.clientesRecurrentes || 0)}</p>
       <p className="text-xs text-slate-400 mt-1">
