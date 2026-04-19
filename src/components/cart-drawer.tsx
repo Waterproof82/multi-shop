@@ -145,6 +145,24 @@ export function CartDrawer() {
 
   const [isMobile, setIsMobile] = useState(false);
 
+  // Helper functions to reduce complexity
+  const getDiscountInputBorder = useCallback(() => {
+    if (discountError) return 'border-destructive';
+    if (discountValid) return 'border-green-500';
+    return '';
+  }, [discountError, discountValid]);
+
+  const getDiscountAriaDescribedBy = useCallback(() => {
+    if (discountError) return "discount-error";
+    if (discountValid) return "discount-valid";
+    return undefined;
+  }, [discountError, discountValid]);
+
+  const getDiscountedTotal = useCallback(() => {
+    if (!discountValid?.valid) return null;
+    return Math.round(totalPrice * (1 - discountValid.porcentaje / 100) * 100) / 100;
+  }, [discountValid, totalPrice]);
+
   useEffect(() => {
     setIsMobile(globalThis.matchMedia('(pointer: coarse)').matches);
   }, []);
@@ -598,9 +616,9 @@ export function CartDrawer() {
                       setDiscountValid(null);
                       setDiscountError(null);
                     }}
-                    className={`h-9 ${discountError ? 'border-destructive' : discountValid ? 'border-green-500' : ''}`}
+                    className={`h-9 ${getDiscountInputBorder()}`}
                     disabled={validatingDiscount || items.length === 0}
-                    aria-describedby={discountError ? "discount-error" : discountValid ? "discount-valid" : undefined}
+                    aria-describedby={getDiscountAriaDescribedBy()}
                     aria-invalid={!!discountError}
                   />
                   <Button
@@ -663,7 +681,7 @@ export function CartDrawer() {
               <div className="mb-4 flex items-center justify-between px-2">
                 <span className="text-lg font-semibold text-foreground">{t("total", language)}</span>
                 <div className="text-right">
-                  {discountValid && discountValid.valid && (
+                  {discountValid?.valid ? (
                     <>
                       <span className="text-sm text-muted-foreground line-through mr-2">
                         {formatPrice(totalPrice, 'EUR', language)}
@@ -672,8 +690,7 @@ export function CartDrawer() {
                         {formatPrice(Math.round(totalPrice * (1 - discountValid.porcentaje / 100) * 100) / 100, 'EUR', language)}
                       </span>
                     </>
-                  )}
-                  {(!discountValid || !discountValid.valid) && (
+                  ) : (
                     <span className="text-2xl font-bold text-foreground tabular-nums animate-price-update" key={totalPrice}>
                       {formatPrice(totalPrice, 'EUR', language)}
                     </span>

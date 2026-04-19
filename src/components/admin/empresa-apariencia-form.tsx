@@ -186,11 +186,14 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
         <p className="text-xs text-muted-foreground mt-1">
           {t('bannerHelp', language)}
         </p>
+        <label htmlFor="banner_fit" className="text-xs font-medium text-muted-foreground dark:text-muted-foreground mt-2 block">
+          {t('bannerFitLabel', language)}
+        </label>
         <select
           id="banner_fit"
           value={formData.banner_fit ?? 'contain'}
           onChange={(e) => handleBannerFitChange(e.target.value as "contain" | "cover" | "fill")}
-          className="mt-2 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <option value="contain">{t('bannerFitContain', language)}</option>
           <option value="cover">{t('bannerFitCover', language)}</option>
