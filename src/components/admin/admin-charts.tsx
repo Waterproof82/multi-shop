@@ -375,7 +375,7 @@ if (!promos.length) {
       {/* Top promo highlight */}
       {topPromo && (
         <div className="backdrop-blur-xl bg-gradient-to-br from-amber-500/20 to-amber-700/20 border border-amber-400/30 rounded-xl px-4 py-3 flex items-start gap-3">
-          <span className="text-xl flex-shrink-0">🏆</span>
+          <span role="img" aria-label={t("topPromoIndicator", language)} className="text-xl flex-shrink-0">🏆</span>
           <div className="min-w-0">
             <p className="text-xs font-medium text-amber-200 mb-0.5">{t("statsTopPromo", language)}</p>
             <p className="text-sm font-semibold text-white truncate">{topPromo.texto_promocion}</p>
@@ -524,7 +524,7 @@ function TgtgStatsChart({
       {/* Savings highlight */}
       {allStats.saved > 0 && (
         <div className="backdrop-blur-xl bg-gradient-to-br from-green-500/20 to-green-700/20 border border-green-400/30 rounded-xl px-4 py-3 flex items-center gap-3">
-          <span className="text-xl flex-shrink-0">🌱</span>
+          <span role="img" aria-label={t("savingsIndicator", language)} className="text-xl flex-shrink-0">🌱</span>
           <div>
             <p className="text-sm font-medium text-white">{formatPrice(allStats.saved, 'EUR', language)} {t("statsTgtgSavedBy", language)}</p>
             <p className="text-xs text-green-200">{t("statsTgtgSavingsHelp", language)}</p>

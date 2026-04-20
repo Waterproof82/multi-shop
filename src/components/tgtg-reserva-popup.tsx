@@ -317,7 +317,7 @@ function TgtgReservaPopupInner() {
           {/* Pickup time */}
           {horaInicio && horaFin && (
             <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 text-sm">
-              <span>🕐</span>
+              <span role="img" aria-label={t("pickupTimeIcon", effectiveLang)}>🕐</span>
               <span className="font-medium text-foreground">
                 {t("tgtgPickupWindow", effectiveLang)}: {horaInicio} – {horaFin}
               </span>

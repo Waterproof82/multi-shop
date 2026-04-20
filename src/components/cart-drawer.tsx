@@ -145,6 +145,19 @@ export function CartDrawer() {
 
   const [isMobile, setIsMobile] = useState(false);
 
+  // Helper functions to reduce complexity
+  const getDiscountInputBorder = useCallback(() => {
+    if (discountError) return 'border-destructive';
+    if (discountValid) return 'border-green-500';
+    return '';
+  }, [discountError, discountValid]);
+
+  const getDiscountAriaDescribedBy = useCallback(() => {
+    if (discountError) return "discount-error";
+    if (discountValid) return "discount-valid";
+    return undefined;
+  }, [discountError, discountValid]);
+
   useEffect(() => {
     setIsMobile(globalThis.matchMedia('(pointer: coarse)').matches);
   }, []);
@@ -391,8 +404,8 @@ export function CartDrawer() {
       </Dialog>
 
       <Sheet open={isCartOpen} onOpenChange={closeCart}>
-      <SheetContent className="flex w-full flex-col sm:max-w-md bg-background">
-        <SheetHeader>
+      <SheetContent side="right" className="flex w-full flex-col sm:max-w-md bg-background h-[100dvh] max-h-[100dvh] p-0">
+        <SheetHeader className="shrink-0 px-4 pt-4 pb-2">
           <SheetTitle className="flex items-center gap-2 text-foreground">
             <ShoppingBag className="size-5" />
             {t("yourOrder", language)}
@@ -403,8 +416,8 @@ export function CartDrawer() {
         </SheetHeader>
 
         {items.length > 0 && (
-          <div className="mx-1 mb-3 rounded-lg bg-secondary border border-border px-3 py-2">
-            <p className="text-sm text-secondary-foreground font-medium">
+          <div className="shrink-0 mx-4 mb-1.5 rounded-md bg-secondary border border-border px-2 py-1.5">
+            <p className="text-xs text-secondary-foreground font-medium">
               {t("noPaymentRequired", language)}
             </p>
           </div>
@@ -431,32 +444,31 @@ export function CartDrawer() {
             </button>
           </div>
         ) : (
-          <>
-            <div className="flex-1 overflow-y-auto">
-              <ul className="flex flex-col gap-3 py-4 cv-auto" style={{ contentVisibility: 'auto' }}>
-                {items.map((ci) => {
-                  const itemKey = getItemKey(ci.item, ci.selectedComplements);
-                  const complementPrice = ci.selectedComplements?.reduce((sum, c) => sum + c.price, 0) || 0;
-                  const totalItemPrice = ci.item.price + complementPrice;
-                  let itemAnimationClass = '';
-                  if (!shouldReduceMotion) {
-                    if (ci.justAdded) {
-                      itemAnimationClass = 'animate-cart-item-add';
-                    } else if (ci.justRemoved) {
-                      itemAnimationClass = 'animate-cart-item-remove';
-                    }
+          <div className="flex-1 overflow-y-auto px-4 py-2">
+            <ul className="flex flex-col gap-2 cv-auto" style={{ contentVisibility: 'auto' }}>
+              {items.map((ci) => {
+                const itemKey = getItemKey(ci.item, ci.selectedComplements);
+                const complementPrice = ci.selectedComplements?.reduce((sum, c) => sum + c.price, 0) || 0;
+                const totalItemPrice = ci.item.price + complementPrice;
+                let itemAnimationClass = '';
+                if (!shouldReduceMotion) {
+                  if (ci.justAdded) {
+                    itemAnimationClass = 'animate-cart-item-add';
+                  } else if (ci.justRemoved) {
+                    itemAnimationClass = 'animate-cart-item-remove';
                   }
-                  return (
-                    <li 
+                }
+                return (
+<li 
                       key={itemKey} 
-                      className={`flex items-center gap-3 rounded-lg bg-card p-3 transition-all duration-200 hover:bg-card/80 hover:shadow-sm hover:scale-[1.01] group ${itemAnimationClass}`}
+                      className={`flex items-center gap-3 rounded-lg bg-card p-3 transition-all duration-200 hover:bg-card/80 group ${itemAnimationClass}`}
                     >
-                      <div className="flex-1">
-                        <p className="font-semibold text-card-foreground group-hover:text-primary transition-colors duration-200">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-card-foreground text-base truncate group-hover:text-primary transition-colors duration-200">
                           {(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}
                         </p>
                         {ci.selectedComplements && ci.selectedComplements.length > 0 && (
-                          <p className="text-xs text-muted-foreground group-hover:text-muted-foreground/80 transition-colors duration-200">
+                          <p className="text-xs text-muted-foreground truncate group-hover:text-muted-foreground/80 transition-colors duration-200">
                             + {ci.selectedComplements.map(c => c.name).join(', ')}
                           </p>
                         )}
@@ -465,23 +477,23 @@ export function CartDrawer() {
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-1 md:gap-2">
+                      <div className="flex items-center gap-0.5 shrink-0">
                         <RippleButton
                           variant="outline"
                           size="icon"
-                          className="min-h-[44px] min-w-[44px] md:min-h-9 md:min-w-9 bg-transparent hover:bg-muted/50 hover:scale-105 active:scale-95 transition-all duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="min-h-11 min-w-11 h-11 w-11 bg-transparent hover:bg-muted/50 transition-all duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => updateQuantity(itemKey, ci.quantity - 1)}
                           aria-label={t("reduceQuantity", language)}
                         >
                           <Minus className="size-4" />
                         </RippleButton>
-                        <span className="w-6 md:w-6 text-center font-semibold text-foreground animate-quantity-pulse">
+                        <span className="w-6 text-center font-semibold text-foreground text-base animate-quantity-pulse">
                           {ci.quantity}
                         </span>
                         <RippleButton
                           variant="outline"
                           size="icon"
-                          className="min-h-[44px] min-w-[44px] md:min-h-9 md:min-w-9 bg-transparent hover:bg-muted/50 hover:scale-105 active:scale-95 transition-all duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="min-h-11 min-w-11 h-11 w-11 bg-transparent hover:bg-muted/50 transition-all duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => updateQuantity(itemKey, ci.quantity + 1)}
                           aria-label={t("increaseQuantity", language)}
                         >
@@ -490,7 +502,7 @@ export function CartDrawer() {
                         <RippleButton
                           variant="ghost"
                           size="icon"
-                          className="min-h-[44px] min-w-[44px] md:min-h-9 md:min-w-9 text-destructive hover:text-destructive hover:bg-destructive/10 hover:scale-105 active:scale-95 transition-all duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="min-h-11 min-w-11 h-11 w-11 text-destructive hover:text-destructive hover:bg-destructive/10 transition-all duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => removeItem(itemKey)}
                           aria-label={`${t("remove", language)} ${(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}`}
                         >
@@ -498,17 +510,16 @@ export function CartDrawer() {
                         </RippleButton>
                       </div>
                     </li>
-                  );
-                })}
-              </ul>
-            </div>
+                );
+              })}
+            </ul>
 
-            <div className="border-t border-border pt-4 pb-6 px-2 bg-background/80 shadow-elegant rounded-b-xl">
-              <div className="space-y-3 mb-4">
+            <div className="border-t border-border pt-3 pb-4 bg-background">
+              <div className="space-y-3 mb-3">
                 <div>
-                  <label htmlFor="cart-nombre" className="text-xs font-medium text-muted-foreground ml-6 mb-1 block">{t("placeholderName", language)}</label>
+                  <label htmlFor="cart-nombre" className="text-xs font-medium text-muted-foreground ml-4 mb-1 block">{t("placeholderName", language)}</label>
                   <div className="flex items-center gap-2">
-                    <User className="size-4 text-muted-foreground" aria-hidden="true" />
+                    <User className="size-4 text-muted-foreground shrink-0" aria-hidden="true" />
                     <Input
                       id="cart-nombre"
                       type="text"
@@ -522,22 +533,22 @@ export function CartDrawer() {
                       aria-invalid={!!errors.nombre}
                     />
                   </div>
-                  {errors.nombre && <p id="nombre-error" role="alert" className="text-xs text-destructive mt-1 ml-6">{errors.nombre}</p>}
+                  {errors.nombre && <p id="nombre-error" role="alert" className="text-xs text-destructive mt-1 ml-4">{errors.nombre}</p>}
                 </div>
                 <div>
-                  <label htmlFor="cart-telefono" className="text-xs font-medium text-muted-foreground ml-6 mb-1 block">{t("placeholderPhone", language)}</label>
+                  <label htmlFor="cart-telefono" className="text-xs font-medium text-muted-foreground ml-4 mb-1 block">{t("placeholderPhone", language)}</label>
                   <div className="flex items-center gap-2">
                     <Phone className="size-4 text-muted-foreground shrink-0" aria-hidden="true" />
                     <div className="flex gap-1 flex-1">
                       <Select value={countryCode} onValueChange={setCountryCode}>
-                        <SelectTrigger id="country-code-select" className="h-9 w-[100px] shrink-0 text-xs px-2" aria-labelledby="country-code-label">
+                        <SelectTrigger id="country-code-select" className="h-9 w-[90px] shrink-0 text-xs px-2" aria-labelledby="country-code-label">
                           <SelectValue />
                         </SelectTrigger>
                         <span id="country-code-label" className="sr-only">{t("countryCode", language)}</span>
                         <SelectContent>
                           {COUNTRY_CODES.map((cc) => (
                             <SelectItem key={cc.code} value={cc.code}>
-                              <span className="flex items-center gap-1.5">
+                              <span className="flex items-center gap-1">
                                 <span>{cc.flag}</span>
                                 <span>+{cc.dialCode}</span>
                               </span>
@@ -559,12 +570,12 @@ export function CartDrawer() {
                       />
                     </div>
                   </div>
-                  {errors.telefono && <p id="telefono-error" role="alert" className="text-xs text-destructive mt-1 ml-6">{errors.telefono}</p>}
+                  {errors.telefono && <p id="telefono-error" role="alert" className="text-xs text-destructive mt-1 ml-4">{errors.telefono}</p>}
                 </div>
                 <div>
-                  <label htmlFor="cart-email" className="text-xs font-medium text-muted-foreground ml-6 mb-1 block">{t("placeholderEmail", language)}</label>
+                  <label htmlFor="cart-email" className="text-xs font-medium text-muted-foreground ml-4 mb-1 block">{t("placeholderEmail", language)}</label>
                   <div className="flex items-center gap-2">
-                    <Mail className="size-4 text-muted-foreground" aria-hidden="true" />
+                    <Mail className="size-4 text-muted-foreground shrink-0" aria-hidden="true" />
                     <Input
                       id="cart-email"
                       type="email"
@@ -576,14 +587,14 @@ export function CartDrawer() {
                       autoComplete="email"
                     />
                   </div>
-                  <p className="text-xs mt-1 ml-6 text-primary font-medium flex items-center gap-1">
+                  <p className="text-xs mt-1 ml-4 text-primary font-medium flex items-center gap-1">
                     {t("promoMessage", language)} <Gift className="size-3.5" />
                   </p>
                 </div>
               </div>
 
               {/* Discount Code Section */}
-              <div className="mb-4 px-2">
+              <div className="mb-3">
                 <label htmlFor="discount-code" className="text-xs font-medium text-muted-foreground ml-1 mb-1 block">
                   {t("discountCodeLabel", language)}
                 </label>
@@ -598,9 +609,9 @@ export function CartDrawer() {
                       setDiscountValid(null);
                       setDiscountError(null);
                     }}
-                    className={`h-9 ${discountError ? 'border-destructive' : discountValid ? 'border-green-500' : ''}`}
+                    className={`h-9 ${getDiscountInputBorder()}`}
                     disabled={validatingDiscount || items.length === 0}
-                    aria-describedby={discountError ? "discount-error" : discountValid ? "discount-valid" : undefined}
+                    aria-describedby={getDiscountAriaDescribedBy()}
                     aria-invalid={!!discountError}
                   />
                   <Button
@@ -660,10 +671,10 @@ export function CartDrawer() {
               </div>
 
               {/* Total Section */}
-              <div className="mb-4 flex items-center justify-between px-2">
+              <div className="mb-4 flex items-center justify-between">
                 <span className="text-lg font-semibold text-foreground">{t("total", language)}</span>
                 <div className="text-right">
-                  {discountValid && discountValid.valid && (
+                  {discountValid?.valid ? (
                     <>
                       <span className="text-sm text-muted-foreground line-through mr-2">
                         {formatPrice(totalPrice, 'EUR', language)}
@@ -672,8 +683,7 @@ export function CartDrawer() {
                         {formatPrice(Math.round(totalPrice * (1 - discountValid.porcentaje / 100) * 100) / 100, 'EUR', language)}
                       </span>
                     </>
-                  )}
-                  {(!discountValid || !discountValid.valid) && (
+                  ) : (
                     <span className="text-2xl font-bold text-foreground tabular-nums animate-price-update" key={totalPrice}>
                       {formatPrice(totalPrice, 'EUR', language)}
                     </span>
@@ -681,9 +691,9 @@ export function CartDrawer() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2 px-1">
+              <div className="flex flex-col gap-2">
                 <Button 
-                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full py-3 text-lg font-semibold shadow-elegant transition-colors duration-150"
+                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full py-3 text-lg font-semibold shadow-elegant transition-colors duration-150 min-h-[44px]"
                   size="lg"
                   onClick={handleConfirmOrder}
                   disabled={sending || confirming}
@@ -700,7 +710,7 @@ export function CartDrawer() {
                 </Button>
               </div>
             </div>
-          </>
+          </div>
         )}
       </SheetContent>
     </Sheet>
