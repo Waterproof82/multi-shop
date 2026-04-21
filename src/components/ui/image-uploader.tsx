@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
-import { Upload, Loader2, Pencil, Trash2, Camera } from 'lucide-react';
+import { Upload, Loader2, Pencil, Trash2, Camera, ChevronDown, Maximize2 } from 'lucide-react';
 import { getCsrfToken } from '@/lib/csrf-client';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
@@ -11,12 +11,11 @@ import { useAdmin } from '@/lib/admin-context';
 import { ImageFit } from '@/core/application/dtos/menu-view-model';
 import { useCameraCapture } from '@/core/infrastructure/camera/camera-capture';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface ImageUploaderProps {
   readonly value: string;
@@ -208,21 +207,35 @@ export function ImageUploader({
               </button>
             </div>
             {onObjectFitChange && (
-              <Select
-                value={objectFit}
-                onValueChange={(v) => onObjectFitChange(v as ImageFit)}
-              >
-                <SelectTrigger className="w-28 h-8 bg-card/90 backdrop-blur-sm text-card-foreground text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="contain">Contain</SelectItem>
-                  <SelectItem value="cover">Cover</SelectItem>
-                  <SelectItem value="fill">Fill</SelectItem>
-                  <SelectItem value="none">None</SelectItem>
-                  <SelectItem value="scale-down">Scale</SelectItem>
-                </SelectContent>
-              </Select>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-card/90 backdrop-blur-sm text-card-foreground text-xs rounded-md hover:bg-muted transition-colors"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5" />
+                    <span className="capitalize">{objectFit === 'scale-down' ? 'Scale' : objectFit}</span>
+                    <ChevronDown className="w-3 h-3 opacity-50" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="min-w-[100px]">
+                  <DropdownMenuItem onClick={() => onObjectFitChange('contain')}>
+                    Contain
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onObjectFitChange('cover')}>
+                    Cover
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onObjectFitChange('fill')}>
+                    Fill
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onObjectFitChange('none')}>
+                    None
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onObjectFitChange('scale-down')}>
+                    Scale
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
           <div className="md:hidden absolute bottom-2 right-2 flex gap-2">
@@ -276,31 +289,36 @@ export function ImageUploader({
           </button>
 
           {isCameraSupported && (
-            <button
-              type="button"
-              onClick={handleCameraCapture}
-              disabled={uploading || isCapturingCamera}
-              className={`
-                flex-1 border-2 border-dashed rounded-lg h-32 flex flex-col items-center justify-center cursor-pointer transition-colors
-                ${dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/40'}
-                ${uploading || isCapturingCamera ? 'pointer-events-none opacity-50' : ''}
-              `}
-              aria-label={t("takePhoto", language) || "Tomar foto"}
-            >
-              {isCapturingCamera ? (
-                <>
-                  <Loader2 className="h-8 w-8 text-primary animate-spin motion-reduce:animate-none" />
-                  <span className="text-sm text-muted-foreground mt-1">Capturando...</span>
-                </>
-              ) : (
-                <>
-                  <Camera className="h-8 w-8 text-muted-foreground/50" />
-                  <span className="text-sm text-muted-foreground mt-1">
-                    {t("takePhoto", language) || "Tomar foto"}
-                  </span>
-                </>
-              )}
-            </button>
+            <div className="flex-1 flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={handleCameraCapture}
+                disabled={uploading || isCapturingCamera}
+                className={`
+                  flex-1 border-2 border-dashed rounded-lg h-32 flex flex-col items-center justify-center cursor-pointer transition-colors
+                  ${dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/40'}
+                  ${uploading || isCapturingCamera ? 'pointer-events-none opacity-50' : ''}
+                `}
+                aria-label={t("takePhoto", language) || "Tomar foto"}
+              >
+                {isCapturingCamera ? (
+                  <>
+                    <Loader2 className="h-8 w-8 text-primary animate-spin motion-reduce:animate-none" />
+                    <span className="text-sm text-muted-foreground mt-1">Capturando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Camera className="h-8 w-8 text-muted-foreground/50" />
+                    <span className="text-sm text-muted-foreground mt-1">
+                      {t("takePhoto", language) || "Tomar foto"}
+                    </span>
+                  </>
+                )}
+              </button>
+              <span className="text-xs text-muted-foreground/70 text-center">
+                {t("horizontalPhoto", language) || "📐 Horizontal"}
+              </span>
+            </div>
           )}
         </div>
       )}
