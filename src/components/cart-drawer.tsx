@@ -404,7 +404,7 @@ export function CartDrawer() {
       </Dialog>
 
       <Sheet open={isCartOpen} onOpenChange={closeCart}>
-      <SheetContent side="right" className="flex w-full flex-col sm:max-w-md bg-background h-[100dvh] max-h-[100dvh] p-0">
+      <SheetContent side="right" className="flex flex-col w-full sm:max-w-md bg-background h-[100dvh] max-h-[100dvh] p-0">
         <SheetHeader className="shrink-0 px-4 pt-4 pb-2">
           <SheetTitle className="flex items-center gap-2 text-foreground">
             <ShoppingBag className="size-5" />
@@ -444,7 +444,7 @@ export function CartDrawer() {
             </button>
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto px-4 py-2">
+          <div className="flex-1 flex flex-col min-h-0 overflow-y-auto px-4 py-2">
             <ul className="flex flex-col gap-2 cv-auto" style={{ contentVisibility: 'auto' }}>
               {items.map((ci) => {
                 const itemKey = getItemKey(ci.item, ci.selectedComplements);
@@ -514,7 +514,7 @@ export function CartDrawer() {
               })}
             </ul>
 
-            <div className="border-t border-border pt-3 pb-4 bg-background">
+            <div className="mt-auto shrink-0 border-t border-border pt-3 pb-4 bg-background">
               <div className="space-y-3 mb-3">
                 <div>
                   <label htmlFor="cart-nombre" className="text-xs font-medium text-muted-foreground ml-4 mb-1 block">{t("placeholderName", language)}</label>
