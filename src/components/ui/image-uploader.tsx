@@ -239,6 +239,36 @@ export function ImageUploader({
             )}
           </div>
           <div className="md:hidden absolute bottom-2 right-2 flex gap-2">
+            {onObjectFitChange && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="p-3 bg-card/90 backdrop-blur-sm rounded-full shadow-elegant outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    aria-label={t("objectFit", language) || "Ajustar imagen"}
+                  >
+                    <Maximize2 className="w-4 h-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-[100px]">
+                  <DropdownMenuItem onClick={() => onObjectFitChange('contain')}>
+                    Contain {objectFit === 'contain' && '✓'}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onObjectFitChange('cover')}>
+                    Cover {objectFit === 'cover' && '✓'}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onObjectFitChange('fill')}>
+                    Fill {objectFit === 'fill' && '✓'}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onObjectFitChange('none')}>
+                    None {objectFit === 'none' && '✓'}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onObjectFitChange('scale-down')}>
+                    Scale {objectFit === 'scale-down' && '✓'}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             <button
               type="button"
               onClick={handleClick}
