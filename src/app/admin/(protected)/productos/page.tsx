@@ -529,7 +529,7 @@ export default function ProductosPage() {
                       className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                         prod.activo
                           ? 'bg-primary/10 text-primary hover:bg-primary/20'
-                          : 'bg-muted text-foreground hover:bg-muted/80'
+                          : 'bg-destructive/10 text-destructive hover:bg-destructive/20'
                       }`}
                     >
                       {prod.activo ? t("active", language) : t("inactive", language)}
