@@ -8,6 +8,7 @@ import { CartProvider } from "@/lib/cart-context";
 import { LanguageProvider } from "@/lib/language-context";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { LazyPromoToast, LazyTgtgReservaPopup } from "@/components/lazy-client-components";
+import { ExitConfirmation } from "@/components/exit-confirmation";
 import { getEmpresaByDomain } from "@/lib/server-services";
 import { getDomainFromHeaders } from "@/lib/domain-utils";
 
@@ -108,6 +109,7 @@ export default async function RootLayout({
           <ErrorBoundary>
             <LanguageProvider>
               <CartProvider>
+                <ExitConfirmation />
                 {/* Skip to main content link for accessibility */}
                 <a
                   href="#main-content"

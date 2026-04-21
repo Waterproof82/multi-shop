@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from "react"
+import { createContext, useContext, useState, useCallback, useMemo, useEffect, type ReactNode } from "react"
 import type { MenuItemVM } from "@/core/application/dtos/menu-view-model"
 
 export interface Complement {
@@ -51,11 +51,40 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [isCartOpen, setIsCartOpen] = useState(false)
   const [lastAddedItem, setLastAddedItem] = useState<AddedItemInfo | null>(null)
 
+  // Manejar botón atrás del navegador para cerrar el carrito en lugar de salir
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (isCartOpen) {
+        // Prevent default navigation and close cart instead
+        event.preventDefault();
+        setIsCartOpen(false);
+        // Push state back so next back button works normally
+        window.history.pushState(null, '', window.location.href);
+      }
+    };
+
+    if (isCartOpen) {
+      // Agregar estado al historial cuando se abre el carrito
+      window.history.pushState({ cartOpen: true }, '', window.location.href);
+      window.addEventListener('popstate', handlePopState);
+    }
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [isCartOpen]);
+
   const openCart = useCallback(() => {
     setLastAddedItem(null);
     setIsCartOpen(true);
   }, [])
-  const closeCart = useCallback(() => setIsCartOpen(false), [])
+  const closeCart = useCallback(() => {
+    setIsCartOpen(false);
+    // Cuando cerramos manualmente, quitamos el estado extra del historial
+    if (window.history.state?.cartOpen) {
+      window.history.back();
+    }
+  }, [])
 
   const addItem = useCallback((item: MenuItemVM, quantity = 1, selectedComplements?: Complement[]) => {
     const itemKey = getItemKey(item, selectedComplements);
