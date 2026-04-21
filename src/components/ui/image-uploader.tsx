@@ -2,13 +2,14 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
-import { Upload, Loader2, Pencil, Trash2 } from 'lucide-react';
+import { Upload, Loader2, Pencil, Trash2, Camera } from 'lucide-react';
 import { getCsrfToken } from '@/lib/csrf-client';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import { optimizeImage, optimizeBannerImage } from '@/lib/image-utils';
 import { useAdmin } from '@/lib/admin-context';
 import { ImageFit } from '@/core/application/dtos/menu-view-model';
+import { useCameraCapture } from '@/core/infrastructure/camera/camera-capture';
 import {
   Select,
   SelectContent,
@@ -55,6 +56,25 @@ export function ImageUploader({
   const [dragOver, setDragOver] = useState(false);
   const [objectFit, setObjectFit] = useState<ImageFit>(propObjectFit || 'contain');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { capture: captureFromCamera, isCapturing: isCapturingCamera, isSupported: isCameraSupported } = useCameraCapture();
+
+  // Manejar la foto capturada desde la cámara
+  const handleCameraCapture = async () => {
+    const result = await captureFromCamera({ sourceType: 'camera' });
+    
+    if (result.error) {
+      // Si el usuario canceló, no mostrar error
+      if (result.error !== 'Captura cancelada' && result.error !== 'No se seleccionó ninguna imagen') {
+        setError(result.error);
+      }
+      return;
+    }
+
+    if (result.file) {
+      // Procesar la imagen capturada igual que un archivo subido
+      await handleFileSelect(result.file);
+    }
+  };
 
   useEffect(() => {
     if (propObjectFit) {
@@ -225,35 +245,64 @@ export function ImageUploader({
           </div>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={handleClick}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          disabled={uploading}
-          className={`
-            border-2 border-dashed rounded-lg h-32 flex flex-col items-center justify-center cursor-pointer transition-colors
-            ${dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/40'}
-            ${uploading ? 'pointer-events-none opacity-50' : ''}
-          `}
-          aria-label={t("uploadImage", language)}
-        >
-          {uploading ? (
-            <>
-              <Loader2 className="h-8 w-8 text-primary animate-spin motion-reduce:animate-none" />
-              <span className="text-sm text-muted-foreground mt-1">Subiendo...</span>
-            </>
-          ) : (
-            <>
-              <Upload className="h-8 w-8 text-muted-foreground/50" />
-              <span className="text-sm text-muted-foreground mt-1">
-                Arrastra o click para subir
-              </span>
-              <span className="text-xs text-muted-foreground/50">JPEG, PNG, WEBP (max 10MB)</span>
-            </>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleClick}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            disabled={uploading || isCapturingCamera}
+            className={`
+              flex-1 border-2 border-dashed rounded-lg h-32 flex flex-col items-center justify-center cursor-pointer transition-colors
+              ${dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/40'}
+              ${uploading || isCapturingCamera ? 'pointer-events-none opacity-50' : ''}
+            `}
+            aria-label={t("uploadImage", language)}
+          >
+            {uploading ? (
+              <>
+                <Loader2 className="h-8 w-8 text-primary animate-spin motion-reduce:animate-none" />
+                <span className="text-sm text-muted-foreground mt-1">Subiendo...</span>
+              </>
+            ) : (
+              <>
+                <Upload className="h-8 w-8 text-muted-foreground/50" />
+                <span className="text-sm text-muted-foreground mt-1">
+                  Arrastra o click
+                </span>
+              </>
+            )}
+          </button>
+
+          {isCameraSupported && (
+            <button
+              type="button"
+              onClick={handleCameraCapture}
+              disabled={uploading || isCapturingCamera}
+              className={`
+                flex-1 border-2 border-dashed rounded-lg h-32 flex flex-col items-center justify-center cursor-pointer transition-colors
+                ${dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/40'}
+                ${uploading || isCapturingCamera ? 'pointer-events-none opacity-50' : ''}
+              `}
+              aria-label={t("takePhoto", language) || "Tomar foto"}
+            >
+              {isCapturingCamera ? (
+                <>
+                  <Loader2 className="h-8 w-8 text-primary animate-spin motion-reduce:animate-none" />
+                  <span className="text-sm text-muted-foreground mt-1">Capturando...</span>
+                </>
+              ) : (
+                <>
+                  <Camera className="h-8 w-8 text-muted-foreground/50" />
+                  <span className="text-sm text-muted-foreground mt-1">
+                    {t("takePhoto", language) || "Tomar foto"}
+                  </span>
+                </>
+              )}
+            </button>
           )}
-        </button>
+        </div>
       )}
 
       <input
