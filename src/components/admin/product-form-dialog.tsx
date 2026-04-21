@@ -267,7 +267,9 @@ export function ProductFormDialog({
                   onChange={(e) => onFormChange({ ...formData, es_especial: e.target.checked })}
                   className="w-4 h-4 rounded border-border text-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background cursor-pointer accent-primary"
                 />
-                <span className="text-sm text-foreground">{t("specialProduct", language)}</span>
+                <span className="text-sm bg-red-500/20 text-red-400 border border-red-400/30 px-2 py-0.5 rounded-full">
+                  {t("specialProduct", language)}
+                </span>
               </label>
               <label htmlFor="activo" className="flex items-center gap-2 cursor-pointer">
                 <input
