@@ -12,9 +12,16 @@ interface HeroBannerProps {
 }
 
 function getAspectRatioClass(fit: "contain" | "cover" | "fill"): string {
-  if (fit === "contain") return "min-h-[150px] md:min-h-[200px]";
-  if (fit === "cover") return "h-[33vh] max-h-[300px] min-h-[150px]";
-  return "aspect-[21/9] md:aspect-[21/9] min-h-[80px] md:min-h-[120px]";
+  // Max height: 1/3 of viewport (~33vh), capped at 300px
+  if (fit === "contain") return "min-h-[120px] max-h-[33vh] h-auto";
+  if (fit === "cover") return "max-h-[33vh] min-h-[150px] h-auto";
+  return "aspect-[4/1] md:aspect-[4/1] max-h-[33vh] min-h-[80px]";
+}
+
+function getObjectFitClass(fit: "contain" | "cover" | "fill"): string {
+  if (fit === "contain") return "object-contain";
+  if (fit === "cover") return "object-cover";
+  return "object-fill";
 }
 
 export function HeroBanner({ empresa, bannerFit = "contain" }: HeroBannerProps) {
@@ -41,6 +48,7 @@ export function HeroBanner({ empresa, bannerFit = "contain" }: HeroBannerProps) 
     : { initial: { opacity: 0 }, animate: { opacity: 1 } };
 
   const aspectClass = getAspectRatioClass(bannerFit ?? "contain");
+  const objectFitClass = getObjectFitClass(bannerFit ?? "contain");
 
   return (
     <div className={`relative flex flex-col items-center justify-center overflow-hidden bg-primary px-0 py-8 md:py-16 text-center ${aspectClass}`}>
@@ -52,7 +60,7 @@ export function HeroBanner({ empresa, bannerFit = "contain" }: HeroBannerProps) 
             fill
             priority
             sizes="100vw"
-            className="object-contain"
+            className={objectFitClass}
           />
         </div>
       )}
