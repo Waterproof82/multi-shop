@@ -25,6 +25,15 @@ interface Empresa {
   mostrarTgtg: boolean;
   createdAt: string;
   stats: EmpresaStats;
+  seoStatus: {
+    hasDescription: boolean;
+    hasLogo: boolean;
+    hasUrlMapa: boolean;
+    hasGeoCoordinates: boolean;
+    hasFb: boolean;
+    hasInstagram: boolean;
+    hasMetaDescription: boolean;
+  };
 }
 
 interface GlobalStats {
@@ -234,6 +243,7 @@ export default async function SuperAdminPage() {
               mostrarPromociones: e.mostrarPromociones,
               mostrarTgtg: e.mostrarTgtg,
               stats: e.stats,
+              seoStatus: e.seoStatus,
             }))}
           />
         )}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Building2, AlertCircle, CheckCircle } from 'lucide-react';
+import { Building2, AlertCircle, CheckCircle, Globe, MapPin, Image as ImageIcon, FileText, Share2, ExternalLink, FileSearch } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { PillSwitch } from '@/components/ui/pill-switch';
 
@@ -26,6 +26,15 @@ interface EmpresaRow {
   mostrarPromociones: boolean;
   mostrarTgtg: boolean;
   stats: EmpresaStats;
+  seoStatus: {
+    hasDescription: boolean;
+    hasLogo: boolean;
+    hasUrlMapa: boolean;
+    hasGeoCoordinates: boolean;
+    hasFb: boolean;
+    hasInstagram: boolean;
+    hasMetaDescription: boolean;
+  };
 }
 
 interface ModuloSwitchProps {
@@ -129,6 +138,12 @@ export function EmpresasTable({ empresas }: EmpresasTableProps) {
                   <span className="text-xs font-normal">validados</span>
                 </span>
               </th>
+              <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">
+                <span className="flex flex-col items-center gap-0.5">
+                  <Globe className="h-4 w-4 mx-auto" />
+                  <span className="text-xs">SEO</span>
+                </span>
+              </th>
               <th className="text-right px-4 py-3 text-sm font-medium text-slate-300">Acciones</th>
             </tr>
           </thead>
@@ -216,6 +231,58 @@ export function EmpresasTable({ empresas }: EmpresasTableProps) {
                     />
                   </div>
                 </td>
+                <td className="px-4 py-4">
+                  <div className="flex items-center justify-center gap-2" role="group" aria-label="Estado SEO">
+                    {/* Logo */}
+                    <span
+                      className={`p-1.5 rounded ${empresa.seoStatus.hasLogo ? 'text-emerald-400' : 'text-red-400/60'}`}
+                      title={empresa.seoStatus.hasLogo ? '✓ Logo configurado' : '✗ Falta logo'}
+                    >
+                      <ImageIcon className="h-4 w-4" aria-label={empresa.seoStatus.hasLogo ? 'Con logo' : 'Sin logo'} />
+                    </span>
+                    {/* Description */}
+                    <span
+                      className={`p-1.5 rounded ${empresa.seoStatus.hasDescription ? 'text-emerald-400' : 'text-red-400/60'}`}
+                      title={empresa.seoStatus.hasDescription ? '✓ Descripción configurada' : '✗ Falta descripción'}
+                    >
+                      <FileText className="h-4 w-4" aria-label={empresa.seoStatus.hasDescription ? 'Con descripción' : 'Sin descripción'} />
+                    </span>
+                    {/* Geo coordinates */}
+                    <span
+                      className={`p-1.5 rounded ${empresa.seoStatus.hasGeoCoordinates ? 'text-emerald-400' : 'text-amber-400/60'}`}
+                      title={empresa.seoStatus.hasGeoCoordinates ? '✓ GPS detectado en url_mapa' : '△ Falta GPS en url_mapa'}
+                    >
+                      <MapPin className="h-4 w-4" aria-label={empresa.seoStatus.hasGeoCoordinates ? 'Con geo' : 'Sin geo'} />
+                    </span>
+                    {/* Social */}
+                    <span
+                      className={`p-1.5 rounded ${empresa.seoStatus.hasFb || empresa.seoStatus.hasInstagram ? 'text-emerald-400' : 'text-amber-400/60'}`}
+                      title={empresa.seoStatus.hasFb || empresa.seoStatus.hasInstagram ? '✓ Redes sociales configuradas' : '△ Falta Facebook o Instagram'}
+                    >
+                      <Share2 className="h-4 w-4" aria-label={empresa.seoStatus.hasFb || empresa.seoStatus.hasInstagram ? 'Con redes' : 'Sin redes'} />
+                    </span>
+                    {/* Sitemap - solo verificar */}
+                    <a
+                      href={`https://${empresa.dominio}/sitemap.xml`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-1.5 rounded text-cyan-400 hover:bg-cyan-400/20 transition-colors"
+                      title="Sitemap → Verificar en Google Search Console"
+                    >
+                      <FileSearch className="h-4 w-4" aria-label="Ver sitemap" />
+                    </a>
+                    {/* Robots - solo verificar */}
+                    <a
+                      href={`https://${empresa.dominio}/robots.txt`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-1.5 rounded text-cyan-400 hover:bg-cyan-400/20 transition-colors"
+                      title="robots.txt → Verificar acceso"
+                    >
+                      <ExternalLink className="h-4 w-4" aria-label="Ver robots.txt" />
+                    </a>
+                  </div>
+                </td>
                 <td className="px-4 py-4 text-right">
                   <a
                     href={`/api/superadmin/switch-empresa?empresaId=${empresa.id}`}
@@ -228,6 +295,52 @@ export function EmpresasTable({ empresas }: EmpresasTableProps) {
             ))}
           </tbody>
         </table>
+        
+        {/* Leyenda SEO */}
+        <div className="px-4 py-3 bg-white/5 border-t border-white/10">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+            {/* Iconos */}
+            <div className="flex items-center gap-4">
+              <span className="flex items-center gap-1.5 text-slate-300">
+                <ImageIcon className="h-4 w-4 text-emerald-400" /> Logo
+              </span>
+              <span className="flex items-center gap-1.5 text-slate-300">
+                <FileText className="h-4 w-4 text-emerald-400" /> Descripción
+              </span>
+              <span className="flex items-center gap-1.5 text-slate-300">
+                <MapPin className="h-4 w-4 text-emerald-400" /> GPS
+              </span>
+              <span className="flex items-center gap-1.5 text-slate-300">
+                <Share2 className="h-4 w-4 text-emerald-400" /> Redes
+              </span>
+              <span className="flex items-center gap-1.5 text-slate-300">
+                <FileSearch className="h-4 w-4 text-cyan-400" /> Sitemap
+              </span>
+              <span className="flex items-center gap-1.5 text-slate-300">
+                <ExternalLink className="h-4 w-4 text-cyan-400" /> robots.txt
+              </span>
+            </div>
+            {/* Estados */}
+            <div className="flex items-center gap-3 pl-4 border-l border-white/20">
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-full bg-emerald-400"></span>
+                <span className="text-emerald-400">Completado</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-full bg-amber-400"></span>
+                <span className="text-amber-400">Pendiente</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-full bg-red-400"></span>
+                <span className="text-red-400">Falta</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-full bg-cyan-400"></span>
+                <span className="text-cyan-400">Verificar</span>
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
