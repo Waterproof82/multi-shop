@@ -19,6 +19,17 @@ const playfair = Playfair_Display({
   display: "swap",
 });
 
+// Multi-language fallback descriptions for SEO
+const FALLBACK_DESCRIPTIONS: Record<string, string> = {
+  es: "Carta digital y pedidos - Consulta nuestro menú online, pide a domicilio o para recoger",
+  en: "Digital menu and online ordering - Browse our menu, order for delivery or pickup",
+  fr: "Menu numérique et commandes en ligne - Consultez notre menu, commandez pour livraison",
+  it: "Menu digitale e ordini online - Consulta il nostro menu, ordina per consegna",
+  de: "Digitales Menü und Online-Bestellung - Durchsuchen Sie unser Menü, bestellen Sie",
+};
+
+const SUPPORTED_LOCALES = ["es_ES", "en_US", "fr_FR", "it_IT", "de_DE"];
+
 function getMimeType(url: string): string {
   if (!url || url === '/favicon.ico') return 'image/x-icon';
   if (url.endsWith('.png')) return 'image/png';
@@ -43,8 +54,27 @@ export async function generateMetadata(): Promise<Metadata> {
   const isDefaultFavicon = faviconUrl === '/favicon.ico';
 
   const title = empresa?.nombre || "Mermelada de Tomate";
-  const description = empresa?.descripcion?.es?.substring(0, 160) || "Carta digital y pedidos";
+  
+  // Multi-language description fallbacks
+  const getDescription = () => {
+    if (empresa?.descripcion?.es) return empresa.descripcion.es.substring(0, 160);
+    if (empresa?.descripcion?.en) return empresa.descripcion.en.substring(0, 160);
+    if (empresa?.descripcion?.fr) return empresa.descripcion.fr.substring(0, 160);
+    if (empresa?.descripcion?.it) return empresa.descripcion.it.substring(0, 160);
+    if (empresa?.descripcion?.de) return empresa.descripcion.de.substring(0, 160);
+    return FALLBACK_DESCRIPTIONS.es;
+  };
+  const description = getDescription();
+  
   const ogImage = empresa?.urlImage || empresa?.logoUrl || undefined;
+  
+  // Dynamic locale based on empresa or default
+  const getOgLocale = () => {
+    // Check if empresa has content in other languages to determine locale
+    const hasEn = empresa?.descripcion?.en || empresa?.titulo;
+    const lang = hasEn ? "en" : "es";
+    return `${lang}_${lang.toUpperCase()}`;
+  };
 
   return {
     title,
@@ -58,6 +88,13 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     alternates: {
       canonical: "/",
+      languages: {
+        "es": "/",
+        "en": "/?lang=en",
+        "fr": "/?lang=fr",
+        "it": "/?lang=it",
+        "de": "/?lang=de",
+      },
     },
     openGraph: {
       title,
@@ -65,7 +102,7 @@ export async function generateMetadata(): Promise<Metadata> {
       url: baseUrl,
       siteName: title,
       type: "website",
-      locale: "es_ES",
+      locale: getOgLocale(),
       ...(ogImage ? { images: [{ url: ogImage, width: 1200, height: 630, alt: title }] } : {}),
     },
     twitter: {

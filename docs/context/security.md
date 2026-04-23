@@ -541,9 +541,9 @@ El componente `json-ld.tsx` sanitiza datos antes de insertar en `<script type="a
 ```typescript
 function safeJsonStringify(data: Record<string, unknown>): string {
   return JSON.stringify(data)
-    .replace(/</g, '\\u003c')
-    .replace(/>/g, '\\u003e')
-    .replace(/&/g, '\\u0026');
+    .replaceAll(String.raw`<`, String.raw`\u003c`)
+    .replaceAll(String.raw`>`, String.raw`\u003e`)
+    .replaceAll(String.raw`&`, String.raw`\u0026`);
 }
 ```
 

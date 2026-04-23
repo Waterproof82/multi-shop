@@ -45,3 +45,27 @@ Todo el codebase usa `Result<T, AppError>`.
 - Dev: `pnpm dev`
 - Build: `pnpm build` (Ignorar "Skipping validation of types")
 - Lint: `pnpm lint`
+
+## 🔍 SEO Multi-Tenant
+
+### Archivos Clave
+- `src/app/layout.tsx` - Metadata dinámica, hreflang, OG tags
+- `src/app/robots.ts` - Robots.txt dinámico por dominio
+- `src/app/sitemap.ts` - Sitemap con lastModified desde BBDD
+- `src/app/not-found.tsx` - 404 con meta tags dinámicos
+- `src/components/json-ld.tsx` - Schema.org Restaurant + FAQ + Menu
+
+### Features SEO Implementadas
+- **Metadata dinámica:** Título, descripción, OG por empresa (multi-tenant)
+- **hreflang:** Idiomas es/en/fr/it/de configurados
+- **Robots.txt:** Bloquea /admin/, /api/, /superadmin/ por dominio
+- **Sitemap:** lastModified desde `actualizado_en` de empresa
+- **Schema.org:** Restaurant (geo desde urlMapa), FAQPage, Menu con MenuItem por plato
+- **Geo coordinates:** Parsea lat/lng desde Google Maps URL
+
+### Campos BBDD para SEO
+- `empresa.dominio` - Dominio principal
+- `empresa.slug` - Slug para URLs
+- `empresa.descripcion` - Descripciones i18n (es/en/fr/it/de)
+- `empresa.url_mapa` - Google Maps (parsea coordenadas)
+- `empresa.updated_at` / `actualizado_en` - Para sitemap
