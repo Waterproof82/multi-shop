@@ -602,6 +602,7 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 | **i18n** | es/en/fr/it/de en productos + panel admin + componentes públicos |
 | **Welcome Discount** | Popup 30s en subdomain pedidos, código único BIENVENIDO-XXXXXX, email con idioma del cliente, porcentaje configurable (1-50%), duración configurable (7/14/30/60/90 días), validación server-side (existencia, usado, expirado, email match), aplicación en checkout, persists en pedido |
 | **Admin Panel Design** | Glassmorphic dark theme (backdrop-blur + white/10 opacity), estadoPendiente=Aceptado colores consistentes con badges de tabla (ámbar/azul), diseño unificado sin colores por empresa |
+| **SEO Multi-Tenant** | Metadata dinámica por empresa, hreflang (5 idiomas), sitemap/robots dinámicos, Schema.org Restaurant+FAQ+Menu, geo coordinates desde urlMapa, 404 con meta tags |
 
 ## Documentación
 

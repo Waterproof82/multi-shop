@@ -5,12 +5,12 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
   const domain = await getDomainFromHeaders();
   const baseUrl = domain ? `https://${domain}` : "https://localhost:3000";
 
-  return {
+return {
     rules: [
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/admin/", "/api/"],
+        disallow: ["/admin/", "/api/", "/superadmin/"],
       },
     ],
     sitemap: `${baseUrl}/sitemap.xml`,

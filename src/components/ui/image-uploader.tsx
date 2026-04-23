@@ -244,7 +244,7 @@ export function ImageUploader({
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className="p-3 bg-card/90 backdrop-blur-sm rounded-full shadow-elegant outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    className="p-3 min-h-[44px] min-w-[44px] flex items-center justify-center bg-card/90 backdrop-blur-sm rounded-full shadow-elegant outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     aria-label={t("objectFit", language) || "Ajustar imagen"}
                   >
                     <Maximize2 className="w-4 h-4" />
@@ -272,7 +272,7 @@ export function ImageUploader({
             <button
               type="button"
               onClick={handleClick}
-              className="p-3 bg-card/90 backdrop-blur-sm rounded-full shadow-elegant outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="p-3 min-h-[44px] min-w-[44px] flex items-center justify-center bg-card/90 backdrop-blur-sm rounded-full shadow-elegant outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               aria-label={t("changeImage", language)}
             >
               <Pencil className="w-4 h-4" />
@@ -280,7 +280,7 @@ export function ImageUploader({
             <button
               type="button"
               onClick={handleRemove}
-              className="p-3 bg-destructive/90 backdrop-blur-sm rounded-full shadow-elegant outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="p-3 min-h-[44px] min-w-[44px] flex items-center justify-center bg-destructive/90 backdrop-blur-sm rounded-full shadow-elegant outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               aria-label={t("deleteImage", language)}
             >
               <Trash2 className="w-4 h-4 text-destructive-foreground" />
