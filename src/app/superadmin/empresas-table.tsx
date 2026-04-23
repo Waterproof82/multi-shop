@@ -249,15 +249,15 @@ export function EmpresasTable({ empresas }: EmpresasTableProps) {
                     </span>
                     {/* Geo coordinates */}
                     <span
-                      className={`p-1.5 rounded ${empresa.seoStatus.hasGeoCoordinates ? 'text-emerald-400' : 'text-amber-400/60'}`}
-                      title={empresa.seoStatus.hasGeoCoordinates ? '✓ GPS detectado en url_mapa' : '△ Falta GPS en url_mapa'}
+                      className={`p-1.5 rounded ${empresa.seoStatus.hasGeoCoordinates ? 'text-emerald-400' : 'text-red-400/60'}`}
+                      title={empresa.seoStatus.hasGeoCoordinates ? '✓ GPS detectado en url_mapa' : '✗ Falta GPS en url_mapa'}
                     >
                       <MapPin className="h-4 w-4" aria-label={empresa.seoStatus.hasGeoCoordinates ? 'Con geo' : 'Sin geo'} />
                     </span>
                     {/* Social */}
                     <span
-                      className={`p-1.5 rounded ${empresa.seoStatus.hasFb || empresa.seoStatus.hasInstagram ? 'text-emerald-400' : 'text-amber-400/60'}`}
-                      title={empresa.seoStatus.hasFb || empresa.seoStatus.hasInstagram ? '✓ Redes sociales configuradas' : '△ Falta Facebook o Instagram'}
+                      className={`p-1.5 rounded ${empresa.seoStatus.hasFb || empresa.seoStatus.hasInstagram ? 'text-emerald-400' : 'text-red-400/60'}`}
+                      title={empresa.seoStatus.hasFb || empresa.seoStatus.hasInstagram ? '✓ Redes sociales configuradas' : '✗ Falta Facebook o Instagram'}
                     >
                       <Share2 className="h-4 w-4" aria-label={empresa.seoStatus.hasFb || empresa.seoStatus.hasInstagram ? 'Con redes' : 'Sin redes'} />
                     </span>
@@ -308,7 +308,7 @@ export function EmpresasTable({ empresas }: EmpresasTableProps) {
                 <FileText className="h-4 w-4 text-emerald-400" /> Descripción
               </span>
               <span className="flex items-center gap-1.5 text-slate-300">
-                <MapPin className="h-4 w-4 text-emerald-400" /> GPS
+                <MapPin className="h-4 w-4 text-emerald-400" /> Mapa Google
               </span>
               <span className="flex items-center gap-1.5 text-slate-300">
                 <Share2 className="h-4 w-4 text-emerald-400" /> Redes
@@ -324,11 +324,7 @@ export function EmpresasTable({ empresas }: EmpresasTableProps) {
             <div className="flex items-center gap-3 pl-4 border-l border-white/20">
               <span className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-full bg-emerald-400"></span>
-                <span className="text-emerald-400">Completado</span>
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-full bg-amber-400"></span>
-                <span className="text-amber-400">Pendiente</span>
+                <span className="text-emerald-400">OK</span>
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-full bg-red-400"></span>
