@@ -399,7 +399,54 @@ export class SupabaseSuperAdminRepository implements ISuperAdminRepository {
         de: row.footer2_de,
       },
       stats,
-      createdAt: row.created_at
+      createdAt: row.created_at,
+      seoStatus: {
+        hasDescription: !!(row.descripcion_es || row.descripcion_en),
+        hasLogo: !!row.logo_url,
+        hasUrlMapa: !!row.url_mapa,
+        hasGeoCoordinates: this.hasGeoCoordinates(row.url_mapa),
+        hasFb: !!row.fb,
+        hasInstagram: !!row.instagram,
+        hasMetaDescription: !!(row.descripcion_es && row.descripcion_es.length > 50),
+      },
     };
+  }
+
+  private hasGeoCoordinates(urlMapa: string | null): boolean {
+    if (!urlMapa) return false;
+    
+    // Decode URL-encoded characters first
+    const decoded = decodeURIComponent(urlMapa);
+    
+    // Check for @lat,lng pattern in Google Maps URLs (most common)
+    // Pattern: @37.4056789,-5.9854321,15z or similar
+    if (/@(-?\d+\.?\d*),(-?\d+\.?\d*)/.test(decoded)) {
+      return true;
+    }
+    
+    // Check for explicit lat/lng params
+    if (/[?&]lat=(-?\d+\.?\d*)/i.test(decoded) && /[?&]lng=(-?\d+\.?\d*)/i.test(decoded)) {
+      return true;
+    }
+    
+    // Check for Google Maps embed format: !2dlng!3dlat or !3dlat!2dlng
+    // e.g., !2d-16.4126258!3d28.4774869
+    if (/!2d(-?\d+\.?\d*).*!3d(-?\d+\.?\d*)/.test(decoded) || 
+        /!3d(-?\d+\.?\d*).*!2d(-?\d+\.?\d*)/.test(decoded)) {
+      return true;
+    }
+    
+    // Check for data format: data=!4m2!3dlat!4dlng
+    if (/!3d(-?\d+\.?\d*)!4d(-?\d+\.?\d*)/.test(decoded)) {
+      return true;
+    }
+    
+    // Check for place coordinates in various formats
+    // e.g., 3d37.4056789!4d-5.9854321
+    if (/3d(-?\d+\.?\d*).*4d(-?\d+\.?\d*)/.test(decoded)) {
+      return true;
+    }
+    
+    return false;
   }
 }

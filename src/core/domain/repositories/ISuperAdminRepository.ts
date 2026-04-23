@@ -80,6 +80,15 @@ export interface EmpresaWithStats {
   } | null;
   stats: EmpresaStats;
   createdAt: string;
+  seoStatus: {
+    hasDescription: boolean;
+    hasLogo: boolean;
+    hasUrlMapa: boolean;
+    hasGeoCoordinates: boolean;
+    hasFb: boolean;
+    hasInstagram: boolean;
+    hasMetaDescription: boolean;
+  };
 }
 
 export interface ISuperAdminRepository {
