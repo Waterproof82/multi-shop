@@ -2,8 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Result } from '@/core/domain/entities/types';
 import { AUTH_ERRORS, createErrorResponse } from '@/core/domain/constants/api-errors';
 
+/**
+ * Result type for requireAuth - returned from authentication middleware.
+ * - When authenticated: { empresaId, error: null, isSuperAdmin }
+ * - When unauthorized: { empresaId: null, error: NextResponse (401), isSuperAdmin }
+ */
+export type AuthResult = {
+  empresaId: string | null;
+  error: NextResponse | null;
+  isSuperAdmin?: boolean;
+};
+
 // Auth middleware helper
-export async function requireAuth(request: NextRequest): Promise<{ empresaId: string | null; error: NextResponse | null; isSuperAdmin?: boolean }> {
+export async function requireAuth(request: NextRequest): Promise<AuthResult> {
   const empresaId = request.headers.get('x-empresa-id');
   const adminRol = request.headers.get('x-admin-rol');
   const isSuperAdmin = adminRol === 'superadmin';

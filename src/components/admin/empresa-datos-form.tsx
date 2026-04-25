@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MapPin, Phone, Mail, Link as LinkIcon, Users, Camera, Loader2 } from 'lucide-react';
+import { MapPin, Phone, Mail, Link as LinkIcon, Users, Camera, Loader2, Facebook } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { logClientError } from '@/lib/client-error';
@@ -119,7 +119,7 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
         {/* Facebook */}
         <div className="flex flex-col gap-2">
           <label htmlFor="fb" className="text-sm font-medium text-foreground flex items-center gap-2">
-            <Users className="w-4 h-4" />
+            <Facebook className="w-4 h-4" />
             {t('facebook', language)}
           </label>
           <Input

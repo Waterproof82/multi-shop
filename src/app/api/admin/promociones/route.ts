@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { sendEmail } from '@/lib/brevo-email';
 import { deleteImageFromR2 } from '@/core/infrastructure/storage/s3-client';
 import { promocionUseCase, empresaUseCase } from '@/core/infrastructure/database';
-import { requireAuth, requireRole, errorResponse, handleResult } from '@/core/infrastructure/api/helpers';
+import { requireAuth, requireRole, errorResponse, handleResult, type AuthResult } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
 import { escapeHtml } from '@/lib/html-utils';
@@ -197,7 +197,7 @@ export async function GET(request: NextRequest) {
   const rateLimited = await rateLimitAdmin(request);
   if (rateLimited) return rateLimited;
 
-  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request) as any;
+  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request) as AuthResult;
   if (authError) return authError;
 
   const { searchParams } = new URL(request.url);
@@ -215,7 +215,7 @@ export async function POST(request: NextRequest) {
   const rateLimited = await rateLimitAdmin(request);
   if (rateLimited) return rateLimited;
 
-  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request) as any;
+  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request) as AuthResult;
   if (authError) return authError;
   const roleError = requireRole(request, ['admin', 'superadmin']);
   if (roleError) return roleError;
