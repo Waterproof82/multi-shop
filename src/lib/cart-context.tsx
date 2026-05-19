@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, type ReactNode } from "react"
 import type { MenuItemVM } from "@/core/application/dtos/menu-view-model"
+import { getItemKey } from "./cart-utils"
 
 export interface Complement {
   id: string;
@@ -16,11 +17,6 @@ export interface CartItem {
   selectedComplements?: Complement[]
   justAdded?: boolean
   justRemoved?: boolean
-}
-
-function getItemKey(item: MenuItemVM, complements?: Complement[]): string {
-  const complementIds = complements?.map(c => c.id).sort().join(',') || '';
-  return `${item.id}-${complementIds}`;
 }
 
 export interface AddedItemInfo {

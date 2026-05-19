@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useRef, useEffect } from "react"
+import { useState, useCallback } from "react"
 import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, Check, Gift } from "lucide-react"
 import { useReducedMotion } from "framer-motion"
 import { Button } from "@/components/ui/button"
@@ -27,17 +27,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useCart, type Complement, type CartItem } from "@/lib/cart-context"
+import { useCart, type CartItem } from "@/lib/cart-context"
 import { useLanguage, type Language } from "@/lib/language-context"
 import { t } from "@/lib/translations"
 import { formatPrice } from "@/lib/format-price"
 import { COUNTRY_CODES, DEFAULT_COUNTRY_CODE } from "@/core/domain/constants/country-codes"
 import type { MenuItemVM } from "@/core/application/dtos/menu-view-model"
 
-function getItemKey(item: MenuItemVM, complements?: Complement[]): string {
-  const complementIds = complements?.map(c => c.id).sort().join(',') || '';
-  return `${item.id}-${complementIds}`;
-}
+import { getItemKey } from "@/lib/cart-utils";
 
 type TranslationKey = keyof typeof import('@/lib/translations').translations.es;
 type TranslateFn = (key: TranslationKey, language: Language) => string;
@@ -125,281 +122,104 @@ export function CartDrawer() {
     closeCart 
   } = useCart()
   const { language } = useLanguage()
-  const shouldReduceMotion = useReducedMotion() ?? false
-  const [sending, setSending] = useState(false)
-  const [sent, setSent] = useState(false)
-  const [confirming, setConfirming] = useState(false)
-  const [discountCode, setDiscountCode] = useState('')
-  const [discountValid, setDiscountValid] = useState<{ valid: boolean; porcentaje: number } | null>(null)
-  const [discountError, setDiscountError] = useState<string | null>(null)
-  const [validatingDiscount, setValidatingDiscount] = useState(false)
-  const [companyPhone, setCompanyPhone] = useState<string | null>(null)
-  const [messageCopied, setMessageCopied] = useState(false)
-  const [retryCountdown, setRetryCountdown] = useState<number | null>(null)
-  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const [nombre, setNombre] = useState('')
-  const [telefono, setTelefono] = useState('')
-  const [countryCode, setCountryCode] = useState(DEFAULT_COUNTRY_CODE)
-  const [email, setEmail] = useState('')
-  const [errors, setErrors] = useState<{ nombre?: string; telefono?: string }>({})
+  const shouldReduceMotion = useReducedMotion() ?? false;
+  const [sending, setSending] = useState(false);
+  const [orderSuccess, setOrderSuccess] = useState<{ numeroPedido: number } | null>(null);
+  const [discountCode, setDiscountCode] = useState('');
+  const [discountValid, setDiscountValid] = useState<{ valid: boolean; porcentaje: number } | null>(null);
+  const [discountError, setDiscountError] = useState<string | null>(null);
+  const [validatingDiscount, setValidatingDiscount] = useState(false);
 
-  const [isMobile, setIsMobile] = useState(false);
-
-  // Helper functions to reduce complexity
-  const getDiscountInputBorder = useCallback(() => {
-    if (discountError) return 'border-destructive';
-    if (discountValid) return 'border-green-500';
-    return '';
-  }, [discountError, discountValid]);
-
-  const getDiscountAriaDescribedBy = useCallback(() => {
-    if (discountError) return "discount-error";
-    if (discountValid) return "discount-valid";
-    return undefined;
-  }, [discountError, discountValid]);
-
-  useEffect(() => {
-    setIsMobile(globalThis.matchMedia('(pointer: coarse)').matches);
-  }, []);
-
-  const getDialogDescription = useCallback(() => {
-    if (isMobile) {
-      return confirming ? t("sendingOrder", language) : t("whatsappCheck", language);
-    }
-    return t("whatsappDesktopChoice", language);
-  }, [isMobile, confirming, language]);
-
-  const getRetryButtonText = useCallback(() => {
-    if (retryCountdown === null) return t("whatsappDesktopApp", language);
-    if (retryCountdown > 0) return t("whatsappRetrying", language).replaceAll("{seconds}", String(retryCountdown));
-    return t("whatsappRetry", language);
-  }, [retryCountdown, language]);
-
-  const buildWhatsAppUrls = (numero: string, mensaje: string) => {
-    const numeroLimpio = numero.replaceAll(/\D/g, '');
-    const textoEncoded = encodeURIComponent(mensaje);
-    return {
-      waMeUrl: `https://wa.me/${numeroLimpio}?text=${textoEncoded}`,
-      webUrl: `https://web.whatsapp.com/send?phone=${numeroLimpio}&text=${textoEncoded}`,
-    };
-  };
-
-  const abrirWhatsApp = useCallback(async (numero: string, mensaje: string) => {
-    const { waMeUrl } = buildWhatsAppUrls(numero, mensaje);
-
-    if (isMobile) {
-      globalThis.location.href = waMeUrl;
-    } else {
-      try {
-        await navigator.clipboard.writeText(mensaje);
-        setMessageCopied(true);
-      } catch {
-        // Clipboard API not available, continue without copy
-      }
-      // Don't auto-open on desktop — show dialog with options
-      // for user to choose (wa.me or WhatsApp Web)
-    }
-  }, [isMobile]);
-
-  const clearRetryTimers = useCallback(() => {
-    if (countdownRef.current) {
-      clearInterval(countdownRef.current);
-      countdownRef.current = null;
-    }
-    setRetryCountdown(null);
-  }, []);
-
-  const handleOpenInApp = useCallback(() => {
-    const link = (globalThis as Record<string, unknown>).__whatsappLink as string | undefined;
-    if (!link) return;
-
-    // If countdown is active, this is a retry (app already warm)
-    if (retryCountdown !== null) {
-      clearRetryTimers();
-      globalThis.open(link, '_blank', 'noopener,noreferrer');
-      return;
-    }
-
-    // First attempt: opens wa.me (may fail due to cold start)
-    globalThis.open(link, '_blank', 'noopener,noreferrer');
-
-    // 10s countdown → when done, button changes to "Retry"
-    const retryDelay = 10;
-    setRetryCountdown(retryDelay);
-
-    countdownRef.current = setInterval(() => {
-      setRetryCountdown(prev => {
-        if (prev === null || prev <= 1) {
-          if (countdownRef.current) clearInterval(countdownRef.current);
-          countdownRef.current = null;
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  }, [clearRetryTimers, retryCountdown]);
-
-  // Limpiar timers al desmontar
-  useEffect(() => {
-    return () => {
-      if (countdownRef.current) clearInterval(countdownRef.current);
-    };
-  }, []);
-
-  const getWhatsAppUrl = (): string | null => {
-    const link = (globalThis as Record<string, unknown>).__whatsappLink as string | undefined;
-    return link || null;
-  };
-
-  const getWhatsAppWebUrl = (): string | null => {
-    const link = (globalThis as Record<string, unknown>).__whatsappLink as string | undefined;
-    if (!link) return null;
-    const match = /wa\.me\/(\d+)\?text=(.+)/.exec(link);
-    if (!match) return link;
-    return `https://web.whatsapp.com/send?phone=${match[1]}&text=${match[2]}`;
-  };
+  const [nombre, setNombre] = useState('');
+  const [telefono, setTelefono] = useState('');
+  const [countryCode, setCountryCode] = useState(DEFAULT_COUNTRY_CODE);
+  const [email, setEmail] = useState('');
+  const [errors, setErrors] = useState<{ nombre?: string; telefono?: string; general?: string }>({});
 
   const handleConfirmOrder = useCallback(async () => {
     setErrors({});
     
-    const validation = validateAndBuildOrderData(
-      { nombre, telefono, countryCode, email, items, totalPrice, language },
-      t,
-      discountValid ? { valid: discountValid.valid, porcentaje: discountValid.porcentaje, code: discountCode } : undefined
-    );
-    
-    if (!validation.valid) {
-      setErrors(validation.errors);
-      return;
+    // Simple validation before sending
+    const nombreError = validateNameInput(nombre, t, language);
+    const telefonoError = validatePhoneInput(telefono, t, language);
+    if (nombreError || telefonoError) {
+        setErrors({ nombre: nombreError, telefono: telefonoError });
+        return;
     }
 
     setSending(true);
+
+    const selectedCountry = COUNTRY_CODES.find(c => c.code === countryCode);
+    const dialCode = selectedCountry?.dialCode || '34';
+
     try {
       const res = await fetch('/api/pedidos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(validation.data),
+        body: JSON.stringify({
+            items: items.map((ci: CartItem) => ({
+                item: { id: ci.item.id, name: ci.item.name, price: ci.item.price },
+                quantity: ci.quantity,
+                selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
+            })),
+            nombre,
+            telefono: dialCode + telefono.replaceAll(/\D/g, ''),
+            email,
+            idioma: language,
+            codigoDescuento: discountCode || undefined,
+        }),
       });
       
       const data = await res.json();
       
       if (res.ok) {
-        closeCart();
-        setNombre('');
-        setTelefono('');
-        setEmail('');
-        setDiscountCode('');
-        setDiscountValid(null);
-        setDiscountError(null);
-        setCompanyPhone(data.companyPhone || null);
-        
-        if (data.whatsappLink) {
-          (globalThis as Record<string, unknown>).__whatsappLink = data.whatsappLink;
-          const matchResult = data.whatsappLink.match(/wa\.me\/(\d+)\?text=(.+)/);
-          if (matchResult) {
-            const numero = matchResult[1];
-            const mensaje = decodeURIComponent(matchResult[2]);
-            abrirWhatsApp(numero, mensaje);
-          }
-        }
-        setSent(true);
-        setConfirming(false);
+        setOrderSuccess({ numeroPedido: data.numeroPedido });
+        // Don't clear cart yet, do it when dialog closes
       } else {
-        setErrors({ nombre: data.error || t("validationOrderError", language) });
+        setErrors({ general: data.error || t("validationOrderError", language) });
       }
     } catch {
-      setErrors({ nombre: t("connectionError", language) });
+      setErrors({ general: t("connectionError", language) });
     } finally {
       setSending(false);
     }
-  }, [nombre, telefono, countryCode, email, items, totalPrice, language, closeCart, abrirWhatsApp, discountCode, discountValid]);
+  }, [nombre, telefono, countryCode, email, items, language, discountCode]);
 
   const handleDialogClose = useCallback((open: boolean) => {
     if (!open) {
-      setSent(false);
-      setConfirming(false);
-      setMessageCopied(false);
-      clearRetryTimers();
+      setOrderSuccess(null);
       clearCart();
+      // Reset form fields
+      setNombre('');
+      setTelefono('');
+      setEmail('');
+      setDiscountCode('');
+      setDiscountValid(null);
+      setDiscountError(null);
       closeCart();
     }
-  }, [clearRetryTimers, clearCart, closeCart]);
+  }, [clearCart, closeCart]);
 
   return (
     <>
-      <Dialog open={sent} onOpenChange={handleDialogClose}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog open={!!orderSuccess} onOpenChange={handleDialogClose}>
+        <DialogContent className="sm:max-w-md text-center">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-primary">
-              <Check className="w-6 h-6" />
-              {t("sendingOrder", language)}
+            <DialogTitle className="flex flex-col items-center justify-center gap-2 text-primary text-2xl">
+              <Check className="w-12 h-12 bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400 rounded-full p-2" />
+              {t("orderSuccessTitle", language)}
             </DialogTitle>
-            <DialogDescription className="text-base">
-              {getDialogDescription()}
+            <DialogDescription className="text-base pt-4">
+              {t("orderSuccessMessage", language)}
+              <br />
+              <strong className="text-xl text-foreground font-bold">
+                #{orderSuccess?.numeroPedido}
+              </strong>
             </DialogDescription>
-            {confirming && companyPhone && (
-              <p className="text-xs text-destructive mt-2 text-center">
-                {t("whatsappFallback", language)} {companyPhone}
-              </p>
-            )}
           </DialogHeader>
-          {!confirming && getWhatsAppUrl() && (
-            <>
-              {isMobile ? (
-                <a
-                  href={getWhatsAppUrl()!}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block w-full text-center bg-whatsapp text-primary-foreground py-3 px-4 rounded-full font-semibold hover:bg-whatsapp-hover transition-colors duration-150"
-                >
-                  {t("whatsappResend", language)}
-                </a>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {/* Screen reader announcement for countdown */}
-                  <span aria-live="polite" aria-atomic="true" className="sr-only">
-                    {retryCountdown !== null && retryCountdown > 0 && (
-                      <>{t("whatsappRetryingCountdown", language).replace("{seconds}", String(retryCountdown))}</>
-                    )}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleOpenInApp}
-                    disabled={retryCountdown !== null && retryCountdown > 0}
-                    className="w-full text-center bg-whatsapp text-primary-foreground py-3 px-4 rounded-full font-semibold hover:bg-whatsapp-hover transition-colors duration-150 disabled:opacity-70"
-                  >
-                    {getRetryButtonText()}
-                  </button>
-                  <a
-                    href={getWhatsAppWebUrl()!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block w-full text-center border border-whatsapp text-whatsapp py-3 px-4 rounded-full font-semibold hover:bg-whatsapp/10 transition-colors duration-150"
-                  >
-                    {t("whatsappWeb", language)}
-                  </a>
-                  {messageCopied && (
-                    <p className="text-xs text-muted-foreground mt-1 text-center">
-                      {t("whatsappClipboard", language)}
-                    </p>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-          {companyPhone && (
-            <div className="bg-foreground text-background p-4 rounded-lg mt-4 w-full text-center">
-              <p className="text-sm font-medium">
-                {t("whatsappCantSend", language)}
-              </p>
-              <a
-                href={`tel:${companyPhone.replaceAll(/\D/g, '')}`}
-                className="block text-2xl font-bold mt-2 tracking-wide hover:opacity-80 transition-opacity"
-              >
-                {companyPhone.replaceAll(/\D/g, '').slice(2)}
-              </a>
-            </div>
-          )}
+          <Button onClick={() => handleDialogClose(false)} className="w-full mt-4">
+            {t("close", language)}
+          </Button>
         </DialogContent>
       </Dialog>
 
@@ -609,10 +429,10 @@ export function CartDrawer() {
                       setDiscountValid(null);
                       setDiscountError(null);
                     }}
-                    className={`h-9 ${getDiscountInputBorder()}`}
-                    disabled={validatingDiscount || items.length === 0}
-                    aria-describedby={getDiscountAriaDescribedBy()}
-                    aria-invalid={!!discountError}
+                     className={`h-9 ${discountError ? 'border-destructive' : (discountValid ? 'border-green-500' : '')}`}
+                     disabled={validatingDiscount || items.length === 0}
+                     aria-describedby={discountError ? "discount-error" : (discountValid ? "discount-valid" : undefined)}
+                     aria-invalid={!!discountError}
                   />
                   <Button
                     variant="outline"
@@ -692,14 +512,14 @@ export function CartDrawer() {
               </div>
 
               <div className="flex flex-col gap-2">
-                <Button 
-                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full py-3 text-lg font-semibold shadow-elegant transition-colors duration-150 min-h-[44px]"
-                  size="lg"
-                  onClick={handleConfirmOrder}
-                  disabled={sending || confirming}
-                >
-                  {sending || confirming ? t("sending", language) : t("sendOrder", language)}
-                </Button>
+                 <Button 
+                   className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full py-3 text-lg font-semibold shadow-elegant transition-colors duration-150 min-h-[44px]"
+                   size="lg"
+                   onClick={handleConfirmOrder}
+                   disabled={sending}
+                 >
+                   {sending ? t("sending", language) : t("sendOrder", language)}
+                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"

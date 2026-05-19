@@ -117,6 +117,39 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     }
   }
 
+  async findById(id: string, empresaId: string): Promise<Result<Pedido | null>> {
+    try {
+      const { data, error } = await this.supabase
+        .from('pedidos')
+        .select(`
+          *,
+          clientes:cliente_id (nombre, email, telefono)
+        `)
+        .eq('id', id)
+        .eq('empresa_id', empresaId)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') { // PostgREST error for "Not a single row"
+          return { success: true, data: null };
+        }
+        await logger.logAndReturnError(
+          'DB_SELECT_ERROR',
+          error.message,
+          'repository',
+          'SupabasePedidoRepository.findById',
+          { empresaId, details: { code: error.code, pedidoId: id } }
+        );
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al buscar pedido', module: 'repository', method: 'findById' } };
+      }
+
+      return { success: true, data: data as Pedido | null };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findById', { empresaId });
+      return { success: false, error: appError };
+    }
+   }
+
   async deleteAllByTenant(empresaId: string): Promise<Result<number>> {
     try {
       const { data: pedidosAEliminar, error: countError } = await this.supabase

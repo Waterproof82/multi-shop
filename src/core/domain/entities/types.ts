@@ -247,7 +247,7 @@ export interface CodigoDescuento {
 
 export type ErrorSeverity = 'error' | 'warning' | 'critical';
 
-export type ErrorModule = 'repository' | 'use-case' | 'api' | 'middleware';
+export type ErrorModule = 'repository' | 'use-case' | 'api' | 'middleware' | 'infrastructure';
 
 export interface AppError {
   code: string;
