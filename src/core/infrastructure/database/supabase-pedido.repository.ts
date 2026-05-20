@@ -409,11 +409,11 @@ export class SupabasePedidoRepository implements IPedidoRepository {
 
   async findByTrackingToken(
     token: string
-  ): Promise<Result<{ numero_pedido: number; estimated_minutes: number | null; estimated_ready_at: string | null } | null>> {
+  ): Promise<Result<{ id: string; numero_pedido: number; estimated_minutes: number | null; estimated_ready_at: string | null; telegram_message_id: string | null; telegram_chat_id: string | null } | null>> {
     try {
       const { data, error } = await this.supabase
         .from('pedidos')
-        .select('numero_pedido, estimated_minutes, estimated_ready_at')
+        .select('id, numero_pedido, estimated_minutes, estimated_ready_at, telegram_message_id, empresas(telegram_chat_id)')
         .eq('tracking_token', token)
         .maybeSingle();
 
@@ -428,7 +428,24 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         return { success: false, error: { code: 'DB_ERROR', message: 'Error al buscar pedido', module: 'repository', method: 'findByTrackingToken' } };
       }
 
-      return { success: true, data: data || null };
+      if (!data) return { success: true, data: null };
+
+      const raw = data as unknown as Record<string, unknown>;
+      const empresa = Array.isArray(raw['empresas'])
+        ? (raw['empresas'][0] as Record<string, unknown> | undefined)
+        : (raw['empresas'] as Record<string, unknown> | null);
+
+      return {
+        success: true,
+        data: {
+          id: raw['id'] as string,
+          numero_pedido: raw['numero_pedido'] as number,
+          estimated_minutes: (raw['estimated_minutes'] as number | null) ?? null,
+          estimated_ready_at: (raw['estimated_ready_at'] as string | null) ?? null,
+          telegram_message_id: (raw['telegram_message_id'] as string | null) ?? null,
+          telegram_chat_id: (empresa?.['telegram_chat_id'] as string | null) ?? null,
+        },
+      };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findByTrackingToken');
       return { success: false, error: appError };

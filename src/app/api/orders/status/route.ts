@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { pedidoRepository } from '@/core/infrastructure/database';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
+import { editMessageText } from '@/core/infrastructure/services/telegram.service';
 
 const tokenSchema = z.string().uuid();
 
@@ -26,9 +27,16 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 });
   }
 
-  return NextResponse.json({
-    numero_pedido: result.data.numero_pedido,
-    estimated_minutes: result.data.estimated_minutes,
-    estimated_ready_at: result.data.estimated_ready_at,
-  });
+  const { id, numero_pedido, estimated_minutes, estimated_ready_at, telegram_message_id, telegram_chat_id } = result.data;
+
+  // If order is ready and has a pending Telegram message, edit it and clear the id (fire-and-forget)
+  const isReady = estimated_ready_at && new Date(estimated_ready_at) <= new Date();
+  if (isReady && telegram_message_id && telegram_chat_id) {
+    void Promise.all([
+      editMessageText(telegram_chat_id, Number(telegram_message_id), '✅ Pedido listo para recoger'),
+      pedidoRepository.clearTelegramMessageId(id),
+    ]);
+  }
+
+  return NextResponse.json({ numero_pedido, estimated_minutes, estimated_ready_at });
 }
