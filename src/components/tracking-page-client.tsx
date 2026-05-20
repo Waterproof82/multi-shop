@@ -25,6 +25,7 @@ interface OrderStatus {
   estimated_minutes: number | null;
   estimated_ready_at: string | null;
   items: OrderItem[];
+  tipo: string;
 }
 
 interface TrackingPageClientProps {
@@ -56,6 +57,7 @@ function getRemainingMinutes(estimated_ready_at: string): number {
 function normalizeStatus(data: OrderStatus): OrderStatus {
   return {
     ...data,
+    tipo: data.tipo ?? 'restaurante',
     items: (data.items ?? []).map(item => ({
       ...item,
       cantidad: Number(item.cantidad),
@@ -272,6 +274,18 @@ export function TrackingPageClient({ token, initialStatus }: TrackingPageClientP
           <>
             <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             <p className="text-muted-foreground">{t('trackingLoading', lang)}</p>
+          </>
+        ) : primaryOrder.status.tipo === 'tienda' ? (
+          <>
+            <CheckCircle className="w-16 h-16 text-green-500" />
+            <div>
+              <p className="text-2xl font-bold text-foreground">{t('tiendaTrackingTitle', lang)}</p>
+              <p className="text-muted-foreground mt-1">{t('trackingOrderPrefix', lang)} #{primaryOrder.status.numero_pedido}</p>
+            </div>
+            <div className="rounded-xl bg-secondary px-6 py-4 max-w-sm w-full">
+              <p className="text-secondary-foreground">{t('tiendaTrackingMessage', lang)}</p>
+            </div>
+            <ItemsList items={primaryOrder.status.items} language={language} />
           </>
         ) : primaryReady ? (
           <>
