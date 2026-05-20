@@ -119,7 +119,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
     try {
       const { data: empresa } = await this.supabase
         .from('empresas')
-        .select('id, nombre, email_notification, telefono_whatsapp')
+        .select('id, nombre, email_notification, telefono_whatsapp, tipo, telegram_chat_id')
         .eq('dominio', dominio)
         .single();
 
@@ -131,7 +131,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
         const mainDomainFromSubdomain = dominio.split('.').slice(1).join('.');
         const { data: empresaSubdomain } = await this.supabase
           .from('empresas')
-          .select('id, nombre, email_notification, telefono_whatsapp')
+          .select('id, nombre, email_notification, telefono_whatsapp, tipo, telegram_chat_id')
           .eq('dominio', mainDomainFromSubdomain)
           .single();
 
