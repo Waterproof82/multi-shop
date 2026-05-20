@@ -75,7 +75,7 @@ function OrderCard({ order, isPrimary }: { order: OrderState; isPrimary: boolean
         <PartyPopper className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
         <div className="flex-1">
           <p className="text-sm font-semibold text-foreground">¡Pedido #{status.numero_pedido} listo!</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Ya podés pasar a recogerlo.</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Ya puedes pasar a recogerlo.</p>
         </div>
       </div>
     );
@@ -110,7 +110,7 @@ export function TrackingPageClient({ token, initialStatus }: TrackingPageClientP
   const [orders, setOrders] = useState<OrderState[]>([]);
 
   useEffect(() => {
-    const allTokens = [token, ...getTrackingTokens().filter(t => t !== token)];
+    const allTokens = [token, ...getTrackingTokens().filter((tk: string) => tk !== token)];
     setOrders(allTokens.map((t, i) => ({
       token: t,
       status: i === 0 ? initialStatus : null,
@@ -176,7 +176,7 @@ export function TrackingPageClient({ token, initialStatus }: TrackingPageClientP
               <p className="text-muted-foreground mt-1">Pedido #{primaryOrder.status.numero_pedido}</p>
             </div>
             <div className="rounded-xl bg-secondary px-6 py-4 max-w-sm">
-              <p className="text-secondary-foreground">Ya podés pasar a recogerlo.</p>
+              <p className="text-secondary-foreground">Ya puedes pasar a recogerlo.</p>
             </div>
           </>
         ) : (

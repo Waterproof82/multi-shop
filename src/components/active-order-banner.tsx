@@ -29,9 +29,9 @@ export function ActiveOrderBanner() {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold leading-tight">
-            {tokens.length === 1 ? '¡Tenés un pedido en curso!' : `¡Tenés ${tokens.length} pedidos en curso!`}
+            {tokens.length === 1 ? '¡Tienes un pedido en curso!' : `¡Tienes ${tokens.length} pedidos en curso!`}
           </p>
-          <p className="text-xs opacity-90 mt-0.5">Tocá para ver el seguimiento</p>
+          <p className="text-xs opacity-90 mt-0.5">Toca para ver el seguimiento</p>
         </div>
       </div>
     </div>

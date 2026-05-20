@@ -393,7 +393,10 @@ export class PedidoUseCase {
             telefono: data.telefono,
           },
         };
-        await sendTelegramWithInlineButtons(pedidoParaNotificar, telegramChatId);
+        const telegramResult = await sendTelegramWithInlineButtons(pedidoParaNotificar, telegramChatId);
+        if (telegramResult.success) {
+          await this.pedidoRepo.saveTelegramMessageId(pedidoResult.data.id, telegramResult.data.messageId);
+        }
       }
 
       return { success: true, data: { ...pedidoResult.data, trackingToken } };

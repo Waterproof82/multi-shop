@@ -14,7 +14,7 @@ const buildOrderMessage = (pedido: Pedido): string => {
   return [
     `*Nuevo Pedido: \\#${numero_pedido}*`,
     `*Cliente:* ${sanitizeForMarkdown(cliente?.nombre)}`,
-    `*Teléfono:* ${sanitizeForMarkdown(cliente?.telefono)}`,
+    `*Teléfono:* [\\+${cliente?.telefono ?? ''}](tel:+${cliente?.telefono ?? ''})`,
     '\\-\\-\\-',
     '*Items:*',
     ...items.map(
@@ -73,7 +73,7 @@ export const sendTelegramNotification = async (
 export const sendTelegramWithInlineButtons = async (
   pedido: Pedido,
   chatId: string
-): Promise<Result<void, AppError>> => {
+): Promise<Result<{ messageId: number }, AppError>> => {
   if (!TELEGRAM_BOT_TOKEN) {
     return {
       success: false,
@@ -125,7 +125,8 @@ export const sendTelegramWithInlineButtons = async (
       return { success: false, error };
     }
 
-    return { success: true, data: undefined };
+    const json = await response.json() as { ok: boolean; result: { message_id: number } };
+    return { success: true, data: { messageId: json.result.message_id } };
   } catch (error) {
     const appError = await logger.logFromCatch(error, 'infrastructure', 'sendTelegramWithInlineButtons');
     return { success: false, error: appError };
