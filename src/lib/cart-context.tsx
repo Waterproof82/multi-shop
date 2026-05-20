@@ -21,6 +21,7 @@ export interface CartItem {
 
 export interface AddedItemInfo {
   name: string;
+  translations?: MenuItemVM['translations'];
   quantity: number;
   price: number;
   totalPrice: number;
@@ -89,6 +90,7 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
     
     setLastAddedItem({
       name: item.name,
+      translations: item.translations,
       quantity,
       price: item.price + complementPrice,
       totalPrice: totalItemPrice,

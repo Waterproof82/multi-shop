@@ -157,6 +157,7 @@ export interface CartItem {
     id: string;
     name: string;
     price: number;
+    translations?: { en?: { name: string }; fr?: { name: string }; it?: { name: string }; de?: { name: string } };
   };
   quantity: number;
   selectedComplements?: { name: string; price: number }[];

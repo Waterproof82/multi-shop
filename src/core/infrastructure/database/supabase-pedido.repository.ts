@@ -230,6 +230,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         detalle_pedido: items.map(ci => ({
           producto_id: ci.item?.id,
           nombre: ci.item?.name,
+          translations: ci.item?.translations,
           precio: ci.item?.price,
           cantidad: ci.quantity,
           complementos: ci.selectedComplements || [],
@@ -348,7 +349,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         }
       });
       const pedidosPorDia = Object.entries(pedidosPorDiaMap).map(([dia, data]) => ({
-        dia: parseInt(dia),
+        dia: Number.parseInt(dia),
         pedidos: data.pedidos,
         ingresos: data.ingresos
       }));

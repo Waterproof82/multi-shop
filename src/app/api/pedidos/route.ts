@@ -10,6 +10,12 @@ const createPedidoSchema = z.object({
       id: z.string().uuid(),
       name: z.string().max(200),
       price: z.number().min(0).max(100_000),
+      translations: z.object({
+        en: z.object({ name: z.string().max(200) }).optional(),
+        fr: z.object({ name: z.string().max(200) }).optional(),
+        it: z.object({ name: z.string().max(200) }).optional(),
+        de: z.object({ name: z.string().max(200) }).optional(),
+      }).optional(),
     }),
     quantity: z.number().int().min(1).max(99),
     selectedComplements: z.array(z.object({

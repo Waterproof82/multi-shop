@@ -104,6 +104,7 @@ export const translations = {
     trackingPendingTime: "Tiempo de recogida pendiente de confirmar.",
     trackingOrderPrefix: "Pedido",
     trackingOrderedItems: "Productos pedidos",
+    trackingTotal: "Total",
     close: "Cerrar",
     accept: "Aceptar",
     viewCart: "Ver carrito",
@@ -649,6 +650,7 @@ export const translations = {
     trackingPendingTime: "Pickup time pending confirmation.",
     trackingOrderPrefix: "Order",
     trackingOrderedItems: "Ordered products",
+    trackingTotal: "Total",
     close: "Close",
     accept: "Accept",
     viewCart: "View cart",
@@ -1169,6 +1171,10 @@ export const translations = {
     trackingPendingTime: "Heure de retrait en attente de confirmation.",
     trackingOrderPrefix: "Commande",
     trackingOrderedItems: "Produits commandés",
+    trackingTotal: "Total",
+    viewCart: "Voir le panier",
+    itemAdded: "ajouté",
+    itemsAdded: "ajoutés",
   },
   it: {
     // UI - Popup y carrito
@@ -1248,6 +1254,10 @@ export const translations = {
     trackingPendingTime: "Orario di ritiro in attesa di conferma.",
     trackingOrderPrefix: "Ordine",
     trackingOrderedItems: "Prodotti ordinati",
+    trackingTotal: "Totale",
+    viewCart: "Vedi carrello",
+    itemAdded: "aggiunto",
+    itemsAdded: "aggiunti",
   },
   de: {
     // UI - Popup y carrito
@@ -1327,6 +1337,10 @@ export const translations = {
     trackingPendingTime: "Abholzeit steht noch aus.",
     trackingOrderPrefix: "Bestellung",
     trackingOrderedItems: "Bestellte Produkte",
+    trackingTotal: "Gesamt",
+    viewCart: "Warenkorb ansehen",
+    itemAdded: "hinzugefügt",
+    itemsAdded: "hinzugefügt",
   },
 } as const;
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Clock, CheckCircle, AlertCircle, PartyPopper, ArrowLeft } from "lucide-react";
+import { Clock, CheckCircle, AlertCircle, PartyPopper, ArrowLeft, Hourglass } from "lucide-react";
 import { getTrackingTokens, removeTrackingToken, isOrderExpired } from "@/lib/order-tracking";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
@@ -10,6 +10,12 @@ import { formatPrice } from "@/lib/format-price";
 
 interface OrderItem {
   nombre: string;
+  translations?: {
+    en?: { name: string };
+    fr?: { name: string };
+    it?: { name: string };
+    de?: { name: string };
+  };
   cantidad: number;
   precio: number;
 }
@@ -79,6 +85,15 @@ function sortOrders(orders: OrderState[]): OrderState[] {
   });
 }
 
+function resolveItemName(item: OrderItem, language: string): string {
+  if (language !== 'es') {
+    const lang = language as 'en' | 'fr' | 'it' | 'de';
+    const translation = item.translations?.[lang];
+    if (translation?.name) return translation.name;
+  }
+  return item.nombre;
+}
+
 function ItemsList({ items, language }: { items: OrderItem[]; language: string }) {
   if (!items || items.length === 0) return null;
   const lang = language as Parameters<typeof t>[1];
@@ -93,7 +108,7 @@ function ItemsList({ items, language }: { items: OrderItem[]; language: string }
           <li key={i} className="flex items-center justify-between gap-2 text-sm">
             <span className="flex items-center gap-1.5">
               <span className="font-medium text-foreground">{item.cantidad}×</span>
-              <span className="text-foreground">{item.nombre}</span>
+              <span className="text-foreground">{resolveItemName(item, language)}</span>
             </span>
             <span className="text-muted-foreground shrink-0">
               {formatPrice(item.precio * item.cantidad, 'EUR', lang)}
@@ -102,7 +117,7 @@ function ItemsList({ items, language }: { items: OrderItem[]; language: string }
         ))}
       </ul>
       <div className="mt-2 pt-2 border-t border-border flex items-center justify-between">
-        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Total</span>
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('trackingTotal', lang)}</span>
         <span className="text-sm font-bold text-foreground">{formatPrice(total, 'EUR', lang)}</span>
       </div>
     </div>
@@ -273,13 +288,15 @@ export function TrackingPageClient({ token, initialStatus }: TrackingPageClientP
         ) : (
           <>
             <div className="relative inline-flex items-center justify-center w-16 h-16">
-              {primaryOrder.status.estimated_minutes !== null && (
+              {primaryOrder.status.estimated_minutes === null ? (
+                <Hourglass className="w-16 h-16 text-primary animate-pulse" style={{ animationDuration: '1.5s' }} />
+              ) : (
                 <>
                   <span className="absolute w-16 h-16 rounded-full bg-green-500 animate-ping" style={{ opacity: 0.25, animationDuration: '2s' }} />
                   <span className="absolute w-20 h-20 rounded-full bg-green-500 animate-ping" style={{ opacity: 0.12, animationDuration: '2s', animationDelay: '0.7s' }} />
+                  <CheckCircle className="relative w-16 h-16 text-green-500 z-10" />
                 </>
               )}
-              <CheckCircle className="relative w-16 h-16 text-green-500 z-10" />
             </div>
             <div>
               <p className="text-2xl font-bold text-foreground">{t('trackingPrep', lang)}</p>

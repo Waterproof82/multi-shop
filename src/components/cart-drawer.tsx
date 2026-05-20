@@ -168,7 +168,7 @@ export function CartDrawer() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             items: items.map((ci: CartItem) => ({
-                item: { id: ci.item.id, name: ci.item.name, price: ci.item.price },
+                item: { id: ci.item.id, name: ci.item.name, price: ci.item.price, translations: ci.item.translations },
                 quantity: ci.quantity,
                 selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
             })),
@@ -187,6 +187,7 @@ export function CartDrawer() {
           // Restaurant mode: save token and redirect to tracking page
           addTrackingToken(data.trackingToken);
           clearCart();
+          closeCart();
           router.push(`/tracking/${data.trackingToken}`);
         } else {
           // Tienda mode: show success dialog

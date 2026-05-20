@@ -5,6 +5,7 @@ import { X, Check } from 'lucide-react';
 import { useCart } from '@/lib/cart-context';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
+import { formatPrice } from '@/lib/format-price';
 
 export function CartToast() {
   const { lastAddedItem, totalPrice, isCartOpen, openCart } = useCart();
@@ -26,7 +27,9 @@ export function CartToast() {
       return;
     }
     if (!isCartOpen) {
-      setItemName(lastAddedItem.name);
+      const lang = language as 'en' | 'fr' | 'it' | 'de';
+      const translatedName = language !== 'es' ? lastAddedItem.translations?.[lang]?.name : undefined;
+      setItemName(translatedName ?? lastAddedItem.name);
       setVisible(true);
       setExiting(false);
 
@@ -88,7 +91,7 @@ export function CartToast() {
           </p>
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground">
-              Total: {totalPrice.toFixed(2).replace('.', ',')}€
+              {t('trackingTotal', language)}: {formatPrice(totalPrice, 'EUR', language)}
             </span>
             <button
               type="button"

@@ -8,7 +8,7 @@ import { sendTelegramWithInlineButtons } from '@/core/infrastructure/services/te
 
 export interface CreatePedidoDTO {
   items: {
-    item: { id: string; name: string; price: number };
+    item: { id: string; name: string; price: number; translations?: { en?: { name: string }; fr?: { name: string }; it?: { name: string }; de?: { name: string } } };
     quantity: number;
     selectedComplements?: { id: string; name: string; price: number }[];
   }[];
