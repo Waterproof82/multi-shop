@@ -54,7 +54,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
     }
 
-    const pedidoResult = await pedidoUseCase.create(empresa.id, parsed.data);
+    const pedidoResult = await pedidoUseCase.create(
+      empresa.id,
+      parsed.data,
+      empresa.tipo ?? 'tienda',
+      empresa.telegram_chat_id ?? null
+    );
 
     if (!pedidoResult.success) {
       const errorCode = pedidoResult.error.code;
@@ -64,11 +69,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Error al crear el pedido' }, { status: 500 });
     }
     
-    const { id: pedidoId, numero_pedido: numeroPedido } = pedidoResult.data;
+    const { id: pedidoId, numero_pedido: numeroPedido, trackingToken } = pedidoResult.data;
 
-    return NextResponse.json({ 
-        success: true, 
-        numeroPedido, 
-        pedidoId 
+    return NextResponse.json({
+        success: true,
+        numeroPedido,
+        pedidoId,
+        ...(trackingToken && { trackingToken }),
     });
 }
