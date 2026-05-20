@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChefHat } from "lucide-react";
-import { getTrackingTokens } from "@/lib/order-tracking";
+import { getTrackingTokens, removeTrackingToken, isOrderExpired } from "@/lib/order-tracking";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 
@@ -13,7 +13,28 @@ export function ActiveOrderBanner() {
   const { language } = useLanguage();
 
   useEffect(() => {
-    setTokens(getTrackingTokens());
+    const stored = getTrackingTokens();
+    if (stored.length === 0) return;
+
+    Promise.all(
+      stored.map(async (token) => {
+        try {
+          const res = await fetch(`/api/orders/status?token=${token}`);
+          if (res.status === 404) { removeTrackingToken(token); return null; }
+          if (!res.ok) return token;
+          const data = await res.json();
+          if (isOrderExpired(data.estimated_ready_at)) {
+            removeTrackingToken(token);
+            return null;
+          }
+          return token;
+        } catch {
+          return token;
+        }
+      })
+    ).then((results) => {
+      setTokens(results.filter((t): t is string => t !== null));
+    });
   }, []);
 
   if (tokens.length === 0) return null;

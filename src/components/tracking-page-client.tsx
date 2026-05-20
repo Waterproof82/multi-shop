@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Clock, CheckCircle, AlertCircle, PartyPopper } from "lucide-react";
-import { getTrackingTokens } from "@/lib/order-tracking";
+import { useRouter } from "next/navigation";
+import { Clock, CheckCircle, AlertCircle, PartyPopper, ArrowLeft } from "lucide-react";
+import { getTrackingTokens, removeTrackingToken, isOrderExpired } from "@/lib/order-tracking";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { formatPrice } from "@/lib/format-price";
@@ -181,6 +182,7 @@ export function TrackingPageClient({ token, initialStatus }: TrackingPageClientP
   const [orders, setOrders] = useState<OrderState[]>([]);
   const { language } = useLanguage();
   const lang = language as Parameters<typeof t>[1];
+  const router = useRouter();
 
   useEffect(() => {
     const allTokens = [token, ...getTrackingTokens().filter((tk: string) => tk !== token)];
@@ -198,7 +200,12 @@ export function TrackingPageClient({ token, initialStatus }: TrackingPageClientP
         if (o.error) return o;
         const result = await fetchOrderStatus(o.token);
         if (result.error) return { ...o, error: true };
-        if (result.status) return { ...o, status: result.status };
+        if (result.status) {
+          if (isOrderExpired(result.status.estimated_ready_at)) {
+            removeTrackingToken(o.token);
+          }
+          return { ...o, status: result.status };
+        }
         return o;
       })
     );
@@ -256,7 +263,15 @@ export function TrackingPageClient({ token, initialStatus }: TrackingPageClientP
           </>
         ) : (
           <>
-            <CheckCircle className="w-16 h-16 text-green-500" />
+            <div className="relative flex items-center justify-center">
+              <CheckCircle className="w-16 h-16 text-green-500" />
+              {primaryOrder.status.estimated_minutes !== null && (
+                <>
+                  <span className="absolute inset-0 rounded-full animate-ping opacity-20 bg-green-500" style={{ animationDuration: '2s' }} />
+                  <span className="absolute inset-0 rounded-full animate-ping opacity-10 bg-green-500" style={{ animationDuration: '2s', animationDelay: '0.5s' }} />
+                </>
+              )}
+            </div>
             <div>
               <p className="text-2xl font-bold text-foreground">{t('trackingPrep', lang)}</p>
               <p className="text-muted-foreground mt-1">{t('trackingOrderPrefix', lang)} #{primaryOrder.status.numero_pedido}</p>
@@ -268,7 +283,7 @@ export function TrackingPageClient({ token, initialStatus }: TrackingPageClientP
             ) : (
               <div className="rounded-xl bg-secondary px-6 py-5 max-w-sm w-full space-y-3">
                 <div className="flex items-center justify-center gap-2">
-                  <Clock className="w-5 h-5 text-primary" />
+                  <Clock className="w-5 h-5 text-primary animate-pulse" />
                   <span className="text-lg font-semibold text-foreground">
                     {primaryRemaining !== null && primaryRemaining > 0
                       ? <>~{primaryRemaining} min</>
@@ -300,6 +315,15 @@ export function TrackingPageClient({ token, initialStatus }: TrackingPageClientP
           ))}
         </div>
       )}
+
+      {/* Volver al inicio */}
+      <button
+        onClick={() => router.push('/')}
+        className="flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors duration-150 mx-auto py-2"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        {t('trackingBackToHome', lang)}
+      </button>
     </div>
   );
 }
