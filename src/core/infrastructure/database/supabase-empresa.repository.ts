@@ -115,7 +115,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
     }
   }
 
-  async findByDomain(dominio: string): Promise<Result<{ id: string; nombre: string; email_notification: string | null; telefono_whatsapp: string | null } | null>> {
+  async findByDomain(dominio: string): Promise<Result<{ id: string; nombre: string; email_notification: string | null; telefono_whatsapp: string | null; tipo: string; telegram_chat_id: string | null } | null>> {
     try {
       const { data: empresa } = await this.supabase
         .from('empresas')
@@ -123,7 +123,14 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
         .eq('dominio', dominio)
         .single();
 
-      if (empresa) return { success: true, data: empresa };
+      if (empresa) return { success: true, data: {
+        id: empresa.id as string,
+        nombre: empresa.nombre as string,
+        email_notification: empresa.email_notification as string | null,
+        telefono_whatsapp: empresa.telefono_whatsapp as string | null,
+        tipo: (empresa.tipo as string) ?? 'tienda',
+        telegram_chat_id: empresa.telegram_chat_id as string | null,
+      }};
 
       const isPedidos = dominio.startsWith(`${DEFAULT_PEDIDOS_SUBDOMAIN}.`) || dominio.endsWith('-pedidos');
 
@@ -135,7 +142,14 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
           .eq('dominio', mainDomainFromSubdomain)
           .single();
 
-        return { success: true, data: empresaSubdomain || null };
+        return { success: true, data: empresaSubdomain ? {
+          id: empresaSubdomain.id as string,
+          nombre: empresaSubdomain.nombre as string,
+          email_notification: empresaSubdomain.email_notification as string | null,
+          telefono_whatsapp: empresaSubdomain.telefono_whatsapp as string | null,
+          tipo: (empresaSubdomain.tipo as string) ?? 'tienda',
+          telegram_chat_id: empresaSubdomain.telegram_chat_id as string | null,
+        } : null };
       }
 
       return { success: true, data: null };
