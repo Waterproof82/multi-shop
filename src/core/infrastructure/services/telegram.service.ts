@@ -151,3 +151,24 @@ export const answerCallbackQuery = async (
     // Best-effort — Telegram requires a 200 response regardless
   }
 };
+
+/** Edit an existing Telegram message — used to mark orders as processed */
+export const editMessageText = async (
+  chatId: string,
+  messageId: number,
+  text: string
+): Promise<void> => {
+  if (!TELEGRAM_BOT_TOKEN) return;
+  try {
+    await fetch(
+      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/editMessageText`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, message_id: messageId, text }),
+      }
+    );
+  } catch {
+    // Best-effort
+  }
+};

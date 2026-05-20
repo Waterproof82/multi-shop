@@ -2,54 +2,115 @@
 
 ## Resumen
 
-Este documento describe la funcionalidad de notificaciones de pedidos a través de la API de Telegram, que reemplaza al antiguo sistema basado en WhatsApp. El objetivo principal de este cambio es mejorar la fiabilidad, la seguridad y la experiencia del usuario final, eliminando la dependencia de aplicaciones externas en el lado del cliente.
+Sistema de notificaciones vía Telegram para pedidos. Soporta dos modos según el tipo de empresa (`tipo` en tabla `empresas`):
 
-## Flujo de la Notificación
+- **`tienda`**: notificación simple de texto, el cliente ve un popup con el número de pedido.
+- **`restaurante`**: notificación con botones de tiempo, el cliente es redirigido a una página de seguimiento en vivo.
 
-1.  **El Cliente Realiza un Pedido**: Desde el carrito de la tienda, el cliente rellena sus datos y confirma el pedido.
-2.  **Llamada al API**: El frontend realiza una petición `POST` al endpoint `/api/pedidos`.
-3.  **Procesamiento en Backend**:
-    a.  El `PedidoUseCase` recibe los datos, los valida y crea el registro del pedido en la base de datos (Supabase).
-    b.  Una vez el pedido se ha guardado con éxito, el caso de uso llama al `TelegramService`.
-    c.  El `TelegramService` construye un mensaje formateado con los detalles del pedido.
-    d.  Se realiza una llamada a la API de bots de Telegram para enviar el mensaje al chat configurado.
-4.  **Respuesta al Cliente**:
-    a.  El backend responde inmediatamente al frontend con un mensaje de éxito (`200 OK`) en cuanto el pedido se guarda en la base de datos, **sin esperar la respuesta de la API de Telegram**.
-    b.  El frontend muestra un diálogo de éxito con el número de pedido. El cliente nunca interactúa directamente con Telegram.
+---
 
-## Configuración Requerida
+## Flujo — Modo Tienda
 
-Para que el sistema de notificaciones funcione, es necesario configurar dos variables de entorno en el archivo `.env.local`:
+1. Cliente confirma pedido → `POST /api/pedidos`
+2. `PedidoUseCase` crea el pedido en DB
+3. `sendTelegramNotification(pedido, chatId)` envía mensaje de texto al chat de la empresa
+4. Cliente ve popup con número de pedido
+
+## Flujo — Modo Restaurante
+
+1. Cliente confirma pedido → `POST /api/pedidos`
+2. `PedidoUseCase` genera `tracking_token` (UUID) y crea el pedido con ese token en DB
+3. `sendTelegramWithInlineButtons(pedido, chatId)` envía mensaje con botones `[10 min] [15 min] [20 min] [30 min]`
+4. Cliente es redirigido a `/tracking/{token}` — sin popup
+5. **El restaurante pulsa un botón en Telegram** → webhook `POST /api/telegram/webhook`
+6. El webhook actualiza `estimated_minutes` y `estimated_ready_at` en el pedido
+7. El webhook edita el mensaje original en Telegram: elimina los botones y confirma el tiempo elegido (`✅ Tiempo fijado: X min`)
+8. La página de tracking del cliente muestra el tiempo en vivo (polling cada 5 s)
+9. Cuando `estimated_ready_at` llega, la página muestra "¡Tu pedido está listo!"
+
+---
+
+## Configuración
+
+### Variables de entorno
 
 ```env
-TELEGRAM_BOT_TOKEN="AQUI_VA_EL_TOKEN_DE_TU_BOT"
-TELEGRAM_CHAT_ID="AQUI_VA_EL_ID_DEL_CHAT"
+# Token del bot (obtenido de @BotFather) — global para todos los tenants
+TELEGRAM_BOT_TOKEN=123456789:AABBccdd...
+
+# Secreto para validar que el webhook viene de Telegram (lo inventás vos)
+# Solo letras, números, guiones y underscores
+TELEGRAM_WEBHOOK_SECRET=mi_secreto_seguro_123
 ```
 
-### Cómo Obtener las Claves
+### Por empresa (tabla `empresas`)
 
-1.  **`TELEGRAM_BOT_TOKEN`**:
-    *   Habla con el bot oficial **@BotFather** en Telegram.
-    *   Usa el comando `/newbot` para crear un nuevo bot.
-    *   BotFather te proporcionará un token de acceso. Este es tu `TELEGRAM_BOT_TOKEN`.
-    *   **IMPORTANTE**: Este token es secreto. No lo compartas ni lo subas a repositorios públicos.
+| Campo | Descripción |
+|-------|-------------|
+| `tipo` | `'tienda'` (defecto) o `'restaurante'` |
+| `telegram_chat_id` | ID del chat de Telegram donde recibe los pedidos |
 
-2.  **`TELEGRAM_CHAT_ID`**:
-    *   Este es el identificador del chat donde el bot enviará las notificaciones.
-    *   **Para un chat privado**: Envía un mensaje a tu bot. Luego, abre esta URL en tu navegador (reemplazando `<TU_TOKEN>`):
-        `https://api.telegram.org/bot<TU_TOKEN>/getUpdates`
-        Busca en la respuesta el objeto `chat`, y dentro de él, el campo `id`. Ese es tu ID.
-    *   **Para un grupo**: Añade tu bot al grupo. Envía un mensaje en el grupo. Usa la misma URL `getUpdates` de antes y busca el `id` del chat del grupo (será un número negativo).
+### Obtener el `telegram_chat_id`
 
-## Manejo de Errores
+1. Mandá un mensaje a tu bot en Telegram
+2. Consultá: `https://api.telegram.org/bot<TOKEN>/getUpdates`
+3. Buscá `"chat":{"id": XXXXXXX}` — ese es el chat ID
 
-El sistema está diseñado para ser resiliente. Si por cualquier motivo la notificación a Telegram falla (API caída, token incorrecto, etc.), el error **será registrado en los logs del servidor**, pero **no impedirá que el pedido se cree correctamente** y que el cliente vea un mensaje de éxito.
+### Registrar el webhook (una sola vez por servidor)
 
-La creación del pedido es la operación prioritaria.
+```bash
+curl "https://api.telegram.org/bot<TOKEN>/setWebhook" \
+  -d "url=https://tu-dominio.vercel.app/api/telegram/webhook" \
+  -d "secret_token=mi_secreto_seguro_123"
+```
 
-## Ventajas del Nuevo Sistema
+Un único webhook sirve todos los tenants — no hay que registrar uno por empresa.
 
-*   **Fiabilidad**: La notificación se envía desde el servidor, eliminando problemas de "cold start" de la app de WhatsApp o si el cliente no la tiene instalada.
-*   **Seguridad**: No se exponen números de teléfono ni se depende de que el cliente envíe el mensaje. Se elimina el riesgo de mensajes manipulados.
-*   **Mejor Experiencia de Usuario**: El cliente recibe una confirmación instantánea en la propia web, sin ser redirigido a una aplicación externa.
-*   **Simplicidad**: Se ha eliminado una gran cantidad de código complejo y propenso a errores del frontend.
+---
+
+## Endpoints
+
+### `POST /api/pedidos`
+Crea el pedido. Si la empresa es `restaurante`, retorna `trackingToken` en el JSON.
+
+### `POST /api/telegram/webhook`
+Recibe callbacks de Telegram al pulsar un botón de tiempo:
+- Valida el header `X-Telegram-Bot-Api-Secret-Token`
+- Parsea `callback_data` con formato `order:{pedidoId}:{minutes}`
+- Actualiza `estimated_minutes` y `estimated_ready_at` en DB
+- Edita el mensaje de Telegram para confirmar y eliminar los botones
+- Siempre devuelve `200` (requisito de Telegram)
+
+### `GET /api/orders/status?token={token}`
+Consulta pública, rate-limited. Devuelve:
+```json
+{
+  "numero_pedido": 42,
+  "estimated_minutes": 20,
+  "estimated_ready_at": "2026-05-20T21:35:00Z"
+}
+```
+Nunca expone el `id` interno del pedido. Devuelve 404 si el token no existe.
+
+---
+
+## Manejo de errores
+
+Si la notificación a Telegram falla, el error se registra en logs pero **no impide la creación del pedido**. La operación es fire-and-forget para no bloquear la respuesta al cliente.
+
+---
+
+## Columnas de base de datos
+
+### `empresas`
+```sql
+tipo              text    DEFAULT 'tienda'   -- 'tienda' | 'restaurante'
+telegram_chat_id  text    NULL               -- per-empresa
+```
+
+### `pedidos`
+```sql
+tracking_token    text    UNIQUE NULL        -- solo restaurantes
+estimated_minutes int     NULL               -- fijado por el restaurante vía Telegram
+estimated_ready_at timestamptz NULL          -- calculado: created_at + estimated_minutes
+```

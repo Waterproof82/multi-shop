@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { answerCallbackQuery } from '@/core/infrastructure/services/telegram.service';
+import { answerCallbackQuery, editMessageText } from '@/core/infrastructure/services/telegram.service';
 
 const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
 
@@ -8,6 +8,11 @@ const callbackQuerySchema = z.object({
   callback_query: z.object({
     id: z.string(),
     data: z.string(),
+    message: z.object({
+      message_id: z.number(),
+      chat: z.object({ id: z.number() }),
+      text: z.string().optional(),
+    }).optional(),
   }),
 });
 
@@ -50,7 +55,14 @@ export async function POST(request: Request) {
   // Import the repository here to avoid circular dependency issues
   const { pedidoRepository } = await import('@/core/infrastructure/database');
   await pedidoRepository.updateEstimatedTime(pedidoId, minutes);
-  await answerCallbackQuery(callbackQueryId, `⏱ Pedido actualizado a ${minutes} minutos`);
+  await answerCallbackQuery(callbackQueryId, `⏱ Tiempo fijado: ${minutes} minutos`);
+
+  // Edit the original message to remove buttons and confirm the selection
+  const { message } = parsed.data.callback_query;
+  if (message) {
+    const confirmedText = `${message.text ?? ''}\n\n✅ Tiempo fijado: ${minutes} min`;
+    await editMessageText(String(message.chat.id), message.message_id, confirmedText);
+  }
 
   return NextResponse.json({ ok: true });
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Clock, CheckCircle, AlertCircle } from "lucide-react";
+import { Clock, CheckCircle, AlertCircle, PartyPopper } from "lucide-react";
 
 interface OrderStatus {
   numero_pedido: number;
@@ -19,9 +19,15 @@ function formatTime(isoString: string): string {
   return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) + ' h';
 }
 
+function isReady(estimated_ready_at: string | null): boolean {
+  if (!estimated_ready_at) return false;
+  return new Date(estimated_ready_at) <= new Date();
+}
+
 export function TrackingPageClient({ token, initialStatus }: TrackingPageClientProps) {
   const [status, setStatus] = useState<OrderStatus | null>(initialStatus);
   const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => new Date());
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -39,7 +45,10 @@ export function TrackingPageClient({ token, initialStatus }: TrackingPageClientP
   }, [token]);
 
   useEffect(() => {
-    const interval = setInterval(fetchStatus, 5000);
+    const interval = setInterval(() => {
+      fetchStatus();
+      setNow(new Date());
+    }, 5000);
     return () => clearInterval(interval);
   }, [fetchStatus]);
 
@@ -57,6 +66,25 @@ export function TrackingPageClient({ token, initialStatus }: TrackingPageClientP
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center px-4">
         <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         <p className="text-muted-foreground">Cargando estado del pedido...</p>
+      </div>
+    );
+  }
+
+  const ready = isReady(status.estimated_ready_at);
+  // Suppress unused variable warning — now is used to trigger re-render on tick
+  void now;
+
+  if (ready) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center px-4">
+        <PartyPopper className="w-16 h-16 text-primary" />
+        <div>
+          <p className="text-2xl font-bold text-foreground">¡Tu pedido está listo!</p>
+          <p className="text-muted-foreground mt-1">Pedido #{status.numero_pedido}</p>
+        </div>
+        <div className="rounded-xl bg-secondary px-6 py-4 max-w-sm">
+          <p className="text-secondary-foreground">Ya podés pasar a recogerlo.</p>
+        </div>
       </div>
     );
   }
