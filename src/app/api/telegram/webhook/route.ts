@@ -4,6 +4,9 @@ import { answerCallbackQuery, editMessageText, editMessageReplyMarkup, buildTime
 
 const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
 
+const sanitizeMarkdown = (text: string): string =>
+  text.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
+
 const callbackQuerySchema = z.object({
   callback_query: z.object({
     id: z.string(),
@@ -67,6 +70,21 @@ export async function POST(request: Request) {
   // Dismiss spinner for read-only "ready" button
   if (callbackData === 'noop') {
     await answerCallbackQuery(callbackQueryId, '');
+    return NextResponse.json({ ok: true });
+  }
+
+  // Handle quick reply acknowledgement
+  const quickReplyMatch = callbackData.match(/^quick_reply:([0-9a-f-]{36}):(soon|call)$/);
+  if (quickReplyMatch) {
+    const [, , action] = quickReplyMatch;
+    const responseText = action === 'soon'
+      ? '💬 Te contestaré lo más pronto posible'
+      : '📞 Te llamo ahora en cuanto tenga un momento';
+    await answerCallbackQuery(callbackQueryId, responseText);
+    if (message) {
+      const updatedText = `${message.text ?? ''}\n\n${sanitizeMarkdown(responseText)}`;
+      await editMessageText(String(message.chat.id), message.message_id, updatedText, []);
+    }
     return NextResponse.json({ ok: true });
   }
 
