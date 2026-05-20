@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, Check, Gift } from "lucide-react"
 import { useReducedMotion } from "framer-motion"
@@ -36,6 +36,7 @@ import { COUNTRY_CODES, DEFAULT_COUNTRY_CODE } from "@/core/domain/constants/cou
 import type { MenuItemVM } from "@/core/application/dtos/menu-view-model"
 
 import { getItemKey } from "@/lib/cart-utils";
+import { getTrackingTokens, addTrackingToken } from "@/lib/order-tracking";
 
 type TranslationKey = keyof typeof import('@/lib/translations').translations.es;
 type TranslateFn = (key: TranslationKey, language: Language) => string;
@@ -127,6 +128,12 @@ export function CartDrawer() {
   const shouldReduceMotion = useReducedMotion() ?? false;
   const [sending, setSending] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState<{ numeroPedido: number } | null>(null);
+  const [activeOrderTokens, setActiveOrderTokens] = useState<string[]>([]);
+
+  useEffect(() => {
+    setActiveOrderTokens(getTrackingTokens());
+  }, [isCartOpen]);
+
   const [discountCode, setDiscountCode] = useState('');
   const [discountValid, setDiscountValid] = useState<{ valid: boolean; porcentaje: number } | null>(null);
   const [discountError, setDiscountError] = useState<string | null>(null);
@@ -177,7 +184,7 @@ export function CartDrawer() {
       if (res.ok) {
         if (data.trackingToken) {
           // Restaurant mode: save token and redirect to tracking page
-          localStorage.setItem('last_order_tracking', data.trackingToken);
+          addTrackingToken(data.trackingToken);
           clearCart();
           closeCart();
           router.push(`/tracking/${data.trackingToken}`);
@@ -521,8 +528,22 @@ export function CartDrawer() {
                 </div>
               </div>
 
+              {activeOrderTokens.length > 0 && (
+                <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/40 px-3 py-2 flex items-start justify-between gap-2">
+                  <p className="text-xs text-amber-800 dark:text-amber-300">
+                    Ya tenés {activeOrderTokens.length === 1 ? 'un pedido' : `${activeOrderTokens.length} pedidos`} en curso.{' '}
+                    <button
+                      onClick={() => router.push(`/tracking/${activeOrderTokens[0]}`)}
+                      className="underline font-semibold hover:opacity-80"
+                    >
+                      Ver seguimiento
+                    </button>
+                  </p>
+                </div>
+              )}
+
               <div className="flex flex-col gap-2">
-                 <Button 
+                 <Button
                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full py-3 text-lg font-semibold shadow-elegant transition-colors duration-150 min-h-[44px]"
                    size="lg"
                    onClick={handleConfirmOrder}
