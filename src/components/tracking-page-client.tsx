@@ -237,6 +237,15 @@ export function TrackingPageClient({ token, initialStatus }: TrackingPageClientP
 
   return (
     <div className="flex flex-col gap-8">
+      {/* Volver al inicio */}
+      <button
+        onClick={() => router.push('/')}
+        className="self-start flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors duration-150 min-h-[44px] -mt-4"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        {t('trackingBackToHome', lang)}
+      </button>
+
       {/* Pedido principal — vista grande */}
       <div className="flex flex-col items-center gap-6 text-center">
         {primaryOrder.error ? (
@@ -263,14 +272,14 @@ export function TrackingPageClient({ token, initialStatus }: TrackingPageClientP
           </>
         ) : (
           <>
-            <div className="relative flex items-center justify-center">
-              <CheckCircle className="w-16 h-16 text-green-500" />
+            <div className="relative inline-flex items-center justify-center w-16 h-16">
               {primaryOrder.status.estimated_minutes !== null && (
                 <>
-                  <span className="absolute inset-0 rounded-full animate-ping opacity-20 bg-green-500" style={{ animationDuration: '2s' }} />
-                  <span className="absolute inset-0 rounded-full animate-ping opacity-10 bg-green-500" style={{ animationDuration: '2s', animationDelay: '0.5s' }} />
+                  <span className="absolute w-16 h-16 rounded-full bg-green-500 animate-ping" style={{ opacity: 0.25, animationDuration: '2s' }} />
+                  <span className="absolute w-20 h-20 rounded-full bg-green-500 animate-ping" style={{ opacity: 0.12, animationDuration: '2s', animationDelay: '0.7s' }} />
                 </>
               )}
+              <CheckCircle className="relative w-16 h-16 text-green-500 z-10" />
             </div>
             <div>
               <p className="text-2xl font-bold text-foreground">{t('trackingPrep', lang)}</p>
@@ -315,15 +324,6 @@ export function TrackingPageClient({ token, initialStatus }: TrackingPageClientP
           ))}
         </div>
       )}
-
-      {/* Volver al inicio */}
-      <button
-        onClick={() => router.push('/')}
-        className="flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors duration-150 mx-auto py-2"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        {t('trackingBackToHome', lang)}
-      </button>
     </div>
   );
 }

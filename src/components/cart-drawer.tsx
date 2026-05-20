@@ -187,7 +187,6 @@ export function CartDrawer() {
           // Restaurant mode: save token and redirect to tracking page
           addTrackingToken(data.trackingToken);
           clearCart();
-          closeCart();
           router.push(`/tracking/${data.trackingToken}`);
         } else {
           // Tienda mode: show success dialog
