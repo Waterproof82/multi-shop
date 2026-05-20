@@ -14,7 +14,7 @@ const buildOrderMessage = (pedido: Pedido): string => {
   return [
     `*Nuevo Pedido: \\#${numero_pedido}*`,
     `*Cliente:* ${sanitizeForMarkdown(cliente?.nombre)}`,
-    `*Teléfono:* ${sanitizeForMarkdown(cliente?.telefono)}`,
+    `*Teléfono:* [\\+${cliente?.telefono ?? ''}](tel:+${cliente?.telefono ?? ''})`,
     '\\-\\-\\-',
     '*Items:*',
     ...items.map(
@@ -73,7 +73,7 @@ export const sendTelegramNotification = async (
 export const sendTelegramWithInlineButtons = async (
   pedido: Pedido,
   chatId: string
-): Promise<Result<void, AppError>> => {
+): Promise<Result<{ messageId: number }, AppError>> => {
   if (!TELEGRAM_BOT_TOKEN) {
     return {
       success: false,
@@ -125,12 +125,46 @@ export const sendTelegramWithInlineButtons = async (
       return { success: false, error };
     }
 
-    return { success: true, data: undefined };
+    const json = await response.json() as { ok: boolean; result: { message_id: number } };
+    return { success: true, data: { messageId: json.result.message_id } };
   } catch (error) {
     const appError = await logger.logFromCatch(error, 'infrastructure', 'sendTelegramWithInlineButtons');
     return { success: false, error: appError };
   }
 };
+
+/** Edit an existing Telegram message — used to mark orders as processed */
+export const editMessageText = async (
+  chatId: string,
+  messageId: number,
+  text: string,
+  inlineKeyboard: { text: string; callback_data: string }[][] = []
+): Promise<void> => {
+  if (!TELEGRAM_BOT_TOKEN) return;
+  try {
+    await fetch(
+      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/editMessageText`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, message_id: messageId, text, reply_markup: { inline_keyboard: inlineKeyboard } }),
+      }
+    );
+  } catch {
+    // Best-effort
+  }
+};
+
+export const buildTimeButtons = (pedidoId: string): { text: string; callback_data: string }[][] => [
+  [
+    { text: '10 min', callback_data: `order:${pedidoId}:10` },
+    { text: '15 min', callback_data: `order:${pedidoId}:15` },
+  ],
+  [
+    { text: '20 min', callback_data: `order:${pedidoId}:20` },
+    { text: '30 min', callback_data: `order:${pedidoId}:30` },
+  ],
+];
 
 /** Acknowledge a Telegram callback_query */
 export const answerCallbackQuery = async (

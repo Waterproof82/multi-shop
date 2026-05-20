@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, Check, Gift } from "lucide-react"
 import { useReducedMotion } from "framer-motion"
@@ -36,6 +36,7 @@ import { COUNTRY_CODES, DEFAULT_COUNTRY_CODE } from "@/core/domain/constants/cou
 import type { MenuItemVM } from "@/core/application/dtos/menu-view-model"
 
 import { getItemKey } from "@/lib/cart-utils";
+import { getTrackingTokens, addTrackingToken } from "@/lib/order-tracking";
 
 type TranslationKey = keyof typeof import('@/lib/translations').translations.es;
 type TranslateFn = (key: TranslationKey, language: Language) => string;
@@ -127,6 +128,12 @@ export function CartDrawer() {
   const shouldReduceMotion = useReducedMotion() ?? false;
   const [sending, setSending] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState<{ numeroPedido: number } | null>(null);
+  const [activeOrderTokens, setActiveOrderTokens] = useState<string[]>([]);
+  const [showActiveOrdersDialog, setShowActiveOrdersDialog] = useState(false);
+
+  useEffect(() => {
+    setActiveOrderTokens(getTrackingTokens());
+  }, [isCartOpen]);
   const [discountCode, setDiscountCode] = useState('');
   const [discountValid, setDiscountValid] = useState<{ valid: boolean; porcentaje: number } | null>(null);
   const [discountError, setDiscountError] = useState<string | null>(null);
@@ -177,7 +184,7 @@ export function CartDrawer() {
       if (res.ok) {
         if (data.trackingToken) {
           // Restaurant mode: save token and redirect to tracking page
-          localStorage.setItem('last_order_tracking', data.trackingToken);
+          addTrackingToken(data.trackingToken);
           clearCart();
           closeCart();
           router.push(`/tracking/${data.trackingToken}`);
@@ -212,6 +219,36 @@ export function CartDrawer() {
 
   return (
     <>
+      <Dialog open={showActiveOrdersDialog} onOpenChange={setShowActiveOrdersDialog}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>¿Enviar nuevo pedido?</DialogTitle>
+            <DialogDescription className="pt-2">
+              Ya tienes {activeOrderTokens.length === 1 ? 'un pedido' : `${activeOrderTokens.length} pedidos`} en curso.{' '}
+              ¿Seguro que quieres enviar un pedido nuevo?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-2 mt-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setShowActiveOrdersDialog(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={() => {
+                setShowActiveOrdersDialog(false);
+                handleConfirmOrder();
+              }}
+            >
+              Continuar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!orderSuccess} onOpenChange={handleDialogClose}>
         <DialogContent className="sm:max-w-md text-center">
           <DialogHeader>
@@ -525,7 +562,13 @@ export function CartDrawer() {
                  <Button 
                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full py-3 text-lg font-semibold shadow-elegant transition-colors duration-150 min-h-[44px]"
                    size="lg"
-                   onClick={handleConfirmOrder}
+                   onClick={() => {
+                     if (activeOrderTokens.length > 0) {
+                       setShowActiveOrdersDialog(true);
+                     } else {
+                       handleConfirmOrder();
+                     }
+                   }}
                    disabled={sending}
                  >
                    {sending ? t("sending", language) : t("sendOrder", language)}
