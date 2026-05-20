@@ -7,6 +7,7 @@ export interface IPedidoRepository {
   delete(id: string, empresaId: string): Promise<Result<void>>;
   findById(id: string, empresaId: string): Promise<Result<Pedido | null>>;
   findByTrackingToken(token: string): Promise<Result<{ id: string; numero_pedido: number; estimated_minutes: number | null; estimated_ready_at: string | null; telegram_message_id: string | null; telegram_chat_id: string | null } | null>>;
+  findEstimatedReadyAtById(pedidoId: string): Promise<Result<string | null>>;
   updateEstimatedTime(pedidoId: string, minutes: number): Promise<Result<void>>;
   saveTelegramMessageId(pedidoId: string, messageId: number): Promise<Result<void>>;
   findReadyPedidosWithTelegramMessage(): Promise<Result<{ id: string; telegram_message_id: string; telegram_chat_id: string }[]>>;

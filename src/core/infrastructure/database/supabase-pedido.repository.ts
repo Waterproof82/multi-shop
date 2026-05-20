@@ -519,6 +519,24 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     }
   }
 
+  async findEstimatedReadyAtById(pedidoId: string): Promise<Result<string | null>> {
+    try {
+      const { data, error } = await this.supabase
+        .from('pedidos')
+        .select('estimated_ready_at')
+        .eq('id', pedidoId)
+        .maybeSingle();
+
+      if (error) {
+        return { success: false, error: { code: 'DB_ERROR', message: error.message, module: 'repository', method: 'findEstimatedReadyAtById' } };
+      }
+      return { success: true, data: (data as { estimated_ready_at: string | null } | null)?.estimated_ready_at ?? null };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findEstimatedReadyAtById');
+      return { success: false, error: appError };
+    }
+  }
+
   async updateEstimatedTime(pedidoId: string, minutes: number): Promise<Result<void>> {
     try {
       const estimatedReadyAt = new Date(Date.now() + minutes * 60 * 1000).toISOString();

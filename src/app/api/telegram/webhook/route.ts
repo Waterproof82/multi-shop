@@ -39,10 +39,23 @@ export async function POST(request: Request) {
 
   const { id: callbackQueryId, data: callbackData, message } = parsed.data.callback_query;
 
-  // Handle "modify" — restore time selector buttons
+  // Handle "modify" — restore time selector buttons (blocked if order is already ready)
   const modifyMatch = callbackData.match(/^modify:([0-9a-f-]{36})$/);
   if (modifyMatch) {
     const [, pedidoId] = modifyMatch;
+    const { pedidoRepository } = await import('@/core/infrastructure/database');
+    const readyAtResult = await pedidoRepository.findEstimatedReadyAtById(pedidoId);
+    const estimatedReadyAt = readyAtResult.success ? readyAtResult.data : null;
+    const isReady = estimatedReadyAt && new Date(estimatedReadyAt) <= new Date();
+
+    if (isReady) {
+      await answerCallbackQuery(callbackQueryId, '✅ El pedido ya está listo para recoger');
+      if (message) {
+        await editMessageText(String(message.chat.id), message.message_id, '✅ Pedido listo para recoger');
+      }
+      return NextResponse.json({ ok: true });
+    }
+
     await answerCallbackQuery(callbackQueryId, 'Selecciona el nuevo tiempo');
     if (message) {
       const restoredText = (message.text ?? '').replace(/\n\n✅ Tiempo fijado:.*$/s, '');
