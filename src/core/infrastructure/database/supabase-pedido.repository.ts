@@ -202,8 +202,9 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     clienteId: string | null,
     items: CartItem[],
     total: number,
-    discountData?: { codigoDescuentoId: string; descuentoPorcentaje: number; totalSinDescuento: number }
-  ): Promise<Result<{ id: string; numero_pedido: number; total: number }>> {
+    discountData?: { codigoDescuentoId: string; descuentoPorcentaje: number; totalSinDescuento: number },
+    trackingToken?: string
+  ): Promise<Result<{ id: string; numero_pedido: number; total: number; trackingToken?: string }>> {
     try {
       // Atomically generate next order number using a DB function with row-level lock
       const { data: nextNum, error: rpcError } = await this.supabase
@@ -243,6 +244,10 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         insertPayload.total_sin_descuento = discountData.totalSinDescuento;
       }
 
+      if (trackingToken) {
+        insertPayload.tracking_token = trackingToken;
+      }
+
       const { data: pedido, error } = await this.supabase
         .from('pedidos')
         .insert(insertPayload)
@@ -259,7 +264,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         );
         return { success: false, error: { code: 'DB_ERROR', message: 'Error al crear pedido', module: 'repository', method: 'create' } };
       }
-      return { success: true, data: { id: pedido.id, numero_pedido: pedido.numero_pedido, total: pedido.total } };
+      return { success: true, data: { id: pedido.id, numero_pedido: pedido.numero_pedido, total: pedido.total, trackingToken } };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.create', { empresaId });
       return { success: false, error: appError };
@@ -398,6 +403,61 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.getStats', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
+  async findByTrackingToken(
+    token: string
+  ): Promise<Result<{ numero_pedido: number; estimated_minutes: number | null; estimated_ready_at: string | null } | null>> {
+    try {
+      const { data, error } = await this.supabase
+        .from('pedidos')
+        .select('numero_pedido, estimated_minutes, estimated_ready_at')
+        .eq('tracking_token', token)
+        .maybeSingle();
+
+      if (error) {
+        await logger.logAndReturnError(
+          'DB_SELECT_ERROR',
+          error.message,
+          'repository',
+          'SupabasePedidoRepository.findByTrackingToken',
+          { details: { code: error.code } }
+        );
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al buscar pedido', module: 'repository', method: 'findByTrackingToken' } };
+      }
+
+      return { success: true, data: data || null };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findByTrackingToken');
+      return { success: false, error: appError };
+    }
+  }
+
+  async updateEstimatedTime(pedidoId: string, minutes: number): Promise<Result<void>> {
+    try {
+      const estimatedReadyAt = new Date(Date.now() + minutes * 60 * 1000).toISOString();
+
+      const { error } = await this.supabase
+        .from('pedidos')
+        .update({ estimated_minutes: minutes, estimated_ready_at: estimatedReadyAt })
+        .eq('id', pedidoId);
+
+      if (error) {
+        await logger.logAndReturnError(
+          'DB_UPDATE_ERROR',
+          error.message,
+          'repository',
+          'SupabasePedidoRepository.updateEstimatedTime',
+          { details: { code: error.code, pedidoId } }
+        );
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al actualizar tiempo estimado', module: 'repository', method: 'updateEstimatedTime' } };
+      }
+
+      return { success: true, data: undefined };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.updateEstimatedTime', { details: { pedidoId } });
       return { success: false, error: appError };
     }
   }
