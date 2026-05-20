@@ -183,18 +183,22 @@ export function CartDrawer() {
       const data = await res.json();
       
       if (res.ok) {
-        if (data.trackingToken) {
-          // Restaurant mode: save token and redirect to tracking page
+        if (data.trackingToken && data.tipo === 'restaurante') {
+          // Restaurant + pedidos: redirect to tracking page
           addTrackingToken(data.trackingToken);
           clearCart();
-          // Clear cartOpen from history state so closeCart doesn't trigger history.back()
           if (window.history.state?.cartOpen) {
             window.history.replaceState({}, '', window.location.href);
           }
           closeCart();
           router.push(`/tracking/${data.trackingToken}`);
+        } else if (data.trackingToken) {
+          // Tienda: save token for persistent banner, show success dialog
+          addTrackingToken(data.trackingToken);
+          window.dispatchEvent(new Event('tracking-token-added'));
+          setOrderSuccess({ numeroPedido: data.numeroPedido });
         } else {
-          // Tienda mode: show success dialog
+          // Fallback: show success dialog only
           setOrderSuccess({ numeroPedido: data.numeroPedido });
         }
       } else {
