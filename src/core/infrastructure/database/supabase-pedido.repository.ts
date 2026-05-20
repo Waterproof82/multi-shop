@@ -409,11 +409,11 @@ export class SupabasePedidoRepository implements IPedidoRepository {
 
   async findByTrackingToken(
     token: string
-  ): Promise<Result<{ id: string; numero_pedido: number; estimated_minutes: number | null; estimated_ready_at: string | null; telegram_message_id: string | null; telegram_chat_id: string | null } | null>> {
+  ): Promise<Result<{ id: string; numero_pedido: number; estimated_minutes: number | null; estimated_ready_at: string | null; telegram_message_id: string | null; telegram_chat_id: string | null; items: { nombre: string; cantidad: number; precio: number }[] } | null>> {
     try {
       const { data, error } = await this.supabase
         .from('pedidos')
-        .select('id, numero_pedido, estimated_minutes, estimated_ready_at, telegram_message_id, empresas(telegram_chat_id)')
+        .select('id, numero_pedido, estimated_minutes, estimated_ready_at, telegram_message_id, detalle_pedido, empresas(telegram_chat_id)')
         .eq('tracking_token', token)
         .maybeSingle();
 
@@ -444,6 +444,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           estimated_ready_at: (raw['estimated_ready_at'] as string | null) ?? null,
           telegram_message_id: (raw['telegram_message_id'] as string | null) ?? null,
           telegram_chat_id: (empresa?.['telegram_chat_id'] as string | null) ?? null,
+          items: ((raw['detalle_pedido'] as { nombre: string; cantidad: number; precio: number }[] | null) ?? []),
         },
       };
     } catch (e) {
