@@ -4,6 +4,7 @@ import { IProductRepository } from "@/core/domain/repositories/IProductRepositor
 import { ICodigoDescuentoRepository } from "@/core/domain/repositories/ICodigoDescuentoRepository";
 import { Pedido, Result } from "@/core/domain/entities/types";
 import { logger } from "@/core/infrastructure/logging/logger";
+import { sendTelegramWithInlineButtons } from '@/core/infrastructure/services/telegram.service';
 
 export interface CreatePedidoDTO {
   items: {
@@ -296,7 +297,12 @@ export class PedidoUseCase {
   /**
    * Create new order - uses helper methods to reduce complexity
    */
-  async create(empresaId: string, data: CreatePedidoDTO): Promise<Result<{ id: string; numero_pedido: number; total: number }>> {
+  async create(
+    empresaId: string,
+    data: CreatePedidoDTO,
+    empresaTipo: string = 'tienda',
+    telegramChatId: string | null = null
+  ): Promise<Result<{ id: string; numero_pedido: number; total: number; trackingToken?: string }>> {
     try {
       // Step 1: Find or create client
       const clienteResult = await this.findOrCreateCliente(
@@ -340,13 +346,17 @@ export class PedidoUseCase {
         }
       }
 
+      // Step 3.5: Generate tracking token for restaurant orders
+      const trackingToken = empresaTipo === 'restaurante' ? crypto.randomUUID() : undefined;
+
       // Step 4: Create the order
       const pedidoResult = await this.pedidoRepo.create(
         empresaId,
         clienteResult.data.clienteId,
         data.items,
         finalTotal,
-        discountData
+        discountData,
+        trackingToken
       );
       if (!pedidoResult.success) {
         return { success: false, error: pedidoResult.error };
@@ -357,7 +367,36 @@ export class PedidoUseCase {
         await this.descuentoRepo.markAsUsed(discountData.codigoDescuentoId, pedidoResult.data.id);
       }
 
-      return { success: true, data: pedidoResult.data };
+      // Step 6: Send Telegram notification
+      if (empresaTipo === 'restaurante' && telegramChatId && pedidoResult.data) {
+        const pedidoParaNotificar: import('@/core/domain/entities/types').Pedido = {
+          id: pedidoResult.data.id,
+          empresa_id: empresaId,
+          cliente_id: clienteResult.data.clienteId,
+          numero_pedido: pedidoResult.data.numero_pedido,
+          detalle_pedido: data.items.map(ci => ({
+            producto_id: ci.item?.id,
+            nombre: ci.item?.name ?? '',
+            precio: ci.item?.price ?? 0,
+            cantidad: ci.quantity,
+          })),
+          total: pedidoResult.data.total,
+          moneda: null,
+          estado: 'pendiente',
+          created_at: new Date().toISOString(),
+          tracking_token: trackingToken ?? null,
+          estimated_minutes: null,
+          estimated_ready_at: null,
+          clientes: {
+            nombre: data.nombre,
+            email: data.email ?? '',
+            telefono: data.telefono,
+          },
+        };
+        await sendTelegramWithInlineButtons(pedidoParaNotificar, telegramChatId);
+      }
+
+      return { success: true, data: { ...pedidoResult.data, trackingToken } };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'use-case', 'PedidoUseCase.create', { empresaId });
       return { success: false, error: appError };
