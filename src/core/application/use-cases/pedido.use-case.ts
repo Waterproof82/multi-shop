@@ -4,7 +4,7 @@ import { IProductRepository } from "@/core/domain/repositories/IProductRepositor
 import { ICodigoDescuentoRepository } from "@/core/domain/repositories/ICodigoDescuentoRepository";
 import { Pedido, Result } from "@/core/domain/entities/types";
 import { logger } from "@/core/infrastructure/logging/logger";
-import { sendTelegramWithInlineButtons } from '@/core/infrastructure/services/telegram.service';
+import { sendTelegramWithInlineButtons, sendTelegramWithQuickReplies } from '@/core/infrastructure/services/telegram.service';
 
 export interface CreatePedidoDTO {
   items: {
@@ -301,7 +301,8 @@ export class PedidoUseCase {
     empresaId: string,
     data: CreatePedidoDTO,
     empresaTipo: string = 'tienda',
-    telegramChatId: string | null = null
+    telegramChatId: string | null = null,
+    esPedidos: boolean = false
   ): Promise<Result<{ id: string; numero_pedido: number; total: number; trackingToken?: string }>> {
     try {
       // Step 1: Find or create client
@@ -346,8 +347,10 @@ export class PedidoUseCase {
         }
       }
 
-      // Step 3.5: Generate tracking token for restaurant orders
-      const trackingToken = empresaTipo === 'restaurante' ? crypto.randomUUID() : undefined;
+      // Step 3.5: Generate tracking token for restaurant orders (only when esPedidos) or tienda
+      const trackingToken = (empresaTipo === 'restaurante' && esPedidos) || empresaTipo === 'tienda'
+        ? crypto.randomUUID()
+        : undefined;
 
       // Step 4: Create the order
       const pedidoResult = await this.pedidoRepo.create(
@@ -368,7 +371,7 @@ export class PedidoUseCase {
       }
 
       // Step 6: Send Telegram notification
-      if (empresaTipo === 'restaurante' && telegramChatId && pedidoResult.data) {
+      if (telegramChatId && pedidoResult.data) {
         const pedidoParaNotificar: import('@/core/domain/entities/types').Pedido = {
           id: pedidoResult.data.id,
           empresa_id: empresaId,
@@ -393,9 +396,17 @@ export class PedidoUseCase {
             telefono: data.telefono,
           },
         };
-        const telegramResult = await sendTelegramWithInlineButtons(pedidoParaNotificar, telegramChatId);
-        if (telegramResult.success) {
-          await this.pedidoRepo.saveTelegramMessageId(pedidoResult.data.id, telegramResult.data.messageId);
+
+        if (empresaTipo === 'restaurante' && esPedidos) {
+          const telegramResult = await sendTelegramWithInlineButtons(pedidoParaNotificar, telegramChatId);
+          if (telegramResult.success) {
+            await this.pedidoRepo.saveTelegramMessageId(pedidoResult.data.id, telegramResult.data.messageId);
+          }
+        } else {
+          const telegramResult = await sendTelegramWithQuickReplies(pedidoParaNotificar, telegramChatId);
+          if (telegramResult.success) {
+            await this.pedidoRepo.saveTelegramMessageId(pedidoResult.data.id, telegramResult.data.messageId);
+          }
         }
       }
 
