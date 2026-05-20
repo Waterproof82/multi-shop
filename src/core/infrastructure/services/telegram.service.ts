@@ -156,7 +156,8 @@ export const answerCallbackQuery = async (
 export const editMessageText = async (
   chatId: string,
   messageId: number,
-  text: string
+  text: string,
+  inlineKeyboard: { text: string; callback_data: string }[][] = []
 ): Promise<void> => {
   if (!TELEGRAM_BOT_TOKEN) return;
   try {
@@ -165,10 +166,21 @@ export const editMessageText = async (
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, message_id: messageId, text, reply_markup: { inline_keyboard: [] } }),
+        body: JSON.stringify({ chat_id: chatId, message_id: messageId, text, reply_markup: { inline_keyboard: inlineKeyboard } }),
       }
     );
   } catch {
     // Best-effort
   }
 };
+
+export const buildTimeButtons = (pedidoId: string): { text: string; callback_data: string }[][] => [
+  [
+    { text: '10 min', callback_data: `order:${pedidoId}:10` },
+    { text: '15 min', callback_data: `order:${pedidoId}:15` },
+  ],
+  [
+    { text: '20 min', callback_data: `order:${pedidoId}:20` },
+    { text: '30 min', callback_data: `order:${pedidoId}:30` },
+  ],
+];

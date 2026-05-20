@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { answerCallbackQuery, editMessageText } from '@/core/infrastructure/services/telegram.service';
+import { answerCallbackQuery, editMessageText, buildTimeButtons } from '@/core/infrastructure/services/telegram.service';
 
 const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
 
@@ -37,7 +37,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true }); // Not a callback query — ignore
   }
 
-  const { id: callbackQueryId, data: callbackData } = parsed.data.callback_query;
+  const { id: callbackQueryId, data: callbackData, message } = parsed.data.callback_query;
+
+  // Handle "modify" — restore time selector buttons
+  const modifyMatch = callbackData.match(/^modify:([0-9a-f-]{36})$/);
+  if (modifyMatch) {
+    const [, pedidoId] = modifyMatch;
+    await answerCallbackQuery(callbackQueryId, 'Selecciona el nuevo tiempo');
+    if (message) {
+      const restoredText = (message.text ?? '').replace(/\n\n✅ Tiempo fijado:.*$/s, '');
+      await editMessageText(String(message.chat.id), message.message_id, restoredText, buildTimeButtons(pedidoId));
+    }
+    return NextResponse.json({ ok: true });
+  }
 
   // Expected format: order:{pedidoId}:{minutes}
   const match = callbackData.match(/^order:([0-9a-f-]{36}):(\d+)$/);
@@ -52,16 +64,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  // Import the repository here to avoid circular dependency issues
   const { pedidoRepository } = await import('@/core/infrastructure/database');
   await pedidoRepository.updateEstimatedTime(pedidoId, minutes);
   await answerCallbackQuery(callbackQueryId, `⏱ Tiempo fijado: ${minutes} minutos`);
 
-  // Edit the original message to remove buttons and confirm the selection
-  const { message } = parsed.data.callback_query;
   if (message) {
     const confirmedText = `${message.text ?? ''}\n\n✅ Tiempo fijado: ${minutes} min`;
-    await editMessageText(String(message.chat.id), message.message_id, confirmedText);
+    await editMessageText(
+      String(message.chat.id),
+      message.message_id,
+      confirmedText,
+      [[{ text: '🔄 Modificar tiempo', callback_data: `modify:${pedidoId}` }]]
+    );
   }
 
   return NextResponse.json({ ok: true });
