@@ -25,7 +25,14 @@ export interface UpdateEmpresaData {
 
 export interface IEmpresaRepository {
   getById(empresaId: string): Promise<Result<Partial<Empresa> | null>>;
-  findByDomain(dominio: string): Promise<Result<{ id: string; nombre: string; email_notification: string | null; telefono_whatsapp: string | null } | null>>;
+  findByDomain(dominio: string): Promise<Result<{
+    id: string;
+    nombre: string;
+    email_notification: string | null;
+    telefono_whatsapp: string | null;
+    tipo: string;
+    telegram_chat_id: string | null;
+  } | null>>;
   findByDomainPublic(domain: string): Promise<Result<EmpresaPublic | null>>;
   update(empresaId: string, data: UpdateEmpresaData): Promise<Result<void>>;
   updateColores(empresaId: string, colores: EmpresaColores): Promise<Result<boolean>>;
