@@ -18,43 +18,18 @@ const createPedidoSchema = z.object({
       price: z.number().min(0).max(100_000),
     })).max(20).optional(),
   })).min(1).max(50),
-  total: z.number().min(0).max(100_000).optional(),
+  total: z.number().min(0).max(100_000).optional(), // This is ignored, server recalculates
   nombre: z.string().min(2).max(100),
   telefono: z.string().min(9).max(20).regex(/^\+?[0-9\s\-()+]+$/, 'Formato de teléfono no válido'),
   email: z.string().email().optional().or(z.literal('')),
   idioma: z.enum(['es', 'en', 'fr', 'it', 'de']).optional(),
   codigoDescuento: z.string().max(30).optional(),
-}).refine(data => !data.codigoDescuento || data.email, {
+}).refine(data => !data.codigoDescuento || (data.email && data.email.length > 0), {
   message: 'Email is required when using a discount code',
   path: ['email'],
 });
 
-type OrderItem = z.infer<typeof createPedidoSchema>['items'][number];
-
-function generateWhatsAppMessage(items: OrderItem[], total: number, nombre: string, numeroPedido: number): string {
-  let mensaje = `*Pedido #${numeroPedido}*\n`;
-  mensaje += `*Cliente:* ${nombre}\n\n`;
-  mensaje += `*PEDIDO:*\n`;
-
-  items.forEach((cartItem, index) => {
-    const itemName = cartItem.item.name;
-    const quantity = cartItem.quantity;
-
-    mensaje += `${index + 1}. ${itemName}`;
-    if (cartItem.selectedComplements && cartItem.selectedComplements.length > 0) {
-      mensaje += ` (+${cartItem.selectedComplements.map(c => c.name).join(', ')})`;
-    }
-    mensaje += ` x${quantity}\n`;
-  });
-
-  mensaje += `\n*TOTAL: ${total.toFixed(2)}€*\n`;
-  mensaje += `¿Cuándo puedo pasar a recoger el pedido?`;
-
-  return mensaje;
-}
-
 export async function POST(request: Request) {
-  try {
     const rateLimited = await rateLimitPublic(request);
     if (rateLimited) return rateLimited;
 
@@ -62,14 +37,10 @@ export async function POST(request: Request) {
     const mainDomain = parseMainDomain(domain);
 
     const empresaResult = await empresaPublicRepository.findByDomain(mainDomain);
-    if (!empresaResult.success) {
-      return NextResponse.json({ error: 'Error al buscar empresa' }, { status: 500 });
+    if (!empresaResult.success || !empresaResult.data) {
+        return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 });
     }
     const empresa = empresaResult.data;
-
-    if (!empresa) {
-      return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 });
-    }
 
     let body: unknown;
     try {
@@ -83,45 +54,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
     }
 
-    const { items, nombre, telefono, email, idioma, codigoDescuento } = parsed.data;
-
-    const pedidoResult = await pedidoUseCase.create(empresa.id, {
-      items,
-      nombre,
-      telefono,
-      email: email || undefined,
-      idioma,
-      codigoDescuento: codigoDescuento || undefined,
-    });
+    const pedidoResult = await pedidoUseCase.create(
+      empresa.id,
+      parsed.data,
+      empresa.tipo ?? 'tienda',
+      empresa.telegram_chat_id ?? null
+    );
 
     if (!pedidoResult.success) {
       const errorCode = pedidoResult.error.code;
-      if (errorCode === 'PRODUCT_NOT_FOUND') {
-        return NextResponse.json({ error: 'Producto no disponible' }, { status: 400 });
-      }
-      if (errorCode === 'CODE_EXPIRED') {
-        return NextResponse.json({ error: 'El código de descuento ha expirado' }, { status: 400 });
-      }
-      if (errorCode === 'CODE_ALREADY_USED') {
-        return NextResponse.json({ error: 'El código de descuento ya fue utilizado' }, { status: 400 });
-      }
-      if (errorCode === 'EMAIL_MISMATCH') {
-        return NextResponse.json({ error: 'El email no coincide con el código de descuento' }, { status: 400 });
+      if (['PRODUCT_NOT_FOUND', 'CODE_EXPIRED', 'CODE_ALREADY_USED', 'EMAIL_MISMATCH'].includes(errorCode)) {
+          return NextResponse.json({ error: pedidoResult.error.message }, { status: 400 });
       }
       return NextResponse.json({ error: 'Error al crear el pedido' }, { status: 500 });
     }
+    
+    const { id: pedidoId, numero_pedido: numeroPedido, trackingToken } = pedidoResult.data;
 
-    const { id: pedidoId, numero_pedido: numeroPedido, total: serverTotal } = pedidoResult.data;
-
-    let whatsappLink: string | undefined;
-    if (empresa.telefono_whatsapp) {
-      const telefonoLimpio = empresa.telefono_whatsapp.replaceAll(/\D/g, '');
-      const mensaje = generateWhatsAppMessage(items, serverTotal, nombre, numeroPedido);
-      whatsappLink = `https://wa.me/${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`;
-    }
-
-    return NextResponse.json({ success: true, numeroPedido, pedidoId, whatsappLink, companyPhone: empresa.telefono_whatsapp });
-  } catch (error) {
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
-  }
+    return NextResponse.json({
+        success: true,
+        numeroPedido,
+        pedidoId,
+        ...(trackingToken && { trackingToken }),
+    });
 }

@@ -172,6 +172,9 @@ export interface Pedido {
   moneda: string | null;
   estado: string;
   created_at: string;
+  tracking_token: string | null;
+  estimated_minutes: number | null;
+  estimated_ready_at: string | null;
   clientes?: {
     nombre: string;
     email: string;
@@ -247,7 +250,7 @@ export interface CodigoDescuento {
 
 export type ErrorSeverity = 'error' | 'warning' | 'critical';
 
-export type ErrorModule = 'repository' | 'use-case' | 'api' | 'middleware';
+export type ErrorModule = 'repository' | 'use-case' | 'api' | 'middleware' | 'infrastructure';
 
 export interface AppError {
   code: string;

@@ -9,6 +9,7 @@ import { MenuSection } from "@/components/menu-section"
 import { SiteFooter } from "@/components/site-footer"
 import { CartToast } from "@/components/cart-toast"
 import { PromoNotification } from "@/components/promo-notification"
+import { ActiveOrderBanner } from "@/components/active-order-banner"
 import type { EmpresaPublic } from "@/core/domain/entities/types"
 import { useLanguage } from "@/lib/language-context"
 import { t } from "@/lib/translations"
@@ -82,6 +83,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa }: Readon
         <>
           <CartDrawer />
           <CartToast />
+          <ActiveOrderBanner />
         </>
       )}
     </div>
