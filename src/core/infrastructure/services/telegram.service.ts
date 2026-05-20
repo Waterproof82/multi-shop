@@ -133,6 +133,60 @@ export const sendTelegramWithInlineButtons = async (
   }
 };
 
+/** Send notification with quick-reply buttons (used by tienda mode and non-pedidos restaurante) */
+export const sendTelegramWithQuickReplies = async (
+  pedido: Pedido,
+  chatId: string
+): Promise<Result<{ messageId: number }, AppError>> => {
+  if (!TELEGRAM_BOT_TOKEN) {
+    return {
+      success: false,
+      error: { code: 'TELEGRAM_NOT_CONFIGURED', message: 'TELEGRAM_BOT_TOKEN is not set.', module: 'infrastructure' },
+    };
+  }
+
+  const message = buildOrderMessage(pedido);
+
+  const inlineKeyboard = [
+    [{ text: '💬 Te contestaré lo más pronto posible', callback_data: `quick_reply:${pedido.id}:soon` }],
+    [{ text: '📞 Te llamo ahora en cuanto tenga un momento', callback_data: `quick_reply:${pedido.id}:call` }],
+  ];
+
+  try {
+    const response = await fetch(
+      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: message,
+          parse_mode: 'MarkdownV2',
+          reply_markup: { inline_keyboard: inlineKeyboard },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const responseBody = await response.json().catch(() => response.text());
+      const error = await logger.logAndReturnError(
+        'TELEGRAM_API_ERROR',
+        `Telegram API Error (quick-reply): ${response.status}`,
+        'infrastructure',
+        'sendTelegramWithQuickReplies',
+        { details: { status: response.status, body: responseBody } }
+      );
+      return { success: false, error };
+    }
+
+    const json = await response.json() as { ok: boolean; result: { message_id: number } };
+    return { success: true, data: { messageId: json.result.message_id } };
+  } catch (error) {
+    const appError = await logger.logFromCatch(error, 'infrastructure', 'sendTelegramWithQuickReplies');
+    return { success: false, error: appError };
+  }
+};
+
 /** Acknowledge a Telegram callback_query */
 export const answerCallbackQuery = async (
   callbackQueryId: string,
