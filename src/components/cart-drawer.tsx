@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, Check, Gift } from "lucide-react"
 import { useReducedMotion } from "framer-motion"
 import { Button } from "@/components/ui/button"
@@ -122,6 +123,7 @@ export function CartDrawer() {
     closeCart 
   } = useCart()
   const { language } = useLanguage()
+  const router = useRouter();
   const shouldReduceMotion = useReducedMotion() ?? false;
   const [sending, setSending] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState<{ numeroPedido: number } | null>(null);
@@ -173,8 +175,16 @@ export function CartDrawer() {
       const data = await res.json();
       
       if (res.ok) {
-        setOrderSuccess({ numeroPedido: data.numeroPedido });
-        // Don't clear cart yet, do it when dialog closes
+        if (data.trackingToken) {
+          // Restaurant mode: save token and redirect to tracking page
+          localStorage.setItem('last_order_tracking', data.trackingToken);
+          clearCart();
+          closeCart();
+          router.push(`/tracking/${data.trackingToken}`);
+        } else {
+          // Tienda mode: show success dialog
+          setOrderSuccess({ numeroPedido: data.numeroPedido });
+        }
       } else {
         setErrors({ general: data.error || t("validationOrderError", language) });
       }
@@ -183,7 +193,7 @@ export function CartDrawer() {
     } finally {
       setSending(false);
     }
-  }, [nombre, telefono, countryCode, email, items, language, discountCode]);
+  }, [nombre, telefono, countryCode, email, items, language, discountCode, clearCart, closeCart, router]);
 
   const handleDialogClose = useCallback((open: boolean) => {
     if (!open) {
