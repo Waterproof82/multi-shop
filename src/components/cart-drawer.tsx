@@ -187,6 +187,10 @@ export function CartDrawer() {
           // Restaurant mode: save token and redirect to tracking page
           addTrackingToken(data.trackingToken);
           clearCart();
+          // Clear cartOpen from history state so closeCart doesn't trigger history.back()
+          if (window.history.state?.cartOpen) {
+            window.history.replaceState({}, '', window.location.href);
+          }
           closeCart();
           router.push(`/tracking/${data.trackingToken}`);
         } else {

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Clock, CheckCircle, AlertCircle, PartyPopper, ArrowLeft, Hourglass } from "lucide-react";
+import { Clock, CheckCircle, AlertCircle, ArrowLeft, Hourglass, ChefHat } from "lucide-react";
 import { getTrackingTokens, removeTrackingToken, isOrderExpired } from "@/lib/order-tracking";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
@@ -152,7 +152,7 @@ function OrderCard({ order, language }: { order: OrderState; language: string })
     return (
       <div className="rounded-xl border border-border bg-muted/30 p-4 flex flex-col gap-3">
         <div className="flex items-start gap-3">
-          <PartyPopper className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
+          <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="text-sm font-semibold text-foreground">
               {t('trackingOrderPrefix', lang)} #{status.numero_pedido} — {t('trackingReady', lang)}
@@ -168,10 +168,10 @@ function OrderCard({ order, language }: { order: OrderState; language: string })
   return (
     <div className="rounded-xl border border-border bg-muted/30 p-4 flex flex-col gap-3">
       <div className="flex items-start gap-3">
-        <CheckCircle className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
+        <ChefHat className="w-5 h-5 text-primary shrink-0 mt-0.5" />
         <div className="flex-1">
           <p className="text-sm font-semibold text-foreground">
-            {t('trackingOrderPrefix', lang)} #{status.numero_pedido} — {t('trackingPrep', lang)}
+            {t('trackingOrderPrefix', lang)} #{status.numero_pedido} — {status.estimated_minutes === null ? t('trackingWaiting', lang) : t('trackingPrep', lang)}
           </p>
           {status.estimated_minutes === null ? (
             <p className="text-xs text-muted-foreground mt-0.5">{t('trackingPendingTime', lang)}</p>
@@ -275,7 +275,7 @@ export function TrackingPageClient({ token, initialStatus }: TrackingPageClientP
           </>
         ) : primaryReady ? (
           <>
-            <PartyPopper className="w-16 h-16 text-primary" />
+            <CheckCircle className="w-16 h-16 text-green-500" />
             <div>
               <p className="text-2xl font-bold text-foreground">{t('trackingReady', lang)}</p>
               <p className="text-muted-foreground mt-1">{t('trackingOrderPrefix', lang)} #{primaryOrder.status.numero_pedido}</p>
@@ -292,14 +292,14 @@ export function TrackingPageClient({ token, initialStatus }: TrackingPageClientP
                 <Hourglass className="w-16 h-16 text-primary animate-pulse" style={{ animationDuration: '1.5s' }} />
               ) : (
                 <>
-                  <span className="absolute w-16 h-16 rounded-full bg-green-500 animate-ping" style={{ opacity: 0.25, animationDuration: '2s' }} />
-                  <span className="absolute w-20 h-20 rounded-full bg-green-500 animate-ping" style={{ opacity: 0.12, animationDuration: '2s', animationDelay: '0.7s' }} />
-                  <CheckCircle className="relative w-16 h-16 text-green-500 z-10" />
+                  <span className="absolute w-16 h-16 rounded-full bg-primary animate-ping" style={{ opacity: 0.2, animationDuration: '2s' }} />
+                  <span className="absolute w-20 h-20 rounded-full bg-primary animate-ping" style={{ opacity: 0.1, animationDuration: '2s', animationDelay: '0.7s' }} />
+                  <ChefHat className="relative w-16 h-16 text-primary z-10" />
                 </>
               )}
             </div>
             <div>
-              <p className="text-2xl font-bold text-foreground">{t('trackingPrep', lang)}</p>
+              <p className="text-2xl font-bold text-foreground">{primaryOrder.status.estimated_minutes === null ? t('trackingWaiting', lang) : t('trackingPrep', lang)}</p>
               <p className="text-muted-foreground mt-1">{t('trackingOrderPrefix', lang)} #{primaryOrder.status.numero_pedido}</p>
             </div>
             {primaryOrder.status.estimated_minutes === null ? (
