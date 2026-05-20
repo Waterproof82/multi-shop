@@ -33,8 +33,6 @@ import { useLanguage, type Language } from "@/lib/language-context"
 import { t } from "@/lib/translations"
 import { formatPrice } from "@/lib/format-price"
 import { COUNTRY_CODES, DEFAULT_COUNTRY_CODE } from "@/core/domain/constants/country-codes"
-import type { MenuItemVM } from "@/core/application/dtos/menu-view-model"
-
 import { getItemKey } from "@/lib/cart-utils";
 import { getTrackingTokens, addTrackingToken } from "@/lib/order-tracking";
 
@@ -57,60 +55,6 @@ function validatePhoneInput(phone: string, translate: TranslateFn, language: Lan
   if (digitsOnly.length < 9) return translate("validationPhoneMin", language);
   if (digitsOnly.length > 15) return translate("validationPhoneMax", language);
   return undefined;
-}
-
-interface OrderFormData {
-  nombre: string;
-  telefono: string;
-  countryCode: string;
-  email: string;
-  items: CartItem[];
-  totalPrice: number;
-  language: Language;
-}
-
-function validateAndBuildOrderData(
-  formData: OrderFormData,
-  translate: TranslateFn,
-  discountData?: { valid: boolean; porcentaje: number; code: string }
-): { valid: true; data: Record<string, unknown> } | { valid: false; errors: { nombre?: string; telefono?: string } } {
-  const { nombre, telefono, countryCode, email, items, totalPrice, language } = formData;
-  
-  const nombreError = validateNameInput(nombre, translate, language);
-  const telefonoError = validatePhoneInput(telefono, translate, language);
-  
-  if (nombreError || telefonoError) {
-    return { valid: false, errors: { nombre: nombreError, telefono: telefonoError } };
-  }
-
-  const selectedCountry = COUNTRY_CODES.find(c => c.code === countryCode);
-  const dialCode = selectedCountry?.dialCode || '34';
-  
-  return {
-    valid: true,
-    data: {
-      items: items.map(ci => ({
-        item: {
-          id: ci.item.id,
-          name: (language !== 'es' && ci.item.translations?.[language]?.name) || ci.item.name,
-          price: ci.item.price,
-          translations: ci.item.translations,
-        },
-        quantity: ci.quantity,
-        selectedComplements: ci.selectedComplements?.map(c => ({
-          id: c.id,
-          name: c.name,
-          price: c.price,
-        })),
-      })),
-      total: totalPrice,
-      nombre: nombre.trim().slice(0, 100),
-      telefono: dialCode + telefono.replaceAll(/\D/g, '').slice(0, 15),
-      email: email.trim().toLowerCase().slice(0, 100),
-      idioma: language,
-      ...(discountData && { codigoDescuento: discountData.code }),
-    },
-  };
 }
 
 export function CartDrawer() {

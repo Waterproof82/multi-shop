@@ -26,49 +26,6 @@ const buildOrderMessage = (pedido: Pedido): string => {
   ].join('\n');
 };
 
-/** Send plain text notification (used by tienda mode) */
-export const sendTelegramNotification = async (
-  pedido: Pedido,
-  chatId: string
-): Promise<Result<void, AppError>> => {
-  if (!TELEGRAM_BOT_TOKEN) {
-    return {
-      success: false,
-      error: { code: 'TELEGRAM_NOT_CONFIGURED', message: 'TELEGRAM_BOT_TOKEN is not set.', module: 'infrastructure' },
-    };
-  }
-
-  const message = buildOrderMessage(pedido);
-
-  try {
-    const response = await fetch(
-      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: 'MarkdownV2' }),
-      }
-    );
-
-    if (!response.ok) {
-      const responseBody = await response.json().catch(() => response.text());
-      const error = await logger.logAndReturnError(
-        'TELEGRAM_API_ERROR',
-        `Telegram API Error: ${response.status}`,
-        'infrastructure',
-        'sendTelegramNotification',
-        { details: { status: response.status, body: responseBody } }
-      );
-      return { success: false, error };
-    }
-
-    return { success: true, data: undefined };
-  } catch (error) {
-    const appError = await logger.logFromCatch(error, 'infrastructure', 'sendTelegramNotification');
-    return { success: false, error: appError };
-  }
-};
-
 /** Send notification with inline time-selector buttons (used by restaurante mode) */
 export const sendTelegramWithInlineButtons = async (
   pedido: Pedido,
@@ -221,7 +178,7 @@ export const editMessageText = async (
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, message_id: messageId, text, reply_markup: { inline_keyboard: inlineKeyboard } }),
+        body: JSON.stringify({ chat_id: chatId, message_id: messageId, text, parse_mode: 'MarkdownV2', reply_markup: { inline_keyboard: inlineKeyboard } }),
       }
     );
   } catch {
