@@ -175,6 +175,27 @@ export const editMessageText = async (
   }
 };
 
+/** Edit only the inline keyboard of an existing message — text stays intact */
+export const editMessageReplyMarkup = async (
+  chatId: string,
+  messageId: number,
+  inlineKeyboard: { text: string; callback_data: string }[][] = []
+): Promise<void> => {
+  if (!TELEGRAM_BOT_TOKEN) return;
+  try {
+    await fetch(
+      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/editMessageReplyMarkup`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, message_id: messageId, reply_markup: { inline_keyboard: inlineKeyboard } }),
+      }
+    );
+  } catch {
+    // Best-effort
+  }
+};
+
 export const buildTimeButtons = (pedidoId: string): { text: string; callback_data: string }[][] => [
   [
     { text: '10 min', callback_data: `order:${pedidoId}:10` },

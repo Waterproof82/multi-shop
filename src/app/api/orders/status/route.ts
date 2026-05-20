@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { pedidoRepository } from '@/core/infrastructure/database';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
-import { editMessageText } from '@/core/infrastructure/services/telegram.service';
+import { editMessageReplyMarkup } from '@/core/infrastructure/services/telegram.service';
 
 const tokenSchema = z.string().uuid();
 
@@ -33,7 +33,7 @@ export async function GET(request: Request) {
   const isReady = estimated_ready_at && new Date(estimated_ready_at) <= new Date();
   if (isReady && telegram_message_id && telegram_chat_id) {
     void Promise.all([
-      editMessageText(telegram_chat_id, Number(telegram_message_id), '✅ Pedido listo para recoger'),
+      editMessageReplyMarkup(telegram_chat_id, Number(telegram_message_id), [[{ text: '✅ Pedido listo para recoger', callback_data: 'noop' }]]),
       pedidoRepository.clearTelegramMessageId(id),
     ]);
   }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { answerCallbackQuery, editMessageText, buildTimeButtons } from '@/core/infrastructure/services/telegram.service';
+import { answerCallbackQuery, editMessageText, editMessageReplyMarkup, buildTimeButtons } from '@/core/infrastructure/services/telegram.service';
 
 const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
 
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     if (isReady) {
       await answerCallbackQuery(callbackQueryId, '✅ El pedido ya está listo para recoger');
       if (message) {
-        await editMessageText(String(message.chat.id), message.message_id, '✅ Pedido listo para recoger');
+        await editMessageReplyMarkup(String(message.chat.id), message.message_id, [[{ text: '✅ Pedido listo para recoger', callback_data: 'noop' }]]);
       }
       return NextResponse.json({ ok: true });
     }
@@ -61,6 +61,12 @@ export async function POST(request: Request) {
       const restoredText = (message.text ?? '').replace(/\n\n✅ Tiempo fijado:.*$/s, '');
       await editMessageText(String(message.chat.id), message.message_id, restoredText, buildTimeButtons(pedidoId));
     }
+    return NextResponse.json({ ok: true });
+  }
+
+  // Dismiss spinner for read-only "ready" button
+  if (callbackData === 'noop') {
+    await answerCallbackQuery(callbackQueryId, '');
     return NextResponse.json({ ok: true });
   }
 
