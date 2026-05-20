@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { empresaPublicRepository, pedidoUseCase } from '@/core/infrastructure/database';
-import { parseMainDomain, getDomainFromHeaders } from '@/lib/domain-utils';
+import { parseMainDomain, isPedidosDomain, getDomainFromHeaders } from '@/lib/domain-utils';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 
 const createPedidoSchema = z.object({
@@ -40,6 +40,7 @@ export async function POST(request: Request) {
     if (rateLimited) return rateLimited;
 
     const domain = await getDomainFromHeaders();
+    const isPedidos = isPedidosDomain(domain);
     const mainDomain = parseMainDomain(domain);
 
     const empresaResult = await empresaPublicRepository.findByDomain(mainDomain);
@@ -64,7 +65,8 @@ export async function POST(request: Request) {
       empresa.id,
       parsed.data,
       empresa.tipo ?? 'tienda',
-      empresa.telegram_chat_id ?? null
+      empresa.telegram_chat_id ?? null,
+      isPedidos
     );
 
     if (!pedidoResult.success) {
@@ -81,6 +83,7 @@ export async function POST(request: Request) {
         success: true,
         numeroPedido,
         pedidoId,
+        tipo: empresa.tipo ?? 'tienda',
         ...(trackingToken && { trackingToken }),
     });
 }
