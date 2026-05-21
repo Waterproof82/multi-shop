@@ -61,8 +61,25 @@ export async function POST(request: Request) {
 
     await answerCallbackQuery(callbackQueryId, 'Selecciona el nuevo tiempo');
     if (message) {
-      const restoredText = (message.text ?? '').replace(/\n\n✅ Tiempo fijado:.*$/s, '');
-      await editMessageText(String(message.chat.id), message.message_id, restoredText, buildTimeButtons(pedidoId));
+      const baseText = (message.text ?? '').replace(/\n\n✅ Tiempo fijado:.*$/s, '');
+      await editMessageText(String(message.chat.id), message.message_id, sanitizeMarkdown(baseText), buildTimeButtons(pedidoId));
+    }
+    return NextResponse.json({ ok: true });
+  }
+
+  // Handle "modify_reply" — restore quick-reply buttons for tienda orders
+  const modifyReplyMatch = callbackData.match(/^modify_reply:([0-9a-f-]{36})$/);
+  if (modifyReplyMatch) {
+    const [, pedidoId] = modifyReplyMatch;
+    const { pedidoRepository } = await import('@/core/infrastructure/database');
+    await pedidoRepository.updateStatusById(pedidoId, 'pendiente');
+    await answerCallbackQuery(callbackQueryId, 'Selecciona una respuesta');
+    if (message) {
+      const baseText = (message.text ?? '').replace(/\n\n[💬📞].+$/s, '');
+      await editMessageText(String(message.chat.id), message.message_id, sanitizeMarkdown(baseText), [
+        [{ text: '💬 Te contestaré lo más pronto posible', callback_data: `quick_reply:${pedidoId}:soon` }],
+        [{ text: '📞 Te llamo ahora en cuanto tenga un momento', callback_data: `quick_reply:${pedidoId}:call` }],
+      ]);
     }
     return NextResponse.json({ ok: true });
   }
@@ -77,15 +94,19 @@ export async function POST(request: Request) {
   const quickReplyMatch = callbackData.match(/^quick_reply:([0-9a-f-]{36}):(soon|call)$/);
   if (quickReplyMatch) {
     const [, pedidoId, action] = quickReplyMatch;
-    const responseText = action === 'soon'
+    const selectedText = action === 'soon'
       ? '💬 Te contestaré lo más pronto posible'
       : '📞 Te llamo ahora en cuanto tenga un momento';
     const { pedidoRepository } = await import('@/core/infrastructure/database');
     await pedidoRepository.updateStatusById(pedidoId, action);
-    await answerCallbackQuery(callbackQueryId, responseText);
+    await answerCallbackQuery(callbackQueryId, selectedText);
     if (message) {
-      const updatedText = `${message.text ?? ''}\n\n${sanitizeMarkdown(responseText)}`;
-      await editMessageText(String(message.chat.id), message.message_id, updatedText, []);
+      const baseText = (message.text ?? '').replace(/\n\n[💬📞].+$/s, '');
+      const updatedText = `${sanitizeMarkdown(baseText)}\n\n${sanitizeMarkdown(selectedText)}`;
+      await editMessageText(String(message.chat.id), message.message_id, updatedText, [
+        [{ text: `✅ ${selectedText}`, callback_data: 'noop' }],
+        [{ text: '🔄 Modificar respuesta', callback_data: `modify_reply:${pedidoId}` }],
+      ]);
     }
     return NextResponse.json({ ok: true });
   }
@@ -108,7 +129,8 @@ export async function POST(request: Request) {
   await answerCallbackQuery(callbackQueryId, `⏱ Tiempo fijado: ${minutes} minutos`);
 
   if (message) {
-    const confirmedText = `${message.text ?? ''}\n\n✅ Tiempo fijado: ${minutes} min`;
+    const baseText = (message.text ?? '').replace(/\n\n✅ Tiempo fijado:.*$/s, '');
+    const confirmedText = `${sanitizeMarkdown(baseText)}\n\n✅ Tiempo fijado: ${minutes} min`;
     await editMessageText(
       String(message.chat.id),
       message.message_id,
