@@ -111,8 +111,8 @@ export const sendTelegramWithQuickReplies = async (
   const message = buildOrderMessage(pedido);
 
   const inlineKeyboard = [
-    [{ text: '💬 Te contestaré lo más pronto posible', callback_data: `quick_reply:${pedido.id}:soon` }],
-    [{ text: '📞 Te llamo ahora en cuanto tenga un momento', callback_data: `quick_reply:${pedido.id}:call` }],
+    [{ text: '💬 Te contestaremos lo más pronto posible', callback_data: `quick_reply:${pedido.id}:soon` }],
+    [{ text: '📞 Te llamamos ahora en cuanto tengamos un momento', callback_data: `quick_reply:${pedido.id}:call` }],
   ];
 
   try {

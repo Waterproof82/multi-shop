@@ -76,8 +76,8 @@ export async function POST(request: Request) {
     if (message) {
       const baseText = (message.text ?? '').replace(/\n\n[💬📞].+$/s, '');
       await editMessageText(String(message.chat.id), message.message_id, sanitizeMarkdown(baseText), [
-        [{ text: '💬 Te contestaré lo más pronto posible', callback_data: `quick_reply:${pedidoId}:soon` }],
-        [{ text: '📞 Te llamo ahora en cuanto tenga un momento', callback_data: `quick_reply:${pedidoId}:call` }],
+        [{ text: '💬 Te contestaremos lo más pronto posible', callback_data: `quick_reply:${pedidoId}:soon` }],
+        [{ text: '📞 Te llamamos ahora en cuanto tengamos un momento', callback_data: `quick_reply:${pedidoId}:call` }],
       ]);
     }
     return NextResponse.json({ ok: true });
@@ -94,8 +94,8 @@ export async function POST(request: Request) {
   if (quickReplyMatch) {
     const [, pedidoId, action] = quickReplyMatch;
     const selectedText = action === 'soon'
-      ? '💬 Te contestaré lo más pronto posible'
-      : '📞 Te llamo ahora en cuanto tenga un momento';
+      ? '💬 Te contestaremos lo más pronto posible'
+      : '📞 Te llamamos ahora en cuanto tengamos un momento';
     const { pedidoRepository } = await import('@/core/infrastructure/database');
     await pedidoRepository.updateStatusById(pedidoId, action);
     await answerCallbackQuery(callbackQueryId, selectedText);
