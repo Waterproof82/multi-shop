@@ -45,38 +45,12 @@ const defaultPedidoSchema = z.object({
   path: ['email'],
 });
 
-const createPedidoSchema = z.discriminatedUnion('tipo', [
+// z.discriminatedUnion does not support .refine() in Zod v3 — use z.union instead
+const createPedidoSchema = z.union([
   mesaPedidoSchema,
-  z.object({
-    tipo: z.literal('restaurante'),
-    items: itemsSchema,
-    total: z.number().min(0).max(100_000).optional(),
-    nombre: z.string().min(2).max(100),
-    telefono: z.string().min(9).max(20).regex(/^\+?[0-9\s\-()+]+$/, 'Formato de teléfono no válido'),
-    email: z.string().email().optional().or(z.literal('')),
-    idioma: z.enum(['es', 'en', 'fr', 'it', 'de']).optional(),
-    codigoDescuento: z.string().max(30).optional(),
-  }).refine(data => !data.codigoDescuento || (data.email && data.email.length > 0), {
-    message: 'Email is required when using a discount code',
-    path: ['email'],
-  }),
-  z.object({
-    tipo: z.literal('tienda'),
-    items: itemsSchema,
-    total: z.number().min(0).max(100_000).optional(),
-    nombre: z.string().min(2).max(100),
-    telefono: z.string().min(9).max(20).regex(/^\+?[0-9\s\-()+]+$/, 'Formato de teléfono no válido'),
-    email: z.string().email().optional().or(z.literal('')),
-    idioma: z.enum(['es', 'en', 'fr', 'it', 'de']).optional(),
-    codigoDescuento: z.string().max(30).optional(),
-  }).refine(data => !data.codigoDescuento || (data.email && data.email.length > 0), {
-    message: 'Email is required when using a discount code',
-    path: ['email'],
-  }),
+  defaultPedidoSchema,
 ]);
 
-// Fallback for payloads without a `tipo` field (legacy clients)
-const legacyPedidoSchema = defaultPedidoSchema;
 
 export async function POST(request: Request) {
   const rateLimited = await rateLimitPublic(request);
@@ -103,37 +77,7 @@ export async function POST(request: Request) {
   const parsed = createPedidoSchema.safeParse(body);
 
   if (!parsed.success) {
-    // Try legacy schema for clients not sending `tipo`
-    const legacyParsed = legacyPedidoSchema.safeParse(body);
-    if (!legacyParsed.success) {
-      return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
-    }
-
-    // Legacy path — use existing createPedido
-    const pedidoResult = await pedidoUseCase.create(
-      empresa.id,
-      legacyParsed.data,
-      empresa.tipo ?? 'tienda',
-      empresa.telegram_chat_id ?? null,
-      isPedidos
-    );
-
-    if (!pedidoResult.success) {
-      const errorCode = pedidoResult.error.code;
-      if (['PRODUCT_NOT_FOUND', 'CODE_EXPIRED', 'CODE_ALREADY_USED', 'EMAIL_MISMATCH'].includes(errorCode)) {
-        return NextResponse.json({ error: pedidoResult.error.message }, { status: 400 });
-      }
-      return NextResponse.json({ error: 'Error al crear el pedido' }, { status: 500 });
-    }
-
-    const { id: pedidoId, numero_pedido: numeroPedido, trackingToken } = pedidoResult.data;
-    return NextResponse.json({
-      success: true,
-      numeroPedido,
-      pedidoId,
-      tipo: empresa.tipo ?? 'tienda',
-      ...(trackingToken && { trackingToken }),
-    });
+    return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
   }
 
   const data = parsed.data;
