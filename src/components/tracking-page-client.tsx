@@ -26,6 +26,7 @@ interface OrderStatus {
   estimated_ready_at: string | null;
   items: OrderItem[];
   tipo: string;
+  estado: string;
 }
 
 interface TrackingPageClientProps {
@@ -58,6 +59,7 @@ function normalizeStatus(data: OrderStatus): OrderStatus {
   return {
     ...data,
     tipo: data.tipo ?? 'restaurante',
+    estado: data.estado ?? 'pendiente',
     items: (data.items ?? []).map(item => ({
       ...item,
       cantidad: Number(item.cantidad),
@@ -146,6 +148,29 @@ function OrderCard({ order, language }: { order: OrderState; language: string })
       <div className="rounded-xl border border-border bg-muted/30 p-4 flex items-center gap-3">
         <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin shrink-0" />
         <p className="text-sm text-muted-foreground">{t('trackingLoadingShort', lang)}</p>
+      </div>
+    );
+  }
+
+  if (status.tipo === 'tienda') {
+    const accepted = status.estado !== 'pendiente';
+    return (
+      <div className="rounded-xl border border-border bg-muted/30 p-4 flex flex-col gap-3">
+        <div className="flex items-start gap-3">
+          {accepted
+            ? <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
+            : <Hourglass className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+          }
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-foreground">
+              {t('trackingOrderPrefix', lang)} #{status.numero_pedido} — {accepted ? t('tiendaTrackingAcceptedTitle', lang) : t('tiendaTrackingTitle', lang)}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {accepted ? t('tiendaTrackingAcceptedMessage', lang) : t('tiendaTrackingMessage', lang)}
+            </p>
+          </div>
+        </div>
+        <ItemsList items={status.items} language={language} />
       </div>
     );
   }
@@ -277,13 +302,25 @@ export function TrackingPageClient({ token, initialStatus }: TrackingPageClientP
           </>
         ) : primaryOrder.status.tipo === 'tienda' ? (
           <>
-            <CheckCircle className="w-16 h-16 text-green-500" />
+            {primaryOrder.status.estado === 'pendiente' ? (
+              <Hourglass className="w-16 h-16 text-primary animate-pulse" style={{ animationDuration: '1.5s' }} />
+            ) : (
+              <CheckCircle className="w-16 h-16 text-green-500" />
+            )}
             <div>
-              <p className="text-2xl font-bold text-foreground">{t('tiendaTrackingTitle', lang)}</p>
+              <p className="text-2xl font-bold text-foreground">
+                {primaryOrder.status.estado === 'pendiente'
+                  ? t('tiendaTrackingTitle', lang)
+                  : t('tiendaTrackingAcceptedTitle', lang)}
+              </p>
               <p className="text-muted-foreground mt-1">{t('trackingOrderPrefix', lang)} #{primaryOrder.status.numero_pedido}</p>
             </div>
             <div className="rounded-xl bg-secondary px-6 py-4 max-w-sm w-full">
-              <p className="text-secondary-foreground">{t('tiendaTrackingMessage', lang)}</p>
+              <p className="text-secondary-foreground">
+                {primaryOrder.status.estado === 'pendiente'
+                  ? t('tiendaTrackingMessage', lang)
+                  : t('tiendaTrackingAcceptedMessage', lang)}
+              </p>
             </div>
             <ItemsList items={primaryOrder.status.items} language={language} />
           </>

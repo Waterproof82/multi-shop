@@ -137,10 +137,11 @@ export function CartDrawer() {
           closeCart();
           router.push(`/tracking/${data.trackingToken}`);
         } else if (data.trackingToken) {
-          // Tienda: save token for persistent banner, show success dialog
+          // Tienda: redirect to tracking page
           addTrackingToken(data.trackingToken);
-          window.dispatchEvent(new Event('tracking-token-added'));
-          setOrderSuccess({ numeroPedido: data.numeroPedido });
+          clearCart();
+          closeCart();
+          window.location.href = `/tracking/${data.trackingToken}`;
         } else {
           // Fallback: show success dialog only
           setOrderSuccess({ numeroPedido: data.numeroPedido });

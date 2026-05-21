@@ -1,15 +1,12 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { pedidoRepository } from '@/core/infrastructure/database';
-import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
+import { rateLimitTracking } from '@/core/infrastructure/api/rate-limit';
 import { editMessageReplyMarkup } from '@/core/infrastructure/services/telegram.service';
 
 const tokenSchema = z.string().uuid();
 
 export async function GET(request: Request) {
-  const rateLimited = await rateLimitPublic(request);
-  if (rateLimited) return rateLimited;
-
   const { searchParams } = new URL(request.url);
   const token = searchParams.get('token');
 
@@ -17,6 +14,9 @@ export async function GET(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: 'Token inválido' }, { status: 400 });
   }
+
+  const rateLimited = await rateLimitTracking(parsed.data);
+  if (rateLimited) return rateLimited;
 
   const result = await pedidoRepository.findByTrackingToken(parsed.data);
   if (!result.success) {
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 });
   }
 
-  const { id, numero_pedido, estimated_minutes, estimated_ready_at, telegram_message_id, telegram_chat_id, items, tipo } = result.data;
+  const { id, numero_pedido, estimated_minutes, estimated_ready_at, telegram_message_id, telegram_chat_id, items, tipo, estado } = result.data;
 
   // If order is ready and has a pending Telegram message, edit it and clear the id (fire-and-forget)
   const isReady = estimated_ready_at && new Date(estimated_ready_at) <= new Date();
@@ -38,5 +38,5 @@ export async function GET(request: Request) {
     ]);
   }
 
-  return NextResponse.json({ numero_pedido, estimated_minutes, estimated_ready_at, items, tipo });
+  return NextResponse.json({ numero_pedido, estimated_minutes, estimated_ready_at, items, tipo, estado });
 }

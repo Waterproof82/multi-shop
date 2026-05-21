@@ -76,10 +76,12 @@ export async function POST(request: Request) {
   // Handle quick reply acknowledgement
   const quickReplyMatch = callbackData.match(/^quick_reply:([0-9a-f-]{36}):(soon|call)$/);
   if (quickReplyMatch) {
-    const [, , action] = quickReplyMatch;
+    const [, pedidoId, action] = quickReplyMatch;
     const responseText = action === 'soon'
       ? '💬 Te contestaré lo más pronto posible'
       : '📞 Te llamo ahora en cuanto tenga un momento';
+    const { pedidoRepository } = await import('@/core/infrastructure/database');
+    await pedidoRepository.updateStatusById(pedidoId, 'aceptado');
     await answerCallbackQuery(callbackQueryId, responseText);
     if (message) {
       const updatedText = `${message.text ?? ''}\n\n${sanitizeMarkdown(responseText)}`;

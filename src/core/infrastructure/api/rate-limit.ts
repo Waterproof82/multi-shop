@@ -69,6 +69,26 @@ function getPublicLimiter(): Ratelimit | null {
 }
 
 /**
+ * Rate limiter for order tracking polling: 60 requests per minute per token.
+ * Keyed by token (not IP) so multiple users don't share the same bucket.
+ */
+let trackingLimiter: Ratelimit | null = null;
+
+function getTrackingLimiter(): Ratelimit | null {
+  if (trackingLimiter) return trackingLimiter;
+
+  const client = getRedis();
+  if (!client) return null;
+
+  trackingLimiter = new Ratelimit({
+    redis: client,
+    limiter: Ratelimit.slidingWindow(60, "1 m"),
+    prefix: "ratelimit:tracking",
+  });
+  return trackingLimiter;
+}
+
+/**
  * Rate limiter for admin routes: 60 requests per minute per IP.
  */
 let adminLimiter: Ratelimit | null = null;
@@ -166,6 +186,26 @@ export async function rateLimitPublic(request: Request): Promise<NextResponse | 
           "Retry-After": Math.ceil((reset - Date.now()) / 1000).toString(),
         },
       }
+    );
+  }
+
+  return null;
+}
+
+/**
+ * Apply rate limiting to tracking polling, keyed by token.
+ * Returns NextResponse 429 if exceeded, or null if passed.
+ */
+export async function rateLimitTracking(token: string): Promise<NextResponse | null> {
+  const limiter = getTrackingLimiter();
+  if (!limiter) return null;
+
+  const { success } = await limiter.limit(token);
+
+  if (!success) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      { status: 429 }
     );
   }
 

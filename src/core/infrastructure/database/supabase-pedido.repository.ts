@@ -410,11 +410,11 @@ export class SupabasePedidoRepository implements IPedidoRepository {
 
   async findByTrackingToken(
     token: string
-  ): Promise<Result<{ id: string; numero_pedido: number; estimated_minutes: number | null; estimated_ready_at: string | null; telegram_message_id: string | null; telegram_chat_id: string | null; tipo: string; items: { nombre: string; translations?: { en?: { name: string }; fr?: { name: string }; it?: { name: string }; de?: { name: string } }; cantidad: number; precio: number }[] } | null>> {
+  ): Promise<Result<{ id: string; numero_pedido: number; estimated_minutes: number | null; estimated_ready_at: string | null; telegram_message_id: string | null; telegram_chat_id: string | null; tipo: string; estado: string; items: { nombre: string; translations?: { en?: { name: string }; fr?: { name: string }; it?: { name: string }; de?: { name: string } }; cantidad: number; precio: number }[] } | null>> {
     try {
       const { data, error } = await this.supabase
         .from('pedidos')
-        .select('id, numero_pedido, estimated_minutes, estimated_ready_at, telegram_message_id, detalle_pedido, empresas(telegram_chat_id, tipo)')
+        .select('id, numero_pedido, estimated_minutes, estimated_ready_at, telegram_message_id, detalle_pedido, estado, empresas(telegram_chat_id, tipo)')
         .eq('tracking_token', token)
         .maybeSingle();
 
@@ -446,6 +446,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           telegram_message_id: (raw['telegram_message_id'] as string | null) ?? null,
           telegram_chat_id: (empresa?.['telegram_chat_id'] as string | null) ?? null,
           tipo: (empresa?.['tipo'] as string) ?? 'tienda',
+          estado: (raw['estado'] as string) ?? 'pendiente',
           items: ((raw['detalle_pedido'] as { nombre: string; translations?: { en?: { name: string }; fr?: { name: string }; it?: { name: string }; de?: { name: string } }; cantidad: number; precio: number }[] | null) ?? []),
         },
       };
@@ -536,6 +537,24 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       return { success: true, data: (data as { estimated_ready_at: string | null } | null)?.estimated_ready_at ?? null };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findEstimatedReadyAtById');
+      return { success: false, error: appError };
+    }
+  }
+
+  async updateStatusById(pedidoId: string, estado: string): Promise<Result<void>> {
+    try {
+      const { error } = await this.supabase
+        .from('pedidos')
+        .update({ estado })
+        .eq('id', pedidoId);
+
+      if (error) {
+        await logger.logAndReturnError('DB_UPDATE_ERROR', error.message, 'repository', 'SupabasePedidoRepository.updateStatusById', { details: { code: error.code, pedidoId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al actualizar estado', module: 'repository', method: 'updateStatusById' } };
+      }
+      return { success: true, data: undefined };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.updateStatusById', { details: { pedidoId } });
       return { success: false, error: appError };
     }
   }
