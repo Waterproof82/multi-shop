@@ -410,11 +410,11 @@ export class SupabasePedidoRepository implements IPedidoRepository {
 
   async findByTrackingToken(
     token: string
-  ): Promise<Result<{ id: string; numero_pedido: number; estimated_minutes: number | null; estimated_ready_at: string | null; telegram_message_id: string | null; telegram_chat_id: string | null; tipo: string; estado: string; items: { nombre: string; translations?: { en?: { name: string }; fr?: { name: string }; it?: { name: string }; de?: { name: string } }; cantidad: number; precio: number }[] } | null>> {
+  ): Promise<Result<{ id: string; numero_pedido: number; estimated_minutes: number | null; estimated_ready_at: string | null; telegram_message_id: string | null; telegram_chat_id: string | null; tipo: string; estado: string; mesa_id: string | null; mesa_numero: number | null; mesa_nombre: string | null; items: { nombre: string; translations?: { en?: { name: string }; fr?: { name: string }; it?: { name: string }; de?: { name: string } }; cantidad: number; precio: number }[] } | null>> {
     try {
       const { data, error } = await this.supabase
         .from('pedidos')
-        .select('id, numero_pedido, estimated_minutes, estimated_ready_at, telegram_message_id, detalle_pedido, estado, empresas(telegram_chat_id, tipo)')
+        .select('id, numero_pedido, estimated_minutes, estimated_ready_at, telegram_message_id, detalle_pedido, estado, mesa_id, mesas(numero, nombre), empresas(telegram_chat_id, tipo)')
         .eq('tracking_token', token)
         .maybeSingle();
 
@@ -436,6 +436,13 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         ? (raw['empresas'][0] as Record<string, unknown> | undefined)
         : (raw['empresas'] as Record<string, unknown> | null);
 
+      const mesaRaw = Array.isArray(raw['mesas'])
+        ? (raw['mesas'][0] as Record<string, unknown> | undefined)
+        : (raw['mesas'] as Record<string, unknown> | null);
+
+      const mesaId = (raw['mesa_id'] as string | null) ?? null;
+      const tipo = mesaId !== null ? 'mesa' : ((empresa?.['tipo'] as string) ?? 'tienda');
+
       return {
         success: true,
         data: {
@@ -445,13 +452,88 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           estimated_ready_at: (raw['estimated_ready_at'] as string | null) ?? null,
           telegram_message_id: (raw['telegram_message_id'] as string | null) ?? null,
           telegram_chat_id: (empresa?.['telegram_chat_id'] as string | null) ?? null,
-          tipo: (empresa?.['tipo'] as string) ?? 'tienda',
+          tipo,
           estado: (raw['estado'] as string) ?? 'pendiente',
+          mesa_id: mesaId,
+          mesa_numero: (mesaRaw?.['numero'] as number | null) ?? null,
+          mesa_nombre: (mesaRaw?.['nombre'] as string | null) ?? null,
           items: ((raw['detalle_pedido'] as { nombre: string; translations?: { en?: { name: string }; fr?: { name: string }; it?: { name: string }; de?: { name: string } }; cantidad: number; precio: number }[] | null) ?? []),
         },
       };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findByTrackingToken');
+      return { success: false, error: appError };
+    }
+  }
+
+  async createMesaOrder(params: {
+    empresaId: string;
+    mesaId: string;
+    items: { nombre: string; cantidad: number; precio: number; translations?: unknown }[];
+    total: number;
+    trackingToken: string;
+  }): Promise<Result<{ id: string; numero_pedido: number; tracking_token: string }>> {
+    try {
+      const { data: nextNum, error: rpcError } = await this.supabase
+        .rpc('get_next_pedido_number', { p_empresa_id: params.empresaId });
+
+      if (rpcError) {
+        await logger.logAndReturnError(
+          'DB_RPC_ERROR',
+          rpcError.message,
+          'repository',
+          'SupabasePedidoRepository.createMesaOrder',
+          { empresaId: params.empresaId, details: { code: rpcError.code } }
+        );
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al generar número de pedido', module: 'repository', method: 'createMesaOrder' } };
+      }
+
+      const nuevoNumeroPedido = nextNum as number;
+
+      const insertPayload: Record<string, unknown> = {
+        empresa_id: params.empresaId,
+        mesa_id: params.mesaId,
+        numero_pedido: nuevoNumeroPedido,
+        cliente_id: null,
+        detalle_pedido: params.items.map(item => ({
+          nombre: item.nombre,
+          cantidad: item.cantidad,
+          precio: item.precio,
+          translations: item.translations ?? null,
+        })),
+        total: params.total,
+        estado: 'pendiente',
+        tracking_token: params.trackingToken,
+      };
+
+      const { data: pedido, error } = await this.supabase
+        .from('pedidos')
+        .insert(insertPayload)
+        .select('id, numero_pedido, tracking_token')
+        .single();
+
+      if (error) {
+        await logger.logAndReturnError(
+          'DB_INSERT_ERROR',
+          error.message,
+          'repository',
+          'SupabasePedidoRepository.createMesaOrder',
+          { empresaId: params.empresaId, details: { code: error.code } }
+        );
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al crear pedido de mesa', module: 'repository', method: 'createMesaOrder' } };
+      }
+
+      const row = pedido as Record<string, unknown>;
+      return {
+        success: true,
+        data: {
+          id: row['id'] as string,
+          numero_pedido: row['numero_pedido'] as number,
+          tracking_token: row['tracking_token'] as string,
+        },
+      };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.createMesaOrder', { empresaId: params.empresaId });
       return { success: false, error: appError };
     }
   }

@@ -4,7 +4,7 @@ import { IProductRepository } from "@/core/domain/repositories/IProductRepositor
 import { ICodigoDescuentoRepository } from "@/core/domain/repositories/ICodigoDescuentoRepository";
 import { Pedido, Result } from "@/core/domain/entities/types";
 import { logger } from "@/core/infrastructure/logging/logger";
-import { sendTelegramWithInlineButtons, sendTelegramWithQuickReplies } from '@/core/infrastructure/services/telegram.service';
+import { sendTelegramWithInlineButtons, sendTelegramWithQuickReplies, sendTelegramForMesa } from '@/core/infrastructure/services/telegram.service';
 
 export interface CreatePedidoDTO {
   items: {
@@ -19,6 +19,12 @@ export interface CreatePedidoDTO {
   email?: string;
   idioma?: string;
   codigoDescuento?: string;
+}
+
+export interface CreateMesaPedidoDTO {
+  items: CreatePedidoDTO['items'];
+  mesa_id: string; // UUID
+  idioma?: string;
 }
 
 export interface PedidoStats {
@@ -413,6 +419,80 @@ export class PedidoUseCase {
       return { success: true, data: { ...pedidoResult.data, trackingToken } };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'use-case', 'PedidoUseCase.create', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
+  /**
+   * Create a mesa order — no cliente required, no PII collected.
+   * Sends Telegram to telegram_mesa_chat_id, falling back to telegram_chat_id.
+   */
+  async createMesaOrder(
+    empresaId: string,
+    data: CreateMesaPedidoDTO,
+    mesaNumero: number,
+    mesaNombre: string | null,
+    telegramMesaChatId: string | null,
+    telegramChatId: string | null
+  ): Promise<Result<{ id: string; numero_pedido: number; total: number; trackingToken: string }>> {
+    try {
+      // Step 1: Validate products and calculate server total
+      const priceResult = await this.validateProductPrices(empresaId, data.items);
+      if (!priceResult.success) {
+        return { success: false, error: priceResult.error };
+      }
+
+      const serverTotal = priceResult.data.serverTotal;
+      const trackingToken = crypto.randomUUID();
+
+      // Step 2: Build items for repo (nombre + cantidad + precio)
+      const repoItems = data.items.map(ci => ({
+        nombre: ci.item?.name ?? '',
+        cantidad: ci.quantity,
+        precio: priceResult.data.priceMap.get(ci.item?.id ?? '') ?? ci.item?.price ?? 0,
+        translations: ci.item?.translations,
+      }));
+
+      // Step 3: Create the order
+      const pedidoResult = await this.pedidoRepo.createMesaOrder({
+        empresaId,
+        mesaId: data.mesa_id,
+        items: repoItems,
+        total: serverTotal,
+        trackingToken,
+      });
+      if (!pedidoResult.success) {
+        return { success: false, error: pedidoResult.error };
+      }
+
+      // Step 4: Send Telegram notification (mesa channel preferred, fallback to main)
+      const chatId = telegramMesaChatId ?? telegramChatId;
+      if (chatId) {
+        const telegramResult = await sendTelegramForMesa(
+          pedidoResult.data.id,
+          pedidoResult.data.numero_pedido,
+          repoItems,
+          serverTotal,
+          mesaNumero,
+          mesaNombre,
+          chatId
+        );
+        if (telegramResult.success) {
+          await this.pedidoRepo.saveTelegramMessageId(pedidoResult.data.id, telegramResult.data.messageId);
+        }
+      }
+
+      return {
+        success: true,
+        data: {
+          id: pedidoResult.data.id,
+          numero_pedido: pedidoResult.data.numero_pedido,
+          total: serverTotal,
+          trackingToken,
+        },
+      };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'use-case', 'PedidoUseCase.createMesaOrder', { empresaId });
       return { success: false, error: appError };
     }
   }

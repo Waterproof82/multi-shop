@@ -115,11 +115,11 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
     }
   }
 
-  async findByDomain(dominio: string): Promise<Result<{ id: string; nombre: string; email_notification: string | null; telefono_whatsapp: string | null; tipo: string; telegram_chat_id: string | null } | null>> {
+  async findByDomain(dominio: string): Promise<Result<{ id: string; nombre: string; email_notification: string | null; telefono_whatsapp: string | null; tipo: string; telegram_chat_id: string | null; telegram_mesa_chat_id: string | null } | null>> {
     try {
       const { data: empresa } = await this.supabase
         .from('empresas')
-        .select('id, nombre, email_notification, telefono_whatsapp, tipo, telegram_chat_id')
+        .select('id, nombre, email_notification, telefono_whatsapp, tipo, telegram_chat_id, telegram_mesa_chat_id')
         .eq('dominio', dominio)
         .single();
 
@@ -130,6 +130,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
         telefono_whatsapp: empresa.telefono_whatsapp as string | null,
         tipo: (empresa.tipo as string) ?? 'tienda',
         telegram_chat_id: empresa.telegram_chat_id as string | null,
+        telegram_mesa_chat_id: (empresa.telegram_mesa_chat_id as string | null) ?? null,
       }};
 
       const isPedidos = dominio.startsWith(`${DEFAULT_PEDIDOS_SUBDOMAIN}.`) || dominio.endsWith('-pedidos');
@@ -138,7 +139,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
         const mainDomainFromSubdomain = dominio.split('.').slice(1).join('.');
         const { data: empresaSubdomain } = await this.supabase
           .from('empresas')
-          .select('id, nombre, email_notification, telefono_whatsapp, tipo, telegram_chat_id')
+          .select('id, nombre, email_notification, telefono_whatsapp, tipo, telegram_chat_id, telegram_mesa_chat_id')
           .eq('dominio', mainDomainFromSubdomain)
           .single();
 
@@ -149,6 +150,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
           telefono_whatsapp: empresaSubdomain.telefono_whatsapp as string | null,
           tipo: (empresaSubdomain.tipo as string) ?? 'tienda',
           telegram_chat_id: empresaSubdomain.telegram_chat_id as string | null,
+          telegram_mesa_chat_id: (empresaSubdomain.telegram_mesa_chat_id as string | null) ?? null,
         } : null };
       }
 

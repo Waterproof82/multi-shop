@@ -20,6 +20,12 @@ const CartDrawer = dynamic(
   { ssr: false }
 )
 
+// Lazy load mesa order history panel - only renders when ?mesa= param is present
+const MesaOrderHistory = dynamic(
+  () => import("@/components/mesa-order-history").then(mod => ({ default: mod.MesaOrderHistory })),
+  { ssr: false }
+)
+
 // Lazy load welcome discount popup - only needed when feature is enabled
 const WelcomeDiscountPopup = dynamic(
   () => import("@/components/welcome-discount-popup").then(mod => ({ default: mod.WelcomeDiscountPopup })),
@@ -84,6 +90,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa }: Readon
           <CartDrawer />
           <CartToast />
           <ActiveOrderBanner />
+          <MesaOrderHistory />
         </>
       )}
     </div>

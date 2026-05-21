@@ -83,6 +83,36 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
+  // Handle anotado — mark as noted, update buttons
+  const anotadoMatch = callbackData.match(/^anotado:([0-9a-f-]{36})$/);
+  if (anotadoMatch) {
+    const [, pedidoId] = anotadoMatch;
+    const { pedidoRepository } = await import('@/core/infrastructure/database');
+    await pedidoRepository.updateStatusById(pedidoId, 'anotado');
+    await answerCallbackQuery(callbackQueryId, '✅ Pedido anotado');
+    if (message) {
+      await editMessageReplyMarkup(String(message.chat.id), message.message_id, [
+        [{ text: '✅ Anotado', callback_data: 'noop' }, { text: '🍽️ Servido', callback_data: `servido:${pedidoId}` }],
+      ]);
+    }
+    return NextResponse.json({ ok: true });
+  }
+
+  // Handle servido — mark as served, replace buttons with confirmation
+  const servidoMatch = callbackData.match(/^servido:([0-9a-f-]{36})$/);
+  if (servidoMatch) {
+    const [, pedidoId] = servidoMatch;
+    const { pedidoRepository } = await import('@/core/infrastructure/database');
+    await pedidoRepository.updateStatusById(pedidoId, 'servido');
+    await answerCallbackQuery(callbackQueryId, '🍽️ Pedido servido');
+    if (message) {
+      await editMessageReplyMarkup(String(message.chat.id), message.message_id, [
+        [{ text: '🍽️ Servido', callback_data: 'noop' }],
+      ]);
+    }
+    return NextResponse.json({ ok: true });
+  }
+
   // Dismiss spinner for read-only "ready" button
   if (callbackData === 'noop') {
     await answerCallbackQuery(callbackQueryId, '');

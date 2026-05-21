@@ -1,30 +1,40 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { empresaPublicRepository, pedidoUseCase } from '@/core/infrastructure/database';
+import { empresaPublicRepository, pedidoUseCase, mesaUseCase } from '@/core/infrastructure/database';
 import { parseMainDomain, isPedidosDomain, getDomainFromHeaders } from '@/lib/domain-utils';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 
-const createPedidoSchema = z.object({
-  items: z.array(z.object({
-    item: z.object({
-      id: z.string().uuid(),
-      name: z.string().max(200),
-      price: z.number().min(0).max(100_000),
-      translations: z.object({
-        en: z.object({ name: z.string().max(200) }).optional(),
-        fr: z.object({ name: z.string().max(200) }).optional(),
-        it: z.object({ name: z.string().max(200) }).optional(),
-        de: z.object({ name: z.string().max(200) }).optional(),
-      }).optional(),
-    }),
-    quantity: z.number().int().min(1).max(99),
-    selectedComplements: z.array(z.object({
-      id: z.string().uuid(),
-      name: z.string().max(200),
-      price: z.number().min(0).max(100_000),
-    })).max(20).optional(),
-  })).min(1).max(50),
-  total: z.number().min(0).max(100_000).optional(), // This is ignored, server recalculates
+const itemsSchema = z.array(z.object({
+  item: z.object({
+    id: z.string().uuid(),
+    name: z.string().max(200),
+    price: z.number().min(0).max(100_000),
+    translations: z.object({
+      en: z.object({ name: z.string().max(200) }).optional(),
+      fr: z.object({ name: z.string().max(200) }).optional(),
+      it: z.object({ name: z.string().max(200) }).optional(),
+      de: z.object({ name: z.string().max(200) }).optional(),
+    }).optional(),
+  }),
+  quantity: z.number().int().min(1).max(99),
+  selectedComplements: z.array(z.object({
+    id: z.string().uuid(),
+    name: z.string().max(200),
+    price: z.number().min(0).max(100_000),
+  })).max(20).optional(),
+})).min(1).max(50);
+
+const mesaPedidoSchema = z.object({
+  tipo: z.literal('mesa'),
+  mesa_id: z.string().uuid('El mesa_id debe ser un UUID válido'),
+  items: itemsSchema,
+  idioma: z.enum(['es', 'en', 'fr', 'it', 'de']).optional(),
+});
+
+const defaultPedidoSchema = z.object({
+  tipo: z.enum(['restaurante', 'tienda']).optional(),
+  items: itemsSchema,
+  total: z.number().min(0).max(100_000).optional(), // ignored — server recalculates
   nombre: z.string().min(2).max(100),
   telefono: z.string().min(9).max(20).regex(/^\+?[0-9\s\-()+]+$/, 'Formato de teléfono no válido'),
   email: z.string().email().optional().or(z.literal('')),
@@ -35,35 +45,74 @@ const createPedidoSchema = z.object({
   path: ['email'],
 });
 
+const createPedidoSchema = z.discriminatedUnion('tipo', [
+  mesaPedidoSchema,
+  z.object({
+    tipo: z.literal('restaurante'),
+    items: itemsSchema,
+    total: z.number().min(0).max(100_000).optional(),
+    nombre: z.string().min(2).max(100),
+    telefono: z.string().min(9).max(20).regex(/^\+?[0-9\s\-()+]+$/, 'Formato de teléfono no válido'),
+    email: z.string().email().optional().or(z.literal('')),
+    idioma: z.enum(['es', 'en', 'fr', 'it', 'de']).optional(),
+    codigoDescuento: z.string().max(30).optional(),
+  }).refine(data => !data.codigoDescuento || (data.email && data.email.length > 0), {
+    message: 'Email is required when using a discount code',
+    path: ['email'],
+  }),
+  z.object({
+    tipo: z.literal('tienda'),
+    items: itemsSchema,
+    total: z.number().min(0).max(100_000).optional(),
+    nombre: z.string().min(2).max(100),
+    telefono: z.string().min(9).max(20).regex(/^\+?[0-9\s\-()+]+$/, 'Formato de teléfono no válido'),
+    email: z.string().email().optional().or(z.literal('')),
+    idioma: z.enum(['es', 'en', 'fr', 'it', 'de']).optional(),
+    codigoDescuento: z.string().max(30).optional(),
+  }).refine(data => !data.codigoDescuento || (data.email && data.email.length > 0), {
+    message: 'Email is required when using a discount code',
+    path: ['email'],
+  }),
+]);
+
+// Fallback for payloads without a `tipo` field (legacy clients)
+const legacyPedidoSchema = defaultPedidoSchema;
+
 export async function POST(request: Request) {
-    const rateLimited = await rateLimitPublic(request);
-    if (rateLimited) return rateLimited;
+  const rateLimited = await rateLimitPublic(request);
+  if (rateLimited) return rateLimited;
 
-    const domain = await getDomainFromHeaders();
-    const isPedidos = isPedidosDomain(domain);
-    const mainDomain = parseMainDomain(domain);
+  const domain = await getDomainFromHeaders();
+  const isPedidos = isPedidosDomain(domain);
+  const mainDomain = parseMainDomain(domain);
 
-    const empresaResult = await empresaPublicRepository.findByDomain(mainDomain);
-    if (!empresaResult.success || !empresaResult.data) {
-        return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 });
-    }
-    const empresa = empresaResult.data;
+  const empresaResult = await empresaPublicRepository.findByDomain(mainDomain);
+  if (!empresaResult.success || !empresaResult.data) {
+    return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 });
+  }
+  const empresa = empresaResult.data;
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
-    }
-    const parsed = createPedidoSchema.safeParse(body);
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+  }
 
-    if (!parsed.success) {
+  // Try discriminated union first; fall back to legacy schema (no `tipo` field)
+  const parsed = createPedidoSchema.safeParse(body);
+
+  if (!parsed.success) {
+    // Try legacy schema for clients not sending `tipo`
+    const legacyParsed = legacyPedidoSchema.safeParse(body);
+    if (!legacyParsed.success) {
       return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
     }
 
+    // Legacy path — use existing createPedido
     const pedidoResult = await pedidoUseCase.create(
       empresa.id,
-      parsed.data,
+      legacyParsed.data,
       empresa.tipo ?? 'tienda',
       empresa.telegram_chat_id ?? null,
       isPedidos
@@ -72,18 +121,86 @@ export async function POST(request: Request) {
     if (!pedidoResult.success) {
       const errorCode = pedidoResult.error.code;
       if (['PRODUCT_NOT_FOUND', 'CODE_EXPIRED', 'CODE_ALREADY_USED', 'EMAIL_MISMATCH'].includes(errorCode)) {
-          return NextResponse.json({ error: pedidoResult.error.message }, { status: 400 });
+        return NextResponse.json({ error: pedidoResult.error.message }, { status: 400 });
       }
       return NextResponse.json({ error: 'Error al crear el pedido' }, { status: 500 });
     }
-    
+
     const { id: pedidoId, numero_pedido: numeroPedido, trackingToken } = pedidoResult.data;
+    return NextResponse.json({
+      success: true,
+      numeroPedido,
+      pedidoId,
+      tipo: empresa.tipo ?? 'tienda',
+      ...(trackingToken && { trackingToken }),
+    });
+  }
+
+  const data = parsed.data;
+
+  // Mesa path
+  if (data.tipo === 'mesa') {
+    // Fetch mesa to get numero/nombre for Telegram message
+    const mesaResult = await mesaUseCase.getMesa(data.mesa_id);
+    if (!mesaResult.success) {
+      return NextResponse.json({ error: 'Error al verificar la mesa' }, { status: 500 });
+    }
+    if (!mesaResult.data) {
+      return NextResponse.json({ error: 'Mesa no encontrada' }, { status: 404 });
+    }
+
+    const mesa = mesaResult.data;
+
+    const pedidoResult = await pedidoUseCase.createMesaOrder(
+      empresa.id,
+      { items: data.items, mesa_id: data.mesa_id, idioma: data.idioma },
+      mesa.numero,
+      mesa.nombre,
+      empresa.telegram_mesa_chat_id ?? null,
+      empresa.telegram_chat_id ?? null
+    );
+
+    if (!pedidoResult.success) {
+      const errorCode = pedidoResult.error.code;
+      if (['PRODUCT_NOT_FOUND', 'INVALID_UUID'].includes(errorCode)) {
+        return NextResponse.json({ error: pedidoResult.error.message }, { status: 400 });
+      }
+      return NextResponse.json({ error: 'Error al crear el pedido de mesa' }, { status: 500 });
+    }
 
     return NextResponse.json({
-        success: true,
-        numeroPedido,
-        pedidoId,
-        tipo: empresa.tipo ?? 'tienda',
-        ...(trackingToken && { trackingToken }),
+      success: true,
+      numeroPedido: pedidoResult.data.numero_pedido,
+      pedidoId: pedidoResult.data.id,
+      tipo: 'mesa',
+      trackingToken: pedidoResult.data.trackingToken,
     });
+  }
+
+  // Standard restaurante/tienda path
+  const pedidoResult = await pedidoUseCase.create(
+    empresa.id,
+    data,
+    empresa.tipo ?? 'tienda',
+    empresa.telegram_chat_id ?? null,
+    isPedidos
+  );
+
+  if (!pedidoResult.success) {
+    const errorCode = pedidoResult.error.code;
+    if (['PRODUCT_NOT_FOUND', 'CODE_EXPIRED', 'CODE_ALREADY_USED', 'EMAIL_MISMATCH'].includes(errorCode)) {
+      return NextResponse.json({ error: pedidoResult.error.message }, { status: 400 });
+    }
+    return NextResponse.json({ error: 'Error al crear el pedido' }, { status: 500 });
+  }
+
+  const { id: pedidoId, numero_pedido: numeroPedido, trackingToken } = pedidoResult.data;
+
+  return NextResponse.json({
+    success: true,
+    numeroPedido,
+    pedidoId,
+    tipo: empresa.tipo ?? 'tienda',
+    ...(trackingToken && { trackingToken }),
+  });
 }

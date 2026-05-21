@@ -6,7 +6,14 @@ export interface IPedidoRepository {
   updateStatus(id: string, empresaId: string, estado: string): Promise<Result<void>>;
   delete(id: string, empresaId: string): Promise<Result<void>>;
   findById(id: string, empresaId: string): Promise<Result<Pedido | null>>;
-  findByTrackingToken(token: string): Promise<Result<{ id: string; numero_pedido: number; estimated_minutes: number | null; estimated_ready_at: string | null; telegram_message_id: string | null; telegram_chat_id: string | null; tipo: string; estado: string; items: { nombre: string; cantidad: number; precio: number }[] } | null>>;
+  findByTrackingToken(token: string): Promise<Result<{ id: string; numero_pedido: number; estimated_minutes: number | null; estimated_ready_at: string | null; telegram_message_id: string | null; telegram_chat_id: string | null; tipo: string; estado: string; mesa_id: string | null; mesa_numero: number | null; mesa_nombre: string | null; items: { nombre: string; cantidad: number; precio: number }[] } | null>>;
+  createMesaOrder(params: {
+    empresaId: string;
+    mesaId: string;
+    items: { nombre: string; cantidad: number; precio: number; translations?: unknown }[];
+    total: number;
+    trackingToken: string;
+  }): Promise<Result<{ id: string; numero_pedido: number; tracking_token: string }>>;
   findEstimatedReadyAtById(pedidoId: string): Promise<Result<string | null>>;
   updateEstimatedTime(pedidoId: string, minutes: number): Promise<Result<void>>;
   updateStatusById(pedidoId: string, estado: string): Promise<Result<void>>;

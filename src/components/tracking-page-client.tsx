@@ -27,6 +27,8 @@ interface OrderStatus {
   items: OrderItem[];
   tipo: string;
   estado: string;
+  mesa_numero: number | null;
+  mesa_nombre: string | null;
 }
 
 interface TrackingPageClientProps {
@@ -60,6 +62,8 @@ function normalizeStatus(data: OrderStatus): OrderStatus {
     ...data,
     tipo: data.tipo ?? 'restaurante',
     estado: data.estado ?? 'pendiente',
+    mesa_numero: data.mesa_numero ?? null,
+    mesa_nombre: data.mesa_nombre ?? null,
     items: (data.items ?? []).map(item => ({
       ...item,
       cantidad: Number(item.cantidad),
@@ -172,6 +176,39 @@ function OrderCard({ order, language }: { order: OrderState; language: string })
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
               {accepted ? acceptedMsg : t('tiendaTrackingMessage', lang)}
+            </p>
+          </div>
+        </div>
+        <ItemsList items={status.items} language={language} />
+      </div>
+    );
+  }
+
+  if (status.tipo === 'mesa') {
+    const tableLabel = status.mesa_numero !== null
+      ? `${t('mesaLabel', lang)} ${status.mesa_numero}${status.mesa_nombre ? ` — ${status.mesa_nombre}` : ''}`
+      : t('mesaLabel', lang);
+    const isServido = status.estado === 'servido';
+    const isAnotado = status.estado === 'anotado';
+    return (
+      <div className="rounded-xl border border-border bg-muted/30 p-4 flex flex-col gap-3">
+        <div className="flex items-start gap-3">
+          {isServido
+            ? <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
+            : isAnotado
+              ? <Clock className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+              : <Hourglass className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+          }
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-foreground">
+              {t('trackingOrderPrefix', lang)} #{status.numero_pedido} — {tableLabel}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {isServido
+                ? t('mesaStatusServido', lang)
+                : isAnotado
+                  ? t('mesaStatusAnotado', lang)
+                  : t('mesaStatusPending', lang)}
             </p>
           </div>
         </div>
@@ -329,6 +366,32 @@ export function TrackingPageClient({ token, initialStatus }: TrackingPageClientP
                     : primaryOrder.status.estado === 'call'
                       ? t('tiendaQuickReplyCall', lang)
                       : t('tiendaTrackingAcceptedMessage', lang)}
+              </p>
+            </div>
+            <ItemsList items={primaryOrder.status.items} language={language} />
+          </>
+        ) : primaryOrder.status.tipo === 'mesa' ? (
+          <>
+            {primaryOrder.status.estado === 'servido' ? (
+              <CheckCircle className="w-16 h-16 text-green-500" />
+            ) : primaryOrder.status.estado === 'anotado' ? (
+              <Clock className="w-16 h-16 text-blue-500" />
+            ) : (
+              <Hourglass className="w-16 h-16 text-primary animate-pulse" style={{ animationDuration: '1.5s' }} />
+            )}
+            <div>
+              <p className="text-2xl font-bold text-foreground">
+                {primaryOrder.status.estado === 'servido'
+                  ? t('mesaStatusServido', lang)
+                  : primaryOrder.status.estado === 'anotado'
+                    ? t('mesaStatusAnotado', lang)
+                    : t('mesaStatusPending', lang)}
+              </p>
+              <p className="text-muted-foreground mt-1">
+                {t('trackingOrderPrefix', lang)} #{primaryOrder.status.numero_pedido}
+                {primaryOrder.status.mesa_numero !== null && (
+                  <> — {t('mesaLabel', lang)} {primaryOrder.status.mesa_numero}{primaryOrder.status.mesa_nombre ? ` (${primaryOrder.status.mesa_nombre})` : ''}</>
+                )}
               </p>
             </div>
             <ItemsList items={primaryOrder.status.items} language={language} />
