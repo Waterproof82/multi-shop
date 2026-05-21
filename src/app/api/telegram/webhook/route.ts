@@ -81,7 +81,7 @@ export async function POST(request: Request) {
       ? '💬 Te contestaré lo más pronto posible'
       : '📞 Te llamo ahora en cuanto tenga un momento';
     const { pedidoRepository } = await import('@/core/infrastructure/database');
-    await pedidoRepository.updateStatusById(pedidoId, 'aceptado');
+    await pedidoRepository.updateStatusById(pedidoId, action);
     await answerCallbackQuery(callbackQueryId, responseText);
     if (message) {
       const updatedText = `${message.text ?? ''}\n\n${sanitizeMarkdown(responseText)}`;

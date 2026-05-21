@@ -154,6 +154,11 @@ function OrderCard({ order, language }: { order: OrderState; language: string })
 
   if (status.tipo === 'tienda') {
     const accepted = status.estado !== 'pendiente';
+    const acceptedMsg = status.estado === 'soon'
+      ? t('tiendaQuickReplySoon', lang)
+      : status.estado === 'call'
+        ? t('tiendaQuickReplyCall', lang)
+        : t('tiendaTrackingAcceptedMessage', lang);
     return (
       <div className="rounded-xl border border-border bg-muted/30 p-4 flex flex-col gap-3">
         <div className="flex items-start gap-3">
@@ -166,7 +171,7 @@ function OrderCard({ order, language }: { order: OrderState; language: string })
               {t('trackingOrderPrefix', lang)} #{status.numero_pedido} — {accepted ? t('tiendaTrackingAcceptedTitle', lang) : t('tiendaTrackingTitle', lang)}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {accepted ? t('tiendaTrackingAcceptedMessage', lang) : t('tiendaTrackingMessage', lang)}
+              {accepted ? acceptedMsg : t('tiendaTrackingMessage', lang)}
             </p>
           </div>
         </div>
@@ -319,7 +324,11 @@ export function TrackingPageClient({ token, initialStatus }: TrackingPageClientP
               <p className="text-secondary-foreground">
                 {primaryOrder.status.estado === 'pendiente'
                   ? t('tiendaTrackingMessage', lang)
-                  : t('tiendaTrackingAcceptedMessage', lang)}
+                  : primaryOrder.status.estado === 'soon'
+                    ? t('tiendaQuickReplySoon', lang)
+                    : primaryOrder.status.estado === 'call'
+                      ? t('tiendaQuickReplyCall', lang)
+                      : t('tiendaTrackingAcceptedMessage', lang)}
               </p>
             </div>
             <ItemsList items={primaryOrder.status.items} language={language} />
