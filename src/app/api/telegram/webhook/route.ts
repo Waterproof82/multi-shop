@@ -61,8 +61,7 @@ export async function POST(request: Request) {
 
     await answerCallbackQuery(callbackQueryId, 'Selecciona el nuevo tiempo');
     if (message) {
-      const baseText = (message.text ?? '').replace(/\n\n✅ Tiempo fijado:.*$/s, '');
-      await editMessageText(String(message.chat.id), message.message_id, sanitizeMarkdown(baseText), buildTimeButtons(pedidoId));
+      await editMessageReplyMarkup(String(message.chat.id), message.message_id, buildTimeButtons(pedidoId));
     }
     return NextResponse.json({ ok: true });
   }
@@ -129,14 +128,10 @@ export async function POST(request: Request) {
   await answerCallbackQuery(callbackQueryId, `⏱ Tiempo fijado: ${minutes} minutos`);
 
   if (message) {
-    const baseText = (message.text ?? '').replace(/\n\n✅ Tiempo fijado:.*$/s, '');
-    const confirmedText = `${sanitizeMarkdown(baseText)}\n\n✅ Tiempo fijado: ${minutes} min`;
-    await editMessageText(
-      String(message.chat.id),
-      message.message_id,
-      confirmedText,
-      [[{ text: '🔄 Modificar tiempo', callback_data: `modify:${pedidoId}` }]]
-    );
+    await editMessageReplyMarkup(String(message.chat.id), message.message_id, [
+      [{ text: `✅ Tiempo fijado: ${minutes} min`, callback_data: 'noop' }],
+      [{ text: '🔄 Modificar tiempo', callback_data: `modify:${pedidoId}` }],
+    ]);
   }
 
   return NextResponse.json({ ok: true });
