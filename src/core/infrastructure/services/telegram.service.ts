@@ -11,10 +11,15 @@ const sanitizeForMarkdown = (text: string | number | null | undefined): string =
 
 const buildOrderMessage = (pedido: Pedido): string => {
   const { clientes: cliente, detalle_pedido: items, total, numero_pedido } = pedido;
-  return [
+  const lines = [
     `*Nuevo Pedido: \\#${numero_pedido}*`,
     `*Cliente:* ${sanitizeForMarkdown(cliente?.nombre)}`,
     `*Teléfono:* [\\+${cliente?.telefono ?? ''}](tel:+${cliente?.telefono ?? ''})`,
+  ];
+  if (cliente?.email) {
+    lines.push(`*Email:* ${sanitizeForMarkdown(cliente.email)}`);
+  }
+  lines.push(
     '\\-\\-\\-',
     '*Items:*',
     ...items.map(
@@ -23,7 +28,8 @@ const buildOrderMessage = (pedido: Pedido): string => {
     ),
     '\\-\\-\\-',
     `*Total:* ${sanitizeForMarkdown(total.toFixed(2))} €`,
-  ].join('\n');
+  );
+  return lines.join('\n');
 };
 
 /** Send notification with inline time-selector buttons (used by restaurante mode) */
