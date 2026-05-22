@@ -2,6 +2,7 @@ import { IPedidoRepository } from "@/core/domain/repositories/IPedidoRepository"
 import { IClienteRepository } from "@/core/domain/repositories/IClienteRepository";
 import { IProductRepository } from "@/core/domain/repositories/IProductRepository";
 import { ICodigoDescuentoRepository } from "@/core/domain/repositories/ICodigoDescuentoRepository";
+import { IMesaSesionRepository } from "@/core/domain/repositories/IMesaSesionRepository";
 import { Pedido, Result } from "@/core/domain/entities/types";
 import { logger } from "@/core/infrastructure/logging/logger";
 import { sendTelegramWithInlineButtons, sendTelegramWithQuickReplies, sendTelegramForMesa } from '@/core/infrastructure/services/telegram.service';
@@ -62,7 +63,8 @@ export class PedidoUseCase {
     private readonly pedidoRepo: IPedidoRepository,
     private readonly clienteRepo: IClienteRepository,
     private readonly productRepo: IProductRepository,
-    private readonly descuentoRepo: ICodigoDescuentoRepository
+    private readonly descuentoRepo: ICodigoDescuentoRepository,
+    private readonly mesaSesionRepo: IMesaSesionRepository | null = null
   ) {}
 
   /**
@@ -445,34 +447,46 @@ export class PedidoUseCase {
       const serverTotal = priceResult.data.serverTotal;
       const trackingToken = crypto.randomUUID();
 
-      // Step 2: Build items for repo (nombre + cantidad + precio)
+      // Step 2: Build items for repo (nombre + cantidad + precio + complementos)
       const repoItems = data.items.map(ci => ({
         nombre: ci.item?.name ?? '',
         cantidad: ci.quantity,
         precio: priceResult.data.priceMap.get(ci.item?.id ?? '') ?? ci.item?.price ?? 0,
         translations: ci.item?.translations,
+        complementos: ci.selectedComplements?.map(c => ({ nombre: c.name, precio: c.price })) ?? [],
       }));
 
-      // Step 3: Create the order
+      // Step 3: Ensure an active session exists (idempotent), then attach it to the order.
+      // This handles the QR-customer flow where no waiter has explicitly opened the table.
+      let sesionId: string | null = null;
+      if (this.mesaSesionRepo) {
+        await this.mesaSesionRepo.openSesion(data.mesa_id, empresaId);
+        const sesionResult = await this.mesaSesionRepo.findActiveSesionByMesa(data.mesa_id);
+        if (sesionResult.success && sesionResult.data) {
+          sesionId = sesionResult.data.id;
+        }
+      }
+
+      // Step 4: Create the order
       const pedidoResult = await this.pedidoRepo.createMesaOrder({
         empresaId,
         mesaId: data.mesa_id,
         items: repoItems,
         total: serverTotal,
         trackingToken,
+        sesionId,
       });
       if (!pedidoResult.success) {
         return { success: false, error: pedidoResult.error };
       }
 
-      // Step 4: Send Telegram notification (mesa channel preferred, fallback to main)
+      // Step 5: Send Telegram notification (mesa channel preferred, fallback to main)
       const chatId = telegramMesaChatId ?? telegramChatId;
       if (chatId) {
         const telegramResult = await sendTelegramForMesa(
           pedidoResult.data.id,
           pedidoResult.data.numero_pedido,
           repoItems,
-          serverTotal,
           mesaNumero,
           mesaNombre,
           chatId

@@ -1,6 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Result } from '@/core/domain/entities/types';
-import { IMesaRepository, Mesa } from '@/core/domain/repositories/IMesaRepository';
+import { IMesaRepository, Mesa, MesaWithSession } from '@/core/domain/repositories/IMesaRepository';
 import { logger } from '../logging/logger';
 
 export class SupabaseMesaRepository implements IMesaRepository {
@@ -189,6 +189,64 @@ export class SupabaseMesaRepository implements IMesaRepository {
       return { success: true, data: undefined };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabaseMesaRepository.delete', { empresaId, details: { mesaId } });
+      return { success: false, error: appError };
+    }
+  }
+
+  async findAllWithSession(empresaId: string): Promise<Result<MesaWithSession[]>> {
+    try {
+      const { data, error } = await this.supabase
+        .from('mesas')
+        .select(`
+          id,
+          empresa_id,
+          numero,
+          nombre,
+          sesion_id,
+          mesa_sesiones!mesas_sesion_id_fkey (
+            id,
+            total
+          ),
+          pedidos_count:pedidos(count)
+        `)
+        .eq('empresa_id', empresaId)
+        .order('numero', { ascending: true });
+
+      if (error) {
+        await logger.logAndReturnError(
+          'DB_SELECT_ERROR',
+          error.message,
+          'repository',
+          'SupabaseMesaRepository.findAllWithSession',
+          { empresaId, details: { code: error.code } }
+        );
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener mesas con sesión', module: 'repository', method: 'findAllWithSession' } };
+      }
+
+      const rows = (data ?? []) as Record<string, unknown>[];
+      return {
+        success: true,
+        data: rows.map(row => {
+          const sesionRaw = row['mesa_sesiones'] as Record<string, unknown> | null;
+          const sesionId = (row['sesion_id'] as string | null) ?? null;
+
+          // pedidos_count comes back as [{ count: number }] from Supabase aggregate
+          const pedidosCountRaw = row['pedidos_count'] as { count: number }[] | null;
+          const activeOrderCount = pedidosCountRaw?.[0]?.count ?? 0;
+
+          return {
+            id: row['id'] as string,
+            empresaId: row['empresa_id'] as string,
+            numero: row['numero'] as number,
+            nombre: (row['nombre'] as string | null) ?? null,
+            sesionId,
+            activeOrderCount,
+            sessionTotal: sesionRaw ? (sesionRaw['total'] as number) : 0,
+          };
+        }),
+      };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseMesaRepository.findAllWithSession', { empresaId });
       return { success: false, error: appError };
     }
   }

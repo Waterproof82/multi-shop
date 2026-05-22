@@ -7,6 +7,7 @@ import { isTokenRevoked } from '@/lib/token-revocation';
 import { AUTH_ERRORS, SERVER_ERRORS, createErrorResponse } from '@/core/domain/constants/api-errors';
 import { errorResponse } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
+import { verifyWaiterToken } from '@/lib/waiter-auth';
 
 function getAdminTokenSecret(): string | undefined {
   return process.env.ACCESS_TOKEN_SECRET;
@@ -226,6 +227,34 @@ function buildCsp(nonce: string, path: string): string {
   ].join('; ');
 }
 
+async function handleWaiterAuth(request: NextRequest, origin: string | null): Promise<NextResponse> {
+  const waiterToken = request.cookies.get('waiter_token')?.value;
+
+  if (!waiterToken) {
+    return addCorsHeaders(
+      NextResponse.json({ error: 'WAITER_UNAUTHORIZED' }, { status: 401 }),
+      origin
+    );
+  }
+
+  const payload = await verifyWaiterToken(waiterToken);
+  if (!payload) {
+    return addCorsHeaders(
+      NextResponse.json({ error: 'WAITER_UNAUTHORIZED' }, { status: 401 }),
+      origin
+    );
+  }
+
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-empresa-id', payload.empresaId);
+  requestHeaders.set('x-waiter-role', 'waiter');
+
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  response.headers.set('x-empresa-id', payload.empresaId);
+  response.headers.set('x-waiter-role', 'waiter');
+  return addCorsHeaders(response, origin);
+}
+
 export async function proxy(request: NextRequest) {
   const url = request.nextUrl.clone();
   const path = request.nextUrl.pathname;
@@ -239,6 +268,11 @@ export async function proxy(request: NextRequest) {
   // Admin auth (protected routes)
   if (path.startsWith('/api/admin') && !isPublicRoute(path)) {
     return handleAdminAuth(request, origin);
+  }
+
+  // Waiter auth (protected routes — all /api/waiter/* except /api/waiter/auth and /api/waiter/logout)
+  if (path.startsWith('/api/waiter') && path !== '/api/waiter/auth' && path !== '/api/waiter/logout') {
+    return handleWaiterAuth(request, origin);
   }
 
   // Superadmin auth (protected routes)

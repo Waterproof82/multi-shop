@@ -89,6 +89,45 @@ function getTrackingLimiter(): Ratelimit | null {
 }
 
 /**
+ * Rate limiter for mesa polling endpoints (orders, token lookup): 120 requests per minute per mesaId.
+ * Keyed by mesaId (UUID) so polling from the customer's table does not exhaust the shared IP bucket.
+ */
+let mesaPollingLimiter: Ratelimit | null = null;
+
+function getMesaPollingLimiter(): Ratelimit | null {
+  if (mesaPollingLimiter) return mesaPollingLimiter;
+
+  const client = getRedis();
+  if (!client) return null;
+
+  mesaPollingLimiter = new Ratelimit({
+    redis: client,
+    limiter: Ratelimit.slidingWindow(120, "1 m"),
+    prefix: "ratelimit:mesa-polling",
+  });
+  return mesaPollingLimiter;
+}
+
+/**
+ * Apply rate limiting to mesa polling endpoints. Keyed by mesaId (not IP).
+ * Returns NextResponse 429 if exceeded, or null if passed.
+ */
+export async function rateLimitMesaPolling(mesaId: string): Promise<NextResponse | null> {
+  const limiter = getMesaPollingLimiter();
+  if (!limiter) return null;
+
+  const { success } = await limiter.limit(mesaId);
+  if (!success) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      { status: 429 }
+    );
+  }
+
+  return null;
+}
+
+/**
  * Rate limiter for admin routes: 60 requests per minute per IP.
  */
 let adminLimiter: Ratelimit | null = null;
@@ -206,6 +245,62 @@ export async function rateLimitTracking(token: string): Promise<NextResponse | n
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
       { status: 429 }
+    );
+  }
+
+  return null;
+}
+
+/**
+ * Rate limiter for waiter login: 5 attempts per minute per IP.
+ * Fail-closed: blocks requests in production if Redis is unavailable.
+ */
+let waiterLoginLimiter: Ratelimit | null = null;
+
+function getWaiterLoginLimiter(): Ratelimit | null {
+  if (waiterLoginLimiter) return waiterLoginLimiter;
+
+  const client = getRedis();
+  if (!client) return null;
+
+  waiterLoginLimiter = new Ratelimit({
+    redis: client,
+    limiter: Ratelimit.slidingWindow(5, "1 m"),
+    prefix: "ratelimit:waiter-login",
+  });
+  return waiterLoginLimiter;
+}
+
+/**
+ * Apply rate limiting to waiter login. Returns NextResponse 429 if exceeded, or null if passed.
+ */
+export async function rateLimitWaiterLogin(request: Request): Promise<NextResponse | null> {
+  const limiter = getWaiterLoginLimiter();
+  if (!limiter) {
+    if (isFailClosed()) {
+      return NextResponse.json(
+        { error: "Service temporarily unavailable. Please try again later." },
+        { status: 503 }
+      );
+    }
+    return null;
+  }
+
+  const ip = getClientIp(request);
+  const { success, limit, remaining, reset } = await limiter.limit(ip);
+
+  if (!success) {
+    return NextResponse.json(
+      { error: "Too many login attempts. Please try again later." },
+      {
+        status: 429,
+        headers: {
+          "X-RateLimit-Limit": limit.toString(),
+          "X-RateLimit-Remaining": remaining.toString(),
+          "X-RateLimit-Reset": reset.toString(),
+          "Retry-After": Math.ceil((reset - Date.now()) / 1000).toString(),
+        },
+      }
     );
   }
 

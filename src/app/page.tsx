@@ -6,11 +6,20 @@ import { EmpresaThemeProvider } from "@/components/empresa-theme-provider";
 import { getDomainFromHeaders } from "@/lib/domain-utils";
 import { logger } from "@/core/infrastructure/logging/logger";
 import { JsonLd } from "@/components/json-ld";
+import { cookies } from "next/headers";
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const resolvedParams = await searchParams;
+  const hasMesaParam = typeof resolvedParams.mesa === 'string' && resolvedParams.mesa.length > 0;
+  const cookieStore = await cookies();
+  const isWaiterMode = !!cookieStore.get('waiter_token')?.value;
   const fullDomain = await getDomainFromHeaders();
 
   let empresa = fullDomain ? await getEmpresaByDomain(fullDomain) : null;
@@ -37,7 +46,12 @@ export default async function Home() {
   }
 
   const mostrarCarritoEmpresa = empresa?.mostrarCarrito ?? false;
-  const showCart = isPedidos || mostrarCarritoEmpresa;
+  const isRestaurant = empresa?.tipo === 'restaurante';
+  // - pedidos subdomain: always
+  // - waiter session or mesa QR: always (regardless of mostrarCarritoEmpresa)
+  // - tienda with mostrarCarritoEmpresa=true: yes
+  // - restaurante on main domain with no table/waiter: never (must come via QR or waiter)
+  const showCart = isPedidos || isWaiterMode || hasMesaParam || (mostrarCarritoEmpresa && !isRestaurant);
 
   let menuData: MenuCategoryVM[] = [];
 

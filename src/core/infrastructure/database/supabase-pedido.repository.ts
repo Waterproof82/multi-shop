@@ -469,9 +469,10 @@ export class SupabasePedidoRepository implements IPedidoRepository {
   async createMesaOrder(params: {
     empresaId: string;
     mesaId: string;
-    items: { nombre: string; cantidad: number; precio: number; translations?: unknown }[];
+    items: { nombre: string; cantidad: number; precio: number; translations?: unknown; complementos?: { nombre: string; precio: number }[] }[];
     total: number;
     trackingToken: string;
+    sesionId: string | null;
   }): Promise<Result<{ id: string; numero_pedido: number; tracking_token: string }>> {
     try {
       const { data: nextNum, error: rpcError } = await this.supabase
@@ -500,10 +501,12 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           cantidad: item.cantidad,
           precio: item.precio,
           translations: item.translations ?? null,
+          complementos: item.complementos ?? [],
         })),
         total: params.total,
         estado: 'pendiente',
         tracking_token: params.trackingToken,
+        sesion_id: params.sesionId,
       };
 
       const { data: pedido, error } = await this.supabase
@@ -664,6 +667,43 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       return { success: true, data: undefined };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.updateEstimatedTime', { details: { pedidoId } });
+      return { success: false, error: appError };
+    }
+  }
+
+  async findBySesionId(sesionId: string): Promise<Result<{ id: string; numero_pedido: number; total: number; estado: string; detalle_pedido: unknown[]; created_at: string }[]>> {
+    try {
+      const { data, error } = await this.supabase
+        .from('pedidos')
+        .select('id, numero_pedido, total, estado, detalle_pedido, created_at')
+        .eq('sesion_id', sesionId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        await logger.logAndReturnError(
+          'DB_SELECT_ERROR',
+          error.message,
+          'repository',
+          'SupabasePedidoRepository.findBySesionId',
+          { details: { code: error.code, sesionId } }
+        );
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pedidos de sesión', module: 'repository', method: 'findBySesionId' } };
+      }
+
+      const rows = (data ?? []) as Record<string, unknown>[];
+      return {
+        success: true,
+        data: rows.map(row => ({
+          id: row['id'] as string,
+          numero_pedido: row['numero_pedido'] as number,
+          total: row['total'] as number,
+          estado: row['estado'] as string,
+          detalle_pedido: (row['detalle_pedido'] as unknown[]) ?? [],
+          created_at: row['created_at'] as string,
+        })),
+      };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findBySesionId', { details: { sesionId } });
       return { success: false, error: appError };
     }
   }

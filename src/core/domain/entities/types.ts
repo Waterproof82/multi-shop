@@ -100,6 +100,7 @@ export interface EmpresaPublic {
   id: string;
   nombre: string;
   dominio: string;
+  tipo: string | null;
   mostrarCarrito: boolean;
   moneda: string;
   subdomainPedidos: string | null;

@@ -29,6 +29,7 @@ export function ActiveOrderBanner() {
           if (!res.ok) return { token, tipo: 'restaurante' };
           const data = await res.json();
           const tipo: string = data.tipo ?? 'restaurante';
+          if (tipo === 'mesa') return null;
           if (tipo === 'restaurante' && isOrderExpired(data.estimated_ready_at)) {
             removeTrackingToken(token);
             return null;
