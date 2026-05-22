@@ -172,6 +172,31 @@ function renderEstadoBadge(
   );
 }
 
+function matchesPedido(p: Pedido, rawTerm: string, lowerTerm: string): boolean {
+  return (
+    p.numero_pedido.toString().includes(rawTerm) ||
+    (p.clientes?.nombre?.toLowerCase().includes(lowerTerm) ?? false) ||
+    (p.clientes?.telefono?.includes(rawTerm) ?? false) ||
+    (p.clientes?.email?.toLowerCase().includes(lowerTerm) ?? false)
+  );
+}
+
+async function loadPedidos(
+  effectiveEmpresaId: string,
+  selectedMonth: { mes: number; año: number },
+  signal: AbortSignal,
+): Promise<Pedido[]> {
+  const url = `/api/admin/pedidos?empresaId=${effectiveEmpresaId}&mes=${selectedMonth.mes}&año=${selectedMonth.año}`;
+  const res = await fetchWithCsrf(url, { signal }, {
+    maxRetries: 3,
+    baseDelay: 1000,
+    retryOn: (response) => response.status >= 500 || response.status === 429 || response.status === 408,
+  });
+  if (!res.ok) return [];
+  const data = await res.json() as { pedidos?: Pedido[] };
+  return data.pedidos ?? [];
+}
+
 function computePedidoStats(pedidos: Pedido[], selectedMonth: { mes: number; año: number }) {
   const today = new Date();
   const selectedMonthStart = new Date(selectedMonth.año, selectedMonth.mes, 1);
@@ -228,41 +253,21 @@ export default function PedidosPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    async function fetchPedidos() {
-      setLoading(true);
-      try {
-        const url = `/api/admin/pedidos?empresaId=${effectiveEmpresaId}&mes=${selectedMonth.mes}&año=${selectedMonth.año}`;
-        const res = await fetchWithCsrf(url, {
-          signal: controller.signal
-        }, {
-          maxRetries: 3,
-          baseDelay: 1000,
-          retryOn: (response) => response.status >= 500 || response.status === 429 || response.status === 408
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setPedidos(data.pedidos || []);
-        }
-      } catch (error) {
+    setLoading(true);
+    loadPedidos(effectiveEmpresaId, selectedMonth, controller.signal)
+      .then(data => setPedidos(data))
+      .catch(error => {
         if (error instanceof DOMException && error.name === 'AbortError') return;
         logClientError(error, 'fetchPedidos');
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchPedidos();
+      })
+      .finally(() => setLoading(false));
     return () => controller.abort();
   }, [effectiveEmpresaId, selectedMonth.mes, selectedMonth.año]);
 
   const filteredPedidos = useMemo(() => {
     const term = searchTerm.toLowerCase();
     return pedidos
-      .filter(p =>
-        p.numero_pedido.toString().includes(searchTerm) ||
-        p.clientes?.nombre?.toLowerCase().includes(term) ||
-        p.clientes?.telefono?.includes(searchTerm) ||
-        p.clientes?.email?.toLowerCase().includes(term)
-      )
+      .filter(p => matchesPedido(p, searchTerm, term))
       .sort((a, b) => comparePedidos(a, b, sortField, sortDirection));
   }, [pedidos, searchTerm, sortField, sortDirection]);
 
