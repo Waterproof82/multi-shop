@@ -1,22 +1,22 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { mesaUseCase } from '@/core/infrastructure/database';
-import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
+import { rateLimitMesaPolling } from '@/core/infrastructure/api/rate-limit';
 
 const getMesaSchema = z.object({
   token: z.string().uuid('El token debe ser un UUID válido'),
 });
 
 export async function GET(request: Request) {
-  const rateLimited = await rateLimitPublic(request);
-  if (rateLimited) return rateLimited;
-
   const { searchParams } = new URL(request.url);
   const parsed = getMesaSchema.safeParse({ token: searchParams.get('token') });
 
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
   }
+
+  const rateLimited = await rateLimitMesaPolling(parsed.data.token);
+  if (rateLimited) return rateLimited;
 
   const mesaResult = await mesaUseCase.getMesa(parsed.data.token);
 

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import { headers } from "next/headers";
+import { Suspense } from "react";
 import "@/styles/globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
@@ -8,6 +9,7 @@ import { CartProvider } from "@/lib/cart-context";
 import { LanguageProvider } from "@/lib/language-context";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { LazyPromoToast, LazyTgtgReservaPopup } from "@/components/lazy-client-components";
+import { WaiterBanner } from "@/components/waiter-banner";
 import { ExitConfirmation } from "@/components/exit-confirmation";
 import { getEmpresaByDomain } from "@/lib/server-services";
 import { getDomainFromHeaders } from "@/lib/domain-utils";
@@ -154,6 +156,9 @@ export default async function RootLayout({
                 >
                   Saltar al contenido principal
                 </a>
+                <Suspense>
+                  <WaiterBanner />
+                </Suspense>
                 <main id="main-content">
                   {children}
                 </main>

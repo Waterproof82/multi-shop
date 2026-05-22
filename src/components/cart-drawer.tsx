@@ -87,18 +87,37 @@ export function CartDrawer() {
   const [mesaSuccessMessage, setMesaSuccessMessage] = useState<string | null>(null);
 
   // Detect ?mesa= param (client-side only, SSR safe)
+  // Falls back to sessionStorage so waiter mode survives navigation without ?mesa= in the URL
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('mesa');
-    setMesaToken(token);
-    if (!token) return;
-    fetch(`/api/mesas?token=${encodeURIComponent(token)}`)
-      .then(async (res) => {
-        if (!res.ok) { setMesaError(true); return; }
-        const data = await res.json() as MesaInfo;
-        setMesaInfo(data);
-      })
-      .catch(() => setMesaError(true));
+
+    function applySessionStorage(): boolean {
+      try {
+        const raw = sessionStorage.getItem('waiter_mesa');
+        if (!raw) return false;
+        const stored = JSON.parse(raw) as { mesaId: string; mesaNumero: number; mesaNombre: string | null };
+        setMesaToken(stored.mesaId);
+        setMesaInfo({ id: stored.mesaId, numero: stored.mesaNumero, nombre: stored.mesaNombre, empresa_id: '' });
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    if (token) {
+      setMesaToken(token);
+      fetch(`/api/mesas?token=${encodeURIComponent(token)}`)
+        .then(async (res) => {
+          if (!res.ok) { if (!applySessionStorage()) setMesaError(true); return; }
+          const data = await res.json() as MesaInfo;
+          setMesaInfo(data);
+        })
+        .catch(() => { if (!applySessionStorage()) setMesaError(true); });
+      return;
+    }
+
+    applySessionStorage();
   }, []);
 
   useEffect(() => {

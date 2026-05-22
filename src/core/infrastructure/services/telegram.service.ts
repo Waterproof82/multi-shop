@@ -213,12 +213,11 @@ export const editMessageReplyMarkup = async (
   }
 };
 
-/** Build a mesa order message without any PII (no nombre, telefono, email) */
+/** Build a mesa order message: order number, table, and products only — no prices */
 const buildMesaOrderMessage = (
   pedidoId: string,
   numeroPedido: number,
-  items: { nombre: string; cantidad: number; precio: number }[],
-  total: number,
+  items: { nombre: string; cantidad: number }[],
   mesaNumero: number,
   mesaNombre: string | null
 ): string => {
@@ -226,15 +225,8 @@ const buildMesaOrderMessage = (
   const lines = [
     `*Pedido \\#${numeroPedido} — ${tableLabel}*`,
     '',
-    '*Items:*',
-    ...items.map(
-      item =>
-        `\\- ${item.cantidad}x ${sanitizeForMarkdown(item.nombre)} \\(${sanitizeForMarkdown(item.precio.toFixed(2))} €\\)`
-    ),
-    '\\-\\-\\-',
-    `*Total:* ${sanitizeForMarkdown(total.toFixed(2))} €`,
+    ...items.map(item => `\\- ${item.cantidad}x ${sanitizeForMarkdown(item.nombre)}`),
   ];
-  // pedidoId is included in buttons callback_data, not in the message body
   void pedidoId;
   return lines.join('\n');
 };
@@ -243,8 +235,7 @@ const buildMesaOrderMessage = (
 export const sendTelegramForMesa = async (
   pedidoId: string,
   numeroPedido: number,
-  items: { nombre: string; cantidad: number; precio: number }[],
-  total: number,
+  items: { nombre: string; cantidad: number }[],
   mesaNumero: number,
   mesaNombre: string | null,
   chatId: string
@@ -256,7 +247,7 @@ export const sendTelegramForMesa = async (
     };
   }
 
-  const message = buildMesaOrderMessage(pedidoId, numeroPedido, items, total, mesaNumero, mesaNombre);
+  const message = buildMesaOrderMessage(pedidoId, numeroPedido, items, mesaNumero, mesaNombre);
 
   const inlineKeyboard = [
     [

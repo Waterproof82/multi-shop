@@ -166,7 +166,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
   }
 
   private static readonly PUBLIC_SELECT = `
-    id, nombre, dominio, mostrar_carrito, moneda, subdomain_pedidos,
+    id, nombre, dominio, tipo, mostrar_carrito, moneda, subdomain_pedidos,
     logo_url, mostrar_logo, url_image, banner_fit,
     color_primary, color_primary_foreground, color_secondary, color_secondary_foreground,
     color_accent, color_accent_foreground, color_background, color_foreground,
@@ -207,6 +207,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
       id: data.id as string,
       nombre: data.nombre as string,
       dominio: data.dominio as string,
+      tipo: (data.tipo as string | null) ?? null,
       mostrarCarrito: (data.mostrar_carrito as boolean) ?? false,
       moneda: (data.moneda as string) ?? 'EUR',
       subdomainPedidos: (data.subdomain_pedidos as string | null) ?? null,

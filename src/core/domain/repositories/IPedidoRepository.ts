@@ -13,6 +13,7 @@ export interface IPedidoRepository {
     items: { nombre: string; cantidad: number; precio: number; translations?: unknown }[];
     total: number;
     trackingToken: string;
+    sesionId: string | null;
   }): Promise<Result<{ id: string; numero_pedido: number; tracking_token: string }>>;
   findEstimatedReadyAtById(pedidoId: string): Promise<Result<string | null>>;
   updateEstimatedTime(pedidoId: string, minutes: number): Promise<Result<void>>;
@@ -21,6 +22,7 @@ export interface IPedidoRepository {
   findReadyPedidosWithTelegramMessage(): Promise<Result<{ id: string; telegram_message_id: string; telegram_chat_id: string }[]>>;
   clearTelegramMessageId(pedidoId: string): Promise<Result<void>>;
   deleteAllByTenant(empresaId: string): Promise<Result<number>>;
+  findBySesionId(sesionId: string): Promise<Result<{ id: string; numero_pedido: number; total: number; estado: string; detalle_pedido: unknown[]; created_at: string }[]>>;
   create(
     empresaId: string,
     clienteId: string | null,
