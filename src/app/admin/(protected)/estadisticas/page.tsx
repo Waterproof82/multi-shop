@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import { BarChart3, ShoppingCart, Euro, TrendingUp, Users, Calendar, ArrowUpRight, ArrowDownRight, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { BarChart3, ShoppingCart, Euro, TrendingUp, Users, ArrowUpRight, ArrowDownRight, ChevronLeft, ChevronRight, Loader2, UtensilsCrossed, ShoppingBag, Globe } from 'lucide-react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { logClientError } from '@/lib/client-error';
@@ -41,6 +41,11 @@ interface Stats {
   pedidosAnterior: number;
   ingresosAnterior: number;
   mesSeleccionado: string;
+  byOrigen?: {
+    mesa:     { pedidos: number; total: number };
+    recogida: { pedidos: number; total: number };
+    web:      { pedidos: number; total: number };
+  };
 }
 
 interface PromoStat {
@@ -408,7 +413,7 @@ function LoadingSkeleton() {
 
 export default function EstadisticasPage() {
   const { language } = useLanguage();
-  const { empresaId, overrideEmpresaId, mostrarPromociones, mostrarTgtg } = useAdmin();
+  const { empresaId, overrideEmpresaId, empresaTipo, mostrarPromociones, mostrarTgtg } = useAdmin();
   const effectiveEmpresaId = overrideEmpresaId || empresaId;
   const lang = language;
   const localeMap: Record<string, string> = { es: 'es-ES', en: 'en-US', fr: 'fr-FR', it: 'it-IT', de: 'de-DE' };
@@ -424,7 +429,7 @@ export default function EstadisticasPage() {
   const { cambiarMes, mesActual, añoActual, esMesActual } = getMonthNavigation(selectedMonth);
 
   const handleCambiarMes = (delta: number) => {
-    setSelectedMonth(prev => cambiarMes(delta));
+    setSelectedMonth(() => cambiarMes(delta));
   };
 
   const kpis = useMemo(() => getKpiData(stats, lang), [stats, lang]);
@@ -450,6 +455,43 @@ export default function EstadisticasPage() {
           <KpiCard key={`kpi-${kpi.label}`} kpi={kpi} motionProps={motionProps} shouldReduceMotion={shouldReduceMotion} index={i} />
         ))}
       </div>
+
+      {/* Origin breakdown */}
+      {stats?.byOrigen && (
+        <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl p-5 shadow-2xl">
+          <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">
+            {t("ordersMonth", lang)} — {t("byOrigin", lang)}
+          </h3>
+          <div className={`grid gap-3 ${empresaTipo === 'restaurante' ? 'grid-cols-3' : 'grid-cols-2'}`}>
+            {empresaTipo === 'restaurante' && (
+              <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-400/20 rounded-xl px-4 py-3">
+                <UtensilsCrossed className="w-5 h-5 text-amber-400 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs text-amber-300/70 truncate">{t("orderTypeMesa", lang)}</p>
+                  <p className="text-lg font-bold text-white">{stats.byOrigen.mesa.pedidos}</p>
+                  <p className="text-xs text-amber-300/70">{formatPrice(stats.byOrigen.mesa.total)}</p>
+                </div>
+              </div>
+            )}
+            <div className="flex items-center gap-3 bg-blue-500/10 border border-blue-400/20 rounded-xl px-4 py-3">
+              <ShoppingBag className="w-5 h-5 text-blue-400 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs text-blue-300/70 truncate">{t("orderTypeRecogida", lang)}</p>
+                <p className="text-lg font-bold text-white">{stats.byOrigen.recogida.pedidos}</p>
+                <p className="text-xs text-blue-300/70">{formatPrice(stats.byOrigen.recogida.total)}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 bg-slate-500/10 border border-slate-400/20 rounded-xl px-4 py-3">
+              <Globe className="w-5 h-5 text-slate-400 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs text-slate-300/70 truncate">{t("orderTypeWeb", lang)}</p>
+                <p className="text-lg font-bold text-white">{stats.byOrigen.web.pedidos}</p>
+                <p className="text-xs text-slate-300/70">{formatPrice(stats.byOrigen.web.total)}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Comparison Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">

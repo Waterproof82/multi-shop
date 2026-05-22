@@ -12,7 +12,8 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         .from('pedidos')
         .select(`
           *,
-          clientes:cliente_id (nombre, email, telefono)
+          clientes:cliente_id (nombre, email, telefono),
+          mesas:mesa_id (numero, nombre)
         `)
         .eq('empresa_id', empresaId)
         .order('created_at', { ascending: false });
@@ -43,7 +44,8 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         .from('pedidos')
         .select(`
           *,
-          clientes:cliente_id (nombre, email, telefono)
+          clientes:cliente_id (nombre, email, telefono),
+          mesas:mesa_id (numero, nombre)
         `)
         .eq('empresa_id', empresaId)
         .gte('created_at', startDate)
@@ -123,7 +125,8 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         .from('pedidos')
         .select(`
           *,
-          clientes:cliente_id (nombre, email, telefono)
+          clientes:cliente_id (nombre, email, telefono),
+          mesas:mesa_id (numero, nombre)
         `)
         .eq('id', id)
         .eq('empresa_id', empresaId)
@@ -287,6 +290,11 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     ticketMedioAnterior: number;
     pedidosAnterior: number;
     ingresosAnterior: number;
+    byOrigen: {
+      mesa:     { pedidos: number; total: number };
+      recogida: { pedidos: number; total: number };
+      web:      { pedidos: number; total: number };
+    };
   }>> {
     try {
       const now = new Date();
@@ -383,6 +391,11 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         return Object.values(dishCount).sort((a, b) => b.cantidad - a.cantidad).slice(0, 10);
       };
 
+      // Origin breakdown for the selected month
+      const mesaPedidos    = pedidosMes.filter(p => p.mesa_id);
+      const recogidaPedidos = pedidosMes.filter(p => !p.mesa_id && p.tracking_token);
+      const webPedidos     = pedidosMes.filter(p => !p.mesa_id && !p.tracking_token);
+
       return {
         success: true,
         data: {
@@ -400,6 +413,11 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           ticketMedioAnterior,
           pedidosAnterior: pedidosAnterior.length,
           ingresosAnterior,
+          byOrigen: {
+            mesa:     { pedidos: mesaPedidos.length,    total: mesaPedidos.reduce((s, p) => s + (p.total || 0), 0) },
+            recogida: { pedidos: recogidaPedidos.length, total: recogidaPedidos.reduce((s, p) => s + (p.total || 0), 0) },
+            web:      { pedidos: webPedidos.length,      total: webPedidos.reduce((s, p) => s + (p.total || 0), 0) },
+          },
         }
       };
     } catch (e) {

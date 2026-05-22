@@ -22,10 +22,12 @@ interface EmpresaRow {
   id: string;
   nombre: string;
   dominio: string;
+  tipo: 'tienda' | 'restaurante';
   logoUrl: string | null;
   mostrarPromociones: boolean;
   mostrarTgtg: boolean;
   stats: EmpresaStats;
+  totalMesas: number;
   seoStatus: {
     hasDescription: boolean;
     hasLogo: boolean;
@@ -99,6 +101,61 @@ function ModuloSwitch({ empresaId, field, checked: initialChecked, label }: Modu
   );
 }
 
+interface TipoSelectorProps {
+  readonly empresaId: string;
+  readonly tipo: 'tienda' | 'restaurante';
+}
+
+function TipoSelector({ empresaId, tipo: initialTipo }: TipoSelectorProps) {
+  const [tipo, setTipo] = useState(initialTipo);
+  const [saving, setSaving] = useState(false);
+
+  const handleChange = async (next: 'tienda' | 'restaurante') => {
+    if (saving || next === tipo) return;
+    setTipo(next);
+    setSaving(true);
+    try {
+      const res = await fetchWithCsrf(`/api/superadmin/empresas/${empresaId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo: next }),
+      });
+      if (!res.ok) setTipo(tipo);
+    } catch {
+      setTipo(tipo);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        onClick={() => void handleChange('tienda')}
+        disabled={saving}
+        className={`px-2 py-1 text-xs rounded-l-full border transition-colors disabled:opacity-50 ${
+          tipo === 'tienda'
+            ? 'bg-violet-500/30 border-violet-400/50 text-violet-200 font-semibold'
+            : 'bg-transparent border-white/20 text-slate-400 hover:text-slate-200'
+        }`}
+      >
+        Tienda
+      </button>
+      <button
+        onClick={() => void handleChange('restaurante')}
+        disabled={saving}
+        className={`px-2 py-1 text-xs rounded-r-full border transition-colors disabled:opacity-50 ${
+          tipo === 'restaurante'
+            ? 'bg-amber-500/30 border-amber-400/50 text-amber-200 font-semibold'
+            : 'bg-transparent border-white/20 text-slate-400 hover:text-slate-200'
+        }`}
+      >
+        Restaurante
+      </button>
+    </div>
+  );
+}
+
 interface EmpresasTableProps {
   readonly empresas: EmpresaRow[];
 }
@@ -121,6 +178,7 @@ export function EmpresasTable({ empresas }: EmpresasTableProps) {
             <tr>
               <th className="text-left px-4 py-3 text-sm font-medium text-slate-300">Empresa</th>
               <th className="text-left px-4 py-3 text-sm font-medium text-slate-300">Dominio</th>
+              <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Tipo</th>
               <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Hoy</th>
               <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Mes</th>
               <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Total</th>
@@ -177,6 +235,16 @@ export function EmpresasTable({ empresas }: EmpresasTableProps) {
                   >
                     {empresa.dominio}
                   </a>
+                </td>
+                <td className="px-4 py-4 text-center">
+                  <div className="flex flex-col items-center gap-1.5">
+                    <TipoSelector empresaId={empresa.id} tipo={empresa.tipo} />
+                    {empresa.tipo === 'restaurante' && (
+                      <span className="text-xs text-amber-300/80">
+                        {empresa.totalMesas} {empresa.totalMesas === 1 ? 'mesa' : 'mesas'}
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-4 text-center">
                   <span className="text-sm font-medium text-blue-300">{empresa.stats.pedidosHoy}</span>

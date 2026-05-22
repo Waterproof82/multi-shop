@@ -37,6 +37,7 @@ export default async function AdminProtectedLayout({
   let isSuperAdminView = false;
   let mostrarPromociones = empresa?.mostrarPromociones ?? true;
   let mostrarTgtg = empresa?.mostrarTgtg ?? true;
+  let empresaTipo: 'tienda' | 'restaurante' = (empresa?.tipo === 'restaurante') ? 'restaurante' : 'tienda';
 
   if (admin.rol === SUPERADMIN_ROLE) {
     const cookieList = await cookies();
@@ -52,6 +53,7 @@ export default async function AdminProtectedLayout({
       empresa = empresaResult.data as unknown as typeof empresa;
       mostrarPromociones = empresaResult.data.mostrarPromociones ?? true;
       mostrarTgtg = empresaResult.data.mostrarTgtg ?? true;
+      empresaTipo = (empresaResult.data.tipo === 'restaurante') ? 'restaurante' : 'tienda';
     }
   } else {
     empresaId = admin.empresaId!;
@@ -63,6 +65,7 @@ export default async function AdminProtectedLayout({
         empresaId={empresaId}
         empresaNombre={empresa?.nombre ?? 'default'}
         empresaLogo={empresa?.logoUrl ?? undefined}
+        empresaTipo={empresaTipo}
         mostrarPromociones={mostrarPromociones}
         mostrarTgtg={mostrarTgtg}
         overrideEmpresaId={isSuperAdminView ? empresaId : undefined}

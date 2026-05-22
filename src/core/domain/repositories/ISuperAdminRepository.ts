@@ -33,6 +33,7 @@ export interface EmpresaWithStats {
   id: string;
   nombre: string;
   dominio: string;
+  tipo: 'tienda' | 'restaurante';
   slug: string | null;
   logoUrl: string | null;
   mostrarCarrito: boolean;
@@ -79,6 +80,7 @@ export interface EmpresaWithStats {
     de?: string | null;
   } | null;
   stats: EmpresaStats;
+  totalMesas: number;
   createdAt: string;
   seoStatus: {
     hasDescription: boolean;

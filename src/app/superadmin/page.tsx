@@ -19,12 +19,14 @@ interface Empresa {
   id: string;
   nombre: string;
   dominio: string;
+  tipo: 'tienda' | 'restaurante';
   logoUrl: string | null;
   emailNotification: string | null;
   mostrarPromociones: boolean;
   mostrarTgtg: boolean;
   createdAt: string;
   stats: EmpresaStats;
+  totalMesas: number;
   seoStatus: {
     hasDescription: boolean;
     hasLogo: boolean;
@@ -239,10 +241,12 @@ export default async function SuperAdminPage() {
               id: e.id,
               nombre: e.nombre,
               dominio: e.dominio,
+              tipo: e.tipo,
               logoUrl: e.logoUrl,
               mostrarPromociones: e.mostrarPromociones,
               mostrarTgtg: e.mostrarTgtg,
               stats: e.stats,
+              totalMesas: e.totalMesas,
               seoStatus: e.seoStatus,
             }))}
           />

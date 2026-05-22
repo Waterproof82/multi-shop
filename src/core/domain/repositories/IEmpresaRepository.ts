@@ -21,6 +21,7 @@ export interface UpdateEmpresaData {
   descuento_bienvenida_activo?: boolean;
   descuento_bienvenida_porcentaje?: number;
   descuento_bienvenida_duracion?: number;
+  tipo?: 'tienda' | 'restaurante';
 }
 
 export interface IEmpresaRepository {
@@ -36,4 +37,5 @@ export interface IEmpresaRepository {
   findByDomainPublic(domain: string): Promise<Result<EmpresaPublic | null>>;
   update(empresaId: string, data: UpdateEmpresaData): Promise<Result<void>>;
   updateColores(empresaId: string, colores: EmpresaColores): Promise<Result<boolean>>;
+  updateWaiterPin(empresaId: string, pinHash: string): Promise<Result<void>>;
 }

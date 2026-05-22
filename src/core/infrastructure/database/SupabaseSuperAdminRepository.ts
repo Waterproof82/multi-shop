@@ -52,6 +52,7 @@ interface EmpresaRow {
   footer2_fr: string | null;
   footer2_it: string | null;
   footer2_de: string | null;
+  tipo: 'tienda' | 'restaurante' | null;
   created_at: string;
 }
 
@@ -84,6 +85,16 @@ export class SupabaseSuperAdminRepository implements ISuperAdminRepository {
         };
       }
 
+      // Batch-fetch mesa counts to avoid N+1
+      const { data: mesaCounts } = await this.supabase
+        .from('mesas')
+        .select('empresa_id');
+      const mesaCountMap: Record<string, number> = {};
+      for (const row of mesaCounts ?? []) {
+        const eid = (row as { empresa_id: string }).empresa_id;
+        mesaCountMap[eid] = (mesaCountMap[eid] ?? 0) + 1;
+      }
+
       const empresasWithStats: EmpresaWithStats[] = [];
 
       for (const empresa of (empresas as unknown as EmpresaRow[]) || []) {
@@ -100,7 +111,7 @@ export class SupabaseSuperAdminRepository implements ISuperAdminRepository {
           cuponesTgtgTotales: 0,
         };
 
-        empresasWithStats.push(this.mapEmpresaToStats(empresa, stats));
+        empresasWithStats.push(this.mapEmpresaToStats(empresa, stats, mesaCountMap[empresa.id] ?? 0));
       }
 
       return { success: true, data: empresasWithStats };
@@ -330,7 +341,7 @@ export class SupabaseSuperAdminRepository implements ISuperAdminRepository {
     }
   }
 
-  private mapEmpresaToStats(row: EmpresaRow, stats: EmpresaStats): EmpresaWithStats {
+  private mapEmpresaToStats(row: EmpresaRow, stats: EmpresaStats, totalMesas = 0): EmpresaWithStats {
     const hasDescripcion = row.descripcion_es || row.descripcion_en || row.descripcion_fr || row.descripcion_it || row.descripcion_de;
     const descripcion = hasDescripcion
       ? {
@@ -359,6 +370,7 @@ export class SupabaseSuperAdminRepository implements ISuperAdminRepository {
       id: row.id,
       nombre: row.nombre,
       dominio: row.dominio,
+      tipo: row.tipo ?? 'tienda',
       slug: row.slug,
       logoUrl: row.logo_url,
       mostrarCarrito: row.mostrar_carrito,
@@ -399,6 +411,7 @@ export class SupabaseSuperAdminRepository implements ISuperAdminRepository {
         de: row.footer2_de,
       },
       stats,
+      totalMesas,
       createdAt: row.created_at,
       seoStatus: {
         hasDescription: !!(row.descripcion_es || row.descripcion_en),

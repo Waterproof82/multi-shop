@@ -21,6 +21,7 @@ export const updateEmpresaSchema = z.object({
   descripcion_de: z.string().max(1000).optional().nullable(),
   mostrar_promociones: z.boolean().optional(),
   mostrar_tgtg: z.boolean().optional(),
+  tipo: z.enum(['tienda', 'restaurante']).optional(),
   descuento_bienvenida_activo: z.boolean().optional(),
   descuento_bienvenida_porcentaje: z.number().min(1).max(50).optional(),
   descuento_bienvenida_duracion: z.number().min(1).max(365).optional(),

@@ -60,6 +60,7 @@ export interface Empresa {
   id: string;
   nombre: string;
   dominio: string;
+  tipo: 'tienda' | 'restaurante' | null;
   slug: string | null;
   logoUrl: string | null;
   mostrarLogo: boolean;

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
 import { Search, ChevronDown, ChevronUp, Check, Clock, Trash2, ShoppingCart, Calendar, Trash, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import type { PedidoItem, PedidoComplemento } from '@/core/domain/entities/types';
-import { PEDIDO_ESTADOS, PEDIDO_ESTADO_COLORS, type PedidoEstado } from '@/core/domain/constants/pedido';
+import { PEDIDO_ESTADO_COLORS, ESTADOS_POR_ORIGEN, getOrigenPedido, type PedidoEstado } from '@/core/domain/constants/pedido';
 import {
   Dialog,
   DialogContent,
@@ -27,6 +27,11 @@ interface Cliente {
   telefono: string | null;
 }
 
+interface MesaInfo {
+  numero: number;
+  nombre: string | null;
+}
+
 interface Pedido {
   id: string;
   numero_pedido: number;
@@ -37,7 +42,12 @@ interface Pedido {
   detalle_pedido: PedidoItem[];
   estado: string;
   created_at: string;
+  mesa_id: string | null;
+  tracking_token: string | null;
+  mesas: MesaInfo | null;
 }
+
+const ORIGEN_ORDER: Record<string, number> = { mesa: 0, recogida: 1, web: 2 };
 
 function getDeleteConfirmationText(language: string): string {
   const confirmationTexts: Record<string, string> = {
@@ -63,13 +73,135 @@ function getDeletingText(language: string): string {
 
 function getAriaSortValue(sortField: string, currentField: string, sortDirection: 'asc' | 'desc') {
   if (sortField === currentField) {
-    if (sortDirection === 'asc') {
-      return 'ascending';
-    } else {
-      return 'descending';
-    }
+    return sortDirection === 'asc' ? 'ascending' : 'descending';
   }
   return 'none';
+}
+
+const ESTADO_TRANSLATION_KEYS: Partial<Record<PedidoEstado, keyof typeof import('@/lib/translations').translations.es>> = {
+  pendiente:  'statusPendiente',
+  anotado:    'statusAnotado',
+  servido:    'statusServido',
+  aceptado:   'statusAceptado',
+  preparando: 'statusPreparando',
+  listo:      'statusListo',
+  enviado:    'statusEnviado',
+  entregado:  'statusEntregado',
+  cancelado:  'statusCancelado',
+};
+
+function shiftMonth(current: { mes: number; año: number }, delta: number) {
+  const nuevoMes = current.mes + delta;
+  const nuevoAño = current.año + Math.floor(nuevoMes / 12);
+  return { mes: ((nuevoMes % 12) + 12) % 12, año: nuevoAño };
+}
+
+function comparePedidos(a: Pedido, b: Pedido, sortField: keyof Pedido | 'origen', sortDirection: 'asc' | 'desc'): number {
+  if (sortField === 'origen') {
+    const aOrd = ORIGEN_ORDER[getOrigenPedido(a.mesa_id, a.tracking_token)];
+    const bOrd = ORIGEN_ORDER[getOrigenPedido(b.mesa_id, b.tracking_token)];
+    return sortDirection === 'asc' ? aOrd - bOrd : bOrd - aOrd;
+  }
+  const aVal = a[sortField];
+  const bVal = b[sortField];
+  if (aVal == null && bVal == null) return 0;
+  if (aVal == null) return 1;
+  if (bVal == null) return -1;
+  if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+  if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+  return 0;
+}
+
+function renderOrigenBadge(pedido: Pedido) {
+  if (pedido.mesa_id) {
+    const label = pedido.mesas ? `Mesa ${pedido.mesas.numero}` : 'Mesa';
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-300 border border-amber-400/30">
+        {label}
+      </span>
+    );
+  }
+  if (pedido.tracking_token) {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300 border border-blue-400/30">
+        Recogida
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-500/20 text-slate-400 border border-slate-500/30">
+      Web
+    </span>
+  );
+}
+
+function renderEstadoBadge(
+  pedido: Pedido,
+  language: Parameters<typeof t>[1],
+  onUpdate: (id: string, estado: string) => void,
+) {
+  const origen = getOrigenPedido(pedido.mesa_id, pedido.tracking_token);
+  const flow = ESTADOS_POR_ORIGEN[origen];
+  const estado = pedido.estado as PedidoEstado;
+  const currentIdx = flow.indexOf(estado);
+
+  let siguienteEstado: string;
+  if (estado === 'cancelado' || currentIdx === -1) {
+    siguienteEstado = 'pendiente';
+  } else if (currentIdx < flow.length - 1) {
+    siguienteEstado = flow[currentIdx + 1];
+  } else {
+    siguienteEstado = flow[0];
+  }
+
+  const translationKey = ESTADO_TRANSLATION_KEYS[estado];
+  const label = translationKey ? t(translationKey, language) : estado;
+  const isPending = estado === 'pendiente' || estado === 'cancelado';
+
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onUpdate(pedido.id, siguienteEstado); }}
+      aria-label={`${label} — ${t('edit', language)}`}
+      className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+        PEDIDO_ESTADO_COLORS[estado] || 'bg-muted text-foreground hover:bg-muted/80'
+      }`}
+    >
+      {isPending ? <Clock className="w-3 h-3" /> : <Check className="w-3 h-3" />}
+      {label}
+    </button>
+  );
+}
+
+function computePedidoStats(pedidos: Pedido[], selectedMonth: { mes: number; año: number }) {
+  const today = new Date();
+  const selectedMonthStart = new Date(selectedMonth.año, selectedMonth.mes, 1);
+  const selectedMonthEnd = new Date(selectedMonth.año, selectedMonth.mes + 1, 0, 23, 59, 59);
+  const isCurrentMonth = selectedMonth.mes === today.getMonth() && selectedMonth.año === today.getFullYear();
+
+  let pedidosHoy: Pedido[] = [];
+  let pedidosDelMes: Pedido[];
+
+  if (isCurrentMonth) {
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    pedidosHoy = pedidos.filter(p => new Date(p.created_at) >= todayStart);
+    pedidosDelMes = pedidos.filter(p => new Date(p.created_at) >= selectedMonthStart);
+  } else {
+    pedidosDelMes = pedidos.filter(p => {
+      const created = new Date(p.created_at);
+      return created >= selectedMonthStart && created <= selectedMonthEnd;
+    });
+  }
+
+  const IN_PROGRESS = new Set(['aceptado', 'preparando', 'enviado', 'entregado']);
+  return {
+    pedidosHoy: pedidosHoy.length,
+    totalHoy: pedidosHoy.reduce((sum, p) => sum + p.total, 0),
+    pedidosMes: pedidosDelMes.length,
+    totalMes: pedidosDelMes.reduce((sum, p) => sum + p.total, 0),
+    pendientes: pedidosDelMes.filter(p => p.estado === 'pendiente').length,
+    aceptados: pedidosDelMes.filter(p => IN_PROGRESS.has(p.estado)).length,
+    isCurrentMonth,
+  };
 }
 
 export default function PedidosPage() {
@@ -78,7 +210,7 @@ export default function PedidosPage() {
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortField, setSortField] = useState<keyof Pedido>('created_at');
+  const [sortField, setSortField] = useState<keyof Pedido | 'origen'>('created_at');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [expandedPedido, setExpandedPedido] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; id: string | null; numero: number | null }>({ show: false, id: null, numero: null });
@@ -90,12 +222,7 @@ export default function PedidosPage() {
   const lang = language;
   const meses = [t("monthJan", lang), t("monthFeb", lang), t("monthMar", lang), t("monthApr", lang), t("monthMay", lang), t("monthJun", lang), t("monthJul", lang), t("monthAug", lang), t("monthSep", lang), t("monthOct", lang), t("monthNov", lang), t("monthDec", lang)];
 
-  const cambiarMes = (delta: number) => {
-    const nuevoMes = selectedMonth.mes + delta;
-    const nuevoAño = selectedMonth.año + Math.floor(nuevoMes / 12);
-    const mesAjustado = ((nuevoMes % 12) + 12) % 12;
-    setSelectedMonth({ mes: mesAjustado, año: nuevoAño });
-  };
+  const cambiarMes = (delta: number) => setSelectedMonth(shiftMonth(selectedMonth, delta));
 
   const esMesActual = selectedMonth.mes === new Date().getMonth() && selectedMonth.año === new Date().getFullYear();
 
@@ -127,61 +254,26 @@ export default function PedidosPage() {
     return () => controller.abort();
   }, [effectiveEmpresaId, selectedMonth.mes, selectedMonth.año]);
 
-  const filteredPedidos = useMemo(() => pedidos
-    .filter(p =>
-      p.numero_pedido.toString().includes(searchTerm) ||
-      p.clientes?.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.clientes?.telefono?.includes(searchTerm) ||
-      p.clientes?.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    .sort((a, b) => {
-      const aVal = a[sortField];
-      const bVal = b[sortField];
-      if (aVal == null && bVal == null) return 0;
-      if (aVal == null) return 1;
-      if (bVal == null) return -1;
-      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
-      return 0;
-    }), [pedidos, searchTerm, sortField, sortDirection]);
+  const filteredPedidos = useMemo(() => {
+    const term = searchTerm.toLowerCase();
+    return pedidos
+      .filter(p =>
+        p.numero_pedido.toString().includes(searchTerm) ||
+        p.clientes?.nombre?.toLowerCase().includes(term) ||
+        p.clientes?.telefono?.includes(searchTerm) ||
+        p.clientes?.email?.toLowerCase().includes(term)
+      )
+      .sort((a, b) => comparePedidos(a, b, sortField, sortDirection));
+  }, [pedidos, searchTerm, sortField, sortDirection]);
 
-  const handleSort = useCallback((field: keyof Pedido) => {
+  const handleSort = useCallback((field: keyof Pedido | 'origen') => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
       setSortField(field);
-      setSortDirection('desc');
+      setSortDirection('asc');
     }
   }, [sortField, sortDirection]);
-
-  const ESTADO_TRANSLATION_KEYS: Record<PedidoEstado, keyof typeof import('@/lib/translations').translations.es> = {
-    pendiente: 'statusPendiente',
-    aceptado: 'statusAceptado',
-    preparando: 'statusPreparando',
-    enviado: 'statusEnviado',
-    entregado: 'statusEntregado',
-    cancelado: 'statusCancelado',
-  };
-
-  const getEstadoBadge = (estado: string, pedidoId: string) => {
-    const estadoIndex = PEDIDO_ESTADOS.indexOf(estado as PedidoEstado);
-    const isPendiente = estadoIndex <= 0;
-    const siguienteEstado = isPendiente ? 'aceptado' : 'pendiente';
-    const translationKey = ESTADO_TRANSLATION_KEYS[estado as PedidoEstado];
-
-    return (
-      <button
-        onClick={(e) => { e.stopPropagation(); updateEstado(pedidoId, siguienteEstado); }}
-        aria-label={`${translationKey ? t(translationKey, language) : estado} — ${t("edit", language)}`}
-        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-          PEDIDO_ESTADO_COLORS[estado as PedidoEstado] || 'bg-muted text-foreground hover:bg-muted/80'
-        }`}
-      >
-        {estado === 'pendiente' || estado === 'cancelado' ? <Clock className="w-3 h-3" /> : <Check className="w-3 h-3" />}
-        {translationKey ? t(translationKey, language) : estado}
-      </button>
-    );
-  };
 
   const toggleExpand = (id: string) => {
     setExpandedPedido(expandedPedido === id ? null : id);
@@ -256,41 +348,7 @@ export default function PedidosPage() {
     setDeleteAllConfirm({ show: true, confirmText: '' });
   };
 
-  const stats = useMemo(() => {
-    const today = new Date();
-    const selectedMonthStart = new Date(selectedMonth.año, selectedMonth.mes, 1);
-    const selectedMonthEnd = new Date(selectedMonth.año, selectedMonth.mes + 1, 0, 23, 59, 59);
-    
-    const isCurrentMonth = selectedMonth.mes === today.getMonth() && selectedMonth.año === today.getFullYear();
-    
-    let pedidosHoy: Pedido[] = [];
-    let pedidosDelMes: Pedido[] = [];
-    
-    if (isCurrentMonth) {
-      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      pedidosHoy = pedidos.filter(p => new Date(p.created_at) >= todayStart);
-      pedidosDelMes = pedidos.filter(p => new Date(p.created_at) >= selectedMonthStart);
-    } else {
-      pedidosDelMes = pedidos.filter(p => {
-        const created = new Date(p.created_at);
-        return created >= selectedMonthStart && created <= selectedMonthEnd;
-      });
-      pedidosHoy = [];
-    }
-    
-    const pendientes = pedidosDelMes.filter(p => p.estado === 'pendiente').length;
-    const aceptados = pedidosDelMes.filter(p => p.estado === 'aceptado' || p.estado === 'preparando' || p.estado === 'enviado' || p.estado === 'entregado').length;
-    
-    return {
-      pedidosHoy: pedidosHoy.length,
-      totalHoy: pedidosHoy.reduce((sum, p) => sum + p.total, 0),
-      pedidosMes: pedidosDelMes.length,
-      totalMes: pedidosDelMes.reduce((sum, p) => sum + p.total, 0),
-      pendientes,
-      aceptados,
-      isCurrentMonth,
-    };
-  }, [pedidos, selectedMonth]);
+  const stats = useMemo(() => computePedidoStats(pedidos, selectedMonth), [pedidos, selectedMonth]);
 
   if (loading) {
     return (
@@ -438,6 +496,15 @@ export default function PedidosPage() {
                     {sortField === 'numero_pedido' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                   </button>
                 </th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={getAriaSortValue(sortField, 'origen', sortDirection)}>
+                  <button
+                    onClick={() => handleSort('origen')}
+                    className="flex items-center gap-1 rounded-sm px-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    Tipo
+                    {sortField === 'origen' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                  </button>
+                </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   {t("customer", language)}
                 </th>
@@ -479,7 +546,7 @@ export default function PedidosPage() {
             <tbody className="divide-y divide-border">
               {filteredPedidos.length === 0 ? (
                 <tr>
-                  <td colSpan={7} aria-live="polite" className="px-4 py-8 text-center text-muted-foreground">
+                  <td colSpan={8} aria-live="polite" className="px-4 py-8 text-center text-muted-foreground">
                     {searchTerm ? t("noOrdersFound", language) : t("noOrders", language)}
                   </td>
                 </tr>
@@ -494,6 +561,9 @@ export default function PedidosPage() {
                       <td className="px-4 py-3 whitespace-nowrap font-medium text-foreground">
                         #{pedido.numero_pedido}
                       </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {renderOrigenBadge(pedido)}
+                      </td>
                       <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                         {pedido.clientes?.nombre || '-'}
                       </td>
@@ -504,7 +574,7 @@ export default function PedidosPage() {
                         {formatPrice(pedido.total)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        {getEstadoBadge(pedido.estado, pedido.id)}
+                        {renderEstadoBadge(pedido, language, updateEstado)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-muted-foreground text-sm">
                         {formatDate(pedido.created_at, {
@@ -524,7 +594,7 @@ export default function PedidosPage() {
                     </tr>
                     {expandedPedido === pedido.id && (
                       <tr>
-                        <td colSpan={7} className="px-4 py-4 bg-muted/30">
+                        <td colSpan={8} className="px-4 py-4 bg-muted/30">
                           <div className="max-w-2xl">
                             <h4 className="font-medium mb-2 text-foreground">{t("orderDetails", language)}</h4>
                             <ul className="space-y-2 text-sm text-foreground">

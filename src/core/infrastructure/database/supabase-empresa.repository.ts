@@ -92,6 +92,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
       if (data.descuento_bienvenida_activo !== undefined) updatePayload.descuento_bienvenida_activo = data.descuento_bienvenida_activo;
       if (data.descuento_bienvenida_porcentaje !== undefined) updatePayload.descuento_bienvenida_porcentaje = data.descuento_bienvenida_porcentaje;
       if (data.descuento_bienvenida_duracion !== undefined) updatePayload.descuento_bienvenida_duracion = data.descuento_bienvenida_duracion;
+      if (data.tipo !== undefined) updatePayload.tipo = data.tipo;
 
       const { error } = await this.supabase
         .from('empresas')
@@ -293,6 +294,31 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
       return { success: true, data: true };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabaseEmpresaRepository.updateColores', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
+  async updateWaiterPin(empresaId: string, pinHash: string): Promise<Result<void>> {
+    try {
+      const { error } = await this.supabase
+        .from('empresas')
+        .update({ waiter_pin_hash: pinHash })
+        .eq('id', empresaId);
+
+      if (error) {
+        await logger.logAndReturnError(
+          'DB_UPDATE_ERROR',
+          error.message,
+          'repository',
+          'SupabaseEmpresaRepository.updateWaiterPin',
+          { empresaId, details: { code: error.code } }
+        );
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al actualizar PIN', module: 'repository', method: 'updateWaiterPin' } };
+      }
+
+      return { success: true, data: undefined };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseEmpresaRepository.updateWaiterPin', { empresaId });
       return { success: false, error: appError };
     }
   }

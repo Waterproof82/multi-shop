@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, Tags, LogOut, Menu, X, ShoppingCart, BarChart3, Users, Megaphone, Settings, ExternalLink, ShoppingBag } from 'lucide-react';
+import { LayoutDashboard, Package, Tags, LogOut, Menu, X, ShoppingCart, BarChart3, Users, Megaphone, Settings, ExternalLink, ShoppingBag, UtensilsCrossed } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useAdmin } from '@/lib/admin-context';
 import { useLanguage } from '@/lib/language-context';
@@ -16,7 +16,7 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
 }
 
-const BASE_NAV_ITEMS: (NavItem & { requiresPromo?: boolean; requiresTgtg?: boolean })[] = [
+const BASE_NAV_ITEMS: (NavItem & { requiresPromo?: boolean; requiresTgtg?: boolean; requiresRestaurant?: boolean })[] = [
   { href: '/admin', labelKey: 'sidebarDashboard', icon: LayoutDashboard },
   { href: '/admin/categorias', labelKey: 'sidebarCategories', icon: Tags },
   { href: '/admin/productos', labelKey: 'sidebarProducts', icon: Package },
@@ -25,6 +25,7 @@ const BASE_NAV_ITEMS: (NavItem & { requiresPromo?: boolean; requiresTgtg?: boole
   { href: '/admin/promociones', labelKey: 'sidebarPromotions', icon: Megaphone, requiresPromo: true },
   { href: '/admin/toogoodtogo', labelKey: 'sidebarTooGoodToGo', icon: ShoppingBag, requiresTgtg: true },
   { href: '/admin/estadisticas', labelKey: 'sidebarStatistics', icon: BarChart3 },
+  { href: '/admin/mesas', labelKey: 'sidebarMesas', icon: UtensilsCrossed, requiresRestaurant: true },
   { href: '/admin/configuracion', labelKey: 'sidebarSettings', icon: Settings },
 ];
 
@@ -35,13 +36,14 @@ interface AdminSidebarProps {
 export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
-  const { empresaLogo, mostrarPromociones, mostrarTgtg } = useAdmin();
+  const { empresaLogo, empresaTipo, mostrarPromociones, mostrarTgtg } = useAdmin();
   const { language } = useLanguage();
 
   const navItems = BASE_NAV_ITEMS.filter(
     (item) =>
       (!item.requiresPromo || mostrarPromociones) &&
-      (!item.requiresTgtg || mostrarTgtg)
+      (!item.requiresTgtg || mostrarTgtg) &&
+      (!item.requiresRestaurant || empresaTipo === 'restaurante')
   );
 
   const closeMenu = () => setIsOpen(false);
