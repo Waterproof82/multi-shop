@@ -172,6 +172,20 @@ function renderEstadoBadge(
   );
 }
 
+function handleFetchError(error: unknown): void {
+  if (error instanceof DOMException && error.name === 'AbortError') return;
+  logClientError(error, 'fetchPedidos');
+}
+
+function nextSortState(
+  field: keyof Pedido | 'origen',
+  currentField: keyof Pedido | 'origen',
+  currentDirection: 'asc' | 'desc',
+): { field: keyof Pedido | 'origen'; direction: 'asc' | 'desc' } {
+  if (currentField === field) return { field, direction: currentDirection === 'asc' ? 'desc' : 'asc' };
+  return { field, direction: 'asc' };
+}
+
 function matchesPedido(p: Pedido, rawTerm: string, lowerTerm: string): boolean {
   return (
     p.numero_pedido.toString().includes(rawTerm) ||
@@ -256,13 +270,10 @@ export default function PedidosPage() {
     setLoading(true);
     loadPedidos(effectiveEmpresaId, selectedMonth, controller.signal)
       .then(data => setPedidos(data))
-      .catch(error => {
-        if (error instanceof DOMException && error.name === 'AbortError') return;
-        logClientError(error, 'fetchPedidos');
-      })
+      .catch(handleFetchError)
       .finally(() => setLoading(false));
     return () => controller.abort();
-  }, [effectiveEmpresaId, selectedMonth.mes, selectedMonth.año]);
+  }, [effectiveEmpresaId, selectedMonth]);
 
   const filteredPedidos = useMemo(() => {
     const term = searchTerm.toLowerCase();
@@ -272,12 +283,9 @@ export default function PedidosPage() {
   }, [pedidos, searchTerm, sortField, sortDirection]);
 
   const handleSort = useCallback((field: keyof Pedido | 'origen') => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
-    }
+    const next = nextSortState(field, sortField, sortDirection);
+    setSortField(next.field);
+    setSortDirection(next.direction);
   }, [sortField, sortDirection]);
 
   const toggleExpand = (id: string) => {
