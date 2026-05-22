@@ -60,6 +60,11 @@ src/
 ├── app/
 │   ├── layout.tsx                   # Root layout (multi-tenant, nonce CSP)
 │   ├── page.tsx                     # Menú público (SSR)
+│   ├── mesa/[mesaId]/orders/        # Ticket de mesa (cliente)
+│   ├── waiter/                      # Panel de sala
+│   │   ├── page.tsx                 # Login PIN
+│   │   ├── tables/page.tsx          # Grid de mesas
+│   │   └── tables/[mesaId]/page.tsx # Detalle de mesa
 │   ├── admin/
 │   │   ├── login/                   # Login admin
 │   │   └── (protected)/             # Rutas protegidas (SSR)
@@ -98,6 +103,22 @@ src/
 │       │   └── empresas/
 │       │       ├── route.ts         # GET — todas las empresas
 │       │       └── [id]/route.ts   # GET/PUT — empresa específica
+│       ├── mesas/                   # Pública — mesa ordering (QR)
+│       │   ├── route.ts             # GET ?token={uuid} — info de mesa
+│       │   └── [mesaId]/orders/     # GET — pedidos de la sesión activa
+│       ├── waiter/                  # Panel de sala (PIN auth)
+│       │   ├── auth/                # POST — login con PIN
+│       │   ├── logout/              # POST — cerrar sesión waiter
+│       │   ├── me/                  # GET — verificar sesión
+│       │   ├── mesa/                # GET — mesa asignada actualmente
+│       │   ├── mesas/               # GET — todas las mesas con estado
+│       │   │   └── [mesaId]/
+│       │   │       ├── open/        # POST — abrir sesión de mesa
+│       │   │       ├── close/       # POST — cerrar sesión de mesa
+│       │   │       └── orders/      # GET — pedidos de una mesa
+│       │   └── productos/           # GET — productos para tomar pedidos
+│       ├── telegram/
+│       │   └── webhook/             # POST — callbacks de Telegram (todos los modos)
 │       ├── pedidos/                 # POST — pública, crear pedido
 │       └── unsubscribe/             # GET — pública, dar de baja/alta promo
 │
@@ -115,7 +136,7 @@ src/
 │   └── infrastructure/
 │       ├── api/
 │       │   ├── helpers.ts           # requireAuth, handleResult (error code → HTTP status), responses
-│       │   ├── rate-limit.ts        # rateLimitLogin (fail-closed prod), rateLimitPublic, rateLimitAdmin
+│       │   ├── rate-limit.ts        # rateLimitLogin, rateLimitPublic, rateLimitAdmin, rateLimitMesaPolling (UUID-keyed)
 │       │   └── api-logger.ts        # logApiError
 │       ├── database/
 │       │   ├── supabase-client.ts   # Singletons Supabase
@@ -254,7 +275,8 @@ import {
 | **CategoryUseCase** | `getAll`, `create`, `update`, `delete` |
 | **ClienteUseCase** | `getAll`, `create`, `update`, `delete`, `togglePromoSubscription` |
 | **EmpresaUseCase** | `getById`, `update`, `updateColores` |
-| **PedidoUseCase** | `getAll`, `create`, `updateStatus`, `getStats`, `delete` |
+| **PedidoUseCase** | `getAll`, `create`, `updateStatus`, `getStats`, `delete`, `createMesaOrder` |
+| **MesaSesionUseCase** | `getAll`, `open`, `close`, `getActiveOrders` |
 | **PromocionUseCase** | `getAll`, `create` |
 | **AuthAdminUseCase** | `login`, `verifyToken` |
 | **TgtgUseCase** | `getWithItems`, `getAllRecent`, `create`, `sendCampaignEmails`, `markEmailSent`, `getHistory`, `getReservas`, `adjustCupones`, `claimCupon`, `updateHoras`, `deletePromo`, `isTokenUsed`, `getPublicItem`, `getPublicPromo` |
@@ -269,7 +291,9 @@ import {
 | **ISuperAdminRepository** | `findAllEmpresas`, `findEmpresaById`, `updateEmpresa`, `getEmpresaStats` |
 | **IClienteRepository** | `findAllByTenant`, `findByEmail`, `findByTelefono`, `create`, `update`, `delete` |
 | **IEmpresaRepository** | `getById`, `findByDomain`, `update`, `updateColores` |
-| **IPedidoRepository** | `findAllByTenant`, `updateStatus`, `delete`, `create`, `getStats` |
+| **IPedidoRepository** | `findAllByTenant`, `updateStatus`, `delete`, `create`, `getStats`, `createMesaOrder`, `findBySessionId`, `updateStatusById`, `findEstimatedReadyAtById`, `updateEstimatedTime` |
+| **IMesaRepository** | `findByToken`, `findById`, `findAllByEmpresa`, `setSessionId` |
+| **IMesaSesionRepository** | `create`, `close`, `findActive`, `findOrdersBySession` |
 | **IPromocionRepository** | `findAllByTenant`, `create`, `deleteAllByTenant` |
 | **IProductRepository** | `findAllByTenant`, `findByIds`, `create`, `update`, `delete` |
 | **ICategoryRepository** | `findAllByTenant`, `create`, `update`, `delete` |
@@ -430,18 +454,20 @@ const main = parseMainDomain(domain); // elimina subdominio pedidos
 
 | Tabla | PK | FK | Notas |
 |-------|----|----|-------|
-| `empresas` | id (uuid) | — | dominio, subdomain_pedidos, colores, fb, instagram, url_mapa, telefono_whatsapp, **descuento_bienvenida_activo/porcentaje** |
+| `empresas` | id (uuid) | — | dominio, subdomain_pedidos, colores, fb, instagram, url_mapa, telefono_whatsapp, **descuento_bienvenida_activo/porcentaje**, telegram_chat_id, **telegram_mesa_chat_id**, **waiter_pin_hash** |
 | `perfiles_admin` | id (uuid) | empresa_id → empresas (nullable) | → auth.users, `rol` = 'admin' o 'superadmin' |
 | `categorias` | id (uuid) | empresa_id → empresas | categoria_padre_id, categoriaComplementoDe |
 | `productos` | id (uuid) | empresa_id, categoria_id | i18n: titulo_es/en/fr/it/de |
 | `clientes` | id (uuid) | empresa_id | telefono único por empresa |
-| `pedidos` | id (uuid) | empresa_id, cliente_id | numero_pedido (atómico por tenant), detalle_pedido: JSON (PedidoItem[]), **codigo_descuento_id, descuento_porcentaje, total_sin_descuento** |
+| `pedidos` | id (uuid) | empresa_id, cliente_id | numero_pedido (atómico por tenant), detalle_pedido: JSON (PedidoItem[]), **codigo_descuento_id, descuento_porcentaje, total_sin_descuento**, **mesa_id, sesion_id, estado** |
 | `promociones` | id (uuid) | empresa_id | imagen_url, numero_envios |
 | `codigos_descuento` | id (uuid) | empresa_id | codigo unik por empresa + email, usado boolean, pedido_id FK |
 | `tgtg_promociones` | id (uuid) | empresa_id | fechaActivacion, horaRecogidaInicio/Fin, emailEnviado, numeroEnvios |
 | `tgtg_items` | id (uuid) | tgtg_promo_id, empresa_id | titulo, precioOriginal, precioDescuento, cuponesTotal, cuponesDisponibles |
 | `tgtg_reservas` | id (uuid) | tgtg_item_id, empresa_id | token único, estado (pendiente/confirmado/cancelado), fechaReserva |
 | `log_errors` | id (uuid) | empresa_id | logging centralizado con severity y metadata JSONB |
+| **`mesas`** | id (uuid) | empresa_id, sesion_id → mesa_sesiones | numero, nombre, token UUID (QR), sesion_id activa |
+| **`mesa_sesiones`** | id (uuid) | mesa_id, empresa_id | abierta_en, cerrada_en (NULL = abierta) |
 
 > `pedidos` NO tiene columna `telefono` — el teléfono está en `clientes`
 
@@ -603,6 +629,9 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 | **Welcome Discount** | Popup 30s en subdomain pedidos, código único BIENVENIDO-XXXXXX, email con idioma del cliente, porcentaje configurable (1-50%), duración configurable (7/14/30/60/90 días), validación server-side (existencia, usado, expirado, email match), aplicación en checkout, persists en pedido |
 | **Admin Panel Design** | Glassmorphic dark theme (backdrop-blur + white/10 opacity), estadoPendiente=Aceptado colores consistentes con badges de tabla (ámbar/azul), diseño unificado sin colores por empresa |
 | **SEO Multi-Tenant** | Metadata dinámica por empresa, hreflang (5 idiomas), sitemap/robots dinámicos, Schema.org Restaurant+FAQ+Menu, geo coordinates desde urlMapa, 404 con meta tags |
+| **Mesa Ordering** | QR table ordering para restaurantes dine-in. mesas + mesa_sesiones en DB. Rate limiting per-UUID (120/min). Ticket view con complementos + i18n + hora 24h. Notificación Telegram con botones Anotado/Servido |
+| **Waiter Panel** | Panel PIN-auth en /waiter. Grid de mesas, detalle por mesa, ciclo de sesión open/close. WaiterBanner sticky global. Integración con mesa_sesiones |
+| **Telegram Multi-modo** | tienda → quick-reply buttons. restaurante takeaway → time-selector + tracking. mesa → Anotado/Servido con estado seleccionado + Modificar |
 
 ## Documentación
 
@@ -612,6 +641,9 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 - [`docs/context/context.md`](docs/context/context.md) — Contexto general del proyecto
 - [`docs/context/toogoodtogo.md`](docs/context/toogoodtogo.md) — Flujo completo TGTG (campañas, reservas, emails, reglas de negocio)
 - [`docs/context/welcome-discount.md`](docs/context/welcome-discount.md) — Sistema de descuento de bienvenida
+- [`docs/context/mesa-ordering.md`](docs/context/mesa-ordering.md) — QR table ordering (flujo, API, rate limiting, ticket)
+- [`docs/context/waiter-panel.md`](docs/context/waiter-panel.md) — Panel de sala (PIN auth, sesiones, mesas)
+- [`docs/telegram-notifications.md`](docs/telegram-notifications.md) — Notificaciones Telegram (tienda, restaurante takeaway, mesa)
 
 ---
 
