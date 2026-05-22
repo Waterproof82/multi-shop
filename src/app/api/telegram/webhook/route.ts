@@ -83,7 +83,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  // Handle anotado — mark as noted, update buttons
+  // Handle anotado — mark as noted, show selected state + modify button
   const anotadoMatch = callbackData.match(/^anotado:([0-9a-f-]{36})$/);
   if (anotadoMatch) {
     const [, pedidoId] = anotadoMatch;
@@ -92,13 +92,14 @@ export async function POST(request: Request) {
     await answerCallbackQuery(callbackQueryId, '✅ Pedido anotado');
     if (message) {
       await editMessageReplyMarkup(String(message.chat.id), message.message_id, [
-        [{ text: '✅ Anotado', callback_data: 'noop' }, { text: '🍽️ Servido', callback_data: `servido:${pedidoId}` }],
+        [{ text: '✅ Anotado ✓', callback_data: 'noop' }],
+        [{ text: '🔄 Modificar', callback_data: `modify_mesa:${pedidoId}` }],
       ]);
     }
     return NextResponse.json({ ok: true });
   }
 
-  // Handle servido — mark as served, replace buttons with confirmation
+  // Handle servido — mark as served, show selected state + modify button
   const servidoMatch = callbackData.match(/^servido:([0-9a-f-]{36})$/);
   if (servidoMatch) {
     const [, pedidoId] = servidoMatch;
@@ -107,7 +108,26 @@ export async function POST(request: Request) {
     await answerCallbackQuery(callbackQueryId, '🍽️ Pedido servido');
     if (message) {
       await editMessageReplyMarkup(String(message.chat.id), message.message_id, [
-        [{ text: '🍽️ Servido', callback_data: 'noop' }],
+        [{ text: '🍽️ Servido ✓', callback_data: 'noop' }],
+        [{ text: '🔄 Modificar', callback_data: `modify_mesa:${pedidoId}` }],
+      ]);
+    }
+    return NextResponse.json({ ok: true });
+  }
+
+  // Handle modify_mesa — restore original Anotado/Servido buttons
+  const modifyMesaMatch = callbackData.match(/^modify_mesa:([0-9a-f-]{36})$/);
+  if (modifyMesaMatch) {
+    const [, pedidoId] = modifyMesaMatch;
+    const { pedidoRepository } = await import('@/core/infrastructure/database');
+    await pedidoRepository.updateStatusById(pedidoId, 'pendiente');
+    await answerCallbackQuery(callbackQueryId, 'Selecciona una opción');
+    if (message) {
+      await editMessageReplyMarkup(String(message.chat.id), message.message_id, [
+        [
+          { text: '✅ Anotado', callback_data: `anotado:${pedidoId}` },
+          { text: '🍽️ Servido', callback_data: `servido:${pedidoId}` },
+        ],
       ]);
     }
     return NextResponse.json({ ok: true });
