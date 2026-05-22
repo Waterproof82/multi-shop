@@ -15,7 +15,7 @@ import {
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { formatPrice } from '@/lib/format-price';
 import { logClientError } from '@/lib/client-error';
-import { useLanguage } from '@/lib/language-context';
+import { useLanguage, type Language } from '@/lib/language-context';
 import { useAdmin } from '@/lib/admin-context';
 import { t } from '@/lib/translations';
 import { SkeletonTable, SkeletonStats, Skeleton } from '@/components/ui/skeleton';
@@ -243,6 +243,57 @@ function computePedidoStats(pedidos: Pedido[], selectedMonth: { mes: number; añ
   };
 }
 
+function StatsSection({
+  stats,
+  language,
+}: Readonly<{
+  stats: ReturnType<typeof computePedidoStats>;
+  language: Language;
+}>) {
+  return (
+    <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-6 sm:p-8 shadow-2xl">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">{t("ordersTitle", language)}</h1>
+          <p className="text-slate-300 text-sm mt-1">{t("ordersSubtitle", language)}</p>
+        </div>
+        <div className={`grid gap-3 sm:gap-4 ${stats.isCurrentMonth ? 'grid-cols-2 sm:grid-cols-6' : 'grid-cols-2 sm:grid-cols-4'}`}>
+          {stats.isCurrentMonth && (
+            <>
+              <section className="backdrop-blur-xl bg-gradient-to-br from-blue-500/20 to-blue-700/20 border border-blue-400/30 rounded-xl px-3 sm:px-4 py-3 text-center hover:shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-shadow duration-300">
+                <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6 text-blue-300 mx-auto mb-2" />
+                <span className="text-lg sm:text-2xl font-semibold text-white">{stats.pedidosHoy}</span>
+                <p className="text-blue-300 text-[10px] sm:text-xs">{t("today", language)}</p>
+              </section>
+              <section className="backdrop-blur-xl bg-gradient-to-br from-blue-500/20 to-blue-700/20 border border-blue-400/30 rounded-xl px-3 sm:px-4 py-3 text-center hover:shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-shadow duration-300">
+                <span className="text-lg sm:text-2xl font-semibold text-white">{formatPrice(stats.totalHoy)}</span>
+                <p className="text-blue-300 text-[10px] sm:text-xs">{t("salesToday", language)}</p>
+              </section>
+            </>
+          )}
+          <section className="backdrop-blur-xl bg-gradient-to-br from-cyan-500/20 to-cyan-700/20 border border-cyan-400/30 rounded-xl px-3 sm:px-4 py-3 text-center hover:shadow-[0_0_20px_rgba(34,211,238,0.3)] transition-shadow duration-300">
+            <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-300 mx-auto mb-2" />
+            <span className="text-lg sm:text-2xl font-semibold text-white">{stats.pedidosMes}</span>
+            <p className="text-cyan-300 text-[10px] sm:text-xs">{t("thisMonth", language)}</p>
+          </section>
+          <section className="backdrop-blur-xl bg-gradient-to-br from-emerald-500/20 to-emerald-700/20 border border-emerald-400/30 rounded-xl px-3 sm:px-4 py-3 text-center hover:shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-shadow duration-300">
+            <span className="text-lg sm:text-2xl font-semibold text-white">{formatPrice(stats.totalMes)}</span>
+            <p className="text-emerald-300 text-[10px] sm:text-xs">{t("salesMonth", language)}</p>
+          </section>
+          <section className="backdrop-blur-xl bg-gradient-to-br from-amber-500/20 to-amber-700/20 border border-amber-400/30 rounded-xl px-3 sm:px-4 py-3 text-center hover:shadow-[0_0_20px_rgba(245,158,11,0.3)] transition-shadow duration-300">
+            <span className="text-lg sm:text-2xl font-semibold text-white">{stats.pendientes}</span>
+            <p className="text-amber-300 text-[10px] sm:text-xs">{t("statusPendiente", language)}</p>
+          </section>
+          <section className="backdrop-blur-xl bg-gradient-to-br from-blue-500/20 to-blue-700/20 border border-blue-400/30 rounded-xl px-3 sm:px-4 py-3 text-center hover:shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-shadow duration-300">
+            <span className="text-lg sm:text-2xl font-semibold text-white">{stats.aceptados}</span>
+            <p className="text-blue-300 text-[10px] sm:text-xs">{t("statusAceptado", language)}</p>
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PedidosPage() {
   const { empresaId, overrideEmpresaId, isSuperAdmin } = useAdmin();
   const effectiveEmpresaId = overrideEmpresaId || empresaId;
@@ -393,46 +444,7 @@ export default function PedidosPage() {
   return (
     <div className="pt-16 lg:pt-0 px-6 py-8 space-y-8 min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Header con stats */}
-      <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-6 sm:p-8 shadow-2xl">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">{t("ordersTitle", language)}</h1>
-            <p className="text-slate-300 text-sm mt-1">{t("ordersSubtitle", language)}</p>
-          </div>
-          <div className={`grid gap-3 sm:gap-4 ${stats.isCurrentMonth ? 'grid-cols-2 sm:grid-cols-6' : 'grid-cols-2 sm:grid-cols-4'}`}>
-            {stats.isCurrentMonth && (
-              <>
-                <section className="backdrop-blur-xl bg-gradient-to-br from-blue-500/20 to-blue-700/20 border border-blue-400/30 rounded-xl px-3 sm:px-4 py-3 text-center hover:shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-shadow duration-300">
-                  <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6 text-blue-300 mx-auto mb-2" />
-                  <span className="text-lg sm:text-2xl font-semibold text-white">{stats.pedidosHoy}</span>
-                  <p className="text-blue-300 text-[10px] sm:text-xs">{t("today", language)}</p>
-                </section>
-                <section className="backdrop-blur-xl bg-gradient-to-br from-blue-500/20 to-blue-700/20 border border-blue-400/30 rounded-xl px-3 sm:px-4 py-3 text-center hover:shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-shadow duration-300">
-                  <span className="text-lg sm:text-2xl font-semibold text-white">{formatPrice(stats.totalHoy)}</span>
-                  <p className="text-blue-300 text-[10px] sm:text-xs">{t("salesToday", language)}</p>
-                </section>
-              </>
-            )}
-            <section className="backdrop-blur-xl bg-gradient-to-br from-cyan-500/20 to-cyan-700/20 border border-cyan-400/30 rounded-xl px-3 sm:px-4 py-3 text-center hover:shadow-[0_0_20px_rgba(34,211,238,0.3)] transition-shadow duration-300">
-              <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-300 mx-auto mb-2" />
-              <span className="text-lg sm:text-2xl font-semibold text-white">{stats.pedidosMes}</span>
-              <p className="text-cyan-300 text-[10px] sm:text-xs">{t("thisMonth", language)}</p>
-            </section>
-            <section className="backdrop-blur-xl bg-gradient-to-br from-emerald-500/20 to-emerald-700/20 border border-emerald-400/30 rounded-xl px-3 sm:px-4 py-3 text-center hover:shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-shadow duration-300">
-              <span className="text-lg sm:text-2xl font-semibold text-white">{formatPrice(stats.totalMes)}</span>
-              <p className="text-emerald-300 text-[10px] sm:text-xs">{t("salesMonth", language)}</p>
-            </section>
-            <section className="backdrop-blur-xl bg-gradient-to-br from-amber-500/20 to-amber-700/20 border border-amber-400/30 rounded-xl px-3 sm:px-4 py-3 text-center hover:shadow-[0_0_20px_rgba(245,158,11,0.3)] transition-shadow duration-300">
-              <span className="text-lg sm:text-2xl font-semibold text-white">{stats.pendientes}</span>
-              <p className="text-amber-300 text-[10px] sm:text-xs">{t("statusPendiente", language)}</p>
-            </section>
-            <section className="backdrop-blur-xl bg-gradient-to-br from-blue-500/20 to-blue-700/20 border border-blue-400/30 rounded-xl px-3 sm:px-4 py-3 text-center hover:shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-shadow duration-300">
-              <span className="text-lg sm:text-2xl font-semibold text-white">{stats.aceptados}</span>
-              <p className="text-blue-300 text-[10px] sm:text-xs">{t("statusAceptado", language)}</p>
-            </section>
-          </div>
-        </div>
-      </div>
+      <StatsSection stats={stats} language={language} />
 
       {/* Month selector */}
       <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-4 shadow-2xl">
@@ -643,86 +655,146 @@ export default function PedidosPage() {
         </div>
       </div>
 
-      <Dialog open={deleteConfirm.show} onOpenChange={(open) => { if (!open) setDeleteConfirm({ show: false, id: null, numero: null }); }}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-3">
-              <div className="p-2 bg-destructive/10 rounded-full">
-                <Trash2 className="w-5 h-5 text-destructive" />
-              </div>
-              {t("deleteOrder", language)}
-            </DialogTitle>
-            <DialogDescription>
-              {t("deleteOrderConfirm", language)} <strong>#{deleteConfirm.numero}</strong>? {t("cannotUndo", language)}
-            </DialogDescription>
-          </DialogHeader>
+      <DeleteOrderDialog
+        show={deleteConfirm.show}
+        orderNumber={deleteConfirm.numero}
+        language={language}
+        onClose={() => setDeleteConfirm({ show: false, id: null, numero: null })}
+        onConfirm={confirmDelete}
+      />
+
+      <DeleteAllOrdersDialog
+        show={deleteAllConfirm.show}
+        language={language}
+        totalOrders={pedidos.length}
+        confirmText={deleteAllConfirm.confirmText}
+        isDeleting={deletingAll}
+        onClose={() => setDeleteAllConfirm({ show: false, confirmText: '' })}
+        onConfirmTextChange={(text) => setDeleteAllConfirm(prev => ({ ...prev, confirmText: text }))}
+        onConfirm={confirmDeleteAll}
+      />
+    </div>
+  );
+}
+
+function DeleteOrderDialog({
+  show,
+  orderNumber,
+  language,
+  onClose,
+  onConfirm,
+}: Readonly<{
+  show: boolean;
+  orderNumber: number | null;
+  language: Language;
+  onClose: () => void;
+  onConfirm: () => void;
+}>) {
+  return (
+    <Dialog open={show} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-3">
+            <div className="p-2 bg-destructive/10 rounded-full">
+              <Trash2 className="w-5 h-5 text-destructive" />
+            </div>
+            {t("deleteOrder", language)}
+          </DialogTitle>
+          <DialogDescription>
+            {t("deleteOrderConfirm", language)} <strong>#{orderNumber}</strong>? {t("cannotUndo", language)}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex gap-3 justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+          >
+            {t("cancel", language)}
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+          >
+            {t("delete", language)}
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DeleteAllOrdersDialog({
+  show,
+  language,
+  totalOrders,
+  confirmText,
+  isDeleting,
+  onClose,
+  onConfirmTextChange,
+  onConfirm,
+}: Readonly<{
+  show: boolean;
+  language: Language;
+  totalOrders: number;
+  confirmText: string;
+  isDeleting: boolean;
+  onClose: () => void;
+  onConfirmTextChange: (text: string) => void;
+  onConfirm: () => void;
+}>) {
+  const expectedText = getDeleteConfirmationText(language);
+  const isValidated = confirmText.toUpperCase() === expectedText;
+
+  return (
+    <Dialog open={show} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-3">
+            <div className="p-2 bg-destructive/10 rounded-full">
+              <AlertTriangle className="w-5 h-5 text-destructive" />
+            </div>
+            {t("deleteAllOrders", language)}
+          </DialogTitle>
+          <DialogDescription className="space-y-2">
+            <span>{t("deleteAllOrdersConfirm", language)}</span>
+            <span className="block text-sm text-muted-foreground">
+              {t("deleteAllOrdersWarning", language)} <strong className="text-destructive">{totalOrders}</strong> {t("deleteAllOrdersWarningEnd", language)}
+            </span>
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="confirmText" className="block text-sm font-medium mb-2">
+              {t("confirmingDeleteAll", language)}
+            </label>
+            <Input
+              id="confirmText"
+              type="text"
+              value={confirmText}
+              onChange={(e) => onConfirmTextChange(e.target.value)}
+              placeholder={expectedText}
+              className="w-full"
+              autoComplete="off"
+            />
+          </div>
           <div className="flex gap-3 justify-end">
             <button
-              onClick={() => setDeleteConfirm({ show: false, id: null, numero: null })}
+              onClick={onClose}
               className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+              disabled={isDeleting}
             >
               {t("cancel", language)}
             </button>
             <button
-              onClick={confirmDelete}
-              className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+              onClick={onConfirm}
+              disabled={!isValidated || isDeleting}
+              className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {t("delete", language)}
+              {isDeleting ? getDeletingText(language) : t("delete", language)}
             </button>
           </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={deleteAllConfirm.show} onOpenChange={(open) => { if (!open) setDeleteAllConfirm({ show: false, confirmText: '' }); }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-3">
-              <div className="p-2 bg-destructive/10 rounded-full">
-                <AlertTriangle className="w-5 h-5 text-destructive" />
-              </div>
-              {t("deleteAllOrders", language)}
-            </DialogTitle>
-            <DialogDescription className="space-y-2">
-              <span>{t("deleteAllOrdersConfirm", language)}</span>
-              <span className="block text-sm text-muted-foreground">
-                {t("deleteAllOrdersWarning", language)} <strong className="text-destructive">{pedidos.length}</strong> {t("deleteAllOrdersWarningEnd", language)}
-              </span>
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="confirmText" className="block text-sm font-medium mb-2">
-                {t("confirmingDeleteAll", language)}
-              </label>
-              <Input
-                id="confirmText"
-                type="text"
-                value={deleteAllConfirm.confirmText}
-                onChange={(e) => setDeleteAllConfirm(prev => ({ ...prev, confirmText: e.target.value }))}
-                placeholder={getDeleteConfirmationText(language)}
-                className="w-full"
-                autoComplete="off"
-              />
-            </div>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setDeleteAllConfirm({ show: false, confirmText: '' })}
-                className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
-                disabled={deletingAll}
-              >
-                {t("cancel", language)}
-              </button>
-              <button
-                onClick={confirmDeleteAll}
-                disabled={deleteAllConfirm.confirmText.toUpperCase() !== getDeleteConfirmationText(language) || deletingAll}
-                className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {deletingAll ? getDeletingText(language) : t("delete", language)}
-              </button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
