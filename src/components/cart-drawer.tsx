@@ -242,6 +242,9 @@ export function CartDrawer() {
           // Tienda: redirect to tracking page
           addTrackingToken(data.trackingToken);
           clearCart();
+          if (window.history.state?.cartOpen) {
+            window.history.replaceState({}, '', window.location.href);
+          }
           closeCart();
           router.push(`/tracking/${data.trackingToken}`);
         } else {
