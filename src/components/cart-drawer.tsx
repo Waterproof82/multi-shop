@@ -644,6 +644,11 @@ export function CartDrawer() {
                 </div>
               </div>
 
+              {errors.general && (
+                <p role="alert" className="text-sm text-destructive text-center mb-2">
+                  {errors.general}
+                </p>
+              )}
               <div className="flex flex-col gap-2">
                  <Button
                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full py-3 text-lg font-semibold shadow-elegant transition-colors duration-150 min-h-[44px]"
