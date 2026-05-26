@@ -243,7 +243,7 @@ export function CartDrawer() {
           addTrackingToken(data.trackingToken);
           clearCart();
           closeCart();
-          window.location.href = `/tracking/${data.trackingToken}`;
+          router.push(`/tracking/${data.trackingToken}`);
         } else {
           // Fallback: show success dialog only
           setOrderSuccess({ numeroPedido: data.numeroPedido });
