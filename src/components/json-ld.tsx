@@ -92,10 +92,9 @@ function buildRestaurantJsonLd(empresa: EmpresaPublic, menuData: MenuCategoryVM[
   return jsonLd;
 }
 
-// Common restaurant FAQ schema - can be extended per empresa
-const COMMON_FAQS = [
+const RESTAURANTE_FAQS = [
   {
-    question: "¿Hacen pedidos para recoger en tienda?",
+    question: "¿Hacen pedidos para recoger en el local?",
     answer: "Sí, puedes pedir online y recoger tu pedido en nuestro local sin esperar.",
   },
   {
@@ -109,6 +108,25 @@ const COMMON_FAQS = [
   {
     question: "¿Cuánto tiempo tarda el pedido a domicilio?",
     answer: "El tiempo depende de tu zona. Puedes consultarlo al hacer el pedido.",
+  },
+];
+
+const TIENDA_FAQS = [
+  {
+    question: "¿Cómo puedo realizar un pedido online?",
+    answer: "Añade los productos al carrito y completa el proceso de compra. Recibirás confirmación por email.",
+  },
+  {
+    question: "¿Puedo recoger mi pedido en tienda?",
+    answer: "Sí, ofrecemos la opción de recogida en tienda sin coste adicional.",
+  },
+  {
+    question: "¿Qué métodos de pago aceptáis?",
+    answer: "Aceptamos pago online con tarjeta y pago en efectivo al recoger en tienda.",
+  },
+  {
+    question: "¿Cuánto tarda en llegar mi pedido a domicilio?",
+    answer: "El plazo de entrega depende de tu zona. Puedes consultarlo al finalizar el pedido.",
   },
 ];
 
@@ -157,12 +175,14 @@ function buildMenuJsonLd(
 export function JsonLd({ empresa, menuData, baseUrl }: JsonLdProps) {
   const restaurantJsonLd = buildRestaurantJsonLd(empresa, menuData, baseUrl);
   const menuJsonLd = menuData.length > 0 ? buildMenuJsonLd(empresa, menuData, baseUrl) : null;
-  
+
+  const faqs = empresa.tipo === 'tienda' ? TIENDA_FAQS : RESTAURANTE_FAQS;
+
   // FAQ schema
   const faqJsonLd = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
-    mainEntity: COMMON_FAQS.map(faq => ({
+    mainEntity: faqs.map(faq => ({
       "@type": "Question",
       name: faq.question,
       acceptedAnswer: {

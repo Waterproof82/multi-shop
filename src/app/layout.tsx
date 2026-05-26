@@ -13,6 +13,7 @@ import { WaiterBanner } from "@/components/waiter-banner";
 import { ExitConfirmation } from "@/components/exit-confirmation";
 import { getEmpresaByDomain } from "@/lib/server-services";
 import { getDomainFromHeaders } from "@/lib/domain-utils";
+import type { EmpresaPublic } from "@/core/domain/entities/types";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 const playfair = Playfair_Display({
@@ -30,7 +31,32 @@ const FALLBACK_DESCRIPTIONS: Record<string, string> = {
   de: "Digitales Menü und Online-Bestellung - Durchsuchen Sie unser Menü, bestellen Sie",
 };
 
-const SUPPORTED_LOCALES = ["es_ES", "en_US", "fr_FR", "it_IT", "de_DE"];
+const LOCALE_MAP: Record<string, string> = {
+  es: "es_ES", en: "en_US", fr: "fr_FR", it: "it_IT", de: "de_DE",
+};
+
+type LangKey = "es" | "en" | "fr" | "it" | "de";
+const LANG_KEYS: LangKey[] = ["es", "en", "fr", "it", "de"];
+
+function getPrimaryLang(empresa: EmpresaPublic | null): LangKey {
+  if (!empresa?.descripcion) return "es";
+  for (const lang of LANG_KEYS) {
+    if (empresa.descripcion[lang]) return lang;
+  }
+  return "es";
+}
+
+function getAvailableLangs(empresa: EmpresaPublic | null): LangKey[] {
+  if (!empresa?.descripcion) return ["es"];
+  const available = LANG_KEYS.filter(l => empresa.descripcion?.[l]);
+  return available.length > 0 ? available : ["es"];
+}
+
+function getDescriptionForLang(empresa: EmpresaPublic | null, lang: LangKey): string {
+  return empresa?.descripcion?.[lang]?.substring(0, 160)
+    ?? FALLBACK_DESCRIPTIONS[lang]
+    ?? FALLBACK_DESCRIPTIONS.es;
+}
 
 function getMimeType(url: string): string {
   if (!url || url === '/favicon.ico') return 'image/x-icon';
@@ -56,27 +82,23 @@ export async function generateMetadata(): Promise<Metadata> {
   const isDefaultFavicon = faviconUrl === '/favicon.ico';
 
   const title = empresa?.nombre || "Mermelada de Tomate";
-  
-  // Multi-language description fallbacks
-  const getDescription = () => {
-    if (empresa?.descripcion?.es) return empresa.descripcion.es.substring(0, 160);
-    if (empresa?.descripcion?.en) return empresa.descripcion.en.substring(0, 160);
-    if (empresa?.descripcion?.fr) return empresa.descripcion.fr.substring(0, 160);
-    if (empresa?.descripcion?.it) return empresa.descripcion.it.substring(0, 160);
-    if (empresa?.descripcion?.de) return empresa.descripcion.de.substring(0, 160);
-    return FALLBACK_DESCRIPTIONS.es;
-  };
-  const description = getDescription();
-  
+
+  const primaryLang = getPrimaryLang(empresa);
+  const availableLangs = getAvailableLangs(empresa);
+
+  const description = getDescriptionForLang(empresa, primaryLang);
+
   const ogImage = empresa?.urlImage || empresa?.logoUrl || undefined;
-  
-  // Dynamic locale based on empresa or default
-  const getOgLocale = () => {
-    // Check if empresa has content in other languages to determine locale
-    const hasEn = empresa?.descripcion?.en || empresa?.titulo;
-    const lang = hasEn ? "en" : "es";
-    return `${lang}_${lang.toUpperCase()}`;
-  };
+  const primaryLocale = LOCALE_MAP[primaryLang] ?? "es_ES";
+  const alternateLocales = availableLangs
+    .filter(l => l !== primaryLang)
+    .map(l => LOCALE_MAP[l])
+    .filter(Boolean) as string[];
+
+  const hreflangMap: Record<string, string> = { [primaryLang]: "/" };
+  for (const lang of availableLangs) {
+    if (lang !== primaryLang) hreflangMap[lang] = `/?lang=${lang}`;
+  }
 
   return {
     title,
@@ -90,13 +112,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     alternates: {
       canonical: "/",
-      languages: {
-        "es": "/",
-        "en": "/?lang=en",
-        "fr": "/?lang=fr",
-        "it": "/?lang=it",
-        "de": "/?lang=de",
-      },
+      languages: hreflangMap,
     },
     openGraph: {
       title,
@@ -104,7 +120,8 @@ export async function generateMetadata(): Promise<Metadata> {
       url: baseUrl,
       siteName: title,
       type: "website",
-      locale: getOgLocale(),
+      locale: primaryLocale,
+      alternateLocale: alternateLocales,
       ...(ogImage ? { images: [{ url: ogImage, width: 1200, height: 630, alt: title }] } : {}),
     },
     twitter: {
@@ -135,8 +152,11 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const nonce = (await headers()).get('x-nonce') ?? undefined;
+  const domain = await getDomainFromHeaders();
+  const empresa = domain ? await getEmpresaByDomain(domain) : null;
+  const lang = getPrimaryLang(empresa);
   return (
-    <html lang="es" suppressHydrationWarning>
+    <html lang={lang} suppressHydrationWarning>
       <body className={`${inter.variable} ${playfair.variable} font-sans`} suppressHydrationWarning>
         <ThemeProvider
           attribute="class"

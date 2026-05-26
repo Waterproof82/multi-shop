@@ -10,7 +10,7 @@ return {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/admin/", "/api/", "/superadmin/"],
+        disallow: ["/admin/", "/api/", "/superadmin/", "/waiter/", "/mesa/", "/tracking/"],
       },
     ],
     sitemap: `${baseUrl}/sitemap.xml`,

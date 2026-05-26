@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { verifyWaiterToken } from '@/lib/waiter-auth';
@@ -6,6 +7,9 @@ import { WaiterTablesGrid } from '@/components/waiter-tables-grid';
 import type { MesaWithSession } from '@/core/domain/repositories/IMesaRepository';
 
 export const dynamic = 'force-dynamic';
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 export default async function WaiterTablesPage() {
   const cookieStore = await cookies();

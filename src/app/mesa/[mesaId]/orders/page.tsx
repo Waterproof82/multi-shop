@@ -1,6 +1,10 @@
+import type { Metadata } from "next";
 import { MesaOrdersClient } from "@/components/mesa-orders-client";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 interface Props {
   params: Promise<{ mesaId: string }>;
