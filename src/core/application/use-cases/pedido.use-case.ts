@@ -88,7 +88,7 @@ export class PedidoUseCase {
     // Step 2: Check legacy format (9-digit without prefix)
     if (!clienteResult.data && telefonoDigits.length > 9) {
       const legacyResult = await this.findLegacyCliente(telefonoDigits, empresaId, telefono);
-      if (legacyResult.success && legacyResult.data) {
+      if (legacyResult.success && legacyResult.data?.id) {
         return { success: true, data: { clienteId: legacyResult.data.id } };
       }
     }
