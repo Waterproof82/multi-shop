@@ -242,11 +242,15 @@ export function CartDrawer() {
           // Tienda: redirect to tracking page
           addTrackingToken(data.trackingToken);
           clearCart();
+          setNombre('');
+          setTelefono('');
+          setEmail('');
           if (window.history.state?.cartOpen) {
             window.history.replaceState({}, '', window.location.href);
           }
           closeCart();
-          router.push(`/tracking/${data.trackingToken}`);
+          const trackingUrl = `/tracking/${data.trackingToken}`;
+          setTimeout(() => { window.location.href = trackingUrl; }, 0);
         } else {
           // Fallback: show success dialog only
           setOrderSuccess({ numeroPedido: data.numeroPedido });
