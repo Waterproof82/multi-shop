@@ -35,6 +35,43 @@ Todo el codebase usa `Result<T, AppError>`.
 - `tenant`: Siempre derivar empresa vía `parseMainDomain(domain)`.
 - `superadmin`: `empresaId` es null. Se pasa por query param `?empresaId=...`.
 
+## 🗄️ Migraciones — Checklist Obligatorio por Tabla Nueva
+
+Toda migración que cree una tabla nueva DEBE incluir estos tres bloques, en este orden:
+
+### 1. RLS
+```sql
+ALTER TABLE public.mi_tabla ENABLE ROW LEVEL SECURITY;
+
+-- Denegar acceso anon explícitamente
+CREATE POLICY "No direct anon access to mi_tabla"
+  ON public.mi_tabla FOR ALL TO anon
+  USING (false) WITH CHECK (false);
+
+-- Policies por rol authenticated usando get_mi_empresa_id()
+CREATE POLICY "Admin ve mi_tabla"
+  ON public.mi_tabla FOR SELECT
+  USING (empresa_id = get_mi_empresa_id());
+-- ... INSERT / UPDATE / DELETE con mismo patrón
+```
+
+### 2. GRANTs explícitos (obligatorio desde oct 2026 — Supabase Data API)
+```sql
+-- service_role: backend (bypasses RLS pero necesita grant de tabla)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.mi_tabla TO service_role;
+
+-- authenticated: admins con RLS
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.mi_tabla TO authenticated;
+
+-- anon: solo si la tabla es pública (ej: productos, categorias, empresas)
+-- GRANT SELECT ON public.mi_tabla TO anon;
+```
+
+### 3. Función auxiliar de aislamiento de tenant
+`get_mi_empresa_id()` — definida en `20260527000002_create_get_mi_empresa_id.sql`.
+Retorna el `empresa_id` del admin autenticado vía `auth.uid()` → `perfiles_admin`.
+Usar siempre en RLS policies para aislar datos por empresa.
+
 ## 🎨 UI & Design System (Tailwind v4)
 - **Tokens:** NUNCA hardcodear colores. Usar variables CSS del tenant.
 - **Accesibilidad:** Touch targets min 44px. Focus rings estándar. `aria-labels` traducidos.
