@@ -6,29 +6,39 @@ import { logger } from "../logging/logger";
 export class SupabasePedidoRepository implements IPedidoRepository {
   constructor(private readonly supabase: SupabaseClient) {}
 
+  private async getOpenSesionIds(empresaId: string): Promise<Set<string>> {
+    const { data } = await this.supabase
+      .from('mesa_sesiones')
+      .select('id')
+      .eq('empresa_id', empresaId)
+      .is('cerrada_at', null);
+    return new Set((data ?? []).map((s: Record<string, unknown>) => s['id'] as string));
+  }
+
+  private excludeOpenSesionPedidos(data: Pedido[], openSesionIds: Set<string>): Pedido[] {
+    if (openSesionIds.size === 0) return data;
+    return data.filter(p => {
+      const sesionId = (p as unknown as Record<string, unknown>)['sesion_id'] as string | null;
+      return !sesionId || !openSesionIds.has(sesionId);
+    });
+  }
+
   async findAllByTenant(empresaId: string): Promise<Result<Pedido[]>> {
     try {
-      const { data, error } = await this.supabase
-        .from('pedidos')
-        .select(`
-          *,
-          clientes:cliente_id (nombre, email, telefono),
-          mesas:mesa_id (numero, nombre)
-        `)
-        .eq('empresa_id', empresaId)
-        .order('created_at', { ascending: false });
+      const [{ data, error }, openSesionIds] = await Promise.all([
+        this.supabase
+          .from('pedidos')
+          .select(`*, clientes:cliente_id (nombre, email, telefono), mesas:mesa_id (numero, nombre)`)
+          .eq('empresa_id', empresaId)
+          .order('created_at', { ascending: false }),
+        this.getOpenSesionIds(empresaId),
+      ]);
 
       if (error) {
-        await logger.logAndReturnError(
-          'DB_SELECT_ERROR',
-          error.message,
-          'repository',
-          'SupabasePedidoRepository.findAllByTenant',
-          { empresaId, details: { code: error.code } }
-        );
+        await logger.logAndReturnError('DB_SELECT_ERROR', error.message, 'repository', 'SupabasePedidoRepository.findAllByTenant', { empresaId, details: { code: error.code } });
         return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pedidos', module: 'repository', method: 'findAllByTenant' } };
       }
-      return { success: true, data: data || [] };
+      return { success: true, data: this.excludeOpenSesionPedidos(data || [], openSesionIds) };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findAllByTenant', { empresaId });
       return { success: false, error: appError };
@@ -40,29 +50,22 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       const startDate = new Date(año, mes, 1).toISOString();
       const endDate = new Date(año, mes + 1, 0, 23, 59, 59).toISOString();
 
-      const { data, error } = await this.supabase
-        .from('pedidos')
-        .select(`
-          *,
-          clientes:cliente_id (nombre, email, telefono),
-          mesas:mesa_id (numero, nombre)
-        `)
-        .eq('empresa_id', empresaId)
-        .gte('created_at', startDate)
-        .lte('created_at', endDate)
-        .order('created_at', { ascending: false });
+      const [{ data, error }, openSesionIds] = await Promise.all([
+        this.supabase
+          .from('pedidos')
+          .select(`*, clientes:cliente_id (nombre, email, telefono), mesas:mesa_id (numero, nombre)`)
+          .eq('empresa_id', empresaId)
+          .gte('created_at', startDate)
+          .lte('created_at', endDate)
+          .order('created_at', { ascending: false }),
+        this.getOpenSesionIds(empresaId),
+      ]);
 
       if (error) {
-        await logger.logAndReturnError(
-          'DB_SELECT_ERROR',
-          error.message,
-          'repository',
-          'SupabasePedidoRepository.findAllByTenantAndMonth',
-          { empresaId, details: { code: error.code, mes, año } }
-        );
+        await logger.logAndReturnError('DB_SELECT_ERROR', error.message, 'repository', 'SupabasePedidoRepository.findAllByTenantAndMonth', { empresaId, details: { code: error.code, mes, año } });
         return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pedidos', module: 'repository', method: 'findAllByTenantAndMonth' } };
       }
-      return { success: true, data: data || [] };
+      return { success: true, data: this.excludeOpenSesionPedidos(data || [], openSesionIds) };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findAllByTenantAndMonth', { empresaId, details: { mes, año } });
       return { success: false, error: appError };
@@ -206,7 +209,15 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     items: CartItem[],
     total: number,
     discountData?: { codigoDescuentoId: string; descuentoPorcentaje: number; totalSinDescuento: number },
-    trackingToken?: string
+    trackingToken?: string,
+    deliveryData?: {
+      origen?: string;
+      direccion_entrega?: string;
+      codigo_postal?: string;
+      latitude_entrega?: number;
+      longitude_entrega?: number;
+      estimated_delivery_fee_cents?: number;
+    }
   ): Promise<Result<{ id: string; numero_pedido: number; total: number; trackingToken?: string }>> {
     try {
       // Atomically generate next order number using a DB function with row-level lock
@@ -250,6 +261,15 @@ export class SupabasePedidoRepository implements IPedidoRepository {
 
       if (trackingToken) {
         insertPayload.tracking_token = trackingToken;
+      }
+
+      if (deliveryData) {
+        if (deliveryData.origen) insertPayload.origen = deliveryData.origen;
+        if (deliveryData.direccion_entrega) insertPayload.direccion_entrega = deliveryData.direccion_entrega;
+        if (deliveryData.codigo_postal) insertPayload.codigo_postal = deliveryData.codigo_postal;
+        if (deliveryData.latitude_entrega !== undefined) insertPayload.latitude_entrega = deliveryData.latitude_entrega;
+        if (deliveryData.longitude_entrega !== undefined) insertPayload.longitude_entrega = deliveryData.longitude_entrega;
+        if (deliveryData.estimated_delivery_fee_cents !== undefined) insertPayload.delivery_fee_cents = deliveryData.estimated_delivery_fee_cents;
       }
 
       const { data: pedido, error } = await this.supabase
@@ -428,11 +448,11 @@ export class SupabasePedidoRepository implements IPedidoRepository {
 
   async findByTrackingToken(
     token: string
-  ): Promise<Result<{ id: string; numero_pedido: number; estimated_minutes: number | null; estimated_ready_at: string | null; telegram_message_id: string | null; telegram_chat_id: string | null; tipo: string; estado: string; mesa_id: string | null; mesa_numero: number | null; mesa_nombre: string | null; items: { nombre: string; translations?: { en?: { name: string }; fr?: { name: string }; it?: { name: string }; de?: { name: string } }; cantidad: number; precio: number }[] } | null>> {
+  ): Promise<Result<{ id: string; numero_pedido: number; estimated_minutes: number | null; estimated_ready_at: string | null; telegram_message_id: string | null; telegram_chat_id: string | null; tipo: string; estado: string; glovo_status: string | null; mesa_id: string | null; mesa_numero: number | null; mesa_nombre: string | null; delivery_fee_cents: number | null; items: { nombre: string; translations?: { en?: { name: string }; fr?: { name: string }; it?: { name: string }; de?: { name: string } }; cantidad: number; precio: number }[] } | null>> {
     try {
       const { data, error } = await this.supabase
         .from('pedidos')
-        .select('id, numero_pedido, estimated_minutes, estimated_ready_at, telegram_message_id, detalle_pedido, estado, mesa_id, mesas(numero, nombre), empresas(telegram_chat_id, tipo)')
+        .select('id, numero_pedido, estimated_minutes, estimated_ready_at, telegram_message_id, detalle_pedido, estado, glovo_status, mesa_id, delivery_fee_cents, mesas(numero, nombre), empresas(telegram_chat_id, tipo)')
         .eq('tracking_token', token)
         .maybeSingle();
 
@@ -472,9 +492,11 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           telegram_chat_id: (empresa?.['telegram_chat_id'] as string | null) ?? null,
           tipo,
           estado: (raw['estado'] as string) ?? 'pendiente',
+          glovo_status: (raw['glovo_status'] as string | null) ?? null,
           mesa_id: mesaId,
           mesa_numero: (mesaRaw?.['numero'] as number | null) ?? null,
           mesa_nombre: (mesaRaw?.['nombre'] as string | null) ?? null,
+          delivery_fee_cents: (raw['delivery_fee_cents'] as number | null) ?? null,
           items: ((raw['detalle_pedido'] as { nombre: string; translations?: { en?: { name: string }; fr?: { name: string }; it?: { name: string }; de?: { name: string } }; cantidad: number; precio: number }[] | null) ?? []),
         },
       };
@@ -722,6 +744,63 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findBySesionId', { details: { sesionId } });
+      return { success: false, error: appError };
+    }
+  }
+
+  async consolidateSesionOrders(sesionId: string): Promise<Result<void>> {
+    try {
+      const ordersResult = await this.findBySesionId(sesionId);
+      if (!ordersResult.success) return { success: false, error: ordersResult.error };
+
+      const orders = ordersResult.data;
+      if (orders.length === 0) return { success: true, data: undefined };
+
+      if (orders.length === 1) {
+        await this.supabase.from('pedidos').update({ estado: 'cerrado' }).eq('id', orders[0].id);
+        return { success: true, data: undefined };
+      }
+
+      const mergedItems = orders.flatMap(o => o.detalle_pedido);
+      const mergedTotal = orders.reduce((sum, o) => sum + Number(o.total), 0);
+      const [primary, ...rest] = orders;
+
+      const { error: updateError } = await this.supabase
+        .from('pedidos')
+        .update({ detalle_pedido: mergedItems, total: Math.round(mergedTotal * 100) / 100, estado: 'cerrado' })
+        .eq('id', primary.id);
+
+      if (updateError) {
+        await logger.logAndReturnError(
+          'DB_UPDATE_ERROR',
+          updateError.message,
+          'repository',
+          'SupabasePedidoRepository.consolidateSesionOrders',
+          { details: { code: updateError.code, sesionId } }
+        );
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al consolidar pedidos', module: 'repository', method: 'consolidateSesionOrders' } };
+      }
+
+      const restIds = rest.map(o => o.id);
+      const { error: deleteError } = await this.supabase
+        .from('pedidos')
+        .delete()
+        .in('id', restIds);
+
+      if (deleteError) {
+        await logger.logAndReturnError(
+          'DB_DELETE_ERROR',
+          deleteError.message,
+          'repository',
+          'SupabasePedidoRepository.consolidateSesionOrders',
+          { details: { code: deleteError.code, sesionId } }
+        );
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al eliminar pedidos duplicados', module: 'repository', method: 'consolidateSesionOrders' } };
+      }
+
+      return { success: true, data: undefined };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.consolidateSesionOrders', { details: { sesionId } });
       return { success: false, error: appError };
     }
   }

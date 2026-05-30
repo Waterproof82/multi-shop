@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { UtensilsCrossed, ArrowLeftRight, LogOut } from "lucide-react";
+import { UtensilsCrossed, ArrowLeftRight, LogOut, X } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { getWaiterMesa, clearWaiterMesa } from "@/components/waiter-login-form";
@@ -18,24 +18,31 @@ const BTN_NEUTRAL_TEXT = "oklch(68% 0.06 252)";
 const BTN_EXIT_BG = "oklch(21% 0.05 25)";
 const BTN_EXIT_HOVER = "oklch(27% 0.07 25)";
 const BTN_EXIT_TEXT = "oklch(65% 0.16 25)";
+const BTN_CLOSE_BG = "oklch(19% 0.04 25)";
+const BTN_CLOSE_HOVER = "oklch(25% 0.07 25)";
+const BTN_CLOSE_TEXT = "oklch(62% 0.18 25)";
 
 export function WaiterBanner() {
   const pathname = usePathname();
   const { language } = useLanguage();
   const lang = language as Parameters<typeof t>[1];
   const [mesaLabel, setMesaLabel] = useState<string | null>(null);
+  const [mesaId, setMesaId] = useState<string | null>(null);
+  const [closing, setClosing] = useState(false);
 
   useEffect(() => {
     const stored = getWaiterMesa();
-    if (!stored) { setMesaLabel(null); return; }
+    if (!stored) { setMesaLabel(null); setMesaId(null); return; }
 
     fetch("/api/waiter/me")
       .then((r) => {
         if (r.ok) {
           setMesaLabel(stored.mesaNombre ?? `Mesa ${stored.mesaNumero}`);
+          setMesaId(stored.mesaId);
         } else {
           clearWaiterMesa();
           setMesaLabel(null);
+          setMesaId(null);
         }
       })
       .catch(() => null);
@@ -44,6 +51,19 @@ export function WaiterBanner() {
   if (!mesaLabel) return null;
 
   function handleChangeTable() { window.location.href = "/waiter"; }
+
+  async function handleCloseTable() {
+    if (!mesaId || closing) return;
+    if (!window.confirm(t("waiterTableCloseConfirm", lang))) return;
+    setClosing(true);
+    try {
+      await fetch(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/close`, { method: "POST" });
+      clearWaiterMesa();
+      window.location.href = "/waiter";
+    } finally {
+      setClosing(false);
+    }
+  }
 
   async function handleLogout() {
     await fetch("/api/waiter/logout", { method: "POST" });
@@ -111,6 +131,19 @@ export function WaiterBanner() {
           >
             <ArrowLeftRight className="w-3.5 h-3.5 shrink-0" />
             <span className="hidden sm:inline">{t("waiterChangeTable", lang)}</span>
+          </button>
+
+          <button
+            onClick={handleCloseTable}
+            disabled={closing}
+            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150 min-h-[32px] disabled:opacity-40"
+            style={{ color: BTN_CLOSE_TEXT, backgroundColor: BTN_CLOSE_BG }}
+            onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_CLOSE_HOVER)}
+            onMouseLeave={e => (e.currentTarget.style.backgroundColor = BTN_CLOSE_BG)}
+            aria-label={t("waiterTableCloseAction", lang)}
+          >
+            <X className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden sm:inline">{t("waiterTableCloseAction", lang)}</span>
           </button>
 
           <button

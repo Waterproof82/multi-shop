@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { mesaSesionUseCase, mesaSesionRepository } from '@/core/infrastructure/database';
+import { mesaSesionUseCase, mesaSesionRepository, pedidoRepository } from '@/core/infrastructure/database';
 
 const mesaIdSchema = z.string().uuid('El mesaId debe ser un UUID válido');
 
@@ -27,7 +27,12 @@ export async function POST(
     return NextResponse.json({ error: 'No hay sesión activa para esta mesa' }, { status: 404 });
   }
 
-  const result = await mesaSesionUseCase.closeSesion(sesionResult.data.id);
+  const sesionId = sesionResult.data.id;
+
+  // Merge all individual orders into a single ticket
+  await pedidoRepository.consolidateSesionOrders(sesionId);
+
+  const result = await mesaSesionUseCase.closeSesion(sesionId);
   if (!result.success) {
     return NextResponse.json({ error: 'Error al cerrar la sesión de mesa' }, { status: 500 });
   }

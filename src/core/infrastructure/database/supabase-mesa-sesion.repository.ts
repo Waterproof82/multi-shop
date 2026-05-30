@@ -1,6 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Result } from '@/core/domain/entities/types';
-import { IMesaSesionRepository, MesaSesion } from '@/core/domain/repositories/IMesaSesionRepository';
+import { IMesaSesionRepository, MesaSesion, PendingItem } from '@/core/domain/repositories/IMesaSesionRepository';
 import { logger } from '../logging/logger';
 
 export class SupabaseMesaSesionRepository implements IMesaSesionRepository {
@@ -53,11 +53,48 @@ export class SupabaseMesaSesionRepository implements IMesaSesionRepository {
     }
   }
 
+  async appendItems(sesionId: string, items: PendingItem[], itemsTotal: number): Promise<Result<void>> {
+    try {
+      const { data: current, error: fetchError } = await this.supabase
+        .from('mesa_sesiones')
+        .select('pending_items, pending_total')
+        .eq('id', sesionId)
+        .single();
+
+      if (fetchError) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', fetchError.message, 'repository', 'SupabaseMesaSesionRepository.appendItems', { details: { code: fetchError.code, sesionId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al leer items pendientes', module: 'repository', method: 'appendItems' } };
+      }
+
+      const row = current as Record<string, unknown>;
+      const existing = (row['pending_items'] as PendingItem[]) ?? [];
+      const existingTotal = Number(row['pending_total']) ?? 0;
+
+      const { error: updateError } = await this.supabase
+        .from('mesa_sesiones')
+        .update({
+          pending_items: [...existing, ...items],
+          pending_total: Math.round((existingTotal + itemsTotal) * 100) / 100,
+        })
+        .eq('id', sesionId);
+
+      if (updateError) {
+        await logger.logAndReturnError('DB_UPDATE_ERROR', updateError.message, 'repository', 'SupabaseMesaSesionRepository.appendItems', { details: { code: updateError.code, sesionId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al guardar items', module: 'repository', method: 'appendItems' } };
+      }
+
+      return { success: true, data: undefined };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseMesaSesionRepository.appendItems', { details: { sesionId } });
+      return { success: false, error: appError };
+    }
+  }
+
   async findActiveSesionByMesa(mesaId: string): Promise<Result<MesaSesion | null>> {
     try {
       const { data, error } = await this.supabase
         .from('mesa_sesiones')
-        .select('id, mesa_id, empresa_id, total, cerrada_at, created_at')
+        .select('id, mesa_id, empresa_id, total, pending_items, pending_total, cerrada_at, created_at')
         .eq('mesa_id', mesaId)
         .is('cerrada_at', null)
         .maybeSingle();
@@ -83,6 +120,8 @@ export class SupabaseMesaSesionRepository implements IMesaSesionRepository {
           mesaId: row['mesa_id'] as string,
           empresaId: row['empresa_id'] as string,
           total: row['total'] as number,
+          pendingItems: (row['pending_items'] as PendingItem[]) ?? [],
+          pendingTotal: Number(row['pending_total']) ?? 0,
           cerradaAt: (row['cerrada_at'] as string | null) ?? null,
           createdAt: row['created_at'] as string,
         },
@@ -97,7 +136,7 @@ export class SupabaseMesaSesionRepository implements IMesaSesionRepository {
     try {
       const { data, error } = await this.supabase
         .from('mesa_sesiones')
-        .select('id, mesa_id, empresa_id, total, cerrada_at, created_at')
+        .select('id, mesa_id, empresa_id, total, pending_items, pending_total, cerrada_at, created_at')
         .eq('id', sesionId)
         .maybeSingle();
 
@@ -122,6 +161,8 @@ export class SupabaseMesaSesionRepository implements IMesaSesionRepository {
           mesaId: row['mesa_id'] as string,
           empresaId: row['empresa_id'] as string,
           total: row['total'] as number,
+          pendingItems: (row['pending_items'] as PendingItem[]) ?? [],
+          pendingTotal: Number(row['pending_total']) ?? 0,
           cerradaAt: (row['cerrada_at'] as string | null) ?? null,
           createdAt: row['created_at'] as string,
         },
