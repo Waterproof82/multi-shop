@@ -10,15 +10,32 @@ The waiter panel is only relevant for empresas with `tipo = 'restaurante'` that 
 
 ## Authentication
 
-Waiters authenticate with a 4-digit PIN. The PIN is stored as a bcrypt hash in `empresas.waiter_pin_hash`.
+Waiters authenticate with a PIN (4–12 characters). The PIN is stored as a bcrypt hash in `empresas.waiter_pin_hash`.
 
-### Login flow
+### Login flow — two steps
+
+**Step 1 — PIN entry:**
 ```
 POST /api/waiter/auth   { pin: "1234" }
   → validates PIN against waiter_pin_hash (bcrypt compare)
   → sets HttpOnly cookie: waiter_token (JWT, 8h expiry)
-  → returns { mesaId, mesaNumero, mesaNombre } if previously assigned mesa
+  → returns { ok: true }
 ```
+The auth endpoint is now PIN-only. It does NOT look up or assign a mesa.
+
+**Step 2 — Table selection:**
+
+After PIN auth succeeds, `WaiterLoginForm` fetches `GET /api/waiter/mesas` and renders a visual table grid inline. The waiter clicks a table card to claim it:
+
+```
+POST /api/waiter/mesa   { mesaNumero: 3 }
+  → opens (or resumes) session for that mesa
+  → returns { mesaId, mesaNumero, mesaNombre }
+  → client saves to sessionStorage (key: waiter_mesa)
+  → router.push(`/?mesa=${mesaId}`)
+```
+
+On mount, `WaiterLoginForm` pings `GET /api/waiter/me`. If the cookie is already valid, it skips the PIN step and shows the table grid directly.
 
 ### Session cookie
 - Name: `waiter_token`
@@ -29,10 +46,10 @@ POST /api/waiter/auth   { pin: "1234" }
 
 | Method | Route | Description |
 |--------|-------|-------------|
-| `POST` | `/api/waiter/auth` | PIN login |
+| `POST` | `/api/waiter/auth` | PIN login — sets cookie, returns `{ ok: true }` |
 | `POST` | `/api/waiter/logout` | Clear cookie |
 | `GET` | `/api/waiter/me` | Verify session is valid |
-| `GET` | `/api/waiter/mesa` | Get currently assigned mesa |
+| `POST` | `/api/waiter/mesa` | Claim a mesa by number |
 | `GET` | `/api/waiter/mesas` | List all mesas with session status |
 | `POST` | `/api/waiter/mesas/{mesaId}/open` | Open a table session |
 | `POST` | `/api/waiter/mesas/{mesaId}/close` | Close a table session |
@@ -44,7 +61,9 @@ POST /api/waiter/auth   { pin: "1234" }
 ## Pages
 
 ### `/waiter`
-Login page. Shows PIN pad. On success, redirects to `/waiter/tables`.
+Login page. Two-step flow managed by `WaiterLoginForm`:
+1. **PIN step** — dark centered card, large password input, `autoComplete="off"` (prevents Chrome password-manager breach warnings). Submit calls `POST /api/waiter/auth`.
+2. **Table step** — visual grid of all mesas (same card design as `/waiter/tables`). Each card shows table number, status dot (pulsing green = occupied), and pill badge "Ocupada"/"Libre". Clicking a card calls `POST /api/waiter/mesa` and redirects to `/?mesa={mesaId}`.
 
 ### `/waiter/tables`
 Grid of all mesas. Each card shows:
@@ -112,9 +131,23 @@ WHERE id = 'your-empresa-id';
 
 ---
 
+## Table Status Display
+
+Mesa cards across both `/waiter` (step 2) and `/waiter/tables` use identical pill badge design:
+
+| State | Indicator | Badge |
+|-------|-----------|-------|
+| Occupied | Pulsing green dot (`animate-ping`) | Green pill "Ocupada" |
+| Free | Static grey dot | Grey pill "Libre" |
+
+Occupied cards also show active order count and session total below the badge. The `activeOrderCount` is computed per-session (not all-time) by querying `pedidos` filtered by `sesion_id IN (activeSesionIds)` and `estado != 'cerrado'`.
+
+---
+
 ## Security Notes
 
 - The waiter token has a separate `sub: 'waiter'` claim to distinguish it from admin tokens
 - All `/api/waiter/*` routes verify the token before any DB access
 - The PIN itself is never stored or logged — only the bcrypt hash
+- PIN input uses `autoComplete="off"` (not `"current-password"`) — Chrome would otherwise match against breach databases and show a security warning
 - Closing a session prevents new orders from being attributed to it

@@ -255,12 +255,27 @@ NEXT_PUBLIC_REDSYS_URL=https://sis.redsys.es/sis/realizarPago
 
 Ruta: `/admin/delivery`
 
-Secciones:
-1. **Zona de entrega** — lista de CP, pedido mínimo, suplemento
+El enlace "Delivery" aparece en el sidebar para **todos los perfiles admin** (no solo restaurante). El acceso está siempre disponible independientemente del `tipo` de empresa.
+
+### Visibilidad por rol
+
+| Sección | Admin normal | Superadmin |
+|---------|-------------|------------|
+| Pedido mínimo (€) | ✅ | ✅ |
+| Suplemento envío (€) | ✅ | ✅ |
+| Glovo Business (credenciales) | ❌ | ✅ |
+| Redsys TPV (credenciales) | ❌ | ✅ |
+
+La visibilidad se controla en el servidor: `page.tsx` detecta `isSuperAdmin = admin.rol === SUPERADMIN_ROLE` y lo pasa como prop a `DeliveryCredentialsForm`. Los bloques de credenciales están envueltos en `{isSuperAdmin && (...)}`.
+
+### Secciones completas (superadmin)
+1. **Configuración general** — pedido mínimo, suplemento
 2. **Glovo Business** — client_id, key_id, private_key (PEM), vendor_id, country_code
 3. **Redsys TPV** — merchant_code, terminal, secret_key
 
 Los campos de clave muestran un indicador `✓ guardado` cuando tienen valor en DB. Enviar un campo vacío no sobreescribe el valor existente.
+
+> **Nota técnica**: `DeliveryCredentialsForm` usa `fetchWithCsrf` (no `fetch` plano) para el `PUT /api/admin/delivery-settings`. El proxy exige el header `x-csrf-token` en todas las peticiones mutativas de admin — sin `fetchWithCsrf`, el endpoint devuelve 403.
 
 ---
 
