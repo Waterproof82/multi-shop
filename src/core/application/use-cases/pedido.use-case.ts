@@ -20,6 +20,13 @@ export interface CreatePedidoDTO {
   email?: string;
   idioma?: string;
   codigoDescuento?: string;
+  // Delivery fields (restaurant only)
+  origen?: 'recogida' | 'delivery';
+  direccion_entrega?: string;
+  codigo_postal?: string;
+  latitude_entrega?: number;
+  longitude_entrega?: number;
+  estimated_delivery_fee_cents?: number;
 }
 
 export interface CreateMesaPedidoDTO {
@@ -355,8 +362,13 @@ export class PedidoUseCase {
         }
       }
 
-      // Step 3.5: Generate tracking token for restaurant orders (only when esPedidos) or tienda
-      const trackingToken = (empresaTipo === 'restaurante' && esPedidos) || empresaTipo === 'tienda'
+      // Step 3.5: Add delivery fee to total for delivery orders
+      const isDelivery = data.origen === 'delivery';
+      if (isDelivery && data.estimated_delivery_fee_cents) {
+        const feeCents = data.estimated_delivery_fee_cents;
+        finalTotal = Math.round((finalTotal * 100 + feeCents)) / 100;
+      }
+      const trackingToken = (empresaTipo === 'restaurante' && esPedidos) || empresaTipo === 'tienda' || isDelivery
         ? crypto.randomUUID()
         : undefined;
 
@@ -367,7 +379,15 @@ export class PedidoUseCase {
         data.items,
         finalTotal,
         discountData,
-        trackingToken
+        trackingToken,
+        isDelivery ? {
+          origen: data.origen,
+          direccion_entrega: data.direccion_entrega,
+          codigo_postal: data.codigo_postal,
+          latitude_entrega: data.latitude_entrega,
+          longitude_entrega: data.longitude_entrega,
+          estimated_delivery_fee_cents: data.estimated_delivery_fee_cents,
+        } : undefined
       );
       if (!pedidoResult.success) {
         return { success: false, error: pedidoResult.error };
@@ -379,7 +399,9 @@ export class PedidoUseCase {
       }
 
       // Step 6: Send Telegram notification
-      if (telegramChatId && pedidoResult.data) {
+      // Delivery orders: payment not confirmed yet — skip until webhook confirms payment
+      const isDeliveryOrder = data.origen === 'delivery';
+      if (telegramChatId && pedidoResult.data && !isDeliveryOrder) {
         const pedidoParaNotificar: import('@/core/domain/entities/types').Pedido = {
           id: pedidoResult.data.id,
           empresa_id: empresaId,
