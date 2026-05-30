@@ -25,6 +25,7 @@ export interface IPedidoRepository {
   findBySesionId(sesionId: string): Promise<Result<{ id: string; numero_pedido: number; total: number; estado: string; detalle_pedido: unknown[]; created_at: string }[]>>;
   consolidateSesionOrders(sesionId: string): Promise<Result<void>>;
   findSesionTelegramMessages(sesionId: string): Promise<Result<{ messageId: number; chatId: string }[]>>;
+  findMesaContextForWebhook(pedidoId: string): Promise<Result<{ empresa_id: string; numero_pedido: number; mesa_numero: number; mesa_nombre: string | null; telegram_bebidas_chat_id: string | null } | null>>;
   create(
     empresaId: string,
     clienteId: string | null,

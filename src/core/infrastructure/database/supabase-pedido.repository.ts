@@ -845,4 +845,41 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       return { success: false, error: appError };
     }
   }
+  async findMesaContextForWebhook(pedidoId: string): Promise<Result<{ empresa_id: string; numero_pedido: number; mesa_numero: number; mesa_nombre: string | null; telegram_bebidas_chat_id: string | null } | null>> {
+    try {
+      const { data, error } = await this.supabase
+        .from('pedidos')
+        .select('empresa_id, numero_pedido, mesas(numero, nombre), empresas(telegram_bebidas_chat_id)')
+        .eq('id', pedidoId)
+        .maybeSingle();
+
+      if (error) {
+        return { success: false, error: { code: 'DB_ERROR', message: error.message, module: 'repository', method: 'findMesaContextForWebhook' } };
+      }
+
+      if (!data) return { success: true, data: null };
+
+      const mesaRaw = Array.isArray(data['mesas'])
+        ? (data['mesas'][0] ?? null)
+        : (data['mesas'] ?? null);
+
+      const empRaw = Array.isArray(data['empresas'])
+        ? (data['empresas'][0] ?? null)
+        : (data['empresas'] ?? null);
+
+      return {
+        success: true,
+        data: {
+          empresa_id: data['empresa_id'] as string,
+          numero_pedido: data['numero_pedido'] as number,
+          mesa_numero: ((mesaRaw as Record<string, unknown> | null)?.['numero'] as number) ?? 0,
+          mesa_nombre: ((mesaRaw as Record<string, unknown> | null)?.['nombre'] as string | null) ?? null,
+          telegram_bebidas_chat_id: ((empRaw as Record<string, unknown> | null)?.['telegram_bebidas_chat_id'] as string | null) ?? null,
+        },
+      };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findMesaContextForWebhook', { details: { pedidoId } });
+      return { success: false, error: appError };
+    }
+  }
 }

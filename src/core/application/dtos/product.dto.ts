@@ -29,6 +29,7 @@ export const createProductSchema = z.object({
   categoria_id: z.string().uuid().nullable().optional(),
   es_especial: z.boolean().default(false),
   activo: z.boolean().default(true),
+  tipo_producto: z.enum(['comida', 'bebida']).default('comida'),
 });
 
 export type CreateProductDTO = z.infer<typeof createProductSchema>;

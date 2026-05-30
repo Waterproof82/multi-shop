@@ -26,6 +26,7 @@ export class SupabaseProductRepository implements IProductRepository {
       fotoObjectFit: (row.foto_object_fit as string | null) as Product['fotoObjectFit'],
       esEspecial: row.es_especial as boolean,
       activo: row.activo as boolean,
+      tipoProducto: (row.tipo_producto as string) === 'bebida' ? 'bebida' : 'comida',
       createdAt: new Date(row.created_at as string),
     };
   }
@@ -52,6 +53,7 @@ export class SupabaseProductRepository implements IProductRepository {
           foto_object_fit: data.foto_object_fit || 'contain',
           es_especial: data.es_especial,
           activo: data.activo,
+          tipo_producto: data.tipo_producto ?? 'comida',
         })
         .select()
         .single();
@@ -90,7 +92,7 @@ export class SupabaseProductRepository implements IProductRepository {
 
       const { data, error } = await this.supabase
         .from("productos")
-        .select("id, precio, empresa_id")
+        .select("id, precio, empresa_id, tipo_producto")
         .in("id", ids)
         .eq("empresa_id", empresaId)
         .eq("activo", true);
@@ -164,7 +166,7 @@ export class SupabaseProductRepository implements IProductRepository {
     const fieldsToMap = [
       'categoria_id', 'titulo_es', 'titulo_en', 'titulo_fr', 'titulo_it', 'titulo_de',
       'descripcion_es', 'descripcion_en', 'descripcion_fr', 'descripcion_it', 'descripcion_de',
-      'precio', 'es_especial', 'activo', 'foto_object_fit'
+      'precio', 'es_especial', 'activo', 'foto_object_fit', 'tipo_producto'
     ];
 
     for (const field of fieldsToMap) {

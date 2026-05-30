@@ -40,8 +40,14 @@ sesion_id   uuid NULL REFERENCES mesa_sesiones(id)
 
 ### `empresas` (delta)
 ```sql
-telegram_mesa_chat_id  text NULL   -- separate Telegram chat for mesa orders
-waiter_pin_hash        text NULL   -- bcrypt hash of waiter PIN
+telegram_mesa_chat_id        text NULL   -- Telegram chat for mesa orders (kitchen)
+telegram_bebidas_chat_id     text NULL   -- Telegram chat for bar/drinks (optional)
+waiter_pin_hash              text NULL   -- bcrypt hash of waiter PIN
+```
+
+### `productos` (delta)
+```sql
+tipo_producto   text NOT NULL DEFAULT 'comida'   -- 'comida' | 'bebida'
 ```
 
 ---
@@ -144,21 +150,31 @@ Mesa orders follow a **session-based visibility** model in `/admin/pedidos`:
 
 ## Telegram Notification
 
-When a mesa order is placed, `sendTelegramForMesa` sends to `telegram_mesa_chat_id`:
+When a mesa order is placed, items are routed based on `tipo_producto` and group configuration:
 
+**With two groups configured (`telegram_mesa_chat_id` + `telegram_bebidas_chat_id`):**
+- Comida items → kitchen group (`telegram_mesa_chat_id`)
+- Bebida items → bar group (`telegram_bebidas_chat_id`)
+
+**With only one group:** all items → `telegram_mesa_chat_id` (backwards-compatible).
+
+Example kitchen message:
 ```
 Pedido #42 — Terraza 1 (Mesa 3)
 
 - 2x Spaghetti Carbonara
-- 1x Agua mineral
 ```
 
-Inline buttons:
+Inline buttons (3-state flow):
 ```
-[ ✅ Anotado ]  [ 🍽️ Servido ]
+[ ✅ Anotado ]  [ 🍳 Preparado ]
 ```
+→ Anotado: `[ ✅ Anotado ✓ ] [ 🍳 Preparado ] [ 🔄 Modificar ]`
+→ Preparado: `[ 🍳 Preparado ✓ ] [ 🍽️ Servido ] [ 🔄 Modificar ]` + alerta al bar
+→ Servido: `[ 🍽️ Servido ✓ ] [ 🗑️ Eliminar ] [ 🔄 Modificar ]`
+→ Eliminar: borra el mensaje del chat
 
-See [telegram-notifications.md](./telegram-notifications.md) for the full callback flow.
+See [telegram-notifications.md](../telegram-notifications.md) for the full callback flow.
 
 ---
 

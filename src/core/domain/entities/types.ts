@@ -19,6 +19,7 @@ export interface Product {
   fotoObjectFit: ImageFit | null;
   esEspecial: boolean;
   activo: boolean;
+  tipoProducto: 'comida' | 'bebida';
   createdAt: Date;
 }
 

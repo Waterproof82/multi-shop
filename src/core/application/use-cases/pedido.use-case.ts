@@ -5,7 +5,7 @@ import { ICodigoDescuentoRepository } from "@/core/domain/repositories/ICodigoDe
 import { IMesaSesionRepository } from "@/core/domain/repositories/IMesaSesionRepository";
 import { Pedido, Result } from "@/core/domain/entities/types";
 import { logger } from "@/core/infrastructure/logging/logger";
-import { sendTelegramWithInlineButtons, sendTelegramWithQuickReplies, sendTelegramForMesa } from '@/core/infrastructure/services/telegram.service';
+import { sendTelegramWithInlineButtons, sendTelegramWithQuickReplies, sendTelegramForMesa, sendTelegramBebidasInfo } from '@/core/infrastructure/services/telegram.service';
 
 export interface CreatePedidoDTO {
   items: {
@@ -164,7 +164,7 @@ export class PedidoUseCase {
   private async validateProductPrices(
     empresaId: string,
     data: CreatePedidoDTO['items']
-  ): Promise<Result<{ priceMap: Map<string, number>; serverTotal: number }>> {
+  ): Promise<Result<{ priceMap: Map<string, number>; tipoProductoMap: Map<string, 'comida' | 'bebida'>; serverTotal: number }>> {
     const productIds = data
       .map(ci => ci.item?.id)
       .filter((id): id is string => Boolean(id));
@@ -177,7 +177,7 @@ export class PedidoUseCase {
     const allIds = [...new Set([...productIds, ...complementIds])];
 
     if (allIds.length === 0) {
-      return { success: true, data: { priceMap: new Map(), serverTotal: 0 } };
+      return { success: true, data: { priceMap: new Map(), tipoProductoMap: new Map(), serverTotal: 0 } };
     }
 
     const productsResult = await this.productRepo.findByIds(allIds, empresaId);
@@ -186,6 +186,7 @@ export class PedidoUseCase {
     }
 
     const priceMap = new Map(productsResult.data.map(p => [p.id, p.precio]));
+    const tipoProductoMap = new Map(productsResult.data.map(p => [p.id, p.tipoProducto]));
 
     // Verify all product IDs exist
     for (const ci of data) {
@@ -225,7 +226,7 @@ export class PedidoUseCase {
       return sum + (unitPrice + complementsTotal) * ci.quantity;
     }, 0);
 
-    return { success: true, data: { priceMap, serverTotal } };
+    return { success: true, data: { priceMap, tipoProductoMap, serverTotal } };
   }
 
   /**
@@ -449,7 +450,11 @@ export class PedidoUseCase {
 
   /**
    * Create a mesa order — no cliente required, no PII collected.
-   * Sends Telegram to telegram_mesa_chat_id, falling back to telegram_chat_id.
+   *
+   * Telegram routing (when telegram_bebidas_chat_id is set):
+   *   - comida → telegram_mesa_chat_id (cocina) with Anotado/Preparado buttons
+   *   - bebidas → telegram_bebidas_chat_id (bar) with informational message only
+   * Fallback (single group): all items → telegram_mesa_chat_id ?? telegram_chat_id
    */
   async createMesaOrder(
     empresaId: string,
@@ -457,7 +462,8 @@ export class PedidoUseCase {
     mesaNumero: number,
     mesaNombre: string | null,
     telegramMesaChatId: string | null,
-    telegramChatId: string | null
+    telegramChatId: string | null,
+    telegramBebidasChatId: string | null = null
   ): Promise<Result<{ id: string; numero_pedido: number; total: number; trackingToken: string }>> {
     try {
       // Step 1: Validate products and calculate server total
@@ -466,20 +472,20 @@ export class PedidoUseCase {
         return { success: false, error: priceResult.error };
       }
 
-      const serverTotal = priceResult.data.serverTotal;
+      const { serverTotal, priceMap, tipoProductoMap } = priceResult.data;
       const trackingToken = crypto.randomUUID();
 
       // Step 2: Build items for repo (nombre + cantidad + precio + complementos)
       const repoItems = data.items.map(ci => ({
         nombre: ci.item?.name ?? '',
         cantidad: ci.quantity,
-        precio: priceResult.data.priceMap.get(ci.item?.id ?? '') ?? ci.item?.price ?? 0,
+        precio: priceMap.get(ci.item?.id ?? '') ?? ci.item?.price ?? 0,
+        tipo_producto: tipoProductoMap.get(ci.item?.id ?? '') ?? 'comida',
         translations: ci.item?.translations,
         complementos: ci.selectedComplements?.map(c => ({ nombre: c.name, precio: c.price })) ?? [],
       }));
 
       // Step 3: Ensure an active session exists (idempotent), then attach it to the order.
-      // This handles the QR-customer flow where no waiter has explicitly opened the table.
       let sesionId: string | null = null;
       if (this.mesaSesionRepo) {
         await this.mesaSesionRepo.openSesion(data.mesa_id, empresaId);
@@ -502,30 +508,39 @@ export class PedidoUseCase {
         return { success: false, error: pedidoResult.error };
       }
 
-      // Step 5: Send Telegram notification (mesa channel preferred, fallback to main)
-      const chatId = telegramMesaChatId ?? telegramChatId;
-      if (chatId) {
-        const telegramResult = await sendTelegramForMesa(
-          pedidoResult.data.id,
-          pedidoResult.data.numero_pedido,
-          repoItems,
-          mesaNumero,
-          mesaNombre,
-          chatId
-        );
+      const pedidoId = pedidoResult.data.id;
+      const numeroPedido = pedidoResult.data.numero_pedido;
+
+      // Step 5: Send Telegram notifications
+      const cocinaChatId = telegramMesaChatId ?? telegramChatId;
+      const hasSplitGroups = Boolean(telegramBebidasChatId && cocinaChatId);
+
+      if (hasSplitGroups) {
+        // Split: comida → cocina group, bebidas → bar group
+        const comidaItems = repoItems.filter(i => i.tipo_producto !== 'bebida');
+        const bebidasItems = repoItems.filter(i => i.tipo_producto === 'bebida');
+
+        if (comidaItems.length > 0) {
+          const telegramResult = await sendTelegramForMesa(pedidoId, numeroPedido, comidaItems, mesaNumero, mesaNombre, cocinaChatId!);
+          if (telegramResult.success) {
+            await this.pedidoRepo.saveTelegramMessageId(pedidoId, telegramResult.data.messageId);
+          }
+        }
+
+        if (bebidasItems.length > 0) {
+          await sendTelegramBebidasInfo(numeroPedido, bebidasItems, mesaNumero, mesaNombre, telegramBebidasChatId!);
+        }
+      } else if (cocinaChatId) {
+        // Single group fallback: all items together
+        const telegramResult = await sendTelegramForMesa(pedidoId, numeroPedido, repoItems, mesaNumero, mesaNombre, cocinaChatId);
         if (telegramResult.success) {
-          await this.pedidoRepo.saveTelegramMessageId(pedidoResult.data.id, telegramResult.data.messageId);
+          await this.pedidoRepo.saveTelegramMessageId(pedidoId, telegramResult.data.messageId);
         }
       }
 
       return {
         success: true,
-        data: {
-          id: pedidoResult.data.id,
-          numero_pedido: pedidoResult.data.numero_pedido,
-          total: serverTotal,
-          trackingToken,
-        },
+        data: { id: pedidoId, numero_pedido: numeroPedido, total: serverTotal, trackingToken },
       };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'use-case', 'PedidoUseCase.createMesaOrder', { empresaId });

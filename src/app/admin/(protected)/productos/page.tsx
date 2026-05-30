@@ -47,6 +47,7 @@ interface Producto {
   categoria_id: string | null;
   es_especial: boolean;
   activo: boolean;
+  tipo_producto: 'comida' | 'bebida';
 }
 
 const emptyForm: ProductoFormData = {
@@ -66,6 +67,7 @@ const emptyForm: ProductoFormData = {
   categoria_id: '',
   es_especial: false,
   activo: true,
+  tipo_producto: 'comida',
 };
 
 const SortIndicator = ({ field, currentField, direction }: { field: keyof Producto | 'categoria'; currentField: keyof Producto | 'categoria'; direction: 'asc' | 'desc' }) => {
@@ -78,7 +80,7 @@ const SortIndicator = ({ field, currentField, direction }: { field: keyof Produc
 };
 
 export default function ProductosPage() {
-  const { empresaId, empresaSlug, overrideEmpresaId } = useAdmin();
+  const { empresaId, empresaSlug, overrideEmpresaId, empresaTipo } = useAdmin();
   const { language } = useLanguage();
   const effectiveEmpresaId = overrideEmpresaId || empresaId;
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -202,6 +204,7 @@ export default function ProductosPage() {
       categoria_id: producto.categoria_id || '',
       es_especial: producto.es_especial,
       activo: producto.activo,
+      tipo_producto: producto.tipo_producto ?? 'comida',
     });
     setEditingId(producto.id);
     setIsModalOpen(true);
@@ -667,6 +670,7 @@ export default function ProductosPage() {
         saving={saving}
         onSubmit={handleSubmit}
         empresaSlug={empresaSlug}
+        isRestaurante={empresaTipo === 'restaurante'}
       />
 
       <DeleteConfirmDialog

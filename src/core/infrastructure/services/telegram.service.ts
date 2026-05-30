@@ -231,7 +231,10 @@ const buildMesaOrderMessage = (
   return lines.join('\n');
 };
 
-/** Send mesa order notification with Anotado/Servido buttons */
+/**
+ * Send mesa order notification with Anotado/Preparado buttons (3-state flow).
+ * Items are filtered by tipo before calling — pass only the relevant subset.
+ */
 export const sendTelegramForMesa = async (
   pedidoId: string,
   numeroPedido: number,
@@ -252,7 +255,7 @@ export const sendTelegramForMesa = async (
   const inlineKeyboard = [
     [
       { text: '✅ Anotado', callback_data: `anotado:${pedidoId}` },
-      { text: '🍽️ Servido', callback_data: `servido:${pedidoId}` },
+      { text: '🍳 Preparado', callback_data: `preparado:${pedidoId}` },
     ],
   ];
 
@@ -288,6 +291,90 @@ export const sendTelegramForMesa = async (
   } catch (error) {
     const appError = await logger.logFromCatch(error, 'infrastructure', 'sendTelegramForMesa');
     return { success: false, error: appError };
+  }
+};
+
+/**
+ * Send a drinks-only informational message to the bar group (no estado buttons needed).
+ * When comida reaches "preparado", a follow-up alert is sent via sendTelegramPreparadoAlert.
+ */
+export const sendTelegramBebidasInfo = async (
+  numeroPedido: number,
+  items: { nombre: string; cantidad: number }[],
+  mesaNumero: number,
+  mesaNombre: string | null,
+  chatId: string
+): Promise<Result<{ messageId: number }, AppError>> => {
+  if (!TELEGRAM_BOT_TOKEN) {
+    return {
+      success: false,
+      error: { code: 'TELEGRAM_NOT_CONFIGURED', message: 'TELEGRAM_BOT_TOKEN is not set.', module: 'infrastructure' },
+    };
+  }
+
+  const tableLabel = mesaNombre ? `${sanitizeForMarkdown(mesaNombre)} \\(Mesa ${mesaNumero}\\)` : `Mesa ${mesaNumero}`;
+  const lines = [
+    `🥤 *Bebidas \\#${numeroPedido} — ${tableLabel}*`,
+    '',
+    ...items.map(item => `\\- ${item.cantidad}x ${sanitizeForMarkdown(item.nombre)}`),
+  ];
+  const message = lines.join('\n');
+
+  try {
+    const response = await fetch(
+      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: message,
+          parse_mode: 'MarkdownV2',
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const responseBody = await response.json().catch(() => response.text());
+      const error = await logger.logAndReturnError(
+        'TELEGRAM_API_ERROR',
+        `Telegram API Error (bebidas-info): ${response.status}`,
+        'infrastructure',
+        'sendTelegramBebidasInfo',
+        { details: { status: response.status, body: responseBody } }
+      );
+      return { success: false, error };
+    }
+
+    const json = await response.json() as { ok: boolean; result: { message_id: number } };
+    return { success: true, data: { messageId: json.result.message_id } };
+  } catch (error) {
+    const appError = await logger.logFromCatch(error, 'infrastructure', 'sendTelegramBebidasInfo');
+    return { success: false, error: appError };
+  }
+};
+
+/** Alert the bar group when kitchen marks comida as "preparado" */
+export const sendTelegramPreparadoAlert = async (
+  numeroPedido: number,
+  mesaNumero: number,
+  mesaNombre: string | null,
+  chatId: string
+): Promise<void> => {
+  if (!TELEGRAM_BOT_TOKEN) return;
+  const tableLabel = mesaNombre ? `${sanitizeForMarkdown(mesaNombre)} \\(Mesa ${mesaNumero}\\)` : `Mesa ${mesaNumero}`;
+  const message = `🍳 *Comida lista* — Pedido \\#${numeroPedido} — ${tableLabel}\n_Servir bebidas ahora_`;
+  try {
+    await fetch(
+      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: 'MarkdownV2' }),
+      }
+    );
+  } catch {
+    // Best-effort — do not block order flow
   }
 };
 

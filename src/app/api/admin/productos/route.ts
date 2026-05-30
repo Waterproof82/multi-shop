@@ -26,6 +26,7 @@ function toAdminProduct(prod: Product) {
     foto_object_fit: prod.fotoObjectFit || 'contain',
     es_especial: prod.esEspecial,
     activo: prod.activo,
+    tipo_producto: prod.tipoProducto,
   };
 }
 

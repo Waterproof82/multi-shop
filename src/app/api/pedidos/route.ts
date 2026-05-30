@@ -108,7 +108,8 @@ export async function POST(request: Request) {
       mesa.numero,
       mesa.nombre,
       empresa.telegram_mesa_chat_id ?? null,
-      empresa.telegram_chat_id ?? null
+      empresa.telegram_chat_id ?? null,
+      empresa.telegram_bebidas_chat_id ?? null
     );
 
     if (!pedidoResult.success) {
