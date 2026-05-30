@@ -171,14 +171,25 @@ export function WaiterTableDetail({ mesaId }: WaiterTableDetailProps) {
 
   return (
     <div className="max-w-lg mx-auto flex flex-col gap-6">
-      {/* Back button */}
-      <button
-        onClick={() => router.push("/waiter/tables")}
-        className="self-start flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px]"
-        aria-label="Volver a las mesas"
-      >
-        ← {t("waiterTablesTitle", lang)}
-      </button>
+      {/* Top banner */}
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => router.push("/waiter/tables")}
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px]"
+          aria-label="Volver a las mesas"
+        >
+          ← {t("waiterTablesTitle", lang)}
+        </button>
+        {isOpen && (
+          <button
+            onClick={handleCloseTable}
+            disabled={actionLoading}
+            className="min-h-[44px] px-4 rounded-lg border border-destructive text-destructive font-semibold text-sm disabled:opacity-50 transition-opacity hover:opacity-80"
+          >
+            {t("waiterTableCloseAction", lang)}
+          </button>
+        )}
+      </div>
 
       {/* Actions */}
       <div className="flex gap-3">
@@ -191,21 +202,12 @@ export function WaiterTableDetail({ mesaId }: WaiterTableDetailProps) {
             {t("waiterTableOpenAction", lang)}
           </button>
         ) : (
-          <>
-            <button
-              onClick={handleOpenProductSelector}
-              className="min-h-[44px] flex-1 rounded-lg bg-[var(--color-primary)] text-[var(--color-primary-foreground)] font-semibold text-sm transition-opacity hover:opacity-90"
-            >
-              {t("waiterAddOrder", lang)}
-            </button>
-            <button
-              onClick={handleCloseTable}
-              disabled={actionLoading}
-              className="min-h-[44px] flex-1 rounded-lg border border-destructive text-destructive font-semibold text-sm disabled:opacity-50 transition-opacity hover:opacity-80"
-            >
-              {t("waiterTableCloseAction", lang)}
-            </button>
-          </>
+          <button
+            onClick={handleOpenProductSelector}
+            className="min-h-[44px] flex-1 rounded-lg bg-[var(--color-primary)] text-[var(--color-primary-foreground)] font-semibold text-sm transition-opacity hover:opacity-90"
+          >
+            {t("waiterAddOrder", lang)}
+          </button>
         )}
       </div>
 

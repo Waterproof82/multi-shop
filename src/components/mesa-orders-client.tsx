@@ -9,6 +9,7 @@ import { formatPrice } from "@/lib/format-price";
 interface OrderItem {
   nombre: string;
   cantidad: number;
+  precio: number;
   complementos?: { nombre: string; precio: number }[];
   translations?: Record<string, { name?: string } | undefined>;
 }
@@ -160,32 +161,40 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
                 style={{ color: "#b0a090", fontFamily: "monospace" }}
               >
                 <span>{t("mesaTicketQty", lang)}&nbsp;&nbsp;{t("mesaTicketItem", lang)}</span>
+                <span>{t("mesaTicketPrice", lang)}</span>
               </div>
 
               {/* Items */}
               <ul className="flex flex-col gap-1 pb-4">
-                {allItems.map((item, i) => (
-                  <li
-                    key={i}
-                    className="flex items-baseline gap-3 text-sm"
-                    style={{ color: "#1a1612", fontFamily: "monospace" }}
-                  >
-                    <span
-                      className="tabular-nums w-4 text-right shrink-0"
-                      style={{ color: "#8a7560" }}
+                {allItems.map((item, i) => {
+                  const complementoTotal = item.complementos?.reduce((s, c) => s + c.precio, 0) ?? 0;
+                  const lineTotal = (item.precio + complementoTotal) * item.cantidad;
+                  return (
+                    <li
+                      key={i}
+                      className="flex items-baseline gap-3 text-sm"
+                      style={{ color: "#1a1612", fontFamily: "monospace" }}
                     >
-                      {item.cantidad}
-                    </span>
-                    <span className="flex flex-col">
-                      <span>{(language !== "es" && item.translations?.[language]?.name) || item.nombre}</span>
-                      {item.complementos && item.complementos.length > 0 && (
-                        <span className="text-xs" style={{ color: "#b0a090" }}>
-                          + {item.complementos.map(c => c.nombre).join(", ")}
-                        </span>
-                      )}
-                    </span>
-                  </li>
-                ))}
+                      <span
+                        className="tabular-nums w-4 text-right shrink-0"
+                        style={{ color: "#8a7560" }}
+                      >
+                        {item.cantidad}
+                      </span>
+                      <span className="flex flex-col flex-1 min-w-0">
+                        <span>{(language !== "es" && item.translations?.[language]?.name) || item.nombre}</span>
+                        {item.complementos && item.complementos.length > 0 && (
+                          <span className="text-xs" style={{ color: "#b0a090" }}>
+                            + {item.complementos.map(c => c.nombre).join(", ")}
+                          </span>
+                        )}
+                      </span>
+                      <span className="tabular-nums shrink-0 text-right" style={{ color: "#1a1612" }}>
+                        {formatPrice(lineTotal, "EUR", lang)}
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
 
               <DottedRule />

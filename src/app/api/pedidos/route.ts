@@ -40,6 +40,13 @@ const defaultPedidoSchema = z.object({
   email: z.string().email().optional().or(z.literal('')),
   idioma: z.enum(['es', 'en', 'fr', 'it', 'de']).optional(),
   codigoDescuento: z.string().max(30).optional(),
+  // Delivery fields (restaurant only)
+  origen: z.enum(['recogida', 'delivery']).optional(),
+  direccion_entrega: z.string().max(500).optional(),
+  codigo_postal: z.string().max(10).optional(),
+  latitude_entrega: z.number().min(-90).max(90).optional(),
+  longitude_entrega: z.number().min(-180).max(180).optional(),
+  estimated_delivery_fee_cents: z.number().int().min(0).max(100000).optional(),
 }).refine(data => !data.codigoDescuento || (data.email && data.email.length > 0), {
   message: 'Email is required when using a discount code',
   path: ['email'],
@@ -101,7 +108,8 @@ export async function POST(request: Request) {
       mesa.numero,
       mesa.nombre,
       empresa.telegram_mesa_chat_id ?? null,
-      empresa.telegram_chat_id ?? null
+      empresa.telegram_chat_id ?? null,
+      empresa.telegram_bebidas_chat_id ?? null
     );
 
     if (!pedidoResult.success) {

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Clock, CheckCircle, AlertCircle, ArrowLeft, Hourglass, ChefHat } from "lucide-react";
+import { Clock, CheckCircle, AlertCircle, ArrowLeft, Hourglass, ChefHat, Truck } from "lucide-react";
 import { getTrackingTokens, removeTrackingToken, isOrderExpired } from "@/lib/order-tracking";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
@@ -27,8 +27,10 @@ interface OrderStatus {
   items: OrderItem[];
   tipo: string;
   estado: string;
+  glovo_status: string | null;
   mesa_numero: number | null;
   mesa_nombre: string | null;
+  delivery_fee_cents: number | null;
 }
 
 interface TrackingPageClientProps {
@@ -62,8 +64,10 @@ function normalizeStatus(data: OrderStatus): OrderStatus {
     ...data,
     tipo: data.tipo ?? 'restaurante',
     estado: data.estado ?? 'pendiente',
+    glovo_status: data.glovo_status ?? null,
     mesa_numero: data.mesa_numero ?? null,
     mesa_nombre: data.mesa_nombre ?? null,
+    delivery_fee_cents: data.delivery_fee_cents ?? null,
     items: (data.items ?? []).map(item => ({
       ...item,
       cantidad: Number(item.cantidad),
@@ -102,10 +106,12 @@ function resolveItemName(item: OrderItem, language: string): string {
   return item.nombre;
 }
 
-function ItemsList({ items, language }: { items: OrderItem[]; language: string }) {
+function ItemsList({ items, language, deliveryFeeCents }: { items: OrderItem[]; language: string; deliveryFeeCents?: number | null }) {
   if (!items || items.length === 0) return null;
   const lang = language as Parameters<typeof t>[1];
-  const total = items.reduce((sum, item) => sum + item.precio * item.cantidad, 0);
+  const subtotal = items.reduce((sum, item) => sum + item.precio * item.cantidad, 0);
+  const deliveryFee = deliveryFeeCents ? deliveryFeeCents / 100 : 0;
+  const total = subtotal + deliveryFee;
   return (
     <div className="w-full rounded-xl border border-border bg-card px-4 py-3">
       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
@@ -123,6 +129,14 @@ function ItemsList({ items, language }: { items: OrderItem[]; language: string }
             </span>
           </li>
         ))}
+        {deliveryFee > 0 && (
+          <li className="flex items-center justify-between gap-2 text-sm">
+            <span className="text-muted-foreground">{t('trackingDeliveryFee', lang)}</span>
+            <span className="text-muted-foreground shrink-0">
+              {formatPrice(deliveryFee, 'EUR', lang)}
+            </span>
+          </li>
+        )}
       </ul>
       <div className="mt-2 pt-2 border-t border-border flex items-center justify-between">
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('trackingTotal', lang)}</span>
@@ -130,6 +144,43 @@ function ItemsList({ items, language }: { items: OrderItem[]; language: string }
       </div>
     </div>
   );
+}
+
+function DeliveryStatusBanner({ glovoStatus, estado, lang }: { glovoStatus: string | null; estado: string; lang: Parameters<typeof t>[1] }) {
+  const isDelivered = glovoStatus === 'COMPLETED' || estado === 'entregado';
+  const isEnRoute = estado === 'en_camino' && !isDelivered;
+  const isAccepted = glovoStatus === 'ACCEPTED' && !isDelivered && !isEnRoute;
+
+  if (!glovoStatus && estado !== 'entregado' && estado !== 'en_camino') return null;
+
+  if (isDelivered) {
+    return (
+      <div className="flex items-center gap-2 rounded-xl border border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950 px-4 py-3 text-sm font-medium text-green-700 dark:text-green-300">
+        <CheckCircle className="w-5 h-5 shrink-0" />
+        <span>{t('deliveryStatusCompleted', lang)}</span>
+      </div>
+    );
+  }
+
+  if (isEnRoute) {
+    return (
+      <div className="flex items-center gap-2 rounded-xl border border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950 px-4 py-3 text-sm font-medium text-blue-700 dark:text-blue-300">
+        <Truck className="w-5 h-5 shrink-0 animate-pulse" />
+        <span>{t('deliveryStatusEnRoute', lang)}</span>
+      </div>
+    );
+  }
+
+  if (isAccepted) {
+    return (
+      <div className="flex items-center gap-2 rounded-xl border border-primary/40 bg-primary/5 px-4 py-3 text-sm font-medium text-primary">
+        <Truck className="w-5 h-5 shrink-0 animate-pulse" />
+        <span>{t('deliveryStatusAccepted', lang)}</span>
+      </div>
+    );
+  }
+
+  return null;
 }
 
 function OrderCard({ order, language }: { order: OrderState; language: string }) {
@@ -179,7 +230,7 @@ function OrderCard({ order, language }: { order: OrderState; language: string })
             </p>
           </div>
         </div>
-        <ItemsList items={status.items} language={language} />
+        <ItemsList items={status.items} language={language} deliveryFeeCents={status.delivery_fee_cents} />
       </div>
     );
   }
@@ -212,7 +263,7 @@ function OrderCard({ order, language }: { order: OrderState; language: string })
             </p>
           </div>
         </div>
-        <ItemsList items={status.items} language={language} />
+        <ItemsList items={status.items} language={language} deliveryFeeCents={status.delivery_fee_cents} />
       </div>
     );
   }
@@ -229,13 +280,14 @@ function OrderCard({ order, language }: { order: OrderState; language: string })
             <p className="text-xs text-muted-foreground mt-0.5">{t('trackingPickup', lang)}</p>
           </div>
         </div>
-        <ItemsList items={status.items} language={language} />
+        <ItemsList items={status.items} language={language} deliveryFeeCents={status.delivery_fee_cents} />
       </div>
     );
   }
 
   return (
     <div className="rounded-xl border border-border bg-muted/30 p-4 flex flex-col gap-3">
+      <DeliveryStatusBanner glovoStatus={status.glovo_status ?? null} estado={status.estado} lang={lang} />
       <div className="flex items-start gap-3">
         <ChefHat className="w-5 h-5 text-primary shrink-0 mt-0.5" />
         <div className="flex-1">
@@ -257,7 +309,7 @@ function OrderCard({ order, language }: { order: OrderState; language: string })
           )}
         </div>
       </div>
-      <ItemsList items={status.items} language={language} />
+      <ItemsList items={status.items} language={language} deliveryFeeCents={status.delivery_fee_cents} />
     </div>
   );
 }
@@ -368,7 +420,7 @@ export function TrackingPageClient({ token, initialStatus }: TrackingPageClientP
                       : t('tiendaTrackingAcceptedMessage', lang)}
               </p>
             </div>
-            <ItemsList items={primaryOrder.status.items} language={language} />
+            <ItemsList items={primaryOrder.status.items} language={language} deliveryFeeCents={primaryOrder.status.delivery_fee_cents} />
           </>
         ) : primaryOrder.status.tipo === 'mesa' ? (
           <>
@@ -394,7 +446,7 @@ export function TrackingPageClient({ token, initialStatus }: TrackingPageClientP
                 )}
               </p>
             </div>
-            <ItemsList items={primaryOrder.status.items} language={language} />
+            <ItemsList items={primaryOrder.status.items} language={language} deliveryFeeCents={primaryOrder.status.delivery_fee_cents} />
           </>
         ) : primaryReady ? (
           <>
@@ -406,10 +458,11 @@ export function TrackingPageClient({ token, initialStatus }: TrackingPageClientP
             <div className="rounded-xl bg-secondary px-6 py-4 max-w-sm w-full">
               <p className="text-secondary-foreground">{t('trackingPickup', lang)}</p>
             </div>
-            <ItemsList items={primaryOrder.status.items} language={language} />
+            <ItemsList items={primaryOrder.status.items} language={language} deliveryFeeCents={primaryOrder.status.delivery_fee_cents} />
           </>
         ) : (
           <>
+            <DeliveryStatusBanner glovoStatus={primaryOrder.status.glovo_status ?? null} estado={primaryOrder.status.estado} lang={lang} />
             <div className="relative inline-flex items-center justify-center w-16 h-16">
               {primaryOrder.status.estimated_minutes === null ? (
                 <Hourglass className="w-16 h-16 text-primary animate-pulse" style={{ animationDuration: '1.5s' }} />
@@ -450,7 +503,7 @@ export function TrackingPageClient({ token, initialStatus }: TrackingPageClientP
                 )}
               </div>
             )}
-            <ItemsList items={primaryOrder.status.items} language={language} />
+            <ItemsList items={primaryOrder.status.items} language={language} deliveryFeeCents={primaryOrder.status.delivery_fee_cents} />
           </>
         )}
       </div>

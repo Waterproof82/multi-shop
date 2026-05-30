@@ -6,7 +6,7 @@ Sistema de notificaciones vía Telegram para pedidos. Soporta tres modos según 
 
 - **`tienda`**: notificación con quick-reply buttons ("Te contestaremos" / "Te llamamos"). El cliente ve una página de tracking con el estado del pedido.
 - **`restaurante` (pedidos subdomain)**: notificación con botones de tiempo, el cliente es redirigido a una página de seguimiento en vivo con cuenta regresiva.
-- **`restaurante` (mesa / dine-in)**: notificación para pedidos de mesa, con botones de estado Anotado/Servido para el equipo de sala.
+- **`restaurante` (mesa / dine-in)**: notificación para pedidos de mesa, con botones de estado Anotado/Preparado/Servido para el equipo de sala. Soporta dos grupos Telegram: cocina (comida) y bar (bebidas).
 
 ---
 
@@ -41,30 +41,42 @@ Al pulsar, el botón seleccionado queda marcado (`✅`) y aparece `🔄 Modifica
 
 1. Cliente en mesa escanea QR → pide desde `/?mesa={token}`
 2. `POST /api/pedidos` incluye `mesa_id` + `sesion_id`
-3. `sendTelegramForMesa(...)` envía al chat configurado en `telegram_mesa_chat_id`
+3. El use case enruta los ítems según `tipo_producto` y la configuración de grupos:
+   - **Con dos grupos**: ítems de comida → `telegram_mesa_chat_id` (cocina), ítems de bebida → `telegram_bebidas_chat_id` (bar)
+   - **Sin grupo bar**: todos los ítems → `telegram_mesa_chat_id` (comportamiento anterior)
 4. El mensaje muestra el número de pedido, la mesa y los ítems (sin precios)
-5. **El equipo de sala interactúa con los botones:**
+5. **El equipo de sala interactúa con los botones (flujo 3 estados):**
 
 **Estado inicial:**
 ```
-[ ✅ Anotado ]  [ 🍽️ Servido ]
+[ ✅ Anotado ]  [ 🍳 Preparado ]
 ```
 
 **Al pulsar Anotado:**
 ```
-[ ✅ Anotado ✓ ]
+[ ✅ Anotado ✓ ]  [ 🍳 Preparado ]
 [ 🔄 Modificar ]
 ```
 → Estado del pedido en DB: `anotado`
 
+**Al pulsar Preparado:**
+```
+[ 🍳 Preparado ✓ ]  [ 🍽️ Servido ]
+[ 🔄 Modificar ]
+```
+→ Estado del pedido en DB: `preparado`
+→ Si `telegram_bebidas_chat_id` está configurado: se envía alerta al grupo bar — *"🍳 Comida lista — Mesa 3 · Pedido #42"*
+
 **Al pulsar Servido:**
 ```
-[ 🍽️ Servido ✓ ]
+[ 🍽️ Servido ✓ ]  [ 🗑️ Eliminar ]
 [ 🔄 Modificar ]
 ```
 → Estado del pedido en DB: `servido`
 
-**Al pulsar Modificar:** restaura los botones originales `Anotado / Servido` y resetea el estado a `pendiente`.
+**Al pulsar Eliminar:** borra el mensaje del chat de Telegram.
+
+**Al pulsar Modificar:** restaura los botones originales `Anotado / Preparado` y resetea el estado a `pendiente`.
 
 ---
 
@@ -87,7 +99,8 @@ TELEGRAM_WEBHOOK_SECRET=mi_secreto_seguro_123
 |-------|-------------|
 | `tipo` | `'tienda'` (defecto) o `'restaurante'` |
 | `telegram_chat_id` | ID del chat para pedidos takeaway/tienda |
-| `telegram_mesa_chat_id` | ID del chat para pedidos de mesa (dine-in) |
+| `telegram_mesa_chat_id` | ID del chat para pedidos de mesa — cocina (comida) |
+| `telegram_bebidas_chat_id` | ID del chat para el bar (bebidas + alerta de comida lista). Opcional. |
 
 ### Obtener el `telegram_chat_id`
 
@@ -122,9 +135,11 @@ Recibe callbacks de Telegram. Valida `X-Telegram-Bot-Api-Secret-Token` y despach
 | `quick_reply:{id}:soon` | Marca estado `soon`, muestra respuesta seleccionada |
 | `quick_reply:{id}:call` | Marca estado `call`, muestra respuesta seleccionada |
 | `modify_reply:{id}` | Restaura botones quick-reply (tienda) |
-| `anotado:{id}` | Marca como anotado, muestra estado + Modificar |
-| `servido:{id}` | Marca como servido, muestra estado + Modificar |
-| `modify_mesa:{id}` | Restaura botones Anotado/Servido (mesa) |
+| `anotado:{id}` | Marca como anotado, muestra estado + Preparado + Modificar |
+| `preparado:{id}` | Marca como preparado, notifica bar si está configurado, muestra Servido + Modificar |
+| `servido:{id}` | Marca como servido, muestra Eliminar + Modificar |
+| `eliminar:{id}` | Borra el mensaje del chat de Telegram |
+| `modify_mesa:{id}` | Restaura botones Anotado/Preparado (mesa), resetea a pendiente |
 | `noop` | Dismiss spinner sin acción |
 
 Siempre devuelve `200` (requisito de Telegram).
@@ -152,10 +167,11 @@ Si la notificación a Telegram falla, el error se registra en logs pero **no imp
 
 ### `empresas`
 ```sql
-tipo                    text    DEFAULT 'tienda'   -- 'tienda' | 'restaurante'
-telegram_chat_id        text    NULL               -- pedidos takeaway/tienda
-telegram_mesa_chat_id   text    NULL               -- pedidos de mesa (dine-in)
-waiter_pin_hash         text    NULL               -- bcrypt hash del PIN de sala
+tipo                         text    DEFAULT 'tienda'   -- 'tienda' | 'restaurante'
+telegram_chat_id             text    NULL               -- pedidos takeaway/tienda
+telegram_mesa_chat_id        text    NULL               -- pedidos de mesa — cocina
+telegram_bebidas_chat_id     text    NULL               -- pedidos de mesa — bar (opcional)
+waiter_pin_hash              text    NULL               -- bcrypt hash del PIN de sala
 ```
 
 ### `pedidos`
@@ -165,5 +181,11 @@ estimated_minutes   int         NULL          -- fijado por el restaurante vía 
 estimated_ready_at  timestamptz NULL          -- calculado: created_at + estimated_minutes
 mesa_id             uuid        NULL          -- FK mesas (solo pedidos de mesa)
 sesion_id           uuid        NULL          -- FK mesa_sesiones
-estado              text        NULL          -- pendiente | anotado | servido | soon | call
+estado              text        NULL          -- pendiente | anotado | preparado | servido | soon | call
 ```
+
+### `productos`
+```sql
+tipo_producto   text    NOT NULL DEFAULT 'comida'   -- 'comida' | 'bebida'
+```
+Usado para el enrutamiento split: comida → cocina, bebida → bar.

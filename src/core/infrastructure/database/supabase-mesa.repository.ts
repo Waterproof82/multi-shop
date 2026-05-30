@@ -206,8 +206,7 @@ export class SupabaseMesaRepository implements IMesaRepository {
           mesa_sesiones!mesas_sesion_id_fkey (
             id,
             total
-          ),
-          pedidos_count:pedidos(count)
+          )
         `)
         .eq('empresa_id', empresaId)
         .order('numero', { ascending: true });
@@ -224,15 +223,30 @@ export class SupabaseMesaRepository implements IMesaRepository {
       }
 
       const rows = (data ?? []) as Record<string, unknown>[];
+
+      // Count active (non-cerrado) pedidos per session in one query, scoped to current sessions only
+      const activeSesionIds = rows
+        .map(r => r['sesion_id'] as string | null)
+        .filter((id): id is string => id !== null);
+
+      const countBySesion: Record<string, number> = {};
+      if (activeSesionIds.length > 0) {
+        const { data: pedidosData } = await this.supabase
+          .from('pedidos')
+          .select('sesion_id')
+          .in('sesion_id', activeSesionIds)
+          .neq('estado', 'cerrado');
+        for (const p of pedidosData ?? []) {
+          const sid = p['sesion_id'] as string;
+          countBySesion[sid] = (countBySesion[sid] ?? 0) + 1;
+        }
+      }
+
       return {
         success: true,
         data: rows.map(row => {
           const sesionRaw = row['mesa_sesiones'] as Record<string, unknown> | null;
           const sesionId = (row['sesion_id'] as string | null) ?? null;
-
-          // pedidos_count comes back as [{ count: number }] from Supabase aggregate
-          const pedidosCountRaw = row['pedidos_count'] as { count: number }[] | null;
-          const activeOrderCount = pedidosCountRaw?.[0]?.count ?? 0;
 
           return {
             id: row['id'] as string,
@@ -240,7 +254,7 @@ export class SupabaseMesaRepository implements IMesaRepository {
             numero: row['numero'] as number,
             nombre: (row['nombre'] as string | null) ?? null,
             sesionId,
-            activeOrderCount,
+            activeOrderCount: sesionId ? (countBySesion[sesionId] ?? 0) : 0,
             sessionTotal: sesionRaw ? (sesionRaw['total'] as number) : 0,
           };
         }),

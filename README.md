@@ -17,6 +17,9 @@ Plataforma multi-tenant de menú digital con sistema de pedidos online, panel de
 | jose | ^6.1.3 | JWT (sign + verify) |
 | Upstash Redis | — | Rate limiting + JWT revocation |
 | Brevo | — | Envío de emails |
+| Mapbox Search JS React | — | Autocompletar dirección de entrega |
+| Redsys TPV Virtual | — | Pago online (HMAC_SHA256_V1) |
+| Glovo Business LaaS | — | Despacho de riders (DH On Demand Rider API) |
 
 ---
 
@@ -60,6 +63,9 @@ src/
 ├── app/
 │   ├── layout.tsx                   # Root layout (multi-tenant, nonce CSP)
 │   ├── page.tsx                     # Menú público (SSR)
+│   ├── pedido/
+│   │   ├── pago-ok/                 # Confirmación pago Redsys → redirect /tracking/{token}
+│   │   └── pago-ko/                 # Error de pago Redsys
 │   ├── mesa/[mesaId]/orders/        # Ticket de mesa (cliente)
 │   ├── waiter/                      # Panel de sala
 │   │   ├── page.tsx                 # Login PIN
@@ -76,6 +82,7 @@ src/
 │   │       ├── clientes/
 │   │       ├── promociones/
 │   │       ├── toogoodtogo/             # Campañas TGTG (crear, enviar, gestionar)
+│   │       ├── delivery/            # Zona de entrega + credenciales Glovo + Redsys
 │   │       ├── estadisticas/
 │   │       └── configuracion/
 │   ├── superadmin/                  # Panel Super Admin
@@ -119,7 +126,14 @@ src/
 │       │   └── productos/           # GET — productos para tomar pedidos
 │       ├── telegram/
 │       │   └── webhook/             # POST — callbacks de Telegram (todos los modos)
-│       ├── pedidos/                 # POST — pública, crear pedido
+│       ├── pedidos/                 # POST — pública, crear pedido (tienda + mesa + delivery)
+│       ├── redsys/
+│       │   ├── initiate/            # POST — pública, genera form TPV Redsys
+│       │   └── webhook/             # POST — notificación servidor Redsys (pago confirmado → despacha Glovo)
+│       ├── glovo/
+│       │   ├── quote/               # POST — pública, cotización de envío en tiempo real
+│       │   ├── order/               # POST — admin, despacho manual de rider
+│       │   └── webhook/             # POST — callbacks de estado del rider Glovo
 │       └── unsubscribe/             # GET — pública, dar de baja/alta promo
 │
 ├── core/                            # Clean Architecture
@@ -277,6 +291,9 @@ import {
 | **EmpresaUseCase** | `getById`, `update`, `updateColores` |
 | **PedidoUseCase** | `getAll`, `create`, `updateStatus`, `getStats`, `delete`, `createMesaOrder` |
 | **MesaSesionUseCase** | `getAll`, `open`, `close`, `getActiveOrders` |
+| **DeliverySettingsUseCase** | `getDeliverySettings`, `updateDeliverySettings`, `getDeliveryZone` |
+| **GlovoUseCase** | `getDeliveryQuote`, `createGlovoOrder`, `processGlovoWebhook` |
+| **RedsysUseCase** | `initiateRedsysPayment`, `processRedsysWebhook` |
 | **PromocionUseCase** | `getAll`, `create` |
 | **AuthAdminUseCase** | `login`, `verifyToken` |
 | **TgtgUseCase** | `getWithItems`, `getAllRecent`, `create`, `sendCampaignEmails`, `markEmailSent`, `getHistory`, `getReservas`, `adjustCupones`, `claimCupon`, `updateHoras`, `deletePromo`, `isTokenUsed`, `getPublicItem`, `getPublicPromo` |
@@ -469,6 +486,38 @@ const main = parseMainDomain(domain); // elimina subdominio pedidos
 | **`mesas`** | id (uuid) | empresa_id, sesion_id → mesa_sesiones | numero, nombre, token UUID (QR), sesion_id activa |
 | **`mesa_sesiones`** | id (uuid) | mesa_id, empresa_id | abierta_en, cerrada_en (NULL = abierta) |
 
+**Columnas delivery en `pedidos`** (añadidas en migración `20260527100000_riders_app.sql` + `add_origen_to_pedidos`):
+
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| `origen` | `TEXT` | `'recogida'` o `'delivery'` |
+| `direccion_entrega` | `TEXT` | Dirección completa |
+| `codigo_postal` | `TEXT` | CP de entrega |
+| `latitude_entrega` | `DOUBLE PRECISION` | Latitud GPS |
+| `longitude_entrega` | `DOUBLE PRECISION` | Longitud GPS |
+| `delivery_fee_cents` | `INT` | Fee total cobrado |
+| `payment_status` | `TEXT` | `'not_required'` / `'pending'` / `'paid'` / `'failed'` |
+| `payment_order_ref` | `TEXT` | Referencia Redsys (DS_MERCHANT_ORDER) |
+| `payment_amount_cents` | `INT` | Importe cobrado |
+| `glovo_order_id` | `TEXT` | ID pedido en Glovo |
+| `glovo_status` | `TEXT` | Estado del rider Glovo |
+
+**Columnas delivery + credenciales en `empresas`**:
+
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| `delivery_postal_codes` | `TEXT[]` | CP habilitados (vacío = delivery off) |
+| `delivery_min_order_cents` | `INT` | Pedido mínimo en céntimos |
+| `delivery_fee_surcharge_cents` | `INT` | Cargo adicional en céntimos |
+| `glovo_client_id` | `TEXT` | Client ID Glovo Business |
+| `glovo_key_id` | `TEXT` | Key ID par RS256 |
+| `glovo_private_key` | `TEXT` | RSA Private Key PEM |
+| `glovo_vendor_id` | `TEXT` | client_vendor_id del outlet |
+| `glovo_country_code` | `TEXT` | Código de país (default `'es'`) |
+| `redsys_merchant_code` | `TEXT` | Número de comercio Redsys |
+| `redsys_terminal` | `TEXT` | Terminal Redsys (default `'001'`) |
+| `redsys_secret_key` | `TEXT` | Clave HMAC_SHA256_V1 |
+
 > `pedidos` NO tiene columna `telefono` — el teléfono está en `clientes`
 
 > `detalle_pedido[].complementos` almacena objetos `{ name, price }` — tipo `PedidoComplemento[]`
@@ -512,6 +561,16 @@ CLOUDFLARE_API_TOKEN=xxx                           # opcional, fallback a AWS SD
 # Email (Brevo)
 BREVO_API_KEY=xxx
 BREVO_DEFAULT_SENDER_EMAIL=noreply@tudominio.com
+
+# Mapbox (selector de dirección de entrega — frontend)
+NEXT_PUBLIC_MAPBOX_TOKEN=pk.eyJxxx
+
+# Redsys TPV Virtual
+# Test: https://sis-t.redsys.es:25443/sis/realizarPago (default si no se define)
+# Prod: https://sis.redsys.es/sis/realizarPago
+NEXT_PUBLIC_REDSYS_URL=https://sis.redsys.es/sis/realizarPago
+# Las credenciales Redsys (merchant_code, terminal, secret_key) se configuran por empresa en /admin/delivery
+# Las credenciales Glovo (client_id, key_id, private_key PEM, vendor_id) se configuran por empresa en /admin/delivery
 ```
 
 ---
@@ -632,6 +691,7 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 | **Mesa Ordering** | QR table ordering para restaurantes dine-in. mesas + mesa_sesiones en DB. Rate limiting per-UUID (120/min). Ticket view con complementos + i18n + hora 24h. Notificación Telegram con botones Anotado/Servido |
 | **Waiter Panel** | Panel PIN-auth en /waiter. Grid de mesas, detalle por mesa, ciclo de sesión open/close. WaiterBanner sticky global. Integración con mesa_sesiones |
 | **Telegram Multi-modo** | tienda → quick-reply buttons. restaurante takeaway → time-selector + tracking. mesa → Anotado/Servido con estado seleccionado + Modificar |
+| **Delivery + Pago online** | Zona de cobertura por CP configurable. Cotización Glovo en tiempo real. Pago Redsys TPV Virtual obligatorio para delivery. Auto-despacho de rider al confirmar pago. Tracking page post-pago. |
 
 ## Documentación
 
@@ -644,6 +704,7 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 - [`docs/context/mesa-ordering.md`](docs/context/mesa-ordering.md) — QR table ordering (flujo, API, rate limiting, ticket)
 - [`docs/context/waiter-panel.md`](docs/context/waiter-panel.md) — Panel de sala (PIN auth, sesiones, mesas)
 - [`docs/telegram-notifications.md`](docs/telegram-notifications.md) — Notificaciones Telegram (tienda, restaurante takeaway, mesa)
+- [`docs/context/delivery.md`](docs/context/delivery.md) — Delivery: zona de cobertura, Glovo Business LaaS, Redsys TPV, flujo completo end-to-end
 
 ---
 

@@ -45,9 +45,11 @@ interface Pedido {
   mesa_id: string | null;
   tracking_token: string | null;
   mesas: MesaInfo | null;
+  delivery_fee_cents?: number | null;
+  origen?: string | null;
 }
 
-const ORIGEN_ORDER: Record<string, number> = { mesa: 0, recogida: 1, web: 2 };
+const ORIGEN_ORDER: Record<string, number> = { mesa: 0, recogida: 1, delivery: 2, web: 3 };
 
 function getDeleteConfirmationText(language: string): string {
   const confirmationTexts: Record<string, string> = {
@@ -82,6 +84,7 @@ const ESTADO_TRANSLATION_KEYS: Partial<Record<PedidoEstado, keyof typeof import(
   pendiente:  'statusPendiente',
   anotado:    'statusAnotado',
   servido:    'statusServido',
+  cerrado:    'statusCerrado',
   aceptado:   'statusAceptado',
   preparando: 'statusPreparando',
   listo:      'statusListo',
@@ -98,8 +101,8 @@ function shiftMonth(current: { mes: number; año: number }, delta: number) {
 
 function comparePedidos(a: Pedido, b: Pedido, sortField: keyof Pedido | 'origen', sortDirection: 'asc' | 'desc'): number {
   if (sortField === 'origen') {
-    const aOrd = ORIGEN_ORDER[getOrigenPedido(a.mesa_id, a.tracking_token)];
-    const bOrd = ORIGEN_ORDER[getOrigenPedido(b.mesa_id, b.tracking_token)];
+    const aOrd = ORIGEN_ORDER[getOrigenPedido(a.mesa_id, a.tracking_token, a.origen)];
+    const bOrd = ORIGEN_ORDER[getOrigenPedido(b.mesa_id, b.tracking_token, b.origen)];
     return sortDirection === 'asc' ? aOrd - bOrd : bOrd - aOrd;
   }
   const aVal = a[sortField];
@@ -118,6 +121,13 @@ function renderOrigenBadge(pedido: Pedido) {
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-300 border border-amber-400/30">
         {label}
+      </span>
+    );
+  }
+  if (pedido.origen === 'delivery') {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-300 border border-green-400/30">
+        Domicilio
       </span>
     );
   }
@@ -140,7 +150,7 @@ function renderEstadoBadge(
   language: Parameters<typeof t>[1],
   onUpdate: (id: string, estado: string) => void,
 ) {
-  const origen = getOrigenPedido(pedido.mesa_id, pedido.tracking_token);
+  const origen = getOrigenPedido(pedido.mesa_id, pedido.tracking_token, pedido.origen);
   const flow = ESTADOS_POR_ORIGEN[origen];
   const estado = pedido.estado as PedidoEstado;
   const currentIdx = flow.indexOf(estado);
@@ -157,6 +167,15 @@ function renderEstadoBadge(
   const translationKey = ESTADO_TRANSLATION_KEYS[estado];
   const label = translationKey ? t(translationKey, language) : estado;
   const isPending = estado === 'pendiente' || estado === 'cancelado';
+
+  if (estado === 'cerrado') {
+    return (
+      <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium ${PEDIDO_ESTADO_COLORS[estado]}`}>
+        <Check className="w-3 h-3" />
+        {label}
+      </span>
+    );
+  }
 
   return (
     <button
@@ -642,6 +661,12 @@ export default function PedidosPage() {
                                   </li>
                                 );
                               })}
+                              {pedido.delivery_fee_cents != null && pedido.delivery_fee_cents > 0 && (
+                                <li className="flex justify-between pt-1 border-t border-border text-muted-foreground">
+                                  <span>{t('trackingDeliveryFee', language)}</span>
+                                  <span>{formatPrice(pedido.delivery_fee_cents / 100)}</span>
+                                </li>
+                              )}
                             </ul>
                           </div>
                         </td>

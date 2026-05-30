@@ -40,8 +40,14 @@ sesion_id   uuid NULL REFERENCES mesa_sesiones(id)
 
 ### `empresas` (delta)
 ```sql
-telegram_mesa_chat_id  text NULL   -- separate Telegram chat for mesa orders
-waiter_pin_hash        text NULL   -- bcrypt hash of waiter PIN
+telegram_mesa_chat_id        text NULL   -- Telegram chat for mesa orders (kitchen)
+telegram_bebidas_chat_id     text NULL   -- Telegram chat for bar/drinks (optional)
+waiter_pin_hash              text NULL   -- bcrypt hash of waiter PIN
+```
+
+### `productos` (delta)
+```sql
+tipo_producto   text NOT NULL DEFAULT 'comida'   -- 'comida' | 'bebida'
 ```
 
 ---
@@ -115,29 +121,60 @@ This avoids the issue where two polling components (MesaOrderHistory + MesaOrder
 The `MesaOrdersClient` component renders a receipt-style ticket:
 - Shows all items from all orders in the current session, flattened
 - Displays complement names under each item
+- **Shows per-item price** and line total (`(precio + complementos) × cantidad`) aligned right
 - Translates item names to the current UI language
 - Time shown is from the **first order** of the session, in 24h format
 - Polls `/api/mesas/{mesaId}/orders` every 10 seconds
 
 ---
 
+## Admin Orders Panel — Mesa Behavior
+
+Mesa orders follow a **session-based visibility** model in `/admin/pedidos`:
+
+- **While session is open**: individual pedidos placed at the table are **hidden** from the admin panel. The parallel helper `getOpenSesionIds()` fetches all `mesa_sesiones` with `cerrada_at IS NULL` for the empresa, then `excludeOpenSesionPedidos()` filters those pedidos out before returning results.
+- **When session is closed**: `consolidateSesionOrders(sesionId)` runs automatically (triggered by `POST /api/waiter/mesas/{mesaId}/close`). It merges all individual pedidos for that session into a **single consolidated ticket**, deletes the rest, and sets `estado = 'cerrado'`. This ticket then becomes visible in the admin panel.
+- **`cerrado` status**: non-interactive — rendered as a `<span>` badge (not a clickable button). Cannot be advanced further. Represents a finalized dine-in ticket.
+
+### `consolidateSesionOrders` logic
+
+```
+1. Fetch all pedidos for the session
+2. Merge all items arrays into first pedido
+3. Sum total + delivery_fee_cents across all pedidos
+4. UPDATE first pedido: items=merged, total=sum, estado='cerrado'
+5. DELETE all other pedidos for the session
+```
+
+---
+
 ## Telegram Notification
 
-When a mesa order is placed, `sendTelegramForMesa` sends to `telegram_mesa_chat_id`:
+When a mesa order is placed, items are routed based on `tipo_producto` and group configuration:
 
+**With two groups configured (`telegram_mesa_chat_id` + `telegram_bebidas_chat_id`):**
+- Comida items → kitchen group (`telegram_mesa_chat_id`)
+- Bebida items → bar group (`telegram_bebidas_chat_id`)
+
+**With only one group:** all items → `telegram_mesa_chat_id` (backwards-compatible).
+
+Example kitchen message:
 ```
 Pedido #42 — Terraza 1 (Mesa 3)
 
 - 2x Spaghetti Carbonara
-- 1x Agua mineral
 ```
 
-Inline buttons:
+Inline buttons (3-state flow):
 ```
-[ ✅ Anotado ]  [ 🍽️ Servido ]
+[ ✅ Anotado ]  [ 🍳 Preparado ]
 ```
+→ Anotado: `[ ✅ Anotado ✓ ] [ 🍳 Preparado ] [ 🔄 Modificar ]`
+→ Preparado: `[ 🍳 Preparado ✓ ] [ 🍽️ Servido ] [ 🔄 Modificar ]` + alerta al bar
+→ Servido: `[ 🍽️ Servido ✓ ] [ 🗑️ Eliminar ] [ 🔄 Modificar ]`
+→ Eliminar: borra el mensaje del chat
 
-See [telegram-notifications.md](./telegram-notifications.md) for the full callback flow.
+See [telegram-notifications.md](../telegram-notifications.md) for the full callback flow.
 
 ---
 

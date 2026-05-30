@@ -19,6 +19,7 @@ export interface Product {
   fotoObjectFit: ImageFit | null;
   esEspecial: boolean;
   activo: boolean;
+  tipoProducto: 'comida' | 'bebida';
   createdAt: Date;
 }
 
@@ -183,6 +184,17 @@ export interface Pedido {
     email: string;
     telefono: string;
   };
+  // Delivery / rider fields
+  riderId?: string | null;
+  pickupEtaMinutes?: number | null;
+  assignedAt?: string | null;
+  direccionEntrega?: string | null;
+  codigoPostal?: string | null;
+  paymentStatus?: 'not_required' | 'pending' | 'paid' | 'failed';
+  paymentOrderRef?: string | null;
+  paymentAmountCents?: number | null;
+  delivery_fee_cents?: number | null;
+  origen?: string | null;
 }
 
 export interface Promocion {

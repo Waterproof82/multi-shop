@@ -11,7 +11,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
     try {
       const { data: empresa } = await this.supabase
         .from('empresas')
-        .select('email_notification, telefono_whatsapp, nombre, logo_url, mostrar_logo, fb, instagram, url_mapa, direccion, dominio, slug, url_image, banner_fit, descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de, mostrar_carrito, mostrar_promociones, mostrar_tgtg, moneda, subdomain_pedidos, color_primary, color_primary_foreground, color_secondary, color_secondary_foreground, color_accent, color_accent_foreground, color_background, color_foreground, descuento_bienvenida_activo, descuento_bienvenida_porcentaje, descuento_bienvenida_duracion')
+        .select('email_notification, telefono_whatsapp, nombre, logo_url, mostrar_logo, fb, instagram, url_mapa, direccion, dominio, slug, url_image, banner_fit, descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de, mostrar_carrito, mostrar_promociones, mostrar_tgtg, moneda, subdomain_pedidos, tipo, color_primary, color_primary_foreground, color_secondary, color_secondary_foreground, color_accent, color_accent_foreground, color_background, color_foreground, descuento_bienvenida_activo, descuento_bienvenida_porcentaje, descuento_bienvenida_duracion')
         .eq('id', empresaId)
         .single();
 
@@ -34,6 +34,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
           id: empresaId,
           nombre: empresa.nombre,
           dominio: empresa.dominio || '',
+          tipo: (empresa.tipo as 'tienda' | 'restaurante' | null) ?? null,
           slug: (empresa.slug as string | null) ?? null,
           logoUrl: empresa.logo_url,
           mostrarLogo: empresa.mostrar_logo ?? true,
@@ -116,11 +117,11 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
     }
   }
 
-  async findByDomain(dominio: string): Promise<Result<{ id: string; nombre: string; email_notification: string | null; telefono_whatsapp: string | null; tipo: string; telegram_chat_id: string | null; telegram_mesa_chat_id: string | null } | null>> {
+  async findByDomain(dominio: string): Promise<Result<{ id: string; nombre: string; email_notification: string | null; telefono_whatsapp: string | null; tipo: string; telegram_chat_id: string | null; telegram_mesa_chat_id: string | null; telegram_bebidas_chat_id: string | null } | null>> {
     try {
       const { data: empresa } = await this.supabase
         .from('empresas')
-        .select('id, nombre, email_notification, telefono_whatsapp, tipo, telegram_chat_id, telegram_mesa_chat_id')
+        .select('id, nombre, email_notification, telefono_whatsapp, tipo, telegram_chat_id, telegram_mesa_chat_id, telegram_bebidas_chat_id')
         .eq('dominio', dominio)
         .single();
 
@@ -132,6 +133,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
         tipo: (empresa.tipo as string) ?? 'tienda',
         telegram_chat_id: empresa.telegram_chat_id as string | null,
         telegram_mesa_chat_id: (empresa.telegram_mesa_chat_id as string | null) ?? null,
+        telegram_bebidas_chat_id: (empresa.telegram_bebidas_chat_id as string | null) ?? null,
       }};
 
       const isPedidos = dominio.startsWith(`${DEFAULT_PEDIDOS_SUBDOMAIN}.`) || dominio.endsWith('-pedidos');
@@ -140,7 +142,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
         const mainDomainFromSubdomain = dominio.split('.').slice(1).join('.');
         const { data: empresaSubdomain } = await this.supabase
           .from('empresas')
-          .select('id, nombre, email_notification, telefono_whatsapp, tipo, telegram_chat_id, telegram_mesa_chat_id')
+          .select('id, nombre, email_notification, telefono_whatsapp, tipo, telegram_chat_id, telegram_mesa_chat_id, telegram_bebidas_chat_id')
           .eq('dominio', mainDomainFromSubdomain)
           .single();
 
@@ -152,6 +154,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
           tipo: (empresaSubdomain.tipo as string) ?? 'tienda',
           telegram_chat_id: empresaSubdomain.telegram_chat_id as string | null,
           telegram_mesa_chat_id: (empresaSubdomain.telegram_mesa_chat_id as string | null) ?? null,
+          telegram_bebidas_chat_id: (empresaSubdomain.telegram_bebidas_chat_id as string | null) ?? null,
         } : null };
       }
 

@@ -42,7 +42,7 @@ export async function GET(
     createdAt: o.created_at,
   }));
 
-  const total = ordersResult.data.reduce((sum, o) => sum + o.total, 0);
+  const total = ordersResult.data.reduce((sum, o) => sum + Number(o.total), 0);
 
   return NextResponse.json({ orders, sesionId: sesion.id, total });
 }

@@ -87,7 +87,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa }: Readon
       {/* Only render cart components when needed */}
       {showCart && (
         <>
-          <CartDrawer />
+          <CartDrawer isRestaurant={empresa?.tipo === 'restaurante'} />
           <CartToast />
           <ActiveOrderBanner />
           <MesaOrderHistory />

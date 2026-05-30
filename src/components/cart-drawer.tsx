@@ -31,6 +31,7 @@ import {
 import { useCart, type CartItem } from "@/lib/cart-context"
 import { useLanguage, type Language } from "@/lib/language-context"
 import { t } from "@/lib/translations"
+import { DeliveryMethodSelector } from "@/components/DeliveryMethodSelector"
 import { formatPrice } from "@/lib/format-price"
 import { COUNTRY_CODES, DEFAULT_COUNTRY_CODE } from "@/core/domain/constants/country-codes"
 import { getItemKey } from "@/lib/cart-utils";
@@ -64,7 +65,11 @@ function validatePhoneInput(phone: string, translate: TranslateFn, language: Lan
   return undefined;
 }
 
-export function CartDrawer() {
+interface CartDrawerProps {
+  isRestaurant?: boolean;
+}
+
+export function CartDrawer({ isRestaurant = false }: Readonly<CartDrawerProps>) {
   const {
     items,
     updateQuantity,
@@ -133,7 +138,13 @@ export function CartDrawer() {
   const [telefono, setTelefono] = useState('');
   const [countryCode, setCountryCode] = useState(DEFAULT_COUNTRY_CODE);
   const [email, setEmail] = useState('');
-  const [errors, setErrors] = useState<{ nombre?: string; telefono?: string; general?: string }>({});
+  const [deliveryMethod, setDeliveryMethod] = useState<'recogida' | 'delivery' | null>(null);
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [deliveryPostalCode, setDeliveryPostalCode] = useState('');
+  const [deliveryLatitude, setDeliveryLatitude] = useState<number | null>(null);
+  const [deliveryLongitude, setDeliveryLongitude] = useState<number | null>(null);
+  const [estimatedFeeCents, setEstimatedFeeCents] = useState<number | null>(null);
+  const [errors, setErrors] = useState<{ nombre?: string; telefono?: string; delivery?: string; general?: string }>({});
 
   const handleConfirmOrder = useCallback(async () => {
     setErrors({});
@@ -198,8 +209,13 @@ export function CartDrawer() {
     // Standard (non-mesa) flow: validate PII
     const nombreError = validateNameInput(nombre, t, language);
     const telefonoError = validatePhoneInput(telefono, t, language);
-    if (nombreError || telefonoError) {
-      setErrors({ nombre: nombreError, telefono: telefonoError });
+    const deliveryError = isRestaurant && deliveryMethod === null
+      ? t('deliveryMethodTitle', language)
+      : isRestaurant && deliveryMethod === 'delivery' && (deliveryLatitude === null || deliveryLongitude === null)
+        ? t('deliverySelectValidAddress', language)
+        : undefined;
+    if (nombreError || telefonoError || deliveryError) {
+      setErrors({ nombre: nombreError, telefono: telefonoError, delivery: deliveryError });
       return;
     }
 
@@ -223,14 +239,68 @@ export function CartDrawer() {
           email,
           idioma: language,
           codigoDescuento: discountCode || undefined,
+          ...(isRestaurant && deliveryMethod ? {
+            origen: deliveryMethod,
+            direccion_entrega: deliveryMethod === 'delivery' ? deliveryAddress : undefined,
+            codigo_postal: deliveryMethod === 'delivery' ? deliveryPostalCode : undefined,
+            latitude_entrega: deliveryMethod === 'delivery' ? deliveryLatitude : undefined,
+            longitude_entrega: deliveryMethod === 'delivery' ? deliveryLongitude : undefined,
+            estimated_delivery_fee_cents: deliveryMethod === 'delivery' ? estimatedFeeCents : undefined,
+          } : {}),
         }),
       });
 
       const data = await res.json();
 
       if (res.ok) {
-        if (data.trackingToken && data.tipo === 'restaurante') {
-          // Restaurant + pedidos: redirect to tracking page
+        if (data.trackingToken && deliveryMethod === 'delivery' && data.pedidoId) {
+          // Delivery order: initiate Redsys payment before redirecting
+          if (data.trackingToken) addTrackingToken(data.trackingToken);
+          clearCart();
+          closeCart();
+          try {
+            const redsysRes = await fetch('/api/redsys/initiate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ pedidoId: data.pedidoId }),
+            });
+            if (redsysRes.ok) {
+              const formData = await redsysRes.json() as {
+                DS_MERCHANT_PARAMETERS: string;
+                DS_SIGNATURE: string;
+                DS_SIGNATURE_VERSION: string;
+              };
+              const redsysUrl = process.env.NEXT_PUBLIC_REDSYS_URL ?? 'https://sis-t.redsys.es:25443/sis/realizarPago';
+              const form = document.createElement('form');
+              form.method = 'POST';
+              form.action = redsysUrl;
+              const fields: Record<string, string> = {
+                Ds_SignatureVersion: formData.DS_SIGNATURE_VERSION,
+                Ds_MerchantParameters: formData.DS_MERCHANT_PARAMETERS,
+                Ds_Signature: formData.DS_SIGNATURE,
+              };
+              for (const [name, value] of Object.entries(fields)) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = name;
+                input.value = value;
+                form.appendChild(input);
+              }
+              try {
+                const decoded = JSON.parse(atob(fields['Ds_MerchantParameters'] ?? '')) as Record<string, unknown>;
+                console.log('[Redsys form] decoded params:', decoded);
+              } catch (e) { console.error('[Redsys form] decode error', e); }
+              document.body.appendChild(form);
+              form.submit();
+              return;
+            }
+            // Redsys not configured — fall through to tracking page
+          } catch {
+            // Network error — fall through to tracking page
+          }
+          router.push(`/tracking/${data.trackingToken}`);
+        } else if (data.trackingToken && data.tipo === 'restaurante') {
+          // Restaurant pickup: redirect to tracking page
           addTrackingToken(data.trackingToken);
           clearCart();
           if (window.history.state?.cartOpen) {
@@ -263,7 +333,9 @@ export function CartDrawer() {
     } finally {
       setSending(false);
     }
-  }, [mesaToken, mesaInfo, nombre, telefono, countryCode, email, items, language, discountCode, totalPrice, clearCart, closeCart, router]);
+  }, [mesaToken, mesaInfo, nombre, telefono, countryCode, email, deliveryMethod, deliveryAddress, deliveryPostalCode, deliveryLatitude, deliveryLongitude, isRestaurant, items, language, discountCode, totalPrice, clearCart, closeCart, router]);
+
+  const isDeliveryIncomplete = isRestaurant && !mesaToken && deliveryMethod === 'delivery' && (deliveryLatitude === null || estimatedFeeCents === null);
 
   const handleDialogClose = useCallback((open: boolean) => {
     if (!open) {
@@ -273,6 +345,12 @@ export function CartDrawer() {
       setNombre('');
       setTelefono('');
       setEmail('');
+      setDeliveryMethod(null);
+      setDeliveryAddress('');
+      setDeliveryPostalCode('');
+      setDeliveryLatitude(null);
+      setDeliveryLongitude(null);
+      setEstimatedFeeCents(null);
       setDiscountCode('');
       setDiscountValid(null);
       setDiscountError(null);
@@ -347,7 +425,7 @@ export function CartDrawer() {
           </SheetDescription>
         </SheetHeader>
 
-        {items.length > 0 && (
+        {items.length > 0 && deliveryMethod !== 'delivery' && (
           <div className="shrink-0 mx-4 mb-1.5 rounded-md bg-secondary border border-border px-2 py-1.5">
             <p className="text-xs text-secondary-foreground font-medium">
               {t("noPaymentRequired", language)}
@@ -553,6 +631,33 @@ export function CartDrawer() {
                 </div>
               )}
 
+              {/* Delivery method selector — only for restaurants in non-mesa mode */}
+              {!mesaToken && isRestaurant && (
+                <DeliveryMethodSelector
+                  value={deliveryMethod}
+                  onChange={(v, deliveryData) => {
+                    setDeliveryMethod(v);
+                    setErrors(prev => ({ ...prev, delivery: undefined }));
+                    if (deliveryData) {
+                      setDeliveryAddress(deliveryData.address);
+                      setDeliveryPostalCode(deliveryData.postalCode);
+                      setDeliveryLatitude(deliveryData.latitude);
+                      setDeliveryLongitude(deliveryData.longitude);
+                      setEstimatedFeeCents(deliveryData.estimatedFeeCents);
+                    } else if (v !== deliveryMethod) {
+                      // Method changed without deliveryData — clear address state
+                      setDeliveryAddress('');
+                      setDeliveryPostalCode('');
+                      setDeliveryLatitude(null);
+                      setDeliveryLongitude(null);
+                      setEstimatedFeeCents(null);
+                    }
+                  }}
+                  orderTotalCents={Math.round(totalPrice * 100)}
+                  disabled={sending}
+                />
+              )}
+
               {/* Discount Code Section — hidden in mesa mode */}
               {!mesaToken && <div className="mb-3">
                 <label htmlFor="discount-code" className="text-xs font-medium text-muted-foreground ml-1 mb-1 block">
@@ -631,29 +736,47 @@ export function CartDrawer() {
               </div>}
 
               {/* Total Section */}
-              <div className="mb-4 flex items-center justify-between">
-                <span className="text-lg font-semibold text-foreground">{t("total", language)}</span>
-                <div className="text-right">
-                  {discountValid?.valid ? (
-                    <>
-                      <span className="text-sm text-muted-foreground line-through mr-2">
-                        {formatPrice(totalPrice, 'EUR', language)}
+              {(() => {
+                const isDelivery = deliveryMethod === 'delivery';
+                const deliveryFeeCents = isDelivery && estimatedFeeCents ? estimatedFeeCents : 0;
+                const deliveryFee = deliveryFeeCents / 100;
+                const discountedItems = discountValid?.valid
+                  ? Math.round(totalPrice * (1 - discountValid.porcentaje / 100) * 100) / 100
+                  : totalPrice;
+                const grandTotal = discountedItems + deliveryFee;
+
+                return (
+                  <div className="mb-4 space-y-1">
+                    {discountValid?.valid && (
+                      <div className="flex items-center justify-between text-sm text-muted-foreground">
+                        <span>{t("subtotal", language)}</span>
+                        <span className="line-through">{formatPrice(totalPrice, 'EUR', language)}</span>
+                      </div>
+                    )}
+                    {isDelivery && deliveryFee > 0 && (
+                      <div className="flex items-center justify-between text-sm text-muted-foreground">
+                        <span>{t("deliveryCost", language)}</span>
+                        <span>{formatPrice(deliveryFee, 'EUR', language)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <span className="text-lg font-semibold text-foreground">{t("total", language)}</span>
+                      <span className={`text-2xl font-bold tabular-nums animate-price-update ${discountValid?.valid ? 'text-green-600 dark:text-green-400' : 'text-foreground'}`} key={grandTotal}>
+                        {formatPrice(grandTotal, 'EUR', language)}
                       </span>
-                      <span className="text-2xl font-bold text-green-600 dark:text-green-400 tabular-nums animate-price-update" key={`discounted-${totalPrice}`}>
-                        {formatPrice(Math.round(totalPrice * (1 - discountValid.porcentaje / 100) * 100) / 100, 'EUR', language)}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-2xl font-bold text-foreground tabular-nums animate-price-update" key={totalPrice}>
-                      {formatPrice(totalPrice, 'EUR', language)}
-                    </span>
-                  )}
-                </div>
-              </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {errors.general && (
                 <p role="alert" className="text-sm text-destructive text-center mb-2">
                   {errors.general}
+                </p>
+              )}
+              {isDeliveryIncomplete && (
+                <p role="status" className="text-xs text-muted-foreground text-center mb-2">
+                  {t('deliverySelectValidAddress', language)}
                 </p>
               )}
               <div className="flex flex-col gap-2">
@@ -667,7 +790,7 @@ export function CartDrawer() {
                        handleConfirmOrder();
                      }
                    }}
-                   disabled={sending || (mesaToken !== null && mesaError)}
+                   disabled={sending || (mesaToken !== null && mesaError) || isDeliveryIncomplete}
                  >
                    {sending ? t("sending", language) : mesaToken ? t("mesaPlaceOrder", language) : t("sendOrder", language)}
                  </Button>

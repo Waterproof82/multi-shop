@@ -18,6 +18,7 @@ export interface CreateProductData {
   categoria_id?: string | null;
   es_especial?: boolean;
   activo?: boolean;
+  tipo_producto?: 'comida' | 'bebida';
 }
 
 export interface UpdateProductData extends Partial<CreateProductData> {

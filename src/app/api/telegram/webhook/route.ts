@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { answerCallbackQuery, editMessageText, editMessageReplyMarkup, buildTimeButtons } from '@/core/infrastructure/services/telegram.service';
+import { answerCallbackQuery, editMessageText, editMessageReplyMarkup, buildTimeButtons, sendTelegramPreparadoAlert, deleteMessage } from '@/core/infrastructure/services/telegram.service';
 
 const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
 
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  // Handle anotado — mark as noted, show selected state + modify button
+  // Handle anotado — mark as noted; keep Preparado button visible
   const anotadoMatch = callbackData.match(/^anotado:([0-9a-f-]{36})$/);
   if (anotadoMatch) {
     const [, pedidoId] = anotadoMatch;
@@ -92,14 +92,46 @@ export async function POST(request: Request) {
     await answerCallbackQuery(callbackQueryId, '✅ Pedido anotado');
     if (message) {
       await editMessageReplyMarkup(String(message.chat.id), message.message_id, [
-        [{ text: '✅ Anotado ✓', callback_data: 'noop' }],
+        [
+          { text: '✅ Anotado ✓', callback_data: 'noop' },
+          { text: '🍳 Preparado', callback_data: `preparado:${pedidoId}` },
+        ],
         [{ text: '🔄 Modificar', callback_data: `modify_mesa:${pedidoId}` }],
       ]);
     }
     return NextResponse.json({ ok: true });
   }
 
-  // Handle servido — mark as served, show selected state + modify button
+  // Handle preparado — food ready; notify bar group; advance to Servido button
+  const preparadoMatch = callbackData.match(/^preparado:([0-9a-f-]{36})$/);
+  if (preparadoMatch) {
+    const [, pedidoId] = preparadoMatch;
+    const { pedidoRepository } = await import('@/core/infrastructure/database');
+    await pedidoRepository.updateStatusById(pedidoId, 'preparado');
+    await answerCallbackQuery(callbackQueryId, '🍳 Comida preparada');
+
+    // Notify bar group if configured
+    const mesaCtxResult = await pedidoRepository.findMesaContextForWebhook(pedidoId);
+    if (mesaCtxResult.success && mesaCtxResult.data) {
+      const { numero_pedido, mesa_numero, mesa_nombre, telegram_bebidas_chat_id } = mesaCtxResult.data;
+      if (telegram_bebidas_chat_id) {
+        await sendTelegramPreparadoAlert(numero_pedido, mesa_numero, mesa_nombre, telegram_bebidas_chat_id);
+      }
+    }
+
+    if (message) {
+      await editMessageReplyMarkup(String(message.chat.id), message.message_id, [
+        [
+          { text: '🍳 Preparado ✓', callback_data: 'noop' },
+          { text: '🍽️ Servido', callback_data: `servido:${pedidoId}` },
+        ],
+        [{ text: '🔄 Modificar', callback_data: `modify_mesa:${pedidoId}` }],
+      ]);
+    }
+    return NextResponse.json({ ok: true });
+  }
+
+  // Handle servido — mark as served; show Eliminar button
   const servidoMatch = callbackData.match(/^servido:([0-9a-f-]{36})$/);
   if (servidoMatch) {
     const [, pedidoId] = servidoMatch;
@@ -108,14 +140,27 @@ export async function POST(request: Request) {
     await answerCallbackQuery(callbackQueryId, '🍽️ Pedido servido');
     if (message) {
       await editMessageReplyMarkup(String(message.chat.id), message.message_id, [
-        [{ text: '🍽️ Servido ✓', callback_data: 'noop' }],
+        [
+          { text: '🍽️ Servido ✓', callback_data: 'noop' },
+          { text: '🗑️ Eliminar', callback_data: `eliminar:${pedidoId}` },
+        ],
         [{ text: '🔄 Modificar', callback_data: `modify_mesa:${pedidoId}` }],
       ]);
     }
     return NextResponse.json({ ok: true });
   }
 
-  // Handle modify_mesa — restore original Anotado/Servido buttons
+  // Handle eliminar — delete the Telegram message
+  const eliminarMatch = callbackData.match(/^eliminar:([0-9a-f-]{36})$/);
+  if (eliminarMatch) {
+    await answerCallbackQuery(callbackQueryId, '🗑️ Mensaje eliminado');
+    if (message) {
+      await deleteMessage(String(message.chat.id), message.message_id);
+    }
+    return NextResponse.json({ ok: true });
+  }
+
+  // Handle modify_mesa — restore initial Anotado/Preparado buttons
   const modifyMesaMatch = callbackData.match(/^modify_mesa:([0-9a-f-]{36})$/);
   if (modifyMesaMatch) {
     const [, pedidoId] = modifyMesaMatch;
@@ -126,7 +171,7 @@ export async function POST(request: Request) {
       await editMessageReplyMarkup(String(message.chat.id), message.message_id, [
         [
           { text: '✅ Anotado', callback_data: `anotado:${pedidoId}` },
-          { text: '🍽️ Servido', callback_data: `servido:${pedidoId}` },
+          { text: '🍳 Preparado', callback_data: `preparado:${pedidoId}` },
         ],
       ]);
     }

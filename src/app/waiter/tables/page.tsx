@@ -28,7 +28,10 @@ export default async function WaiterTablesPage() {
   const mesas: MesaWithSession[] = result.success ? (result.data ?? []) : [];
 
   return (
-    <div className="min-h-screen bg-background p-4">
+    <div className="min-h-screen p-6" style={{ background: "oklch(13% 0.02 252)" }}>
+      <p className="text-xs font-semibold tracking-[0.18em] uppercase mb-6" style={{ color: "oklch(42% 0.06 252)" }}>
+        Mesas
+      </p>
       <WaiterTablesGrid mesas={mesas} />
     </div>
   );

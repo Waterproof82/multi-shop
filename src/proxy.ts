@@ -217,11 +217,11 @@ function buildCsp(nonce: string, path: string): string {
     `img-src ${imgSources}`,
     `media-src ${mediaSources}`,
     "font-src 'self'",
-    `connect-src 'self' https://*.supabase.co https://api.brevo.com https://*.upstash.io${connectR2}${devConnectSrc}`,
+    `connect-src 'self' https://*.supabase.co https://api.brevo.com https://*.upstash.io https://api.mapbox.com https://events.mapbox.com${connectR2}${devConnectSrc}`,
     "frame-src 'self' https://www.google.com https://maps.google.com",
     "object-src 'none'",
     "base-uri 'self'",
-    "form-action 'self'",
+    "form-action 'self' https://sis-t.redsys.es:25443 https://sis.redsys.es",
     frameAncestors,
     "report-uri /api/csp-report",
   ].join('; ');

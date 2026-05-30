@@ -41,6 +41,21 @@ export const DISCOUNT_ERRORS = {
   FEATURE_DISABLED: { code: 'DSC_006', message: 'Welcome discount is not enabled for this store' },
 } as const;
 
+// Glovo LaaS
+export const GLOVO_ERRORS = {
+  GLOVO_QUOTE_FAILED:     { code: 'GLV_001', message: 'No couriers available right now' },
+  GLOVO_ORDER_FAILED:     { code: 'GLV_002', message: 'Failed to create Glovo order' },
+  GLOVO_NOT_CONFIGURED:   { code: 'GLV_003', message: 'Delivery service is not configured for this store' },
+  GLOVO_QUOTE_EXPIRED:    { code: 'GLV_004', message: 'Delivery quote has expired' },
+} as const;
+
+// Delivery errors
+export const DELIVERY_ERRORS = {
+  PAYMENT_REQUIRED:           { code: 'DLV_002', message: 'The order must be paid before being assigned' },
+  PAYMENT_NOT_CONFIGURED:     { code: 'DLV_003', message: 'Payment is not configured for this store' },
+  DELIVERY_MIN_ORDER_NOT_MET: { code: 'DLV_004', message: 'Order total is below the minimum for home delivery' },
+} as const;
+
 // API Error response type
 export interface ApiErrorResponse {
   code: string;

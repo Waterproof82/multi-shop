@@ -4,11 +4,9 @@ import { getSupabaseClient } from '@/core/infrastructure/database/supabase-clien
 import { parseMainDomain, getDomainFromHeaders } from '@/lib/domain-utils';
 import { verifyPin, signWaiterToken } from '@/lib/waiter-auth';
 import { rateLimitWaiterLogin } from '@/core/infrastructure/api/rate-limit';
-import { mesaSesionUseCase } from '@/core/infrastructure/database';
 
 const authSchema = z.object({
   pin: z.string().min(4).max(12),
-  mesaNumero: z.number().int().positive(),
 });
 
 export async function POST(request: Request) {
@@ -51,23 +49,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'PIN incorrecto' }, { status: 401 });
   }
 
-  const { data: mesa } = await supabase
-    .from('mesas')
-    .select('id, numero, nombre')
-    .eq('empresa_id', empresa.id)
-    .eq('numero', parsed.data.mesaNumero)
-    .maybeSingle();
-
-  if (!mesa) {
-    return NextResponse.json({ error: 'Mesa no encontrada' }, { status: 404 });
-  }
-
-  // Open (or reuse) the mesa session — idempotent RPC
-  await mesaSesionUseCase.openSesion(mesa.id as string, empresa.id as string);
-
   const token = await signWaiterToken(empresa.id as string);
 
-  const response = NextResponse.json({ ok: true, mesaId: mesa.id, mesaNumero: mesa.numero, mesaNombre: mesa.nombre });
+  const response = NextResponse.json({ ok: true });
   response.cookies.set('waiter_token', token, {
     httpOnly: true,
     sameSite: 'strict',

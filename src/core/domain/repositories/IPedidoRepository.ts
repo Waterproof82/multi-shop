@@ -6,7 +6,7 @@ export interface IPedidoRepository {
   updateStatus(id: string, empresaId: string, estado: string): Promise<Result<void>>;
   delete(id: string, empresaId: string): Promise<Result<void>>;
   findById(id: string, empresaId: string): Promise<Result<Pedido | null>>;
-  findByTrackingToken(token: string): Promise<Result<{ id: string; numero_pedido: number; estimated_minutes: number | null; estimated_ready_at: string | null; telegram_message_id: string | null; telegram_chat_id: string | null; tipo: string; estado: string; mesa_id: string | null; mesa_numero: number | null; mesa_nombre: string | null; items: { nombre: string; cantidad: number; precio: number }[] } | null>>;
+  findByTrackingToken(token: string): Promise<Result<{ id: string; numero_pedido: number; estimated_minutes: number | null; estimated_ready_at: string | null; telegram_message_id: string | null; telegram_chat_id: string | null; tipo: string; estado: string; glovo_status: string | null; mesa_id: string | null; mesa_numero: number | null; mesa_nombre: string | null; delivery_fee_cents: number | null; items: { nombre: string; cantidad: number; precio: number }[] } | null>>;
   createMesaOrder(params: {
     empresaId: string;
     mesaId: string;
@@ -23,13 +23,24 @@ export interface IPedidoRepository {
   clearTelegramMessageId(pedidoId: string): Promise<Result<void>>;
   deleteAllByTenant(empresaId: string): Promise<Result<number>>;
   findBySesionId(sesionId: string): Promise<Result<{ id: string; numero_pedido: number; total: number; estado: string; detalle_pedido: unknown[]; created_at: string }[]>>;
+  consolidateSesionOrders(sesionId: string): Promise<Result<void>>;
+  findSesionTelegramMessages(sesionId: string): Promise<Result<{ messageId: number; chatId: string }[]>>;
+  findMesaContextForWebhook(pedidoId: string): Promise<Result<{ empresa_id: string; numero_pedido: number; mesa_numero: number; mesa_nombre: string | null; telegram_bebidas_chat_id: string | null } | null>>;
   create(
     empresaId: string,
     clienteId: string | null,
     items: CartItem[],
     total: number,
     discountData?: { codigoDescuentoId: string; descuentoPorcentaje: number; totalSinDescuento: number },
-    trackingToken?: string
+    trackingToken?: string,
+    deliveryData?: {
+      origen?: string;
+      direccion_entrega?: string;
+      codigo_postal?: string;
+      latitude_entrega?: number;
+      longitude_entrega?: number;
+      estimated_delivery_fee_cents?: number;
+    }
   ): Promise<Result<{ id: string; numero_pedido: number; total: number; trackingToken?: string }>>;
   getStats(empresaId: string, mes: number, año: number): Promise<Result<{
     pedidosHoy: number;
