@@ -291,6 +291,23 @@ export const sendTelegramForMesa = async (
   }
 };
 
+/** Delete a message sent by the bot */
+export const deleteMessage = async (chatId: string, messageId: number): Promise<void> => {
+  if (!TELEGRAM_BOT_TOKEN) return;
+  try {
+    await fetch(
+      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/deleteMessage`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, message_id: messageId }),
+      }
+    );
+  } catch {
+    // Best-effort — message may have already been deleted or is too old
+  }
+};
+
 export const buildTimeButtons = (pedidoId: string): { text: string; callback_data: string }[][] => [
   [
     { text: '10 min', callback_data: `order:${pedidoId}:10` },

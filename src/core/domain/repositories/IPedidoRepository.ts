@@ -24,6 +24,7 @@ export interface IPedidoRepository {
   deleteAllByTenant(empresaId: string): Promise<Result<number>>;
   findBySesionId(sesionId: string): Promise<Result<{ id: string; numero_pedido: number; total: number; estado: string; detalle_pedido: unknown[]; created_at: string }[]>>;
   consolidateSesionOrders(sesionId: string): Promise<Result<void>>;
+  findSesionTelegramMessages(sesionId: string): Promise<Result<{ messageId: number; chatId: string }[]>>;
   create(
     empresaId: string,
     clienteId: string | null,

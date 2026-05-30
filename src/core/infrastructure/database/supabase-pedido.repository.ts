@@ -804,4 +804,30 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       return { success: false, error: appError };
     }
   }
+
+  async findSesionTelegramMessages(sesionId: string): Promise<Result<{ messageId: number; chatId: string }[]>> {
+    try {
+      const { data, error } = await this.supabase
+        .from('pedidos')
+        .select('telegram_message_id, empresas(telegram_mesa_chat_id, telegram_chat_id)')
+        .eq('sesion_id', sesionId)
+        .not('telegram_message_id', 'is', null);
+
+      if (error) {
+        return { success: false, error: { code: 'DB_ERROR', message: error.message, module: 'repository', method: 'findSesionTelegramMessages' } };
+      }
+
+      const messages = (data ?? []).flatMap((row) => {
+        const emp = row['empresas'] as { telegram_mesa_chat_id: string | null; telegram_chat_id: string | null } | null;
+        const chatId = emp?.telegram_mesa_chat_id ?? emp?.telegram_chat_id ?? null;
+        const messageId = Number(row['telegram_message_id']);
+        return chatId && messageId ? [{ messageId, chatId }] : [];
+      });
+
+      return { success: true, data: messages };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findSesionTelegramMessages', { details: { sesionId } });
+      return { success: false, error: appError };
+    }
+  }
 }
