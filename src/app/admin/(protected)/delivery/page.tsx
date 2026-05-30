@@ -17,8 +17,9 @@ export default async function DeliveryPage() {
   const admin = await authAdminUseCase.verifyToken(token);
   if (!admin) redirect('/admin/login');
 
+  const isSuperAdmin = admin.rol === SUPERADMIN_ROLE;
   let empresaId = admin.empresaId;
-  if (admin.rol === SUPERADMIN_ROLE) {
+  if (isSuperAdmin) {
     const superadminEmpresaId = cookieStore.get('superadmin_empresa_id')?.value;
     if (!superadminEmpresaId) redirect('/superadmin');
     empresaId = superadminEmpresaId;
@@ -53,7 +54,7 @@ export default async function DeliveryPage() {
           </div>
         </div>
         <div className="rounded-xl border border-white/10 bg-white/5 p-6">
-          <DeliveryCredentialsForm initial={initialSettings} />
+          <DeliveryCredentialsForm initial={initialSettings} isSuperAdmin={isSuperAdmin} />
         </div>
       </section>
     </div>

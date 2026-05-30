@@ -3,6 +3,24 @@ import { Pedido, CartItem, PedidoItem, Result } from "@/core/domain/entities/typ
 import { IPedidoRepository } from "@/core/domain/repositories/IPedidoRepository";
 import { logger } from "../logging/logger";
 
+type DeliveryData = {
+  origen?: string;
+  direccion_entrega?: string;
+  codigo_postal?: string;
+  latitude_entrega?: number;
+  longitude_entrega?: number;
+  estimated_delivery_fee_cents?: number;
+};
+
+function applyDeliveryFields(payload: Record<string, unknown>, d: DeliveryData): void {
+  if (d.origen) payload.origen = d.origen;
+  if (d.direccion_entrega) payload.direccion_entrega = d.direccion_entrega;
+  if (d.codigo_postal) payload.codigo_postal = d.codigo_postal;
+  if (d.latitude_entrega !== undefined) payload.latitude_entrega = d.latitude_entrega;
+  if (d.longitude_entrega !== undefined) payload.longitude_entrega = d.longitude_entrega;
+  if (d.estimated_delivery_fee_cents !== undefined) payload.delivery_fee_cents = d.estimated_delivery_fee_cents;
+}
+
 export class SupabasePedidoRepository implements IPedidoRepository {
   constructor(private readonly supabase: SupabaseClient) {}
 
@@ -263,14 +281,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         insertPayload.tracking_token = trackingToken;
       }
 
-      if (deliveryData) {
-        if (deliveryData.origen) insertPayload.origen = deliveryData.origen;
-        if (deliveryData.direccion_entrega) insertPayload.direccion_entrega = deliveryData.direccion_entrega;
-        if (deliveryData.codigo_postal) insertPayload.codigo_postal = deliveryData.codigo_postal;
-        if (deliveryData.latitude_entrega !== undefined) insertPayload.latitude_entrega = deliveryData.latitude_entrega;
-        if (deliveryData.longitude_entrega !== undefined) insertPayload.longitude_entrega = deliveryData.longitude_entrega;
-        if (deliveryData.estimated_delivery_fee_cents !== undefined) insertPayload.delivery_fee_cents = deliveryData.estimated_delivery_fee_cents;
-      }
+      if (deliveryData) applyDeliveryFields(insertPayload, deliveryData);
 
       const { data: pedido, error } = await this.supabase
         .from('pedidos')
@@ -479,7 +490,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         : (raw['mesas'] as Record<string, unknown> | null);
 
       const mesaId = (raw['mesa_id'] as string | null) ?? null;
-      const tipo = mesaId !== null ? 'mesa' : ((empresa?.['tipo'] as string) ?? 'tienda');
+      const tipo = mesaId ? 'mesa' : ((empresa?.['tipo'] as string) ?? 'tienda');
 
       return {
         success: true,
@@ -818,8 +829,12 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       }
 
       const messages = (data ?? []).flatMap((row) => {
-        const emp = row['empresas'] as { telegram_mesa_chat_id: string | null; telegram_chat_id: string | null } | null;
-        const chatId = emp?.telegram_mesa_chat_id ?? emp?.telegram_chat_id ?? null;
+        const empRaw = Array.isArray(row['empresas'])
+          ? (row['empresas'][0] as Record<string, unknown> | undefined) ?? null
+          : (row['empresas'] as Record<string, unknown> | null);
+        const chatId = (empRaw?.['telegram_mesa_chat_id'] as string | null)
+          ?? (empRaw?.['telegram_chat_id'] as string | null)
+          ?? null;
         const messageId = Number(row['telegram_message_id']);
         return chatId && messageId ? [{ messageId, chatId }] : [];
       });

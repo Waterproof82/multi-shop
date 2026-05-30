@@ -8,6 +8,7 @@ import { t } from "@/lib/translations";
 import { useEffect, useState, useRef } from "react";
 import { useCart } from "@/lib/cart-context";
 import { useLanguage } from "@/lib/language-context";
+import { getWaiterMesa } from "@/components/waiter-login-form";
 import type { EmpresaPublic } from "@/core/domain/entities/types";
 
 const SCROLL_OFFSET_PX = 140;
@@ -21,6 +22,11 @@ export function SiteHeaderClient({ showCart, empresa }: SiteHeaderClientProps) {
   const { openCart, totalItems } = useCart();
   const { language } = useLanguage();
   const [animate, setAnimate] = useState(false);
+  const [waiterActive, setWaiterActive] = useState(false);
+
+  useEffect(() => {
+    setWaiterActive(!!getWaiterMesa());
+  }, []);
 
   const handleOpenCart = () => {
     openCart();
@@ -70,7 +76,7 @@ export function SiteHeaderClient({ showCart, empresa }: SiteHeaderClientProps) {
         </button>
         <div className="flex items-center gap-1">
           <LanguageSelector />
-          {showCart ? (
+          {showCart && !waiterActive ? (
             <Button
               variant="ghost"
               size="icon"

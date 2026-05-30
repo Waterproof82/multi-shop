@@ -4,10 +4,12 @@ import { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
+import { fetchWithCsrf } from '@/lib/csrf-client';
 import type { DeliverySettings } from '@/core/application/use-cases/delivery/getDeliverySettingsUseCase';
 
 interface Props {
   initial: DeliverySettings;
+  isSuperAdmin: boolean;
 }
 
 interface FieldProps {
@@ -79,7 +81,7 @@ function Field({ label, id, value, onChange, placeholder, hint, textarea, secret
   );
 }
 
-export function DeliveryCredentialsForm({ initial }: Readonly<Props>) {
+export function DeliveryCredentialsForm({ initial, isSuperAdmin }: Readonly<Props>) {
   const { language } = useLanguage();
 
   // Delivery config
@@ -125,9 +127,8 @@ export function DeliveryCredentialsForm({ initial }: Readonly<Props>) {
     if (redsysSecretKey.trim()) payload['redsys_secret_key'] = redsysSecretKey.trim();
 
     try {
-      const res = await fetch('/api/admin/delivery-settings', {
+      const res = await fetchWithCsrf('/api/admin/delivery-settings', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       if (res.ok) {
@@ -173,86 +174,89 @@ export function DeliveryCredentialsForm({ initial }: Readonly<Props>) {
         </div>
       </section>
 
-      {/* Glovo credentials */}
-      <section className="space-y-4">
-        <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
-          Glovo Business (LaaS)
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field
-            label="Client ID"
-            id="glovo-client-id"
-            value={glovoClientId}
-            onChange={setGlovoClientId}
-            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-          />
-          <Field
-            label="Key ID"
-            id="glovo-key-id"
-            value={glovoKeyId}
-            onChange={setGlovoKeyId}
-            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-          />
-          <Field
-            label="Vendor ID"
-            id="glovo-vendor-id"
-            value={glovoVendorId}
-            onChange={setGlovoVendorId}
-            placeholder="outlet-slug"
-          />
-          <Field
-            label="País"
-            id="glovo-country"
-            value={glovoCountry}
-            onChange={setGlovoCountry}
-            placeholder="es"
-            hint="Código ISO de 2 letras: es, pt, fr..."
-          />
-        </div>
-        <Field
-          label="Clave privada RSA (PEM)"
-          id="glovo-private-key"
-          value={glovoPrivateKey}
-          onChange={setGlovoPrivateKey}
-          placeholder="-----BEGIN RSA PRIVATE KEY-----"
-          hint="Solo pegá si querés reemplazar la existente."
-          textarea
-          isSet={initial.glovo_private_key_set}
-        />
-      </section>
+      {/* Glovo + Redsys credentials — superadmin only */}
+      {isSuperAdmin && (
+        <>
+          <section className="space-y-4">
+            <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
+              Glovo Business (LaaS)
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field
+                label="Client ID"
+                id="glovo-client-id"
+                value={glovoClientId}
+                onChange={setGlovoClientId}
+                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+              />
+              <Field
+                label="Key ID"
+                id="glovo-key-id"
+                value={glovoKeyId}
+                onChange={setGlovoKeyId}
+                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+              />
+              <Field
+                label="Vendor ID"
+                id="glovo-vendor-id"
+                value={glovoVendorId}
+                onChange={setGlovoVendorId}
+                placeholder="outlet-slug"
+              />
+              <Field
+                label="País"
+                id="glovo-country"
+                value={glovoCountry}
+                onChange={setGlovoCountry}
+                placeholder="es"
+                hint="Código ISO de 2 letras: es, pt, fr..."
+              />
+            </div>
+            <Field
+              label="Clave privada RSA (PEM)"
+              id="glovo-private-key"
+              value={glovoPrivateKey}
+              onChange={setGlovoPrivateKey}
+              placeholder="-----BEGIN RSA PRIVATE KEY-----"
+              hint="Solo pegá si querés reemplazar la existente."
+              textarea
+              isSet={initial.glovo_private_key_set}
+            />
+          </section>
 
-      {/* Redsys credentials */}
-      <section className="space-y-4">
-        <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
-          Redsys TPV Virtual
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field
-            label="Código de comercio"
-            id="redsys-merchant-code"
-            value={redsysMerchantCode}
-            onChange={setRedsysMerchantCode}
-            placeholder="999008881"
-          />
-          <Field
-            label="Terminal"
-            id="redsys-terminal"
-            value={redsysTerminal}
-            onChange={setRedsysTerminal}
-            placeholder="001"
-          />
-        </div>
-        <Field
-          label="Clave secreta (Base64)"
-          id="redsys-secret-key"
-          value={redsysSecretKey}
-          onChange={setRedsysSecretKey}
-          placeholder="sq7HjrUOBfKmC576ILgskD5srU870gJ7"
-          hint="Solo pegá si querés reemplazar la existente."
-          secret
-          isSet={initial.redsys_secret_key_set}
-        />
-      </section>
+          <section className="space-y-4">
+            <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
+              Redsys TPV Virtual
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field
+                label="Código de comercio"
+                id="redsys-merchant-code"
+                value={redsysMerchantCode}
+                onChange={setRedsysMerchantCode}
+                placeholder="999008881"
+              />
+              <Field
+                label="Terminal"
+                id="redsys-terminal"
+                value={redsysTerminal}
+                onChange={setRedsysTerminal}
+                placeholder="001"
+              />
+            </div>
+            <Field
+              label="Clave secreta (Base64)"
+              id="redsys-secret-key"
+              value={redsysSecretKey}
+              onChange={setRedsysSecretKey}
+              placeholder="sq7HjrUOBfKmC576ILgskD5srU870gJ7"
+              hint="Solo pegá si querés reemplazar la existente."
+              secret
+              isSet={initial.redsys_secret_key_set}
+            />
+          </section>
+        </>
+      )}
 
       {feedback && (
         <p

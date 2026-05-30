@@ -8,8 +8,13 @@ export const metadata: Metadata = {
 
 export default function WaiterLoginPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <WaiterLoginForm />
+    <div
+      className="min-h-screen flex items-center justify-center px-4 py-10"
+      style={{ background: "oklch(13% 0.02 252)" }}
+    >
+      <div className="w-full max-w-xl">
+        <WaiterLoginForm />
+      </div>
     </div>
   );
 }

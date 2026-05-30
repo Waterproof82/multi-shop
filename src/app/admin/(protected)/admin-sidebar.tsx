@@ -26,7 +26,7 @@ const BASE_NAV_ITEMS: (NavItem & { requiresPromo?: boolean; requiresTgtg?: boole
   { href: '/admin/toogoodtogo', labelKey: 'sidebarTooGoodToGo', icon: ShoppingBag, requiresTgtg: true },
   { href: '/admin/estadisticas', labelKey: 'sidebarStatistics', icon: BarChart3 },
   { href: '/admin/mesas', labelKey: 'sidebarMesas', icon: UtensilsCrossed, requiresRestaurant: true },
-  { href: '/admin/delivery', labelKey: 'sidebarDelivery', icon: MapPin, requiresRestaurant: true },
+  { href: '/admin/delivery', labelKey: 'sidebarDelivery', icon: MapPin },
   { href: '/admin/configuracion', labelKey: 'sidebarSettings', icon: Settings },
 ];
 
