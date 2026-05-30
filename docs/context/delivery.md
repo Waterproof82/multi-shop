@@ -264,7 +264,26 @@ Los campos de clave muestran un indicador `✓ guardado` cuando tienen valor en 
 
 ---
 
-## 9. Errores relacionados
+## 9. Propagación del `delivery_fee_cents`
+
+El campo se propaga por toda la cadena hasta mostrarse en UI:
+
+```
+pedidos.delivery_fee_cents (DB)
+  → supabase-pedido.repository.ts (SELECT + map a camelCase)
+  → /api/orders/status (GET response)
+  → tracking-page-client.tsx (OrderStatus interface + normalizeStatus)
+  → <ItemsList deliveryFeeCents={...} />
+      → línea "Gastos de envío" + incluido en total mostrado
+  → /admin/pedidos (expanded detail)
+      → línea "Envío" visible cuando delivery_fee_cents > 0
+```
+
+> TRAMPAS: `getOrigenPedido()` recibe ahora un tercer argumento opcional `origen?: string | null`. Si `origen === 'delivery'`, devuelve `'delivery'` antes de comprobar `trackingToken`. Sin este fix, pedidos delivery mostraban badge "Recogida" en admin.
+
+---
+
+## 10. Errores relacionados
 
 | Código | Descripción |
 |--------|-------------|

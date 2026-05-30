@@ -71,10 +71,16 @@ Waiter opens table  → POST /api/waiter/mesas/{mesaId}/open
 
 Customer orders (or waiter adds order)
   → POST /api/pedidos with mesa_id + sesion_id
+  → individual pedidos created and stored (NOT yet visible in admin panel)
 
 Waiter closes table → POST /api/waiter/mesas/{mesaId}/close
-  → sets mesa_sesiones.cerrada_en = now()
-  → sets mesas.sesion_id = NULL
+  → pedidoRepository.consolidateSesionOrders(sesionId)
+      → merges all session pedidos into one (estado='cerrado')
+      → deletes individual pedidos
+      → consolidated ticket becomes visible in admin /pedidos
+  → mesaSesionUseCase.closeSesion(sesionId)
+      → sets mesa_sesiones.cerrada_at = now()
+      → sets mesas.sesion_id = NULL
 ```
 
 ---
@@ -87,6 +93,7 @@ The `WaiterBanner` component is rendered globally in the root layout. It appears
 - Pulsing live indicator dot
 - Shows active mesa name
 - "Change table" button → redirects to `/waiter/tables`
+- **"Close table" button (X icon)** → shown when a session is active. Calls `window.confirm`, then `POST /api/waiter/mesas/{mesaId}/close`, then clears the local waiter session state. Triggers order consolidation (see Session Lifecycle).
 - "Logout" button → calls `/api/waiter/logout` and redirects to `/waiter`
 - Re-validates session on every route change
 - `z-index: 100`, always visible above all content

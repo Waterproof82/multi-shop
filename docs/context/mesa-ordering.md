@@ -115,9 +115,30 @@ This avoids the issue where two polling components (MesaOrderHistory + MesaOrder
 The `MesaOrdersClient` component renders a receipt-style ticket:
 - Shows all items from all orders in the current session, flattened
 - Displays complement names under each item
+- **Shows per-item price** and line total (`(precio + complementos) × cantidad`) aligned right
 - Translates item names to the current UI language
 - Time shown is from the **first order** of the session, in 24h format
 - Polls `/api/mesas/{mesaId}/orders` every 10 seconds
+
+---
+
+## Admin Orders Panel — Mesa Behavior
+
+Mesa orders follow a **session-based visibility** model in `/admin/pedidos`:
+
+- **While session is open**: individual pedidos placed at the table are **hidden** from the admin panel. The parallel helper `getOpenSesionIds()` fetches all `mesa_sesiones` with `cerrada_at IS NULL` for the empresa, then `excludeOpenSesionPedidos()` filters those pedidos out before returning results.
+- **When session is closed**: `consolidateSesionOrders(sesionId)` runs automatically (triggered by `POST /api/waiter/mesas/{mesaId}/close`). It merges all individual pedidos for that session into a **single consolidated ticket**, deletes the rest, and sets `estado = 'cerrado'`. This ticket then becomes visible in the admin panel.
+- **`cerrado` status**: non-interactive — rendered as a `<span>` badge (not a clickable button). Cannot be advanced further. Represents a finalized dine-in ticket.
+
+### `consolidateSesionOrders` logic
+
+```
+1. Fetch all pedidos for the session
+2. Merge all items arrays into first pedido
+3. Sum total + delivery_fee_cents across all pedidos
+4. UPDATE first pedido: items=merged, total=sum, estado='cerrado'
+5. DELETE all other pedidos for the session
+```
 
 ---
 
