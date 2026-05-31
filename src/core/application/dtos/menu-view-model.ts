@@ -24,6 +24,7 @@ export interface MenuItemVM {
   image?: string;
   imageFit?: ImageFit;
   highlight?: boolean;
+  tipoProducto?: 'comida' | 'bebida';
   translations?: {
     en?: TranslationEntry;
     fr?: TranslationEntry;

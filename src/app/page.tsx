@@ -78,7 +78,7 @@ export default async function Home({
   return (
     <EmpresaThemeProvider colores={empresa?.colores || null}>
       {empresa && <JsonLd empresa={empresa} menuData={menuData} baseUrl={baseUrl} />}
-      <MenuPage menuData={menuData} header={header} showCart={showCart} empresa={empresa} />
+      <MenuPage menuData={menuData} header={header} showCart={showCart} empresa={empresa} isWaiterMode={isWaiterMode} />
     </EmpresaThemeProvider>
   );
 }

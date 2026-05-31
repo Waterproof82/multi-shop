@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
@@ -67,11 +67,10 @@ export function WaiterTableDetail({ mesaId }: WaiterTableDetailProps) {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Product selector state
-  const [showProductSelector, setShowProductSelector] = useState(false);
   const [productos, setProductos] = useState<Product[]>([]);
-  const [cart, setCart] = useState<CartItem[]>([]);
   const [productosLoading, setProductosLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [orderLoading, setOrderLoading] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -80,12 +79,28 @@ export function WaiterTableDetail({ mesaId }: WaiterTableDetailProps) {
     setLoading(false);
   }, [mesaId]);
 
-  // Initial fetch + polling every 10s
   useEffect(() => {
     void refresh();
     const interval = setInterval(() => { void refresh(); }, 10000);
     return () => clearInterval(interval);
   }, [refresh]);
+
+  // Load products once when table is open
+  useEffect(() => {
+    if (!loading && sessionData?.sesionId && productos.length === 0) {
+      setProductosLoading(true);
+      void fetchProductos().then(data => {
+        setProductos(data.filter(p => p.activo));
+        setProductosLoading(false);
+      });
+    }
+  }, [loading, sessionData?.sesionId, productos.length]);
+
+  const filteredProductos = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return productos;
+    return productos.filter(p => p.titulo_es.toLowerCase().includes(q));
+  }, [productos, search]);
 
   async function handleOpenTable() {
     setActionLoading(true);
@@ -104,16 +119,6 @@ export function WaiterTableDetail({ mesaId }: WaiterTableDetailProps) {
       router.push("/waiter/tables");
     } finally {
       setActionLoading(false);
-    }
-  }
-
-  async function handleOpenProductSelector() {
-    setShowProductSelector(true);
-    if (productos.length === 0) {
-      setProductosLoading(true);
-      const data = await fetchProductos();
-      setProductos(data.filter(p => p.activo));
-      setProductosLoading(false);
     }
   }
 
@@ -150,7 +155,7 @@ export function WaiterTableDetail({ mesaId }: WaiterTableDetailProps) {
       });
 
       setCart([]);
-      setShowProductSelector(false);
+      setSearch("");
       await refresh();
     } finally {
       setOrderLoading(false);
@@ -158,6 +163,7 @@ export function WaiterTableDetail({ mesaId }: WaiterTableDetailProps) {
   }
 
   const isOpen = !!(sessionData?.sesionId);
+  const cartTotal = cart.reduce((sum, ci) => sum + ci.product.precio * ci.quantity, 0);
 
   if (loading) {
     return (
@@ -167,52 +173,114 @@ export function WaiterTableDetail({ mesaId }: WaiterTableDetailProps) {
     );
   }
 
-  const cartTotal = cart.reduce((sum, ci) => sum + ci.product.precio * ci.quantity, 0);
-
-  return (
-    <div className="max-w-lg mx-auto flex flex-col gap-6">
-      {/* Top banner */}
-      <div className="flex items-center justify-between">
+  // Closed table: keep minimal back + open action
+  if (!isOpen) {
+    return (
+      <div className="max-w-lg mx-auto flex flex-col gap-6">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => router.push("/waiter/tables")}
+            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px]"
+            aria-label="Volver a las mesas"
+          >
+            ← {t("waiterTablesTitle", lang)}
+          </button>
+        </div>
         <button
-          onClick={() => router.push("/waiter/tables")}
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px]"
-          aria-label="Volver a las mesas"
+          onClick={handleOpenTable}
+          disabled={actionLoading}
+          className="min-h-[44px] w-full rounded-lg bg-green-500 text-white font-semibold text-sm disabled:opacity-50 transition-opacity hover:opacity-90"
         >
-          ← {t("waiterTablesTitle", lang)}
+          {t("waiterTableOpenAction", lang)}
         </button>
-        {isOpen && (
-          <button
-            onClick={handleCloseTable}
-            disabled={actionLoading}
-            className="min-h-[44px] px-4 rounded-lg border border-destructive text-destructive font-semibold text-sm disabled:opacity-50 transition-opacity hover:opacity-80"
-          >
-            {t("waiterTableCloseAction", lang)}
-          </button>
-        )}
+      </div>
+    );
+  }
+
+  // Open table: search replaces banner
+  return (
+    <div className="max-w-lg mx-auto flex flex-col gap-4">
+      {/* Search input — replaces top banner */}
+      <div className="relative">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
+          🔍
+        </span>
+        <input
+          type="search"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Buscar producto..."
+          className="w-full pl-9 pr-4 py-3 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+        />
       </div>
 
-      {/* Actions */}
-      <div className="flex gap-3">
-        {!isOpen ? (
-          <button
-            onClick={handleOpenTable}
-            disabled={actionLoading}
-            className="min-h-[44px] flex-1 rounded-lg bg-green-500 text-white font-semibold text-sm disabled:opacity-50 transition-opacity hover:opacity-90"
-          >
-            {t("waiterTableOpenAction", lang)}
-          </button>
+      {/* Inline product list */}
+      <div className="flex flex-col gap-2">
+        {productosLoading ? (
+          <div className="flex justify-center py-6">
+            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : filteredProductos.length === 0 ? (
+          search ? (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              Sin resultados para &ldquo;{search}&rdquo;
+            </p>
+          ) : null
         ) : (
-          <button
-            onClick={handleOpenProductSelector}
-            className="min-h-[44px] flex-1 rounded-lg bg-[var(--color-primary)] text-[var(--color-primary-foreground)] font-semibold text-sm transition-opacity hover:opacity-90"
-          >
-            {t("waiterAddOrder", lang)}
-          </button>
+          filteredProductos.map(product => {
+            const qty = cart.find(ci => ci.product.id === product.id)?.quantity ?? 0;
+            return (
+              <div
+                key={product.id}
+                className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{product.titulo_es}</p>
+                  <p className="text-xs text-muted-foreground">{formatPrice(product.precio, "EUR", lang)}</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => adjustQuantity(product, -1)}
+                    disabled={qty === 0}
+                    aria-label={t("reduceQuantity", lang)}
+                    className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-border text-foreground disabled:opacity-30 hover:bg-muted transition-colors"
+                  >
+                    −
+                  </button>
+                  <span className="w-6 text-center text-sm font-semibold text-foreground">{qty}</span>
+                  <button
+                    onClick={() => adjustQuantity(product, 1)}
+                    aria-label={t("increaseQuantity", lang)}
+                    className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-border text-foreground hover:bg-muted transition-colors"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            );
+          })
         )}
       </div>
 
-      {/* Running total */}
-      {isOpen && sessionData && sessionData.total > 0 && (
+      {/* Cart summary + confirm */}
+      {cart.length > 0 && (
+        <div className="rounded-xl border border-border bg-card p-4 flex flex-col gap-3">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">{t("waiterTotal", lang)}</span>
+            <span className="font-bold text-foreground">{formatPrice(cartTotal, "EUR", lang)}</span>
+          </div>
+          <button
+            onClick={handleConfirmOrder}
+            disabled={orderLoading}
+            className="min-h-[44px] w-full rounded-lg bg-[var(--color-primary)] text-[var(--color-primary-foreground)] font-semibold text-sm disabled:opacity-50 transition-opacity hover:opacity-90"
+          >
+            {orderLoading ? t("loading", lang) : t("confirmOrder", lang)}
+          </button>
+        </div>
+      )}
+
+      {/* Running session total */}
+      {sessionData && sessionData.total > 0 && (
         <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
           <span className="font-semibold text-foreground">{t("waiterTotal", lang)}</span>
           <span className="text-lg font-bold text-foreground">
@@ -222,129 +290,57 @@ export function WaiterTableDetail({ mesaId }: WaiterTableDetailProps) {
       )}
 
       {/* Orders list */}
-      {isOpen && (
-        <div className="flex flex-col gap-3">
-          {!sessionData || sessionData.orders.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              {t("waiterNoOrders", lang)}
-            </p>
-          ) : (
-            sessionData.orders.map(order => (
-              <div
-                key={order.id}
-                className="rounded-xl border border-border bg-card p-4 flex flex-col gap-2"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-foreground">#{order.numeroPedido}</span>
-                  <span className="text-xs text-muted-foreground">{order.estado}</span>
-                </div>
-                <ul className="flex flex-col gap-0.5">
-                  {order.items.map((item, i) => (
-                    <li key={i} className="flex justify-between text-sm text-muted-foreground">
-                      <span>{item.cantidad}× {item.nombre}</span>
-                      <span>{formatPrice(item.precio * item.cantidad, "EUR", lang)}</span>
-                    </li>
-                  ))}
-                </ul>
-                <div className="flex justify-between text-sm font-semibold border-t border-border pt-2">
-                  <span className="text-muted-foreground uppercase tracking-wide text-xs">
-                    {t("total", lang)}
-                  </span>
-                  <span>{formatPrice(order.total, "EUR", lang)}</span>
-                </div>
+      <div className="flex flex-col gap-3">
+        {!sessionData || sessionData.orders.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            {t("waiterNoOrders", lang)}
+          </p>
+        ) : (
+          sessionData.orders.map(order => (
+            <div
+              key={order.id}
+              className="rounded-xl border border-border bg-card p-4 flex flex-col gap-2"
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-foreground">#{order.numeroPedido}</span>
+                <span className="text-xs text-muted-foreground">{order.estado}</span>
               </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {/* Product selector overlay */}
-      {showProductSelector && (
-        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-card rounded-2xl border border-border shadow-xl flex flex-col max-h-[80vh]">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-              <h2 className="font-semibold text-foreground">{t("waiterAddOrder", lang)}</h2>
-              <button
-                onClick={() => { setShowProductSelector(false); setCart([]); }}
-                className="min-h-[44px] min-w-[44px] flex items-center justify-center text-muted-foreground hover:text-foreground"
-                aria-label="Cerrar"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2">
-              {productosLoading ? (
-                <div className="flex justify-center py-8">
-                  <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                </div>
-              ) : productos.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  {t("waiterNoOrders", lang)}
-                </p>
-              ) : (
-                productos.map(product => {
-                  const cartItem = cart.find(ci => ci.product.id === product.id);
-                  const qty = cartItem?.quantity ?? 0;
-                  return (
-                    <div
-                      key={product.id}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">
-                          {product.titulo_es}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatPrice(product.precio, "EUR", lang)}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          onClick={() => adjustQuantity(product, -1)}
-                          disabled={qty === 0}
-                          aria-label={t("reduceQuantity", lang)}
-                          className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-border text-foreground disabled:opacity-30 hover:bg-muted transition-colors"
-                        >
-                          −
-                        </button>
-                        <span className="w-6 text-center text-sm font-semibold text-foreground">
-                          {qty}
-                        </span>
-                        <button
-                          onClick={() => adjustQuantity(product, 1)}
-                          aria-label={t("increaseQuantity", lang)}
-                          className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-border text-foreground hover:bg-muted transition-colors"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            {cart.length > 0 && (
-              <div className="p-4 border-t border-border flex flex-col gap-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{t("waiterTotal", lang)}</span>
-                  <span className="font-bold text-foreground">
-                    {formatPrice(cartTotal, "EUR", lang)}
-                  </span>
-                </div>
-                <button
-                  onClick={handleConfirmOrder}
-                  disabled={orderLoading}
-                  className="min-h-[44px] w-full rounded-lg bg-[var(--color-primary)] text-[var(--color-primary-foreground)] font-semibold text-sm disabled:opacity-50 transition-opacity hover:opacity-90"
-                >
-                  {orderLoading ? t("loading", lang) : t("confirmOrder", lang)}
-                </button>
+              <ul className="flex flex-col gap-0.5">
+                {order.items.map((item, i) => (
+                  <li key={i} className="flex justify-between text-sm text-muted-foreground">
+                    <span>{item.cantidad}× {item.nombre}</span>
+                    <span>{formatPrice(item.precio * item.cantidad, "EUR", lang)}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="flex justify-between text-sm font-semibold border-t border-border pt-2">
+                <span className="text-muted-foreground uppercase tracking-wide text-xs">
+                  {t("total", lang)}
+                </span>
+                <span>{formatPrice(order.total, "EUR", lang)}</span>
               </div>
-            )}
-          </div>
-        </div>
-      )}
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Bottom actions */}
+      <div className="flex items-center justify-between pt-2">
+        <button
+          onClick={() => router.push("/waiter/tables")}
+          className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px]"
+          aria-label="Volver a las mesas"
+        >
+          ← {t("waiterTablesTitle", lang)}
+        </button>
+        <button
+          onClick={handleCloseTable}
+          disabled={actionLoading}
+          className="min-h-[44px] px-4 rounded-lg border border-destructive text-destructive font-semibold text-sm disabled:opacity-50 transition-opacity hover:opacity-80"
+        >
+          {t("waiterTableCloseAction", lang)}
+        </button>
+      </div>
     </div>
   );
 }
