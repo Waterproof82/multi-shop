@@ -659,6 +659,24 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     }
   }
 
+  async findStatusById(pedidoId: string): Promise<Result<string | null>> {
+    try {
+      const { data, error } = await this.supabase
+        .from('pedidos')
+        .select('estado')
+        .eq('id', pedidoId)
+        .maybeSingle();
+
+      if (error) {
+        return { success: false, error: { code: 'DB_ERROR', message: error.message, module: 'repository', method: 'findStatusById' } };
+      }
+      return { success: true, data: (data as { estado: string } | null)?.estado ?? null };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findStatusById');
+      return { success: false, error: appError };
+    }
+  }
+
   async findEstimatedReadyAtById(pedidoId: string): Promise<Result<string | null>> {
     try {
       const { data, error } = await this.supabase
@@ -845,11 +863,11 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       return { success: false, error: appError };
     }
   }
-  async findMesaContextForWebhook(pedidoId: string): Promise<Result<{ empresa_id: string; numero_pedido: number; mesa_numero: number; mesa_nombre: string | null; telegram_bebidas_chat_id: string | null } | null>> {
+  async findMesaContextForWebhook(pedidoId: string): Promise<Result<{ empresa_id: string; numero_pedido: number; mesa_numero: number; mesa_nombre: string | null; telegram_bebidas_chat_id: string | null; comidaItems: { nombre: string; cantidad: number }[] } | null>> {
     try {
       const { data, error } = await this.supabase
         .from('pedidos')
-        .select('empresa_id, numero_pedido, mesas(numero, nombre), empresas(telegram_bebidas_chat_id)')
+        .select('empresa_id, numero_pedido, detalle_pedido, mesas(numero, nombre), empresas(telegram_bebidas_chat_id)')
         .eq('id', pedidoId)
         .maybeSingle();
 
@@ -867,6 +885,11 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         ? (data['empresas'][0] ?? null)
         : (data['empresas'] ?? null);
 
+      const allItems = (data['detalle_pedido'] as { nombre: string; cantidad: number; tipo_producto?: string }[] | null) ?? [];
+      const comidaItems = allItems
+        .filter(i => i.tipo_producto !== 'bebida')
+        .map(i => ({ nombre: i.nombre, cantidad: i.cantidad }));
+
       return {
         success: true,
         data: {
@@ -875,6 +898,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           mesa_numero: ((mesaRaw as Record<string, unknown> | null)?.['numero'] as number) ?? 0,
           mesa_nombre: ((mesaRaw as Record<string, unknown> | null)?.['nombre'] as string | null) ?? null,
           telegram_bebidas_chat_id: ((empRaw as Record<string, unknown> | null)?.['telegram_bebidas_chat_id'] as string | null) ?? null,
+          comidaItems,
         },
       };
     } catch (e) {

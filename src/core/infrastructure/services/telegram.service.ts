@@ -354,23 +354,32 @@ export const sendTelegramBebidasInfo = async (
   }
 };
 
-/** Alert the bar group when kitchen marks comida as "preparado" */
+/** Alert the bar group when kitchen marks comida as "preparado" — includes item list and Servido button */
 export const sendTelegramPreparadoAlert = async (
+  pedidoId: string,
   numeroPedido: number,
   mesaNumero: number,
   mesaNombre: string | null,
+  comidaItems: { nombre: string; cantidad: number }[],
   chatId: string
 ): Promise<void> => {
   if (!TELEGRAM_BOT_TOKEN) return;
   const tableLabel = mesaNombre ? `${sanitizeForMarkdown(mesaNombre)} \\(Mesa ${mesaNumero}\\)` : `Mesa ${mesaNumero}`;
-  const message = `🍳 *Comida lista* — Pedido \\#${numeroPedido} — ${tableLabel}\n_Servir bebidas ahora_`;
+  const itemLines = comidaItems.map(i => `\\- ${i.cantidad}x ${sanitizeForMarkdown(i.nombre)}`);
+  const lines = [
+    `🍳 *Comida lista* — Pedido \\#${numeroPedido} — ${tableLabel}`,
+    '',
+    ...itemLines,
+  ];
+  const message = lines.join('\n');
+  const inlineKeyboard = [[{ text: '🍽️ Servido', callback_data: `servido:${pedidoId}` }]];
   try {
     await fetch(
       `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: 'MarkdownV2' }),
+        body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: 'MarkdownV2', reply_markup: { inline_keyboard: inlineKeyboard } }),
       }
     );
   } catch {

@@ -16,6 +16,7 @@ export interface IPedidoRepository {
     sesionId: string | null;
   }): Promise<Result<{ id: string; numero_pedido: number; tracking_token: string }>>;
   findEstimatedReadyAtById(pedidoId: string): Promise<Result<string | null>>;
+  findStatusById(pedidoId: string): Promise<Result<string | null>>;
   updateEstimatedTime(pedidoId: string, minutes: number): Promise<Result<void>>;
   updateStatusById(pedidoId: string, estado: string): Promise<Result<void>>;
   saveTelegramMessageId(pedidoId: string, messageId: number): Promise<Result<void>>;
@@ -25,7 +26,7 @@ export interface IPedidoRepository {
   findBySesionId(sesionId: string): Promise<Result<{ id: string; numero_pedido: number; total: number; estado: string; detalle_pedido: unknown[]; created_at: string }[]>>;
   consolidateSesionOrders(sesionId: string): Promise<Result<void>>;
   findSesionTelegramMessages(sesionId: string): Promise<Result<{ messageId: number; chatId: string }[]>>;
-  findMesaContextForWebhook(pedidoId: string): Promise<Result<{ empresa_id: string; numero_pedido: number; mesa_numero: number; mesa_nombre: string | null; telegram_bebidas_chat_id: string | null } | null>>;
+  findMesaContextForWebhook(pedidoId: string): Promise<Result<{ empresa_id: string; numero_pedido: number; mesa_numero: number; mesa_nombre: string | null; telegram_bebidas_chat_id: string | null; comidaItems: { nombre: string; cantidad: number }[] } | null>>;
   create(
     empresaId: string,
     clienteId: string | null,
