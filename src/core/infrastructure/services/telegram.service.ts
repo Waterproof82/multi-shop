@@ -372,7 +372,10 @@ export const sendTelegramPreparadoAlert = async (
     ...itemLines,
   ];
   const message = lines.join('\n');
-  const inlineKeyboard = [[{ text: '🍽️ Servido', callback_data: `servido:${pedidoId}` }]];
+  const inlineKeyboard = [[
+    { text: '🍽️ Servido', callback_data: `servido:${pedidoId}` },
+    { text: '🗑️ Eliminar', callback_data: `eliminar_bebidas:${pedidoId}` },
+  ]];
   try {
     await fetch(
       `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
