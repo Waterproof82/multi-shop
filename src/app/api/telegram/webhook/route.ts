@@ -131,7 +131,7 @@ export async function POST(request: Request) {
         const statusResult = await repo.findStatusById(pedidoId);
         if (statusResult.success && statusResult.data === 'preparado') {
           if (mesaCtx?.telegram_bebidas_chat_id) {
-            await sendTelegramPreparadoAlert(pedidoId, mesaCtx.numero_pedido, mesaCtx.mesa_numero, mesaCtx.mesa_nombre, mesaCtx.comidaItems, mesaCtx.telegram_bebidas_chat_id);
+            await sendTelegramPreparadoAlert(mesaCtx.numero_pedido, mesaCtx.mesa_numero, mesaCtx.mesa_nombre, mesaCtx.comidaItems, mesaCtx.telegram_bebidas_chat_id);
           }
           await deleteMessage(chatId, messageId);
         }
@@ -188,7 +188,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  // Handle cancelar_servido — cancel servido deletion, restore Servido + Eliminar buttons
+  // Handle cancelar_servido — cancel servido deletion, restore Servido button
   const cancelarServidoMatch = callbackData.match(/^cancelar_servido:([0-9a-f-]{36})$/);
   if (cancelarServidoMatch) {
     const [, pedidoId] = cancelarServidoMatch;
@@ -197,56 +197,7 @@ export async function POST(request: Request) {
     await answerCallbackQuery(callbackQueryId, '↩️ Eliminación cancelada');
     if (message) {
       await editMessageReplyMarkup(String(message.chat.id), message.message_id, [
-        [
-          { text: '🍽️ Servido', callback_data: `servido:${pedidoId}` },
-          { text: '🗑️ Eliminar', callback_data: `eliminar_bebidas:${pedidoId}` },
-        ],
-      ]);
-    }
-    return NextResponse.json({ ok: true });
-  }
-
-  // Handle eliminar_bebidas — delete bebidas alert after 5s countdown (cancellable)
-  const eliminarBebidasMatch = callbackData.match(/^eliminar_bebidas:([0-9a-f-]{36})$/);
-  if (eliminarBebidasMatch) {
-    const [, pedidoId] = eliminarBebidasMatch;
-    const { pedidoRepository } = await import('@/core/infrastructure/database');
-    await pedidoRepository.updateStatusById(pedidoId, 'eliminando_bebidas');
-    await answerCallbackQuery(callbackQueryId, '🗑️ Eliminando en 5s');
-    if (message) {
-      const chatId = String(message.chat.id);
-      const messageId = message.message_id;
-      await editMessageReplyMarkup(chatId, messageId, [
-        [
-          { text: '🗑️ Eliminando...', callback_data: 'noop' },
-          { text: '❌ Cancelar (5s)', callback_data: `cancelar_eliminar_bebidas:${pedidoId}` },
-        ],
-      ]);
-      after(async () => {
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        const { pedidoRepository: repo } = await import('@/core/infrastructure/database');
-        const statusResult = await repo.findStatusById(pedidoId);
-        if (statusResult.success && statusResult.data === 'eliminando_bebidas') {
-          await deleteMessage(chatId, messageId);
-        }
-      });
-    }
-    return NextResponse.json({ ok: true });
-  }
-
-  // Handle cancelar_eliminar_bebidas — cancel bebidas deletion, restore Servido + Eliminar buttons
-  const cancelarEliminarBebidasMatch = callbackData.match(/^cancelar_eliminar_bebidas:([0-9a-f-]{36})$/);
-  if (cancelarEliminarBebidasMatch) {
-    const [, pedidoId] = cancelarEliminarBebidasMatch;
-    const { pedidoRepository } = await import('@/core/infrastructure/database');
-    await pedidoRepository.updateStatusById(pedidoId, 'preparado');
-    await answerCallbackQuery(callbackQueryId, '↩️ Eliminación cancelada');
-    if (message) {
-      await editMessageReplyMarkup(String(message.chat.id), message.message_id, [
-        [
-          { text: '🍽️ Servido', callback_data: `servido:${pedidoId}` },
-          { text: '🗑️ Eliminar', callback_data: `eliminar_bebidas:${pedidoId}` },
-        ],
+        [{ text: '🍽️ Servido', callback_data: `servido:${pedidoId}` }],
       ]);
     }
     return NextResponse.json({ ok: true });

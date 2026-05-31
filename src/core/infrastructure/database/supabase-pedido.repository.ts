@@ -520,7 +520,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
   async createMesaOrder(params: {
     empresaId: string;
     mesaId: string;
-    items: { nombre: string; cantidad: number; precio: number; translations?: unknown; complementos?: { nombre: string; precio: number }[] }[];
+    items: { nombre: string; cantidad: number; precio: number; tipo_producto?: string; translations?: unknown; complementos?: { nombre: string; precio: number }[] }[];
     total: number;
     trackingToken: string;
     sesionId: string | null;
@@ -551,6 +551,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           nombre: item.nombre,
           cantidad: item.cantidad,
           precio: item.precio,
+          tipo_producto: item.tipo_producto ?? 'comida',
           translations: item.translations ?? null,
           complementos: item.complementos ?? [],
         })),

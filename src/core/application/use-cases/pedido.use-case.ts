@@ -528,7 +528,7 @@ export class PedidoUseCase {
         }
 
         if (bebidasItems.length > 0) {
-          await sendTelegramBebidasInfo(numeroPedido, bebidasItems, mesaNumero, mesaNombre, telegramBebidasChatId!);
+          await sendTelegramBebidasInfo(pedidoId, numeroPedido, bebidasItems, mesaNumero, mesaNombre, telegramBebidasChatId!);
         }
       } else if (cocinaChatId) {
         // Single group fallback: all items together
