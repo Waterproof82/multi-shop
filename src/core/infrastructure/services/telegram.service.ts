@@ -358,8 +358,9 @@ export const sendTelegramBebidasInfo = async (
   }
 };
 
-/** Alert the bar group when kitchen marks comida as "preparado" — lists ready comida items, informational only */
+/** Alert the bar group when kitchen marks comida as "preparado" — lists ready comida items with Servido button */
 export const sendTelegramPreparadoAlert = async (
+  pedidoId: string,
   numeroPedido: number,
   mesaNumero: number,
   mesaNombre: string | null,
@@ -375,13 +376,14 @@ export const sendTelegramPreparadoAlert = async (
     ...itemLines,
   ];
   const message = lines.join('\n');
+  const inlineKeyboard = [[{ text: '🍽️ Servido', callback_data: `servido:${pedidoId}` }]];
   try {
     await fetch(
       `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: 'MarkdownV2' }),
+        body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: 'MarkdownV2', reply_markup: { inline_keyboard: inlineKeyboard } }),
       }
     );
   } catch {

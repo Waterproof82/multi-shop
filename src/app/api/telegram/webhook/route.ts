@@ -131,7 +131,7 @@ export async function POST(request: Request) {
         const statusResult = await repo.findStatusById(pedidoId);
         if (statusResult.success && statusResult.data === 'preparado') {
           if (mesaCtx?.telegram_bebidas_chat_id) {
-            await sendTelegramPreparadoAlert(mesaCtx.numero_pedido, mesaCtx.mesa_numero, mesaCtx.mesa_nombre, mesaCtx.comidaItems, mesaCtx.telegram_bebidas_chat_id);
+            await sendTelegramPreparadoAlert(pedidoId, mesaCtx.numero_pedido, mesaCtx.mesa_numero, mesaCtx.mesa_nombre, mesaCtx.comidaItems, mesaCtx.telegram_bebidas_chat_id);
           }
           await deleteMessage(chatId, messageId);
         }
