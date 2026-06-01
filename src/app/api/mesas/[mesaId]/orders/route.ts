@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { mesaSesionRepository, pedidoRepository } from '@/core/infrastructure/database';
 import { rateLimitMesaPolling } from '@/core/infrastructure/api/rate-limit';
+import { getSupabaseAnonClient, getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 
 const mesaIdSchema = z.string().uuid('El mesaId debe ser un UUID válido');
 
@@ -44,5 +45,40 @@ export async function GET(
 
   const total = ordersResult.data.reduce((sum, o) => sum + Number(o.total), 0);
 
-  return NextResponse.json({ orders, sesionId: sesion.id, total });
+  // Check if mesa payments are enabled for this empresa
+  let pagosHabilitados = false;
+  try {
+    const supabase = getSupabaseAnonClient();
+    const { data: emp } = await supabase
+      .from('empresas')
+      .select('pagos_mesa_habilitados')
+      .eq('id', sesion.empresaId)
+      .single();
+    pagosHabilitados = (emp as { pagos_mesa_habilitados: boolean } | null)?.pagos_mesa_habilitados ?? false;
+  } catch {
+    // best-effort — default false
+  }
+
+  // Fetch division state from the session (service_role to bypass RLS)
+  let division: { personas: number; pagosRealizados: number; importePorPersona: number } | null = null;
+  try {
+    const supabaseAdmin = getSupabaseClient();
+    const { data: sesionRow } = await supabaseAdmin
+      .from('mesa_sesiones')
+      .select('division_personas, division_pagos_realizados')
+      .eq('id', sesion.id)
+      .single();
+
+    const row = sesionRow as { division_personas: number | null; division_pagos_realizados: number } | null;
+    if (row?.division_personas) {
+      const personas = row.division_personas;
+      const pagosRealizados = row.division_pagos_realizados;
+      const importePorPersona = Math.round((total / personas) * 100) / 100;
+      division = { personas, pagosRealizados, importePorPersona };
+    }
+  } catch {
+    // best-effort
+  }
+
+  return NextResponse.json({ orders, sesionId: sesion.id, total, pagosHabilitados, division });
 }

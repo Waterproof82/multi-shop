@@ -20,10 +20,18 @@ interface MesaOrder {
   createdAt: string;
 }
 
+interface DivisionState {
+  personas: number;
+  pagosRealizados: number;
+  importePorPersona: number;
+}
+
 interface MesaSessionData {
   orders: MesaOrder[];
   sesionId: string | null;
   total: number;
+  pagosHabilitados: boolean;
+  division: DivisionState | null;
 }
 
 interface MesaInfo {
@@ -61,12 +69,119 @@ function DottedRule() {
   );
 }
 
+// Personas selector modal
+function DivisionModal({
+  total,
+  lang,
+  onConfirm,
+  onClose,
+}: {
+  total: number;
+  lang: Parameters<typeof t>[1];
+  onConfirm: (n: number) => void;
+  onClose: () => void;
+}) {
+  const [selected, setSelected] = useState(2);
+  const perPersona = Math.round((total / selected) * 100) / 100;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center"
+      style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm rounded-t-3xl p-6 pb-10"
+        style={{ backgroundColor: "#fffcf7", fontFamily: "monospace" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Handle */}
+        <div
+          className="mx-auto mb-5 rounded-full"
+          style={{ width: 40, height: 4, backgroundColor: "#c9b99a" }}
+        />
+
+        <p
+          className="text-center text-xs tracking-widest uppercase mb-5"
+          style={{ color: "#8a7560" }}
+        >
+          {t("mesaDivisionTitle", lang)}
+        </p>
+
+        {/* Number selector */}
+        <div className="flex items-center justify-center gap-6 mb-4">
+          <button
+            type="button"
+            onClick={() => setSelected((n) => Math.max(2, n - 1))}
+            className="flex items-center justify-center rounded-full text-xl font-bold transition-opacity disabled:opacity-30"
+            style={{
+              width: 44,
+              height: 44,
+              backgroundColor: "#1a1612",
+              color: "#fffcf7",
+            }}
+            disabled={selected <= 2}
+            aria-label="Menos personas"
+          >
+            −
+          </button>
+
+          <div className="flex flex-col items-center" style={{ minWidth: 60 }}>
+            <span
+              className="text-4xl font-bold tabular-nums"
+              style={{ color: "#1a1612" }}
+            >
+              {selected}
+            </span>
+            <span className="text-xs uppercase tracking-widest" style={{ color: "#8a7560" }}>
+              {t("mesaDivisionPersonas", lang)}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setSelected((n) => Math.min(20, n + 1))}
+            className="flex items-center justify-center rounded-full text-xl font-bold transition-opacity disabled:opacity-30"
+            style={{
+              width: 44,
+              height: 44,
+              backgroundColor: "#1a1612",
+              color: "#fffcf7",
+            }}
+            disabled={selected >= 20}
+            aria-label="Más personas"
+          >
+            +
+          </button>
+        </div>
+
+        <p className="text-center text-sm mb-6" style={{ color: "#8a7560", fontFamily: "monospace" }}>
+          {formatPrice(perPersona, "EUR", lang)}{" "}
+          <span className="text-xs">{t("mesaDivisionPorPersona", lang)}</span>
+        </p>
+
+        <button
+          type="button"
+          onClick={() => onConfirm(selected)}
+          className="w-full py-4 rounded-2xl text-sm font-bold tracking-widest uppercase"
+          style={{ backgroundColor: "#1a1612", color: "#fffcf7" }}
+        >
+          {t("mesaDivisionConfirm", lang)}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
   const { language } = useLanguage();
   const lang = language as Parameters<typeof t>[1];
   const [sessionData, setSessionData] = useState<MesaSessionData | null>(null);
   const [mesaInfo, setMesaInfo] = useState<MesaInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [paying, setPaying] = useState(false);
+  const [showDivisionModal, setShowDivisionModal] = useState(false);
+  const [settingDivision, setSettingDivision] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -91,6 +206,59 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
       .catch(() => null);
   }, [mesaId]);
 
+  const initiateRedsys = async (esDivision: boolean) => {
+    if (paying) return;
+    setPaying(true);
+    try {
+      const res = await fetch('/api/redsys/initiate-mesa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mesaId, esDivision }),
+      });
+      if (!res.ok) { setPaying(false); return; }
+      const formData = await res.json() as {
+        DS_MERCHANT_PARAMETERS: string;
+        DS_SIGNATURE: string;
+        DS_SIGNATURE_VERSION: string;
+      };
+      const redsysUrl = process.env.NEXT_PUBLIC_REDSYS_URL ?? 'https://sis-t.redsys.es:25443/sis/realizarPago';
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = redsysUrl;
+      const fields: Record<string, string> = {
+        Ds_SignatureVersion: formData.DS_SIGNATURE_VERSION,
+        Ds_MerchantParameters: formData.DS_MERCHANT_PARAMETERS,
+        Ds_Signature: formData.DS_SIGNATURE,
+      };
+      for (const [name, value] of Object.entries(fields)) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = name;
+        input.value = value;
+        form.appendChild(input);
+      }
+      document.body.appendChild(form);
+      form.submit();
+    } catch {
+      setPaying(false);
+    }
+  };
+
+  const handleConfirmDivision = async (numPersonas: number) => {
+    setShowDivisionModal(false);
+    setSettingDivision(true);
+    try {
+      await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/division`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ numPersonas }),
+      });
+      await refresh();
+    } finally {
+      setSettingDivision(false);
+    }
+  };
+
   const allItems = sessionData?.orders.flatMap((o) => o.items) ?? [];
 
   const firstOrderDate = sessionData?.orders[0]?.createdAt
@@ -99,6 +267,11 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
   const dateStr = firstOrderDate?.toLocaleDateString(language, { day: "2-digit", month: "2-digit", year: "numeric" }) ?? "";
   const timeStr = firstOrderDate?.toLocaleTimeString(language, { hour: "2-digit", minute: "2-digit", hour12: false }) ?? "";
   const tableLabel = mesaInfo?.nombre ?? (mesaInfo ? `Mesa ${mesaInfo.numero}` : "Mesa");
+
+  const division = sessionData?.division ?? null;
+  const fullyPaid = division
+    ? division.pagosRealizados >= division.personas
+    : false;
 
   return (
     <div className="min-h-screen py-8 px-4" style={{ backgroundColor: PAGE_BG }}>
@@ -233,7 +406,142 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
             <PerforatedEdge position="bottom" />
           </div>
         )}
+
+        {/* Payment section */}
+        {allItems.length > 0 && sessionData?.pagosHabilitados && (
+          <div className="mt-6 flex flex-col gap-3">
+
+            {/* Division progress bar */}
+            {division && (
+              <div
+                className="rounded-2xl p-4"
+                style={{ backgroundColor: "#fffcf7", fontFamily: "monospace" }}
+              >
+                <div className="flex justify-between items-center text-xs mb-2" style={{ color: "#8a7560" }}>
+                  <span className="uppercase tracking-widest">{t("mesaDivisionProgress", lang)}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="tabular-nums font-bold" style={{ color: "#1a1612" }}>
+                      {division.pagosRealizados}/{division.personas}
+                    </span>
+                    {division.pagosRealizados === 0 && !fullyPaid && (
+                      <button
+                        type="button"
+                        onClick={() => setShowDivisionModal(true)}
+                        disabled={settingDivision}
+                        className="text-xs underline underline-offset-2 transition-opacity disabled:opacity-40"
+                        style={{ color: "#8a7560", fontFamily: "monospace" }}
+                        aria-label={t("mesaDivisionEdit", lang)}
+                      >
+                        {t("mesaDivisionEdit", lang)}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Progress track */}
+                <div
+                  className="rounded-full overflow-hidden mb-3"
+                  style={{ height: 6, backgroundColor: "#e8e0d8" }}
+                >
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{
+                      width: `${Math.min(100, (division.pagosRealizados / division.personas) * 100)}%`,
+                      backgroundColor: fullyPaid ? "#4ade80" : "#1a1612",
+                    }}
+                  />
+                </div>
+
+                {/* Individual shares */}
+                <div className="flex gap-1.5 justify-center">
+                  {Array.from({ length: division.personas }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="rounded-full transition-colors duration-300"
+                      style={{
+                        width: 10,
+                        height: 10,
+                        backgroundColor: i < division.pagosRealizados ? "#1a1612" : "#e8e0d8",
+                      }}
+                    />
+                  ))}
+                </div>
+
+                {!fullyPaid && (
+                  <p className="text-center text-xs mt-2" style={{ color: "#8a7560" }}>
+                    {formatPrice(division.importePorPersona, "EUR", lang)}{" "}
+                    {t("mesaDivisionPorPersona", lang)}
+                  </p>
+                )}
+
+                {fullyPaid && (
+                  <p className="text-center text-xs mt-2 font-bold" style={{ color: "#4ade80" }}>
+                    {t("mesaDivisionComplete", lang)}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Buttons */}
+            {!division && !fullyPaid && (
+              <div className="flex gap-3">
+                {/* Pagar total */}
+                <button
+                  type="button"
+                  onClick={() => { void initiateRedsys(false); }}
+                  disabled={paying || settingDivision}
+                  className="flex-1 py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-opacity disabled:opacity-50"
+                  style={{ backgroundColor: "#1a1612", color: "#fffcf7", fontFamily: "monospace" }}
+                >
+                  {paying ? t("loading", lang) : t("mesaPayTotal", lang)}
+                </button>
+
+                {/* Dividir cuenta */}
+                <button
+                  type="button"
+                  onClick={() => setShowDivisionModal(true)}
+                  disabled={paying || settingDivision}
+                  className="flex-1 py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-opacity disabled:opacity-50"
+                  style={{
+                    backgroundColor: "transparent",
+                    color: "#1a1612",
+                    fontFamily: "monospace",
+                    border: "2px solid #1a1612",
+                  }}
+                >
+                  {settingDivision ? t("loading", lang) : t("mesaDivideCheck", lang)}
+                </button>
+              </div>
+            )}
+
+            {/* Pagar mi parte */}
+            {division && !fullyPaid && (
+              <button
+                type="button"
+                onClick={() => { void initiateRedsys(true); }}
+                disabled={paying}
+                className="w-full py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-opacity disabled:opacity-50"
+                style={{ backgroundColor: "#1a1612", color: "#fffcf7", fontFamily: "monospace" }}
+              >
+                {paying
+                  ? t("loading", lang)
+                  : `${t("mesaPayShare", lang)} ${formatPrice(division.importePorPersona, "EUR", lang)}`}
+              </button>
+            )}
+
+          </div>
+        )}
       </div>
+
+      {/* Division modal */}
+      {showDivisionModal && sessionData && (
+        <DivisionModal
+          total={sessionData.total}
+          lang={lang}
+          onConfirm={(n) => { void handleConfirmDivision(n); }}
+          onClose={() => setShowDivisionModal(false)}
+        />
+      )}
     </div>
   );
 }

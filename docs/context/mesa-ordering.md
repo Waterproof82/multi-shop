@@ -185,3 +185,5 @@ Shown on the main menu page when `?mesa=` is active. Displays a collapsible summ
 ## Component: `MesaOrdersClient`
 
 Full ticket view rendered at `/mesa/{mesaId}/orders`. Receipt-style UI with perforated edges, monospace font, running total, item list with complements.
+
+When `pagos_mesa_habilitados` is enabled for the empresa, payment buttons appear below the ticket. See [mesa-payments.md](./mesa-payments.md) for the full payment flow.

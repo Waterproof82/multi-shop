@@ -73,7 +73,7 @@ export async function processRedsysWebhookUseCase(
     // Find pedido by payment_order_ref + empresaId
     const { data: pedido, error: pedidoError } = await supabase
       .from('pedidos')
-      .select('id, payment_status, empresa_id, total, numero_pedido, payment_order_ref, direccion_entrega, latitude_entrega, longitude_entrega, clientes(nombre, telefono)')
+      .select('id, payment_status, empresa_id, total, numero_pedido, payment_order_ref, sesion_id, direccion_entrega, latitude_entrega, longitude_entrega, clientes(nombre, telefono)')
       .eq('payment_order_ref', dsOrder)
       .eq('empresa_id', input.empresaId)
       .maybeSingle();
@@ -101,6 +101,47 @@ export async function processRedsysWebhookUseCase(
       .update({ payment_status: newPaymentStatus })
       .eq('id', p['id'] as string)
       .eq('empresa_id', input.empresaId);
+
+    // If this pedido belongs to a mesa session, handle session-level payment logic
+    const sesionId = p['sesion_id'] as string | null;
+    if (!updateError && sesionId && newPaymentStatus === 'paid') {
+      // Check if this session has division enabled
+      const { data: sesionData } = await supabase
+        .from('mesa_sesiones')
+        .select('division_personas, division_pagos_realizados')
+        .eq('id', sesionId)
+        .maybeSingle();
+
+      const sd = sesionData as { division_personas: number | null; division_pagos_realizados: number } | null;
+      const divisionPersonas = sd?.division_personas ?? null;
+
+      if (divisionPersonas) {
+        // Division payment: atomically increment the counter
+        const { data: rpcResult } = await supabase
+          .rpc('increment_division_pagos', { p_sesion_id: sesionId });
+
+        const rpcRows = rpcResult as { pagos_realizados: number; personas: number }[] | null;
+        const row = rpcRows?.[0];
+        const allPaid = row ? row.pagos_realizados >= row.personas : false;
+
+        if (allPaid) {
+          // All shares paid — mark every pedido in the session as paid
+          await supabase
+            .from('pedidos')
+            .update({ payment_status: 'paid' })
+            .eq('sesion_id', sesionId)
+            .eq('empresa_id', input.empresaId);
+        }
+        // Otherwise: partial payment confirmed, leave other pedidos unchanged
+      } else {
+        // No division — full payment, mark all session pedidos as paid
+        await supabase
+          .from('pedidos')
+          .update({ payment_status: 'paid' })
+          .eq('sesion_id', sesionId)
+          .eq('empresa_id', input.empresaId);
+      }
+    }
 
     if (updateError) {
       await logger.logAndReturnError(
