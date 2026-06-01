@@ -79,6 +79,7 @@ export interface EmpresaWithStats {
     it?: string | null;
     de?: string | null;
   } | null;
+  pagosMesaHabilitados: boolean;
   stats: EmpresaStats;
   totalMesas: number;
   createdAt: string;
