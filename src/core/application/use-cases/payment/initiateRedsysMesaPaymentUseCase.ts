@@ -78,10 +78,10 @@ export async function initiateRedsysMesaPaymentUseCase(
       };
     }
 
-    // Find active sesion for the mesa (including division state)
+    // Find active sesion for the mesa (including division state + payment lock)
     const { data: sesion, error: sesionError } = await supabase
       .from('mesa_sesiones')
-      .select('id, empresa_id, division_personas, division_pagos_realizados')
+      .select('id, empresa_id, division_personas, division_pagos_realizados, pago_en_curso, pago_iniciado_en')
       .eq('mesa_id', input.mesaId)
       .is('cerrada_at', null)
       .maybeSingle();
@@ -102,6 +102,25 @@ export async function initiateRedsysMesaPaymentUseCase(
     const sesionId = s['id'] as string;
     const divisionPersonas = (s['division_personas'] as number | null) ?? null;
     const divisionPagosRealizados = (s['division_pagos_realizados'] as number) ?? 0;
+
+    // Reject if another payment is already in progress (lock not expired)
+    const pagoEnCurso = s['pago_en_curso'] as boolean;
+    const pagoIniciadoEn = s['pago_iniciado_en'] as string | null;
+    const LOCK_EXPIRY_MS = 15 * 60 * 1000;
+    const lockFresh = pagoIniciadoEn
+      ? Date.now() - new Date(pagoIniciadoEn).getTime() < LOCK_EXPIRY_MS
+      : false;
+    if (pagoEnCurso && lockFresh) {
+      return {
+        success: false,
+        error: {
+          code: 'PAYMENT_IN_PROGRESS',
+          message: 'Ya hay un pago en curso para esta mesa',
+          module: 'use-case',
+          method: 'initiateRedsysMesaPaymentUseCase',
+        },
+      };
+    }
 
     // Fetch all pedidos in the session
     const { data: pedidos, error: pedidosError } = await supabase
@@ -258,6 +277,12 @@ export async function initiateRedsysMesaPaymentUseCase(
         webhookUrl: input.webhookUrl,
       }
     );
+
+    // Lock the session so concurrent initiations and new orders are blocked
+    await supabase
+      .from('mesa_sesiones')
+      .update({ pago_en_curso: true, pago_iniciado_en: new Date().toISOString() })
+      .eq('id', sesionId);
 
     return { success: true, data: formData };
   } catch (e) {

@@ -62,12 +62,13 @@ export async function GET(
   // Fetch division state + payment status from the session (service_role to bypass RLS)
   let division: { personas: number; pagosRealizados: number; importePorPersona: number } | null = null;
   let sesionPagada = false;
+  let pagoEnCurso = false;
   try {
     const supabaseAdmin = getSupabaseClient();
     const [sesionRowResult, paymentRowsResult] = await Promise.all([
       supabaseAdmin
         .from('mesa_sesiones')
-        .select('division_personas, division_pagos_realizados')
+        .select('division_personas, division_pagos_realizados, pago_en_curso, pago_iniciado_en')
         .eq('id', sesion.id)
         .single(),
       supabaseAdmin
@@ -76,7 +77,7 @@ export async function GET(
         .eq('sesion_id', sesion.id),
     ]);
 
-    const row = sesionRowResult.data as { division_personas: number | null; division_pagos_realizados: number } | null;
+    const row = sesionRowResult.data as { division_personas: number | null; division_pagos_realizados: number; pago_en_curso: boolean; pago_iniciado_en: string | null } | null;
     if (row?.division_personas) {
       const personas = row.division_personas;
       const pagosRealizados = row.division_pagos_realizados;
@@ -96,9 +97,14 @@ export async function GET(
         sesionPagada = paymentRows.every(r => r.payment_status === 'paid');
       }
     }
+    const LOCK_EXPIRY_MS = 15 * 60 * 1000;
+    const lockFresh = row?.pago_iniciado_en
+      ? Date.now() - new Date(row.pago_iniciado_en).getTime() < LOCK_EXPIRY_MS
+      : false;
+    pagoEnCurso = !!(row?.pago_en_curso && lockFresh);
   } catch {
     // best-effort
   }
 
-  return NextResponse.json({ orders, sesionId: sesion.id, total, pagosHabilitados, division, sesionPagada });
+  return NextResponse.json({ orders, sesionId: sesion.id, total, pagosHabilitados, division, sesionPagada, pagoEnCurso });
 }

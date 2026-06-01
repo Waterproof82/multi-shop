@@ -158,6 +158,12 @@ export async function processRedsysWebhookUseCase(
         }
       }
 
+      // Unlock session regardless of paid/failed outcome
+      await supabase
+        .from('mesa_sesiones')
+        .update({ pago_en_curso: false, pago_iniciado_en: null })
+        .eq('id', dp.sesion_id);
+
       return { success: true, data: { verified: true, paymentStatus: newPaymentStatus } };
     }
 
@@ -199,6 +205,14 @@ export async function processRedsysWebhookUseCase(
         const { mesaNumero, mesaNombre, sessionTotal } = await fetchMesaContext(sesionId, input.empresaId);
         await sendTelegramPagoMesaCompleto(sesionId, mesaNumero, mesaNombre, sessionTotal, bebidasChatId);
       }
+    }
+
+    // Unlock session regardless of paid/failed outcome
+    if (sesionId) {
+      await supabase
+        .from('mesa_sesiones')
+        .update({ pago_en_curso: false, pago_iniciado_en: null })
+        .eq('id', sesionId);
     }
 
     if (updateError) {

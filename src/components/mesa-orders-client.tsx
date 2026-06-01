@@ -289,16 +289,18 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
     <div className="min-h-screen py-8 px-4" style={{ backgroundColor: PAGE_BG }}>
       <div className="mx-auto max-w-xs">
 
-        {/* Back link */}
-        <div className="mb-5">
-          <Link
-            href={`/?mesa=${mesaId}`}
-            className="text-sm font-medium transition-colors"
-            style={{ color: "#8a7560" }}
-          >
-            {t("mesaBackToMenu", lang)}
-          </Link>
-        </div>
+        {/* Back link — hidden when session is fully paid */}
+        {!fullyPaid && (
+          <div className="mb-5">
+            <Link
+              href={`/?mesa=${mesaId}`}
+              className="text-sm font-medium transition-colors"
+              style={{ color: "#8a7560" }}
+            >
+              {t("mesaBackToMenu", lang)}
+            </Link>
+          </div>
+        )}
 
         {/* Loading / empty */}
         {loading && allItems.length === 0 && (
