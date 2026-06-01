@@ -39,8 +39,9 @@ export async function POST(request: NextRequest) {
     mesaId,
     empresaId: empresaResult.data.id,
     esDivision,
-    // Always redirect back to the mesa ticket page after payment
-    urlOk: `${origin}/mesa/${mesaId}/orders`,
+    // urlOk → confirm-mesa processes the Redsys POST and then redirects to the ticket.
+    // This acts as a reliable fallback when the server-to-server webhook is delayed or fails.
+    urlOk: `${origin}/api/redsys/confirm-mesa?redirect=/mesa/${mesaId}/orders`,
     urlKo: `${origin}/mesa/${mesaId}/orders`,
     webhookUrl: `${origin}/api/redsys/webhook`,
   });
