@@ -3,34 +3,24 @@ import { getSupabaseClient } from '@/core/infrastructure/database/supabase-clien
 import { processRedsysWebhookUseCase } from '@/core/application/use-cases/payment/processRedsysWebhookUseCase';
 
 /**
- * Redsys URLOK handler — receives the browser-side POST after a successful payment.
- * Redsys POSTs the same Ds_MerchantParameters/Ds_Signature payload here (form-encoded)
- * before redirecting the user's browser. We process it idempotently (same logic as the
- * server-to-server webhook) and then redirect to the mesa ticket page.
+ * Redsys URLOK handler — receives the browser-side redirect after a successful payment.
+ *
+ * Redsys dev simulator (sis-d) sends params via GET query string.
+ * Redsys production sends params via POST form-encoded body.
+ * Both paths are handled here idempotently and redirect to the mesa ticket page.
  *
  * This acts as a reliable fallback when the server-to-server webhook notification fails
  * or arrives after the browser redirect.
  */
-export async function POST(request: NextRequest) {
-  const redirectTo = request.nextUrl.searchParams.get('redirect') ?? '/';
-
+async function processAndRedirect(
+  dsParameters: string | null,
+  dsSignature: string | null,
+  dsSignatureVersion: string | null,
+  redirectTo: string,
+  origin: string
+): Promise<NextResponse> {
   try {
-    const contentType = request.headers.get('content-type') ?? '';
-
-    let dsParameters: string | null = null;
-    let dsSignature: string | null = null;
-    let dsSignatureVersion: string | null = null;
-
-    if (contentType.includes('application/x-www-form-urlencoded')) {
-      const text = await request.text();
-      const params = new URLSearchParams(text);
-      dsParameters = params.get('Ds_MerchantParameters');
-      dsSignature = params.get('Ds_Signature');
-      dsSignatureVersion = params.get('Ds_SignatureVersion');
-    }
-
     if (dsParameters && dsSignature && dsSignatureVersion) {
-      // Decode Ds_Order from parameters to look up the empresa
       let dsOrder: string | null = null;
       try {
         const decoded = Buffer.from(dsParameters, 'base64').toString('utf8');
@@ -53,7 +43,7 @@ export async function POST(request: NextRequest) {
 
         if (pedido) {
           const empresaId = (pedido as Record<string, unknown>)['empresa_id'] as string;
-          // Fire-and-forget — idempotent; webhook may have already handled it
+          // Idempotent — webhook may have already handled it
           await processRedsysWebhookUseCase({
             dsParameters,
             dsSignature,
@@ -67,5 +57,41 @@ export async function POST(request: NextRequest) {
     // Never block the redirect — payment is already confirmed by Redsys
   }
 
-  return NextResponse.redirect(new URL(redirectTo, request.nextUrl.origin));
+  return NextResponse.redirect(new URL(redirectTo, origin));
+}
+
+/** Redsys production: POST with form-encoded body */
+export async function POST(request: NextRequest) {
+  const sp = request.nextUrl.searchParams;
+  const redirectTo = sp.get('redirect') ?? '/';
+
+  let dsParameters: string | null = null;
+  let dsSignature: string | null = null;
+  let dsSignatureVersion: string | null = null;
+
+  try {
+    const contentType = request.headers.get('content-type') ?? '';
+    if (contentType.includes('application/x-www-form-urlencoded')) {
+      const text = await request.text();
+      const params = new URLSearchParams(text);
+      dsParameters = params.get('Ds_MerchantParameters');
+      dsSignature = params.get('Ds_Signature');
+      dsSignatureVersion = params.get('Ds_SignatureVersion');
+    }
+  } catch {
+    // fall through
+  }
+
+  return processAndRedirect(dsParameters, dsSignature, dsSignatureVersion, redirectTo, request.nextUrl.origin);
+}
+
+/** Redsys dev simulator: GET with params in query string */
+export async function GET(request: NextRequest) {
+  const sp = request.nextUrl.searchParams;
+  const redirectTo = sp.get('redirect') ?? '/';
+  const dsParameters = sp.get('Ds_MerchantParameters');
+  const dsSignature = sp.get('Ds_Signature');
+  const dsSignatureVersion = sp.get('Ds_SignatureVersion');
+
+  return processAndRedirect(dsParameters, dsSignature, dsSignatureVersion, redirectTo, request.nextUrl.origin);
 }
