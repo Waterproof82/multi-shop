@@ -13,9 +13,9 @@ import { ActiveOrderBanner } from "@/components/active-order-banner"
 import type { EmpresaPublic } from "@/core/domain/entities/types"
 import { useLanguage } from "@/lib/language-context"
 import { t } from "@/lib/translations"
-import { useCart } from "@/lib/cart-context"
 import { formatPrice } from "@/lib/format-price"
 import { getWaiterMesa } from "@/components/waiter-login-form"
+import { QuantitySelectorDialog } from "@/components/quantity-selector-dialog"
 
 // Lazy load cart components - only needed when showCart is true
 const CartDrawer = dynamic(
@@ -46,8 +46,9 @@ interface MenuPageProps {
 function WaiterProductSearch({ menuData, showCart, empresa }: { menuData: MenuCategoryVM[]; showCart: boolean; empresa?: EmpresaPublic | null }) {
   const { language } = useLanguage();
   const lang = language as Parameters<typeof t>[1];
-  const { addItem } = useCart();
   const [search, setSearch] = useState("");
+  const [selectedItem, setSelectedItem] = useState<MenuItemVM | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const allProducts = useMemo<MenuItemVM[]>(() =>
     menuData.flatMap(cat => cat.items),
@@ -59,6 +60,11 @@ function WaiterProductSearch({ menuData, showCart, empresa }: { menuData: MenuCa
     if (!q) return [];
     return allProducts.filter(p => p.name.toLowerCase().includes(q));
   }, [allProducts, search]);
+
+  const handleAdd = (product: MenuItemVM) => {
+    setSelectedItem(product);
+    setIsDialogOpen(true);
+  };
 
   return (
     <div className="w-full px-4 py-3 max-w-2xl mx-auto flex flex-col gap-3">
@@ -94,7 +100,8 @@ function WaiterProductSearch({ menuData, showCart, empresa }: { menuData: MenuCa
                 </div>
                 {showCart && (
                   <button
-                    onClick={() => { addItem(product); setSearch(""); }}
+                    type="button"
+                    onClick={() => handleAdd(product)}
                     className="min-h-[40px] px-4 rounded-lg bg-[var(--color-primary)] text-[var(--color-primary-foreground)] text-sm font-semibold shrink-0 transition-opacity hover:opacity-90"
                   >
                     + {t("addToCart", lang)}
@@ -105,6 +112,15 @@ function WaiterProductSearch({ menuData, showCart, empresa }: { menuData: MenuCa
           )}
         </div>
       )}
+
+      <QuantitySelectorDialog
+        item={selectedItem}
+        open={isDialogOpen}
+        onOpenChange={(open) => {
+          setIsDialogOpen(open);
+          if (!open) setSearch("");
+        }}
+      />
     </div>
   );
 }
