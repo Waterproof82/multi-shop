@@ -142,7 +142,6 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
   const [waiterHasMesa, setWaiterHasMesa] = useState(false);
   const [menuTab, setMenuTab] = useState<'comida' | 'bebidas'>('comida');
   const [mesaEsperandoActivacion, setMesaEsperandoActivacion] = useState(false);
-  const [mesaPagoEnCurso, setMesaPagoEnCurso] = useState(false);
 
   useEffect(() => {
     if (isWaiterMode) {
@@ -162,10 +161,14 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
         const pagada = data.sesionPagada === true;
         const enCurso = data.pagoEnCurso === true;
         setMesaEsperandoActivacion(pagada);
-        setMesaPagoEnCurso(!pagada && enCurso);
-        if (pagada || enCurso) {
+        if (pagada) {
           clearCart();
           closeCart();
+        } else if (enCurso) {
+          clearCart();
+          closeCart();
+          // Redirect to ticket so users can track payment and pay their share
+          window.location.href = `/mesa/${encodeURIComponent(mesa)}/orders`;
         }
       } catch { /* best-effort */ }
     };
@@ -232,51 +235,6 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
               style={{ color: '#8a7560', fontFamily: 'monospace' }}
             >
               {t('mesaEsperandoActivacionDesc', language as Parameters<typeof t>[1])}
-            </p>
-          </div>
-          <div className="flex gap-1.5 mt-2">
-            {[0, 1, 2].map(i => (
-              <div
-                key={i}
-                className="rounded-full"
-                style={{
-                  width: 6,
-                  height: 6,
-                  backgroundColor: '#8a7560',
-                  animation: `pulse 1.4s ease-in-out ${i * 0.2}s infinite`,
-                  opacity: 0.6,
-                }}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Payment in progress overlay — blocks interaction while payment is being processed */}
-      {mesaPagoEnCurso && (
-        <div
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 px-8 text-center"
-          style={{ backgroundColor: 'rgba(10, 8, 6, 0.92)' }}
-          aria-live="polite"
-        >
-          <div
-            className="flex items-center justify-center rounded-full"
-            style={{ width: 72, height: 72, backgroundColor: 'rgba(255,252,247,0.08)' }}
-          >
-            <span style={{ fontSize: 36 }}>💳</span>
-          </div>
-          <div className="flex flex-col gap-3 max-w-xs">
-            <p
-              className="text-lg font-bold tracking-widest uppercase"
-              style={{ color: '#fffcf7', fontFamily: 'monospace' }}
-            >
-              {t('mesaPagoEnCurso', language as Parameters<typeof t>[1])}
-            </p>
-            <p
-              className="text-sm leading-relaxed"
-              style={{ color: '#8a7560', fontFamily: 'monospace' }}
-            >
-              {t('mesaPagoEnCursoDesc', language as Parameters<typeof t>[1])}
             </p>
           </div>
           <div className="flex gap-1.5 mt-2">

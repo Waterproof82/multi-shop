@@ -33,6 +33,7 @@ interface MesaSessionData {
   pagosHabilitados: boolean;
   division: DivisionState | null;
   sesionPagada: boolean;
+  pagoEnCurso?: boolean;
 }
 
 interface MesaInfo {
@@ -193,6 +194,9 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
     pendingAction: PendingAction;
   } | null>(null);
 
+  // Derived early so the polling effect can use it as a dependency
+  const pagoEnCursoForPoll = sessionData?.pagoEnCurso ?? false;
+
   const refresh = useCallback(async () => {
     try {
       const res = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/orders`);
@@ -203,9 +207,12 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
 
   useEffect(() => {
     void refresh();
-    const interval = setInterval(() => { void refresh(); }, 10000);
+    // Poll every 3s while a payment is in progress — so the overlay
+    // disappears within seconds of the payment completing or being cancelled.
+    // Otherwise poll every 10s to reduce server load.
+    const interval = setInterval(() => { void refresh(); }, pagoEnCursoForPoll ? 3000 : 10000);
     return () => clearInterval(interval);
-  }, [refresh]);
+  }, [refresh, pagoEnCursoForPoll]);
 
   useEffect(() => {
     fetch(`/api/mesas?token=${encodeURIComponent(mesaId)}`)
@@ -271,9 +278,16 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
 
   const executePendingAction = (action: PendingAction) => {
     setTotalMismatch(null);
-    if (action === 'full') void initiateRedsys(false);
-    else if (action === 'division-modal') setShowDivisionModal(true);
-    else void initiateRedsys(true);
+    if (action === 'full') {
+      void initiateRedsys(false);
+    } else if (action === 'division-modal') {
+      // Release the pre-lock — division setup doesn't require locking.
+      // The lock will be re-acquired when "Pagar mi parte" is clicked.
+      void fetch(`/api/mesas/${encodeURIComponent(mesaId)}/lock`, { method: 'DELETE' }).catch(() => null);
+      setShowDivisionModal(true);
+    } else {
+      void initiateRedsys(true);
+    }
   };
 
   const handlePrePaymentCheck = async (action: PendingAction) => {
@@ -316,6 +330,20 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
     }
   };
 
+  // Another user is paying — we should wait without being able to navigate away
+  const externalPaymentInProgress = (sessionData?.pagoEnCurso ?? false) && !paying;
+
+  // Trap the browser back button while someone else's payment is in progress
+  useEffect(() => {
+    if (!externalPaymentInProgress) return;
+    window.history.pushState({ mesaPaymentWaiting: true }, '', window.location.href);
+    const handlePopState = () => {
+      window.history.pushState({ mesaPaymentWaiting: true }, '', window.location.href);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [externalPaymentInProgress]);
+
   const allItems = sessionData?.orders.flatMap((o) => o.items) ?? [];
 
   const firstOrderDate = sessionData?.orders[0]?.createdAt
@@ -332,6 +360,50 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
 
   return (
     <div className="min-h-screen py-8 px-4" style={{ backgroundColor: PAGE_BG }}>
+      {/* Payment-in-progress overlay — someone else on this mesa is paying */}
+      {externalPaymentInProgress && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 px-8 text-center"
+          style={{ backgroundColor: 'rgba(10, 8, 6, 0.92)' }}
+          aria-live="polite"
+        >
+          <div
+            className="flex items-center justify-center rounded-full"
+            style={{ width: 72, height: 72, backgroundColor: 'rgba(255,252,247,0.08)' }}
+          >
+            <span style={{ fontSize: 36 }}>💳</span>
+          </div>
+          <div className="flex flex-col gap-3 max-w-xs">
+            <p
+              className="text-lg font-bold tracking-widest uppercase"
+              style={{ color: '#fffcf7', fontFamily: 'monospace' }}
+            >
+              {t('mesaPagoEnCurso', lang)}
+            </p>
+            <p
+              className="text-sm leading-relaxed"
+              style={{ color: '#8a7560', fontFamily: 'monospace' }}
+            >
+              {t('mesaPagoEnCursoDesc', lang)}
+            </p>
+          </div>
+          <div className="flex gap-1.5 mt-2">
+            {[0, 1, 2].map(i => (
+              <div
+                key={i}
+                className="rounded-full"
+                style={{
+                  width: 6,
+                  height: 6,
+                  backgroundColor: '#8a7560',
+                  animation: `pulse 1.4s ease-in-out ${i * 0.2}s infinite`,
+                  opacity: 0.6,
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
       <div className="mx-auto max-w-xs">
 
         {/* Back link — hidden when session is fully paid */}
