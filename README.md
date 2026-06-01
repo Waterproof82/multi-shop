@@ -112,7 +112,10 @@ src/
 │       │       └── [id]/route.ts   # GET/PUT — empresa específica
 │       ├── mesas/                   # Pública — mesa ordering (QR)
 │       │   ├── route.ts             # GET ?token={uuid} — info de mesa
-│       │   └── [mesaId]/orders/     # GET — pedidos de la sesión activa
+│       │   └── [mesaId]/
+│       │       ├── orders/          # GET — pedidos + estado de pago (sesionPagada, pagoEnCurso)
+│       │       ├── lock/            # POST (adquirir) + DELETE (liberar) — lock de pago
+│       │       └── division/        # POST (activar) + DELETE (cancelar) — división de cuenta
 │       ├── waiter/                  # Panel de sala (PIN auth)
 │       │   ├── auth/                # POST — login con PIN
 │       │   ├── logout/              # POST — cerrar sesión waiter
@@ -128,8 +131,11 @@ src/
 │       │   └── webhook/             # POST — callbacks de Telegram (todos los modos)
 │       ├── pedidos/                 # POST — pública, crear pedido (tienda + mesa + delivery)
 │       ├── redsys/
-│       │   ├── initiate/            # POST — pública, genera form TPV Redsys
-│       │   └── webhook/             # POST — notificación servidor Redsys (pago confirmado → despacha Glovo)
+│       │   ├── initiate/            # POST — pública, genera form TPV Redsys (delivery)
+│       │   ├── initiate-mesa/       # POST — pública, genera form TPV Redsys (mesa)
+│       │   ├── confirm-mesa/        # GET — urlOk de Redsys (fallback confirmación mesa)
+│       │   ├── cancel-mesa/         # GET — urlKo de Redsys (libera lock + redirect)
+│       │   └── webhook/             # POST — notificación servidor Redsys (pago confirmado → despacha Glovo / actualiza mesa)
 │       ├── glovo/
 │       │   ├── quote/               # POST — pública, cotización de envío en tiempo real
 │       │   ├── order/               # POST — admin, despacho manual de rider
@@ -688,7 +694,8 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 | **Welcome Discount** | Popup 30s en subdomain pedidos, código único BIENVENIDO-XXXXXX, email con idioma del cliente, porcentaje configurable (1-50%), duración configurable (7/14/30/60/90 días), validación server-side (existencia, usado, expirado, email match), aplicación en checkout, persists en pedido |
 | **Admin Panel Design** | Glassmorphic dark theme (backdrop-blur + white/10 opacity), estadoPendiente=Aceptado colores consistentes con badges de tabla (ámbar/azul), diseño unificado sin colores por empresa |
 | **SEO Multi-Tenant** | Metadata dinámica por empresa, hreflang (5 idiomas), sitemap/robots dinámicos, Schema.org Restaurant+FAQ+Menu, geo coordinates desde urlMapa, 404 con meta tags |
-| **Mesa Ordering** | QR table ordering para restaurantes dine-in. mesas + mesa_sesiones en DB. Rate limiting per-UUID (120/min). Ticket view con complementos + i18n + hora 24h. Notificación Telegram con botones Anotado/Servido |
+| **Mesa Ordering** | QR table ordering para restaurantes dine-in. mesas + mesa_sesiones en DB. Rate limiting per-UUID (120/min). Ticket view con complementos + i18n + hora 24h. Notificación Telegram con botones Anotado/Servido. |
+| **Mesa Payments** | Pago en mesa vía Redsys TPV. Pago total o división de cuenta (2–20 personas). `mesa_division_pagos` elimina race condition en pagos simultáneos. Sistema de lock atómico (`pago_en_curso`) bloquea todos los usuarios de la mesa durante el pago. Verificación de total antes de pagar (detecta nuevos productos). Overlay 💳 en ticket + back button trap + adaptive polling (3s/10s). |
 | **Waiter Panel** | Panel PIN-auth en /waiter. Grid de mesas, detalle por mesa, ciclo de sesión open/close. WaiterBanner sticky global. Integración con mesa_sesiones |
 | **Telegram Multi-modo** | tienda → quick-reply buttons. restaurante takeaway → time-selector + tracking. mesa → Anotado/Servido con estado seleccionado + Modificar |
 | **Delivery + Pago online** | Zona de cobertura por CP configurable. Cotización Glovo en tiempo real. Pago Redsys TPV Virtual obligatorio para delivery. Auto-despacho de rider al confirmar pago. Tracking page post-pago. |
@@ -702,6 +709,7 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 - [`docs/context/toogoodtogo.md`](docs/context/toogoodtogo.md) — Flujo completo TGTG (campañas, reservas, emails, reglas de negocio)
 - [`docs/context/welcome-discount.md`](docs/context/welcome-discount.md) — Sistema de descuento de bienvenida
 - [`docs/context/mesa-ordering.md`](docs/context/mesa-ordering.md) — QR table ordering (flujo, API, rate limiting, ticket)
+- [`docs/context/mesa-payments.md`](docs/context/mesa-payments.md) — Pagos en mesa: Redsys, división, lock system, race conditions, overlays
 - [`docs/context/waiter-panel.md`](docs/context/waiter-panel.md) — Panel de sala (PIN auth, sesiones, mesas)
 - [`docs/telegram-notifications.md`](docs/telegram-notifications.md) — Notificaciones Telegram (tienda, restaurante takeaway, mesa)
 - [`docs/context/delivery.md`](docs/context/delivery.md) — Delivery: zona de cobertura, Glovo Business LaaS, Redsys TPV, flujo completo end-to-end

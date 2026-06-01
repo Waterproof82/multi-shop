@@ -49,6 +49,7 @@ function errorCodeToStatus(code: string): number {
   if (code === 'VALIDATION_ERROR') return 400;
   if (code === 'PRODUCT_NOT_FOUND' || code === 'NOT_FOUND') return 404;
   if (code === 'AUTH_003' || code === 'AUTH_FORBIDDEN' || code === 'FORBIDDEN') return 403;
+  if (code === 'PAYMENT_IN_PROGRESS') return 423;
   if (code.startsWith('AUTH_')) return 401;
   if (code.startsWith('DEL_')) return 400;
   if (code.startsWith('GLV_') || code.startsWith('PAY_')) return 503;

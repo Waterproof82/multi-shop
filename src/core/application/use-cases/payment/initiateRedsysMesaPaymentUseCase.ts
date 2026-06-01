@@ -110,13 +110,11 @@ export async function initiateRedsysMesaPaymentUseCase(
     const pagoEnCurso = s['pago_en_curso'] as boolean;
     const pagoIniciadoEn = s['pago_iniciado_en'] as string | null;
     const LOCK_EXPIRY_MS = 15 * 60 * 1000;
-    const GRACE_PERIOD_MS = 2 * 60 * 1000;
     const lockAge = pagoIniciadoEn
       ? Date.now() - new Date(pagoIniciadoEn).getTime()
       : Infinity;
     const lockFresh = lockAge < LOCK_EXPIRY_MS;
-    const lockInGrace = lockAge < GRACE_PERIOD_MS;
-    if (pagoEnCurso && lockFresh && !lockInGrace) {
+    if (pagoEnCurso && lockFresh) {
       return {
         success: false,
         error: {

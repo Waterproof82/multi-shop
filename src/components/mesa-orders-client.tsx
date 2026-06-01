@@ -232,6 +232,12 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mesaId, esDivision }),
       });
+      if (res.status === 423) {
+        // Another payment started between verification and now — refresh to show overlay
+        setPaying(false);
+        void refresh();
+        return;
+      }
       if (!res.ok) { setPaying(false); return; }
       const formData = await res.json() as {
         DS_MERCHANT_PARAMETERS: string;
@@ -281,9 +287,6 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
     if (action === 'full') {
       void initiateRedsys(false);
     } else if (action === 'division-modal') {
-      // Release the pre-lock — division setup doesn't require locking.
-      // The lock will be re-acquired when "Pagar mi parte" is clicked.
-      void fetch(`/api/mesas/${encodeURIComponent(mesaId)}/lock`, { method: 'DELETE' }).catch(() => null);
       setShowDivisionModal(true);
     } else {
       void initiateRedsys(true);
@@ -294,17 +297,15 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
     if (paying || verifyingTotal) return;
     setVerifyingTotal(true);
     try {
-      // Step 1: Claim the session lock immediately — blocks all other users' menus right away
-      const lockRes = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/lock`, { method: 'POST' });
-      if (lockRes.status === 423) {
-        // Another payment already in progress — trigger a refresh so the overlay appears immediately
-        void refresh();
-        return;
-      }
-      // Step 2: Verify total against fresh DB state
+      // Verify total against fresh DB state before going to Redsys
       const res = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/orders`);
       if (!res.ok) { executePendingAction(action); return; }
       const fresh = await res.json() as MesaSessionData;
+      if (fresh.pagoEnCurso) {
+        // Another user started paying while we were checking — update state so overlay appears
+        setSessionData(fresh);
+        return;
+      }
       const currentTotal = sessionData?.total ?? 0;
       if (Math.abs(fresh.total - currentTotal) > 0.005) {
         setSessionData(fresh);
@@ -667,9 +668,7 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
                     type="button"
                     onClick={() => {
                       setTotalMismatch(null);
-                      void fetch(`/api/mesas/${encodeURIComponent(mesaId)}/lock`, { method: 'DELETE' })
-                        .then(() => refresh())
-                        .catch(() => null);
+                      void refresh();
                     }}
                     className="py-3 px-4 rounded-xl text-xs font-bold tracking-widest uppercase"
                     style={{ backgroundColor: "transparent", color: "#8a7560", border: "1.5px solid #c9b99a" }}
