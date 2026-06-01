@@ -50,10 +50,11 @@ interface MenuSectionProps {
   category: MenuCategoryVM
   showCart?: boolean
   priority?: boolean
+  hideImages?: boolean
 }
 
 export const MenuSection = memo(function MenuSection(props: Readonly<MenuSectionProps>) {
-  const { category, showCart, priority = false } = props;
+  const { category, showCart, priority = false, hideImages = false } = props;
   const { language } = useLanguage();
   const [selectedItem, setSelectedItem] = useState<MenuItemVM | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -127,6 +128,7 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
               shouldReduceMotion={shouldReduceMotion}
               complementCategoryName={category.complementCategoryName}
               complementCategoryTranslations={category.complementCategoryTranslations}
+              hideImages={hideImages}
             />
           ))}
         </div>
@@ -153,6 +155,7 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
                 priority={priority && index < 3}
                 complementCategoryName={category.complementCategoryName}
                 complementCategoryTranslations={category.complementCategoryTranslations}
+                hideImages={hideImages}
               />
             </motion.div>
           ))}
@@ -186,8 +189,9 @@ const SubcategorySection = memo(function SubcategorySection(props: Readonly<{
   shouldReduceMotion?: boolean;
   complementCategoryName?: string;
   complementCategoryTranslations?: MenuCategoryVM['complementCategoryTranslations'];
+  hideImages?: boolean;
 }>) {
-  const { subcategory, translationLang, onItemClick, onDetailClick, showCart, shouldReduceMotion = false, complementCategoryName, complementCategoryTranslations } = props;
+  const { subcategory, translationLang, onItemClick, onDetailClick, showCart, shouldReduceMotion = false, complementCategoryName, complementCategoryTranslations, hideImages = false } = props;
 
   const subContainerVariants = shouldReduceMotion
     ? { hidden: {}, visible: {} }
@@ -239,6 +243,7 @@ const SubcategorySection = memo(function SubcategorySection(props: Readonly<{
               showCart={showCart}
               complementCategoryName={complementCategoryName}
               complementCategoryTranslations={complementCategoryTranslations}
+              hideImages={hideImages}
             />
           </motion.div>
         ))}
@@ -307,8 +312,9 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
   priority?: boolean;
   complementCategoryName?: string;
   complementCategoryTranslations?: MenuCategoryVM['complementCategoryTranslations'];
+  hideImages?: boolean;
 }>) {
-  const { item, language, onItemClick, onDetailClick, showCart, priority = false, complementCategoryName, complementCategoryTranslations } = props;
+  const { item, language, onItemClick, onDetailClick, showCart, priority = false, complementCategoryName, complementCategoryTranslations, hideImages = false } = props;
   const { language: appLanguage } = useLanguage();
   const safeLanguage = appLanguage || "es";
   const [imageError, setImageError] = useState(false);
@@ -368,7 +374,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
           }}
         />
       )}
-      {item.image && !imageError && (
+      {item.image && !imageError && !hideImages && (
         <div className="relative aspect-[16/10] w-full overflow-hidden">
           <CardMedia item={item} displayName={displayName} priority={priority} onError={() => setImageError(true)} shouldReduceMotion={shouldReduceMotionCard} />
         </div>

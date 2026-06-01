@@ -51,6 +51,7 @@ function mapProductToItem(product: Product, categoryName: string): MenuItemVM {
     image: product.fotoUrl || undefined,
     imageFit: product.fotoObjectFit || undefined,
     highlight: product.esEspecial,
+    tipoProducto: product.tipoProducto,
     translations: mapProductTranslations(product),
   };
 }

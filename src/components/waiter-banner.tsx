@@ -94,6 +94,9 @@ export function WaiterBanner() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [dropdownOpen]);
 
+  // Hide on waiter panel pages — they have their own navigation and product search
+  if (pathname.startsWith("/waiter/tables")) return null;
+
   if (!mesaLabel) return null;
 
   async function handleToggleDropdown() {

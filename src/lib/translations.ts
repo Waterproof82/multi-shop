@@ -48,6 +48,8 @@ export const translations = {
     complementsRequired: "Complementos (obligatorio)",
     nuestraCarta: "Nuestro Catálogo",
     menuCategories: "Categorías del catálogo",
+    filterFood: "Comida",
+    filterDrinks: "Bebidas",
     especial: "Especial",
     // Allergens
     allergenCrustaceans: "Crustáceos",
@@ -688,6 +690,8 @@ export const translations = {
     complementsRequired: "Complements (required)",
     nuestraCarta: "Our Catalog",
     menuCategories: "Catalog categories",
+    filterFood: "Food",
+    filterDrinks: "Drinks",
     especial: "Special",
     // Allergens
     allergenCrustaceans: "Crustaceans",

@@ -9,11 +9,19 @@ import { t } from "@/lib/translations"
 
 interface CategoryNavProps {
   categories: MenuCategoryVM[]
+  showTabs?: boolean
+  tab?: 'comida' | 'bebidas'
+  onTabChange?: (tab: 'comida' | 'bebidas') => void
 }
 
 export function CategoryNav(props: Readonly<CategoryNavProps>) {
-  const { categories } = props;
+  const { categories, showTabs, tab, onTabChange } = props;
   const [activeId, setActiveId] = useState(categories[0]?.id ?? "")
+
+  // Reset active category when the visible categories list changes (e.g. tab switch)
+  useEffect(() => {
+    setActiveId(categories[0]?.id ?? "")
+  }, [categories])
   const { language } = useLanguage()
   const navRef = useRef<HTMLDivElement>(null)
   const isManualScrolling = useRef(false)
@@ -94,6 +102,29 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
     >
       <div className="mx-auto max-w-6xl px-4 md:px-6">
         <div className="flex flex-nowrap gap-1 py-2 items-center min-w-max">
+          {showTabs && onTabChange && (
+            <>
+              {tab === 'bebidas' && (
+                <button
+                  type="button"
+                  onClick={() => onTabChange('comida')}
+                  className="whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-semibold transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
+                >
+                  🍳 {t("filterFood", language)}
+                </button>
+              )}
+              {tab === 'comida' && (
+                <button
+                  type="button"
+                  onClick={() => onTabChange('bebidas')}
+                  className="whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-semibold transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
+                >
+                  🥤 {t("filterDrinks", language)}
+                </button>
+              )}
+              <span className="h-5 w-px bg-border mx-1 shrink-0" aria-hidden />
+            </>
+          )}
           {categories.map((cat) => (
             <button
               key={cat.id}
