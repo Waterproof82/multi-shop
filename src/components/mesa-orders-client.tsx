@@ -40,6 +40,8 @@ interface MesaInfo {
   nombre: string | null;
 }
 
+type PendingAction = 'full' | 'division-modal' | 'division-pay';
+
 const PAGE_BG = "#f0ede8";
 
 function PerforatedEdge({ position }: { position: "top" | "bottom" }) {
@@ -184,6 +186,12 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
   const [showDivisionModal, setShowDivisionModal] = useState(false);
   const [settingDivision, setSettingDivision] = useState(false);
   const [cancellingDivision, setCancellingDivision] = useState(false);
+  const [verifyingTotal, setVerifyingTotal] = useState(false);
+  const [totalMismatch, setTotalMismatch] = useState<{
+    oldTotal: number;
+    newTotal: number;
+    pendingAction: PendingAction;
+  } | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -258,6 +266,35 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
       await refresh();
     } finally {
       setSettingDivision(false);
+    }
+  };
+
+  const executePendingAction = (action: PendingAction) => {
+    setTotalMismatch(null);
+    if (action === 'full') void initiateRedsys(false);
+    else if (action === 'division-modal') setShowDivisionModal(true);
+    else void initiateRedsys(true);
+  };
+
+  const handlePrePaymentCheck = async (action: PendingAction) => {
+    if (paying || verifyingTotal) return;
+    setVerifyingTotal(true);
+    try {
+      const res = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/orders`);
+      if (!res.ok) { executePendingAction(action); return; }
+      const fresh = await res.json() as MesaSessionData;
+      const currentTotal = sessionData?.total ?? 0;
+      if (Math.abs(fresh.total - currentTotal) > 0.005) {
+        setSessionData(fresh);
+        setTotalMismatch({ oldTotal: currentTotal, newTotal: fresh.total, pendingAction: action });
+      } else {
+        setSessionData(fresh);
+        executePendingAction(action);
+      }
+    } catch {
+      executePendingAction(action);
+    } finally {
+      setVerifyingTotal(false);
     }
   };
 
@@ -519,25 +556,64 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
               </div>
             )}
 
+            {/* Total updated warning */}
+            {totalMismatch && (
+              <div
+                className="rounded-2xl p-5 flex flex-col gap-3"
+                style={{ backgroundColor: "#fff8e1", border: "1.5px solid #f59e0b", fontFamily: "monospace" }}
+              >
+                <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "#92400e" }}>
+                  {t("mesaTotalUpdated", lang)}
+                </p>
+                <div className="flex items-center justify-between text-sm">
+                  <span style={{ color: "#b0a090", textDecoration: "line-through" }}>
+                    {formatPrice(totalMismatch.oldTotal, "EUR", lang)}
+                  </span>
+                  <span style={{ color: "#78350f" }}>→</span>
+                  <span className="font-bold" style={{ color: "#1a1612" }}>
+                    {formatPrice(totalMismatch.newTotal, "EUR", lang)}
+                  </span>
+                </div>
+                <div className="flex gap-2 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => executePendingAction(totalMismatch.pendingAction)}
+                    className="flex-1 py-3 rounded-xl text-xs font-bold tracking-widest uppercase"
+                    style={{ backgroundColor: "#1a1612", color: "#fffcf7" }}
+                  >
+                    {t("mesaTotalUpdatedConfirm", lang)}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTotalMismatch(null)}
+                    className="py-3 px-4 rounded-xl text-xs font-bold tracking-widest uppercase"
+                    style={{ backgroundColor: "transparent", color: "#8a7560", border: "1.5px solid #c9b99a" }}
+                  >
+                    {t("mesaDivisionCancel", lang)}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Buttons */}
-            {!division && !fullyPaid && (
+            {!division && !fullyPaid && !totalMismatch && (
               <div className="flex gap-3">
                 {/* Pagar total */}
                 <button
                   type="button"
-                  onClick={() => { void initiateRedsys(false); }}
-                  disabled={paying || settingDivision}
+                  onClick={() => { void handlePrePaymentCheck('full'); }}
+                  disabled={paying || settingDivision || verifyingTotal}
                   className="flex-1 py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-opacity disabled:opacity-50"
                   style={{ backgroundColor: "#1a1612", color: "#fffcf7", fontFamily: "monospace" }}
                 >
-                  {paying ? t("loading", lang) : t("mesaPayTotal", lang)}
+                  {paying || verifyingTotal ? t("loading", lang) : t("mesaPayTotal", lang)}
                 </button>
 
                 {/* Dividir cuenta */}
                 <button
                   type="button"
-                  onClick={() => setShowDivisionModal(true)}
-                  disabled={paying || settingDivision}
+                  onClick={() => { void handlePrePaymentCheck('division-modal'); }}
+                  disabled={paying || settingDivision || verifyingTotal}
                   className="flex-1 py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-opacity disabled:opacity-50"
                   style={{
                     backgroundColor: "transparent",
@@ -546,21 +622,21 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
                     border: "2px solid #1a1612",
                   }}
                 >
-                  {settingDivision ? t("loading", lang) : t("mesaDivideCheck", lang)}
+                  {settingDivision || verifyingTotal ? t("loading", lang) : t("mesaDivideCheck", lang)}
                 </button>
               </div>
             )}
 
             {/* Pagar mi parte */}
-            {division && !fullyPaid && (
+            {division && !fullyPaid && !totalMismatch && (
               <button
                 type="button"
-                onClick={() => { void initiateRedsys(true); }}
-                disabled={paying}
+                onClick={() => { void handlePrePaymentCheck('division-pay'); }}
+                disabled={paying || verifyingTotal}
                 className="w-full py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-opacity disabled:opacity-50"
                 style={{ backgroundColor: "#1a1612", color: "#fffcf7", fontFamily: "monospace" }}
               >
-                {paying
+                {paying || verifyingTotal
                   ? t("loading", lang)
                   : `${t("mesaPayShare", lang)} ${formatPrice(division.importePorPersona, "EUR", lang)}`}
               </button>
