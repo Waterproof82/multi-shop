@@ -15,6 +15,7 @@ import { useLanguage } from "@/lib/language-context"
 import { t } from "@/lib/translations"
 import { formatPrice } from "@/lib/format-price"
 import { getWaiterMesa } from "@/components/waiter-login-form"
+import { useCart } from "@/lib/cart-context"
 import { QuantitySelectorDialog } from "@/components/quantity-selector-dialog"
 
 // Lazy load cart components - only needed when showCart is true
@@ -136,6 +137,7 @@ function getCategoryTab(cat: MenuCategoryVM): 'comida' | 'bebida' | 'both' | 'em
 
 export function MenuPage({ menuData, header, showCart = false, empresa, isWaiterMode = false }: Readonly<MenuPageProps>) {
   const { language } = useLanguage();
+  const { clearCart, closeCart } = useCart();
   // Mirror exactly the WaiterBanner condition: waiter_token (server) + mesa selected (sessionStorage)
   const [waiterHasMesa, setWaiterHasMesa] = useState(false);
   const [menuTab, setMenuTab] = useState<'comida' | 'bebidas'>('comida');
@@ -156,13 +158,18 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
         const res = await fetch(`/api/mesas/${encodeURIComponent(mesa)}/orders`);
         if (!res.ok) return;
         const data = await res.json() as { sesionPagada?: boolean };
-        setMesaEsperandoActivacion(data.sesionPagada === true);
+        const pagada = data.sesionPagada === true;
+        setMesaEsperandoActivacion(pagada);
+        if (pagada) {
+          clearCart();
+          closeCart();
+        }
       } catch { /* best-effort */ }
     };
     void check();
     const interval = setInterval(() => { void check(); }, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [clearCart, closeCart]);
 
   const showWaiterSearch = isWaiterMode && waiterHasMesa;
 
