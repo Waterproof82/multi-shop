@@ -59,26 +59,38 @@ export async function GET(
     // best-effort — default false
   }
 
-  // Fetch division state from the session (service_role to bypass RLS)
+  // Fetch division state + payment status from the session (service_role to bypass RLS)
   let division: { personas: number; pagosRealizados: number; importePorPersona: number } | null = null;
+  let sesionPagada = false;
   try {
     const supabaseAdmin = getSupabaseClient();
-    const { data: sesionRow } = await supabaseAdmin
-      .from('mesa_sesiones')
-      .select('division_personas, division_pagos_realizados')
-      .eq('id', sesion.id)
-      .single();
+    const [sesionRowResult, paymentRowsResult] = await Promise.all([
+      supabaseAdmin
+        .from('mesa_sesiones')
+        .select('division_personas, division_pagos_realizados')
+        .eq('id', sesion.id)
+        .single(),
+      supabaseAdmin
+        .from('pedidos')
+        .select('payment_status')
+        .eq('sesion_id', sesion.id),
+    ]);
 
-    const row = sesionRow as { division_personas: number | null; division_pagos_realizados: number } | null;
+    const row = sesionRowResult.data as { division_personas: number | null; division_pagos_realizados: number } | null;
     if (row?.division_personas) {
       const personas = row.division_personas;
       const pagosRealizados = row.division_pagos_realizados;
       const importePorPersona = Math.round((total / personas) * 100) / 100;
       division = { personas, pagosRealizados, importePorPersona };
     }
+
+    const paymentRows = (paymentRowsResult.data ?? []) as { payment_status: string }[];
+    if (paymentRows.length > 0) {
+      sesionPagada = paymentRows.every(r => r.payment_status === 'paid');
+    }
   } catch {
     // best-effort
   }
 
-  return NextResponse.json({ orders, sesionId: sesion.id, total, pagosHabilitados, division });
+  return NextResponse.json({ orders, sesionId: sesion.id, total, pagosHabilitados, division, sesionPagada });
 }

@@ -32,6 +32,7 @@ interface MesaSessionData {
   total: number;
   pagosHabilitados: boolean;
   division: DivisionState | null;
+  sesionPagada: boolean;
 }
 
 interface MesaInfo {
@@ -280,9 +281,9 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
   const tableLabel = mesaInfo?.nombre ?? (mesaInfo ? `Mesa ${mesaInfo.numero}` : "Mesa");
 
   const division = sessionData?.division ?? null;
-  const fullyPaid = division
+  const fullyPaid = (sessionData?.sesionPagada ?? false) || (division
     ? division.pagosRealizados >= division.personas
-    : false;
+    : false);
 
   return (
     <div className="min-h-screen py-8 px-4" style={{ backgroundColor: PAGE_BG }}>

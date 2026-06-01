@@ -139,12 +139,30 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
   // Mirror exactly the WaiterBanner condition: waiter_token (server) + mesa selected (sessionStorage)
   const [waiterHasMesa, setWaiterHasMesa] = useState(false);
   const [menuTab, setMenuTab] = useState<'comida' | 'bebidas'>('comida');
+  const [mesaEsperandoActivacion, setMesaEsperandoActivacion] = useState(false);
 
   useEffect(() => {
     if (isWaiterMode) {
       setWaiterHasMesa(!!getWaiterMesa());
     }
   }, [isWaiterMode]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const mesa = params.get('mesa');
+    if (!mesa) return;
+    const check = async () => {
+      try {
+        const res = await fetch(`/api/mesas/${encodeURIComponent(mesa)}/orders`);
+        if (!res.ok) return;
+        const data = await res.json() as { sesionPagada?: boolean };
+        setMesaEsperandoActivacion(data.sesionPagada === true);
+      } catch { /* best-effort */ }
+    };
+    void check();
+    const interval = setInterval(() => { void check(); }, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   const showWaiterSearch = isWaiterMode && waiterHasMesa;
 
@@ -167,6 +185,51 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
+      {/* Mesa waiting-for-activation overlay */}
+      {mesaEsperandoActivacion && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 px-8 text-center"
+          style={{ backgroundColor: 'rgba(10, 8, 6, 0.95)' }}
+          aria-live="polite"
+        >
+          <div
+            className="flex items-center justify-center rounded-full"
+            style={{ width: 72, height: 72, backgroundColor: 'rgba(255,252,247,0.08)' }}
+          >
+            <span style={{ fontSize: 36 }}>🍽️</span>
+          </div>
+          <div className="flex flex-col gap-3 max-w-xs">
+            <p
+              className="text-lg font-bold tracking-widest uppercase"
+              style={{ color: '#fffcf7', fontFamily: 'monospace' }}
+            >
+              {t('mesaEsperandoActivacion', language as Parameters<typeof t>[1])}
+            </p>
+            <p
+              className="text-sm leading-relaxed"
+              style={{ color: '#8a7560', fontFamily: 'monospace' }}
+            >
+              {t('mesaEsperandoActivacionDesc', language as Parameters<typeof t>[1])}
+            </p>
+          </div>
+          <div className="flex gap-1.5 mt-2">
+            {[0, 1, 2].map(i => (
+              <div
+                key={i}
+                className="rounded-full"
+                style={{
+                  width: 6,
+                  height: 6,
+                  backgroundColor: '#8a7560',
+                  animation: `pulse 1.4s ease-in-out ${i * 0.2}s infinite`,
+                  opacity: 0.6,
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Skip to main content link for accessibility */}
       <a
         href="#menu-content"
