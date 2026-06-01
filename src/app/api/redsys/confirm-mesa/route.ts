@@ -35,6 +35,11 @@ async function processAndRedirect(
 
       if (dsOrder) {
         const supabase = getSupabaseClient();
+
+        // Resolve empresa_id: check pedidos first (full payments), then
+        // mesa_division_pagos (division payments — no longer in pedidos).
+        let empresaId: string | null = null;
+
         const { data: pedido } = await supabase
           .from('pedidos')
           .select('empresa_id')
@@ -42,7 +47,19 @@ async function processAndRedirect(
           .maybeSingle();
 
         if (pedido) {
-          const empresaId = (pedido as Record<string, unknown>)['empresa_id'] as string;
+          empresaId = (pedido as Record<string, unknown>)['empresa_id'] as string;
+        } else {
+          const { data: divPago } = await supabase
+            .from('mesa_division_pagos')
+            .select('empresa_id')
+            .eq('payment_order_ref', dsOrder)
+            .maybeSingle();
+          if (divPago) {
+            empresaId = (divPago as Record<string, unknown>)['empresa_id'] as string;
+          }
+        }
+
+        if (empresaId) {
           // Idempotent — webhook may have already handled it
           await processRedsysWebhookUseCase({
             dsParameters,

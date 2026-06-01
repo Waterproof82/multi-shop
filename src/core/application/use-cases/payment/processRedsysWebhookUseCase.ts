@@ -71,7 +71,97 @@ export async function processRedsysWebhookUseCase(
       return { success: true, data: { verified: false } };
     }
 
-    // Find pedido by payment_order_ref + empresaId
+    // DS_RESPONSE '0000'–'0099' → paid; anything else → failed
+    const responseCode = dsResponse ?? '9999';
+    const responseNum = Number.parseInt(responseCode, 10);
+    const newPaymentStatus: 'paid' | 'failed' =
+      responseNum >= 0 && responseNum <= 99 ? 'paid' : 'failed';
+
+    // Helper: fetch mesa info and session total for Telegram notification
+    const fetchMesaContext = async (sesionId: string, empresaId: string): Promise<{
+      mesaNumero: number;
+      mesaNombre: string | null;
+      sessionTotal: number;
+    }> => {
+      const { data: sesionRow } = await supabase
+        .from('mesa_sesiones')
+        .select('mesa_id')
+        .eq('id', sesionId)
+        .maybeSingle();
+      const mesaId = (sesionRow as { mesa_id: string | null } | null)?.mesa_id ?? null;
+
+      let mesaNumero = 0;
+      let mesaNombre: string | null = null;
+      if (mesaId) {
+        const { data: mesaData } = await supabase
+          .from('mesas')
+          .select('numero, nombre')
+          .eq('id', mesaId)
+          .maybeSingle();
+        const m = mesaData as { numero: number; nombre: string | null } | null;
+        mesaNumero = m?.numero ?? 0;
+        mesaNombre = m?.nombre ?? null;
+      }
+
+      const { data: pedidosData } = await supabase
+        .from('pedidos')
+        .select('total')
+        .eq('sesion_id', sesionId)
+        .eq('empresa_id', empresaId);
+      const sessionTotal = (pedidosData as { total: string | number }[] | null)
+        ?.reduce((acc, row) => acc + Number(row.total), 0) ?? 0;
+
+      return { mesaNumero, mesaNombre, sessionTotal };
+    };
+
+    // ── Path 1: Division payment (tracked in mesa_division_pagos) ──────────────
+    const { data: divPago } = await supabase
+      .from('mesa_division_pagos')
+      .select('id, sesion_id, empresa_id, status')
+      .eq('payment_order_ref', dsOrder)
+      .maybeSingle();
+
+    if (divPago) {
+      const dp = divPago as { id: string; sesion_id: string; empresa_id: string; status: string };
+
+      // Idempotency: already processed
+      if (dp.status !== 'pending') {
+        return { success: true, data: { verified: true, skipped: true } };
+      }
+
+      const newDivStatus = newPaymentStatus === 'paid' ? 'paid' : 'failed';
+      await supabase
+        .from('mesa_division_pagos')
+        .update({ status: newDivStatus })
+        .eq('id', dp.id);
+
+      if (newPaymentStatus === 'paid') {
+        const { data: rpcResult } = await supabase
+          .rpc('increment_division_pagos', { p_sesion_id: dp.sesion_id });
+
+        const rpcRows = rpcResult as { pagos_realizados: number; personas: number }[] | null;
+        const rpcRow = rpcRows?.[0];
+        const allPaid = rpcRow ? rpcRow.pagos_realizados >= rpcRow.personas : false;
+
+        if (allPaid) {
+          await supabase
+            .from('pedidos')
+            .update({ payment_status: 'paid' })
+            .eq('sesion_id', dp.sesion_id)
+            .eq('empresa_id', dp.empresa_id);
+
+          if (bebidasChatId) {
+            const { sendTelegramPagoMesaCompleto } = await import('@/core/infrastructure/services/telegram.service');
+            const { mesaNumero, mesaNombre, sessionTotal } = await fetchMesaContext(dp.sesion_id, dp.empresa_id);
+            await sendTelegramPagoMesaCompleto(dp.sesion_id, mesaNumero, mesaNombre, sessionTotal, bebidasChatId);
+          }
+        }
+      }
+
+      return { success: true, data: { verified: true, paymentStatus: newPaymentStatus } };
+    }
+
+    // ── Path 2: Full (non-division) payment (tracked via pedidos) ───────────────
     const { data: pedido, error: pedidoError } = await supabase
       .from('pedidos')
       .select('id, payment_status, empresa_id, total, numero_pedido, payment_order_ref, sesion_id, direccion_entrega, latitude_entrega, longitude_entrega, clientes(nombre, telefono)')
@@ -80,22 +170,14 @@ export async function processRedsysWebhookUseCase(
       .maybeSingle();
 
     if (pedidoError || !pedido) {
-      // Not found — verified but nothing to update
       return { success: true, data: { verified: true } };
     }
 
     const p = pedido as Record<string, unknown>;
 
-    // Idempotency: already paid, skip
     if (p['payment_status'] === 'paid') {
       return { success: true, data: { verified: true, skipped: true } };
     }
-
-    // DS_RESPONSE '0000'–'0099' → paid; anything else → failed
-    const responseCode = dsResponse ?? '9999';
-    const responseNum = Number.parseInt(responseCode, 10);
-    const newPaymentStatus: 'paid' | 'failed' =
-      responseNum >= 0 && responseNum <= 99 ? 'paid' : 'failed';
 
     const { error: updateError } = await supabase
       .from('pedidos')
@@ -103,92 +185,19 @@ export async function processRedsysWebhookUseCase(
       .eq('id', p['id'] as string)
       .eq('empresa_id', input.empresaId);
 
-    // If this pedido belongs to a mesa session, handle session-level payment logic
     const sesionId = p['sesion_id'] as string | null;
     if (!updateError && sesionId && newPaymentStatus === 'paid') {
-      // Fetch session data (no join — mesa_sesiones.total is not updated by ordering flow)
-      const { data: sesionData } = await supabase
-        .from('mesa_sesiones')
-        .select('division_personas, division_pagos_realizados, mesa_id')
-        .eq('id', sesionId)
-        .maybeSingle();
+      // No division — full payment, mark all session pedidos as paid
+      await supabase
+        .from('pedidos')
+        .update({ payment_status: 'paid' })
+        .eq('sesion_id', sesionId)
+        .eq('empresa_id', input.empresaId);
 
-      const sd = sesionData as {
-        division_personas: number | null;
-        division_pagos_realizados: number;
-        mesa_id: string | null;
-      } | null;
-      const divisionPersonas = sd?.division_personas ?? null;
-
-      // Helper: fetch mesa info and session total for Telegram notification
-      const fetchMesaContext = async (): Promise<{
-        mesaNumero: number;
-        mesaNombre: string | null;
-        sessionTotal: number;
-      }> => {
-        // Fetch mesa number/name directly (reliable, no PostgREST join)
-        let mesaNumero = 0;
-        let mesaNombre: string | null = null;
-        if (sd?.mesa_id) {
-          const { data: mesaData } = await supabase
-            .from('mesas')
-            .select('numero, nombre')
-            .eq('id', sd.mesa_id)
-            .maybeSingle();
-          const m = mesaData as { numero: number; nombre: string | null } | null;
-          mesaNumero = m?.numero ?? 0;
-          mesaNombre = m?.nombre ?? null;
-        }
-
-        // Sum all pedidos for this session (mesa_sesiones.total is always "0.00")
-        const { data: pedidosData } = await supabase
-          .from('pedidos')
-          .select('total')
-          .eq('sesion_id', sesionId)
-          .eq('empresa_id', input.empresaId);
-        const sessionTotal = (pedidosData as { total: string | number }[] | null)
-          ?.reduce((acc, row) => acc + Number(row.total), 0) ?? 0;
-
-        return { mesaNumero, mesaNombre, sessionTotal };
-      };
-
-      if (divisionPersonas) {
-        // Division payment: atomically increment the counter
-        const { data: rpcResult } = await supabase
-          .rpc('increment_division_pagos', { p_sesion_id: sesionId });
-
-        const rpcRows = rpcResult as { pagos_realizados: number; personas: number }[] | null;
-        const row = rpcRows?.[0];
-        const allPaid = row ? row.pagos_realizados >= row.personas : false;
-
-        if (allPaid) {
-          // All shares paid — mark every pedido in the session as paid
-          await supabase
-            .from('pedidos')
-            .update({ payment_status: 'paid' })
-            .eq('sesion_id', sesionId)
-            .eq('empresa_id', input.empresaId);
-          // Notify bebidas chat: full session paid
-          if (bebidasChatId) {
-            const { sendTelegramPagoMesaCompleto } = await import('@/core/infrastructure/services/telegram.service');
-            const { mesaNumero, mesaNombre, sessionTotal } = await fetchMesaContext();
-            await sendTelegramPagoMesaCompleto(sesionId, mesaNumero, mesaNombre, sessionTotal, bebidasChatId);
-          }
-        }
-        // Otherwise: partial payment confirmed, leave other pedidos unchanged
-      } else {
-        // No division — full payment, mark all session pedidos as paid
-        await supabase
-          .from('pedidos')
-          .update({ payment_status: 'paid' })
-          .eq('sesion_id', sesionId)
-          .eq('empresa_id', input.empresaId);
-        // Notify bebidas chat: full session paid
-        if (bebidasChatId) {
-          const { sendTelegramPagoMesaCompleto } = await import('@/core/infrastructure/services/telegram.service');
-          const { mesaNumero, mesaNombre, sessionTotal } = await fetchMesaContext();
-          await sendTelegramPagoMesaCompleto(sesionId, mesaNumero, mesaNombre, sessionTotal, bebidasChatId);
-        }
+      if (bebidasChatId) {
+        const { sendTelegramPagoMesaCompleto } = await import('@/core/infrastructure/services/telegram.service');
+        const { mesaNumero, mesaNombre, sessionTotal } = await fetchMesaContext(sesionId, input.empresaId);
+        await sendTelegramPagoMesaCompleto(sesionId, mesaNumero, mesaNombre, sessionTotal, bebidasChatId);
       }
     }
 
@@ -200,11 +209,10 @@ export async function processRedsysWebhookUseCase(
         'processRedsysWebhookUseCase',
         { details: { code: updateError.code, pedidoId: p['id'] } }
       );
-      // Still return 200 to Redsys — log internally
       return { success: true, data: { verified: true, paymentStatus: newPaymentStatus } };
     }
 
-    // On paid: dispatch Glovo order (fire-and-forget)
+    // On paid: dispatch Glovo order (fire-and-forget) — only for non-mesa delivery orders
     if (newPaymentStatus === 'paid') {
       const cliente = (p['clientes'] as Record<string, unknown> | null) ?? {};
       const recipientName = (cliente['nombre'] as string | null) ?? 'Cliente';

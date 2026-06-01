@@ -150,61 +150,95 @@ export async function initiateRedsysMesaPaymentUseCase(
     const anchorPedido = rows.find(p => Number(p.numero_pedido) === maxNumeroPedido) ?? rows[0];
     const paymentOrderRef = generatePaymentOrderRef(maxNumeroPedido || undefined);
 
-    // Mark all pedidos in the session as pending and set payment_order_ref on the anchor
-    const pedidoIds = rows.map(p => p.id);
+    if (input.esDivision && divisionPersonas && divisionPersonas > 1) {
+      // Division payment: each person's share gets its own row in mesa_division_pagos.
+      // This prevents the race condition where concurrent initiations overwrite the same
+      // anchor pedido's payment_order_ref, causing one payment to be silently lost.
+      const { error: divInsertError } = await supabase
+        .from('mesa_division_pagos')
+        .insert({
+          sesion_id: sesionId,
+          empresa_id: input.empresaId,
+          payment_order_ref: paymentOrderRef,
+          payment_amount_cents: amountCents,
+          status: 'pending',
+        });
 
-    const { error: updatePendingError } = await supabase
-      .from('pedidos')
-      .update({ payment_status: 'pending' })
-      .in('id', pedidoIds)
-      .eq('empresa_id', input.empresaId);
+      if (divInsertError) {
+        await logger.logAndReturnError(
+          'DB_INSERT_ERROR',
+          divInsertError.message,
+          'use-case',
+          'initiateRedsysMesaPaymentUseCase',
+          { details: { code: divInsertError.code, sesionId } }
+        );
+        return {
+          success: false,
+          error: {
+            code: 'DB_ERROR',
+            message: 'Error al iniciar pago de división',
+            module: 'use-case',
+            method: 'initiateRedsysMesaPaymentUseCase',
+          },
+        };
+      }
+    } else {
+      // Full (non-division) payment: mark all pedidos as pending and set payment_order_ref
+      // on the anchor so the webhook can reconcile against pedidos as before.
+      const pedidoIds = rows.map(p => p.id);
 
-    if (updatePendingError) {
-      await logger.logAndReturnError(
-        'DB_UPDATE_ERROR',
-        updatePendingError.message,
-        'use-case',
-        'initiateRedsysMesaPaymentUseCase',
-        { details: { code: updatePendingError.code, sesionId } }
-      );
-      return {
-        success: false,
-        error: {
-          code: 'DB_ERROR',
-          message: 'Error al iniciar pago de mesa',
-          module: 'use-case',
-          method: 'initiateRedsysMesaPaymentUseCase',
-        },
-      };
-    }
+      const { error: updatePendingError } = await supabase
+        .from('pedidos')
+        .update({ payment_status: 'pending' })
+        .in('id', pedidoIds)
+        .eq('empresa_id', input.empresaId);
 
-    // Set payment_order_ref and amount on the anchor pedido so the webhook can reconcile
-    const { error: updateAnchorError } = await supabase
-      .from('pedidos')
-      .update({
-        payment_order_ref: paymentOrderRef,
-        payment_amount_cents: amountCents,
-      })
-      .eq('id', anchorPedido.id)
-      .eq('empresa_id', input.empresaId);
+      if (updatePendingError) {
+        await logger.logAndReturnError(
+          'DB_UPDATE_ERROR',
+          updatePendingError.message,
+          'use-case',
+          'initiateRedsysMesaPaymentUseCase',
+          { details: { code: updatePendingError.code, sesionId } }
+        );
+        return {
+          success: false,
+          error: {
+            code: 'DB_ERROR',
+            message: 'Error al iniciar pago de mesa',
+            module: 'use-case',
+            method: 'initiateRedsysMesaPaymentUseCase',
+          },
+        };
+      }
 
-    if (updateAnchorError) {
-      await logger.logAndReturnError(
-        'DB_UPDATE_ERROR',
-        updateAnchorError.message,
-        'use-case',
-        'initiateRedsysMesaPaymentUseCase',
-        { details: { code: updateAnchorError.code, pedidoId: anchorPedido.id } }
-      );
-      return {
-        success: false,
-        error: {
-          code: 'DB_ERROR',
-          message: 'Error al iniciar pago de mesa',
-          module: 'use-case',
-          method: 'initiateRedsysMesaPaymentUseCase',
-        },
-      };
+      const { error: updateAnchorError } = await supabase
+        .from('pedidos')
+        .update({
+          payment_order_ref: paymentOrderRef,
+          payment_amount_cents: amountCents,
+        })
+        .eq('id', anchorPedido.id)
+        .eq('empresa_id', input.empresaId);
+
+      if (updateAnchorError) {
+        await logger.logAndReturnError(
+          'DB_UPDATE_ERROR',
+          updateAnchorError.message,
+          'use-case',
+          'initiateRedsysMesaPaymentUseCase',
+          { details: { code: updateAnchorError.code, pedidoId: anchorPedido.id } }
+        );
+        return {
+          success: false,
+          error: {
+            code: 'DB_ERROR',
+            message: 'Error al iniciar pago de mesa',
+            module: 'use-case',
+            method: 'initiateRedsysMesaPaymentUseCase',
+          },
+        };
+      }
     }
 
     const formData = buildRedsysFormData(
