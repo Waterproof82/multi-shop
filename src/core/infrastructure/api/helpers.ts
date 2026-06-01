@@ -52,6 +52,7 @@ function errorCodeToStatus(code: string): number {
   if (code.startsWith('AUTH_')) return 401;
   if (code.startsWith('DEL_')) return 400;
   if (code.startsWith('GLV_') || code.startsWith('PAY_')) return 503;
+  if (code.startsWith('DLV_')) return 422;
   return 500;
 }
 
