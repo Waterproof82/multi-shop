@@ -157,17 +157,18 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
       try {
         const res = await fetch(`/api/mesas/${encodeURIComponent(mesa)}/orders`);
         if (!res.ok) return;
-        const data = await res.json() as { sesionPagada?: boolean; pagoEnCurso?: boolean };
+        const data = await res.json() as { sesionPagada?: boolean; pagoEnCurso?: boolean; division?: unknown };
         const pagada = data.sesionPagada === true;
         const enCurso = data.pagoEnCurso === true;
+        const divisionActiva = data.division != null;
         setMesaEsperandoActivacion(pagada);
         if (pagada) {
           clearCart();
           closeCart();
-        } else if (enCurso) {
+        } else if (enCurso || divisionActiva) {
           clearCart();
           closeCart();
-          // Redirect to ticket so users can track payment and pay their share
+          // Redirect to ticket so users can see the bill and pay their share
           window.location.href = `/mesa/${encodeURIComponent(mesa)}/orders`;
         }
       } catch { /* best-effort */ }

@@ -271,6 +271,18 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
     setShowDivisionModal(false);
     setSettingDivision(true);
     try {
+      // Re-verify total hasn't changed while the modal was open
+      const checkRes = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/orders`);
+      if (checkRes.ok) {
+        const fresh = await checkRes.json() as MesaSessionData;
+        const currentTotal = sessionData?.total ?? 0;
+        if (Math.abs(fresh.total - currentTotal) > 0.005) {
+          setSessionData(fresh);
+          setTotalMismatch({ oldTotal: currentTotal, newTotal: fresh.total, pendingAction: 'division-modal' });
+          return;
+        }
+        setSessionData(fresh);
+      }
       await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/division`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
