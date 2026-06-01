@@ -103,14 +103,20 @@ export async function initiateRedsysMesaPaymentUseCase(
     const divisionPersonas = (s['division_personas'] as number | null) ?? null;
     const divisionPagosRealizados = (s['division_pagos_realizados'] as number) ?? 0;
 
-    // Reject if another payment is already in progress (lock not expired)
+    // Reject if another payment is already in progress (lock not expired).
+    // Allow if the lock is within GRACE_PERIOD_MS — the UI pre-locks via
+    // POST /api/mesas/[mesaId]/lock before total verification, and then this
+    // use case is called immediately after. A fresh lock means it's the same client.
     const pagoEnCurso = s['pago_en_curso'] as boolean;
     const pagoIniciadoEn = s['pago_iniciado_en'] as string | null;
     const LOCK_EXPIRY_MS = 15 * 60 * 1000;
-    const lockFresh = pagoIniciadoEn
-      ? Date.now() - new Date(pagoIniciadoEn).getTime() < LOCK_EXPIRY_MS
-      : false;
-    if (pagoEnCurso && lockFresh) {
+    const GRACE_PERIOD_MS = 2 * 60 * 1000;
+    const lockAge = pagoIniciadoEn
+      ? Date.now() - new Date(pagoIniciadoEn).getTime()
+      : Infinity;
+    const lockFresh = lockAge < LOCK_EXPIRY_MS;
+    const lockInGrace = lockAge < GRACE_PERIOD_MS;
+    if (pagoEnCurso && lockFresh && !lockInGrace) {
       return {
         success: false,
         error: {

@@ -280,6 +280,14 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
     if (paying || verifyingTotal) return;
     setVerifyingTotal(true);
     try {
+      // Step 1: Claim the session lock immediately — blocks all other users' menus right away
+      const lockRes = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/lock`, { method: 'POST' });
+      if (lockRes.status === 423) {
+        // Another payment already in progress — trigger a refresh so the overlay appears immediately
+        void refresh();
+        return;
+      }
+      // Step 2: Verify total against fresh DB state
       const res = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/orders`);
       if (!res.ok) { executePendingAction(action); return; }
       const fresh = await res.json() as MesaSessionData;
@@ -587,7 +595,9 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
                     type="button"
                     onClick={() => {
                       setTotalMismatch(null);
-                      void fetch(`/api/redsys/cancel-mesa?mesaId=${encodeURIComponent(mesaId)}&redirect=`).catch(() => null);
+                      void fetch(`/api/mesas/${encodeURIComponent(mesaId)}/lock`, { method: 'DELETE' })
+                        .then(() => refresh())
+                        .catch(() => null);
                     }}
                     className="py-3 px-4 rounded-xl text-xs font-bold tracking-widest uppercase"
                     style={{ backgroundColor: "transparent", color: "#8a7560", border: "1.5px solid #c9b99a" }}
