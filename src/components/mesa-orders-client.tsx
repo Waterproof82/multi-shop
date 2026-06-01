@@ -585,11 +585,14 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setTotalMismatch(null)}
+                    onClick={() => {
+                      setTotalMismatch(null);
+                      void fetch(`/api/redsys/cancel-mesa?mesaId=${encodeURIComponent(mesaId)}&redirect=`).catch(() => null);
+                    }}
                     className="py-3 px-4 rounded-xl text-xs font-bold tracking-widest uppercase"
                     style={{ backgroundColor: "transparent", color: "#8a7560", border: "1.5px solid #c9b99a" }}
                   >
-                    {t("mesaDivisionCancel", lang)}
+                    {t("cancel", lang)}
                   </button>
                 </div>
               </div>
