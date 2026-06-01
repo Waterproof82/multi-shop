@@ -564,6 +564,33 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
               </button>
             )}
 
+            {/* Fully paid confirmation */}
+            {fullyPaid && (
+              <div
+                className="rounded-2xl p-6 flex flex-col items-center gap-3"
+                style={{ backgroundColor: "#fffcf7", fontFamily: "monospace" }}
+              >
+                <div
+                  className="flex items-center justify-center rounded-full"
+                  style={{ width: 52, height: 52, backgroundColor: "#dcfce7" }}
+                >
+                  <span style={{ fontSize: 26 }}>✓</span>
+                </div>
+                <p
+                  className="text-sm font-bold tracking-widest uppercase"
+                  style={{ color: "#1a1612" }}
+                >
+                  {t("mesaDivisionComplete", lang)}
+                </p>
+                <p
+                  className="text-2xl font-bold tabular-nums"
+                  style={{ color: "#1a1612" }}
+                >
+                  {formatPrice(sessionData.total, "EUR", lang)}
+                </p>
+              </div>
+            )}
+
           </div>
         )}
       </div>
