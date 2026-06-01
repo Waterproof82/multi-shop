@@ -361,54 +361,10 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
 
   return (
     <div className="min-h-screen py-8 px-4" style={{ backgroundColor: PAGE_BG }}>
-      {/* Payment-in-progress overlay — someone else on this mesa is paying */}
-      {externalPaymentInProgress && (
-        <div
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 px-8 text-center"
-          style={{ backgroundColor: 'rgba(10, 8, 6, 0.92)' }}
-          aria-live="polite"
-        >
-          <div
-            className="flex items-center justify-center rounded-full"
-            style={{ width: 72, height: 72, backgroundColor: 'rgba(255,252,247,0.08)' }}
-          >
-            <span style={{ fontSize: 36 }}>💳</span>
-          </div>
-          <div className="flex flex-col gap-3 max-w-xs">
-            <p
-              className="text-lg font-bold tracking-widest uppercase"
-              style={{ color: '#fffcf7', fontFamily: 'monospace' }}
-            >
-              {t('mesaPagoEnCurso', lang)}
-            </p>
-            <p
-              className="text-sm leading-relaxed"
-              style={{ color: '#8a7560', fontFamily: 'monospace' }}
-            >
-              {t('mesaPagoEnCursoDesc', lang)}
-            </p>
-          </div>
-          <div className="flex gap-1.5 mt-2">
-            {[0, 1, 2].map(i => (
-              <div
-                key={i}
-                className="rounded-full"
-                style={{
-                  width: 6,
-                  height: 6,
-                  backgroundColor: '#8a7560',
-                  animation: `pulse 1.4s ease-in-out ${i * 0.2}s infinite`,
-                  opacity: 0.6,
-                }}
-              />
-            ))}
-          </div>
-        </div>
-      )}
       <div className="mx-auto max-w-xs">
 
-        {/* Back link — hidden when session is fully paid */}
-        {!fullyPaid && (
+        {/* Back link — hidden when session is fully paid or payment is in progress */}
+        {!fullyPaid && !externalPaymentInProgress && (
           <div className="mb-5">
             <Link
               href={`/?mesa=${mesaId}`}
@@ -610,8 +566,8 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
                   }
                 </p>
 
-                {/* Edit / Cancel actions — only before any payment */}
-                {division.pagosRealizados === 0 && !fullyPaid && (
+                {/* Edit / Cancel actions — only before any payment and when no payment is in progress */}
+                {division.pagosRealizados === 0 && !fullyPaid && !externalPaymentInProgress && (
                   <div className="flex justify-center gap-4 mt-3 pt-3" style={{ borderTop: "1px dashed #e8e0d8" }}>
                     <button
                       type="button"
@@ -637,8 +593,26 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
               </div>
             )}
 
+            {/* Payment in progress — another user is paying */}
+            {externalPaymentInProgress && (
+              <div
+                className="rounded-2xl p-5 flex items-center gap-4"
+                style={{ backgroundColor: '#1a1612', fontFamily: 'monospace' }}
+              >
+                <span style={{ fontSize: 24, flexShrink: 0 }}>💳</span>
+                <div className="flex flex-col gap-1">
+                  <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#fffcf7' }}>
+                    {t('mesaPagoEnCurso', lang)}
+                  </p>
+                  <p className="text-xs" style={{ color: '#8a7560' }}>
+                    {t('mesaPagoEnCursoDesc', lang)}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Total updated warning */}
-            {totalMismatch && (
+            {totalMismatch && !externalPaymentInProgress && (
               <div
                 className="rounded-2xl p-5 flex flex-col gap-3"
                 style={{ backgroundColor: "#fff8e1", border: "1.5px solid #f59e0b", fontFamily: "monospace" }}
@@ -680,7 +654,7 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
             )}
 
             {/* Buttons */}
-            {!division && !fullyPaid && !totalMismatch && (
+            {!division && !fullyPaid && !totalMismatch && !externalPaymentInProgress && (
               <div className="flex gap-3">
                 {/* Pagar total */}
                 <button
@@ -712,7 +686,7 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
             )}
 
             {/* Pagar mi parte */}
-            {division && !fullyPaid && !totalMismatch && (
+            {division && !fullyPaid && !totalMismatch && !externalPaymentInProgress && (
               <button
                 type="button"
                 onClick={() => { void handlePrePaymentCheck('division-pay'); }}
