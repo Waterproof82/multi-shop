@@ -106,20 +106,51 @@ export async function processRedsysWebhookUseCase(
     // If this pedido belongs to a mesa session, handle session-level payment logic
     const sesionId = p['sesion_id'] as string | null;
     if (!updateError && sesionId && newPaymentStatus === 'paid') {
-      // Check if this session has division enabled
+      // Fetch session data (no join — mesa_sesiones.total is not updated by ordering flow)
       const { data: sesionData } = await supabase
         .from('mesa_sesiones')
-        .select('division_personas, division_pagos_realizados, total, mesas(numero, nombre)')
+        .select('division_personas, division_pagos_realizados, mesa_id')
         .eq('id', sesionId)
         .maybeSingle();
 
       const sd = sesionData as {
         division_personas: number | null;
         division_pagos_realizados: number;
-        total: number | null;
-        mesas: { numero: number; nombre: string | null } | null;
+        mesa_id: string | null;
       } | null;
       const divisionPersonas = sd?.division_personas ?? null;
+
+      // Helper: fetch mesa info and session total for Telegram notification
+      const fetchMesaContext = async (): Promise<{
+        mesaNumero: number;
+        mesaNombre: string | null;
+        sessionTotal: number;
+      }> => {
+        // Fetch mesa number/name directly (reliable, no PostgREST join)
+        let mesaNumero = 0;
+        let mesaNombre: string | null = null;
+        if (sd?.mesa_id) {
+          const { data: mesaData } = await supabase
+            .from('mesas')
+            .select('numero, nombre')
+            .eq('id', sd.mesa_id)
+            .maybeSingle();
+          const m = mesaData as { numero: number; nombre: string | null } | null;
+          mesaNumero = m?.numero ?? 0;
+          mesaNombre = m?.nombre ?? null;
+        }
+
+        // Sum all pedidos for this session (mesa_sesiones.total is always "0.00")
+        const { data: pedidosData } = await supabase
+          .from('pedidos')
+          .select('total')
+          .eq('sesion_id', sesionId)
+          .eq('empresa_id', input.empresaId);
+        const sessionTotal = (pedidosData as { total: string | number }[] | null)
+          ?.reduce((acc, row) => acc + Number(row.total), 0) ?? 0;
+
+        return { mesaNumero, mesaNombre, sessionTotal };
+      };
 
       if (divisionPersonas) {
         // Division payment: atomically increment the counter
@@ -140,7 +171,8 @@ export async function processRedsysWebhookUseCase(
           // Notify bebidas chat: full session paid
           if (bebidasChatId) {
             const { sendTelegramPagoMesaCompleto } = await import('@/core/infrastructure/services/telegram.service');
-            await sendTelegramPagoMesaCompleto(sesionId, sd?.mesas?.numero ?? 0, sd?.mesas?.nombre ?? null, sd?.total ?? 0, bebidasChatId);
+            const { mesaNumero, mesaNombre, sessionTotal } = await fetchMesaContext();
+            await sendTelegramPagoMesaCompleto(sesionId, mesaNumero, mesaNombre, sessionTotal, bebidasChatId);
           }
         }
         // Otherwise: partial payment confirmed, leave other pedidos unchanged
@@ -154,7 +186,8 @@ export async function processRedsysWebhookUseCase(
         // Notify bebidas chat: full session paid
         if (bebidasChatId) {
           const { sendTelegramPagoMesaCompleto } = await import('@/core/infrastructure/services/telegram.service');
-          await sendTelegramPagoMesaCompleto(sesionId, sd?.mesas?.numero ?? 0, sd?.mesas?.nombre ?? null, sd?.total ?? 0, bebidasChatId);
+          const { mesaNumero, mesaNombre, sessionTotal } = await fetchMesaContext();
+          await sendTelegramPagoMesaCompleto(sesionId, mesaNumero, mesaNombre, sessionTotal, bebidasChatId);
         }
       }
     }
