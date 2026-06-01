@@ -182,6 +182,7 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
   const [paying, setPaying] = useState(false);
   const [showDivisionModal, setShowDivisionModal] = useState(false);
   const [settingDivision, setSettingDivision] = useState(false);
+  const [cancellingDivision, setCancellingDivision] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -256,6 +257,16 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
       await refresh();
     } finally {
       setSettingDivision(false);
+    }
+  };
+
+  const handleCancelDivision = async () => {
+    setCancellingDivision(true);
+    try {
+      await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/division`, { method: 'DELETE' });
+      await refresh();
+    } finally {
+      setCancellingDivision(false);
     }
   };
 
@@ -411,31 +422,34 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
         {allItems.length > 0 && sessionData?.pagosHabilitados && (
           <div className="mt-6 flex flex-col gap-3">
 
-            {/* Division progress bar */}
+            {/* Division block */}
             {division && (
               <div
-                className="rounded-2xl p-4"
+                className="rounded-2xl p-5"
                 style={{ backgroundColor: "#fffcf7", fontFamily: "monospace" }}
               >
-                <div className="flex justify-between items-center text-xs mb-2" style={{ color: "#8a7560" }}>
-                  <span className="uppercase tracking-widest">{t("mesaDivisionProgress", lang)}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="tabular-nums font-bold" style={{ color: "#1a1612" }}>
-                      {division.pagosRealizados}/{division.personas}
+                {/* Prominent person count */}
+                <div className="flex flex-col items-center mb-4">
+                  <div className="flex items-baseline gap-2 mb-1">
+                    <span
+                      className="tabular-nums font-bold"
+                      style={{ fontSize: 48, lineHeight: 1, color: "#1a1612" }}
+                    >
+                      {division.personas}
                     </span>
-                    {division.pagosRealizados === 0 && !fullyPaid && (
-                      <button
-                        type="button"
-                        onClick={() => setShowDivisionModal(true)}
-                        disabled={settingDivision}
-                        className="text-xs underline underline-offset-2 transition-opacity disabled:opacity-40"
-                        style={{ color: "#8a7560", fontFamily: "monospace" }}
-                        aria-label={t("mesaDivisionEdit", lang)}
-                      >
-                        {t("mesaDivisionEdit", lang)}
-                      </button>
-                    )}
+                    <span
+                      className="text-sm uppercase tracking-widest"
+                      style={{ color: "#8a7560" }}
+                    >
+                      {t("mesaDivisionPersonas", lang)}
+                    </span>
                   </div>
+                  <p className="text-sm font-bold tabular-nums" style={{ color: "#1a1612" }}>
+                    {formatPrice(division.importePorPersona, "EUR", lang)}{" "}
+                    <span className="text-xs font-normal" style={{ color: "#8a7560" }}>
+                      {t("mesaDivisionPorPersona", lang)}
+                    </span>
+                  </p>
                 </div>
 
                 {/* Progress track */}
@@ -452,8 +466,8 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
                   />
                 </div>
 
-                {/* Individual shares */}
-                <div className="flex gap-1.5 justify-center">
+                {/* Individual share dots */}
+                <div className="flex gap-1.5 justify-center mb-3">
                   {Array.from({ length: division.personas }).map((_, i) => (
                     <div
                       key={i}
@@ -467,17 +481,37 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
                   ))}
                 </div>
 
-                {!fullyPaid && (
-                  <p className="text-center text-xs mt-2" style={{ color: "#8a7560" }}>
-                    {formatPrice(division.importePorPersona, "EUR", lang)}{" "}
-                    {t("mesaDivisionPorPersona", lang)}
-                  </p>
-                )}
+                {/* Progress label */}
+                <p className="text-center text-xs uppercase tracking-widest" style={{ color: "#8a7560" }}>
+                  {fullyPaid
+                    ? <span className="font-bold" style={{ color: "#4ade80" }}>{t("mesaDivisionComplete", lang)}</span>
+                    : <>{division.pagosRealizados}/{division.personas} {t("mesaDivisionProgress", lang).toLowerCase()}</>
+                  }
+                </p>
 
-                {fullyPaid && (
-                  <p className="text-center text-xs mt-2 font-bold" style={{ color: "#4ade80" }}>
-                    {t("mesaDivisionComplete", lang)}
-                  </p>
+                {/* Edit / Cancel actions — only before any payment */}
+                {division.pagosRealizados === 0 && !fullyPaid && (
+                  <div className="flex justify-center gap-4 mt-3 pt-3" style={{ borderTop: "1px dashed #e8e0d8" }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowDivisionModal(true)}
+                      disabled={settingDivision || cancellingDivision}
+                      className="text-xs underline underline-offset-2 transition-opacity disabled:opacity-40"
+                      style={{ color: "#8a7560" }}
+                    >
+                      {t("mesaDivisionEdit", lang)}
+                    </button>
+                    <span style={{ color: "#c9b99a" }}>·</span>
+                    <button
+                      type="button"
+                      onClick={() => { void handleCancelDivision(); }}
+                      disabled={settingDivision || cancellingDivision}
+                      className="text-xs underline underline-offset-2 transition-opacity disabled:opacity-40"
+                      style={{ color: "#8a7560" }}
+                    >
+                      {cancellingDivision ? t("loading", lang) : t("mesaDivisionCancel", lang)}
+                    </button>
+                  </div>
                 )}
               </div>
             )}

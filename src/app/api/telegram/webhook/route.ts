@@ -203,6 +203,37 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
+  // Handle cerrar_mesa — close the session immediately, delete messages, auto-delete this one in 5s
+  const cerrarMesaMatch = callbackData.match(/^cerrar_mesa:([0-9a-f-]{36})$/);
+  if (cerrarMesaMatch) {
+    const [, sesionId] = cerrarMesaMatch;
+    const { mesaSesionUseCase, pedidoRepository: repo } = await import('@/core/infrastructure/database');
+    await answerCallbackQuery(callbackQueryId, '🔒 Cerrando mesa...');
+
+    // Delete all order Telegram messages for this session (best-effort)
+    const telegramMessages = await repo.findSesionTelegramMessages(sesionId);
+    if (telegramMessages.success) {
+      await Promise.all(
+        telegramMessages.data.map(({ messageId: msgId, chatId: cId }) => deleteMessage(cId, msgId))
+      );
+    }
+    await repo.consolidateSesionOrders(sesionId);
+    await mesaSesionUseCase.closeSesion(sesionId);
+
+    if (message) {
+      const chatId = String(message.chat.id);
+      const messageId = message.message_id;
+      await editMessageReplyMarkup(chatId, messageId, [
+        [{ text: '🔒 Mesa cerrada ✓', callback_data: 'noop' }],
+      ]);
+      after(async () => {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        await deleteMessage(chatId, messageId);
+      });
+    }
+    return NextResponse.json({ ok: true });
+  }
+
   // Handle eliminar — delete the Telegram message
   const eliminarMatch = callbackData.match(/^eliminar:([0-9a-f-]{36})$/);
   if (eliminarMatch) {

@@ -40,10 +40,10 @@ export async function processRedsysWebhookUseCase(
       return { success: true, data: { verified: false } };
     }
 
-    // Fetch empresa secret key
+    // Fetch empresa secret key + bebidas chat id for payment notification
     const { data: empresa, error: empresaError } = await supabase
       .from('empresas')
-      .select('redsys_secret_key')
+      .select('redsys_secret_key, telegram_bebidas_chat_id')
       .eq('id', input.empresaId)
       .single();
 
@@ -53,6 +53,7 @@ export async function processRedsysWebhookUseCase(
 
     const e = empresa as Record<string, unknown>;
     const secretKey = e['redsys_secret_key'] as string | null;
+    const bebidasChatId = e['telegram_bebidas_chat_id'] as string | null;
 
     if (!secretKey) {
       return { success: true, data: { verified: false } };
@@ -108,11 +109,16 @@ export async function processRedsysWebhookUseCase(
       // Check if this session has division enabled
       const { data: sesionData } = await supabase
         .from('mesa_sesiones')
-        .select('division_personas, division_pagos_realizados')
+        .select('division_personas, division_pagos_realizados, total, mesas(numero, nombre)')
         .eq('id', sesionId)
         .maybeSingle();
 
-      const sd = sesionData as { division_personas: number | null; division_pagos_realizados: number } | null;
+      const sd = sesionData as {
+        division_personas: number | null;
+        division_pagos_realizados: number;
+        total: number | null;
+        mesas: { numero: number; nombre: string | null } | null;
+      } | null;
       const divisionPersonas = sd?.division_personas ?? null;
 
       if (divisionPersonas) {
@@ -131,6 +137,11 @@ export async function processRedsysWebhookUseCase(
             .update({ payment_status: 'paid' })
             .eq('sesion_id', sesionId)
             .eq('empresa_id', input.empresaId);
+          // Notify bebidas chat: full session paid
+          if (bebidasChatId) {
+            const { sendTelegramPagoMesaCompleto } = await import('@/core/infrastructure/services/telegram.service');
+            await sendTelegramPagoMesaCompleto(sesionId, sd?.mesas?.numero ?? 0, sd?.mesas?.nombre ?? null, sd?.total ?? 0, bebidasChatId);
+          }
         }
         // Otherwise: partial payment confirmed, leave other pedidos unchanged
       } else {
@@ -140,6 +151,11 @@ export async function processRedsysWebhookUseCase(
           .update({ payment_status: 'paid' })
           .eq('sesion_id', sesionId)
           .eq('empresa_id', input.empresaId);
+        // Notify bebidas chat: full session paid
+        if (bebidasChatId) {
+          const { sendTelegramPagoMesaCompleto } = await import('@/core/infrastructure/services/telegram.service');
+          await sendTelegramPagoMesaCompleto(sesionId, sd?.mesas?.numero ?? 0, sd?.mesas?.nombre ?? null, sd?.total ?? 0, bebidasChatId);
+        }
       }
     }
 
@@ -155,7 +171,7 @@ export async function processRedsysWebhookUseCase(
       return { success: true, data: { verified: true, paymentStatus: newPaymentStatus } };
     }
 
-    // On paid: dispatch Glovo order + notify via Telegram
+    // On paid: dispatch Glovo order (fire-and-forget)
     if (newPaymentStatus === 'paid') {
       const cliente = (p['clientes'] as Record<string, unknown> | null) ?? {};
       const recipientName = (cliente['nombre'] as string | null) ?? 'Cliente';
@@ -167,7 +183,6 @@ export async function processRedsysWebhookUseCase(
       const numeroPedido = (p['numero_pedido'] as number | null) ?? 0;
       const paymentRef = (p['payment_order_ref'] as string | null) ?? dsOrder;
 
-      // Auto-dispatch — fire and forget; errors are logged internally
       createGlovoOrderUseCase({
         empresaId: input.empresaId,
         pedidoId: p['id'] as string,
@@ -184,36 +199,6 @@ export async function processRedsysWebhookUseCase(
           empresaId: input.empresaId,
         });
       });
-
-      // Telegram notification — best-effort
-      try {
-        const { data: empresaFull } = await supabase
-          .from('empresas')
-          .select('telegram_chat_id')
-          .eq('id', input.empresaId)
-          .single();
-
-        const ef = empresaFull as Record<string, unknown> | null;
-        const chatId = ef?.['telegram_chat_id'] as string | null;
-
-        if (chatId) {
-          const botToken = process.env.TELEGRAM_BOT_TOKEN;
-          if (botToken) {
-            const text = `*Pago confirmado* \\| Pedido ref: ${dsOrder.replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&')}`;
-            await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                chat_id: chatId,
-                text,
-                parse_mode: 'MarkdownV2',
-              }),
-            });
-          }
-        }
-      } catch {
-        // Best-effort — do not fail the webhook response
-      }
     }
 
     return { success: true, data: { verified: true, paymentStatus: newPaymentStatus } };

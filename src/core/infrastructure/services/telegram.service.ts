@@ -391,6 +391,44 @@ export const sendTelegramPreparadoAlert = async (
   }
 };
 
+/**
+ * Notify the bebidas chat when the full mesa payment is complete.
+ * Includes a "Cerrar mesa" button that triggers an immediate session close.
+ */
+export const sendTelegramPagoMesaCompleto = async (
+  sesionId: string,
+  mesaNumero: number,
+  mesaNombre: string | null,
+  totalEuros: number,
+  chatId: string
+): Promise<void> => {
+  if (!TELEGRAM_BOT_TOKEN) return;
+  const tableLabel = mesaNombre
+    ? `${sanitizeForMarkdown(mesaNombre)} \\(Mesa ${mesaNumero}\\)`
+    : `Mesa ${mesaNumero}`;
+  const lines = [
+    `💳 *Cuenta pagada — ${tableLabel}*`,
+    '',
+    `*Total:* ${sanitizeForMarkdown(totalEuros.toFixed(2))} €`,
+  ];
+  const message = lines.join('\n');
+  const inlineKeyboard = [[{ text: '🔒 Cerrar mesa', callback_data: `cerrar_mesa:${sesionId}` }]];
+  try {
+    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: 'MarkdownV2',
+        reply_markup: { inline_keyboard: inlineKeyboard },
+      }),
+    });
+  } catch {
+    // Best-effort
+  }
+};
+
 /** Delete a message sent by the bot */
 export const deleteMessage = async (chatId: string, messageId: number): Promise<void> => {
   if (!TELEGRAM_BOT_TOKEN) return;
