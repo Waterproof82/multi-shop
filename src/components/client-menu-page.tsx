@@ -182,7 +182,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
             <div id="menu-content" className="container mx-auto max-w-6xl px-4 py-8 md:px-6">
               <div className="space-y-12 md:space-y-16">
                 {visibleCategories.map((category, index) => (
-                  <MenuSection key={category.id} category={category} showCart={showCart} priority={index === 0} />
+                  <MenuSection key={category.id} category={category} showCart={showCart} priority={index === 0} hideImages={showWaiterSearch} />
                 ))}
               </div>
             </div>
