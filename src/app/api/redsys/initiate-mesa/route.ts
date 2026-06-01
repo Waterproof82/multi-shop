@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     // urlOk → confirm-mesa processes the Redsys POST and then redirects to the ticket.
     // This acts as a reliable fallback when the server-to-server webhook is delayed or fails.
     urlOk: `${origin}/api/redsys/confirm-mesa?redirect=/mesa/${mesaId}/orders`,
-    urlKo: `${origin}/mesa/${mesaId}/orders`,
+    urlKo: `${origin}/api/redsys/cancel-mesa?mesaId=${mesaId}&redirect=/mesa/${mesaId}/orders`,
     webhookUrl: `${origin}/api/redsys/webhook`,
   });
 
