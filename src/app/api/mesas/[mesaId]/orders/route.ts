@@ -84,9 +84,16 @@ export async function GET(
       division = { personas, pagosRealizados, importePorPersona };
     }
 
-    const paymentRows = (paymentRowsResult.data ?? []) as { payment_status: string }[];
-    if (paymentRows.length > 0) {
-      sesionPagada = paymentRows.every(r => r.payment_status === 'paid');
+    // sesionPagada only applies to non-division payments.
+    // For divisions, the RPC counter (division.pagosRealizados >= division.personas) is the
+    // authoritative source. Using payment_status here would give a false positive when only
+    // the anchor pedido (the sole food pedido) is marked 'paid' after the first share.
+    const hasDivision = !!row?.division_personas;
+    if (!hasDivision) {
+      const paymentRows = (paymentRowsResult.data ?? []) as { payment_status: string }[];
+      if (paymentRows.length > 0) {
+        sesionPagada = paymentRows.every(r => r.payment_status === 'paid');
+      }
     }
   } catch {
     // best-effort

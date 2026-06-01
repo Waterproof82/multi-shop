@@ -77,9 +77,10 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
   }, [])
   const closeCart = useCallback(() => {
     setIsCartOpen(false);
-    // Cuando cerramos manualmente, quitamos el estado extra del historial
+    // Neutralize the cartOpen history entry without navigating (history.back() triggers
+    // the browser "leave page?" dialog on mobile when previous entry is cross-origin)
     if (window.history.state?.cartOpen) {
-      window.history.back();
+      window.history.replaceState({}, '', window.location.href);
     }
   }, [])
 
