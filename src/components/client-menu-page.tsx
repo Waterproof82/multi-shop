@@ -167,7 +167,10 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
         const enCurso = data.pagoEnCurso === true;
         const divisionActiva = data.division != null;
         if (isWaiterMode) {
-          if (pagada || enCurso || divisionActiva) setWaiterMesaLocked(true);
+          if (pagada || enCurso || divisionActiva) {
+            setWaiterMesaLocked(true);
+            window.location.href = `/mesa/${encodeURIComponent(mesa)}/orders`;
+          }
         } else {
           setMesaEsperandoActivacion(pagada);
           if (pagada) {
@@ -201,7 +204,10 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
         const pagoEnCurso = payload.new['pago_en_curso'] === true;
         const sesionPagada = payload.new['sesion_pagada'] === true;
         if (isWaiterMode) {
-          if (pagoEnCurso || sesionPagada) setWaiterMesaLocked(true);
+          if (pagoEnCurso || sesionPagada) {
+            setWaiterMesaLocked(true);
+            window.location.href = `/mesa/${encodeURIComponent(mesa)}/orders`;
+          }
         } else if (pagoEnCurso) {
           setMesaPaymentLocked(true);
           clearCart();

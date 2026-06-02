@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@supabase/supabase-js";
 import { UtensilsCrossed } from "lucide-react";
 import { formatPrice } from "@/lib/format-price";
 import type { MesaWithSession } from "@/core/domain/repositories/IMesaRepository";
@@ -32,7 +33,25 @@ export function WaiterTablesGrid({ mesas: initialMesas }: WaiterTablesGridProps)
 
   useEffect(() => {
     const interval = setInterval(() => { void refresh(); }, 15000);
-    return () => clearInterval(interval);
+
+    // Realtime: refresh grid instantly when any session payment state changes
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    const channel = supabase
+      .channel('waiter-grid-sesiones')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'mesa_sesiones',
+      }, () => { void refresh(); })
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      void supabase.removeChannel(channel);
+    };
   }, [refresh]);
 
   if (mesas.length === 0) {
