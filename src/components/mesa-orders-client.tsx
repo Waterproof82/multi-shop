@@ -327,8 +327,19 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
     }
   };
 
-  const executePendingAction = (action: PendingAction) => {
+  const executePendingAction = async (action: PendingAction) => {
     setTotalMismatch(null);
+    // Acquire checkout lock here — AFTER price is confirmed — so the lock doesn't
+    // interfere with the fresh-total verification (pedidos route blocks orders when locked).
+    if (!isInitiatingPayment) {
+      const lockRes = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/lock`, { method: 'POST' });
+      if (lockRes.status === 423) {
+        void refresh();
+        return;
+      }
+      setIsInitiatingPayment(true);
+      try { sessionStorage.setItem(`mesa-lock-${mesaId}`, 'true'); } catch { /* ignore */ }
+    }
     if (action === 'full') {
       void initiateRedsys(false);
     } else if (action === 'division-modal') {
@@ -342,31 +353,27 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
     if (paying || verifyingTotal) return;
     setVerifyingTotal(true);
     try {
-      // Acquire checkout lock — signals all other users on this mesa to redirect to ticket.
-      // Skip if we already own it (e.g. re-checking after a totalMismatch confirmation).
-      if (!isInitiatingPayment) {
-        const lockRes = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/lock`, { method: 'POST' });
-        if (lockRes.status === 423) {
-          void refresh();
-          return;
-        }
-        setIsInitiatingPayment(true);
-        try { sessionStorage.setItem(`mesa-lock-${mesaId}`, 'true'); } catch { /* ignore */ }
-      }
-      // Verify total against fresh DB state
+      // Verify total against fresh DB state — NO LOCK here.
+      // The lock is acquired in executePendingAction, AFTER the price is confirmed,
+      // so it doesn't interfere with the mismatch detection.
       const res = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/orders`);
-      if (!res.ok) { executePendingAction(action); return; }
+      if (!res.ok) { void executePendingAction(action); return; }
       const fresh = await res.json() as MesaSessionData;
+      if (fresh.pagoEnCurso && !isInitiatingPayment) {
+        // Another user already locked — show the external payment banner
+        setSessionData(fresh);
+        return;
+      }
       const currentTotal = sessionData?.total ?? 0;
       if (Math.abs(fresh.total - currentTotal) > 0.005) {
         setSessionData(fresh);
         setTotalMismatch({ oldTotal: currentTotal, newTotal: fresh.total, pendingAction: action });
       } else {
         setSessionData(fresh);
-        executePendingAction(action);
+        void executePendingAction(action);
       }
     } catch {
-      executePendingAction(action);
+      void executePendingAction(action);
     } finally {
       setVerifyingTotal(false);
     }
@@ -665,7 +672,7 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
             )}
 
             {/* Total updated warning */}
-            {totalMismatch && !externalPaymentInProgress && (
+            {totalMismatch && (
               <div
                 className="rounded-2xl p-5 flex flex-col gap-3"
                 style={{ backgroundColor: "#fff8e1", border: "1.5px solid #f59e0b", fontFamily: "monospace" }}
@@ -685,7 +692,7 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
                 <div className="flex gap-2 mt-1">
                   <button
                     type="button"
-                    onClick={() => executePendingAction(totalMismatch.pendingAction)}
+                    onClick={() => { void executePendingAction(totalMismatch.pendingAction); }}
                     className="flex-1 py-3 rounded-xl text-xs font-bold tracking-widest uppercase"
                     style={{ backgroundColor: "#1a1612", color: "#fffcf7" }}
                   >
