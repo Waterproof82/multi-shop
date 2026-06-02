@@ -16,6 +16,7 @@ export interface MesaWithSession {
   sesionId: string | null;
   activeOrderCount: number;
   sessionTotal: number;
+  sesionPagada: boolean;
 }
 
 export interface IMesaRepository {

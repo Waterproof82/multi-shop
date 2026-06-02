@@ -205,7 +205,9 @@ export class SupabaseMesaRepository implements IMesaRepository {
           sesion_id,
           mesa_sesiones!mesas_sesion_id_fkey (
             id,
-            total
+            total,
+            division_personas,
+            division_pagos_realizados
           )
         `)
         .eq('empresa_id', empresaId)
@@ -230,15 +232,26 @@ export class SupabaseMesaRepository implements IMesaRepository {
         .filter((id): id is string => id !== null);
 
       const countBySesion: Record<string, number> = {};
+      const allPaidBySesion: Record<string, boolean> = {};
+
       if (activeSesionIds.length > 0) {
         const { data: pedidosData } = await this.supabase
           .from('pedidos')
-          .select('sesion_id')
+          .select('sesion_id, payment_status')
           .in('sesion_id', activeSesionIds)
           .neq('estado', 'cerrado');
+
+        const pedidosBySesion: Record<string, { payment_status: string | null }[]> = {};
         for (const p of pedidosData ?? []) {
           const sid = p['sesion_id'] as string;
           countBySesion[sid] = (countBySesion[sid] ?? 0) + 1;
+          if (!pedidosBySesion[sid]) pedidosBySesion[sid] = [];
+          pedidosBySesion[sid].push({ payment_status: p['payment_status'] as string | null });
+        }
+
+        for (const sid of activeSesionIds) {
+          const pedidos = pedidosBySesion[sid] ?? [];
+          allPaidBySesion[sid] = pedidos.length > 0 && pedidos.every(p => p.payment_status === 'paid');
         }
       }
 
@@ -248,6 +261,14 @@ export class SupabaseMesaRepository implements IMesaRepository {
           const sesionRaw = row['mesa_sesiones'] as Record<string, unknown> | null;
           const sesionId = (row['sesion_id'] as string | null) ?? null;
 
+          // Division paid: all shares collected
+          const divPersonas = sesionRaw ? ((sesionRaw['division_personas'] as number | null) ?? null) : null;
+          const divPagos    = sesionRaw ? ((sesionRaw['division_pagos_realizados'] as number) ?? 0) : 0;
+          const divisionPaid = divPersonas !== null && divPersonas > 0 && divPagos >= divPersonas;
+
+          // Full payment paid: every pedido in the session has payment_status = 'paid'
+          const fullPaid = sesionId ? (allPaidBySesion[sesionId] ?? false) : false;
+
           return {
             id: row['id'] as string,
             empresaId: row['empresa_id'] as string,
@@ -256,6 +277,7 @@ export class SupabaseMesaRepository implements IMesaRepository {
             sesionId,
             activeOrderCount: sesionId ? (countBySesion[sesionId] ?? 0) : 0,
             sessionTotal: sesionRaw ? (sesionRaw['total'] as number) : 0,
+            sesionPagada: divisionPaid || fullPaid,
           };
         }),
       };
