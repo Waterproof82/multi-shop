@@ -60,7 +60,7 @@ const createPedidoSchema = z.union([
 
 type MesaData = z.infer<typeof mesaPedidoSchema>;
 type DefaultData = z.infer<typeof defaultPedidoSchema>;
-type EmpresaData = NonNullable<Awaited<ReturnType<typeof empresaPublicRepository.findByDomain>>['data']>;
+type EmpresaOrderData = NonNullable<Extract<Awaited<ReturnType<typeof empresaPublicRepository.findByDomain>>, { success: true }>['data']>;
 
 async function checkMesaPaymentLock(mesaId: string): Promise<NextResponse | null> {
   const { getSupabaseClient } = await import('@/core/infrastructure/database/supabase-client');
@@ -85,7 +85,7 @@ async function checkMesaPaymentLock(mesaId: string): Promise<NextResponse | null
   return null;
 }
 
-async function handleMesaOrder(empresa: EmpresaData, data: MesaData): Promise<NextResponse> {
+async function handleMesaOrder(empresa: EmpresaOrderData, data: MesaData): Promise<NextResponse> {
   const mesaResult = await mesaUseCase.getMesa(data.mesa_id);
   if (!mesaResult.success) {
     return NextResponse.json({ error: 'Error al verificar la mesa' }, { status: 500 });
@@ -124,7 +124,7 @@ async function handleMesaOrder(empresa: EmpresaData, data: MesaData): Promise<Ne
   });
 }
 
-async function handleDefaultOrder(empresa: EmpresaData, data: DefaultData, isPedidos: boolean): Promise<NextResponse> {
+async function handleDefaultOrder(empresa: EmpresaOrderData, data: DefaultData, isPedidos: boolean): Promise<NextResponse> {
   const pedidoResult = await pedidoUseCase.create(
     empresa.id,
     data,
