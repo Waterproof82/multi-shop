@@ -195,44 +195,45 @@ export class SupabaseMesaRepository implements IMesaRepository {
 
   async findAllWithSession(empresaId: string): Promise<Result<MesaWithSession[]>> {
     try {
-      const { data, error } = await this.supabase
+      // Step 1: fetch mesas (plain columns — no FK embed to avoid PostgREST join ambiguity)
+      const { data: mesasData, error: mesasError } = await this.supabase
         .from('mesas')
-        .select(`
-          id,
-          empresa_id,
-          numero,
-          nombre,
-          sesion_id,
-          mesa_sesiones!mesas_sesion_id_fkey (
-            id,
-            total,
-            sesion_pagada,
-            pago_en_curso
-          )
-        `)
+        .select('id, empresa_id, numero, nombre, sesion_id')
         .eq('empresa_id', empresaId)
         .order('numero', { ascending: true });
 
-      if (error) {
+      if (mesasError) {
         await logger.logAndReturnError(
           'DB_SELECT_ERROR',
-          error.message,
+          mesasError.message,
           'repository',
           'SupabaseMesaRepository.findAllWithSession',
-          { empresaId, details: { code: error.code } }
+          { empresaId, details: { code: mesasError.code } }
         );
         return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener mesas con sesión', module: 'repository', method: 'findAllWithSession' } };
       }
 
-      const rows = (data ?? []) as Record<string, unknown>[];
-
-      // Count active (non-cerrado) pedidos per session in one query, scoped to current sessions only
+      const rows = (mesasData ?? []) as Record<string, unknown>[];
       const activeSesionIds = rows
         .map(r => r['sesion_id'] as string | null)
         .filter((id): id is string => id !== null);
 
-      const countBySesion: Record<string, number> = {};
+      // Step 2: fetch session data (total, sesion_pagada, pago_en_curso) via direct query
+      type SesionRow = { id: string; total: number; sesion_pagada: boolean; pago_en_curso: boolean };
+      const sesionMap: Record<string, SesionRow> = {};
 
+      if (activeSesionIds.length > 0) {
+        const { data: sesionesData } = await this.supabase
+          .from('mesa_sesiones')
+          .select('id, total, sesion_pagada, pago_en_curso')
+          .in('id', activeSesionIds);
+        for (const s of (sesionesData ?? []) as SesionRow[]) {
+          sesionMap[s.id] = s;
+        }
+      }
+
+      // Step 3: count active (non-cerrado) pedidos per session
+      const countBySesion: Record<string, number> = {};
       if (activeSesionIds.length > 0) {
         const { data: activeData } = await this.supabase
           .from('pedidos')
@@ -248,8 +249,8 @@ export class SupabaseMesaRepository implements IMesaRepository {
       return {
         success: true,
         data: rows.map(row => {
-          const sesionRaw = row['mesa_sesiones'] as Record<string, unknown> | null;
           const sesionId = (row['sesion_id'] as string | null) ?? null;
+          const sesion = sesionId ? sesionMap[sesionId] : null;
 
           return {
             id: row['id'] as string,
@@ -258,9 +259,9 @@ export class SupabaseMesaRepository implements IMesaRepository {
             nombre: (row['nombre'] as string | null) ?? null,
             sesionId,
             activeOrderCount: sesionId ? (countBySesion[sesionId] ?? 0) : 0,
-            sessionTotal: sesionRaw ? (sesionRaw['total'] as number) : 0,
-            sesionPagada: sesionRaw ? ((sesionRaw['sesion_pagada'] as boolean) ?? false) : false,
-            pagoEnCurso: sesionRaw ? ((sesionRaw['pago_en_curso'] as boolean) ?? false) : false,
+            sessionTotal: sesion ? Number(sesion.total) : 0,
+            sesionPagada: sesion ? (sesion.sesion_pagada ?? false) : false,
+            pagoEnCurso: sesion ? (sesion.pago_en_curso ?? false) : false,
           };
         }),
       };
