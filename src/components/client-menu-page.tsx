@@ -141,6 +141,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
   const { clearCart, closeCart } = useCart();
   // Mirror exactly the WaiterBanner condition: waiter_token (server) + mesa selected (sessionStorage)
   const [waiterHasMesa, setWaiterHasMesa] = useState(false);
+  const [waiterMesaLocked, setWaiterMesaLocked] = useState(false);
   const [menuTab, setMenuTab] = useState<'comida' | 'bebidas'>('comida');
   const [mesaEsperandoActivacion, setMesaEsperandoActivacion] = useState(false);
   const [mesaPaymentLocked, setMesaPaymentLocked] = useState(false);
@@ -165,7 +166,9 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
         const pagada = data.sesionPagada === true;
         const enCurso = data.pagoEnCurso === true;
         const divisionActiva = data.division != null;
-        if (!isWaiterMode) {
+        if (isWaiterMode) {
+          if (pagada || enCurso || divisionActiva) setWaiterMesaLocked(true);
+        } else {
           setMesaEsperandoActivacion(pagada);
           if (pagada) {
             clearCart();
@@ -195,7 +198,11 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
         table: 'mesa_sesiones',
         filter: `mesa_id=eq.${mesa}`,
       }, (payload: { new: Record<string, unknown> }) => {
-        if (payload.new['pago_en_curso'] === true && !isWaiterMode) {
+        const pagoEnCurso = payload.new['pago_en_curso'] === true;
+        const sesionPagada = payload.new['sesion_pagada'] === true;
+        if (isWaiterMode) {
+          if (pagoEnCurso || sesionPagada) setWaiterMesaLocked(true);
+        } else if (pagoEnCurso) {
           setMesaPaymentLocked(true);
           clearCart();
           closeCart();
@@ -222,7 +229,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
     return () => window.removeEventListener('popstate', handlePopState);
   }, [mesaEsperandoActivacion]);
 
-  const showWaiterSearch = isWaiterMode && waiterHasMesa;
+  const showWaiterSearch = isWaiterMode && waiterHasMesa && !waiterMesaLocked;
 
   const isRestaurant = empresa?.tipo === 'restaurante';
   const showTabs = isRestaurant && menuData.some(cat => cat.items.some(i => i.tipoProducto === 'bebida'));
