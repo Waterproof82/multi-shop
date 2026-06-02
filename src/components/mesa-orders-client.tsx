@@ -193,8 +193,12 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
     newTotal: number;
     pendingAction: PendingAction;
   } | null>(null);
-  // true while THIS user owns the checkout lock (they clicked "Pagar" / "Dividir cuenta")
-  const [isInitiatingPayment, setIsInitiatingPayment] = useState(false);
+  // true while THIS user owns the checkout lock (they clicked "Pagar" / "Dividir cuenta").
+  // Persisted in sessionStorage so it survives in-app navigation (back button recovery).
+  const [isInitiatingPayment, setIsInitiatingPayment] = useState(() => {
+    try { return sessionStorage.getItem(`mesa-lock-${mesaId}`) === 'true'; }
+    catch { return false; }
+  });
 
   // Derived early so the polling effect can use it as a dependency
   const pagoEnCursoForPoll = sessionData?.pagoEnCurso ?? false;
@@ -209,6 +213,7 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
 
   const releaseCheckoutLock = useCallback(() => {
     setIsInitiatingPayment(false);
+    try { sessionStorage.removeItem(`mesa-lock-${mesaId}`); } catch { /* ignore */ }
     void fetch(`/api/mesas/${encodeURIComponent(mesaId)}/lock`, { method: 'DELETE' }).catch(() => null);
   }, [mesaId]);
 
@@ -329,6 +334,7 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
           return;
         }
         setIsInitiatingPayment(true);
+        try { sessionStorage.setItem(`mesa-lock-${mesaId}`, 'true'); } catch { /* ignore */ }
       }
       // Verify total against fresh DB state
       const res = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/orders`);
@@ -363,16 +369,18 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
   // Exclude: when WE own the lock (isInitiatingPayment) or we're submitting the form (paying).
   const externalPaymentInProgress = (sessionData?.pagoEnCurso ?? false) && !paying && !isInitiatingPayment;
 
-  // Trap the browser back button while someone else's payment is in progress
+  // Trap the browser back button while a payment is in progress —
+  // either this user owns the lock (isInitiatingPayment) or another user does (externalPaymentInProgress).
+  const shouldTrapBack = externalPaymentInProgress || isInitiatingPayment;
   useEffect(() => {
-    if (!externalPaymentInProgress) return;
+    if (!shouldTrapBack) return;
     window.history.pushState({ mesaPaymentWaiting: true }, '', window.location.href);
     const handlePopState = () => {
       window.history.pushState({ mesaPaymentWaiting: true }, '', window.location.href);
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [externalPaymentInProgress]);
+  }, [shouldTrapBack]);
 
   const allItems = sessionData?.orders.flatMap((o) => o.items) ?? [];
 
