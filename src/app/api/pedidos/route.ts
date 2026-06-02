@@ -58,6 +58,98 @@ const createPedidoSchema = z.union([
   defaultPedidoSchema,
 ]);
 
+type MesaData = z.infer<typeof mesaPedidoSchema>;
+type DefaultData = z.infer<typeof defaultPedidoSchema>;
+type EmpresaData = NonNullable<Awaited<ReturnType<typeof empresaPublicRepository.findByDomain>>['data']>;
+
+async function checkMesaPaymentLock(mesaId: string): Promise<NextResponse | null> {
+  const { getSupabaseClient } = await import('@/core/infrastructure/database/supabase-client');
+  const supabase = getSupabaseClient();
+  const { data: sesionLock, error: lockError } = await supabase
+    .from('mesa_sesiones')
+    .select('pago_en_curso, pago_iniciado_en')
+    .eq('mesa_id', mesaId)
+    .is('cerrada_at', null)
+    .maybeSingle();
+  if (lockError) {
+    return NextResponse.json({ error: 'Error al verificar el estado de la mesa.' }, { status: 500 });
+  }
+  const lock = sesionLock as { pago_en_curso: boolean; pago_iniciado_en: string | null } | null;
+  const LOCK_EXPIRY_MS = 15 * 60 * 1000;
+  const lockFresh = lock?.pago_iniciado_en
+    ? Date.now() - new Date(lock.pago_iniciado_en).getTime() < LOCK_EXPIRY_MS
+    : false;
+  if (lock?.pago_en_curso && lockFresh) {
+    return NextResponse.json({ error: 'Hay un pago en curso en esta mesa. Espera a que finalice.' }, { status: 423 });
+  }
+  return null;
+}
+
+async function handleMesaOrder(empresa: EmpresaData, data: MesaData): Promise<NextResponse> {
+  const mesaResult = await mesaUseCase.getMesa(data.mesa_id);
+  if (!mesaResult.success) {
+    return NextResponse.json({ error: 'Error al verificar la mesa' }, { status: 500 });
+  }
+  if (!mesaResult.data) {
+    return NextResponse.json({ error: 'Mesa no encontrada' }, { status: 404 });
+  }
+
+  const lockResponse = await checkMesaPaymentLock(data.mesa_id);
+  if (lockResponse) return lockResponse;
+
+  const pedidoResult = await pedidoUseCase.createMesaOrder(
+    empresa.id,
+    { items: data.items, mesa_id: data.mesa_id, idioma: data.idioma },
+    mesaResult.data.numero,
+    mesaResult.data.nombre,
+    empresa.telegram_mesa_chat_id ?? null,
+    empresa.telegram_chat_id ?? null,
+    empresa.telegram_bebidas_chat_id ?? null
+  );
+
+  if (!pedidoResult.success) {
+    const errorCode = pedidoResult.error.code;
+    if (['PRODUCT_NOT_FOUND', 'INVALID_UUID'].includes(errorCode)) {
+      return NextResponse.json({ error: pedidoResult.error.message }, { status: 400 });
+    }
+    return NextResponse.json({ error: 'Error al crear el pedido de mesa' }, { status: 500 });
+  }
+
+  return NextResponse.json({
+    success: true,
+    numeroPedido: pedidoResult.data.numero_pedido,
+    pedidoId: pedidoResult.data.id,
+    tipo: 'mesa',
+    trackingToken: pedidoResult.data.trackingToken,
+  });
+}
+
+async function handleDefaultOrder(empresa: EmpresaData, data: DefaultData, isPedidos: boolean): Promise<NextResponse> {
+  const pedidoResult = await pedidoUseCase.create(
+    empresa.id,
+    data,
+    empresa.tipo ?? 'tienda',
+    empresa.telegram_chat_id ?? null,
+    isPedidos
+  );
+
+  if (!pedidoResult.success) {
+    const errorCode = pedidoResult.error.code;
+    if (['PRODUCT_NOT_FOUND', 'CODE_EXPIRED', 'CODE_ALREADY_USED', 'EMAIL_MISMATCH'].includes(errorCode)) {
+      return NextResponse.json({ error: pedidoResult.error.message }, { status: 400 });
+    }
+    return NextResponse.json({ error: 'Error al crear el pedido' }, { status: 500 });
+  }
+
+  const { id: pedidoId, numero_pedido: numeroPedido, trackingToken } = pedidoResult.data;
+  return NextResponse.json({
+    success: true,
+    numeroPedido,
+    pedidoId,
+    tipo: empresa.tipo ?? 'tienda',
+    ...(trackingToken && { trackingToken }),
+  });
+}
 
 export async function POST(request: Request) {
   const rateLimited = await rateLimitPublic(request);
@@ -80,102 +172,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
-  // Try discriminated union first; fall back to legacy schema (no `tipo` field)
   const parsed = createPedidoSchema.safeParse(body);
-
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
   }
 
   const data = parsed.data;
-
-  // Mesa path
-  if (data.tipo === 'mesa') {
-    // Fetch mesa to get numero/nombre for Telegram message
-    const mesaResult = await mesaUseCase.getMesa(data.mesa_id);
-    if (!mesaResult.success) {
-      return NextResponse.json({ error: 'Error al verificar la mesa' }, { status: 500 });
-    }
-    if (!mesaResult.data) {
-      return NextResponse.json({ error: 'Mesa no encontrada' }, { status: 404 });
-    }
-
-    const mesa = mesaResult.data;
-
-    // Reject new orders while a payment is in progress (lock expires after 15 min)
-    {
-      const { getSupabaseClient } = await import('@/core/infrastructure/database/supabase-client');
-      const supabaseAdmin = getSupabaseClient();
-      const { data: sesionLock, error: lockError } = await supabaseAdmin
-        .from('mesa_sesiones')
-        .select('pago_en_curso, pago_iniciado_en')
-        .eq('mesa_id', data.mesa_id)
-        .is('cerrada_at', null)
-        .maybeSingle();
-      if (lockError) {
-        return NextResponse.json({ error: 'Error al verificar el estado de la mesa.' }, { status: 500 });
-      }
-      const lock = sesionLock as { pago_en_curso: boolean; pago_iniciado_en: string | null } | null;
-      const LOCK_EXPIRY_MS = 15 * 60 * 1000;
-      const lockFresh = lock?.pago_iniciado_en
-        ? Date.now() - new Date(lock.pago_iniciado_en).getTime() < LOCK_EXPIRY_MS
-        : false;
-      if (lock?.pago_en_curso && lockFresh) {
-        return NextResponse.json({ error: 'Hay un pago en curso en esta mesa. Espera a que finalice.' }, { status: 423 });
-      }
-    }
-
-    const pedidoResult = await pedidoUseCase.createMesaOrder(
-      empresa.id,
-      { items: data.items, mesa_id: data.mesa_id, idioma: data.idioma },
-      mesa.numero,
-      mesa.nombre,
-      empresa.telegram_mesa_chat_id ?? null,
-      empresa.telegram_chat_id ?? null,
-      empresa.telegram_bebidas_chat_id ?? null
-    );
-
-    if (!pedidoResult.success) {
-      const errorCode = pedidoResult.error.code;
-      if (['PRODUCT_NOT_FOUND', 'INVALID_UUID'].includes(errorCode)) {
-        return NextResponse.json({ error: pedidoResult.error.message }, { status: 400 });
-      }
-      return NextResponse.json({ error: 'Error al crear el pedido de mesa' }, { status: 500 });
-    }
-
-    return NextResponse.json({
-      success: true,
-      numeroPedido: pedidoResult.data.numero_pedido,
-      pedidoId: pedidoResult.data.id,
-      tipo: 'mesa',
-      trackingToken: pedidoResult.data.trackingToken,
-    });
-  }
-
-  // Standard restaurante/tienda path
-  const pedidoResult = await pedidoUseCase.create(
-    empresa.id,
-    data,
-    empresa.tipo ?? 'tienda',
-    empresa.telegram_chat_id ?? null,
-    isPedidos
-  );
-
-  if (!pedidoResult.success) {
-    const errorCode = pedidoResult.error.code;
-    if (['PRODUCT_NOT_FOUND', 'CODE_EXPIRED', 'CODE_ALREADY_USED', 'EMAIL_MISMATCH'].includes(errorCode)) {
-      return NextResponse.json({ error: pedidoResult.error.message }, { status: 400 });
-    }
-    return NextResponse.json({ error: 'Error al crear el pedido' }, { status: 500 });
-  }
-
-  const { id: pedidoId, numero_pedido: numeroPedido, trackingToken } = pedidoResult.data;
-
-  return NextResponse.json({
-    success: true,
-    numeroPedido,
-    pedidoId,
-    tipo: empresa.tipo ?? 'tienda',
-    ...(trackingToken && { trackingToken }),
-  });
+  if (data.tipo === 'mesa') return handleMesaOrder(empresa, data);
+  return handleDefaultOrder(empresa, data, isPedidos);
 }
