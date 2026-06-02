@@ -41,7 +41,8 @@ export async function GET(
 
 /**
  * POST — claim the payment lock for this mesa.
- * Returns 423 if another fresh lock is already active.
+ * Uses an atomic DB-level CAS via acquire_mesa_lock() to eliminate the
+ * read-then-write race condition. Returns 423 if another fresh lock is active.
  */
 export async function POST(
   _request: Request,
@@ -52,27 +53,17 @@ export async function POST(
 
   const supabase = getSupabaseClient();
 
-  const { data: row } = await supabase
-    .from('mesa_sesiones')
-    .select('pago_en_curso, pago_iniciado_en')
-    .eq('mesa_id', parsed.data)
-    .is('cerrada_at', null)
-    .maybeSingle();
+  const { data: acquired, error } = await supabase.rpc('acquire_mesa_lock', {
+    p_mesa_id: parsed.data,
+  });
 
-  const lock = row as LockRow;
-  const lockAge = lock?.pago_iniciado_en
-    ? Date.now() - new Date(lock.pago_iniciado_en).getTime()
-    : Infinity;
-
-  if (lock?.pago_en_curso && lockAge < LOCK_EXPIRY_MS) {
-    return NextResponse.json({ error: 'Hay un pago en curso en esta mesa.' }, { status: 423 });
+  if (error) {
+    return NextResponse.json({ error: 'DB error acquiring lock' }, { status: 500 });
   }
 
-  await supabase
-    .from('mesa_sesiones')
-    .update({ pago_en_curso: true, pago_iniciado_en: new Date().toISOString() })
-    .eq('mesa_id', parsed.data)
-    .is('cerrada_at', null);
+  if (!acquired) {
+    return NextResponse.json({ error: 'Hay un pago en curso en esta mesa.' }, { status: 423 });
+  }
 
   return NextResponse.json({ ok: true });
 }

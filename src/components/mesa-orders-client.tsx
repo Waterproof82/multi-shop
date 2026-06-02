@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { formatPrice } from "@/lib/format-price";
+import { getWaiterMesa } from "@/components/waiter-login-form";
 
 interface OrderItem {
   nombre: string;
@@ -208,6 +209,13 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
     try { return sessionStorage.getItem(`mesa-lock-${mesaId}`) === 'true'; }
     catch { return false; }
   });
+
+  // True when the current session belongs to a waiter impersonating this table.
+  // Waiters should not see payment buttons — the customer pays, not the waiter.
+  const isWaiterMode = (() => {
+    try { return getWaiterMesa()?.mesaId === mesaId; }
+    catch { return false; }
+  })();
 
   // Derived early so the polling effect can use it as a dependency
   const pagoEnCursoForPoll = sessionData?.pagoEnCurso ?? false;
@@ -726,7 +734,7 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
             )}
 
             {/* Buttons */}
-            {!division && !fullyPaid && !totalMismatch && !externalPaymentInProgress && (
+            {!division && !fullyPaid && !totalMismatch && !externalPaymentInProgress && !isWaiterMode && (
               <div className="flex gap-3">
                 {/* Pagar total */}
                 <button
@@ -758,7 +766,7 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
             )}
 
             {/* Pagar mi parte */}
-            {division && !fullyPaid && !totalMismatch && !externalPaymentInProgress && (
+            {division && !fullyPaid && !totalMismatch && !externalPaymentInProgress && !isWaiterMode && (
               <button
                 type="button"
                 onClick={() => { void handlePrePaymentCheck('division-pay'); }}
