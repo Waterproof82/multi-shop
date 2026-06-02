@@ -216,7 +216,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
       {/* Mesa waiting-for-activation overlay */}
       {mesaEsperandoActivacion && (
         <div
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 px-8 text-center"
+          className="fixed inset-0 z-[200] flex flex-col items-center justify-center gap-6 px-8 text-center"
           style={{ backgroundColor: 'rgba(10, 8, 6, 0.95)' }}
           aria-live="polite"
         >
@@ -289,7 +289,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
             <div id="menu-content" className="container mx-auto max-w-6xl px-4 py-8 md:px-6">
               <div className="space-y-12 md:space-y-16">
                 {visibleCategories.map((category, index) => (
-                  <MenuSection key={category.id} category={category} showCart={showCart && !mesaPaymentLocked} priority={index === 0} hideImages={showWaiterSearch} />
+                  <MenuSection key={category.id} category={category} showCart={showCart && !mesaPaymentLocked && !mesaEsperandoActivacion} priority={index === 0} hideImages={showWaiterSearch} />
                 ))}
               </div>
             </div>
@@ -312,8 +312,8 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
           idioma={language}
         />
       )}
-      {/* Only render cart components when needed */}
-      {showCart && (
+      {/* Only render cart components when needed — suppress entirely when mesa is fully paid */}
+      {showCart && !mesaEsperandoActivacion && (
         <>
           <CartDrawer isRestaurant={empresa?.tipo === 'restaurante'} />
           {!mesaPaymentLocked && <CartToast />}
