@@ -192,7 +192,16 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
     oldTotal: number;
     newTotal: number;
     pendingAction: PendingAction;
-  } | null>(null);
+  } | null>(() => {
+    // Restore mismatch warning if the payer navigated away and came back (back button)
+    try {
+      if (sessionStorage.getItem(`mesa-lock-${mesaId}`) === 'true') {
+        const stored = sessionStorage.getItem(`mesa-mismatch-${mesaId}`);
+        if (stored) return JSON.parse(stored) as { oldTotal: number; newTotal: number; pendingAction: PendingAction };
+      }
+    } catch { /* ignore */ }
+    return null;
+  });
   // true while THIS user owns the checkout lock (they clicked "Pagar" / "Dividir cuenta").
   // Persisted in sessionStorage so it survives in-app navigation (back button recovery).
   const [isInitiatingPayment, setIsInitiatingPayment] = useState(() => {
@@ -213,7 +222,10 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
 
   const releaseCheckoutLock = useCallback(() => {
     setIsInitiatingPayment(false);
-    try { sessionStorage.removeItem(`mesa-lock-${mesaId}`); } catch { /* ignore */ }
+    try {
+      sessionStorage.removeItem(`mesa-lock-${mesaId}`);
+      sessionStorage.removeItem(`mesa-mismatch-${mesaId}`);
+    } catch { /* ignore */ }
     void fetch(`/api/mesas/${encodeURIComponent(mesaId)}/lock`, { method: 'DELETE' }).catch(() => null);
   }, [mesaId]);
 
@@ -308,7 +320,9 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
         const currentTotal = sessionData?.total ?? 0;
         if (Math.abs(fresh.total - currentTotal) > 0.005) {
           setSessionData(fresh);
-          setTotalMismatch({ oldTotal: currentTotal, newTotal: fresh.total, pendingAction: 'division-modal' });
+          const mismatch = { oldTotal: currentTotal, newTotal: fresh.total, pendingAction: 'division-modal' as PendingAction };
+          setTotalMismatch(mismatch);
+          try { sessionStorage.setItem(`mesa-mismatch-${mesaId}`, JSON.stringify(mismatch)); } catch { /* ignore */ }
           return;
         }
         setSessionData(fresh);
@@ -327,35 +341,9 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
     }
   };
 
-  const executePendingAction = async (action: PendingAction) => {
+  const executePendingAction = (action: PendingAction) => {
     setTotalMismatch(null);
-    // Acquire checkout lock AFTER price is confirmed — the lock blocks new orders,
-    // so the fresh-total verification in handlePrePaymentCheck sees the real DB state.
-    if (!isInitiatingPayment) {
-      const lockRes = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/lock`, { method: 'POST' });
-      if (lockRes.status === 423) {
-        void refresh();
-        return;
-      }
-      setIsInitiatingPayment(true);
-      try { sessionStorage.setItem(`mesa-lock-${mesaId}`, 'true'); } catch { /* ignore */ }
-
-      // Re-verify after acquiring the lock — catches any orders added between the initial
-      // pre-check and now. Skip for division-modal: handleConfirmDivision re-checks there.
-      if (action !== 'division-modal') {
-        const checkRes = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/orders`);
-        if (checkRes.ok) {
-          const fresh = await checkRes.json() as MesaSessionData;
-          const currentTotal = sessionData?.total ?? 0;
-          if (Math.abs(fresh.total - currentTotal) > 0.005) {
-            setSessionData(fresh);
-            setTotalMismatch({ oldTotal: currentTotal, newTotal: fresh.total, pendingAction: action });
-            return;
-          }
-          setSessionData(fresh);
-        }
-      }
-    }
+    try { sessionStorage.removeItem(`mesa-mismatch-${mesaId}`); } catch { /* ignore */ }
     if (action === 'full') {
       void initiateRedsys(false);
     } else if (action === 'division-modal') {
@@ -369,27 +357,33 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
     if (paying || verifyingTotal) return;
     setVerifyingTotal(true);
     try {
-      // Verify total against fresh DB state — NO LOCK here.
-      // The lock is acquired in executePendingAction, AFTER the price is confirmed,
-      // so it doesn't interfere with the mismatch detection.
-      const res = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/orders`);
-      if (!res.ok) { void executePendingAction(action); return; }
-      const fresh = await res.json() as MesaSessionData;
-      if (fresh.pagoEnCurso && !isInitiatingPayment) {
-        // Another user already locked — show the external payment banner
-        setSessionData(fresh);
-        return;
+      // Acquire checkout lock — signals all other users on this mesa to redirect to ticket.
+      // Skip if we already own it (e.g. re-checking after a totalMismatch confirmation).
+      if (!isInitiatingPayment) {
+        const lockRes = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/lock`, { method: 'POST' });
+        if (lockRes.status === 423) {
+          void refresh();
+          return;
+        }
+        setIsInitiatingPayment(true);
+        try { sessionStorage.setItem(`mesa-lock-${mesaId}`, 'true'); } catch { /* ignore */ }
       }
+      // Verify total against fresh DB state
+      const res = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/orders`);
+      if (!res.ok) { executePendingAction(action); return; }
+      const fresh = await res.json() as MesaSessionData;
       const currentTotal = sessionData?.total ?? 0;
       if (Math.abs(fresh.total - currentTotal) > 0.005) {
         setSessionData(fresh);
-        setTotalMismatch({ oldTotal: currentTotal, newTotal: fresh.total, pendingAction: action });
+        const mismatch = { oldTotal: currentTotal, newTotal: fresh.total, pendingAction: action };
+        setTotalMismatch(mismatch);
+        try { sessionStorage.setItem(`mesa-mismatch-${mesaId}`, JSON.stringify(mismatch)); } catch { /* ignore */ }
       } else {
         setSessionData(fresh);
-        void executePendingAction(action);
+        executePendingAction(action);
       }
     } catch {
-      void executePendingAction(action);
+      executePendingAction(action);
     } finally {
       setVerifyingTotal(false);
     }
@@ -409,17 +403,18 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
   // Exclude: when WE own the lock (isInitiatingPayment) or we're submitting the form (paying).
   const externalPaymentInProgress = (sessionData?.pagoEnCurso ?? false) && !paying && !isInitiatingPayment;
 
-  // Trap the browser back button only for OTHER users watching a payment in progress.
-  // The payer is free to navigate away — unmount cleanup releases the lock automatically.
+  // Trap the browser back button while a payment is in progress —
+  // either this user owns the lock (isInitiatingPayment) or another user does (externalPaymentInProgress).
+  const shouldTrapBack = externalPaymentInProgress || isInitiatingPayment;
   useEffect(() => {
-    if (!externalPaymentInProgress) return;
+    if (!shouldTrapBack) return;
     window.history.pushState({ mesaPaymentWaiting: true }, '', window.location.href);
     const handlePopState = () => {
       window.history.pushState({ mesaPaymentWaiting: true }, '', window.location.href);
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [externalPaymentInProgress]);
+  }, [shouldTrapBack]);
 
   const allItems = sessionData?.orders.flatMap((o) => o.items) ?? [];
 
