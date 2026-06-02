@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
@@ -226,6 +226,23 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
     return () => clearInterval(interval);
   }, [refresh, pagoEnCursoForPoll]);
 
+  // Refs to read current state in the unmount cleanup (avoids stale closures)
+  const isInitiatingPaymentRef = useRef(isInitiatingPayment);
+  const payingRef = useRef(paying);
+  useEffect(() => { isInitiatingPaymentRef.current = isInitiatingPayment; }, [isInitiatingPayment]);
+  useEffect(() => { payingRef.current = paying; }, [paying]);
+
+  // If the payer navigates away while owning the lock (but before reaching Redsys),
+  // release the lock so others aren't stuck. If paying=true, they're at Redsys — keep the lock.
+  useEffect(() => {
+    return () => {
+      if (isInitiatingPaymentRef.current && !payingRef.current) {
+        try { sessionStorage.removeItem(`mesa-lock-${mesaId}`); } catch { /* */ }
+        void fetch(`/api/mesas/${encodeURIComponent(mesaId)}/lock`, { method: 'DELETE' }).catch(() => null);
+      }
+    };
+  }, [mesaId]);
+
   useEffect(() => {
     fetch(`/api/mesas?token=${encodeURIComponent(mesaId)}`)
       .then(r => r.ok ? r.json() : null)
@@ -369,18 +386,17 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
   // Exclude: when WE own the lock (isInitiatingPayment) or we're submitting the form (paying).
   const externalPaymentInProgress = (sessionData?.pagoEnCurso ?? false) && !paying && !isInitiatingPayment;
 
-  // Trap the browser back button while a payment is in progress —
-  // either this user owns the lock (isInitiatingPayment) or another user does (externalPaymentInProgress).
-  const shouldTrapBack = externalPaymentInProgress || isInitiatingPayment;
+  // Trap the browser back button only for OTHER users watching a payment in progress.
+  // The payer is free to navigate away — unmount cleanup releases the lock automatically.
   useEffect(() => {
-    if (!shouldTrapBack) return;
+    if (!externalPaymentInProgress) return;
     window.history.pushState({ mesaPaymentWaiting: true }, '', window.location.href);
     const handlePopState = () => {
       window.history.pushState({ mesaPaymentWaiting: true }, '', window.location.href);
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [shouldTrapBack]);
+  }, [externalPaymentInProgress]);
 
   const allItems = sessionData?.orders.flatMap((o) => o.items) ?? [];
 
