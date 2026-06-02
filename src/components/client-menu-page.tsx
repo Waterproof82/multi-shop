@@ -163,13 +163,14 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
         if (!res.ok) return;
         const data = await res.json() as { sesionPagada?: boolean; pagoEnCurso?: boolean; division?: unknown };
         const pagada = data.sesionPagada === true;
+        const enCurso = data.pagoEnCurso === true;
         const divisionActiva = data.division != null;
         if (!isWaiterMode) {
           setMesaEsperandoActivacion(pagada);
           if (pagada) {
             clearCart();
             closeCart();
-          } else if (divisionActiva) {
+          } else if (enCurso || divisionActiva) {
             setMesaPaymentLocked(true);
             clearCart();
             closeCart();

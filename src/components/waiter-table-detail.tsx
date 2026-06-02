@@ -26,6 +26,7 @@ interface MesaSessionData {
   orders: MesaOrder[];
   sesionId: string | null;
   total: number;
+  sesionPagada: boolean;
 }
 
 interface CartItem {
@@ -163,6 +164,7 @@ export function WaiterTableDetail({ mesaId }: WaiterTableDetailProps) {
   }
 
   const isOpen = !!(sessionData?.sesionId);
+  const isPaid = sessionData?.sesionPagada === true;
   const cartTotal = cart.reduce((sum, ci) => sum + ci.product.precio * ci.quantity, 0);
 
   if (loading) {
@@ -200,83 +202,97 @@ export function WaiterTableDetail({ mesaId }: WaiterTableDetailProps) {
   // Open table: search replaces banner
   return (
     <div className="max-w-lg mx-auto flex flex-col gap-4">
-      {/* Search input — replaces top banner */}
-      <div className="relative">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
-          🔍
-        </span>
-        <input
-          type="search"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Buscar producto..."
-          className="w-full pl-9 pr-4 py-3 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-        />
-      </div>
-
-      {/* Inline product list */}
-      <div className="flex flex-col gap-2">
-        {productosLoading ? (
-          <div className="flex justify-center py-6">
-            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : filteredProductos.length === 0 ? (
-          search ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              Sin resultados para &ldquo;{search}&rdquo;
-            </p>
-          ) : null
-        ) : (
-          filteredProductos.map(product => {
-            const qty = cart.find(ci => ci.product.id === product.id)?.quantity ?? 0;
-            return (
-              <div
-                key={product.id}
-                className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2"
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{product.titulo_es}</p>
-                  <p className="text-xs text-muted-foreground">{formatPrice(product.precio, "EUR", lang)}</p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => adjustQuantity(product, -1)}
-                    disabled={qty === 0}
-                    aria-label={t("reduceQuantity", lang)}
-                    className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-border text-foreground disabled:opacity-30 hover:bg-muted transition-colors"
-                  >
-                    −
-                  </button>
-                  <span className="w-6 text-center text-sm font-semibold text-foreground">{qty}</span>
-                  <button
-                    onClick={() => adjustQuantity(product, 1)}
-                    aria-label={t("increaseQuantity", lang)}
-                    className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-border text-foreground hover:bg-muted transition-colors"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      {/* Cart summary + confirm */}
-      {cart.length > 0 && (
-        <div className="rounded-xl border border-border bg-card p-4 flex flex-col gap-3">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">{t("waiterTotal", lang)}</span>
-            <span className="font-bold text-foreground">{formatPrice(cartTotal, "EUR", lang)}</span>
-          </div>
-          <button
-            onClick={handleConfirmOrder}
-            disabled={orderLoading}
-            className="min-h-[44px] w-full rounded-lg bg-[var(--color-primary)] text-[var(--color-primary-foreground)] font-semibold text-sm disabled:opacity-50 transition-opacity hover:opacity-90"
-          >
-            {orderLoading ? t("loading", lang) : t("confirmOrder", lang)}
-          </button>
+      {/* Paid badge — shown instead of catalog when session is fully paid */}
+      {isPaid && (
+        <div className="flex items-center gap-2 rounded-xl border px-4 py-3" style={{ borderColor: 'oklch(60% 0.19 62 / 0.4)', backgroundColor: 'oklch(20% 0.06 62)' }}>
+          <span style={{ color: 'oklch(70% 0.19 62)' }}>✓</span>
+          <span className="text-sm font-semibold" style={{ color: 'oklch(70% 0.19 62)' }}>
+            Cuenta pagada
+          </span>
         </div>
+      )}
+
+      {/* Search input + product list — hidden when session is paid */}
+      {!isPaid && (
+        <>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
+              🔍
+            </span>
+            <input
+              type="search"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar producto..."
+              className="w-full pl-9 pr-4 py-3 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            />
+          </div>
+
+          {/* Inline product list */}
+          <div className="flex flex-col gap-2">
+            {productosLoading ? (
+              <div className="flex justify-center py-6">
+                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : filteredProductos.length === 0 ? (
+              search ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Sin resultados para &ldquo;{search}&rdquo;
+                </p>
+              ) : null
+            ) : (
+              filteredProductos.map(product => {
+                const qty = cart.find(ci => ci.product.id === product.id)?.quantity ?? 0;
+                return (
+                  <div
+                    key={product.id}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{product.titulo_es}</p>
+                      <p className="text-xs text-muted-foreground">{formatPrice(product.precio, "EUR", lang)}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => adjustQuantity(product, -1)}
+                        disabled={qty === 0}
+                        aria-label={t("reduceQuantity", lang)}
+                        className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-border text-foreground disabled:opacity-30 hover:bg-muted transition-colors"
+                      >
+                        −
+                      </button>
+                      <span className="w-6 text-center text-sm font-semibold text-foreground">{qty}</span>
+                      <button
+                        onClick={() => adjustQuantity(product, 1)}
+                        aria-label={t("increaseQuantity", lang)}
+                        className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-border text-foreground hover:bg-muted transition-colors"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Cart summary + confirm */}
+          {cart.length > 0 && (
+            <div className="rounded-xl border border-border bg-card p-4 flex flex-col gap-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">{t("waiterTotal", lang)}</span>
+                <span className="font-bold text-foreground">{formatPrice(cartTotal, "EUR", lang)}</span>
+              </div>
+              <button
+                onClick={handleConfirmOrder}
+                disabled={orderLoading}
+                className="min-h-[44px] w-full rounded-lg bg-[var(--color-primary)] text-[var(--color-primary-foreground)] font-semibold text-sm disabled:opacity-50 transition-opacity hover:opacity-90"
+              >
+                {orderLoading ? t("loading", lang) : t("confirmOrder", lang)}
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {/* Running session total */}

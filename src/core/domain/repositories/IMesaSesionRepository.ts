@@ -16,6 +16,7 @@ export interface MesaSesion {
   pendingTotal: number;
   cerradaAt: string | null;
   createdAt: string;
+  sesionPagada: boolean;
 }
 
 export interface IMesaSesionRepository {

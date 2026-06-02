@@ -45,5 +45,5 @@ export async function GET(
 
   const total = ordersResult.data.reduce((sum, o) => sum + Number(o.total), 0);
 
-  return NextResponse.json({ orders, sesionId: sesion.id, total });
+  return NextResponse.json({ orders, sesionId: sesion.id, total, sesionPagada: sesion.sesionPagada });
 }

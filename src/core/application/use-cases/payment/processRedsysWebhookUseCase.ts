@@ -150,6 +150,11 @@ export async function processRedsysWebhookUseCase(
             .eq('sesion_id', dp.sesion_id)
             .eq('empresa_id', dp.empresa_id);
 
+          await supabase
+            .from('mesa_sesiones')
+            .update({ sesion_pagada: true })
+            .eq('id', dp.sesion_id);
+
           if (bebidasChatId) {
             const { sendTelegramPagoMesaCompleto } = await import('@/core/infrastructure/services/telegram.service');
             const { mesaNumero, mesaNombre, sessionTotal } = await fetchMesaContext(dp.sesion_id, dp.empresa_id);
@@ -199,6 +204,11 @@ export async function processRedsysWebhookUseCase(
         .update({ payment_status: 'paid' })
         .eq('sesion_id', sesionId)
         .eq('empresa_id', input.empresaId);
+
+      await supabase
+        .from('mesa_sesiones')
+        .update({ sesion_pagada: true })
+        .eq('id', sesionId);
 
       if (bebidasChatId) {
         const { sendTelegramPagoMesaCompleto } = await import('@/core/infrastructure/services/telegram.service');
