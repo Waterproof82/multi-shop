@@ -54,6 +54,7 @@ export function WaiterTablesGrid({ mesas: initialMesas }: WaiterTablesGridProps)
           mesa={mesa}
           isOpen={!!mesa.sesionId}
           isPaid={mesa.sesionPagada}
+          isPaymentInProgress={mesa.pagoEnCurso && !mesa.sesionPagada}
           onClick={() => router.push(`/waiter/tables/${mesa.id}`)}
         />
       ))}
@@ -65,43 +66,46 @@ interface TableCardProps {
   mesa: MesaWithSession;
   isOpen: boolean;
   isPaid: boolean;
+  isPaymentInProgress: boolean;
   onClick: () => void;
 }
 
-function TableCard({ mesa, isOpen, isPaid, onClick }: TableCardProps) {
-  const statusLabel = isPaid ? "pagada" : isOpen ? "ocupada" : "libre";
+function TableCard({ mesa, isOpen, isPaid, isPaymentInProgress, onClick }: TableCardProps) {
+  const statusLabel = isPaid ? "pagada" : isPaymentInProgress ? "pago en curso" : isOpen ? "ocupada" : "libre";
 
-  const cardBg = isPaid
+  const isAmber = isPaid || isPaymentInProgress;
+
+  const cardBg = isAmber
     ? "oklch(20% 0.06 62 / 0.7)"
     : isOpen
       ? "oklch(20% 0.06 148 / 0.7)"
       : "oklch(20% 0.025 252 / 0.7)";
 
-  const cardBorder = isPaid
+  const cardBorder = isAmber
     ? "1px solid oklch(55% 0.18 62 / 0.5)"
     : isOpen
       ? "1px solid oklch(55% 0.18 148 / 0.5)"
       : "1px solid oklch(35% 0.04 252 / 0.6)";
 
-  const cardShadow = isPaid
+  const cardShadow = isAmber
     ? "0 0 18px oklch(55% 0.18 62 / 0.15), inset 0 1px 0 oklch(70% 0.15 62 / 0.1)"
     : isOpen
       ? "0 0 18px oklch(55% 0.18 148 / 0.15), inset 0 1px 0 oklch(70% 0.15 148 / 0.1)"
       : "inset 0 1px 0 oklch(100% 0 0 / 0.04)";
 
-  const iconColor = isPaid
+  const iconColor = isAmber
     ? "oklch(65% 0.16 62)"
     : isOpen
       ? "oklch(65% 0.16 148)"
       : "oklch(42% 0.06 252)";
 
-  const numberColor = isPaid
+  const numberColor = isAmber
     ? "oklch(92% 0.04 62)"
     : isOpen
       ? "oklch(92% 0.04 148)"
       : "oklch(80% 0.03 252)";
 
-  const nameColor = isPaid
+  const nameColor = isAmber
     ? "oklch(60% 0.10 62)"
     : isOpen
       ? "oklch(60% 0.10 148)"
@@ -116,7 +120,7 @@ function TableCard({ mesa, isOpen, isPaid, onClick }: TableCardProps) {
     >
       {/* Status dot */}
       <div className="absolute top-3 right-3">
-        {isPaid ? (
+        {isAmber ? (
           <span
             className="block h-2.5 w-2.5 rounded-full"
             style={{ backgroundColor: "oklch(70% 0.19 62)" }}
@@ -168,6 +172,18 @@ function TableCard({ mesa, isOpen, isPaid, onClick }: TableCardProps) {
               style={{ background: "oklch(30% 0.10 62 / 0.6)", color: "oklch(82% 0.18 62)" }}
             >
               Pagada
+            </span>
+            <span className="text-[10px] font-medium" style={{ color: "oklch(58% 0.10 62)" }}>
+              {formatPrice(mesa.sessionTotal)}
+            </span>
+          </>
+        ) : isPaymentInProgress ? (
+          <>
+            <span
+              className="text-[11px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-full"
+              style={{ background: "oklch(30% 0.10 62 / 0.6)", color: "oklch(82% 0.18 62)" }}
+            >
+              En pago
             </span>
             <span className="text-[10px] font-medium" style={{ color: "oklch(58% 0.10 62)" }}>
               {formatPrice(mesa.sessionTotal)}

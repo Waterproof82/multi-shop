@@ -17,6 +17,7 @@ export interface MesaWithSession {
   activeOrderCount: number;
   sessionTotal: number;
   sesionPagada: boolean;
+  pagoEnCurso: boolean;
 }
 
 export interface IMesaRepository {

@@ -94,7 +94,7 @@ export class SupabaseMesaSesionRepository implements IMesaSesionRepository {
     try {
       const { data, error } = await this.supabase
         .from('mesa_sesiones')
-        .select('id, mesa_id, empresa_id, total, pending_items, pending_total, cerrada_at, created_at, sesion_pagada')
+        .select('id, mesa_id, empresa_id, total, pending_items, pending_total, cerrada_at, created_at, sesion_pagada, pago_en_curso')
         .eq('mesa_id', mesaId)
         .is('cerrada_at', null)
         .maybeSingle();
@@ -125,6 +125,7 @@ export class SupabaseMesaSesionRepository implements IMesaSesionRepository {
           cerradaAt: (row['cerrada_at'] as string | null) ?? null,
           createdAt: row['created_at'] as string,
           sesionPagada: (row['sesion_pagada'] as boolean) ?? false,
+          pagoEnCurso: (row['pago_en_curso'] as boolean) ?? false,
         },
       };
     } catch (e) {
@@ -137,7 +138,7 @@ export class SupabaseMesaSesionRepository implements IMesaSesionRepository {
     try {
       const { data, error } = await this.supabase
         .from('mesa_sesiones')
-        .select('id, mesa_id, empresa_id, total, pending_items, pending_total, cerrada_at, created_at, sesion_pagada')
+        .select('id, mesa_id, empresa_id, total, pending_items, pending_total, cerrada_at, created_at, sesion_pagada, pago_en_curso')
         .eq('id', sesionId)
         .maybeSingle();
 
@@ -167,6 +168,7 @@ export class SupabaseMesaSesionRepository implements IMesaSesionRepository {
           cerradaAt: (row['cerrada_at'] as string | null) ?? null,
           createdAt: row['created_at'] as string,
           sesionPagada: (row['sesion_pagada'] as boolean) ?? false,
+          pagoEnCurso: (row['pago_en_curso'] as boolean) ?? false,
         },
       };
     } catch (e) {

@@ -206,7 +206,8 @@ export class SupabaseMesaRepository implements IMesaRepository {
           mesa_sesiones!mesas_sesion_id_fkey (
             id,
             total,
-            sesion_pagada
+            sesion_pagada,
+            pago_en_curso
           )
         `)
         .eq('empresa_id', empresaId)
@@ -259,6 +260,7 @@ export class SupabaseMesaRepository implements IMesaRepository {
             activeOrderCount: sesionId ? (countBySesion[sesionId] ?? 0) : 0,
             sessionTotal: sesionRaw ? (sesionRaw['total'] as number) : 0,
             sesionPagada: sesionRaw ? ((sesionRaw['sesion_pagada'] as boolean) ?? false) : false,
+            pagoEnCurso: sesionRaw ? ((sesionRaw['pago_en_curso'] as boolean) ?? false) : false,
           };
         }),
       };

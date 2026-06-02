@@ -17,6 +17,7 @@ export interface MesaSesion {
   cerradaAt: string | null;
   createdAt: string;
   sesionPagada: boolean;
+  pagoEnCurso: boolean;
 }
 
 export interface IMesaSesionRepository {
