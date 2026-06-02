@@ -411,9 +411,14 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
   // Exclude: when WE own the lock (isInitiatingPayment) or we're submitting the form (paying).
   const externalPaymentInProgress = (sessionData?.pagoEnCurso ?? false) && !paying && !isInitiatingPayment;
 
-  // Trap the browser back button while a payment is in progress —
-  // either this user owns the lock (isInitiatingPayment) or another user does (externalPaymentInProgress).
-  const shouldTrapBack = externalPaymentInProgress || isInitiatingPayment;
+  const division = sessionData?.division ?? null;
+  const fullyPaid = (sessionData?.sesionPagada ?? false) || (division
+    ? division.pagosRealizados >= division.personas
+    : false);
+
+  // Trap the browser back button while a payment is in progress or the table is fully paid.
+  // Fully paid: customer must stay on the ticket screen until the waiter closes the table.
+  const shouldTrapBack = externalPaymentInProgress || isInitiatingPayment || fullyPaid;
   useEffect(() => {
     if (!shouldTrapBack) return;
     window.history.pushState({ mesaPaymentWaiting: true }, '', window.location.href);
@@ -432,11 +437,6 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
   const dateStr = firstOrderDate?.toLocaleDateString(language, { day: "2-digit", month: "2-digit", year: "numeric" }) ?? "";
   const timeStr = firstOrderDate?.toLocaleTimeString(language, { hour: "2-digit", minute: "2-digit", hour12: false }) ?? "";
   const tableLabel = mesaInfo?.nombre ?? (mesaInfo ? `Mesa ${mesaInfo.numero}` : "Mesa");
-
-  const division = sessionData?.division ?? null;
-  const fullyPaid = (sessionData?.sesionPagada ?? false) || (division
-    ? division.pagosRealizados >= division.personas
-    : false);
 
   return (
     <div className="min-h-screen py-8 px-4" style={{ backgroundColor: PAGE_BG }}>
