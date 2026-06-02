@@ -103,15 +103,18 @@ export async function POST(request: Request) {
     const mesa = mesaResult.data;
 
     // Reject new orders while a payment is in progress (lock expires after 15 min)
-    try {
+    {
       const { getSupabaseClient } = await import('@/core/infrastructure/database/supabase-client');
       const supabaseAdmin = getSupabaseClient();
-      const { data: sesionLock } = await supabaseAdmin
+      const { data: sesionLock, error: lockError } = await supabaseAdmin
         .from('mesa_sesiones')
         .select('pago_en_curso, pago_iniciado_en')
         .eq('mesa_id', data.mesa_id)
         .is('cerrada_at', null)
         .maybeSingle();
+      if (lockError) {
+        return NextResponse.json({ error: 'Error al verificar el estado de la mesa.' }, { status: 500 });
+      }
       const lock = sesionLock as { pago_en_curso: boolean; pago_iniciado_en: string | null } | null;
       const LOCK_EXPIRY_MS = 15 * 60 * 1000;
       const lockFresh = lock?.pago_iniciado_en
@@ -120,8 +123,6 @@ export async function POST(request: Request) {
       if (lock?.pago_en_curso && lockFresh) {
         return NextResponse.json({ error: 'Hay un pago en curso en esta mesa. Espera a que finalice.' }, { status: 423 });
       }
-    } catch {
-      // best-effort — don't block order creation if lock check fails
     }
 
     const pedidoResult = await pedidoUseCase.createMesaOrder(
