@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode, Suspense, useState, useMemo, useEffect, useCallback } from "react"
+import { createClient } from "@supabase/supabase-js"
 import dynamic from "next/dynamic"
 import { MenuCategoryVM, MenuItemVM } from "@/core/application/dtos/menu-view-model"
 import { HeroBanner } from "@/components/hero-banner"
@@ -154,31 +155,59 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
     const params = new URLSearchParams(window.location.search);
     const mesa = params.get('mesa');
     if (!mesa) return;
+
+    // Polling: detect sesionPagada (fully paid) and division state (10s is fine — not time-critical)
     const check = async () => {
       try {
         const res = await fetch(`/api/mesas/${encodeURIComponent(mesa)}/orders`);
         if (!res.ok) return;
         const data = await res.json() as { sesionPagada?: boolean; pagoEnCurso?: boolean; division?: unknown };
         const pagada = data.sesionPagada === true;
-        const enCurso = data.pagoEnCurso === true;
         const divisionActiva = data.division != null;
-        setMesaEsperandoActivacion(pagada);
-        if (pagada) {
-          clearCart();
-          closeCart();
-        } else if (enCurso || divisionActiva) {
-          setMesaPaymentLocked(true);
-          clearCart();
-          closeCart();
-          // Redirect to ticket so users can see the bill and pay their share
-          window.location.href = `/mesa/${encodeURIComponent(mesa)}/orders`;
+        if (!isWaiterMode) {
+          setMesaEsperandoActivacion(pagada);
+          if (pagada) {
+            clearCart();
+            closeCart();
+          } else if (divisionActiva) {
+            setMesaPaymentLocked(true);
+            clearCart();
+            closeCart();
+            window.location.href = `/mesa/${encodeURIComponent(mesa)}/orders`;
+          }
         }
       } catch { /* best-effort */ }
     };
     void check();
     const interval = setInterval(() => { void check(); }, 10000);
-    return () => clearInterval(interval);
-  }, [clearCart, closeCart]);
+
+    // Realtime: detect pago_en_curso immediately — fires as soon as any user clicks "Pagar"
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    const channel = supabase
+      .channel(`mesa-payment:${mesa}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'mesa_sesiones',
+        filter: `mesa_id=eq.${mesa}`,
+      }, (payload: { new: Record<string, unknown> }) => {
+        if (payload.new['pago_en_curso'] === true && !isWaiterMode) {
+          setMesaPaymentLocked(true);
+          clearCart();
+          closeCart();
+          window.location.href = `/mesa/${encodeURIComponent(mesa)}/orders`;
+        }
+      })
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      void supabase.removeChannel(channel);
+    };
+  }, [clearCart, closeCart, isWaiterMode]);
 
   // Trap the browser back button while the "mesa en preparación" overlay is active
   // so the user cannot navigate away from the waiting screen.
@@ -213,8 +242,8 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      {/* Mesa waiting-for-activation overlay */}
-      {mesaEsperandoActivacion && (
+      {/* Mesa waiting-for-activation overlay — never shown to waiters, they manage the table */}
+      {mesaEsperandoActivacion && !isWaiterMode && (
         <div
           className="fixed inset-0 z-[200] flex flex-col items-center justify-center gap-6 px-8 text-center"
           style={{ backgroundColor: 'rgba(10, 8, 6, 0.95)' }}

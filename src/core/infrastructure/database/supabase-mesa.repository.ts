@@ -235,23 +235,33 @@ export class SupabaseMesaRepository implements IMesaRepository {
       const allPaidBySesion: Record<string, boolean> = {};
 
       if (activeSesionIds.length > 0) {
-        const { data: pedidosData } = await this.supabase
+        // Active order count — exclude closed pedidos
+        const { data: activeData } = await this.supabase
           .from('pedidos')
-          .select('sesion_id, payment_status')
+          .select('sesion_id')
           .in('sesion_id', activeSesionIds)
           .neq('estado', 'cerrado');
-
-        const pedidosBySesion: Record<string, { payment_status: string | null }[]> = {};
-        for (const p of pedidosData ?? []) {
+        for (const p of activeData ?? []) {
           const sid = p['sesion_id'] as string;
           countBySesion[sid] = (countBySesion[sid] ?? 0) + 1;
-          if (!pedidosBySesion[sid]) pedidosBySesion[sid] = [];
-          pedidosBySesion[sid].push({ payment_status: p['payment_status'] as string | null });
         }
 
+        // Payment status — include ALL pedidos regardless of estado
+        // (pedidos may be 'paid' but still in 'entregado'/'cerrado' estado)
+        const { data: paymentData } = await this.supabase
+          .from('pedidos')
+          .select('sesion_id, payment_status')
+          .in('sesion_id', activeSesionIds);
+
+        const paymentsBySesion: Record<string, (string | null)[]> = {};
+        for (const p of paymentData ?? []) {
+          const sid = p['sesion_id'] as string;
+          if (!paymentsBySesion[sid]) paymentsBySesion[sid] = [];
+          paymentsBySesion[sid].push(p['payment_status'] as string | null);
+        }
         for (const sid of activeSesionIds) {
-          const pedidos = pedidosBySesion[sid] ?? [];
-          allPaidBySesion[sid] = pedidos.length > 0 && pedidos.every(p => p.payment_status === 'paid');
+          const statuses = paymentsBySesion[sid] ?? [];
+          allPaidBySesion[sid] = statuses.length > 0 && statuses.every(s => s === 'paid');
         }
       }
 
