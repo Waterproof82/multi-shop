@@ -110,11 +110,16 @@ export async function initiateRedsysMesaPaymentUseCase(
     const pagoEnCurso = s['pago_en_curso'] as boolean;
     const pagoIniciadoEn = s['pago_iniciado_en'] as string | null;
     const LOCK_EXPIRY_MS = 15 * 60 * 1000;
+    // Grace period: the UI pre-locks when the user clicks "Pagar" / "Dividir cuenta",
+    // then calls this use case after total verification + optional division modal.
+    // A fresh lock (< 5 min) means it's the same client — let them through.
+    const GRACE_PERIOD_MS = 5 * 60 * 1000;
     const lockAge = pagoIniciadoEn
       ? Date.now() - new Date(pagoIniciadoEn).getTime()
       : Infinity;
     const lockFresh = lockAge < LOCK_EXPIRY_MS;
-    if (pagoEnCurso && lockFresh) {
+    const lockInGrace = lockAge < GRACE_PERIOD_MS;
+    if (pagoEnCurso && lockFresh && !lockInGrace) {
       return {
         success: false,
         error: {

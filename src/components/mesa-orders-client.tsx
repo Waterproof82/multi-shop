@@ -193,6 +193,8 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
     newTotal: number;
     pendingAction: PendingAction;
   } | null>(null);
+  // true while THIS user owns the checkout lock (they clicked "Pagar" / "Dividir cuenta")
+  const [isInitiatingPayment, setIsInitiatingPayment] = useState(false);
 
   // Derived early so the polling effect can use it as a dependency
   const pagoEnCursoForPoll = sessionData?.pagoEnCurso ?? false;
@@ -203,6 +205,11 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
       if (res.ok) setSessionData(await res.json() as MesaSessionData);
     } catch { /* best-effort */ }
     finally { setLoading(false); }
+  }, [mesaId]);
+
+  const releaseCheckoutLock = useCallback(() => {
+    setIsInitiatingPayment(false);
+    void fetch(`/api/mesas/${encodeURIComponent(mesaId)}/lock`, { method: 'DELETE' }).catch(() => null);
   }, [mesaId]);
 
   useEffect(() => {
@@ -233,7 +240,8 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
         body: JSON.stringify({ mesaId, esDivision }),
       });
       if (res.status === 423) {
-        // Another payment started between verification and now — refresh to show overlay
+        // Another payment started between verification and now
+        releaseCheckoutLock();
         setPaying(false);
         void refresh();
         return;
@@ -288,6 +296,9 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ numPersonas }),
       });
+      // Division is set — release the checkout lock.
+      // Other users are already on the ticket via divisionActiva redirect.
+      releaseCheckoutLock();
       await refresh();
     } finally {
       setSettingDivision(false);
@@ -309,15 +320,20 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
     if (paying || verifyingTotal) return;
     setVerifyingTotal(true);
     try {
-      // Verify total against fresh DB state before going to Redsys
+      // Acquire checkout lock — signals all other users on this mesa to redirect to ticket.
+      // Skip if we already own it (e.g. re-checking after a totalMismatch confirmation).
+      if (!isInitiatingPayment) {
+        const lockRes = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/lock`, { method: 'POST' });
+        if (lockRes.status === 423) {
+          void refresh();
+          return;
+        }
+        setIsInitiatingPayment(true);
+      }
+      // Verify total against fresh DB state
       const res = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/orders`);
       if (!res.ok) { executePendingAction(action); return; }
       const fresh = await res.json() as MesaSessionData;
-      if (fresh.pagoEnCurso) {
-        // Another user started paying while we were checking — update state so overlay appears
-        setSessionData(fresh);
-        return;
-      }
       const currentTotal = sessionData?.total ?? 0;
       if (Math.abs(fresh.total - currentTotal) > 0.005) {
         setSessionData(fresh);
@@ -343,8 +359,9 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
     }
   };
 
-  // Another user is paying — we should wait without being able to navigate away
-  const externalPaymentInProgress = (sessionData?.pagoEnCurso ?? false) && !paying;
+  // Another user is paying — we should wait without being able to navigate away.
+  // Exclude: when WE own the lock (isInitiatingPayment) or we're submitting the form (paying).
+  const externalPaymentInProgress = (sessionData?.pagoEnCurso ?? false) && !paying && !isInitiatingPayment;
 
   // Trap the browser back button while someone else's payment is in progress
   useEffect(() => {
@@ -375,8 +392,8 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
     <div className="min-h-screen py-8 px-4" style={{ backgroundColor: PAGE_BG }}>
       <div className="mx-auto max-w-xs">
 
-        {/* Back link — hidden when session is fully paid or payment is in progress */}
-        {!fullyPaid && !externalPaymentInProgress && (
+        {/* Back link — hidden when session is fully paid, payment in progress, or division is active */}
+        {!fullyPaid && !externalPaymentInProgress && !division && (
           <div className="mb-5">
             <Link
               href={`/?mesa=${mesaId}`}
@@ -654,6 +671,7 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
                     type="button"
                     onClick={() => {
                       setTotalMismatch(null);
+                      releaseCheckoutLock();
                       void refresh();
                     }}
                     className="py-3 px-4 rounded-xl text-xs font-bold tracking-widest uppercase"
@@ -749,7 +767,7 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
           total={sessionData.total}
           lang={lang}
           onConfirm={(n) => { void handleConfirmDivision(n); }}
-          onClose={() => setShowDivisionModal(false)}
+          onClose={() => { releaseCheckoutLock(); setShowDivisionModal(false); }}
         />
       )}
     </div>
