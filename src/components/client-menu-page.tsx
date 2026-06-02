@@ -142,6 +142,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
   const [waiterHasMesa, setWaiterHasMesa] = useState(false);
   const [menuTab, setMenuTab] = useState<'comida' | 'bebidas'>('comida');
   const [mesaEsperandoActivacion, setMesaEsperandoActivacion] = useState(false);
+  const [mesaPaymentLocked, setMesaPaymentLocked] = useState(false);
 
   useEffect(() => {
     if (isWaiterMode) {
@@ -166,6 +167,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
           clearCart();
           closeCart();
         } else if (enCurso || divisionActiva) {
+          setMesaPaymentLocked(true);
           clearCart();
           closeCart();
           // Redirect to ticket so users can see the bill and pay their share
@@ -287,7 +289,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
             <div id="menu-content" className="container mx-auto max-w-6xl px-4 py-8 md:px-6">
               <div className="space-y-12 md:space-y-16">
                 {visibleCategories.map((category, index) => (
-                  <MenuSection key={category.id} category={category} showCart={showCart} priority={index === 0} hideImages={showWaiterSearch} />
+                  <MenuSection key={category.id} category={category} showCart={showCart && !mesaPaymentLocked} priority={index === 0} hideImages={showWaiterSearch} />
                 ))}
               </div>
             </div>
@@ -314,7 +316,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
       {showCart && (
         <>
           <CartDrawer isRestaurant={empresa?.tipo === 'restaurante'} />
-          <CartToast />
+          {!mesaPaymentLocked && <CartToast />}
           <ActiveOrderBanner />
           <MesaOrderHistory />
         </>
