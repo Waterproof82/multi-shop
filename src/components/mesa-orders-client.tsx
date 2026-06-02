@@ -329,8 +329,8 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
 
   const executePendingAction = async (action: PendingAction) => {
     setTotalMismatch(null);
-    // Acquire checkout lock here — AFTER price is confirmed — so the lock doesn't
-    // interfere with the fresh-total verification (pedidos route blocks orders when locked).
+    // Acquire checkout lock AFTER price is confirmed — the lock blocks new orders,
+    // so the fresh-total verification in handlePrePaymentCheck sees the real DB state.
     if (!isInitiatingPayment) {
       const lockRes = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/lock`, { method: 'POST' });
       if (lockRes.status === 423) {
@@ -339,6 +339,22 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
       }
       setIsInitiatingPayment(true);
       try { sessionStorage.setItem(`mesa-lock-${mesaId}`, 'true'); } catch { /* ignore */ }
+
+      // Re-verify after acquiring the lock — catches any orders added between the initial
+      // pre-check and now. Skip for division-modal: handleConfirmDivision re-checks there.
+      if (action !== 'division-modal') {
+        const checkRes = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/orders`);
+        if (checkRes.ok) {
+          const fresh = await checkRes.json() as MesaSessionData;
+          const currentTotal = sessionData?.total ?? 0;
+          if (Math.abs(fresh.total - currentTotal) > 0.005) {
+            setSessionData(fresh);
+            setTotalMismatch({ oldTotal: currentTotal, newTotal: fresh.total, pendingAction: action });
+            return;
+          }
+          setSessionData(fresh);
+        }
+      }
     }
     if (action === 'full') {
       void initiateRedsys(false);
