@@ -195,44 +195,31 @@ export class SupabaseMesaRepository implements IMesaRepository {
 
   async findAllWithSession(empresaId: string): Promise<Result<MesaWithSession[]>> {
     try {
-      // Step 1: fetch mesas (plain columns — no FK embed to avoid PostgREST join ambiguity)
-      const { data: mesasData, error: mesasError } = await this.supabase
-        .from('mesas')
-        .select('id, empresa_id, numero, nombre, sesion_id')
-        .eq('empresa_id', empresaId)
-        .order('numero', { ascending: true });
+      // Step 1: fetch mesas + session flags via RPC (single LEFT JOIN — avoids PostgREST FK embed ambiguity)
+      type RpcRow = {
+        id: string; empresa_id: string; numero: number; nombre: string | null;
+        sesion_id: string | null; sesion_pagada: boolean; pago_en_curso: boolean; session_total: number;
+      };
+      const { data: rpcData, error: rpcError } = await this.supabase
+        .rpc('get_mesas_with_sessions', { p_empresa_id: empresaId });
 
-      if (mesasError) {
+      if (rpcError) {
         await logger.logAndReturnError(
           'DB_SELECT_ERROR',
-          mesasError.message,
+          rpcError.message,
           'repository',
           'SupabaseMesaRepository.findAllWithSession',
-          { empresaId, details: { code: mesasError.code } }
+          { empresaId, details: { code: rpcError.code } }
         );
         return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener mesas con sesión', module: 'repository', method: 'findAllWithSession' } };
       }
 
-      const rows = (mesasData ?? []) as Record<string, unknown>[];
+      const rows = (rpcData ?? []) as RpcRow[];
       const activeSesionIds = rows
-        .map(r => r['sesion_id'] as string | null)
+        .map(r => r.sesion_id)
         .filter((id): id is string => id !== null);
 
-      // Step 2: fetch session data (total, sesion_pagada, pago_en_curso) via direct query
-      type SesionRow = { id: string; total: number; sesion_pagada: boolean; pago_en_curso: boolean };
-      const sesionMap: Record<string, SesionRow> = {};
-
-      if (activeSesionIds.length > 0) {
-        const { data: sesionesData } = await this.supabase
-          .from('mesa_sesiones')
-          .select('id, total, sesion_pagada, pago_en_curso')
-          .in('id', activeSesionIds);
-        for (const s of (sesionesData ?? []) as SesionRow[]) {
-          sesionMap[s.id] = s;
-        }
-      }
-
-      // Step 3: count active (non-cerrado) pedidos per session
+      // Step 2: count active (non-cerrado) pedidos per session
       const countBySesion: Record<string, number> = {};
       if (activeSesionIds.length > 0) {
         const { data: activeData } = await this.supabase
@@ -248,22 +235,17 @@ export class SupabaseMesaRepository implements IMesaRepository {
 
       return {
         success: true,
-        data: rows.map(row => {
-          const sesionId = (row['sesion_id'] as string | null) ?? null;
-          const sesion = sesionId ? sesionMap[sesionId] : null;
-
-          return {
-            id: row['id'] as string,
-            empresaId: row['empresa_id'] as string,
-            numero: row['numero'] as number,
-            nombre: (row['nombre'] as string | null) ?? null,
-            sesionId,
-            activeOrderCount: sesionId ? (countBySesion[sesionId] ?? 0) : 0,
-            sessionTotal: sesion ? Number(sesion.total) : 0,
-            sesionPagada: sesion ? (sesion.sesion_pagada ?? false) : false,
-            pagoEnCurso: sesion ? (sesion.pago_en_curso ?? false) : false,
-          };
-        }),
+        data: rows.map(row => ({
+          id: row.id,
+          empresaId: row.empresa_id,
+          numero: row.numero,
+          nombre: row.nombre ?? null,
+          sesionId: row.sesion_id ?? null,
+          activeOrderCount: row.sesion_id ? (countBySesion[row.sesion_id] ?? 0) : 0,
+          sessionTotal: Number(row.session_total),
+          sesionPagada: row.sesion_pagada ?? false,
+          pagoEnCurso: row.pago_en_curso ?? false,
+        })),
       };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabaseMesaRepository.findAllWithSession', { empresaId });
