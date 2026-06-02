@@ -13,6 +13,33 @@ async function getMesaId(params: Promise<{ mesaId: string }>) {
 }
 
 /**
+ * GET — return current lock status for this mesa (waiter use).
+ */
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ mesaId: string }> }
+) {
+  const parsed = await getMesaId(params);
+  if (!parsed.success) return NextResponse.json({ error: 'Invalid mesaId' }, { status: 400 });
+
+  const supabase = getSupabaseClient();
+  const { data: row } = await supabase
+    .from('mesa_sesiones')
+    .select('pago_en_curso, pago_iniciado_en')
+    .eq('mesa_id', parsed.data)
+    .is('cerrada_at', null)
+    .maybeSingle();
+
+  const lock = row as LockRow;
+  const lockAge = lock?.pago_iniciado_en
+    ? Date.now() - new Date(lock.pago_iniciado_en).getTime()
+    : Infinity;
+  const active = !!(lock?.pago_en_curso && lockAge < LOCK_EXPIRY_MS);
+
+  return NextResponse.json({ pago_en_curso: active, pago_iniciado_en: lock?.pago_iniciado_en ?? null });
+}
+
+/**
  * POST — claim the payment lock for this mesa.
  * Returns 423 if another fresh lock is already active.
  */

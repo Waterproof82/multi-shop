@@ -623,6 +623,7 @@ export const translations = {
     waiterModeActive: "Modo mozo",
     waiterLogout: "Salir",
     waiterChangeTable: "Cambiar mesa",
+    waiterUnlockPayment: "Desbloquear pago",
     waiterSelectMesaTitle: "Seleccionar mesa",
     // Checkout delivery
     deliveryMethodTitle: "Método de entrega",
@@ -1283,6 +1284,7 @@ export const translations = {
     waiterModeActive: "Waiter mode",
     waiterLogout: "Log out",
     waiterChangeTable: "Change table",
+    waiterUnlockPayment: "Unlock payment",
     waiterSelectMesaTitle: "Select table",
     // Checkout delivery
     deliveryMethodTitle: "Delivery method",
@@ -1468,6 +1470,7 @@ export const translations = {
     waiterModeActive: "Mode serveur",
     waiterLogout: "Se déconnecter",
     waiterChangeTable: "Changer de table",
+    waiterUnlockPayment: "Débloquer le paiement",
     waiterSelectMesaTitle: "Sélectionner une table",
     // Checkout delivery
     deliveryMethodTitle: "Mode de livraison",
@@ -1653,6 +1656,7 @@ export const translations = {
     waiterModeActive: "Modalità cameriere",
     waiterLogout: "Esci",
     waiterChangeTable: "Cambia tavolo",
+    waiterUnlockPayment: "Sblocca pagamento",
     waiterSelectMesaTitle: "Seleziona tavolo",
     // Checkout delivery
     deliveryMethodTitle: "Metodo di consegna",
@@ -1838,6 +1842,7 @@ export const translations = {
     waiterModeActive: "Kellner-Modus",
     waiterLogout: "Abmelden",
     waiterChangeTable: "Tisch wechseln",
+    waiterUnlockPayment: "Zahlung entsperren",
     waiterSelectMesaTitle: "Tisch auswählen",
     // Checkout delivery
     deliveryMethodTitle: "Liefermethode",

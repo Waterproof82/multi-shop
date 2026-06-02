@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { UtensilsCrossed, ArrowLeftRight, LogOut, X, ShoppingCart, ChevronDown, Circle } from "lucide-react";
+import { UtensilsCrossed, ArrowLeftRight, LogOut, X, ShoppingCart, ChevronDown, Circle, LockOpen } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { getWaiterMesa, clearWaiterMesa, saveWaiterMesa } from "@/components/waiter-login-form";
@@ -34,6 +34,11 @@ const BTN_EXIT_BG    = "oklch(20% 0.05 25)";
 const BTN_EXIT_HOVER = "oklch(26% 0.08 25)";
 const BTN_EXIT_TEXT  = "oklch(66% 0.18 25)";
 
+// Unlock payment — orange (warning/action)
+const BTN_UNLOCK_BG    = "oklch(22% 0.07 40)";
+const BTN_UNLOCK_HOVER = "oklch(28% 0.11 40)";
+const BTN_UNLOCK_TEXT  = "oklch(75% 0.20 40)";
+
 // Dropdown
 const DD_BG        = "oklch(19% 0.025 252)";
 const DD_BORDER    = "oklch(38% 0.10 252 / 0.5)";
@@ -53,9 +58,11 @@ export function WaiterBanner() {
   const lang = language as Parameters<typeof t>[1];
   const { openCart, totalItems } = useCart();
 
-  const [mesaLabel, setMesaLabel] = useState<string | null>(null);
-  const [mesaId, setMesaId]       = useState<string | null>(null);
-  const [closing, setClosing]     = useState(false);
+  const [mesaLabel, setMesaLabel]     = useState<string | null>(null);
+  const [mesaId, setMesaId]           = useState<string | null>(null);
+  const [closing, setClosing]         = useState(false);
+  const [pagoEnCurso, setPagoEnCurso] = useState(false);
+  const [unlocking, setUnlocking]     = useState(false);
 
   // Table dropdown
   const [dropdownOpen, setDropdownOpen]   = useState(false);
@@ -93,6 +100,26 @@ export function WaiterBanner() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [dropdownOpen]);
+
+  // Poll lock status
+  const fetchLock = useCallback(async (id: string) => {
+    try {
+      const r = await fetch(`/api/mesas/${encodeURIComponent(id)}/lock`);
+      if (r.ok) {
+        const json = await r.json() as { pago_en_curso: boolean };
+        setPagoEnCurso(json.pago_en_curso);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!mesaId) { setPagoEnCurso(false); return; }
+    void fetchLock(mesaId);
+    const interval = setInterval(() => { void fetchLock(mesaId); }, 10_000);
+    return () => clearInterval(interval);
+  }, [mesaId, fetchLock]);
 
   // Hide on waiter panel pages — they have their own navigation and product search
   if (pathname.startsWith("/waiter/tables")) return null;
@@ -141,6 +168,17 @@ export function WaiterBanner() {
       window.location.href = "/waiter";
     } finally {
       setClosing(false);
+    }
+  }
+
+  async function handleUnlockPayment() {
+    if (!mesaId || unlocking) return;
+    setUnlocking(true);
+    try {
+      await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/lock`, { method: "DELETE" });
+      setPagoEnCurso(false);
+    } finally {
+      setUnlocking(false);
     }
   }
 
@@ -283,6 +321,22 @@ export function WaiterBanner() {
               </div>
             )}
           </div>
+
+          {/* Unlock payment — visible only when pago_en_curso */}
+          {pagoEnCurso && (
+            <button
+              onClick={handleUnlockPayment}
+              disabled={unlocking}
+              className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150 min-h-[32px] disabled:opacity-40"
+              style={{ color: BTN_UNLOCK_TEXT, backgroundColor: BTN_UNLOCK_BG }}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_UNLOCK_HOVER)}
+              onMouseLeave={e => (e.currentTarget.style.backgroundColor = BTN_UNLOCK_BG)}
+              aria-label={t("waiterUnlockPayment", lang)}
+            >
+              <LockOpen className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden sm:inline">{t("waiterUnlockPayment", lang)}</span>
+            </button>
+          )}
 
           {/* Close table */}
           <button
