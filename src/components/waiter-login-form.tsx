@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, type FormEvent } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { UtensilsCrossed, KeyRound } from "lucide-react";
@@ -45,6 +45,186 @@ async function fetchMesas(): Promise<MesaWithSession[]> {
   }
 }
 
+interface MesaColors {
+  bg: string;
+  border: string;
+  shadow: string;
+  icon: string;
+  num: string;
+  name: string;
+  dot: string;
+}
+
+function getMesaColors(isPaid: boolean, isPaymentInProgress: boolean, isOpen: boolean): MesaColors {
+  if (isPaid) {
+    return {
+      bg: "oklch(20% 0.06 290 / 0.7)",
+      border: "1px solid oklch(55% 0.18 290 / 0.5)",
+      shadow: "0 0 18px oklch(55% 0.18 290 / 0.15), inset 0 1px 0 oklch(70% 0.15 290 / 0.1)",
+      icon: "oklch(65% 0.16 290)",
+      num: "oklch(92% 0.04 290)",
+      name: "oklch(60% 0.10 290)",
+      dot: "oklch(70% 0.19 290)",
+    };
+  }
+  if (isPaymentInProgress) {
+    return {
+      bg: "oklch(20% 0.06 62 / 0.7)",
+      border: "1px solid oklch(55% 0.18 62 / 0.5)",
+      shadow: "0 0 18px oklch(55% 0.18 62 / 0.15), inset 0 1px 0 oklch(70% 0.15 62 / 0.1)",
+      icon: "oklch(65% 0.16 62)",
+      num: "oklch(92% 0.04 62)",
+      name: "oklch(60% 0.10 62)",
+      dot: "oklch(70% 0.19 62)",
+    };
+  }
+  if (isOpen) {
+    return {
+      bg: "oklch(20% 0.06 148 / 0.7)",
+      border: "1px solid oklch(55% 0.18 148 / 0.5)",
+      shadow: "0 0 18px oklch(55% 0.18 148 / 0.15), inset 0 1px 0 oklch(70% 0.15 148 / 0.1)",
+      icon: "oklch(65% 0.16 148)",
+      num: "oklch(92% 0.04 148)",
+      name: "oklch(60% 0.10 148)",
+      dot: "oklch(70% 0.19 148)",
+    };
+  }
+  return {
+    bg: "oklch(20% 0.025 252 / 0.7)",
+    border: "1px solid oklch(35% 0.04 252 / 0.6)",
+    shadow: "inset 0 1px 0 oklch(100% 0 0 / 0.04)",
+    icon: "oklch(42% 0.06 252)",
+    num: "oklch(80% 0.03 252)",
+    name: "oklch(48% 0.05 252)",
+    dot: "oklch(38% 0.04 252)",
+  };
+}
+
+function getMesaStatus(isPaid: boolean, isPaymentInProgress: boolean, isOpen: boolean): string {
+  if (isPaid) return "pagada";
+  if (isPaymentInProgress) return "pago en curso";
+  if (isOpen) return "ocupada";
+  return "libre";
+}
+
+function MesaDot({ pulsing, dotColor }: Readonly<{ pulsing: boolean; dotColor: string }>) {
+  if (pulsing) {
+    return (
+      <span className="relative flex h-2.5 w-2.5">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-60" style={{ backgroundColor: dotColor }} />
+        <span className="relative inline-flex h-2.5 w-2.5 rounded-full" style={{ backgroundColor: dotColor }} />
+      </span>
+    );
+  }
+  return <span className="block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: dotColor }} />;
+}
+
+interface MesaFooterProps {
+  readonly isPaid: boolean;
+  readonly isPaymentInProgress: boolean;
+  readonly isOpen: boolean;
+  readonly sessionTotal: number;
+  readonly activeOrderCount: number;
+}
+
+function MesaFooter({ isPaid, isPaymentInProgress, isOpen, sessionTotal, activeOrderCount }: MesaFooterProps) {
+  if (isPaid) {
+    return (
+      <>
+        <span className="text-[11px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-full" style={{ background: "oklch(28% 0.10 290 / 0.6)", color: "oklch(82% 0.18 290)" }}>
+          Pagada
+        </span>
+        <span className="text-[10px] font-medium" style={{ color: "oklch(58% 0.10 290)" }}>
+          {formatPrice(sessionTotal)}
+        </span>
+      </>
+    );
+  }
+  if (isPaymentInProgress) {
+    return (
+      <>
+        <span className="text-[11px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-full" style={{ background: "oklch(30% 0.10 62 / 0.6)", color: "oklch(82% 0.18 62)" }}>
+          En pago
+        </span>
+        <span className="text-[10px] font-medium" style={{ color: "oklch(58% 0.10 62)" }}>
+          {formatPrice(sessionTotal)}
+        </span>
+      </>
+    );
+  }
+  if (isOpen) {
+    const orderSuffix = activeOrderCount === 1 ? "" : "s";
+    const totalLabel = sessionTotal > 0 ? ` · ${formatPrice(sessionTotal)}` : "";
+    return (
+      <>
+        <span className="text-[11px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-full" style={{ background: "oklch(30% 0.10 148 / 0.6)", color: "oklch(82% 0.18 148)" }}>
+          Ocupada
+        </span>
+        <span className="text-[10px] font-medium" style={{ color: "oklch(58% 0.10 148)" }}>
+          {activeOrderCount} pedido{orderSuffix}{totalLabel}
+        </span>
+      </>
+    );
+  }
+  return (
+    <span className="text-[11px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-full" style={{ background: "oklch(24% 0.03 252 / 0.7)", color: "oklch(62% 0.05 252)" }}>
+      Libre
+    </span>
+  );
+}
+
+interface MesaCardProps {
+  readonly mesa: MesaWithSession;
+  readonly isLoading: boolean;
+  readonly onClick: () => void;
+}
+
+function MesaCard({ mesa, isLoading, onClick }: MesaCardProps) {
+  const isOpen = !!mesa.sesionId;
+  const isPaid = mesa.sesionPagada;
+  const isPaymentInProgress = mesa.pagoEnCurso && !mesa.sesionPagada;
+  const colors = getMesaColors(isPaid, isPaymentInProgress, isOpen);
+  const statusLabel = getMesaStatus(isPaid, isPaymentInProgress, isOpen);
+  const nameSuffix = mesa.nombre ? ` — ${mesa.nombre}` : "";
+  const pulsing = !isPaid && (isPaymentInProgress || isOpen);
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={isLoading}
+      aria-label={`Mesa ${mesa.numero}${nameSuffix} (${statusLabel})`}
+      className="group relative flex flex-col items-center justify-between rounded-2xl p-4 transition-all duration-200 hover:scale-[1.04] active:scale-[0.97] focus-visible:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+      style={{ minHeight: "120px", background: colors.bg, border: colors.border, boxShadow: colors.shadow }}
+    >
+      <div className="absolute top-3 right-3">
+        <MesaDot pulsing={pulsing} dotColor={colors.dot} />
+      </div>
+
+      <div className="flex flex-col items-center gap-1 flex-1 justify-center">
+        <UtensilsCrossed className="w-5 h-5 mb-1" style={{ color: colors.icon }} />
+        <span className="text-3xl font-black leading-none tracking-tight" style={{ color: colors.num }}>
+          {isLoading ? "…" : mesa.numero}
+        </span>
+        {mesa.nombre && (
+          <span className="text-[10px] font-medium truncate max-w-full mt-0.5" style={{ color: colors.name }}>
+            {mesa.nombre}
+          </span>
+        )}
+      </div>
+
+      <div className="w-full mt-2 min-h-[24px] flex flex-col items-center gap-0.5">
+        <MesaFooter
+          isPaid={isPaid}
+          isPaymentInProgress={isPaymentInProgress}
+          isOpen={isOpen}
+          sessionTotal={mesa.sessionTotal}
+          activeOrderCount={mesa.activeOrderCount}
+        />
+      </div>
+    </button>
+  );
+}
+
 export function WaiterLoginForm() {
   const router = useRouter();
 
@@ -61,7 +241,6 @@ export function WaiterLoginForm() {
     if (data.length > 0) setMesas(data);
   }, []);
 
-  // Polling + Realtime when authenticated
   useEffect(() => {
     if (step !== "tables" || !empresaId) return;
 
@@ -89,7 +268,6 @@ export function WaiterLoginForm() {
   }, [step, empresaId, refresh]);
 
   useEffect(() => {
-    // If they already have a valid session cookie, skip PIN and go to tables
     fetch("/api/waiter/me")
       .then(async (r) => {
         if (r.ok) {
@@ -101,8 +279,7 @@ export function WaiterLoginForm() {
       .catch(() => null);
   }, []);
 
-  async function handlePinSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  async function handlePinSubmit() {
     setLoading(true);
     setError(null);
 
@@ -169,7 +346,7 @@ export function WaiterLoginForm() {
         </div>
 
         <form
-          onSubmit={handlePinSubmit}
+          onSubmit={(e) => { e.preventDefault(); void handlePinSubmit(); }}
           className="w-full max-w-xs flex flex-col gap-4"
         >
           <div className="flex flex-col gap-2">
@@ -226,7 +403,6 @@ export function WaiterLoginForm() {
     );
   }
 
-  // Step: tables
   return (
     <div className="flex flex-col gap-6 w-full">
       <p className="text-xs font-semibold tracking-[0.18em] uppercase" style={{ color: "oklch(42% 0.06 252)" }}>
@@ -248,144 +424,14 @@ export function WaiterLoginForm() {
         </div>
       ) : (
         <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
-          {mesas.map((mesa) => {
-            const isOpen = !!mesa.sesionId;
-            const isPaid = mesa.sesionPagada;
-            const isPaymentInProgress = mesa.pagoEnCurso && !mesa.sesionPagada;
-            const isLoading = mesaLoading === mesa.id;
-
-            const statusLabel = isPaid ? "pagada" : isPaymentInProgress ? "pago en curso" : isOpen ? "ocupada" : "libre";
-
-            // Color tokens per state
-            const cardBg = isPaid
-              ? "oklch(20% 0.06 290 / 0.7)"
-              : isPaymentInProgress
-                ? "oklch(20% 0.06 62 / 0.7)"
-                : isOpen
-                  ? "oklch(20% 0.06 148 / 0.7)"
-                  : "oklch(20% 0.025 252 / 0.7)";
-            const cardBorder = isPaid
-              ? "1px solid oklch(55% 0.18 290 / 0.5)"
-              : isPaymentInProgress
-                ? "1px solid oklch(55% 0.18 62 / 0.5)"
-                : isOpen
-                  ? "1px solid oklch(55% 0.18 148 / 0.5)"
-                  : "1px solid oklch(35% 0.04 252 / 0.6)";
-            const cardShadow = isPaid
-              ? "0 0 18px oklch(55% 0.18 290 / 0.15), inset 0 1px 0 oklch(70% 0.15 290 / 0.1)"
-              : isPaymentInProgress
-                ? "0 0 18px oklch(55% 0.18 62 / 0.15), inset 0 1px 0 oklch(70% 0.15 62 / 0.1)"
-                : isOpen
-                  ? "0 0 18px oklch(55% 0.18 148 / 0.15), inset 0 1px 0 oklch(70% 0.15 148 / 0.1)"
-                  : "inset 0 1px 0 oklch(100% 0 0 / 0.04)";
-            const iconColor = isPaid
-              ? "oklch(65% 0.16 290)"
-              : isPaymentInProgress
-                ? "oklch(65% 0.16 62)"
-                : isOpen
-                  ? "oklch(65% 0.16 148)"
-                  : "oklch(42% 0.06 252)";
-            const numColor = isPaid
-              ? "oklch(92% 0.04 290)"
-              : isPaymentInProgress
-                ? "oklch(92% 0.04 62)"
-                : isOpen
-                  ? "oklch(92% 0.04 148)"
-                  : "oklch(80% 0.03 252)";
-            const nameColor = isPaid
-              ? "oklch(60% 0.10 290)"
-              : isPaymentInProgress
-                ? "oklch(60% 0.10 62)"
-                : isOpen
-                  ? "oklch(60% 0.10 148)"
-                  : "oklch(48% 0.05 252)";
-
-            return (
-              <button
-                key={mesa.id}
-                onClick={() => void handleMesaClick(mesa)}
-                disabled={isLoading}
-                aria-label={`Mesa ${mesa.numero}${mesa.nombre ? ` — ${mesa.nombre}` : ""} (${statusLabel})`}
-                className="group relative flex flex-col items-center justify-between rounded-2xl p-4 transition-all duration-200 hover:scale-[1.04] active:scale-[0.97] focus-visible:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
-                style={{ minHeight: "120px", background: cardBg, border: cardBorder, boxShadow: cardShadow }}
-              >
-                {/* Status dot */}
-                <div className="absolute top-3 right-3">
-                  {isPaid ? (
-                    <span className="block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: "oklch(70% 0.19 290)" }} />
-                  ) : isPaymentInProgress ? (
-                    <span className="relative flex h-2.5 w-2.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-60" style={{ backgroundColor: "oklch(70% 0.19 62)" }} />
-                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full" style={{ backgroundColor: "oklch(70% 0.19 62)" }} />
-                    </span>
-                  ) : isOpen ? (
-                    <span className="relative flex h-2.5 w-2.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-60" style={{ backgroundColor: "oklch(70% 0.19 148)" }} />
-                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full" style={{ backgroundColor: "oklch(70% 0.19 148)" }} />
-                    </span>
-                  ) : (
-                    <span className="block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: "oklch(38% 0.04 252)" }} />
-                  )}
-                </div>
-
-                {/* Icon + number */}
-                <div className="flex flex-col items-center gap-1 flex-1 justify-center">
-                  <UtensilsCrossed className="w-5 h-5 mb-1" style={{ color: iconColor }} />
-                  <span
-                    className="text-3xl font-black leading-none tracking-tight"
-                    style={{ color: numColor }}
-                  >
-                    {isLoading ? "…" : mesa.numero}
-                  </span>
-                  {mesa.nombre && (
-                    <span
-                      className="text-[10px] font-medium truncate max-w-full mt-0.5"
-                      style={{ color: nameColor }}
-                    >
-                      {mesa.nombre}
-                    </span>
-                  )}
-                </div>
-
-                {/* Footer */}
-                <div className="w-full mt-2 min-h-[24px] flex flex-col items-center gap-0.5">
-                  {isPaid ? (
-                    <>
-                      <span className="text-[11px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-full" style={{ background: "oklch(28% 0.10 290 / 0.6)", color: "oklch(82% 0.18 290)" }}>
-                        Pagada
-                      </span>
-                      <span className="text-[10px] font-medium" style={{ color: "oklch(58% 0.10 290)" }}>
-                        {formatPrice(mesa.sessionTotal)}
-                      </span>
-                    </>
-                  ) : isPaymentInProgress ? (
-                    <>
-                      <span className="text-[11px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-full" style={{ background: "oklch(30% 0.10 62 / 0.6)", color: "oklch(82% 0.18 62)" }}>
-                        En pago
-                      </span>
-                      <span className="text-[10px] font-medium" style={{ color: "oklch(58% 0.10 62)" }}>
-                        {formatPrice(mesa.sessionTotal)}
-                      </span>
-                    </>
-                  ) : isOpen ? (
-                    <>
-                      <span className="text-[11px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-full" style={{ background: "oklch(30% 0.10 148 / 0.6)", color: "oklch(82% 0.18 148)" }}>
-                        Ocupada
-                      </span>
-                      <span className="text-[10px] font-medium" style={{ color: "oklch(58% 0.10 148)" }}>
-                        {mesa.activeOrderCount} pedido{mesa.activeOrderCount !== 1 ? "s" : ""}
-                        {mesa.sessionTotal > 0 && ` · ${formatPrice(mesa.sessionTotal)}`}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-[11px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-full" style={{ background: "oklch(24% 0.03 252 / 0.7)", color: "oklch(62% 0.05 252)" }}>
-                      Libre
-                    </span>
-                  )}
-                </div>
-              </button>
-            );
-          })}
+          {mesas.map((mesa) => (
+            <MesaCard
+              key={mesa.id}
+              mesa={mesa}
+              isLoading={mesaLoading === mesa.id}
+              onClick={() => void handleMesaClick(mesa)}
+            />
+          ))}
         </div>
       )}
     </div>
