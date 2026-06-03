@@ -57,9 +57,12 @@ export class SupabaseMesaClientTokenRepository implements IMesaClientTokenReposi
         return { success: true, data: { valid: false, code: 'NOT_FOUND' } };
       }
 
-      const row = data as { expires_at: string; mesa_sesiones: { cerrada_at: string | null }[] };
+      const row = data as { expires_at: string; mesa_sesiones: { cerrada_at: string | null } | { cerrada_at: string | null }[] };
 
-      if (row.mesa_sesiones[0]?.cerrada_at !== null) {
+      // Supabase returns many-to-one joins as an object, but !inner can return an array in some versions.
+      const sesion = Array.isArray(row.mesa_sesiones) ? row.mesa_sesiones[0] : row.mesa_sesiones;
+
+      if (sesion?.cerrada_at !== null) {
         return { success: true, data: { valid: false, code: 'SESSION_CLOSED' } };
       }
 
