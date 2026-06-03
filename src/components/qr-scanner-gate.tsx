@@ -58,11 +58,9 @@ export function QRScannerGate({ mesaId, state, onTokenIssued }: QRScannerGatePro
         videoRef.current,
         async (result, err) => {
           if (!result) {
-            // zxing fires continuously with null until a QR is found; ignore non-error nulls
-            if (err && err.name !== 'NotFoundException') {
-              stopScanner();
-              setError(t('qrScannerRetry', lang));
-            }
+            // NotFoundException is normal (no QR in frame yet), ignore.
+            // Other errors on mobile are often transient (stream not ready on first frames).
+            // Do NOT stop the scanner — let it keep running.
             return;
           }
 
@@ -137,6 +135,7 @@ export function QRScannerGate({ mesaId, state, onTokenIssued }: QRScannerGatePro
                 className="w-full h-full object-cover"
                 muted
                 playsInline
+                autoPlay
               />
               {scanning && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
