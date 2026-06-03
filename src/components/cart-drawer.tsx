@@ -409,6 +409,7 @@ export function CartDrawer({ isRestaurant = false }: Readonly<CartDrawerProps>) 
           onTokenIssued={(token, expiresAt) => {
             storeMesaClientToken(mesaInfo?.id ?? mesaToken, token, expiresAt);
             setQrGateState(null);
+            void handleConfirmOrder();
           }}
         />
       )}
