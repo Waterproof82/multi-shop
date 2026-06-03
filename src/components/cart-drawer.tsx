@@ -178,6 +178,7 @@ export function CartDrawer({ isRestaurant = false }: Readonly<CartDrawerProps>) 
       const mesaId = mesaInfo?.id ?? mesaToken;
       const storedClientToken = getMesaClientToken(mesaId);
       if (!storedClientToken || isMesaClientTokenExpired(storedClientToken.expiresAt)) {
+        closeCart();
         setQrGateState('TOKEN_EXPIRED');
         return;
       }
@@ -201,6 +202,7 @@ export function CartDrawer({ isRestaurant = false }: Readonly<CartDrawerProps>) 
         });
         if (res.status === 401) {
           const body = await res.json() as { code?: string };
+          closeCart();
           if (body.code === 'SESSION_CLOSED') {
             setQrGateState('SESSION_CLOSED');
           } else {

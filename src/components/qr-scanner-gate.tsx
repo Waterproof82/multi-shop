@@ -122,7 +122,7 @@ export function QRScannerGate({ mesaId, state, onTokenIssued }: QRScannerGatePro
   }, [startScanner, stopScanner]);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/95 backdrop-blur-sm p-6">
+    <div className="fixed inset-0 z-[300] flex flex-col items-center justify-center bg-background/95 backdrop-blur-sm p-6">
       <div className="w-full max-w-sm flex flex-col items-center gap-6">
         <div className="text-center">
           <h2 className="text-xl font-semibold">{title}</h2>
