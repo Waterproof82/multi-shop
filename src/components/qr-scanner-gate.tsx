@@ -21,6 +21,8 @@ export function QRScannerGate({ mesaId, state, onTokenIssued }: QRScannerGatePro
   const controlsRef = useRef<IScannerControls | null>(null);
   // Ref so the zxing callback can schedule a retry without self-reference TDZ
   const startScannerRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  // Guard: zxing fires the callback multiple times for the same QR; prevent duplicate token requests
+  const tokenRequestInFlightRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
 
@@ -64,6 +66,9 @@ export function QRScannerGate({ mesaId, state, onTokenIssued }: QRScannerGatePro
             return;
           }
 
+          if (tokenRequestInFlightRef.current) return;
+          tokenRequestInFlightRef.current = true;
+
           stopScanner();
 
           const text = result.getText();
@@ -79,6 +84,7 @@ export function QRScannerGate({ mesaId, state, onTokenIssued }: QRScannerGatePro
 
           if (!scannedMesaId || scannedMesaId !== mesaId) {
             setError(t('qrScannerWrongMesa', lang));
+            tokenRequestInFlightRef.current = false;
             setTimeout(() => { void startScannerRef.current(); }, 1500);
             return;
           }
@@ -88,13 +94,18 @@ export function QRScannerGate({ mesaId, state, onTokenIssued }: QRScannerGatePro
             if (!res.ok) {
               const body = await res.json() as { error?: string };
               setError(body.error ?? t('qrScannerRetry', lang));
-              setTimeout(() => { void startScannerRef.current(); }, 1500);
+              tokenRequestInFlightRef.current = false;
+              // Don't auto-retry on rate limit (429) — user must tap retry manually
+              if (res.status !== 429) {
+                setTimeout(() => { void startScannerRef.current(); }, 1500);
+              }
               return;
             }
             const data = await res.json() as { token: string; expiresAt: string };
             onTokenIssued(data.token, data.expiresAt);
           } catch {
             setError(t('qrScannerRetry', lang));
+            tokenRequestInFlightRef.current = false;
             setTimeout(() => { void startScannerRef.current(); }, 1500);
           }
         }

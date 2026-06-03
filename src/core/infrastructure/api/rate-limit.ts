@@ -349,7 +349,7 @@ function getMesaTokenLimiter(): Ratelimit | null {
 
   mesaTokenLimiter = new Ratelimit({
     redis: client,
-    limiter: Ratelimit.slidingWindow(10, "1 h"),
+    limiter: Ratelimit.slidingWindow(30, "1 h"),
     prefix: "ratelimit:mesa-token",
   });
   return mesaTokenLimiter;
