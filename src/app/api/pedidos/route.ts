@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { empresaPublicRepository, pedidoUseCase, mesaUseCase } from '@/core/infrastructure/database';
 import { parseMainDomain, isPedidosDomain, getDomainFromHeaders } from '@/lib/domain-utils';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
+import { validateMesaClientToken } from '@/core/infrastructure/api/validate-mesa-client-token';
 
 const itemsSchema = z.array(z.object({
   item: z.object({
@@ -85,7 +86,11 @@ async function checkMesaPaymentLock(mesaId: string): Promise<NextResponse | null
   return null;
 }
 
-async function handleMesaOrder(empresa: EmpresaOrderData, data: MesaData): Promise<NextResponse> {
+async function handleMesaOrder(empresa: EmpresaOrderData, data: MesaData, request: Request): Promise<NextResponse> {
+  // Validate client QR token for mesa orders
+  const tokenError = await validateMesaClientToken(request);
+  if (tokenError) return tokenError;
+
   const mesaResult = await mesaUseCase.getMesa(data.mesa_id);
   if (!mesaResult.success) {
     return NextResponse.json({ error: 'Error al verificar la mesa' }, { status: 500 });
@@ -178,6 +183,6 @@ export async function POST(request: Request) {
   }
 
   const data = parsed.data;
-  if (data.tipo === 'mesa') return handleMesaOrder(empresa, data);
+  if (data.tipo === 'mesa') return handleMesaOrder(empresa, data, request);
   return handleDefaultOrder(empresa, data, isPedidos);
 }

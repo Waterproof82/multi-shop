@@ -3,11 +3,12 @@ import { z } from 'zod';
 import { mesaSesionRepository, pedidoRepository } from '@/core/infrastructure/database';
 import { rateLimitMesaPolling } from '@/core/infrastructure/api/rate-limit';
 import { getSupabaseAnonClient, getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
+import { validateMesaClientToken } from '@/core/infrastructure/api/validate-mesa-client-token';
 
 const mesaIdSchema = z.string().uuid('El mesaId debe ser un UUID válido');
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ mesaId: string }> }
 ) {
   const { mesaId } = await params;
@@ -15,6 +16,9 @@ export async function GET(
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
   }
+
+  const tokenError = await validateMesaClientToken(request);
+  if (tokenError) return tokenError;
 
   const rateLimited = await rateLimitMesaPolling(parsed.data);
   if (rateLimited) return rateLimited;
