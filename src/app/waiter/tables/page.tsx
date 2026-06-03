@@ -32,7 +32,7 @@ export default async function WaiterTablesPage() {
       <p className="text-xs font-semibold tracking-[0.18em] uppercase mb-6" style={{ color: "oklch(42% 0.06 252)" }}>
         Mesas
       </p>
-      <WaiterTablesGrid mesas={mesas} />
+      <WaiterTablesGrid mesas={mesas} empresaId={payload.empresaId} />
     </div>
   );
 }

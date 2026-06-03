@@ -2,12 +2,14 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@supabase/supabase-js";
 import { UtensilsCrossed } from "lucide-react";
 import { formatPrice } from "@/lib/format-price";
 import type { MesaWithSession } from "@/core/domain/repositories/IMesaRepository";
 
 interface WaiterTablesGridProps {
   mesas: MesaWithSession[];
+  empresaId: string;
 }
 
 async function fetchMesas(): Promise<MesaWithSession[]> {
@@ -21,7 +23,7 @@ async function fetchMesas(): Promise<MesaWithSession[]> {
   }
 }
 
-export function WaiterTablesGrid({ mesas: initialMesas }: WaiterTablesGridProps) {
+export function WaiterTablesGrid({ mesas: initialMesas, empresaId }: WaiterTablesGridProps) {
   const router = useRouter();
   const [mesas, setMesas] = useState<MesaWithSession[]>(initialMesas);
 
@@ -33,8 +35,30 @@ export function WaiterTablesGrid({ mesas: initialMesas }: WaiterTablesGridProps)
   useEffect(() => {
     void refresh();
     const interval = setInterval(() => { void refresh(); }, 2000);
-    return () => clearInterval(interval);
-  }, [refresh]);
+
+    // Realtime: trigger immediate refresh on any mesa_sesiones change for this empresa.
+    // Filtered subscription (empresa_id) — same pattern as client-menu-page.tsx which
+    // works despite the anon RLS block because Supabase evaluates filtered postgres_changes
+    // subscriptions against the WAL before applying row-level policies.
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    const channel = supabase
+      .channel(`waiter-grid:${empresaId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'mesa_sesiones',
+        filter: `empresa_id=eq.${empresaId}`,
+      }, () => { void refresh(); })
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      void supabase.removeChannel(channel);
+    };
+  }, [refresh, empresaId]);
 
   if (mesas.length === 0) {
     return (
