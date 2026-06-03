@@ -6,6 +6,7 @@ import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { formatPrice } from "@/lib/format-price";
 import { getWaiterMesa } from "@/components/waiter-login-form";
+import { QRScannerGate, type QRGateState } from "@/components/qr-scanner-gate";
 
 interface OrderItem {
   nombre: string;
@@ -45,6 +46,87 @@ interface MesaInfo {
 type PendingAction = 'full' | 'division-modal' | 'division-pay';
 
 const PAGE_BG = "#f0ede8";
+
+// ── Mesa token helpers ──────────────────────────────────────────────────────
+
+const TOKEN_KEY = (mesaId: string) => `mesa_token_${mesaId}`;
+
+function getStoredToken(mesaId: string): { token: string; expiresAt: string } | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(TOKEN_KEY(mesaId));
+    if (!raw) return null;
+    return JSON.parse(raw) as { token: string; expiresAt: string };
+  } catch {
+    return null;
+  }
+}
+
+function storeToken(mesaId: string, token: string, expiresAt: string): void {
+  sessionStorage.setItem(TOKEN_KEY(mesaId), JSON.stringify({ token, expiresAt }));
+}
+
+function isTokenExpired(expiresAt: string): boolean {
+  return new Date(expiresAt) <= new Date();
+}
+
+function useMesaToken(mesaId: string) {
+  const [token, setToken] = useState<string | null>(null);
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
+  const [gateState, setGateState] = useState<QRGateState | null>(null);
+
+  // Check sessionStorage on mount
+  useEffect(() => {
+    const stored = getStoredToken(mesaId);
+    if (!stored || isTokenExpired(stored.expiresAt)) {
+      setToken(null);
+    } else {
+      setToken(stored.token);
+      setExpiresAt(stored.expiresAt);
+    }
+  }, [mesaId]);
+
+  // Auto-expire timer
+  useEffect(() => {
+    if (!expiresAt) return;
+    const ms = new Date(expiresAt).getTime() - Date.now();
+    if (ms <= 0) return;
+    const timer = setTimeout(() => {
+      setToken(null);
+      setExpiresAt(null);
+      // Don't open gate immediately — open when next order is attempted
+    }, ms);
+    return () => clearTimeout(timer);
+  }, [expiresAt]);
+
+  const handleTokenIssued = useCallback((newToken: string, newExpiresAt: string) => {
+    storeToken(mesaId, newToken, newExpiresAt);
+    setToken(newToken);
+    setExpiresAt(newExpiresAt);
+    setGateState(null);
+  }, [mesaId]);
+
+  const requireToken = useCallback((): string | null => {
+    const stored = getStoredToken(mesaId);
+    if (!stored || isTokenExpired(stored.expiresAt)) {
+      setGateState('TOKEN_EXPIRED');
+      return null;
+    }
+    return stored.token;
+  }, [mesaId]);
+
+  const handleAuthError = useCallback((code?: string) => {
+    if (code === 'SESSION_CLOSED') {
+      setGateState('SESSION_CLOSED');
+    } else {
+      setGateState('TOKEN_EXPIRED');
+    }
+    setToken(null);
+    setExpiresAt(null);
+  }, []);
+
+  return { token, gateState, handleTokenIssued, requireToken, handleAuthError };
+}
 
 function PerforatedEdge({ position }: { position: "top" | "bottom" }) {
   const cy = position === "top" ? "0%" : "100%";
@@ -181,6 +263,7 @@ function DivisionModal({
 export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
   const { language } = useLanguage();
   const lang = language as Parameters<typeof t>[1];
+  const { gateState, handleTokenIssued, requireToken, handleAuthError } = useMesaToken(mesaId);
   const [sessionData, setSessionData] = useState<MesaSessionData | null>(null);
   const [mesaInfo, setMesaInfo] = useState<MesaInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -222,11 +305,21 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/orders`);
+      const stored = getStoredToken(mesaId);
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (stored && !isTokenExpired(stored.expiresAt)) {
+        headers['Authorization'] = `Bearer ${stored.token}`;
+      }
+      const res = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/orders`, { headers });
+      if (res.status === 401) {
+        const body = await res.json() as { code?: string };
+        handleAuthError(body.code);
+        return;
+      }
       if (res.ok) setSessionData(await res.json() as MesaSessionData);
     } catch { /* best-effort */ }
     finally { setLoading(false); }
-  }, [mesaId]);
+  }, [mesaId, handleAuthError]);
 
   const releaseCheckoutLock = useCallback(() => {
     setIsInitiatingPayment(false);
@@ -274,13 +367,24 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
 
   const initiateRedsys = async (esDivision: boolean) => {
     if (paying) return;
+    const clientToken = requireToken();
+    if (!clientToken) return; // gate is now open
     setPaying(true);
     try {
       const res = await fetch('/api/redsys/initiate-mesa', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${clientToken}`,
+        },
         body: JSON.stringify({ mesaId, esDivision }),
       });
+      if (res.status === 401) {
+        const body = await res.json() as { code?: string };
+        handleAuthError(body.code);
+        setPaying(false);
+        return;
+      }
       if (res.status === 423) {
         // Another payment started between verification and now
         releaseCheckoutLock();
@@ -439,6 +543,14 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
   const tableLabel = mesaInfo?.nombre ?? (mesaInfo ? `Mesa ${mesaInfo.numero}` : "Mesa");
 
   return (
+    <>
+    {gateState && (
+      <QRScannerGate
+        mesaId={mesaId}
+        state={gateState}
+        onTokenIssued={handleTokenIssued}
+      />
+    )}
     <div className="min-h-screen py-8 px-4" style={{ backgroundColor: PAGE_BG }}>
       <div className="mx-auto max-w-xs">
 
@@ -821,5 +933,6 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
         />
       )}
     </div>
+    </>
   );
 }
