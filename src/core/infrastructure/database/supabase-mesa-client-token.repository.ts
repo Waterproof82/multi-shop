@@ -57,9 +57,9 @@ export class SupabaseMesaClientTokenRepository implements IMesaClientTokenReposi
         return { success: true, data: { valid: false, code: 'NOT_FOUND' } };
       }
 
-      const row = data as { expires_at: string; mesa_sesiones: { cerrada_at: string | null } };
+      const row = data as { expires_at: string; mesa_sesiones: { cerrada_at: string | null }[] };
 
-      if (row.mesa_sesiones.cerrada_at !== null) {
+      if (row.mesa_sesiones[0]?.cerrada_at !== null) {
         return { success: true, data: { valid: false, code: 'SESSION_CLOSED' } };
       }
 
