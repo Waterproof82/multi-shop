@@ -36,6 +36,28 @@ import { formatPrice } from "@/lib/format-price"
 import { COUNTRY_CODES, DEFAULT_COUNTRY_CODE } from "@/core/domain/constants/country-codes"
 import { getItemKey } from "@/lib/cart-utils";
 import { getTrackingTokens, addTrackingToken } from "@/lib/order-tracking";
+import { QRScannerGate, type QRGateState } from '@/components/qr-scanner-gate';
+
+const MESA_CLIENT_TOKEN_KEY = (mesaId: string) => `mesa_token_${mesaId}`;
+
+function getMesaClientToken(mesaId: string): { token: string; expiresAt: string } | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(MESA_CLIENT_TOKEN_KEY(mesaId));
+    if (!raw) return null;
+    return JSON.parse(raw) as { token: string; expiresAt: string };
+  } catch {
+    return null;
+  }
+}
+
+function isMesaClientTokenExpired(expiresAt: string): boolean {
+  return new Date(expiresAt) <= new Date();
+}
+
+function storeMesaClientToken(mesaId: string, token: string, expiresAt: string): void {
+  sessionStorage.setItem(MESA_CLIENT_TOKEN_KEY(mesaId), JSON.stringify({ token, expiresAt }));
+}
 
 interface MesaInfo {
   id: string;
@@ -90,6 +112,7 @@ export function CartDrawer({ isRestaurant = false }: Readonly<CartDrawerProps>) 
   const [mesaInfo, setMesaInfo] = useState<MesaInfo | null>(null);
   const [mesaError, setMesaError] = useState(false);
   const [mesaSuccessMessage, setMesaSuccessMessage] = useState<string | null>(null);
+  const [qrGateState, setQrGateState] = useState<QRGateState | null>(null);
 
   // Detect ?mesa= param (client-side only, SSR safe)
   // Falls back to sessionStorage so waiter mode survives navigation without ?mesa= in the URL
@@ -151,12 +174,20 @@ export function CartDrawer({ isRestaurant = false }: Readonly<CartDrawerProps>) 
 
     // Mesa mode: skip PII validation, use mesa submit path
     if (mesaToken) {
+      // Validate QR client token before placing mesa order
+      const mesaId = mesaInfo?.id ?? mesaToken;
+      const storedClientToken = getMesaClientToken(mesaId);
+      if (!storedClientToken || isMesaClientTokenExpired(storedClientToken.expiresAt)) {
+        setQrGateState('TOKEN_EXPIRED');
+        return;
+      }
+      const clientToken = storedClientToken.token;
+
       setSending(true);
       try {
-        const mesaId = mesaInfo?.id ?? mesaToken;
         const res = await fetch('/api/pedidos', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${clientToken}` },
           body: JSON.stringify({
             tipo: 'mesa',
             mesa_id: mesaId,
@@ -168,6 +199,15 @@ export function CartDrawer({ isRestaurant = false }: Readonly<CartDrawerProps>) 
             idioma: language,
           }),
         });
+        if (res.status === 401) {
+          const body = await res.json() as { code?: string };
+          if (body.code === 'SESSION_CLOSED') {
+            setQrGateState('SESSION_CLOSED');
+          } else {
+            setQrGateState('TOKEN_EXPIRED');
+          }
+          return;
+        }
         const data = await res.json();
         if (res.ok && data.trackingToken) {
           addTrackingToken(data.trackingToken);
@@ -360,6 +400,16 @@ export function CartDrawer({ isRestaurant = false }: Readonly<CartDrawerProps>) 
 
   return (
     <>
+      {qrGateState && mesaToken && (
+        <QRScannerGate
+          mesaId={mesaInfo?.id ?? mesaToken}
+          state={qrGateState}
+          onTokenIssued={(token, expiresAt) => {
+            storeMesaClientToken(mesaInfo?.id ?? mesaToken, token, expiresAt);
+            setQrGateState(null);
+          }}
+        />
+      )}
       <Dialog open={showActiveOrdersDialog} onOpenChange={setShowActiveOrdersDialog}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
