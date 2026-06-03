@@ -187,3 +187,13 @@ Shown on the main menu page when `?mesa=` is active. Displays a collapsible summ
 Full ticket view rendered at `/mesa/{mesaId}/orders`. Receipt-style UI with perforated edges, monospace font, running total, item list with complements.
 
 When `pagos_mesa_habilitados` is enabled for the empresa, payment buttons appear below the ticket. See [mesa-payments.md](./mesa-payments.md) for the full payment flow.
+
+---
+
+## QR Session Enforcement
+
+Order placement (not menu browsing) requires physical presence at the table — enforced via in-app QR scan. On the first order attempt without a valid token, `QRScannerGate` activates the camera. A successful scan calls `POST /api/mesas/{mesaId}/token` and issues a 20-minute session token stored in `sessionStorage`.
+
+`validateMesaClientToken` middleware is applied to `GET /api/mesas/{mesaId}/orders` and `POST /api/pedidos`, returning `401 TOKEN_EXPIRED` or `SESSION_CLOSED` without a valid token.
+
+Session rotation on waiter close invalidates all previous tokens. See [qr-session-enforcement.md](./qr-session-enforcement.md) for the full design.

@@ -20,6 +20,7 @@ Plataforma multi-tenant de menú digital con sistema de pedidos online, panel de
 | Mapbox Search JS React | — | Autocompletar dirección de entrega |
 | Redsys TPV Virtual | — | Pago online (HMAC_SHA256_V1) |
 | Glovo Business LaaS | — | Despacho de riders (DH On Demand Rider API) |
+| @zxing/browser | — | Decodificación QR in-app (iOS Safari + Android Chrome) |
 
 ---
 
@@ -114,6 +115,7 @@ src/
 │       │   ├── route.ts             # GET ?token={uuid} — info de mesa
 │       │   └── [mesaId]/
 │       │       ├── orders/          # GET — pedidos + estado de pago (sesionPagada, pagoEnCurso)
+│       │       ├── token/           # POST — emite mesa_client_token (QR session enforcement)
 │       │       ├── lock/            # POST (adquirir) + DELETE (liberar) — lock de pago
 │       │       └── division/        # POST (activar) + DELETE (cancelar) — división de cuenta
 │       ├── waiter/                  # Panel de sala (PIN auth)
@@ -696,6 +698,7 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 | **SEO Multi-Tenant** | Metadata dinámica por empresa, hreflang (5 idiomas), sitemap/robots dinámicos, Schema.org Restaurant+FAQ+Menu, geo coordinates desde urlMapa, 404 con meta tags |
 | **Mesa Ordering** | QR table ordering para restaurantes dine-in. mesas + mesa_sesiones en DB. Rate limiting per-UUID (120/min). Ticket view con complementos + i18n + hora 24h. Notificación Telegram con botones Anotado/Servido. |
 | **Mesa Payments** | Pago en mesa vía Redsys TPV. Pago total o división de cuenta (2–20 personas). `mesa_division_pagos` elimina race condition en pagos simultáneos. Sistema de lock atómico (`pago_en_curso`) bloquea todos los usuarios de la mesa durante el pago. Verificación de total antes de pagar (detecta nuevos productos). Overlay 💳 en ticket + back button trap + adaptive polling (3s/10s). |
+| **QR Session Enforcement** | Pedidos en mesa requieren presencia física validada por escaneo in-app del QR impreso. Token de 20min en `mesa_client_tokens` (sessionStorage). `validateMesaClientToken` middleware en `/api/pedidos` y `/api/mesas/{mesaId}/orders`. Rotación de sesión al cerrar mesa invalida todos los tokens anteriores. Rate limit: 10 tokens/hora/mesa. |
 | **Waiter Panel** | Panel PIN-auth en /waiter. Grid de mesas, detalle por mesa, ciclo de sesión open/close. WaiterBanner sticky global. Integración con mesa_sesiones |
 | **Telegram Multi-modo** | tienda → quick-reply buttons. restaurante takeaway → time-selector + tracking. mesa → Anotado/Servido con estado seleccionado + Modificar |
 | **Delivery + Pago online** | Zona de cobertura por CP configurable. Cotización Glovo en tiempo real. Pago Redsys TPV Virtual obligatorio para delivery. Auto-despacho de rider al confirmar pago. Tracking page post-pago. |
@@ -713,6 +716,7 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 - [`docs/context/waiter-panel.md`](docs/context/waiter-panel.md) — Panel de sala (PIN auth, sesiones, mesas)
 - [`docs/telegram-notifications.md`](docs/telegram-notifications.md) — Notificaciones Telegram (tienda, restaurante takeaway, mesa)
 - [`docs/context/delivery.md`](docs/context/delivery.md) — Delivery: zona de cobertura, Glovo Business LaaS, Redsys TPV, flujo completo end-to-end
+- [`docs/context/qr-session-enforcement.md`](docs/context/qr-session-enforcement.md) — QR session enforcement: presencia física, mesa_client_tokens, QRScannerGate, rotación de sesión
 
 ---
 
