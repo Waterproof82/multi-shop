@@ -661,6 +661,16 @@ export const translations = {
     paymentKoTitle: "Pago no completado",
     paymentKoMessage: "No pudimos procesar tu pago. Podés intentarlo de nuevo.",
     paymentRetry: "Volver al pedido",
+    // QR Scanner Gate
+    qrScannerNoToken: "Escaneá el QR de tu mesa",
+    qrScannerNoTokenSub: "Para hacer un pedido, apuntá la cámara al código QR de tu mesa",
+    qrScannerExpired: "Sesión expirada",
+    qrScannerExpiredSub: "Tu sesión de 20 minutos finalizó. Escaneá el QR de nuevo para continuar",
+    qrScannerClosed: "Mesa cerrada",
+    qrScannerClosedSub: "Esta mesa ya no está disponible",
+    qrScannerWrongMesa: "Este QR no corresponde a tu mesa",
+    qrScannerPermission: "Activá el permiso de cámara para continuar",
+    qrScannerRetry: "Intentar de nuevo",
   },
   en: {
     // UI
@@ -1321,6 +1331,16 @@ export const translations = {
     paymentKoTitle: "Payment not completed",
     paymentKoMessage: "We could not process your payment. You can try again.",
     paymentRetry: "Back to order",
+    // QR Scanner Gate
+    qrScannerNoToken: "Scan your table QR",
+    qrScannerNoTokenSub: "To place an order, point your camera at the QR code on your table",
+    qrScannerExpired: "Session expired",
+    qrScannerExpiredSub: "Your 20-minute session ended. Scan the QR again to continue",
+    qrScannerClosed: "Table closed",
+    qrScannerClosedSub: "This table is no longer available",
+    qrScannerWrongMesa: "This QR does not match your table",
+    qrScannerPermission: "Enable camera permission to continue",
+    qrScannerRetry: "Try again",
   },
   fr: {
     // UI - Popup y carrito
@@ -1507,6 +1527,16 @@ export const translations = {
     paymentKoTitle: "Paiement non complété",
     paymentKoMessage: "Nous n'avons pas pu traiter votre paiement. Vous pouvez réessayer.",
     paymentRetry: "Retour à la commande",
+    // QR Scanner Gate
+    qrScannerNoToken: "Scannez le QR de votre table",
+    qrScannerNoTokenSub: "Pour passer une commande, pointez votre caméra sur le code QR de votre table",
+    qrScannerExpired: "Session expirée",
+    qrScannerExpiredSub: "Votre session de 20 minutes est terminée. Scannez à nouveau le QR pour continuer",
+    qrScannerClosed: "Table fermée",
+    qrScannerClosedSub: "Cette table n'est plus disponible",
+    qrScannerWrongMesa: "Ce QR ne correspond pas à votre table",
+    qrScannerPermission: "Activez l'autorisation de caméra pour continuer",
+    qrScannerRetry: "Réessayer",
   },
   it: {
     // UI - Popup y carrito
@@ -1693,6 +1723,16 @@ export const translations = {
     paymentKoTitle: "Pagamento non completato",
     paymentKoMessage: "Non siamo riusciti a elaborare il tuo pagamento. Puoi riprovare.",
     paymentRetry: "Torna all'ordine",
+    // QR Scanner Gate
+    qrScannerNoToken: "Scansiona il QR del tuo tavolo",
+    qrScannerNoTokenSub: "Per effettuare un ordine, punta la fotocamera sul codice QR del tuo tavolo",
+    qrScannerExpired: "Sessione scaduta",
+    qrScannerExpiredSub: "La tua sessione di 20 minuti è terminata. Scansiona di nuovo il QR per continuare",
+    qrScannerClosed: "Tavolo chiuso",
+    qrScannerClosedSub: "Questo tavolo non è più disponibile",
+    qrScannerWrongMesa: "Questo QR non corrisponde al tuo tavolo",
+    qrScannerPermission: "Attiva il permesso della fotocamera per continuare",
+    qrScannerRetry: "Riprova",
   },
   de: {
     // UI - Popup y carrito
@@ -1879,6 +1919,16 @@ export const translations = {
     paymentKoTitle: "Zahlung nicht abgeschlossen",
     paymentKoMessage: "Wir konnten Ihre Zahlung nicht verarbeiten. Sie können es erneut versuchen.",
     paymentRetry: "Zurück zur Bestellung",
+    // QR Scanner Gate
+    qrScannerNoToken: "QR-Code Ihres Tisches scannen",
+    qrScannerNoTokenSub: "Um eine Bestellung aufzugeben, richten Sie die Kamera auf den QR-Code an Ihrem Tisch",
+    qrScannerExpired: "Sitzung abgelaufen",
+    qrScannerExpiredSub: "Ihre 20-Minuten-Sitzung ist beendet. Scannen Sie den QR-Code erneut, um fortzufahren",
+    qrScannerClosed: "Tisch geschlossen",
+    qrScannerClosedSub: "Dieser Tisch ist nicht mehr verfügbar",
+    qrScannerWrongMesa: "Dieser QR-Code gehört nicht zu Ihrem Tisch",
+    qrScannerPermission: "Aktivieren Sie die Kameraberechtigung, um fortzufahren",
+    qrScannerRetry: "Erneut versuchen",
   },
 } as const;
 

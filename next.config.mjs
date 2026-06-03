@@ -71,7 +71,7 @@ const nextConfig = withBundleAnalyzer({
             // Fallback CSP for static assets; middleware overrides this for page requests with a per-request nonce
             value: cspFallback,
           },
-          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=(), usb=()' },
+          { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=(), payment=(), usb=()' },
           { key: 'X-XSS-Protection', value: '1; mode=block' },
         ],
       },

@@ -46,5 +46,9 @@ export async function POST(
     return NextResponse.json({ error: 'Error al cerrar la sesión de mesa' }, { status: 500 });
   }
 
+  // Auto-reopen: rotate session so the table is immediately available for new customers.
+  // Old client tokens are invalidated because they reference the closed session (cerrada_at check).
+  await mesaSesionUseCase.openSesion(parsed.data, empresaId);
+
   return NextResponse.json({ ok: true });
 }

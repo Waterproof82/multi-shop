@@ -308,7 +308,7 @@ Configurados en `next.config.mjs` para todas las rutas:
 | `X-Frame-Options` | `SAMEORIGIN` (páginas) / `DENY` (admin y API) |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |
 | `Strict-Transport-Security` | `max-age=31536000; includeSubDomains; preload` |
-| `Permissions-Policy` | `camera=(), microphone=(), geolocation=(), payment=(), usb=()` |
+| `Permissions-Policy` | `camera=(self), microphone=(), geolocation=(), payment=(), usb=()` — `camera=(self)` required for `QRScannerGate` |
 | `X-XSS-Protection` | `1; mode=block` |
 | `Cache-Control` (API) | `no-store, private` |
 
@@ -339,6 +339,8 @@ Cada route handler aplica su propio rate limiter como segunda capa:
 | `rateLimitLogin` | `POST /api/admin/login` | 5 intentos / 15 min por IP |
 | `rateLimitPublic` | `GET /api/admin/login`, `/api/pedidos`, `/api/unsubscribe`, `/api/csp-report` | 20 req / min por IP |
 | `rateLimitAdmin` | Todas las rutas `/api/admin/*` | 60 req / min por IP |
+| `rateLimitMesaPolling` | `GET /api/mesas/{mesaId}/orders` | 120 req / min por mesa UUID |
+| `rateLimitMesaTokenIssuance` | `POST /api/mesas/{mesaId}/token` | 10 tokens / hora por mesa UUID |
 
 La IP real se extrae del header `cf-connecting-ip` (Cloudflare) con fallback al **primer** entry de `x-forwarded-for` (nunca el último, que sería IP de Cloudflare).
 
@@ -666,6 +668,41 @@ Configurado en el proxy para todas las rutas `/api/*`. Solo orígenes en:
 | `NEXT_PUBLIC_R2_DOMAIN` | Dominio público de imágenes R2 | warn Producción |
 | `CORS_ALLOWED_ORIGINS` | Lista exacta de orígenes CORS | — |
 | `CLOUDFLARE_API_TOKEN` | Upload directo vía Cloudflare API | — |
+
+---
+
+## Mesa Client Tokens
+
+Token-based physical presence enforcement for dine-in ordering. See [`qr-session-enforcement.md`](./qr-session-enforcement.md) for the full feature documentation.
+
+### `mesa_client_tokens` table
+
+```sql
+id          uuid PRIMARY KEY
+mesa_id     uuid NOT NULL REFERENCES mesas(id) ON DELETE CASCADE
+sesion_id   uuid NOT NULL REFERENCES mesa_sesiones(id) ON DELETE CASCADE
+token       text NOT NULL UNIQUE   -- cryptographically random, base64url
+expires_at  timestamptz NOT NULL   -- issued_at + 20 minutes
+```
+
+RLS: `anon` access explicitly denied (RESTRICTIVE policy). `service_role` has full access via explicit GRANT.
+
+### Validation middleware
+
+`validateMesaClientToken(request)` in `src/core/infrastructure/api/validate-mesa-client-token.ts` is applied before all mesa order endpoints:
+- Reads `Authorization: Bearer {token}`
+- Queries `mesa_client_tokens JOIN mesa_sesiones` — checks `expires_at > now()` AND `cerrada_at IS NULL`
+- Returns `401` with code `TOKEN_EXPIRED` or `SESSION_CLOSED` on failure
+
+Session rotation on waiter close (`POST /api/waiter/mesas/{mesaId}/close`) immediately reopens the session. All tokens tied to the previous session fail validation because `cerrada_at IS NULL` is no longer true.
+
+### Rate limiter
+
+`rateLimitMesaTokenIssuance`: `slidingWindow(10, "1 h")` — 10 tokens/hour per mesa UUID. Prefix: `ratelimit:mesa-token`.
+
+### Camera permission
+
+`next.config.mjs` sets `Permissions-Policy: camera=(self)` — required for `QRScannerGate` (`@zxing/browser`) to access the device camera. Without this, the browser would throw `NotAllowedError` even if the user grants camera permission.
 
 ---
 

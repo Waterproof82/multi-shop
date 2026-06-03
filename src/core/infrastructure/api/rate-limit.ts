@@ -334,3 +334,42 @@ export async function rateLimitAdmin(request: Request): Promise<NextResponse | n
 
   return null;
 }
+
+/**
+ * Rate limiter for mesa client token issuance: 10 tokens per hour per mesaId.
+ * Keyed by mesaId to prevent abuse even with physical QR access.
+ */
+let mesaTokenLimiter: Ratelimit | null = null;
+
+function getMesaTokenLimiter(): Ratelimit | null {
+  if (mesaTokenLimiter) return mesaTokenLimiter;
+
+  const client = getRedis();
+  if (!client) return null;
+
+  mesaTokenLimiter = new Ratelimit({
+    redis: client,
+    limiter: Ratelimit.slidingWindow(10, "1 h"),
+    prefix: "ratelimit:mesa-token",
+  });
+  return mesaTokenLimiter;
+}
+
+/**
+ * Apply rate limiting to mesa token issuance. Keyed by mesaId.
+ * Returns NextResponse 429 if exceeded, or null if passed.
+ */
+export async function rateLimitMesaTokenIssuance(mesaId: string): Promise<NextResponse | null> {
+  const limiter = getMesaTokenLimiter();
+  if (!limiter) return null;
+
+  const { success } = await limiter.limit(mesaId);
+  if (!success) {
+    return NextResponse.json(
+      { error: "Too many QR scans. Please try again later." },
+      { status: 429 }
+    );
+  }
+
+  return null;
+}
