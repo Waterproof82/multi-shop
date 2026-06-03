@@ -121,8 +121,6 @@ export function WaiterBanner() {
     return () => clearInterval(interval);
   }, [mesaId, fetchLock]);
 
-  // Hide on waiter panel pages — they have their own navigation and product search
-  if (pathname.startsWith("/waiter/tables")) return null;
 
   if (!mesaLabel) return null;
 

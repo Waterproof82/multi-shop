@@ -51,7 +51,7 @@ export async function POST(request: Request) {
 
   const token = await signWaiterToken(empresa.id as string);
 
-  const response = NextResponse.json({ ok: true });
+  const response = NextResponse.json({ ok: true, empresaId: empresa.id as string });
   response.cookies.set('waiter_token', token, {
     httpOnly: true,
     sameSite: 'strict',

@@ -5,5 +5,5 @@ export async function GET(request: NextRequest) {
   if (!empresaId) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, empresaId });
 }
