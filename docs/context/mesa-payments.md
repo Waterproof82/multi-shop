@@ -55,6 +55,16 @@ payment_amount_cents int   -- importe en céntimos enviado a Redsys
 ### RPC: `increment_division_pagos(p_sesion_id UUID)`
 Incremento atómico de `division_pagos_realizados`. Retorna `(pagos_realizados INT, personas INT)`. Usa `SECURITY DEFINER` para ejecutarse en contexto de servicio desde el webhook. Garantiza que el contador no se incrementa dos veces si el webhook llega duplicado.
 
+### RPC: `get_mesas_with_sessions(p_empresa_id UUID)`
+Retorna todas las mesas de la empresa con el estado de sesión activa. Usada por el waiter grid.
+
+**Importante:** `session_total` se computa como `SUM(pedidos.total)` desde la tabla `pedidos` — NO desde `mesa_sesiones.total`. Esto garantiza que el importe es correcto en todos los estados, incluyendo `pago_en_curso = true`, donde `mesa_sesiones.total` puede ser 0.
+
+```sql
+-- session_total siempre refleja la suma real de pedidos
+COALESCE((SELECT SUM(p.total) FROM pedidos p WHERE p.sesion_id = ms.id), 0) AS session_total
+```
+
 ---
 
 ## Sistema de Bloqueo de Pago (`pago_en_curso`)
@@ -356,9 +366,10 @@ ngrok http 3000
 | Archivo | Rol |
 |---|---|
 | `supabase/migrations/20260601000001_pagos_mesa_habilitados.sql` | Columna en empresas |
-| `supabase/migrations/20260601000002_division_cuenta_mesa.sql` | Columnas de división + RPC |
+| `supabase/migrations/20260601000002_division_cuenta_mesa.sql` | Columnas de división + RPC increment_division_pagos |
 | `supabase/migrations/20260601000003_mesa_division_pagos.sql` | Tabla mesa_division_pagos |
 | `supabase/migrations/20260601000004_mesa_sesion_pago_en_curso.sql` | Columnas pago_en_curso + pago_iniciado_en |
+| `supabase/migrations/20260603000001_fix_get_mesas_with_sessions_total.sql` | Fix RPC: session_total desde SUM(pedidos) en vez de mesa_sesiones.total |
 | `src/core/application/use-cases/payment/initiateRedsysMesaPaymentUseCase.ts` | Use case de inicio de pago (lock + grace period) |
 | `src/core/application/use-cases/payment/processRedsysWebhookUseCase.ts` | Webhook — Path 1 (división) + Path 2 (total) |
 | `src/app/api/redsys/initiate-mesa/route.ts` | Endpoint de inicio de pago |
