@@ -11,6 +11,7 @@ import { SupabaseMesaSesionRepository } from './supabase-mesa-sesion.repository'
 import { SupabaseSuperAdminRepository } from './SupabaseSuperAdminRepository';
 import { SupabaseTgtgRepository } from './supabase-tgtg.repository';
 import { SupabaseDescuentoRepository } from './supabase-descuento.repository';
+import { SupabaseMesaClientTokenRepository } from './supabase-mesa-client-token.repository';
 import { ProductUseCase } from '@/core/application/use-cases/product.use-case';
 import { CategoryUseCase } from '@/core/application/use-cases/category.use-case';
 import { ClienteUseCase } from '@/core/application/use-cases/cliente.use-case';
@@ -23,6 +24,7 @@ import { TgtgUseCase } from '@/core/application/use-cases/tgtg.use-case';
 import { AuthAdminUseCase } from '@/core/application/use-cases/auth-admin.use-case';
 import { SuperAdminUseCase } from '@/core/application/use-cases/superadmin.use-case';
 import { DescuentoUseCase } from '@/core/application/use-cases/descuento.use-case';
+import { MesaClientTokenUseCase } from '@/core/application/use-cases/mesa-client-token.use-case';
 
 const supabase = getSupabaseClient();
 const supabaseAnon = getSupabaseAnonClient();
@@ -39,6 +41,7 @@ export const mesaSesionRepository = new SupabaseMesaSesionRepository(supabase);
 const superAdminRepository = new SupabaseSuperAdminRepository(supabase);
 const tgtgRepository = new SupabaseTgtgRepository(supabase);
 const descuentoRepository = new SupabaseDescuentoRepository(supabase);
+const mesaClientTokenRepository = new SupabaseMesaClientTokenRepository(supabase);
 
 // Public repository (anon key) for public-facing pages
 export const empresaPublicRepository = new SupabaseEmpresaRepository(supabaseAnon);
@@ -56,3 +59,4 @@ export const tgtgUseCase = new TgtgUseCase(tgtgRepository, clienteRepository);
 export const authAdminUseCase = new AuthAdminUseCase(adminRepository);
 export const superAdminUseCase = new SuperAdminUseCase(superAdminRepository);
 export const descuentoUseCase = new DescuentoUseCase(descuentoRepository, empresaRepository);
+export const mesaClientTokenUseCase = new MesaClientTokenUseCase(mesaClientTokenRepository, mesaSesionRepository);
