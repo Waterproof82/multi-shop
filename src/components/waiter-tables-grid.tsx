@@ -12,7 +12,7 @@ interface WaiterTablesGridProps {
 
 async function fetchMesas(): Promise<MesaWithSession[]> {
   try {
-    const res = await fetch("/api/waiter/mesas");
+    const res = await fetch("/api/waiter/mesas", { cache: "no-store" });
     if (!res.ok) return [];
     const data = await res.json() as { mesas: MesaWithSession[] };
     return data.mesas ?? [];
@@ -32,7 +32,7 @@ export function WaiterTablesGrid({ mesas: initialMesas }: WaiterTablesGridProps)
 
   useEffect(() => {
     void refresh();
-    const interval = setInterval(() => { void refresh(); }, 5000);
+    const interval = setInterval(() => { void refresh(); }, 2000);
     return () => clearInterval(interval);
   }, [refresh]);
 

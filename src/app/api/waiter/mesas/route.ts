@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { mesaSesionUseCase } from '@/core/infrastructure/database';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   const empresaId = request.headers.get('x-empresa-id');
   if (!empresaId) {
