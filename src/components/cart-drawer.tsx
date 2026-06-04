@@ -404,9 +404,13 @@ export function CartDrawer({ isRestaurant = false }: Readonly<CartDrawerProps>) 
     <>
       {showOrderToast && (
         <div className="fixed inset-0 z-[400] flex items-center justify-center pointer-events-none">
-          <div className="bg-primary text-primary-foreground px-8 py-5 rounded-2xl shadow-xl text-lg font-semibold flex items-center gap-3 animate-in fade-in zoom-in-95 duration-200">
-            <Check className="size-6 shrink-0" />
-            {t('mesaOrderConfirmed', language)}
+          <div className="bg-card/95 backdrop-blur-md border border-border shadow-2xl rounded-3xl px-10 py-8 flex flex-col items-center gap-4 animate-in fade-in zoom-in-90 duration-300">
+            <div className="w-16 h-16 rounded-full bg-primary/10 border-2 border-primary/25 flex items-center justify-center">
+              <Check className="size-8 text-primary" strokeWidth={2.5} />
+            </div>
+            <p className="text-base font-bold text-foreground text-center leading-snug">
+              {t('mesaOrderConfirmed', language)}
+            </p>
           </div>
         </div>
       )}

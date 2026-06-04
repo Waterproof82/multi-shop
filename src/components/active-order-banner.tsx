@@ -92,26 +92,30 @@ export function ActiveOrderBanner() {
 
   return (
     <>
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-md">
+      <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2.5rem)] max-w-sm">
         <div
-          className="flex items-center gap-3 rounded-2xl px-4 py-3 shadow-xl cursor-pointer active:scale-95 transition-transform"
-          style={{ backgroundColor: '#f97316', color: '#fff' }}
+          className="flex items-center gap-3 rounded-2xl px-4 py-3.5 cursor-pointer active:scale-[0.97] transition-all duration-200 border border-white/15"
+          style={{
+            background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+            color: '#fff',
+            boxShadow: '0 8px 24px rgba(249, 115, 22, 0.45), 0 2px 8px rgba(0,0,0,0.12)',
+          }}
           onClick={() => router.push(`/tracking/${primaryToken}`)}
           role="button"
           aria-label={bannerCta}
         >
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 shrink-0">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 shrink-0 backdrop-blur-sm">
             <Icon className="w-5 h-5" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold leading-tight">{bannerText}</p>
-            <p className="text-xs opacity-90 mt-0.5">{bannerCta}</p>
+            <p className="text-sm font-bold leading-tight tracking-wide">{bannerText}</p>
+            <p className="text-xs mt-0.5 font-medium" style={{ opacity: 0.82 }}>{bannerCta} →</p>
           </div>
           {hasTienda && (
             <button
               type="button"
               onClick={handleDismissTienda}
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors shrink-0"
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 hover:bg-white/35 transition-colors shrink-0"
               aria-label={t('close', language)}
             >
               <X className="w-4 h-4" />
