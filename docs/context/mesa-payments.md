@@ -131,6 +131,18 @@ Antes de cualquier pago, el cliente verifica que el total en DB coincide con lo 
 
 El total que Redsys cobra siempre se recalcula server-side. El warning es UX — garantiza que el usuario confirma explícitamente el importe antes de pagar.
 
+### Segunda capa de verificación — `expectedTotalCents` en el use case
+
+El check del cliente (paso 3) puede perder un pedido que estaba en vuelo: si el `POST /api/pedidos` de otro usuario empezó ANTES de que se adquiriese el lock pero commitea DESPUÉS de que el cliente lee el total fresco, ese pedido no aparece en el fetch del paso 3.
+
+Para cubrirlo, el cliente pasa `expectedTotalCents` (total verificado en centavos) al hacer `POST /api/redsys/initiate-mesa`. El use case recalcula el total de DB justo antes de construir el form Redsys y, si difiere en más de 1 céntimo, retorna **409 TOTAL_MISMATCH**:
+
+```json
+{ "code": "TOTAL_MISMATCH", "newTotalCents": 4250 }
+```
+
+El cliente trata el 409 igual que el mismatch client-side: actualiza `sessionData.total` al nuevo importe y muestra el banner de confirmación. El usuario ve el total real y confirma antes de ir a Redsys.
+
 ---
 
 ## Flujo: Pagar total
@@ -245,9 +257,11 @@ Inicia el pago para la sesión activa de una mesa.
 ```json
 {
   "mesaId": "uuid",
-  "esDivision": false
+  "esDivision": false,
+  "expectedTotalCents": 4250
 }
 ```
+`expectedTotalCents` es opcional pero siempre se envía desde el cliente para activar la validación anti-race-condition.
 
 **Response (success):**
 ```json
@@ -258,7 +272,12 @@ Inicia el pago para la sesión activa de una mesa.
 }
 ```
 
-**Response (error 423):** Hay otro pago en curso y el lock no está en grace period.
+**Response (409 — total actualizado mientras se procesaba):**
+```json
+{ "code": "TOTAL_MISMATCH", "newTotalCents": 4250 }
+```
+
+**Response (423):** Hay otro pago en curso y el lock no está en grace period.
 
 ### `POST /api/mesas/{mesaId}/lock`
 
