@@ -349,7 +349,8 @@ export function CartDrawer({ isRestaurant = false }: Readonly<CartDrawerProps>) 
             window.history.replaceState({}, '', window.location.href);
           }
           closeCart();
-          router.push(`/tracking/${data.trackingToken}`);
+          const restauranteTrackingUrl = `/tracking/${data.trackingToken}`;
+          setTimeout(() => { window.location.href = restauranteTrackingUrl; }, 0);
         } else if (data.trackingToken) {
           // Tienda: redirect to tracking page
           addTrackingToken(data.trackingToken);
