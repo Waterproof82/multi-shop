@@ -9,6 +9,8 @@ import { initiateRedsysMesaPaymentUseCase } from '@/core/application/use-cases/p
 const initiateMesaSchema = z.object({
   mesaId: z.string().uuid(),
   esDivision: z.boolean().default(false),
+  /** Client's expected total in cents for race-condition guard */
+  expectedTotalCents: z.number().int().positive().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -33,18 +35,29 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return validationErrorResponse(parsed.error.errors[0].message);
 
   const origin = request.nextUrl.origin;
-  const { mesaId, esDivision } = parsed.data;
+  const { mesaId, esDivision, expectedTotalCents } = parsed.data;
 
   const result = await initiateRedsysMesaPaymentUseCase({
     mesaId,
     empresaId: empresaResult.data.id,
     esDivision,
+    expectedTotalCents,
     // urlOk → confirm-mesa processes the Redsys POST and then redirects to the ticket.
     // This acts as a reliable fallback when the server-to-server webhook is delayed or fails.
     urlOk: `${origin}/api/redsys/confirm-mesa?redirect=/mesa/${mesaId}/orders`,
     urlKo: `${origin}/api/redsys/cancel-mesa?mesaId=${mesaId}&redirect=/mesa/${mesaId}/orders`,
     webhookUrl: `${origin}/api/redsys/webhook`,
   });
+
+  if (!result.success && result.error.code === 'TOTAL_MISMATCH') {
+    // Parse the newTotalCents from the error message (encoded as JSON)
+    try {
+      const payload = JSON.parse(result.error.message) as { newTotalCents: number };
+      return NextResponse.json({ code: 'TOTAL_MISMATCH', newTotalCents: payload.newTotalCents }, { status: 409 });
+    } catch {
+      return NextResponse.json({ code: 'TOTAL_MISMATCH' }, { status: 409 });
+    }
+  }
 
   return handleResult(result);
 }

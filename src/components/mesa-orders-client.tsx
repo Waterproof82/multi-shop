@@ -365,7 +365,7 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
       .catch(() => null);
   }, [mesaId]);
 
-  const initiateRedsys = async (esDivision: boolean) => {
+  const initiateRedsys = async (esDivision: boolean, expectedTotalCents?: number) => {
     if (paying) return;
     const clientToken = requireToken();
     if (!clientToken) return; // gate is now open
@@ -377,11 +377,27 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${clientToken}`,
         },
-        body: JSON.stringify({ mesaId, esDivision }),
+        body: JSON.stringify({ mesaId, esDivision, expectedTotalCents }),
       });
       if (res.status === 401) {
         const body = await res.json() as { code?: string };
         handleAuthError(body.code);
+        setPaying(false);
+        return;
+      }
+      if (res.status === 409) {
+        // An order committed to DB between the client's total check and Redsys initiation.
+        // Show the updated total so the user can review and confirm before paying.
+        const body = await res.json() as { code?: string; newTotalCents?: number };
+        if (body.code === 'TOTAL_MISMATCH' && body.newTotalCents !== undefined) {
+          const oldTotal = sessionData?.total ?? 0;
+          const newTotal = body.newTotalCents / 100;
+          const action: PendingAction = esDivision ? 'division-pay' : 'full';
+          const mismatch = { oldTotal, newTotal, pendingAction: action };
+          setSessionData(prev => prev ? { ...prev, total: newTotal } : prev);
+          setTotalMismatch(mismatch);
+          try { sessionStorage.setItem(`mesa-mismatch-${mesaId}`, JSON.stringify(mismatch)); } catch { /* ignore */ }
+        }
         setPaying(false);
         return;
       }
@@ -456,12 +472,14 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
   const executePendingAction = (action: PendingAction) => {
     setTotalMismatch(null);
     try { sessionStorage.removeItem(`mesa-mismatch-${mesaId}`); } catch { /* ignore */ }
+    // Use the current sessionData.total (already updated to the fresh total after any mismatch)
+    const expectedCents = sessionData ? Math.round(sessionData.total * 100) : undefined;
     if (action === 'full') {
-      void initiateRedsys(false);
+      void initiateRedsys(false, expectedCents);
     } else if (action === 'division-modal') {
       setShowDivisionModal(true);
     } else {
-      void initiateRedsys(true);
+      void initiateRedsys(true, expectedCents);
     }
   };
 

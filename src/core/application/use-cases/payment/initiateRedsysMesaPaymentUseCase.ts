@@ -13,6 +13,9 @@ export interface InitiateRedsysMesaPaymentInput {
   empresaId: string;
   /** true = pay only this person's share */
   esDivision: boolean;
+  /** Client's expected total in cents. If provided and it differs from DB total, the use case
+   *  returns TOTAL_MISMATCH so the client can show an updated total before retrying. */
+  expectedTotalCents?: number;
   urlOk: string;
   urlKo: string;
   webhookUrl: string;
@@ -152,6 +155,24 @@ export async function initiateRedsysMesaPaymentUseCase(
 
     const rows = pedidos as { id: string; total: unknown; numero_pedido: unknown }[];
     const sessionTotal = rows.reduce((sum, p) => sum + Number(p.total), 0);
+
+    // Guard against in-flight orders that committed after the client's last fetch.
+    // If the caller provided expectedTotalCents and it differs by more than 1 cent,
+    // abort and return a typed error so the client can show the updated total.
+    if (
+      input.expectedTotalCents !== undefined &&
+      Math.abs(Math.round(sessionTotal * 100) - input.expectedTotalCents) > 1
+    ) {
+      return {
+        success: false,
+        error: {
+          code: 'TOTAL_MISMATCH',
+          message: JSON.stringify({ newTotalCents: Math.round(sessionTotal * 100) }),
+          module: 'use-case',
+          method: 'initiateRedsysMesaPaymentUseCase',
+        },
+      };
+    }
 
     // Determine the charge amount: full total or one person's share
     let amountCents: number;
