@@ -305,21 +305,11 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
 
   const refresh = useCallback(async () => {
     try {
-      const stored = getStoredToken(mesaId);
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (stored && !isTokenExpired(stored.expiresAt)) {
-        headers['Authorization'] = `Bearer ${stored.token}`;
-      }
-      const res = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/orders`, { headers });
-      if (res.status === 401) {
-        const body = await res.json() as { code?: string };
-        handleAuthError(body.code);
-        return;
-      }
+      const res = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/orders`);
       if (res.ok) setSessionData(await res.json() as MesaSessionData);
     } catch { /* best-effort */ }
     finally { setLoading(false); }
-  }, [mesaId, handleAuthError]);
+  }, [mesaId]);
 
   const releaseCheckoutLock = useCallback(() => {
     setIsInitiatingPayment(false);
