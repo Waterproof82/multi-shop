@@ -198,6 +198,16 @@ if (cancelled) {
 controlsRef.current = controls;
 ```
 
+3. **`onTokenIssuedRef` — parent re-render stability** — `onTokenIssued` is defined inline in `cart-drawer.tsx` (no `useCallback`), so it's a new reference on every parent render. Including it in `startScanner`'s deps would cause the scanner to restart on each render: `stopScanner() → startScanner()` — camera flickers on/off. Fix: `onTokenIssuedRef` holds the latest callback via a sync `useEffect`. The ref is used inside the decode callback instead of the prop directly. `onTokenIssued` is excluded from `startScanner`'s deps.
+
+```typescript
+const onTokenIssuedRef = useRef(onTokenIssued);
+useEffect(() => { onTokenIssuedRef.current = onTokenIssued; }, [onTokenIssued]);
+// inside decode callback:
+onTokenIssuedRef.current(data.token, data.expiresAt);
+// startScanner deps: [mesaId, state, stopScanner, lang]  ← no onTokenIssued
+```
+
 **Permissions:** Requires `camera=(self)` in `Permissions-Policy` header (set in `next.config.mjs`). The browser will prompt for camera permission on first use.
 
 ### Token storage utilities (in `mesa-orders-client.tsx` and `cart-drawer.tsx`)
