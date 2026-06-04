@@ -11,20 +11,27 @@ interface QRScannerGateProps {
   mesaId: string;
   state: QRGateState;
   onTokenIssued: (token: string, expiresAt: string) => void;
+  onCancel?: () => void;
 }
 
-export function QRScannerGate({ mesaId, state, onTokenIssued }: QRScannerGateProps) {
+export function QRScannerGate({ mesaId, state, onTokenIssued, onCancel }: QRScannerGateProps) {
   const { language } = useLanguage();
   const lang = language as Parameters<typeof t>[1];
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  // Per-invocation cancel fn. React StrictMode runs effects twice: cleanup fires before
+  // decodeFromVideoDevice resolves, so isActiveRef would be reset to true by the second run
+  // before invocation #1 checks it. A closure-local `cancelled` flag solves this correctly.
+  const cancelCurrentScanRef = useRef<(() => void) | null>(null);
   // Ref so the zxing callback can schedule a retry without self-reference TDZ
   const startScannerRef = useRef<() => Promise<void>>(() => Promise.resolve());
   // Guard: zxing fires the callback multiple times for the same QR; prevent duplicate token requests
   const tokenRequestInFlightRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [simulating, setSimulating] = useState(false);
 
   const title =
     state === 'NO_TOKEN'
@@ -41,8 +48,20 @@ export function QRScannerGate({ mesaId, state, onTokenIssued }: QRScannerGatePro
         : t('qrScannerClosedSub', lang);
 
   const stopScanner = useCallback(() => {
+    // Cancel the in-flight startScanner invocation so it stops its own orphaned stream on resolve
+    cancelCurrentScanRef.current?.();
+    cancelCurrentScanRef.current = null;
+
+    const stream =
+      streamRef.current ??
+      (videoRef.current?.srcObject instanceof MediaStream ? videoRef.current.srcObject : null);
+
     controlsRef.current?.stop();
     controlsRef.current = null;
+    streamRef.current = null;
+
+    if (videoRef.current) videoRef.current.srcObject = null;
+    stream?.getTracks().forEach(track => track.stop());
     setScanning(false);
   }, []);
 
@@ -50,15 +69,21 @@ export function QRScannerGate({ mesaId, state, onTokenIssued }: QRScannerGatePro
     if (state === 'SESSION_CLOSED') return;
     if (!videoRef.current) return;
 
+    // Local flag per invocation — immune to isActiveRef being reset by the second StrictMode run
+    let cancelled = false;
+    cancelCurrentScanRef.current = () => { cancelled = true; };
+
     setError(null);
     setScanning(true);
 
     try {
       const reader = new BrowserQRCodeReader();
-      controlsRef.current = await reader.decodeFromVideoDevice(
+      const video = videoRef.current;
+
+      const controls = await reader.decodeFromVideoDevice(
         undefined,
-        videoRef.current,
-        async (result, err) => {
+        video,
+        async (result, _err) => {
           if (!result) {
             // NotFoundException is normal (no QR in frame yet), ignore.
             // Other errors on mobile are often transient (stream not ready on first frames).
@@ -110,6 +135,24 @@ export function QRScannerGate({ mesaId, state, onTokenIssued }: QRScannerGatePro
           }
         }
       );
+
+      if (cancelled) {
+        // Cleanup ran while we were awaiting getUserMedia (React StrictMode or fast cancel).
+        // Stop the orphaned stream immediately before returning.
+        controls.stop();
+        if (video.srcObject instanceof MediaStream) {
+          const s = video.srcObject;
+          video.srcObject = null;
+          s.getTracks().forEach(t => t.stop());
+        }
+        return;
+      }
+
+      cancelCurrentScanRef.current = null;
+      controlsRef.current = controls;
+      if (video.srcObject instanceof MediaStream) {
+        streamRef.current = video.srcObject;
+      }
     } catch (e) {
       setScanning(false);
       if (e instanceof DOMException && e.name === 'NotAllowedError') {
@@ -170,6 +213,49 @@ export function QRScannerGate({ mesaId, state, onTokenIssued }: QRScannerGatePro
             )}
           </>
         )}
+
+        <div className="flex flex-col items-center gap-2 w-full mt-2">
+          {state !== 'SESSION_CLOSED' && (
+            <button
+              type="button"
+              disabled={simulating}
+              onClick={async () => {
+                if (tokenRequestInFlightRef.current) return;
+                tokenRequestInFlightRef.current = true;
+                setSimulating(true);
+                stopScanner();
+                try {
+                  const res = await fetch(`/api/mesas/${mesaId}/token`, { method: 'POST' });
+                  if (!res.ok) {
+                    const body = await res.json() as { error?: string };
+                    setError(body.error ?? t('qrScannerRetry', lang));
+                    tokenRequestInFlightRef.current = false;
+                  } else {
+                    const data = await res.json() as { token: string; expiresAt: string };
+                    onTokenIssued(data.token, data.expiresAt);
+                  }
+                } catch {
+                  setError(t('qrScannerRetry', lang));
+                  tokenRequestInFlightRef.current = false;
+                } finally {
+                  setSimulating(false);
+                }
+              }}
+              className="w-full px-4 py-2 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-muted/50 disabled:opacity-50"
+            >
+              {simulating ? '...' : t('qrScannerSimulate', lang)}
+            </button>
+          )}
+          {onCancel && (
+            <button
+              type="button"
+              onClick={() => { stopScanner(); onCancel(); }}
+              className="w-full px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted/40"
+            >
+              {t('cancel', lang)}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

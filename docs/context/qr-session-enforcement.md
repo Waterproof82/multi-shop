@@ -103,7 +103,7 @@ Issues a new mesa client token for a device.
 
 **Auth:** None required — this is the entry point. Rate-limited.
 
-**Rate limit:** `rateLimitMesaTokenIssuance` — 10 tokens/hour per mesa UUID (Upstash Redis, `slidingWindow`). Prefix: `ratelimit:mesa-token`.
+**Rate limit:** `rateLimitMesaTokenIssuance` — 30 tokens/hour per mesa UUID (Upstash Redis, `slidingWindow`). Prefix: `ratelimit:mesa-token`.
 
 **Request body:** `{}` (none required)
 
@@ -153,31 +153,52 @@ File: `src/components/qr-scanner-gate.tsx`
 
 A fullscreen dark overlay with an in-app camera feed. Uses `@zxing/browser` (`BrowserQRCodeReader`) for QR decoding — compatible with iOS Safari and Android Chrome.
 
-**State machine (`QRGateState`):**
+**State type (`QRGateState`):**
 ```typescript
-type QRGateState =
-  | { status: 'idle' }           // not shown
-  | { status: 'scanning' }       // camera active, waiting for scan
-  | { status: 'success' }        // scan succeeded, token stored
-  | { status: 'error'; message: string }  // camera error
-  | { status: 'session_closed' } // SESSION_CLOSED — shows "mesa cerrada" UI, no camera
+export type QRGateState = 'NO_TOKEN' | 'TOKEN_EXPIRED' | 'SESSION_CLOSED';
 ```
 
-**Key implementation detail — `startScannerRef` pattern:**
-
-`startScanner` schedules its own retry via `setTimeout(() => startScannerRef.current())`. A direct self-reference inside `useCallback` would trigger a temporal dead zone error (ESLint `react-hooks/exhaustive-deps`). The fix: a `useRef` holds the latest `startScanner` binding, updated via `useEffect`. The timeout calls `startScannerRef.current()` instead.
+- `NO_TOKEN` — first order attempt, no token in sessionStorage yet
+- `TOKEN_EXPIRED` — token found but past 20-minute TTL or server returned TOKEN_EXPIRED
+- `SESSION_CLOSED` — server returned SESSION_CLOSED (waiter rotated session); camera not shown, only informational message
 
 **Props:**
 ```typescript
 interface QRScannerGateProps {
   mesaId: string;
-  onSuccess: (token: string, expiresAt: string) => void;
-  onClose?: () => void;
-  sessionClosed?: boolean;  // shows "mesa cerrada" state, no camera
+  state: QRGateState;
+  onTokenIssued: (token: string, expiresAt: string) => void;
+  onCancel?: () => void;
 }
 ```
 
-**Permissions:** Requires `camera=(self)` in `Permissions-Policy` header (fixed in `next.config.mjs`). The browser will prompt for camera permission on first use.
+**UI buttons:**
+- **Cancel** (`onCancel`) — closes the gate without issuing a token; cart stays open but order is not submitted
+- **Continuar sin QR** (simulate) — calls `POST /api/mesas/{mesaId}/token` directly without scanning, for testing or fallback
+
+**Auto-submit on scan:** When a valid token is issued (`onTokenIssued`), `cart-drawer.tsx` stores the token in sessionStorage and immediately calls `handleConfirmOrder()` — no manual resubmit needed.
+
+**Confirmed order toast:** After a successful mesa order, a 2-second fullscreen toast ("¡Pedido confirmado!") is shown at `z-[400]` using `animate-in fade-in zoom-in-95`. A `mesa-order-placed` custom event is also dispatched on `window` to trigger the bounce animation on the "Ver mis pedidos" floating button.
+
+**Key implementation details:**
+
+1. **`startScannerRef` pattern** — `startScanner` schedules retries via `setTimeout(() => startScannerRef.current())`. A direct self-reference inside `useCallback` would hit a temporal dead zone (ESLint `react-hooks/exhaustive-deps`). A `useRef` holds the latest binding, updated via `useEffect`.
+
+2. **React StrictMode orphaned stream fix** — StrictMode runs effects twice. The second invocation calls `stopScanner` (cleanup) before the first invocation's `decodeFromVideoDevice` resolves. A shared `isActiveRef` flag is NOT safe because the second run resets it to `true` before the first await returns. Fix: each `startScanner` invocation creates a **closure-local** `cancelled` flag and registers `() => { cancelled = true }` in `cancelCurrentScanRef`. After `decodeFromVideoDevice` resolves, if `cancelled === true` the orphaned stream is stopped immediately.
+
+```typescript
+let cancelled = false;
+cancelCurrentScanRef.current = () => { cancelled = true; };
+// ... await decodeFromVideoDevice(...)
+if (cancelled) {
+  controls.stop();
+  // stop orphaned tracks
+  return;
+}
+controlsRef.current = controls;
+```
+
+**Permissions:** Requires `camera=(self)` in `Permissions-Policy` header (set in `next.config.mjs`). The browser will prompt for camera permission on first use.
 
 ### Token storage utilities (in `mesa-orders-client.tsx` and `cart-drawer.tsx`)
 
@@ -262,9 +283,9 @@ GET /api/mesas/{mesaId}/orders  (and POST /api/pedidos)
 | **Session binding** | Token is tied to `sesion_id`. Session rotation invalidates all tokens |
 | **Short TTL** | 20 minutes — limits damage from a token leak |
 | **sessionStorage** | Tokens cleared on tab close — no persistent proof across sessions |
-| **Rate limiting** | 10 tokens/hour/mesa — prevents token farming |
+| **Rate limiting** | 30 tokens/hour/mesa — prevents token farming |
 | **Server-side validation** | `expires_at` and `cerrada_at` checked on every order request |
-| **`!inner` join** | Supabase join returns array — accessed as `row.mesa_sesiones[0]?.cerrada_at` |
+| **`!inner` join** | Supabase many-to-one join returns an **object**, not an array. Use `Array.isArray` check: `const sesion = Array.isArray(row.mesa_sesiones) ? row.mesa_sesiones[0] : row.mesa_sesiones` |
 | **CASCADE delete** | Token rows deleted when mesa or session is deleted |
 | **No camera blocking** | `Permissions-Policy: camera=(self)` allows self-origin camera use |
 
@@ -274,4 +295,4 @@ GET /api/mesas/{mesaId}/orders  (and POST /api/pedidos)
 
 - **Multi-device**: Each device needs its own token. A second device at the same table must also scan the QR. This is intentional — it enforces per-device physical presence.
 - **Static QR**: The QR URL is static (`/?mesa={token}`). The token here is the mesa token (static identifier), not the session token. Session enforcement happens server-side — the static QR does not change.
-- **Camera permission**: Users must grant camera permission in the browser. If denied, they cannot place orders. There is no fallback.
+- **Camera permission**: Users must grant camera permission in the browser. If denied, the gate shows an error. The "Continuar sin QR" button is always visible as a testing/development fallback — it should be removed or guarded behind a feature flag in strict production deployments.

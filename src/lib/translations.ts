@@ -671,6 +671,8 @@ export const translations = {
     qrScannerWrongMesa: "Este QR no corresponde a tu mesa",
     qrScannerPermission: "Activá el permiso de cámara para continuar",
     qrScannerRetry: "Intentar de nuevo",
+    qrScannerSimulate: "Continuar sin QR",
+    mesaOrderConfirmed: "¡Pedido confirmado!",
   },
   en: {
     // UI
@@ -1341,6 +1343,8 @@ export const translations = {
     qrScannerWrongMesa: "This QR does not match your table",
     qrScannerPermission: "Enable camera permission to continue",
     qrScannerRetry: "Try again",
+    qrScannerSimulate: "Continue without QR",
+    mesaOrderConfirmed: "Order confirmed!",
   },
   fr: {
     // UI - Popup y carrito
@@ -1537,6 +1541,8 @@ export const translations = {
     qrScannerWrongMesa: "Ce QR ne correspond pas à votre table",
     qrScannerPermission: "Activez l'autorisation de caméra pour continuer",
     qrScannerRetry: "Réessayer",
+    qrScannerSimulate: "Continuer sans QR",
+    mesaOrderConfirmed: "Commande confirmée !",
   },
   it: {
     // UI - Popup y carrito
@@ -1733,6 +1739,8 @@ export const translations = {
     qrScannerWrongMesa: "Questo QR non corrisponde al tuo tavolo",
     qrScannerPermission: "Attiva il permesso della fotocamera per continuare",
     qrScannerRetry: "Riprova",
+    qrScannerSimulate: "Continua senza QR",
+    mesaOrderConfirmed: "Ordine confermato!",
   },
   de: {
     // UI - Popup y carrito
@@ -1929,6 +1937,8 @@ export const translations = {
     qrScannerWrongMesa: "Dieser QR-Code gehört nicht zu Ihrem Tisch",
     qrScannerPermission: "Aktivieren Sie die Kameraberechtigung, um fortzufahren",
     qrScannerRetry: "Erneut versuchen",
+    qrScannerSimulate: "Ohne QR fortfahren",
+    mesaOrderConfirmed: "Bestellung bestätigt!",
   },
 } as const;
 

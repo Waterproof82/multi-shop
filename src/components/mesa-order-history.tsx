@@ -58,6 +58,15 @@ export function MesaOrderHistory() {
     return () => window.removeEventListener("tracking-token-added", handler);
   }, [mesaId, fetchCount]);
 
+  useEffect(() => {
+    const handler = () => {
+      setBouncing(true);
+      setTimeout(() => setBouncing(false), 700);
+    };
+    window.addEventListener("mesa-order-placed", handler);
+    return () => window.removeEventListener("mesa-order-placed", handler);
+  }, []);
+
   if (!mesaId) return null;
 
   return (

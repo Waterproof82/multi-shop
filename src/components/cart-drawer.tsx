@@ -111,8 +111,8 @@ export function CartDrawer({ isRestaurant = false }: Readonly<CartDrawerProps>) 
   const [mesaToken, setMesaToken] = useState<string | null>(null);
   const [mesaInfo, setMesaInfo] = useState<MesaInfo | null>(null);
   const [mesaError, setMesaError] = useState(false);
-  const [mesaSuccessMessage, setMesaSuccessMessage] = useState<string | null>(null);
   const [qrGateState, setQrGateState] = useState<QRGateState | null>(null);
+  const [showOrderToast, setShowOrderToast] = useState(false);
 
   // Detect ?mesa= param (client-side only, SSR safe)
   // Falls back to sessionStorage so waiter mode survives navigation without ?mesa= in the URL
@@ -234,9 +234,9 @@ export function CartDrawer({ isRestaurant = false }: Readonly<CartDrawerProps>) 
           }
           clearCart();
           closeCart();
-          setMesaSuccessMessage(`${t('mesaOrderTitle', language)} #${data.numeroPedido}`);
-          // Dismiss success message after 4 seconds
-          setTimeout(() => setMesaSuccessMessage(null), 4000);
+          setShowOrderToast(true);
+          setTimeout(() => setShowOrderToast(false), 2000);
+          window.dispatchEvent(new CustomEvent('mesa-order-placed'));
         } else {
           setErrors({ general: data.error || t('validationOrderError', language) });
         }
@@ -402,6 +402,14 @@ export function CartDrawer({ isRestaurant = false }: Readonly<CartDrawerProps>) 
 
   return (
     <>
+      {showOrderToast && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center pointer-events-none">
+          <div className="bg-primary text-primary-foreground px-8 py-5 rounded-2xl shadow-xl text-lg font-semibold flex items-center gap-3 animate-in fade-in zoom-in-95 duration-200">
+            <Check className="size-6 shrink-0" />
+            {t('mesaOrderConfirmed', language)}
+          </div>
+        </div>
+      )}
       {qrGateState && mesaToken && (
         <QRScannerGate
           mesaId={mesaInfo?.id ?? mesaToken}
@@ -410,6 +418,9 @@ export function CartDrawer({ isRestaurant = false }: Readonly<CartDrawerProps>) 
             storeMesaClientToken(mesaInfo?.id ?? mesaToken, token, expiresAt);
             setQrGateState(null);
             void handleConfirmOrder();
+          }}
+          onCancel={() => {
+            setQrGateState(null);
           }}
         />
       )}
@@ -595,12 +606,6 @@ export function CartDrawer({ isRestaurant = false }: Readonly<CartDrawerProps>) 
                     <p role="alert" className="text-xs text-muted-foreground mt-1 ml-1">
                       {t('mesaLabel', language)}
                     </p>
-                  )}
-                  {mesaSuccessMessage && (
-                    <div role="status" className="mt-2 flex items-center gap-2 rounded-lg bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 px-3 py-2 text-sm text-green-700 dark:text-green-300">
-                      <Check className="size-4 shrink-0" />
-                      {mesaSuccessMessage}
-                    </div>
                   )}
                 </div>
               ) : (
