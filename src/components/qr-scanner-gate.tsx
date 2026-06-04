@@ -27,6 +27,9 @@ export function QRScannerGate({ mesaId, state, onTokenIssued, onCancel }: QRScan
   const cancelCurrentScanRef = useRef<(() => void) | null>(null);
   // Ref so the zxing callback can schedule a retry without self-reference TDZ
   const startScannerRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  // Stable ref for onTokenIssued — prevents restarting the scanner when the parent re-renders
+  // with a new inline callback reference (which would recreate startScanner and re-trigger the effect)
+  const onTokenIssuedRef = useRef(onTokenIssued);
   // Guard: zxing fires the callback multiple times for the same QR; prevent duplicate token requests
   const tokenRequestInFlightRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
@@ -127,7 +130,7 @@ export function QRScannerGate({ mesaId, state, onTokenIssued, onCancel }: QRScan
               return;
             }
             const data = await res.json() as { token: string; expiresAt: string };
-            onTokenIssued(data.token, data.expiresAt);
+            onTokenIssuedRef.current(data.token, data.expiresAt);
           } catch {
             setError(t('qrScannerRetry', lang));
             tokenRequestInFlightRef.current = false;
@@ -161,12 +164,16 @@ export function QRScannerGate({ mesaId, state, onTokenIssued, onCancel }: QRScan
         setError(t('qrScannerRetry', lang));
       }
     }
-  }, [mesaId, state, onTokenIssued, stopScanner, lang]);
+  }, [mesaId, state, stopScanner, lang]);
 
-  // Keep the ref in sync so the zxing callback always has the latest version
+  // Keep refs in sync so callbacks always have the latest version
   useEffect(() => {
     startScannerRef.current = startScanner;
   }, [startScanner]);
+
+  useEffect(() => {
+    onTokenIssuedRef.current = onTokenIssued;
+  }, [onTokenIssued]);
 
   useEffect(() => {
     void startScanner();
