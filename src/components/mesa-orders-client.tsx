@@ -47,12 +47,47 @@ type PendingAction = 'full' | 'division-modal' | 'division-pay';
 
 const PAGE_BG = "#f0ede8";
 
+function buildTotalMismatch(
+  body: { code?: string; newTotalCents?: number },
+  currentTotal: number,
+  esDivision: boolean
+): { oldTotal: number; newTotal: number; pendingAction: PendingAction } | null {
+  if (body.code !== 'TOTAL_MISMATCH' || body.newTotalCents === undefined) return null;
+  return {
+    oldTotal: currentTotal,
+    newTotal: body.newTotalCents / 100,
+    pendingAction: esDivision ? 'division-pay' : 'full',
+  };
+}
+
+function submitRedsysForm(
+  formData: { DS_MERCHANT_PARAMETERS: string; DS_SIGNATURE: string; DS_SIGNATURE_VERSION: string },
+  redsysUrl: string
+): void {
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = redsysUrl;
+  const fields: Record<string, string> = {
+    Ds_SignatureVersion: formData.DS_SIGNATURE_VERSION,
+    Ds_MerchantParameters: formData.DS_MERCHANT_PARAMETERS,
+    Ds_Signature: formData.DS_SIGNATURE,
+  };
+  for (const [name, value] of Object.entries(fields)) {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = name;
+    input.value = value;
+    form.appendChild(input);
+  }
+  document.body.appendChild(form);
+  form.submit();
+}
+
 // ── Mesa token helpers ──────────────────────────────────────────────────────
 
 const TOKEN_KEY = (mesaId: string) => `mesa_token_${mesaId}`;
 
 function getStoredToken(mesaId: string): { token: string; expiresAt: string } | null {
-  if (typeof window === 'undefined') return null;
   try {
     const raw = sessionStorage.getItem(TOKEN_KEY(mesaId));
     if (!raw) return null;
@@ -128,7 +163,7 @@ function useMesaToken(mesaId: string) {
   return { token, gateState, handleTokenIssued, requireToken, handleAuthError };
 }
 
-function PerforatedEdge({ position }: { position: "top" | "bottom" }) {
+function PerforatedEdge({ position }: Readonly<{ position: "top" | "bottom" }>) {
   const cy = position === "top" ? "0%" : "100%";
   return (
     <div
@@ -162,12 +197,12 @@ function DivisionModal({
   lang,
   onConfirm,
   onClose,
-}: {
+}: Readonly<{
   total: number;
   lang: Parameters<typeof t>[1];
   onConfirm: (n: number) => void;
   onClose: () => void;
-}) {
+}>) {
   const [selected, setSelected] = useState(2);
   const perPersona = Math.round((total / selected) * 100) / 100;
 
@@ -175,12 +210,17 @@ function DivisionModal({
     <div
       className="fixed inset-0 z-50 flex items-end justify-center"
       style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
-      onClick={onClose}
     >
+      <button
+        type="button"
+        className="absolute inset-0 w-full h-full"
+        style={{ background: 'transparent', border: 'none', cursor: 'default' }}
+        onClick={onClose}
+        aria-label="Cerrar"
+      />
       <div
-        className="w-full max-w-sm rounded-t-3xl p-6 pb-10"
-        style={{ backgroundColor: "#fffcf7", fontFamily: "monospace" }}
-        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-sm rounded-t-3xl p-6 pb-10 relative"
+        style={{ backgroundColor: "#fffcf7", fontFamily: "monospace", zIndex: 1 }}
       >
         {/* Handle */}
         <div
@@ -260,9 +300,9 @@ function DivisionModal({
   );
 }
 
-export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
+export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
   const { language } = useLanguage();
-  const lang = language as Parameters<typeof t>[1];
+  const lang = language;
   const { gateState, handleTokenIssued, requireToken, handleAuthError } = useMesaToken(mesaId);
   const [sessionData, setSessionData] = useState<MesaSessionData | null>(null);
   const [mesaInfo, setMesaInfo] = useState<MesaInfo | null>(null);
@@ -271,6 +311,7 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
   const [showDivisionModal, setShowDivisionModal] = useState(false);
   const [settingDivision, setSettingDivision] = useState(false);
   const [cancellingDivision, setCancellingDivision] = useState(false);
+  const [manualPaying, setManualPaying] = useState(false);
   const [verifyingTotal, setVerifyingTotal] = useState(false);
   const [totalMismatch, setTotalMismatch] = useState<{
     oldTotal: number;
@@ -379,12 +420,9 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
         // An order committed to DB between the client's total check and Redsys initiation.
         // Show the updated total so the user can review and confirm before paying.
         const body = await res.json() as { code?: string; newTotalCents?: number };
-        if (body.code === 'TOTAL_MISMATCH' && body.newTotalCents !== undefined) {
-          const oldTotal = sessionData?.total ?? 0;
-          const newTotal = body.newTotalCents / 100;
-          const action: PendingAction = esDivision ? 'division-pay' : 'full';
-          const mismatch = { oldTotal, newTotal, pendingAction: action };
-          setSessionData(prev => prev ? { ...prev, total: newTotal } : prev);
+        const mismatch = buildTotalMismatch(body, sessionData?.total ?? 0, esDivision);
+        if (mismatch) {
+          setSessionData(prev => prev ? { ...prev, total: mismatch.newTotal } : prev);
           setTotalMismatch(mismatch);
           try { sessionStorage.setItem(`mesa-mismatch-${mesaId}`, JSON.stringify(mismatch)); } catch { /* ignore */ }
         }
@@ -405,23 +443,7 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
         DS_SIGNATURE_VERSION: string;
       };
       const redsysUrl = process.env.NEXT_PUBLIC_REDSYS_URL ?? 'https://sis-t.redsys.es:25443/sis/realizarPago';
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = redsysUrl;
-      const fields: Record<string, string> = {
-        Ds_SignatureVersion: formData.DS_SIGNATURE_VERSION,
-        Ds_MerchantParameters: formData.DS_MERCHANT_PARAMETERS,
-        Ds_Signature: formData.DS_SIGNATURE,
-      };
-      for (const [name, value] of Object.entries(fields)) {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = name;
-        input.value = value;
-        form.appendChild(input);
-      }
-      document.body.appendChild(form);
-      form.submit();
+      submitRedsysForm(formData, redsysUrl);
     } catch {
       setPaying(false);
     }
@@ -519,6 +541,17 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
     }
   };
 
+  const handleManualPayment = async () => {
+    if (manualPaying) return;
+    setManualPaying(true);
+    try {
+      await fetch(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/manual-payment`, { method: 'POST' });
+      await refresh();
+    } finally {
+      setManualPaying(false);
+    }
+  };
+
   // Another user is paying — we should wait without being able to navigate away.
   // Exclude: when WE own the lock (isInitiatingPayment) or we're submitting the form (paying).
   const externalPaymentInProgress = (sessionData?.pagoEnCurso ?? false) && !paying && !isInitiatingPayment;
@@ -533,12 +566,12 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
   const shouldTrapBack = externalPaymentInProgress || isInitiatingPayment || fullyPaid;
   useEffect(() => {
     if (!shouldTrapBack) return;
-    window.history.pushState({ mesaPaymentWaiting: true }, '', window.location.href);
+    globalThis.history.pushState({ mesaPaymentWaiting: true }, '', globalThis.location.href);
     const handlePopState = () => {
-      window.history.pushState({ mesaPaymentWaiting: true }, '', window.location.href);
+      globalThis.history.pushState({ mesaPaymentWaiting: true }, '', globalThis.location.href);
     };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    globalThis.addEventListener('popstate', handlePopState);
+    return () => globalThis.removeEventListener('popstate', handlePopState);
   }, [shouldTrapBack]);
 
   const allItems = sessionData?.orders.flatMap((o) => o.items) ?? [];
@@ -549,6 +582,15 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
   const dateStr = firstOrderDate?.toLocaleDateString(language, { day: "2-digit", month: "2-digit", year: "numeric" }) ?? "";
   const timeStr = firstOrderDate?.toLocaleTimeString(language, { hour: "2-digit", minute: "2-digit", hour12: false }) ?? "";
   const tableLabel = mesaInfo?.nombre ?? (mesaInfo ? `Mesa ${mesaInfo.numero}` : "Mesa");
+
+  let manualPayLabel: string;
+  if (manualPaying) {
+    manualPayLabel = "Registrando...";
+  } else if (division) {
+    manualPayLabel = `Pago manual · ${formatPrice(division.importePorPersona, "EUR", lang)}`;
+  } else {
+    manualPayLabel = "Marcar pagada (efectivo)";
+  }
 
   return (
     <>
@@ -626,12 +668,12 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
 
               {/* Items */}
               <ul className="flex flex-col gap-1 pb-4">
-                {allItems.map((item, i) => {
+                {allItems.map((item) => {
                   const complementoTotal = item.complementos?.reduce((s, c) => s + c.precio, 0) ?? 0;
                   const lineTotal = (item.precio + complementoTotal) * item.cantidad;
                   return (
                     <li
-                      key={i}
+                      key={`${item.nombre}|${item.precio}|${item.cantidad}`}
                       className="flex items-baseline gap-3 text-sm"
                       style={{ color: "#1a1612", fontFamily: "monospace" }}
                     >
@@ -695,7 +737,7 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
         )}
 
         {/* Payment section */}
-        {allItems.length > 0 && sessionData?.pagosHabilitados && (
+        {allItems.length > 0 && (sessionData?.pagosHabilitados || isWaiterMode) && (
           <div className="mt-6 flex flex-col gap-3">
 
             {/* Division block */}
@@ -744,14 +786,14 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
 
                 {/* Individual share dots */}
                 <div className="flex gap-1.5 justify-center mb-3">
-                  {Array.from({ length: division.personas }).map((_, i) => (
+                  {Array.from({ length: division.personas }, (_, n) => n + 1).map(shareNum => (
                     <div
-                      key={i}
+                      key={`share-${shareNum}`}
                       className="rounded-full transition-colors duration-300"
                       style={{
                         width: 10,
                         height: 10,
-                        backgroundColor: i < division.pagosRealizados ? "#1a1612" : "#e8e0d8",
+                        backgroundColor: shareNum <= division.pagosRealizados ? "#1a1612" : "#e8e0d8",
                       }}
                     />
                   ))}
@@ -831,7 +873,7 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
                 <div className="flex gap-2 mt-1">
                   <button
                     type="button"
-                    onClick={() => { void executePendingAction(totalMismatch.pendingAction); }}
+                    onClick={() => { executePendingAction(totalMismatch.pendingAction); }}
                     className="flex-1 py-3 rounded-xl text-xs font-bold tracking-widest uppercase"
                     style={{ backgroundColor: "#1a1612", color: "#fffcf7" }}
                   >
@@ -900,6 +942,19 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
               </button>
             )}
 
+            {/* Waiter: manual payment button */}
+            {isWaiterMode && !fullyPaid && !externalPaymentInProgress && (
+              <button
+                type="button"
+                onClick={() => { void handleManualPayment(); }}
+                disabled={manualPaying}
+                className="w-full py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-opacity disabled:opacity-50"
+                style={{ backgroundColor: "#1a1612", color: "#fffcf7", fontFamily: "monospace" }}
+              >
+                {manualPayLabel}
+              </button>
+            )}
+
             {/* Fully paid confirmation */}
             {fullyPaid && (
               <div
@@ -922,7 +977,7 @@ export function MesaOrdersClient({ mesaId }: { mesaId: string }) {
                   className="text-2xl font-bold tabular-nums"
                   style={{ color: "#1a1612" }}
                 >
-                  {formatPrice(sessionData.total, "EUR", lang)}
+                  {formatPrice(sessionData?.total ?? 0, "EUR", lang)}
                 </p>
               </div>
             )}
