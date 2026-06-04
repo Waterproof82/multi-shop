@@ -249,12 +249,59 @@ const amountCents = row.actual_total_cents;
 
 ---
 
+### Pieza 4 — Capturar la excepción del trigger en el repositorio de pedidos
+
+Este es el único punto delicado de la implementación. Actualmente `POST /api/pedidos` devuelve 423 gracias a un check JS que lee `pago_en_curso` antes del INSERT. Con el trigger en su lugar, si ese check JS se saltase (o si el timing es muy ajustado), el INSERT lanzará una excepción de Postgres con el mensaje `PAYMENT_IN_PROGRESS`.
+
+Sin manejo explícito, Supabase devolvería un error genérico 500. Hay que capturarlo en el repositorio o en la route y mapearlo a 423:
+
+```typescript
+// En la route POST /api/pedidos (o en el repositorio de pedidos)
+// donde se hace el INSERT a Supabase:
+
+const { data, error } = await supabase
+  .from('pedidos')
+  .insert({ ... });
+
+if (error) {
+  // El trigger lanza PAYMENT_IN_PROGRESS cuando pago_en_curso=true
+  if (error.message?.includes('PAYMENT_IN_PROGRESS')) {
+    return NextResponse.json(
+      { error: 'Hay un pago en curso en esta mesa.' },
+      { status: 423 }
+    );
+  }
+  // resto del manejo de errores existente
+}
+```
+
+El check JS previo (`pago_en_curso`) puede mantenerse como primera capa (evita el round-trip a la DB en el caso normal). El trigger es la red de seguridad cuando el check JS no es suficiente por timing.
+
+---
+
+## Viabilidad
+
+**Plan gratuito de Supabase**: completamente viable. Triggers, funciones PL/pgSQL, `SECURITY DEFINER`, `FOR UPDATE` y RPCs están disponibles en todos los planes sin restricciones. No hay ninguna feature de pago involucrada.
+
+**Tamaño real**:
+
+| Pieza | Líneas |
+|-------|--------|
+| Trigger + `check_session_not_locked` | ~15 líneas SQL |
+| RPC `initiate_mesa_payment_atomic` | ~60 líneas PL/pgSQL |
+| `initiateRedsysMesaPaymentUseCase.ts` | Reemplazar ~40 líneas por ~20 |
+| Captura de `PAYMENT_IN_PROGRESS` en `POST /api/pedidos` | ~5 líneas TS |
+
+No hay cambios de schema (ninguna tabla nueva ni columna nueva). Todo es aditivo excepto la simplificación del use case.
+
+---
+
 ## Checklist de implementación
 
-- [ ] Migración 1: `YYYYMMDD_trigger_prevent_order_during_payment.sql` — trigger BEFORE INSERT en pedidos
-- [ ] Migración 2: `YYYYMMDD_initiate_mesa_payment_atomic.sql` — RPC con FOR UPDATE + pago_en_curso dentro
+- [ ] Migración 1: `YYYYMMDD_trigger_prevent_order_during_payment.sql` — función + trigger BEFORE INSERT en pedidos
+- [ ] Migración 2: `YYYYMMDD_initiate_mesa_payment_atomic.sql` — RPC con FOR UPDATE + SET pago_en_curso dentro de la transacción
 - [ ] Actualizar `initiateRedsysMesaPaymentUseCase.ts`: reemplazar SELECT+UPDATE por RPC; eliminar el UPDATE de pago_en_curso posterior (ya lo hace el RPC)
-- [ ] Actualizar `POST /api/pedidos`: el trigger reemplaza el check JS de `pago_en_curso`; el check JS puede mantenerse como primera capa (más rápido que llegar a la DB)
+- [ ] Actualizar `POST /api/pedidos`: capturar excepción `PAYMENT_IN_PROGRESS` del trigger y devolver 423
 - [ ] Test concurrencia: `Promise.all([fetch('/api/pedidos'), fetch('/api/redsys/initiate-mesa')])` en staging — verificar que uno de los dos siempre falla con el error correcto
 
 ---
