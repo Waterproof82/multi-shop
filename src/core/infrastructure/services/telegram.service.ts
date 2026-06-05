@@ -59,6 +59,13 @@ export const sendTelegramWithInlineButtons = async (
       { text: '20 min', callback_data: `order:${pedido.id}:20` },
       { text: '30 min', callback_data: `order:${pedido.id}:30` },
     ],
+    [
+      { text: '45 min', callback_data: `order:${pedido.id}:45` },
+      { text: '1 hora', callback_data: `order:${pedido.id}:60` },
+    ],
+    [
+      { text: '1 h 15 min', callback_data: `order:${pedido.id}:75` },
+    ],
   ];
 
   try {
@@ -454,5 +461,12 @@ export const buildTimeButtons = (pedidoId: string): { text: string; callback_dat
   [
     { text: '20 min', callback_data: `order:${pedidoId}:20` },
     { text: '30 min', callback_data: `order:${pedidoId}:30` },
+  ],
+  [
+    { text: '45 min', callback_data: `order:${pedidoId}:45` },
+    { text: '1 hora', callback_data: `order:${pedidoId}:60` },
+  ],
+  [
+    { text: '1 h 15 min', callback_data: `order:${pedidoId}:75` },
   ],
 ];
