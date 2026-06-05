@@ -289,6 +289,54 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
+  // Handle entregado — mark as delivered; auto-delete message after 5s (cancellable)
+  const entregadoMatch = callbackData.match(/^entregado:([0-9a-f-]{36}):(\d+)$/);
+  if (entregadoMatch) {
+    const [, pedidoId, minutesStr] = entregadoMatch;
+    const { pedidoRepository } = await import('@/core/infrastructure/database');
+    await pedidoRepository.updateStatusById(pedidoId, 'entregado');
+    await answerCallbackQuery(callbackQueryId, '✅ Pedido entregado — eliminando en 5s');
+    if (message) {
+      const chatId = String(message.chat.id);
+      const messageId = message.message_id;
+      await editMessageReplyMarkup(chatId, messageId, [
+        [
+          { text: '✅ Entregado ✓', callback_data: 'noop' },
+          { text: '❌ Cancelar (5s)', callback_data: `cancelar_entregado:${pedidoId}:${minutesStr}` },
+        ],
+      ]);
+      after(async () => {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        const { pedidoRepository: repo } = await import('@/core/infrastructure/database');
+        const statusResult = await repo.findStatusById(pedidoId);
+        if (statusResult.success && statusResult.data === 'entregado') {
+          await deleteMessage(chatId, messageId);
+        }
+      });
+    }
+    return NextResponse.json({ ok: true });
+  }
+
+  // Handle cancelar_entregado — cancel delivery deletion, restore time buttons
+  const cancelarEntregadoMatch = callbackData.match(/^cancelar_entregado:([0-9a-f-]{36}):(\d+)$/);
+  if (cancelarEntregadoMatch) {
+    const [, pedidoId, minutesStr] = cancelarEntregadoMatch;
+    const minutes = parseInt(minutesStr, 10);
+    const { pedidoRepository } = await import('@/core/infrastructure/database');
+    await pedidoRepository.updateStatusById(pedidoId, 'pendiente');
+    await answerCallbackQuery(callbackQueryId, '↩️ Eliminación cancelada');
+    if (message) {
+      await editMessageReplyMarkup(String(message.chat.id), message.message_id, [
+        [{ text: `✅ Tiempo fijado: ${minutes} min`, callback_data: 'noop' }],
+        [
+          { text: '🔄 Modificar tiempo', callback_data: `modify:${pedidoId}` },
+          { text: '✅ Entregado', callback_data: `entregado:${pedidoId}:${minutesStr}` },
+        ],
+      ]);
+    }
+    return NextResponse.json({ ok: true });
+  }
+
   // Expected format: order:{pedidoId}:{minutes}
   const match = callbackData.match(/^order:([0-9a-f-]{36}):(\d+)$/);
   if (!match) {
@@ -309,7 +357,10 @@ export async function POST(request: Request) {
   if (message) {
     await editMessageReplyMarkup(String(message.chat.id), message.message_id, [
       [{ text: `✅ Tiempo fijado: ${minutes} min`, callback_data: 'noop' }],
-      [{ text: '🔄 Modificar tiempo', callback_data: `modify:${pedidoId}` }],
+      [
+        { text: '🔄 Modificar tiempo', callback_data: `modify:${pedidoId}` },
+        { text: '✅ Entregado', callback_data: `entregado:${pedidoId}:${minutes}` },
+      ],
     ]);
   }
 
