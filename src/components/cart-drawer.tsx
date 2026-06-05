@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, Check, Gift, UtensilsCrossed } from "lucide-react"
+import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, Check, Gift, UtensilsCrossed, Clock } from "lucide-react"
 import { useReducedMotion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -98,6 +98,9 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     updateQuantity,
     removeItem,
     clearCart,
+    clearNonDeferred,
+    toggleDeferred,
+    loadDeferredItems,
     totalPrice,
     isCartOpen,
     closeCart
@@ -105,6 +108,8 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
   const { language } = useLanguage()
   const router = useRouter();
   const shouldReduceMotion = useReducedMotion() ?? false;
+  // Keyed to mesaId so a mesa-switch also triggers a reload
+  const deferredLoadedRef = useRef<string | null>(null);
   const [sending, setSending] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState<{ numeroPedido: number } | null>(null);
   const [activeOrderTokens, setActiveOrderTokens] = useState<string[]>([]);
@@ -114,6 +119,9 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
   const [mesaError, setMesaError] = useState(false);
   const [qrGateState, setQrGateState] = useState<QRGateState | null>(null);
   const [showOrderToast, setShowOrderToast] = useState(false);
+
+  // True when all non-fromPending items are explicitly deferred
+  const allDeferred = items.length > 0 && items.filter(ci => !ci.fromPending).length > 0 && items.filter(ci => !ci.fromPending).every(ci => ci.deferred);
 
   // Detect ?mesa= param (client-side only, SSR safe)
   // Falls back to sessionStorage so waiter mode survives navigation without ?mesa= in the URL
@@ -153,6 +161,23 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     setActiveOrderTokens(getTrackingTokens());
   }, [isCartOpen]);
 
+  // Pre-load deferred items from DB when a mesa is identified
+  useEffect(() => {
+    const mesaId = mesaInfo?.id ?? mesaToken;
+    if (!mesaId || deferredLoadedRef.current === mesaId) return;
+    deferredLoadedRef.current = mesaId;
+
+    fetch(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/deferred`)
+      .then(async r => {
+        if (!r.ok) return;
+        const data = await r.json() as { items: Array<{ itemId: string; itemName: string; price: number; quantity: number; translations?: Record<string, { name: string }>; selectedComplements?: Array<{ id: string; name: string; price: number }> }> };
+        if (data.items?.length > 0) {
+          loadDeferredItems(data.items);
+        }
+      })
+      .catch(() => null);
+  }, [mesaInfo, mesaToken, loadDeferredItems]);
+
   const [discountCode, setDiscountCode] = useState('');
   const [discountValid, setDiscountValid] = useState<{ valid: boolean; porcentaje: number } | null>(null);
   const [discountError, setDiscountError] = useState<string | null>(null);
@@ -185,6 +210,11 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
       }
       const clientToken = storedClientToken.token;
 
+      const toOrder = items.filter(ci => !ci.deferred);
+      const toDefer = items.filter(ci => ci.deferred);
+
+      if (toOrder.length === 0) return; // guard: button should already be disabled
+
       setSending(true);
       try {
         const res = await fetch('/api/pedidos', {
@@ -193,7 +223,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
           body: JSON.stringify({
             tipo: 'mesa',
             mesa_id: mesaId,
-            items: items.map((ci: CartItem) => ({
+            items: toOrder.map((ci: CartItem) => ({
               item: { id: ci.item.id, name: ci.item.name, price: ci.item.price, translations: ci.item.translations },
               quantity: ci.quantity,
               selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
@@ -214,26 +244,45 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
         const data = await res.json();
         if (res.ok && data.trackingToken) {
           addTrackingToken(data.trackingToken);
-          // Persist to mesa-specific localStorage array
           try {
             const storageKey = `mesa_orders_${mesaId}`;
             const existing = JSON.parse(localStorage.getItem(storageKey) ?? '[]') as unknown[];
             existing.push({
               pedidoId: data.pedidoId ?? data.id,
               trackingToken: data.trackingToken,
-              items: items.map((ci: CartItem) => ({
+              items: toOrder.map((ci: CartItem) => ({
                 name: ci.item.name,
                 quantity: ci.quantity,
                 price: ci.item.price,
               })),
-              total: totalPrice,
+              total: toOrder.reduce((s, ci) => {
+                const compPrice = ci.selectedComplements?.reduce((sc, c) => sc + c.price, 0) ?? 0;
+                return s + (ci.item.price + compPrice) * ci.quantity;
+              }, 0),
               timestamp: Date.now(),
             });
             localStorage.setItem(storageKey, JSON.stringify(existing));
           } catch {
-            // localStorage may be unavailable — not fatal
+            // localStorage may be unavailable
           }
-          clearCart();
+
+          // Save deferred items to DB (empty array clears if none remain)
+          await fetch(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/deferred`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              items: toDefer.map(ci => ({
+                itemId: ci.item.id,
+                itemName: ci.item.name,
+                price: ci.item.price,
+                quantity: ci.quantity,
+                translations: ci.item.translations,
+                selectedComplements: ci.selectedComplements,
+              })),
+            }),
+          }).catch(() => null);
+
+          clearNonDeferred();
           closeCart();
           setShowOrderToast(true);
           setTimeout(() => setShowOrderToast(false), 2000);
@@ -380,7 +429,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     } finally {
       setSending(false);
     }
-  }, [mesaToken, mesaInfo, nombre, telefono, countryCode, email, deliveryMethod, deliveryAddress, deliveryPostalCode, deliveryLatitude, deliveryLongitude, isRestaurant, pagosPickupHabilitados, items, language, discountCode, totalPrice, clearCart, closeCart, router]);
+  }, [mesaToken, mesaInfo, nombre, telefono, countryCode, email, deliveryMethod, deliveryAddress, deliveryPostalCode, deliveryLatitude, deliveryLongitude, isRestaurant, pagosPickupHabilitados, items, language, discountCode, estimatedFeeCents, clearCart, clearNonDeferred, closeCart, router]);
 
   const isDeliveryIncomplete = isRestaurant && !mesaToken && deliveryMethod === 'delivery' && (deliveryLatitude === null || estimatedFeeCents === null);
 
@@ -542,13 +591,22 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                   }
                 }
                 return (
-<li 
-                      key={itemKey} 
-                      className={`flex items-center gap-3 rounded-lg bg-card p-3 transition-all duration-200 hover:bg-card/80 group ${itemAnimationClass}`}
+<li
+                      key={itemKey}
+                      className={`flex items-center gap-3 rounded-lg p-3 transition-all duration-200 group ${itemAnimationClass}`}
+                      style={{ backgroundColor: ci.deferred ? 'oklch(22% 0.06 62 / 0.5)' : undefined }}
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-card-foreground text-base truncate group-hover:text-primary transition-colors duration-200">
-                          {(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}
+                        <p className="font-semibold text-card-foreground text-base truncate group-hover:text-primary transition-colors duration-200 flex items-center gap-1.5">
+                          <span className="truncate">{(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}</span>
+                          {ci.fromPending && (
+                            <span
+                              className="inline-flex shrink-0 items-center rounded px-1 py-0.5 text-[9px] font-semibold tracking-wide uppercase"
+                              style={{ backgroundColor: 'oklch(22% 0.04 255 / 0.7)', color: 'oklch(65% 0.14 255)' }}
+                            >
+                              pendiente
+                            </span>
+                          )}
                         </p>
                         {ci.selectedComplements && ci.selectedComplements.length > 0 && (
                           <p className="text-xs text-muted-foreground truncate group-hover:text-muted-foreground/80 transition-colors duration-200">
@@ -591,6 +649,21 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                         >
                           <Trash2 className="size-4" />
                         </RippleButton>
+                        {mesaToken && !ci.fromPending && (
+                          <button
+                            type="button"
+                            onClick={() => toggleDeferred(itemKey)}
+                            className="flex items-center justify-center rounded-md p-1.5 transition-colors duration-150 min-h-[44px] min-w-[44px]"
+                            style={{
+                              backgroundColor: ci.deferred ? 'oklch(28% 0.08 62 / 0.8)' : 'transparent',
+                              color: ci.deferred ? 'oklch(75% 0.18 62)' : 'oklch(45% 0.04 252)',
+                            }}
+                            aria-label={ci.deferred ? 'Quitar diferido' : 'Diferir ítem'}
+                            title={ci.deferred ? 'Quitar diferido' : 'Diferir para más tarde'}
+                          >
+                            <Clock className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     </li>
                 );
@@ -857,9 +930,9 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                        handleConfirmOrder();
                      }
                    }}
-                   disabled={sending || (mesaToken !== null && mesaError) || isDeliveryIncomplete}
+                   disabled={sending || (mesaToken !== null && mesaError) || isDeliveryIncomplete || allDeferred}
                  >
-                   {sending ? t("sending", language) : mesaToken ? t("mesaPlaceOrder", language) : t("sendOrder", language)}
+                   {sending ? t("sending", language) : allDeferred ? 'Todos los ítems están diferidos' : mesaToken ? t("mesaPlaceOrder", language) : t("sendOrder", language)}
                  </Button>
                 <Button
                   variant="ghost"

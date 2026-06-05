@@ -1,4 +1,5 @@
 import { Result } from '@/core/domain/entities/types';
+import type { DeferredItem } from './IMesaSesionRepository';
 
 export interface Mesa {
   id: string;
@@ -18,6 +19,7 @@ export interface MesaWithSession {
   sessionTotal: number;
   sesionPagada: boolean;
   pagoEnCurso: boolean;
+  itemsDiferidos: DeferredItem[];
 }
 
 export interface IMesaRepository {

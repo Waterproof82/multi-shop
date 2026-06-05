@@ -2,6 +2,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { Result } from '@/core/domain/entities/types';
 import { IMesaRepository, Mesa, MesaWithSession } from '@/core/domain/repositories/IMesaRepository';
 import { logger } from '../logging/logger';
+import type { DeferredItem } from '@/core/domain/repositories/IMesaSesionRepository';
 
 export class SupabaseMesaRepository implements IMesaRepository {
   constructor(private readonly supabase: SupabaseClient) {}
@@ -198,7 +199,8 @@ export class SupabaseMesaRepository implements IMesaRepository {
       // Step 1: fetch mesas + session flags via RPC (single LEFT JOIN — avoids PostgREST FK embed ambiguity)
       type RpcRow = {
         id: string; empresa_id: string; numero: number; nombre: string | null;
-        sesion_id: string | null; sesion_pagada: boolean; pago_en_curso: boolean; session_total: number;
+        sesion_id: string | null; sesion_pagada: boolean; pago_en_curso: boolean;
+        session_total: number; items_diferidos: unknown[] | null;
       };
       const { data: rpcData, error: rpcError } = await this.supabase
         .rpc('get_mesas_with_sessions', { p_empresa_id: empresaId });
@@ -245,6 +247,7 @@ export class SupabaseMesaRepository implements IMesaRepository {
           sessionTotal: Number(row.session_total),
           sesionPagada: row.sesion_pagada ?? false,
           pagoEnCurso: row.pago_en_curso ?? false,
+          itemsDiferidos: (row.items_diferidos ?? []) as DeferredItem[],
         })),
       };
     } catch (e) {

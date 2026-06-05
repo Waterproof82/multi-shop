@@ -17,6 +17,8 @@ export interface CartItem {
   selectedComplements?: Complement[]
   justAdded?: boolean
   justRemoved?: boolean
+  deferred?: boolean      // waiter marked this item to send later
+  fromPending?: boolean   // pre-loaded from DB (will be released on next confirm)
 }
 
 export interface AddedItemInfo {
@@ -33,6 +35,16 @@ interface CartContextType {
   removeItem: (itemKey: string) => void
   updateQuantity: (itemKey: string, quantity: number) => void
   clearCart: () => void
+  clearNonDeferred: () => void
+  toggleDeferred: (itemKey: string) => void
+  loadDeferredItems: (items: Array<{
+    itemId: string;
+    itemName: string;
+    price: number;
+    quantity: number;
+    translations?: Record<string, { name: string }>;
+    selectedComplements?: Array<{ id: string; name: string; price: number }>;
+  }>) => void
   totalItems: number
   totalPrice: number
   isCartOpen: boolean
@@ -157,6 +169,54 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
 
   const clearCart = useCallback(() => { setItems([]); setLastAddedItem(null); }, [])
 
+  const clearNonDeferred = useCallback(() => {
+    setLastAddedItem(null);
+    // Keep only items explicitly marked deferred. fromPending items were included
+    // in the order (toOrder), so they should be cleared too.
+    setItems(prev => prev.filter(ci => ci.deferred));
+  }, [])
+
+  const toggleDeferred = useCallback((itemKey: string) => {
+    setItems(prev =>
+      prev.map(ci =>
+        getItemKey(ci.item, ci.selectedComplements) === itemKey
+          ? { ...ci, deferred: !ci.deferred }
+          : ci
+      )
+    );
+  }, [])
+
+  const loadDeferredItems = useCallback((deferredItems: Array<{
+    itemId: string;
+    itemName: string;
+    price: number;
+    quantity: number;
+    translations?: Record<string, { name: string }>;
+    selectedComplements?: Array<{ id: string; name: string; price: number }>;
+  }>) => {
+    if (deferredItems.length === 0) return;
+    setItems(prev => {
+      const toAdd = deferredItems
+        .filter(d => !prev.some(ci => ci.item.id === d.itemId && ci.fromPending))
+        .map(d => ({
+          item: {
+            id: d.itemId,
+            name: d.itemName,
+            price: d.price,
+            translations: d.translations,
+          } as MenuItemVM,
+          quantity: d.quantity,
+          selectedComplements: d.selectedComplements?.map(c => ({
+            id: c.id,
+            name: c.name,
+            price: c.price,
+          })),
+          fromPending: true as const,
+        }));
+      return [...prev, ...toAdd];
+    });
+  }, [])
+
   const totalItems = items.reduce((sum, ci) => sum + ci.quantity, 0)
   const totalPrice = items.reduce((sum, ci) => {
     const complementPrice = ci.selectedComplements?.reduce((s, c) => s + c.price, 0) || 0;
@@ -169,13 +229,16 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
     removeItem,
     updateQuantity,
     clearCart,
+    clearNonDeferred,
+    toggleDeferred,
+    loadDeferredItems,
     totalItems,
     totalPrice,
     isCartOpen,
     openCart,
     closeCart,
     lastAddedItem,
-  }), [items, addItem, removeItem, updateQuantity, clearCart, totalItems, totalPrice, isCartOpen, openCart, closeCart, lastAddedItem]);
+  }), [items, addItem, removeItem, updateQuantity, clearCart, clearNonDeferred, toggleDeferred, loadDeferredItems, totalItems, totalPrice, isCartOpen, openCart, closeCart, lastAddedItem]);
 
   return (
     <CartContext.Provider value={contextValue}>
