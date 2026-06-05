@@ -295,6 +295,22 @@ export function WaiterBanner() {
                   </div>
                 ) : (
                   <ul className="py-1 max-h-64 overflow-y-auto">
+                    <li>
+                      <button
+                        onClick={() => { setDropdownOpen(false); window.location.href = "/waiter"; }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-xs font-semibold transition-colors duration-100 border-b"
+                        style={{
+                          color: BTN_TABLE_TEXT,
+                          backgroundColor: "transparent",
+                          borderColor: DD_BORDER,
+                        }}
+                        onMouseEnter={e => { (e.currentTarget.style.backgroundColor = DD_ITEM_HV); }}
+                        onMouseLeave={e => { (e.currentTarget.style.backgroundColor = "transparent"); }}
+                      >
+                        <ArrowLeftRight className="w-3 h-3 shrink-0" />
+                        <span className="flex-1 truncate">{t("waiterViewAllTables", lang)}</span>
+                      </button>
+                    </li>
                     {mesas.map((mesa) => {
                       const isActive = mesa.id === mesaId;
                       const isOpen   = mesa.sesionId !== null;
