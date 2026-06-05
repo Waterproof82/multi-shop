@@ -180,6 +180,31 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
       .catch(() => null);
   }, [mesaInfo, mesaToken, loadDeferredItems]);
 
+  // Auto-persist deferred items to DB on every change (waiter mode only, after initial load)
+  useEffect(() => {
+    if (!isWaiterMode || !mesaToken) return;
+    const mesaId = mesaInfo?.id ?? mesaToken;
+    // Only run after loadDeferredItems has been called for this mesa
+    if (deferredLoadedRef.current !== mesaId) return;
+
+    const deferredItems = items
+      .filter(ci => ci.deferred)
+      .map(ci => ({
+        itemId: ci.item.id,
+        itemName: ci.item.name,
+        price: ci.item.price,
+        quantity: ci.quantity,
+        translations: ci.item.translations,
+        selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
+      }));
+
+    void fetch(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/deferred`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: deferredItems }),
+    });
+  }, [items, isWaiterMode, mesaToken, mesaInfo]);
+
   const [discountCode, setDiscountCode] = useState('');
   const [discountValid, setDiscountValid] = useState<{ valid: boolean; porcentaje: number } | null>(null);
   const [discountError, setDiscountError] = useState<string | null>(null);
