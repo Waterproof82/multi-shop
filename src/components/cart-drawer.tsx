@@ -110,6 +110,9 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
   const shouldReduceMotion = useReducedMotion() ?? false;
   // Keyed to mesaId so a mesa-switch also triggers a reload
   const deferredLoadedRef = useRef<string | null>(null);
+  // Set to mesaId AFTER the initial deferred fetch resolves — guards auto-save from firing too early
+  const deferredPersistReadyRef = useRef<string | null>(null);
+  const deferredSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [sending, setSending] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState<{ numeroPedido: number } | null>(null);
   const [activeOrderTokens, setActiveOrderTokens] = useState<string[]>([]);
@@ -177,15 +180,20 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
           loadDeferredItems(data.items);
         }
       })
-      .catch(() => null);
+      .catch(() => null)
+      .finally(() => {
+        // Mark ready to auto-save ONLY after fetch completes (success or error)
+        deferredPersistReadyRef.current = mesaId;
+      });
   }, [mesaInfo, mesaToken, loadDeferredItems]);
 
-  // Auto-persist deferred items to DB on every change (waiter mode only, after initial load)
+  // Auto-persist deferred items to DB on every change (waiter mode only, after initial load).
+  // Debounced to avoid race conditions from rapid state changes.
   useEffect(() => {
     if (!isWaiterMode || !mesaToken) return;
     const mesaId = mesaInfo?.id ?? mesaToken;
-    // Only run after loadDeferredItems has been called for this mesa
-    if (deferredLoadedRef.current !== mesaId) return;
+    // Only run after the initial fetch resolved — prevents wiping DB on mount
+    if (deferredPersistReadyRef.current !== mesaId) return;
 
     const deferredItems = items
       .filter(ci => ci.deferred)
@@ -198,11 +206,19 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
         selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
       }));
 
-    void fetch(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/deferred`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items: deferredItems }),
-    });
+    // Cancel any pending save from a previous rapid change
+    if (deferredSaveTimerRef.current) clearTimeout(deferredSaveTimerRef.current);
+    deferredSaveTimerRef.current = setTimeout(() => {
+      void fetch(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/deferred`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: deferredItems }),
+      });
+    }, 300);
+
+    return () => {
+      if (deferredSaveTimerRef.current) clearTimeout(deferredSaveTimerRef.current);
+    };
   }, [items, isWaiterMode, mesaToken, mesaInfo]);
 
   const [discountCode, setDiscountCode] = useState('');
