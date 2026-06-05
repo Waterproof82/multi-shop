@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
   const result = await initiateRedsysPaymentUseCase({
     pedidoId: parsed.data.pedidoId,
     empresaId: empresaResult.data.id,
-    urlOk: `${origin}/pedido/pago-ok`,
+    urlOk: `${origin}/api/redsys/confirm-pedido`,
     urlKo: `${origin}/pedido/pago-ko?lang=${lang}`,
     webhookUrl: `${origin}/api/redsys/webhook`,
   });
