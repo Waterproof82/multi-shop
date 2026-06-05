@@ -187,6 +187,7 @@ export class SupabaseAdminRepository implements IAdminRepository {
       mostrarCarrito: (row.mostrar_carrito as boolean) ?? true,
       mostrarPromociones: (row.mostrar_promociones as boolean) ?? true,
       mostrarTgtg: (row.mostrar_tgtg as boolean) ?? true,
+      mesasHabilitadas: (row.mesas_habilitadas as boolean) ?? true,
       moneda: (row.moneda as string) ?? "EUR",
       emailNotification: (row.email_notification as string | null) ?? null,
       urlImage: (row.url_image as string | null) ?? null,
