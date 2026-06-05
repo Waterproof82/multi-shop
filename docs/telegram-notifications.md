@@ -25,6 +25,25 @@ Sistema de notificaciones vía Telegram para pedidos. Soporta tres modos según 
 ```
 Al pulsar, el botón seleccionado queda marcado (`✅`) y aparece `🔄 Modificar respuesta`.
 
+> **Con `pagos_pickup_habilitados = true`:** el paso 3 se omite en la creación del pedido. Telegram se envía desde el webhook de Redsys una vez confirmado el pago (ver sección siguiente).
+
+## Flujo — Tienda / Recogida con pago online (`pagos_pickup_habilitados`)
+
+Cuando la empresa tiene `pagos_pickup_habilitados = true`, los pedidos de tipo `tienda` y `recogida en local` requieren pago online (Redsys) antes de notificar al negocio.
+
+1. Cliente confirma pedido → `POST /api/pedidos`
+2. `PedidoUseCase` crea el pedido en DB **sin** enviar Telegram
+3. El cliente es redirigido al formulario de Redsys (TPV virtual)
+4. Redsys llama al webhook `POST /api/redsys/webhook/{empresaId}`
+5. `processRedsysWebhookUseCase` verifica la firma y el resultado del pago
+6. Si el pago es **exitoso** (`Ds_Response 0000–0099`):
+   - `tipo === 'restaurante'` + `origen === 'recogida'` → `sendTelegramWithInlineButtons` (botones de tiempo)
+   - `tipo === 'tienda'` → `sendTelegramWithQuickReplies`
+   - Se guarda el `telegram_message_id` en el pedido
+7. Si el pago **falla**, el pedido queda marcado como `failed` y no se notifica
+
+> Para pedidos de `delivery`, Redsys ya era obligatorio antes de este toggle. El webhook también es el encargado de disparar el pedido a Glovo (solo para `origen === 'delivery'`).
+
 ## Flujo — Modo Restaurante (subdomain pedidos / takeaway)
 
 1. Cliente confirma pedido → `POST /api/pedidos`
@@ -167,11 +186,12 @@ Si la notificación a Telegram falla, el error se registra en logs pero **no imp
 
 ### `empresas`
 ```sql
-tipo                         text    DEFAULT 'tienda'   -- 'tienda' | 'restaurante'
-telegram_chat_id             text    NULL               -- pedidos takeaway/tienda
-telegram_mesa_chat_id        text    NULL               -- pedidos de mesa — cocina
-telegram_bebidas_chat_id     text    NULL               -- pedidos de mesa — bar (opcional)
-waiter_pin_hash              text    NULL               -- bcrypt hash del PIN de sala
+tipo                         text     DEFAULT 'tienda'   -- 'tienda' | 'restaurante'
+telegram_chat_id             text     NULL               -- pedidos takeaway/tienda/recogida
+telegram_mesa_chat_id        text     NULL               -- pedidos de mesa — cocina
+telegram_bebidas_chat_id     text     NULL               -- pedidos de mesa — bar (opcional)
+waiter_pin_hash              text     NULL               -- bcrypt hash del PIN de sala
+pagos_pickup_habilitados     boolean  DEFAULT false      -- requiere pago online para recogida/tienda; Telegram se envía post-pago
 ```
 
 ### `pedidos`
