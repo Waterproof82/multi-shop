@@ -80,6 +80,7 @@ export interface EmpresaWithStats {
     de?: string | null;
   } | null;
   pagosMesaHabilitados: boolean;
+  mesasHabilitadas: boolean;
   stats: EmpresaStats;
   totalMesas: number;
   createdAt: string;

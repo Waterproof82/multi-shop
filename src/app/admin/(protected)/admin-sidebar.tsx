@@ -37,14 +37,14 @@ interface AdminSidebarProps {
 export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
-  const { empresaLogo, empresaTipo, mostrarPromociones, mostrarTgtg } = useAdmin();
+  const { empresaLogo, empresaTipo, mostrarPromociones, mostrarTgtg, mesasHabilitadas } = useAdmin();
   const { language } = useLanguage();
 
   const navItems = BASE_NAV_ITEMS.filter(
     (item) =>
       (!item.requiresPromo || mostrarPromociones) &&
       (!item.requiresTgtg || mostrarTgtg) &&
-      (!item.requiresRestaurant || empresaTipo === 'restaurante')
+      (!item.requiresRestaurant || (empresaTipo === 'restaurante' && mesasHabilitadas))
   );
 
   const closeMenu = () => setIsOpen(false);

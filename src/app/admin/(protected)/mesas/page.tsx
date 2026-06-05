@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { UtensilsCrossed, Plus, Trash2, KeyRound, QrCode, Check, AlertTriangle, Copy, ShoppingBag, XCircle } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useAdmin } from '@/lib/admin-context';
@@ -30,8 +31,15 @@ function buildQrUrl(mesaId: string): string {
 }
 
 export default function MesasPage() {
-  const { empresaId, overrideEmpresaId } = useAdmin();
+  const { empresaId, overrideEmpresaId, mesasHabilitadas } = useAdmin();
   const effectiveEmpresaId = overrideEmpresaId || empresaId;
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!mesasHabilitadas) {
+      router.replace('/admin');
+    }
+  }, [mesasHabilitadas, router]);
 
   const [mesas, setMesas] = useState<Mesa[]>([]);
   const [loading, setLoading] = useState(true);

@@ -68,6 +68,7 @@ export interface Empresa {
   mostrarCarrito: boolean;
   mostrarPromociones: boolean;
   mostrarTgtg: boolean;
+  mesasHabilitadas: boolean;
   moneda: string;
   emailNotification: string | null;
   urlImage: string | null;

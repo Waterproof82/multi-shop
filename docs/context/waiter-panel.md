@@ -52,7 +52,8 @@ On mount, `WaiterLoginForm` pings `GET /api/waiter/me`. If the cookie is already
 | `POST` | `/api/waiter/mesa` | Claim a mesa by number |
 | `GET` | `/api/waiter/mesas` | List all mesas with session status |
 | `POST` | `/api/waiter/mesas/{mesaId}/open` | Open a table session |
-| `POST` | `/api/waiter/mesas/{mesaId}/close` | Close a table session |
+| `POST` | `/api/waiter/mesas/{mesaId}/close` | Close session (consolidate orders) + auto-reopen |
+| `POST` | `/api/waiter/mesas/{mesaId}/manual-payment` | Register a cash/external payment (full or one division share) |
 
 ---
 
@@ -84,7 +85,33 @@ Waiter closes table → POST /api/waiter/mesas/{mesaId}/close
   → mesaSesionUseCase.closeSesion(sesionId)
       → sets mesa_sesiones.cerrada_at = now()
       → sets mesas.sesion_id = NULL
+  → mesaSesionUseCase.openSesion(mesaId)   ← auto-reopen
+      → creates new empty mesa_sesiones row
+      → sets mesas.sesion_id = new session UUID
+      → table is immediately available for the next customers
+      → old client tokens are invalidated (they reference the closed session)
 ```
+
+**Close error handling:** If the close endpoint returns a non-2xx/404 response, the banner shows a localized error message for 5 seconds and does NOT navigate. A 404 ("no active session") is treated as success — the table is already libre.
+
+### Manual payment (cash / external)
+
+```
+Waiter registers manual payment → POST /api/waiter/mesas/{mesaId}/manual-payment
+  → finds active session for the mesa
+  → if division active:
+      calls increment_division_pagos RPC (atomic counter increment)
+      if counter reaches division_personas → fullyPaid = true
+  → if no division (full payment):
+      fullyPaid = true immediately
+  → if fullyPaid:
+      updates all pedidos payment_status = 'paid'
+      sets sesion_pagada = true, clears pago_en_curso
+      sends Telegram notification (fire-and-forget)
+  → returns { pagosRealizados, personas, fullyPaid }
+```
+
+Response codes: `404` no active session, `403` wrong empresa, `409` session already paid, `500` DB error.
 
 ---
 
@@ -96,7 +123,7 @@ The `WaiterBanner` component is rendered globally in the root layout. It appears
 - Pulsing live indicator dot
 - Shows active mesa name
 - **"Change table" dropdown** — fetches `GET /api/waiter/mesas` on open, lists all mesas with open/libre status. Selecting a libre mesa calls `POST /api/waiter/mesas/{mesaId}/open` first.
-- **"Close table" button (X icon)** → shown when a session is active. Calls `window.confirm`, then `POST /api/waiter/mesas/{mesaId}/close`, then clears the local waiter session state. Triggers order consolidation (see Session Lifecycle).
+- **"Close table" button (X icon)** → shown when a session is active. Calls `window.confirm`, then `POST /api/waiter/mesas/{mesaId}/close`. On success (2xx or 404), clears local state and redirects to `/waiter`. On error, shows a localized error toast below the banner for 5 seconds without navigating. Triggers order consolidation + auto-reopen (see Session Lifecycle).
 - **"Unlock payment" button (🔓)** → shown only when `pago_en_curso = true` for the active mesa. Calls `DELETE /api/mesas/{mesaId}/lock` to release the payment lock.
 - "Logout" button → calls `/api/waiter/logout` and redirects to `/waiter`
 - Re-validates session on every route change (polls `/api/waiter/me`)
@@ -127,7 +154,9 @@ Mesa cards in `/waiter` (step 2) reflect four payment states with distinct color
 | Payment in progress | Pulsing amber dot | Amber | "En pago" | Session total |
 | Paid | Static violet dot | Violet | "Pagada" | Session total |
 
-The `activeOrderCount` is computed per-session (not all-time) by querying `pedidos` filtered by `sesion_id IN (activeSesionIds)` and `estado != 'cerrado'`.
+A mesa is considered **occupied** only if it has an active session AND `activeOrderCount > 0`. After a waiter closes a table, the auto-reopen creates a new empty session (`activeOrderCount = 0`), so the card immediately shows as **libre** on the next grid refresh.
+
+The `activeOrderCount` is computed per-session (not all-time) by querying `pedidos` filtered by `sesion_id IN (activeSesionIds)` and `estado != 'cerrado'`. The session IDs come from `get_mesas_with_sessions` RPC which reads `mesas.sesion_id` (the currently linked session).
 
 The `sessionTotal` is computed live from `SUM(pedidos.total)` inside the RPC — NOT from `mesa_sesiones.total`, which may be 0 when payment is in progress.
 
