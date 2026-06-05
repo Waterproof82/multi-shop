@@ -25,6 +25,7 @@ interface Empresa {
   mostrarPromociones: boolean;
   mostrarTgtg: boolean;
   pagosMesaHabilitados: boolean;
+  mesasHabilitadas: boolean;
   createdAt: string;
   stats: EmpresaStats;
   totalMesas: number;
@@ -247,6 +248,7 @@ export default async function SuperAdminPage() {
               mostrarPromociones: e.mostrarPromociones,
               mostrarTgtg: e.mostrarTgtg,
               pagosMesaHabilitados: e.pagosMesaHabilitados,
+              mesasHabilitadas: e.mesasHabilitadas,
               stats: e.stats,
               totalMesas: e.totalMesas,
               seoStatus: e.seoStatus,

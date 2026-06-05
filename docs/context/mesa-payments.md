@@ -277,6 +277,12 @@ Inicia el pago para la sesión activa de una mesa.
 { "code": "TOTAL_MISMATCH", "newTotalCents": 4250 }
 ```
 
+**Response (409 — sesión ya pagada):**
+```json
+{ "code": "ALREADY_PAID" }
+```
+Ocurre si `sesion_pagada = true` o si el contador de división ya alcanzó el número de personas. El cliente libera el lock, refresca el estado y muestra la pantalla de pago completado.
+
 **Response (423):** Hay otro pago en curso y el lock no está en grace period.
 
 ### `POST /api/mesas/{mesaId}/lock`
@@ -380,6 +386,51 @@ ngrok http 3000
 
 ---
 
+## Pago Manual por el Camarero
+
+Cuando un cliente paga en efectivo o con terminal externa (no Redsys), el camarero puede registrar el pago desde la vista de la mesa. El botón aparece en `mesa-orders-client.tsx` solo en modo camarero (`isWaiterMode = true`) siempre que `pagosHabilitados || isWaiterMode`.
+
+### Endpoint
+
+```
+POST /api/waiter/mesas/{mesaId}/manual-payment
+  (requiere waiter_token cookie + x-empresa-id header del proxy)
+
+→ registerManualMesaPaymentUseCase
+  → Si hay división activa:
+      increment_division_pagos RPC (atómico) → { pagos_realizados, personas }
+      Si pagos_realizados >= personas → fullyPaid = true
+  → Si no hay división:
+      fullyPaid = true directamente
+  → Si fullyPaid:
+      UPDATE pedidos SET payment_status = 'paid' (todos de la sesión)
+      UPDATE mesa_sesiones SET sesion_pagada=true, pago_en_curso=false
+      Telegram: sendTelegramPagoMesaCompleto (fire-and-forget)
+  → Si no fullyPaid (división parcial):
+      UPDATE mesa_sesiones SET pago_en_curso=false  (libera lock si había)
+```
+
+**Response (200):**
+```json
+{ "pagosRealizados": 2, "personas": 4, "fullyPaid": false }
+```
+
+**Response (409):** sesión ya pagada.
+**Response (404):** no hay sesión activa.
+**Response (403):** empresa no coincide.
+
+### Texto del botón
+
+| Caso | Texto |
+|------|-------|
+| Sin división activa | "Marcar pagada (efectivo)" |
+| División activa, pagos pendientes | "Pago manual (N/M pagado)" |
+| División activa, último pago | "Pago manual (último)" |
+
+La notificación de Telegram solo se envía cuando `fullyPaid = true` (pago completo o último share de división). Es fire-and-forget — no bloquea el response aunque falle.
+
+---
+
 ## Archivos
 
 | Archivo | Rol |
@@ -398,6 +449,8 @@ ngrok http 3000
 | `src/app/api/mesas/[mesaId]/division/route.ts` | POST (activar división) + DELETE (cancelar) |
 | `src/app/api/mesas/[mesaId]/orders/route.ts` | Retorna estado completo incluyendo pagoEnCurso + sesionPagada |
 | `src/app/api/pedidos/route.ts` | Mesa path: verifica lock antes de crear pedido (423 si activo) |
-| `src/components/mesa-orders-client.tsx` | UI: ticket, botones pago, division modal, lock flow, overlays, adaptive polling |
+| `src/components/mesa-orders-client.tsx` | UI: ticket, botones pago, division modal, lock flow, overlays, adaptive polling, pago manual |
 | `src/components/client-menu-page.tsx` | Menú: redirect a ticket cuando pagoEnCurso, overlay waiting screen |
 | `src/app/superadmin/empresas-table.tsx` | Toggle "Pagos" en superadmin |
+| `src/core/application/use-cases/payment/registerManualMesaPaymentUseCase.ts` | Pago manual: lógica de division counter + marcado pagado + Telegram |
+| `src/app/api/waiter/mesas/[mesaId]/manual-payment/route.ts` | Endpoint pago manual (waiter JWT required) |
