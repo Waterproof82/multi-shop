@@ -118,7 +118,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
     }
   }
 
-  async findByDomain(dominio: string): Promise<Result<{ id: string; nombre: string; email_notification: string | null; telefono_whatsapp: string | null; tipo: string; telegram_chat_id: string | null; telegram_mesa_chat_id: string | null; telegram_bebidas_chat_id: string | null } | null>> {
+  async findByDomain(dominio: string): Promise<Result<{ id: string; nombre: string; email_notification: string | null; telefono_whatsapp: string | null; tipo: string; telegram_chat_id: string | null; telegram_mesa_chat_id: string | null; telegram_bebidas_chat_id: string | null; mesas_habilitadas: boolean } | null>> {
     try {
       const { data: empresa } = await this.supabase
         .from('empresas')
