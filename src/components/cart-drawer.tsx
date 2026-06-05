@@ -120,8 +120,8 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
   const [qrGateState, setQrGateState] = useState<QRGateState | null>(null);
   const [showOrderToast, setShowOrderToast] = useState(false);
 
-  // True when all non-fromPending items are explicitly deferred
-  const allDeferred = items.length > 0 && items.filter(ci => !ci.fromPending).length > 0 && items.filter(ci => !ci.fromPending).every(ci => ci.deferred);
+  // True when every item in cart is deferred
+  const allDeferred = items.length > 0 && items.every(ci => ci.deferred);
 
   // Detect ?mesa= param (client-side only, SSR safe)
   // Falls back to sessionStorage so waiter mode survives navigation without ?mesa= in the URL
@@ -599,14 +599,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-card-foreground text-base truncate group-hover:text-primary transition-colors duration-200 flex items-center gap-1.5">
                           <span className="truncate">{(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}</span>
-                          {ci.fromPending && (
-                            <span
-                              className="inline-flex shrink-0 items-center rounded px-1 py-0.5 text-[9px] font-semibold tracking-wide uppercase"
-                              style={{ backgroundColor: 'oklch(22% 0.04 255 / 0.7)', color: 'oklch(65% 0.14 255)' }}
-                            >
-                              pendiente
-                            </span>
-                          )}
+
                         </p>
                         {ci.selectedComplements && ci.selectedComplements.length > 0 && (
                           <p className="text-xs text-muted-foreground truncate group-hover:text-muted-foreground/80 transition-colors duration-200">
@@ -649,7 +642,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                         >
                           <Trash2 className="size-4" />
                         </RippleButton>
-                        {mesaToken && !ci.fromPending && (
+                        {mesaToken && (
                           <button
                             type="button"
                             onClick={() => toggleDeferred(itemKey)}

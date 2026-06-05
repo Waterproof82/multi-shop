@@ -18,7 +18,7 @@ export interface CartItem {
   justAdded?: boolean
   justRemoved?: boolean
   deferred?: boolean      // waiter marked this item to send later
-  fromPending?: boolean   // pre-loaded from DB (will be released on next confirm)
+  fromPending?: boolean   // kept for compat but no longer set; DB items load as deferred
 }
 
 export interface AddedItemInfo {
@@ -171,8 +171,7 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
 
   const clearNonDeferred = useCallback(() => {
     setLastAddedItem(null);
-    // Keep only items explicitly marked deferred. fromPending items were included
-    // in the order (toOrder), so they should be cleared too.
+    // Keep only items explicitly marked deferred.
     setItems(prev => prev.filter(ci => ci.deferred));
   }, [])
 
@@ -197,7 +196,7 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
     if (deferredItems.length === 0) return;
     setItems(prev => {
       const toAdd = deferredItems
-        .filter(d => !prev.some(ci => ci.item.id === d.itemId && ci.fromPending))
+        .filter(d => !prev.some(ci => ci.item.id === d.itemId && ci.deferred))
         .map(d => ({
           item: {
             id: d.itemId,
@@ -211,7 +210,7 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
             name: c.name,
             price: c.price,
           })),
-          fromPending: true as const,
+          deferred: true as const,
         }));
       return [...prev, ...toAdd];
     });

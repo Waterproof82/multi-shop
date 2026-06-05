@@ -221,16 +221,26 @@ function MesaCard({ mesa, isLoading, onClick }: MesaCardProps) {
           activeOrderCount={mesa.activeOrderCount}
         />
         {mesa.itemsDiferidos.length > 0 && (
-          <div className="w-full flex items-start gap-1 mt-1">
-            <Clock className="w-2.5 h-2.5 shrink-0 mt-0.5" style={{ color: "oklch(65% 0.14 62)" }} />
-            <span
-              className="text-[9px] leading-tight break-words"
-              style={{ color: "oklch(65% 0.14 62)" }}
-            >
-              {mesa.itemsDiferidos
-                .map(d => `${d.itemName} x${d.quantity}`)
-                .join(', ')}
-            </span>
+          <div
+            className="w-full mt-1.5 rounded-lg px-2 py-1.5 flex flex-col gap-0.5"
+            style={{ background: 'oklch(18% 0.05 62 / 0.7)', border: '1px solid oklch(38% 0.1 62 / 0.5)' }}
+          >
+            <div className="flex items-center gap-1 mb-0.5">
+              <Clock className="w-3 h-3 shrink-0" style={{ color: 'oklch(72% 0.16 62)' }} />
+              <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'oklch(72% 0.16 62)' }}>
+                Para servir
+              </span>
+            </div>
+            {mesa.itemsDiferidos.map((d, i) => (
+              <div key={i} className="flex items-center justify-between gap-1">
+                <span className="text-[10px] leading-tight truncate" style={{ color: 'oklch(82% 0.06 62)' }}>
+                  {d.itemName}
+                </span>
+                <span className="text-[10px] font-bold shrink-0" style={{ color: 'oklch(72% 0.16 62)' }}>
+                  x{d.quantity}
+                </span>
+              </div>
+            ))}
           </div>
         )}
       </div>
