@@ -193,8 +193,8 @@ function MesaCard({ mesa, isLoading, onClick }: MesaCardProps) {
       onClick={onClick}
       disabled={isLoading}
       aria-label={`Mesa ${mesa.numero}${nameSuffix} (${statusLabel})`}
-      className="group relative flex flex-col items-center justify-between rounded-2xl p-4 transition-all duration-200 hover:scale-[1.04] active:scale-[0.97] focus-visible:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
-      style={{ minHeight: "120px", background: colors.bg, border: colors.border, boxShadow: colors.shadow }}
+      className="group relative flex flex-col items-center justify-between rounded-2xl p-4 transition-all duration-200 hover:scale-[1.04] active:scale-[0.97] focus-visible:outline-none disabled:opacity-60 disabled:cursor-not-allowed w-full"
+      style={{ minHeight: "128px", background: colors.bg, border: colors.border, boxShadow: colors.shadow }}
     >
       <div className="absolute top-3 right-3">
         <MesaDot pulsing={pulsing} dotColor={colors.dot} />
@@ -232,12 +232,12 @@ function MesaCard({ mesa, isLoading, onClick }: MesaCardProps) {
               </span>
             </div>
             {mesa.itemsDiferidos.map((d, i) => (
-              <div key={i} className="flex items-center justify-between gap-1">
-                <span className="text-[10px] leading-tight truncate" style={{ color: 'oklch(82% 0.06 62)' }}>
+              <div key={i} className="flex items-baseline justify-between gap-1.5">
+                <span className="text-[11px] leading-snug break-words min-w-0" style={{ color: 'oklch(84% 0.05 62)', wordBreak: 'break-word' }}>
                   {d.itemName}
                 </span>
-                <span className="text-[10px] font-bold shrink-0" style={{ color: 'oklch(72% 0.16 62)' }}>
-                  x{d.quantity}
+                <span className="text-[11px] font-bold shrink-0" style={{ color: 'oklch(72% 0.16 62)' }}>
+                  ×{d.quantity}
                 </span>
               </div>
             ))}
@@ -446,7 +446,7 @@ export function WaiterLoginForm() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
           {mesas.map((mesa) => (
             <MesaCard
               key={mesa.id}

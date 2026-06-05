@@ -117,6 +117,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
   const [mesaToken, setMesaToken] = useState<string | null>(null);
   const [mesaInfo, setMesaInfo] = useState<MesaInfo | null>(null);
   const [mesaError, setMesaError] = useState(false);
+  const [isWaiterMode, setIsWaiterMode] = useState(false);
   const [qrGateState, setQrGateState] = useState<QRGateState | null>(null);
   const [showOrderToast, setShowOrderToast] = useState(false);
 
@@ -136,6 +137,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
         const stored = JSON.parse(raw) as { mesaId: string; mesaNumero: number; mesaNombre: string | null };
         setMesaToken(stored.mesaId);
         setMesaInfo({ id: stored.mesaId, numero: stored.mesaNumero, nombre: stored.mesaNombre, empresa_id: '' });
+        setIsWaiterMode(true);
         return true;
       } catch {
         return false;
@@ -200,15 +202,18 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
 
     // Mesa mode: skip PII validation, use mesa submit path
     if (mesaToken) {
-      // Validate QR client token before placing mesa order
+      // Waiters bypass QR token validation — authenticated via waiter_token cookie
       const mesaId = mesaInfo?.id ?? mesaToken;
-      const storedClientToken = getMesaClientToken(mesaId);
-      if (!storedClientToken || isMesaClientTokenExpired(storedClientToken.expiresAt)) {
-        closeCart();
-        setQrGateState('TOKEN_EXPIRED');
-        return;
+      let clientToken: string | null = null;
+      if (!isWaiterMode) {
+        const storedClientToken = getMesaClientToken(mesaId);
+        if (!storedClientToken || isMesaClientTokenExpired(storedClientToken.expiresAt)) {
+          closeCart();
+          setQrGateState('TOKEN_EXPIRED');
+          return;
+        }
+        clientToken = storedClientToken.token;
       }
-      const clientToken = storedClientToken.token;
 
       const toOrder = items.filter(ci => !ci.deferred);
       const toDefer = items.filter(ci => ci.deferred);
@@ -219,7 +224,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
       try {
         const res = await fetch('/api/pedidos', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${clientToken}` },
+          headers: { 'Content-Type': 'application/json', ...(clientToken ? { 'Authorization': `Bearer ${clientToken}` } : {}) },
           body: JSON.stringify({
             tipo: 'mesa',
             mesa_id: mesaId,
@@ -429,7 +434,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     } finally {
       setSending(false);
     }
-  }, [mesaToken, mesaInfo, nombre, telefono, countryCode, email, deliveryMethod, deliveryAddress, deliveryPostalCode, deliveryLatitude, deliveryLongitude, isRestaurant, pagosPickupHabilitados, items, language, discountCode, estimatedFeeCents, clearCart, clearNonDeferred, closeCart, router]);
+  }, [mesaToken, mesaInfo, isWaiterMode, nombre, telefono, countryCode, email, deliveryMethod, deliveryAddress, deliveryPostalCode, deliveryLatitude, deliveryLongitude, isRestaurant, pagosPickupHabilitados, items, language, discountCode, estimatedFeeCents, clearCart, clearNonDeferred, closeCart, router]);
 
   const isDeliveryIncomplete = isRestaurant && !mesaToken && deliveryMethod === 'delivery' && (deliveryLatitude === null || estimatedFeeCents === null);
 
@@ -468,7 +473,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
           </div>
         </div>
       )}
-      {qrGateState && mesaToken && (
+      {qrGateState && mesaToken && !isWaiterMode && (
         <QRScannerGate
           mesaId={mesaInfo?.id ?? mesaToken}
           state={qrGateState}
@@ -592,7 +597,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                 }
                 return (
 <li
-                      key={itemKey}
+                      key={ci.cartId}
                       className={`flex items-center gap-3 rounded-lg p-3 transition-all duration-200 group ${itemAnimationClass}`}
                       style={{ backgroundColor: ci.deferred ? 'oklch(22% 0.06 62 / 0.5)' : undefined }}
                     >
@@ -616,7 +621,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                           variant="outline"
                           size="icon"
                           className="min-h-11 min-w-11 h-11 w-11 bg-transparent hover:bg-muted/50 transition-all duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                          onClick={() => updateQuantity(itemKey, ci.quantity - 1)}
+                          onClick={() => updateQuantity(ci.cartId, ci.quantity - 1)}
                           aria-label={t("reduceQuantity", language)}
                         >
                           <Minus className="size-4" />
@@ -628,7 +633,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                           variant="outline"
                           size="icon"
                           className="min-h-11 min-w-11 h-11 w-11 bg-transparent hover:bg-muted/50 transition-all duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                          onClick={() => updateQuantity(itemKey, ci.quantity + 1)}
+                          onClick={() => updateQuantity(ci.cartId, ci.quantity + 1)}
                           aria-label={t("increaseQuantity", language)}
                         >
                           <Plus className="size-4" />
@@ -637,7 +642,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                           variant="ghost"
                           size="icon"
                           className="min-h-11 min-w-11 h-11 w-11 text-destructive hover:text-destructive hover:bg-destructive/10 transition-all duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                          onClick={() => removeItem(itemKey)}
+                          onClick={() => removeItem(ci.cartId)}
                           aria-label={`${t("remove", language)} ${(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}`}
                         >
                           <Trash2 className="size-4" />
@@ -645,7 +650,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                         {mesaToken && (
                           <button
                             type="button"
-                            onClick={() => toggleDeferred(itemKey)}
+                            onClick={() => toggleDeferred(ci.cartId)}
                             className="flex items-center justify-center rounded-md p-1.5 transition-colors duration-150 min-h-[44px] min-w-[44px]"
                             style={{
                               backgroundColor: ci.deferred ? 'oklch(28% 0.08 62 / 0.8)' : 'transparent',

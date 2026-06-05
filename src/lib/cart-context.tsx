@@ -12,6 +12,7 @@ export interface Complement {
 }
 
 export interface CartItem {
+  cartId: string           // unique per cart entry — allows same product deferred + non-deferred simultaneously
   item: MenuItemVM
   quantity: number
   selectedComplements?: Complement[]
@@ -19,6 +20,10 @@ export interface CartItem {
   justRemoved?: boolean
   deferred?: boolean      // waiter marked this item to send later
   fromPending?: boolean   // kept for compat but no longer set; DB items load as deferred
+}
+
+function newCartId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 
 export interface AddedItemInfo {
@@ -32,11 +37,11 @@ export interface AddedItemInfo {
 interface CartContextType {
   items: CartItem[]
   addItem: (item: MenuItemVM, quantity?: number, selectedComplements?: Complement[]) => void
-  removeItem: (itemKey: string) => void
-  updateQuantity: (itemKey: string, quantity: number) => void
+  removeItem: (cartId: string) => void
+  updateQuantity: (cartId: string, quantity: number) => void
   clearCart: () => void
   clearNonDeferred: () => void
-  toggleDeferred: (itemKey: string) => void
+  toggleDeferred: (cartId: string) => void
   loadDeferredItems: (items: Array<{
     itemId: string;
     itemName: string;
@@ -110,60 +115,43 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
     });
     
     setItems((prev) => {
-      const existingIndex = prev.findIndex((ci) => getItemKey(ci.item, ci.selectedComplements) === itemKey);
+      // Only merge with a non-deferred entry of the same product.
+      // If the existing entry is deferred, add a separate non-deferred entry instead.
+      const existingIndex = prev.findIndex((ci) =>
+        getItemKey(ci.item, ci.selectedComplements) === itemKey && !ci.deferred
+      );
       if (existingIndex >= 0) {
         return prev.map((ci, index) =>
           index === existingIndex ? { ...ci, quantity: ci.quantity + quantity } : ci
         )
       }
-      return [...prev, { item, quantity, selectedComplements, justAdded: true }]
+      return [...prev, { cartId: newCartId(), item, quantity, selectedComplements, justAdded: true }]
     })
   }, [])
 
-  const removeItem = useCallback((itemKey: string) => {
+  const removeItem = useCallback((cartId: string) => {
     setLastAddedItem(null);
     setItems((prev) => {
-      const next = prev.map(ci => 
-        getItemKey(ci.item, ci.selectedComplements) === itemKey 
-          ? { ...ci, justRemoved: true }
-          : ci
-      );
+      const next = prev.map(ci => ci.cartId === cartId ? { ...ci, justRemoved: true } : ci);
       setTimeout(() => {
-        setItems(prev => {
-          const filtered = prev.filter((ci) => getItemKey(ci.item, ci.selectedComplements) !== itemKey);
-          return filtered;
-        });
+        setItems(prev => prev.filter(ci => ci.cartId !== cartId));
       }, 200);
       return next;
     })
   }, [])
 
-  const updateQuantity = useCallback((itemKey: string, quantity: number) => {
+  const updateQuantity = useCallback((cartId: string, quantity: number) => {
     setLastAddedItem(null);
     if (quantity <= 0) {
       setItems((prev) => {
-        const next = prev.map(ci => 
-          getItemKey(ci.item, ci.selectedComplements) === itemKey 
-            ? { ...ci, justRemoved: true }
-            : ci
-        );
+        const next = prev.map(ci => ci.cartId === cartId ? { ...ci, justRemoved: true } : ci);
         setTimeout(() => {
-          setItems(prev => {
-            const filtered = prev.filter((ci) => getItemKey(ci.item, ci.selectedComplements) !== itemKey);
-            return filtered;
-          });
+          setItems(prev => prev.filter(ci => ci.cartId !== cartId));
         }, 200);
         return next;
       })
     } else {
-      setItems((prev) =>
-        prev.map((ci) => {
-          if (getItemKey(ci.item, ci.selectedComplements) === itemKey) {
-            return { ...ci, quantity, justAdded: false };
-          }
-          return ci;
-        })
-      )
+      setItems((prev) => prev.map(ci => ci.cartId === cartId ? { ...ci, quantity, justAdded: false } : ci))
     }
   }, [])
 
@@ -175,14 +163,8 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
     setItems(prev => prev.filter(ci => ci.deferred));
   }, [])
 
-  const toggleDeferred = useCallback((itemKey: string) => {
-    setItems(prev =>
-      prev.map(ci =>
-        getItemKey(ci.item, ci.selectedComplements) === itemKey
-          ? { ...ci, deferred: !ci.deferred }
-          : ci
-      )
-    );
+  const toggleDeferred = useCallback((cartId: string) => {
+    setItems(prev => prev.map(ci => ci.cartId === cartId ? { ...ci, deferred: !ci.deferred } : ci));
   }, [])
 
   const loadDeferredItems = useCallback((deferredItems: Array<{
@@ -198,6 +180,7 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
       const toAdd = deferredItems
         .filter(d => !prev.some(ci => ci.item.id === d.itemId && ci.deferred))
         .map(d => ({
+          cartId: newCartId(),
           item: {
             id: d.itemId,
             name: d.itemName,
