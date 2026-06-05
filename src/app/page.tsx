@@ -46,14 +46,19 @@ export default async function Home({
   }
 
   // If mesas are disabled for this empresa, treat mesa param as absent
-  const hasMesaParam = rawMesaParam && (empresa?.mesasHabilitadas ?? true);
+  const mesasHabilitadas = empresa?.mesasHabilitadas ?? true;
+  const hasMesaParam = rawMesaParam && mesasHabilitadas;
   const mostrarCarritoEmpresa = empresa?.mostrarCarrito ?? false;
   const isRestaurant = empresa?.tipo === 'restaurante';
+  // When a mesa URL is present but mesas are disabled, suppress the cart entirely
+  // (read-only mode: customer can view their ticket but not place new orders or pay)
+  const mesaDisabledContext = rawMesaParam && !mesasHabilitadas;
   // - pedidos subdomain: always
   // - waiter session or mesa QR: always (regardless of mostrarCarritoEmpresa)
   // - tienda with mostrarCarritoEmpresa=true: yes
   // - restaurante on main domain with no table/waiter: never (must come via QR or waiter)
-  const showCart = isPedidos || isWaiterMode || hasMesaParam || (mostrarCarritoEmpresa && !isRestaurant);
+  // - mesa URL with mesas disabled: never (overrides all the above)
+  const showCart = !mesaDisabledContext && (isPedidos || isWaiterMode || hasMesaParam || (mostrarCarritoEmpresa && !isRestaurant));
 
   let menuData: MenuCategoryVM[] = [];
 

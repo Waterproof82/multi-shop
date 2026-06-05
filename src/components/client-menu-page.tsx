@@ -354,14 +354,16 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
           idioma={language}
         />
       )}
-      {/* Only render cart components when needed — suppress entirely when mesa is fully paid */}
+      {/* Cart components — only when cart is active */}
       {showCart && !mesaEsperandoActivacion && (
         <>
           <CartDrawer isRestaurant={empresa?.tipo === 'restaurante'} />
-<ActiveOrderBanner />
-          <MesaOrderHistory />
+          <ActiveOrderBanner />
         </>
       )}
+      {/* Mesa order history — shown whenever a mesa param is present, even in read-only mode
+          (mesas disabled: customer can still view their existing ticket) */}
+      {!mesaEsperandoActivacion && <MesaOrderHistory />}
     </div>
   );
 }

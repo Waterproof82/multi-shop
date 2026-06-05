@@ -46,15 +46,17 @@ export async function GET(
   const total = ordersResult.data.reduce((sum, o) => sum + Number(o.total), 0);
 
   // Check if mesa payments are enabled for this empresa
+  // Both mesas_habilitadas AND pagos_mesa_habilitados must be true
   let pagosHabilitados = false;
   try {
     const supabase = getSupabaseAnonClient();
     const { data: emp } = await supabase
       .from('empresas')
-      .select('pagos_mesa_habilitados')
+      .select('pagos_mesa_habilitados, mesas_habilitadas')
       .eq('id', sesion.empresaId)
       .single();
-    pagosHabilitados = (emp as { pagos_mesa_habilitados: boolean } | null)?.pagos_mesa_habilitados ?? false;
+    const empData = emp as { pagos_mesa_habilitados: boolean; mesas_habilitadas: boolean } | null;
+    pagosHabilitados = (empData?.mesas_habilitadas ?? true) && (empData?.pagos_mesa_habilitados ?? false);
   } catch {
     // best-effort — default false
   }
