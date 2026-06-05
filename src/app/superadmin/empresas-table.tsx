@@ -27,6 +27,7 @@ interface EmpresaRow {
   mostrarPromociones: boolean;
   mostrarTgtg: boolean;
   pagosMesaHabilitados: boolean;
+  pagosPickupHabilitados: boolean;
   mesasHabilitadas: boolean;
   stats: EmpresaStats;
   totalMesas: number;
@@ -43,7 +44,7 @@ interface EmpresaRow {
 
 interface ModuloSwitchProps {
   readonly empresaId: string;
-  readonly field: 'mostrar_promociones' | 'mostrar_tgtg' | 'pagos_mesa_habilitados' | 'mesas_habilitadas';
+  readonly field: 'mostrar_promociones' | 'mostrar_tgtg' | 'pagos_mesa_habilitados' | 'pagos_pickup_habilitados' | 'mesas_habilitadas';
   readonly checked: boolean;
   readonly label: string;
 }
@@ -182,7 +183,8 @@ export function EmpresasTable({ empresas }: EmpresasTableProps) {
               <th className="text-left px-4 py-3 text-sm font-medium text-slate-300">Dominio</th>
               <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Tipo</th>
               <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Mesas</th>
-              <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Pagos</th>
+              <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Pagos Mesa</th>
+              <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Pagos Pick-up</th>
               <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Hoy</th>
               <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Mes</th>
               <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Total</th>
@@ -273,6 +275,14 @@ export function EmpresasTable({ empresas }: EmpresasTableProps) {
                   ) : (
                     <span className="text-slate-600">—</span>
                   )}
+                </td>
+                <td className="px-4 py-4 text-center">
+                  <ModuloSwitch
+                    empresaId={empresa.id}
+                    field="pagos_pickup_habilitados"
+                    checked={empresa.pagosPickupHabilitados}
+                    label={`Activar pagos pick-up para ${empresa.nombre}`}
+                  />
                 </td>
                 <td className="px-4 py-4 text-center">
                   <span className="text-sm font-medium text-blue-300">{empresa.stats.pedidosHoy}</span>

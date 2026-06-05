@@ -89,9 +89,10 @@ function validatePhoneInput(phone: string, translate: TranslateFn, language: Lan
 
 interface CartDrawerProps {
   isRestaurant?: boolean;
+  pagosPickupHabilitados?: boolean;
 }
 
-export function CartDrawer({ isRestaurant = false }: Readonly<CartDrawerProps>) {
+export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = false }: Readonly<CartDrawerProps>) {
   const {
     items,
     updateQuantity,
@@ -295,8 +296,11 @@ export function CartDrawer({ isRestaurant = false }: Readonly<CartDrawerProps>) 
       const data = await res.json();
 
       if (res.ok) {
-        if (data.trackingToken && deliveryMethod === 'delivery' && data.pedidoId) {
-          // Delivery order: initiate Redsys payment before redirecting
+        if (data.trackingToken && data.pedidoId && (
+          deliveryMethod === 'delivery' ||
+          (pagosPickupHabilitados && (deliveryMethod === 'recogida' || !isRestaurant))
+        )) {
+          // Delivery always, recogida/tienda only when pagosPickupHabilitados: initiate Redsys payment
           if (data.trackingToken) addTrackingToken(data.trackingToken);
           clearCart();
           closeCart();
@@ -376,7 +380,7 @@ export function CartDrawer({ isRestaurant = false }: Readonly<CartDrawerProps>) 
     } finally {
       setSending(false);
     }
-  }, [mesaToken, mesaInfo, nombre, telefono, countryCode, email, deliveryMethod, deliveryAddress, deliveryPostalCode, deliveryLatitude, deliveryLongitude, isRestaurant, items, language, discountCode, totalPrice, clearCart, closeCart, router]);
+  }, [mesaToken, mesaInfo, nombre, telefono, countryCode, email, deliveryMethod, deliveryAddress, deliveryPostalCode, deliveryLatitude, deliveryLongitude, isRestaurant, pagosPickupHabilitados, items, language, discountCode, totalPrice, clearCart, closeCart, router]);
 
   const isDeliveryIncomplete = isRestaurant && !mesaToken && deliveryMethod === 'delivery' && (deliveryLatitude === null || estimatedFeeCents === null);
 
@@ -494,7 +498,7 @@ export function CartDrawer({ isRestaurant = false }: Readonly<CartDrawerProps>) 
           </SheetDescription>
         </SheetHeader>
 
-        {items.length > 0 && deliveryMethod !== 'delivery' && (
+        {items.length > 0 && deliveryMethod !== 'delivery' && !(pagosPickupHabilitados && (deliveryMethod === 'recogida' || !isRestaurant)) && (
           <div className="shrink-0 mx-4 mb-1.5 rounded-md bg-secondary border border-border px-2 py-1.5">
             <p className="text-xs text-secondary-foreground font-medium">
               {t("noPaymentRequired", language)}

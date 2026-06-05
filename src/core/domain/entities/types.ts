@@ -128,6 +128,7 @@ export interface EmpresaPublic {
   descuentoBienvenidaPorcentaje: number;
   descuentoBienvenidaDuracion?: number | null;
   mesasHabilitadas?: boolean;
+  pagosPickupHabilitados?: boolean;
 }
 
 export interface Cliente {
