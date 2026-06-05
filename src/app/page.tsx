@@ -17,7 +17,7 @@ export default async function Home({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const resolvedParams = await searchParams;
-  const hasMesaParam = typeof resolvedParams.mesa === 'string' && resolvedParams.mesa.length > 0;
+  const rawMesaParam = typeof resolvedParams.mesa === 'string' && resolvedParams.mesa.length > 0;
   const cookieStore = await cookies();
   const isWaiterMode = !!cookieStore.get('waiter_token')?.value;
   const fullDomain = await getDomainFromHeaders();
@@ -45,6 +45,8 @@ export default async function Home({
     );
   }
 
+  // If mesas are disabled for this empresa, treat mesa param as absent
+  const hasMesaParam = rawMesaParam && (empresa?.mesasHabilitadas ?? true);
   const mostrarCarritoEmpresa = empresa?.mostrarCarrito ?? false;
   const isRestaurant = empresa?.tipo === 'restaurante';
   // - pedidos subdomain: always
