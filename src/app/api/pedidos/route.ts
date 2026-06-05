@@ -87,6 +87,11 @@ async function checkMesaPaymentLock(mesaId: string): Promise<NextResponse | null
 }
 
 async function handleMesaOrder(empresa: EmpresaOrderData, data: MesaData, request: Request): Promise<NextResponse> {
+  // Guard: mesa ordering must be enabled for this empresa
+  if (!empresa.mesas_habilitadas) {
+    return NextResponse.json({ error: 'El servicio de mesas no está disponible.' }, { status: 403 });
+  }
+
   // Validate client QR token for mesa orders
   const tokenError = await validateMesaClientToken(request);
   if (tokenError) return tokenError;
