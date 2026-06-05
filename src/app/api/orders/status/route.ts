@@ -27,6 +27,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 });
   }
 
+  // Failed payment → treat as non-existent: clears banner and prevents tracking page from showing
+  if (result.data.payment_status === 'failed') {
+    return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 });
+  }
+
   const { id, numero_pedido, estimated_minutes, estimated_ready_at, telegram_message_id, telegram_chat_id, items, tipo, estado, glovo_status, delivery_fee_cents } = result.data;
 
   // If order is ready and has a pending Telegram message, edit it and clear the id (fire-and-forget)

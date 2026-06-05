@@ -308,7 +308,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
             const redsysRes = await fetch('/api/redsys/initiate', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ pedidoId: data.pedidoId }),
+              body: JSON.stringify({ pedidoId: data.pedidoId, lang: language }),
             });
             if (redsysRes.ok) {
               const formData = await redsysRes.json() as {

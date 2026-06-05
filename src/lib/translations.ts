@@ -660,7 +660,7 @@ export const translations = {
     paymentOkTitle: "¡Pago confirmado!",
     paymentOkMessage: "Tu pedido fue recibido y estamos buscando un repartidor.",
     paymentKoTitle: "Pago no completado",
-    paymentKoMessage: "No pudimos procesar tu pago. Podés intentarlo de nuevo.",
+    paymentKoMessage: "No pudimos procesar tu pago. Puedes intentarlo de nuevo.",
     paymentRetry: "Volver al pedido",
     // QR Scanner Gate
     qrScannerNoToken: "Escaneá el QR de tu mesa",

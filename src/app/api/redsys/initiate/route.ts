@@ -8,6 +8,7 @@ import { initiateRedsysPaymentUseCase } from '@/core/application/use-cases/payme
 
 const initiateSchema = z.object({
   pedidoId: z.string().uuid(),
+  lang: z.enum(['es', 'en', 'fr', 'it', 'de']).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -32,12 +33,13 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return validationErrorResponse(parsed.error.errors[0].message);
 
   const origin = request.nextUrl.origin;
+  const lang = parsed.data.lang ?? 'es';
 
   const result = await initiateRedsysPaymentUseCase({
     pedidoId: parsed.data.pedidoId,
     empresaId: empresaResult.data.id,
     urlOk: `${origin}/pedido/pago-ok`,
-    urlKo: `${origin}/pedido/pago-ko`,
+    urlKo: `${origin}/pedido/pago-ko?lang=${lang}`,
     webhookUrl: `${origin}/api/redsys/webhook`,
   });
 

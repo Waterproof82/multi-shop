@@ -141,7 +141,7 @@ export async function initiateRedsysPaymentUseCase(
         currency: '978',
         transactionType: '0',
         urlOk: trackingToken ? `${input.urlOk}?token=${trackingToken}` : input.urlOk,
-        urlKo: input.urlKo,
+        urlKo: trackingToken ? `${input.urlKo}&token=${trackingToken}` : input.urlKo,
         merchantName,
         webhookUrl: input.webhookUrl,
       }
