@@ -1,6 +1,48 @@
 # Carta Digital Multi-idioma
 
-Plataforma multi-tenant de menú digital con sistema de pedidos online, panel de administración y envío de promociones por email.
+Plataforma **multi-tenant** de gestión de negocios de hostelería y retail. Cada empresa tiene su propio dominio, su propio panel de administración y opera de forma completamente aislada. Un único despliegue sirve a N negocios.
+
+---
+
+## ¿Qué puede hacer este sistema?
+
+### 🛍️ Modo Tienda — autogestionable de extremo a extremo
+
+- **Carta digital** con categorías, productos, imágenes y precios gestionables desde el panel de admin.
+- **Pedidos online** con formulario de cliente, seguimiento en tiempo real y notificación instantánea al negocio vía Telegram.
+- **Pasarela de pagos Redsys TPV Virtual** integrada: el cliente paga al hacer el pedido (envío a domicilio y recogida en local, configurable por separado).
+- **Sistema de envío a domicilio con riders** mediante integración con Glovo Business LaaS: cotización de coste en tiempo real, auto-despacho del rider al confirmar el pago, tracking del estado del rider.
+- **Selector de dirección** con autocompletado Mapbox y validación por código postal.
+- **Descuento de bienvenida**: popup automático a los 30 segundos, código único por email, porcentaje y duración configurables, validación server-side completa.
+- **Campañas TooGoodToGo**: crea paquetes sorpresa con precio reducido, envía emails masivos a suscriptores, gestiona cupones y reservas.
+- **Envío de promociones** por email a la base de clientes con imagen y texto personalizado.
+
+### 🍽️ Modo Restaurante — pedidos en mesa y takeaway
+
+- **Pedidos desde la mesa** mediante QR: el cliente escanea el código QR de la mesa con la cámara del móvil, sin instalar nada, y hace su pedido directamente.
+- **Validación de presencia física**: los pedidos en mesa requieren escaneo in-app del QR impreso (token de sesión de 20 min, rotación automática al cerrar la sesión).
+- **Panel de sala para camareros** con login por PIN: grid de mesas con estado en tiempo real, apertura y cierre de sesión, búsqueda rápida de productos para tomar pedidos.
+- **Pago en mesa** vía Redsys TPV: pago total o división de cuenta entre 2 y 20 personas. Sistema de lock atómico para evitar pagos simultáneos. Verificación de total antes de pagar (detecta productos nuevos añadidos en el último momento).
+- **Registro manual de pagos** por el camarero (efectivo / pago externo) para desbloquear la sesión en escenarios de división.
+- **Gestión de pedidos takeaway** desde un entorno de chat de Telegram: con un solo botón se indica el tiempo de recogida (10, 15, 20, 30 o 45 minutos). El cliente recibe la notificación automáticamente en su pantalla de seguimiento, sin necesidad de llamar por teléfono.
+
+### 🤖 Notificaciones Telegram — tres modos de operación
+
+- **Tienda**: botones de acción rápida (Aceptar, Rechazar) directamente en el mensaje.
+- **Restaurante takeaway**: selector de tiempo de preparación con botones; el admin confirma el tiempo y el cliente lo ve al instante.
+- **Mesa**: botones por pedido (Anotado / Servido) con estado actualizado en el mensaje; botón "Modificar" para tiempos variables.
+
+### 🌐 Multi-idioma y multi-tenant
+
+- **5 idiomas**: español, inglés, francés, italiano y alemán en todos los textos de cara al cliente.
+- **Cada empresa** tiene su propio dominio (o subdominio `pedidos.`), colores, logo, carta, clientes y configuración completamente aislados.
+- **Panel SuperAdmin** con vista global de todas las empresas, estadísticas, ranking y toggles de funcionalidades por empresa.
+
+### 🔒 Seguridad de producción
+
+JWT + HttpOnly cookies, revocación en Redis (fail-closed), RBAC por rol, CSRF HMAC-SHA256, CSP con nonce criptográfico por request, rate limiting por IP y por UUID, validación de precio server-side (anti-tampering), aislamiento por tenant con RLS en Supabase.
+
+---
 
 ## Stack Tecnológico
 
