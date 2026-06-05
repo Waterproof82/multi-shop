@@ -1,3 +1,4 @@
+import { SupabaseClient } from '@supabase/supabase-js';
 import { Result } from '@/core/domain/entities/types';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { logger } from '@/core/infrastructure/logging/logger';
@@ -11,6 +12,54 @@ export interface RegisterManualMesaPaymentResult {
   pagosRealizados: number;
   personas: number | null;
   fullyPaid: boolean;
+}
+
+async function sendTelegramCompletionNotification(
+  supabase: SupabaseClient,
+  sesionId: string,
+  mesaId: string,
+  empresaId: string
+): Promise<void> {
+  try {
+    const { data: empresaData } = await supabase
+      .from('empresas')
+      .select('telegram_bebidas_chat_id')
+      .eq('id', empresaId)
+      .single();
+
+    const chatId = (empresaData as { telegram_bebidas_chat_id: string | null } | null)
+      ?.telegram_bebidas_chat_id;
+    if (!chatId) return;
+
+    const { data: mesaData } = await supabase
+      .from('mesas')
+      .select('numero, nombre')
+      .eq('id', mesaId)
+      .maybeSingle();
+
+    const m = mesaData as { numero: number; nombre: string | null } | null;
+    const mesaNumero = m?.numero ?? 0;
+    const mesaNombre = m?.nombre ?? null;
+
+    const { data: pedidosData } = await supabase
+      .from('pedidos')
+      .select('total')
+      .eq('sesion_id', sesionId)
+      .eq('empresa_id', empresaId);
+
+    const sessionTotal =
+      (pedidosData as { total: string | number }[] | null)?.reduce(
+        (acc, row) => acc + Number(row.total),
+        0
+      ) ?? 0;
+
+    const { sendTelegramPagoMesaCompleto } = await import(
+      '@/core/infrastructure/services/telegram.service'
+    );
+    await sendTelegramPagoMesaCompleto(sesionId, mesaNumero, mesaNombre, sessionTotal, chatId);
+  } catch {
+    // fire-and-forget — do not fail the main operation
+  }
 }
 
 export async function registerManualMesaPaymentUseCase(
@@ -75,6 +124,9 @@ export async function registerManualMesaPaymentUseCase(
         .from('mesa_sesiones')
         .update({ sesion_pagada: true, pago_en_curso: false, pago_iniciado_en: null })
         .eq('id', sesionId);
+
+      // Fire-and-forget Telegram notification
+      void sendTelegramCompletionNotification(supabase, sesionId, input.mesaId, input.empresaId);
     } else {
       // Release lock if held (division payment not yet complete)
       await supabase

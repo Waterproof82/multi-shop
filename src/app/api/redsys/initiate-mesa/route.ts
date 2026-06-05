@@ -59,5 +59,9 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  if (!result.success && result.error.code === 'ALREADY_PAID') {
+    return NextResponse.json({ code: 'ALREADY_PAID' }, { status: 409 });
+  }
+
   return handleResult(result);
 }

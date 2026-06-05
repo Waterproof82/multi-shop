@@ -417,9 +417,17 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
         return;
       }
       if (res.status === 409) {
+        const body = await res.json() as { code?: string; newTotalCents?: number };
+        if (body.code === 'ALREADY_PAID') {
+          // Session completed (e.g. waiter registered manual payment) while this user
+          // was on the checkout flow — release lock and refresh to show paid screen.
+          releaseCheckoutLock();
+          setPaying(false);
+          void refresh();
+          return;
+        }
         // An order committed to DB between the client's total check and Redsys initiation.
         // Show the updated total so the user can review and confirm before paying.
-        const body = await res.json() as { code?: string; newTotalCents?: number };
         const mismatch = buildTotalMismatch(body, sessionData?.total ?? 0, esDivision);
         if (mismatch) {
           setSessionData(prev => prev ? { ...prev, total: mismatch.newTotal } : prev);
@@ -514,6 +522,17 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
       const res = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/orders`);
       if (!res.ok) { executePendingAction(action); return; }
       const fresh = await res.json() as MesaSessionData;
+
+      // Guard: session may have been paid (e.g. waiter manual payment) while this
+      // user was going through the checkout flow — bail out and show the paid screen.
+      const freshFullyPaid = fresh.sesionPagada ||
+        (fresh.division ? fresh.division.pagosRealizados >= fresh.division.personas : false);
+      if (freshFullyPaid) {
+        setSessionData(fresh);
+        releaseCheckoutLock();
+        return;
+      }
+
       const currentTotal = sessionData?.total ?? 0;
       if (Math.abs(fresh.total - currentTotal) > 0.005) {
         setSessionData(fresh);

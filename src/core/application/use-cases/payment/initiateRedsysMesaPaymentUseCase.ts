@@ -84,7 +84,7 @@ export async function initiateRedsysMesaPaymentUseCase(
     // Find active sesion for the mesa (including division state + payment lock)
     const { data: sesion, error: sesionError } = await supabase
       .from('mesa_sesiones')
-      .select('id, empresa_id, division_personas, division_pagos_realizados, pago_en_curso, pago_iniciado_en')
+      .select('id, empresa_id, division_personas, division_pagos_realizados, sesion_pagada, pago_en_curso, pago_iniciado_en')
       .eq('mesa_id', input.mesaId)
       .is('cerrada_at', null)
       .maybeSingle();
@@ -105,6 +105,35 @@ export async function initiateRedsysMesaPaymentUseCase(
     const sesionId = s['id'] as string;
     const divisionPersonas = (s['division_personas'] as number | null) ?? null;
     const divisionPagosRealizados = (s['division_pagos_realizados'] as number) ?? 0;
+    const sesionPagada = (s['sesion_pagada'] as boolean) ?? false;
+
+    // Reject if the session is already fully paid (covers both full and division payments,
+    // including manual payments registered by the waiter).
+    if (sesionPagada) {
+      return {
+        success: false,
+        error: {
+          code: 'ALREADY_PAID',
+          message: 'Esta sesión ya está pagada',
+          module: 'use-case',
+          method: 'initiateRedsysMesaPaymentUseCase',
+        },
+      };
+    }
+
+    // For division payments: also guard against the counter being already complete,
+    // which can happen if sesion_pagada hasn't propagated yet.
+    if (input.esDivision && divisionPersonas && divisionPagosRealizados >= divisionPersonas) {
+      return {
+        success: false,
+        error: {
+          code: 'ALREADY_PAID',
+          message: 'Todos los pagos de la división ya han sido realizados',
+          module: 'use-case',
+          method: 'initiateRedsysMesaPaymentUseCase',
+        },
+      };
+    }
 
     // Reject if another payment is already in progress (lock not expired).
     // Allow if the lock is within GRACE_PERIOD_MS — the UI pre-locks via
