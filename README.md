@@ -30,7 +30,9 @@ Plataforma **multi-tenant** de gestión de negocios de hostelería y retail. Cad
 
 - **Tienda**: botones de acción rápida (Aceptar, Rechazar) directamente en el mensaje.
 - **Restaurante takeaway**: selector de tiempo de preparación con botones; el admin confirma el tiempo y el cliente lo ve al instante.
-- **Mesa**: botones por pedido (Anotado / Servido) con estado actualizado en el mensaje; botón "Modificar" para tiempos variables.
+- **Mesa — dos grupos de trabajo independientes**:
+  - **Grupo de cocina / barra**: recibe cada pedido con botones por línea (Anotado / Servido). Cuando cocina marca un plato como servido, el camarero recibe la notificación en tiempo real para saber que el pedido está listo para llevar a la mesa.
+  - **Grupo de gestión general**: coordina el sistema completo de pedidos (apertura y cierre de mesas, pagos, incidencias). Permite que sala y cocina operen en canales separados sin interferencias.
 
 ### 🌐 Multi-idioma y multi-tenant
 
