@@ -375,6 +375,7 @@ export class PedidoUseCase {
         : undefined;
 
       // Step 4: Create the order
+      // Pass origen for both delivery and recogida so the Redsys webhook can identify order type
       const pedidoResult = await this.pedidoRepo.create(
         empresaId,
         clienteResult.data.clienteId,
@@ -382,13 +383,15 @@ export class PedidoUseCase {
         finalTotal,
         discountData,
         trackingToken,
-        isDelivery ? {
+        data.origen ? {
           origen: data.origen,
-          direccion_entrega: data.direccion_entrega,
-          codigo_postal: data.codigo_postal,
-          latitude_entrega: data.latitude_entrega,
-          longitude_entrega: data.longitude_entrega,
-          estimated_delivery_fee_cents: data.estimated_delivery_fee_cents,
+          ...(isDelivery ? {
+            direccion_entrega: data.direccion_entrega,
+            codigo_postal: data.codigo_postal,
+            latitude_entrega: data.latitude_entrega,
+            longitude_entrega: data.longitude_entrega,
+            estimated_delivery_fee_cents: data.estimated_delivery_fee_cents,
+          } : {})
         } : undefined
       );
       if (!pedidoResult.success) {
