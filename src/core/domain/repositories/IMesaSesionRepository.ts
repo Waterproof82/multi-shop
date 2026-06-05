@@ -7,6 +7,15 @@ export interface PendingItem {
   translations?: Record<string, { name?: string } | undefined>;
 }
 
+export interface DeferredItem {
+  itemId: string;
+  itemName: string;
+  price: number;
+  quantity: number;
+  translations?: Record<string, { name: string }>;
+  selectedComplements?: Array<{ id: string; name: string; price: number }>;
+}
+
 export interface MesaSesion {
   id: string;
   mesaId: string;
@@ -21,9 +30,11 @@ export interface MesaSesion {
 }
 
 export interface IMesaSesionRepository {
-  openSesion(mesaId: string, empresaId: string): Promise<Result<string>>; // returns sesion_id
+  openSesion(mesaId: string, empresaId: string): Promise<Result<string>>;
   closeSesion(sesionId: string): Promise<Result<void>>;
   findActiveSesionByMesa(mesaId: string): Promise<Result<MesaSesion | null>>;
   findSesionWithOrders(sesionId: string): Promise<Result<MesaSesion | null>>;
   appendItems(sesionId: string, items: PendingItem[], itemsTotal: number): Promise<Result<void>>;
+  getDeferredItems(mesaId: string): Promise<Result<DeferredItem[]>>;
+  setDeferredItems(mesaId: string, items: DeferredItem[]): Promise<Result<void>>;
 }

@@ -25,11 +25,12 @@ sesion_id   uuid NULL REFERENCES mesa_sesiones(id) -- active session FK
 
 ### `mesa_sesiones`
 ```sql
-id          uuid PRIMARY KEY DEFAULT gen_random_uuid()
-mesa_id     uuid NOT NULL REFERENCES mesas(id)
-empresa_id  uuid NOT NULL REFERENCES empresas(id)
-abierta_en  timestamptz NOT NULL DEFAULT now()
-cerrada_en  timestamptz NULL                        -- NULL = session still open
+id               uuid PRIMARY KEY DEFAULT gen_random_uuid()
+mesa_id          uuid NOT NULL REFERENCES mesas(id)
+empresa_id       uuid NOT NULL REFERENCES empresas(id)
+abierta_en       timestamptz NOT NULL DEFAULT now()
+cerrada_en       timestamptz NULL                        -- NULL = session still open
+items_diferidos  jsonb NOT NULL DEFAULT '[]'             -- deferred cart items (waiter "para servir después")
 ```
 
 ### `pedidos` (delta)

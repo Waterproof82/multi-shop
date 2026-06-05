@@ -54,6 +54,8 @@ On mount, `WaiterLoginForm` pings `GET /api/waiter/me`. If the cookie is already
 | `POST` | `/api/waiter/mesas/{mesaId}/open` | Open a table session |
 | `POST` | `/api/waiter/mesas/{mesaId}/close` | Close session (consolidate orders) + auto-reopen |
 | `POST` | `/api/waiter/mesas/{mesaId}/manual-payment` | Register a cash/external payment (full or one division share) |
+| `GET` | `/api/waiter/mesas/{mesaId}/deferred` | Get deferred items for the active session |
+| `PUT` | `/api/waiter/mesas/{mesaId}/deferred` | Save/clear deferred items for the active session |
 
 ---
 
@@ -122,7 +124,7 @@ The `WaiterBanner` component is rendered globally in the root layout. It appears
 **Features:**
 - Pulsing live indicator dot
 - Shows active mesa name
-- **"Change table" dropdown** — fetches `GET /api/waiter/mesas` on open, lists all mesas with open/libre status. Selecting a libre mesa calls `POST /api/waiter/mesas/{mesaId}/open` first.
+- **"Change table" dropdown** — fetches `GET /api/waiter/mesas` on open. First item is always **"Ver todas las mesas"** (navigates to `/waiter`). Remaining items list all mesas with open/libre status. Selecting a libre mesa calls `POST /api/waiter/mesas/{mesaId}/open` first.
 - **"Close table" button (X icon)** → shown when a session is active. Calls `window.confirm`, then `POST /api/waiter/mesas/{mesaId}/close`. On success (2xx or 404), clears local state and redirects to `/waiter`. On error, shows a localized error toast below the banner for 5 seconds without navigating. Triggers order consolidation + auto-reopen (see Session Lifecycle).
 - **"Unlock payment" button (🔓)** → shown only when `pago_en_curso = true` for the active mesa. Calls `DELETE /api/mesas/{mesaId}/lock` to release the payment lock.
 - "Logout" button → calls `/api/waiter/logout` and redirects to `/waiter`
@@ -177,3 +179,65 @@ Both mechanisms run simultaneously while the waiter is on the table grid. `empre
 - The PIN itself is never stored or logged — only the bcrypt hash
 - PIN input uses `autoComplete="off"` (not `"current-password"`) — Chrome would otherwise match against breach databases and show a security warning
 - Closing a session prevents new orders from being attributed to it
+
+---
+
+## Deferred Items ("Para servir después")
+
+A waiter can mark one or more cart items as **deferred** before confirming a comanda. Deferred items are excluded from the current kitchen order but persisted to the DB so any waiter can see and release them later.
+
+### DB storage
+
+`mesa_sesiones.items_diferidos JSONB NOT NULL DEFAULT '[]'` — overwritten atomically on every deferred-items update. The `get_mesas_with_sessions` RPC includes this field.
+
+### `DeferredItem` type
+
+```typescript
+interface DeferredItem {
+  itemId: string;
+  itemName: string;
+  price: number;
+  quantity: number;
+  translations?: Record<string, { name: string }>;
+  selectedComplements?: Array<{ id: string; name: string; price: number }>;
+}
+```
+
+### Cart flags
+
+| Flag | Meaning |
+|---|---|
+| `deferred?: boolean` | Waiter marked this item to send later. Excluded from the next confirm. |
+| `fromPending?: boolean` | Pre-loaded from DB when entering a mesa. Sent normally on next confirm. |
+
+### Lifecycle
+
+```
+Waiter marks item deferred
+  → deferred flag on CartItem (client only)
+
+Waiter confirms comanda
+  → non-deferred items → POST /api/pedidos (kitchen)
+  → deferred items → PUT /api/waiter/mesas/{mesaId}/deferred (save to DB)
+  → non-deferred cleared from cart; deferred items remain visible
+
+Grid refresh
+  → MesaCard shows deferred items list (clock icon + "ItemName x qty")
+
+Any waiter enters mesa
+  → GET /api/waiter/mesas/{mesaId}/deferred
+  → loadDeferredItems() → items appear in cart with fromPending flag
+
+Waiter confirms (releasing deferred)
+  → all cart items → POST /api/pedidos
+  → PUT /api/waiter/mesas/{mesaId}/deferred with [] (clears DB)
+  → cart cleared
+```
+
+### UI
+
+- Each cart item in mesa mode shows a **clock button (⏱)** — click to toggle deferred.
+- Deferred items: amber row tint, active clock icon.
+- `fromPending` items: "pendiente" badge next to the name, no clock toggle (sent on next confirm).
+- Confirm button disabled with label "Todos los ítems están diferidos" when all non-pending items are deferred.
+- Mesa grid cards show deferred items inline: `🕐 Tiramisú x1, Café x2` (amber, small text).

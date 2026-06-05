@@ -1,4 +1,4 @@
-import { IMesaSesionRepository, MesaSesion } from '@/core/domain/repositories/IMesaSesionRepository';
+import { IMesaSesionRepository, MesaSesion, DeferredItem } from '@/core/domain/repositories/IMesaSesionRepository';
 import { IMesaRepository, MesaWithSession } from '@/core/domain/repositories/IMesaRepository';
 import { Result } from '@/core/domain/entities/types';
 import { logger } from '@/core/infrastructure/logging/logger';
@@ -57,6 +57,32 @@ export class MesaSesionUseCase {
       return { success: true, data: result.data };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'use-case', 'MesaSesionUseCase.getMesasWithSessions', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
+  async getDeferredItems(mesaId: string): Promise<Result<DeferredItem[]>> {
+    try {
+      const result = await this.mesaSesionRepo.getDeferredItems(mesaId);
+      if (!result.success) {
+        return { success: false, error: { ...result.error, method: 'MesaSesionUseCase.getDeferredItems' } };
+      }
+      return { success: true, data: result.data };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'use-case', 'MesaSesionUseCase.getDeferredItems', { details: { mesaId } });
+      return { success: false, error: appError };
+    }
+  }
+
+  async setDeferredItems(mesaId: string, items: DeferredItem[]): Promise<Result<void>> {
+    try {
+      const result = await this.mesaSesionRepo.setDeferredItems(mesaId, items);
+      if (!result.success) {
+        return { success: false, error: { ...result.error, method: 'MesaSesionUseCase.setDeferredItems' } };
+      }
+      return { success: true, data: undefined };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'use-case', 'MesaSesionUseCase.setDeferredItems', { details: { mesaId } });
       return { success: false, error: appError };
     }
   }

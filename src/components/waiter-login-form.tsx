@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
-import { UtensilsCrossed, KeyRound } from "lucide-react";
+import { UtensilsCrossed, KeyRound, Clock } from "lucide-react";
 import { formatPrice } from "@/lib/format-price";
 import type { MesaWithSession } from "@/core/domain/repositories/IMesaRepository";
 
@@ -220,6 +220,19 @@ function MesaCard({ mesa, isLoading, onClick }: MesaCardProps) {
           sessionTotal={mesa.sessionTotal}
           activeOrderCount={mesa.activeOrderCount}
         />
+        {mesa.itemsDiferidos.length > 0 && (
+          <div className="w-full flex items-start gap-1 mt-1">
+            <Clock className="w-2.5 h-2.5 shrink-0 mt-0.5" style={{ color: "oklch(65% 0.14 62)" }} />
+            <span
+              className="text-[9px] leading-tight break-words"
+              style={{ color: "oklch(65% 0.14 62)" }}
+            >
+              {mesa.itemsDiferidos
+                .map(d => `${d.itemName} x${d.quantity}`)
+                .join(', ')}
+            </span>
+          </div>
+        )}
       </div>
     </button>
   );

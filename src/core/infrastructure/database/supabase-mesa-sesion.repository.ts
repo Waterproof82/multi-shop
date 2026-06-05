@@ -1,6 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Result } from '@/core/domain/entities/types';
-import { IMesaSesionRepository, MesaSesion, PendingItem } from '@/core/domain/repositories/IMesaSesionRepository';
+import { IMesaSesionRepository, MesaSesion, PendingItem, DeferredItem } from '@/core/domain/repositories/IMesaSesionRepository';
 import { logger } from '../logging/logger';
 
 export class SupabaseMesaSesionRepository implements IMesaSesionRepository {
@@ -173,6 +173,62 @@ export class SupabaseMesaSesionRepository implements IMesaSesionRepository {
       };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabaseMesaSesionRepository.findSesionWithOrders', { details: { sesionId } });
+      return { success: false, error: appError };
+    }
+  }
+
+  async getDeferredItems(mesaId: string): Promise<Result<DeferredItem[]>> {
+    try {
+      const { data, error } = await this.supabase
+        .from('mesa_sesiones')
+        .select('items_diferidos')
+        .eq('mesa_id', mesaId)
+        .is('cerrada_at', null)
+        .maybeSingle();
+
+      if (error) {
+        await logger.logAndReturnError(
+          'DB_SELECT_ERROR',
+          error.message,
+          'repository',
+          'SupabaseMesaSesionRepository.getDeferredItems',
+          { details: { code: error.code, mesaId } }
+        );
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener ítems diferidos', module: 'repository', method: 'getDeferredItems' } };
+      }
+
+      if (!data) return { success: true, data: [] };
+
+      const row = data as Record<string, unknown>;
+      return { success: true, data: (row['items_diferidos'] as DeferredItem[]) ?? [] };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseMesaSesionRepository.getDeferredItems', { details: { mesaId } });
+      return { success: false, error: appError };
+    }
+  }
+
+  async setDeferredItems(mesaId: string, items: DeferredItem[]): Promise<Result<void>> {
+    try {
+      const { error } = await this.supabase
+        .from('mesa_sesiones')
+        .update({ items_diferidos: items })
+        .eq('mesa_id', mesaId)
+        .is('cerrada_at', null);
+
+      if (error) {
+        await logger.logAndReturnError(
+          'DB_UPDATE_ERROR',
+          error.message,
+          'repository',
+          'SupabaseMesaSesionRepository.setDeferredItems',
+          { details: { code: error.code, mesaId } }
+        );
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al guardar ítems diferidos', module: 'repository', method: 'setDeferredItems' } };
+      }
+
+      return { success: true, data: undefined };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseMesaSesionRepository.setDeferredItems', { details: { mesaId } });
       return { success: false, error: appError };
     }
   }
