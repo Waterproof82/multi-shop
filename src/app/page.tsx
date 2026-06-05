@@ -50,9 +50,9 @@ export default async function Home({
   const hasMesaParam = rawMesaParam && mesasHabilitadas;
   const mostrarCarritoEmpresa = empresa?.mostrarCarrito ?? false;
   const isRestaurant = empresa?.tipo === 'restaurante';
-  // When a mesa URL is present but mesas are disabled, suppress the cart entirely
-  // (read-only mode: customer can view their ticket but not place new orders or pay)
-  const mesaDisabledContext = rawMesaParam && !mesasHabilitadas;
+  // When a mesa URL is present but mesas are disabled, suppress the cart for customers.
+  // Waiter mode bypasses this — staff can always place orders regardless of the toggle.
+  const mesaDisabledContext = rawMesaParam && !mesasHabilitadas && !isWaiterMode;
   // - pedidos subdomain: always
   // - waiter session or mesa QR: always (regardless of mostrarCarritoEmpresa)
   // - tienda with mostrarCarritoEmpresa=true: yes
