@@ -54,6 +54,7 @@ interface EmpresaRow {
   footer2_de: string | null;
   tipo: 'tienda' | 'restaurante' | null;
   pagos_mesa_habilitados: boolean;
+  pagos_pickup_habilitados: boolean;
   mesas_habilitadas: boolean;
   created_at: string;
 }
@@ -379,6 +380,7 @@ export class SupabaseSuperAdminRepository implements ISuperAdminRepository {
       mostrarPromociones: row.mostrar_promociones ?? true,
       mostrarTgtg: row.mostrar_tgtg ?? true,
       pagosMesaHabilitados: row.pagos_mesa_habilitados ?? false,
+      pagosPickupHabilitados: row.pagos_pickup_habilitados ?? false,
       mesasHabilitadas: row.mesas_habilitadas ?? true,
       moneda: row.moneda,
       emailNotification: row.email_notification,

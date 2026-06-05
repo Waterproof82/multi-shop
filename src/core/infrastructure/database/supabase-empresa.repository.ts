@@ -185,7 +185,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
     fb, instagram, url_mapa,
     direccion, telefono_whatsapp, email_notification,
     descuento_bienvenida_activo, descuento_bienvenida_porcentaje, descuento_bienvenida_duracion,
-    mesas_habilitadas
+    mesas_habilitadas, pagos_pickup_habilitados
   `;
 
   private static mapTranslations(data: Record<string, unknown>, prefix: string): { es?: string | null; en?: string | null; fr?: string | null; it?: string | null; de?: string | null } | null {
@@ -240,6 +240,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
       descuentoBienvenidaPorcentaje: Number(data.descuento_bienvenida_porcentaje ?? 5),
       descuentoBienvenidaDuracion: Number(data.descuento_bienvenida_duracion ?? 30),
       mesasHabilitadas: (data.mesas_habilitadas as boolean) ?? true,
+      pagosPickupHabilitados: (data.pagos_pickup_habilitados as boolean) ?? false,
     };
   }
 

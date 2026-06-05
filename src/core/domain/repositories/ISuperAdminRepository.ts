@@ -80,6 +80,7 @@ export interface EmpresaWithStats {
     de?: string | null;
   } | null;
   pagosMesaHabilitados: boolean;
+  pagosPickupHabilitados: boolean;
   mesasHabilitadas: boolean;
   stats: EmpresaStats;
   totalMesas: number;
