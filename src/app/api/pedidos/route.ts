@@ -4,6 +4,7 @@ import { empresaPublicRepository, pedidoUseCase, mesaUseCase } from '@/core/infr
 import { parseMainDomain, isPedidosDomain, getDomainFromHeaders } from '@/lib/domain-utils';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 import { validateMesaClientToken } from '@/core/infrastructure/api/validate-mesa-client-token';
+import { verifyWaiterToken } from '@/lib/waiter-auth';
 
 const itemsSchema = z.array(z.object({
   item: z.object({
@@ -86,14 +87,25 @@ async function checkMesaPaymentLock(mesaId: string): Promise<NextResponse | null
   return null;
 }
 
+async function isWaiterRequest(request: Request): Promise<boolean> {
+  const cookie = request.headers.get('cookie') ?? '';
+  const match = /(?:^|;\s*)waiter_token=([^;]+)/.exec(cookie);
+  if (!match) return false;
+  const payload = await verifyWaiterToken(decodeURIComponent(match[1]));
+  return payload !== null;
+}
+
 async function handleMesaOrder(empresa: EmpresaOrderData, data: MesaData, request: Request): Promise<NextResponse> {
-  // Guard: mesa ordering must be enabled for this empresa
-  if (!empresa.mesas_habilitadas) {
+  const isWaiter = await isWaiterRequest(request);
+
+  // Guard: mesa ordering must be enabled for this empresa.
+  // Waiter requests bypass this — staff can always place orders regardless of the toggle.
+  if (!empresa.mesas_habilitadas && !isWaiter) {
     return NextResponse.json({ error: 'El servicio de mesas no está disponible.' }, { status: 403 });
   }
 
-  // Validate client QR token for mesa orders
-  const tokenError = await validateMesaClientToken(request);
+  // Validate client QR token for mesa orders (skipped for waiters — they use waiter_token)
+  const tokenError = isWaiter ? null : await validateMesaClientToken(request);
   if (tokenError) return tokenError;
 
   const mesaResult = await mesaUseCase.getMesa(data.mesa_id);
