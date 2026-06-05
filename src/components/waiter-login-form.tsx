@@ -180,7 +180,7 @@ interface MesaCardProps {
 }
 
 function MesaCard({ mesa, isLoading, onClick }: MesaCardProps) {
-  const isOpen = !!mesa.sesionId;
+  const isOpen = !!mesa.sesionId && mesa.activeOrderCount > 0;
   const isPaid = mesa.sesionPagada;
   const isPaymentInProgress = mesa.pagoEnCurso && !mesa.sesionPagada;
   const colors = getMesaColors(isPaid, isPaymentInProgress, isOpen);
