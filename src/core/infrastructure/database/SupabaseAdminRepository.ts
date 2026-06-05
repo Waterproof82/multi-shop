@@ -180,7 +180,7 @@ export class SupabaseAdminRepository implements IAdminRepository {
       id: row.id as string,
       nombre: row.nombre as string,
       dominio: row.dominio as string,
-      tipo: (row.tipo === 'restaurante' ? 'restaurante' : 'tienda') as 'tienda' | 'restaurante',
+      tipo: row.tipo === 'restaurante' ? 'restaurante' : 'tienda',
       slug: (row.slug as string | null) ?? null,
       logoUrl: row.logo_url as string | null,
       mostrarLogo: (row.mostrar_logo as boolean) ?? true,
