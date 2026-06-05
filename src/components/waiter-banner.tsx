@@ -61,6 +61,7 @@ export function WaiterBanner() {
   const [mesaLabel, setMesaLabel]     = useState<string | null>(null);
   const [mesaId, setMesaId]           = useState<string | null>(null);
   const [closing, setClosing]         = useState(false);
+  const [closeError, setCloseError]   = useState<string | null>(null);
   const [pagoEnCurso, setPagoEnCurso] = useState(false);
   const [unlocking, setUnlocking]     = useState(false);
 
@@ -160,10 +161,17 @@ export function WaiterBanner() {
     if (!mesaId || closing) return;
     if (!window.confirm(t("waiterTableCloseConfirm", lang))) return;
     setClosing(true);
+    setCloseError(null);
     try {
-      await fetch(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/close`, { method: "POST" });
-      clearWaiterMesa();
-      window.location.href = "/waiter";
+      const res = await fetch(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/close`, { method: "POST" });
+      // 404 = no active session (already closed) — navigate anyway
+      if (res.ok || res.status === 404) {
+        clearWaiterMesa();
+        window.location.href = "/waiter";
+      } else {
+        setCloseError(t("waiterTableCloseError", lang));
+        setTimeout(() => { setCloseError(null); }, 5000);
+      }
     } finally {
       setClosing(false);
     }
@@ -189,6 +197,15 @@ export function WaiterBanner() {
   return (
     <>
       <div aria-hidden className="h-12" />
+      {closeError && (
+        <div
+          role="alert"
+          className="fixed top-12 left-0 right-0 z-[100] px-4 py-2 text-xs text-center font-medium"
+          style={{ background: "oklch(25% 0.08 25)", color: "oklch(88% 0.10 25)" }}
+        >
+          {closeError}
+        </div>
+      )}
       <div
         role="status"
         aria-live="polite"
