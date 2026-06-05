@@ -122,7 +122,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
     try {
       const { data: empresa } = await this.supabase
         .from('empresas')
-        .select('id, nombre, email_notification, telefono_whatsapp, tipo, telegram_chat_id, telegram_mesa_chat_id, telegram_bebidas_chat_id')
+        .select('id, nombre, email_notification, telefono_whatsapp, tipo, telegram_chat_id, telegram_mesa_chat_id, telegram_bebidas_chat_id, mesas_habilitadas')
         .eq('dominio', dominio)
         .single();
 
@@ -135,6 +135,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
         telegram_chat_id: empresa.telegram_chat_id as string | null,
         telegram_mesa_chat_id: (empresa.telegram_mesa_chat_id as string | null) ?? null,
         telegram_bebidas_chat_id: (empresa.telegram_bebidas_chat_id as string | null) ?? null,
+        mesas_habilitadas: (empresa.mesas_habilitadas as boolean) ?? true,
       }};
 
       const isPedidos = dominio.startsWith(`${DEFAULT_PEDIDOS_SUBDOMAIN}.`) || dominio.endsWith('-pedidos');
@@ -143,7 +144,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
         const mainDomainFromSubdomain = dominio.split('.').slice(1).join('.');
         const { data: empresaSubdomain } = await this.supabase
           .from('empresas')
-          .select('id, nombre, email_notification, telefono_whatsapp, tipo, telegram_chat_id, telegram_mesa_chat_id, telegram_bebidas_chat_id')
+          .select('id, nombre, email_notification, telefono_whatsapp, tipo, telegram_chat_id, telegram_mesa_chat_id, telegram_bebidas_chat_id, mesas_habilitadas')
           .eq('dominio', mainDomainFromSubdomain)
           .single();
 
@@ -156,6 +157,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
           telegram_chat_id: empresaSubdomain.telegram_chat_id as string | null,
           telegram_mesa_chat_id: (empresaSubdomain.telegram_mesa_chat_id as string | null) ?? null,
           telegram_bebidas_chat_id: (empresaSubdomain.telegram_bebidas_chat_id as string | null) ?? null,
+          mesas_habilitadas: (empresaSubdomain.mesas_habilitadas as boolean) ?? true,
         } : null };
       }
 

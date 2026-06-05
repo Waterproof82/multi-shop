@@ -35,6 +35,7 @@ export interface IEmpresaRepository {
     telegram_chat_id: string | null;
     telegram_mesa_chat_id: string | null;
     telegram_bebidas_chat_id: string | null;
+    mesas_habilitadas: boolean;
   } | null>>;
   findByDomainPublic(domain: string): Promise<Result<EmpresaPublic | null>>;
   update(empresaId: string, data: UpdateEmpresaData): Promise<Result<void>>;
