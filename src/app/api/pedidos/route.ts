@@ -152,7 +152,8 @@ async function handleDefaultOrder(empresa: EmpresaOrderData, data: DefaultData, 
     data,
     empresa.tipo ?? 'tienda',
     empresa.telegram_chat_id ?? null,
-    isPedidos
+    isPedidos,
+    empresa.pagos_pickup_habilitados ?? false
   );
 
   if (!pedidoResult.success) {

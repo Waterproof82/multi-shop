@@ -318,7 +318,8 @@ export class PedidoUseCase {
     data: CreatePedidoDTO,
     empresaTipo: string = 'tienda',
     telegramChatId: string | null = null,
-    esPedidos: boolean = false
+    esPedidos: boolean = false,
+    pagosPickupHabilitados: boolean = false
   ): Promise<Result<{ id: string; numero_pedido: number; total: number; trackingToken?: string }>> {
     try {
       // Step 1: Find or create client
@@ -400,9 +401,11 @@ export class PedidoUseCase {
       }
 
       // Step 6: Send Telegram notification
-      // Delivery orders: payment not confirmed yet — skip until webhook confirms payment
+      // Delivery orders: always skip — payment must be confirmed first via Redsys webhook
+      // Pickup/tienda orders with pagosPickupHabilitados: also skip until webhook confirms payment
       const isDeliveryOrder = data.origen === 'delivery';
-      if (telegramChatId && pedidoResult.data && !isDeliveryOrder) {
+      const isPickupWithPayment = pagosPickupHabilitados && (data.origen === 'recogida' || empresaTipo !== 'restaurante');
+      if (telegramChatId && pedidoResult.data && !isDeliveryOrder && !isPickupWithPayment) {
         const pedidoParaNotificar: import('@/core/domain/entities/types').Pedido = {
           id: pedidoResult.data.id,
           empresa_id: empresaId,

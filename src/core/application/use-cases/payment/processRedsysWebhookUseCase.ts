@@ -40,10 +40,10 @@ export async function processRedsysWebhookUseCase(
       return { success: true, data: { verified: false } };
     }
 
-    // Fetch empresa secret key + bebidas chat id for payment notification
+    // Fetch empresa secret key + telegram chat ids + tipo for payment notification
     const { data: empresa, error: empresaError } = await supabase
       .from('empresas')
-      .select('redsys_secret_key, telegram_bebidas_chat_id')
+      .select('redsys_secret_key, telegram_bebidas_chat_id, telegram_chat_id, tipo')
       .eq('id', input.empresaId)
       .single();
 
@@ -54,6 +54,8 @@ export async function processRedsysWebhookUseCase(
     const e = empresa as Record<string, unknown>;
     const secretKey = e['redsys_secret_key'] as string | null;
     const bebidasChatId = e['telegram_bebidas_chat_id'] as string | null;
+    const telegramChatId = e['telegram_chat_id'] as string | null;
+    const empresaTipo = e['tipo'] as string | null;
 
     if (!secretKey) {
       return { success: true, data: { verified: false } };
@@ -175,7 +177,7 @@ export async function processRedsysWebhookUseCase(
     // ── Path 2: Full (non-division) payment (tracked via pedidos) ───────────────
     const { data: pedido, error: pedidoError } = await supabase
       .from('pedidos')
-      .select('id, payment_status, empresa_id, total, numero_pedido, payment_order_ref, sesion_id, direccion_entrega, latitude_entrega, longitude_entrega, clientes(nombre, telefono)')
+      .select('id, payment_status, empresa_id, total, numero_pedido, payment_order_ref, sesion_id, direccion_entrega, latitude_entrega, longitude_entrega, origen, detalle_pedido, tracking_token, clientes(nombre, telefono, email)')
       .eq('payment_order_ref', dsOrder)
       .eq('empresa_id', input.empresaId)
       .maybeSingle();
@@ -236,11 +238,57 @@ export async function processRedsysWebhookUseCase(
       return { success: true, data: { verified: true, paymentStatus: newPaymentStatus } };
     }
 
-    // On paid: dispatch Glovo order (fire-and-forget) — only for non-mesa delivery orders
-    if (newPaymentStatus === 'paid') {
-      const cliente = (p['clientes'] as Record<string, unknown> | null) ?? {};
-      const recipientName = (cliente['nombre'] as string | null) ?? 'Cliente';
-      const recipientPhone = (cliente['telefono'] as string | null) ?? '';
+    const cliente = (p['clientes'] as Record<string, unknown> | null) ?? {};
+    const recipientName = (cliente['nombre'] as string | null) ?? 'Cliente';
+    const recipientPhone = (cliente['telefono'] as string | null) ?? '';
+    const recipientEmail = (cliente['email'] as string | null) ?? '';
+    const origen = (p['origen'] as string | null) ?? null;
+
+    // On paid: send Telegram for recogida/tienda orders (delivery and mesa are handled elsewhere)
+    if (newPaymentStatus === 'paid' && !sesionId && telegramChatId) {
+      const isRecogida = origen === 'recogida';
+      const isTienda = empresaTipo === 'tienda';
+      if (isRecogida || isTienda) {
+        const { sendTelegramWithInlineButtons, sendTelegramWithQuickReplies } = await import('@/core/infrastructure/services/telegram.service');
+        const rawItems = p['detalle_pedido'] as { producto_id?: string; nombre: string; precio: number; cantidad: number }[] | null;
+        const pedidoParaNotificar: import('@/core/domain/entities/types').Pedido = {
+          id: p['id'] as string,
+          empresa_id: input.empresaId,
+          cliente_id: null,
+          numero_pedido: (p['numero_pedido'] as number | null) ?? 0,
+          detalle_pedido: (rawItems ?? []).map(item => ({
+            producto_id: item.producto_id,
+            nombre: item.nombre,
+            precio: item.precio,
+            cantidad: item.cantidad,
+          })),
+          total: (p['total'] as number | null) ?? 0,
+          moneda: null,
+          estado: 'pendiente',
+          created_at: new Date().toISOString(),
+          tracking_token: (p['tracking_token'] as string | null) ?? null,
+          estimated_minutes: null,
+          estimated_ready_at: null,
+          clientes: {
+            nombre: recipientName,
+            email: recipientEmail,
+            telefono: recipientPhone,
+          },
+        };
+
+        const telegramFn = isRecogida ? sendTelegramWithInlineButtons : sendTelegramWithQuickReplies;
+        const telegramResult = await telegramFn(pedidoParaNotificar, telegramChatId);
+        if (telegramResult.success) {
+          await supabase
+            .from('pedidos')
+            .update({ telegram_message_id: telegramResult.data.messageId })
+            .eq('id', p['id'] as string);
+        }
+      }
+    }
+
+    // On paid: dispatch Glovo order (fire-and-forget) — only for delivery orders
+    if (newPaymentStatus === 'paid' && origen === 'delivery') {
       const direccion = (p['direccion_entrega'] as string | null) ?? '';
       const lat = (p['latitude_entrega'] as number | null) ?? 0;
       const lng = (p['longitude_entrega'] as number | null) ?? 0;
