@@ -110,9 +110,6 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
   const shouldReduceMotion = useReducedMotion() ?? false;
   // Keyed to mesaId so a mesa-switch also triggers a reload
   const deferredLoadedRef = useRef<string | null>(null);
-  // Set to mesaId AFTER the initial deferred fetch resolves — guards auto-save from firing too early
-  const deferredPersistReadyRef = useRef<string | null>(null);
-  const deferredSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [sending, setSending] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState<{ numeroPedido: number } | null>(null);
   const [activeOrderTokens, setActiveOrderTokens] = useState<string[]>([]);
@@ -180,46 +177,29 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
           loadDeferredItems(data.items);
         }
       })
-      .catch(() => null)
-      .finally(() => {
-        // Mark ready to auto-save ONLY after fetch completes (success or error)
-        deferredPersistReadyRef.current = mesaId;
-      });
+      .catch(() => null);
   }, [mesaInfo, mesaToken, loadDeferredItems]);
 
-  // Auto-persist deferred items to DB on every change (waiter mode only, after initial load).
-  // Debounced to avoid race conditions from rapid state changes.
-  useEffect(() => {
+  // Explicitly persist a computed deferred list to DB. Called immediately at each action
+  // (toggle, remove, quantity change) so there are no timing or race-condition issues.
+  const saveDeferredToDb = useCallback((deferredItems: CartItem[]) => {
     if (!isWaiterMode || !mesaToken) return;
     const mesaId = mesaInfo?.id ?? mesaToken;
-    // Only run after the initial fetch resolved — prevents wiping DB on mount
-    if (deferredPersistReadyRef.current !== mesaId) return;
-
-    const deferredItems = items
-      .filter(ci => ci.deferred)
-      .map(ci => ({
-        itemId: ci.item.id,
-        itemName: ci.item.name,
-        price: ci.item.price,
-        quantity: ci.quantity,
-        translations: ci.item.translations,
-        selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
-      }));
-
-    // Cancel any pending save from a previous rapid change
-    if (deferredSaveTimerRef.current) clearTimeout(deferredSaveTimerRef.current);
-    deferredSaveTimerRef.current = setTimeout(() => {
-      void fetch(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/deferred`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: deferredItems }),
-      });
-    }, 300);
-
-    return () => {
-      if (deferredSaveTimerRef.current) clearTimeout(deferredSaveTimerRef.current);
-    };
-  }, [items, isWaiterMode, mesaToken, mesaInfo]);
+    void fetch(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/deferred`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items: deferredItems.map(ci => ({
+          itemId: ci.item.id,
+          itemName: ci.item.name,
+          price: ci.item.price,
+          quantity: ci.quantity,
+          translations: ci.item.translations,
+          selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
+        })),
+      }),
+    });
+  }, [isWaiterMode, mesaToken, mesaInfo]);
 
   const [discountCode, setDiscountCode] = useState('');
   const [discountValid, setDiscountValid] = useState<{ valid: boolean; porcentaje: number } | null>(null);
@@ -662,7 +642,17 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                           variant="outline"
                           size="icon"
                           className="min-h-11 min-w-11 h-11 w-11 bg-transparent hover:bg-muted/50 transition-all duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                          onClick={() => updateQuantity(ci.cartId, ci.quantity - 1)}
+                          onClick={() => {
+                            const newQty = ci.quantity - 1;
+                            updateQuantity(ci.cartId, newQty);
+                            if (ci.deferred) {
+                              saveDeferredToDb(
+                                newQty <= 0
+                                  ? items.filter(c => c.deferred && c.cartId !== ci.cartId)
+                                  : items.filter(c => c.deferred).map(c => c.cartId === ci.cartId ? { ...c, quantity: newQty } : c)
+                              );
+                            }
+                          }}
                           aria-label={t("reduceQuantity", language)}
                         >
                           <Minus className="size-4" />
@@ -674,7 +664,15 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                           variant="outline"
                           size="icon"
                           className="min-h-11 min-w-11 h-11 w-11 bg-transparent hover:bg-muted/50 transition-all duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                          onClick={() => updateQuantity(ci.cartId, ci.quantity + 1)}
+                          onClick={() => {
+                            const newQty = ci.quantity + 1;
+                            updateQuantity(ci.cartId, newQty);
+                            if (ci.deferred) {
+                              saveDeferredToDb(
+                                items.filter(c => c.deferred).map(c => c.cartId === ci.cartId ? { ...c, quantity: newQty } : c)
+                              );
+                            }
+                          }}
                           aria-label={t("increaseQuantity", language)}
                         >
                           <Plus className="size-4" />
@@ -683,7 +681,12 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                           variant="ghost"
                           size="icon"
                           className="min-h-11 min-w-11 h-11 w-11 text-destructive hover:text-destructive hover:bg-destructive/10 transition-all duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                          onClick={() => removeItem(ci.cartId)}
+                          onClick={() => {
+                            if (ci.deferred) {
+                              saveDeferredToDb(items.filter(c => c.deferred && c.cartId !== ci.cartId));
+                            }
+                            removeItem(ci.cartId);
+                          }}
                           aria-label={`${t("remove", language)} ${(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}`}
                         >
                           <Trash2 className="size-4" />
@@ -691,7 +694,15 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                         {mesaToken && (
                           <button
                             type="button"
-                            onClick={() => toggleDeferred(ci.cartId)}
+                            onClick={() => {
+                              const willBeDeferred = !ci.deferred;
+                              toggleDeferred(ci.cartId);
+                              saveDeferredToDb(
+                                willBeDeferred
+                                  ? [...items.filter(c => c.deferred), ci]
+                                  : items.filter(c => c.deferred && c.cartId !== ci.cartId)
+                              );
+                            }}
                             className="flex items-center justify-center rounded-md p-1.5 transition-colors duration-150 min-h-[44px] min-w-[44px]"
                             style={{
                               backgroundColor: ci.deferred ? 'oklch(28% 0.08 62 / 0.8)' : 'transparent',
