@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { UtensilsCrossed, ArrowLeftRight, LogOut, X, ShoppingCart, ChevronDown, Circle, LockOpen } from "lucide-react";
+import { UtensilsCrossed, ArrowLeftRight, LogOut, X, ShoppingCart, ChevronDown, Circle, LockOpen, AlertTriangle } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { getWaiterMesa, clearWaiterMesa, saveWaiterMesa } from "@/components/waiter-login-form";
 import { useCart } from "@/lib/cart-context";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 const BG            = "oklch(17% 0.025 252)";
 const BORDER        = "oklch(42% 0.14 62 / 0.35)";
@@ -57,6 +59,7 @@ export function WaiterBanner() {
   const { language } = useLanguage();
   const lang = language as Parameters<typeof t>[1];
   const { openCart, totalItems } = useCart();
+  const [closeDialog, setCloseDialog] = useState<'confirm' | 'cart' | 'payment' | null>(null);
 
   const [mesaLabel, setMesaLabel]     = useState<string | null>(null);
   const [mesaId, setMesaId]           = useState<string | null>(null);
@@ -156,14 +159,13 @@ export function WaiterBanner() {
     }
   }
 
-  async function handleCloseTable() {
+  async function doCloseTable() {
     if (!mesaId || closing) return;
-    if (!window.confirm(t("waiterTableCloseConfirm", lang))) return;
+    setCloseDialog(null);
     setClosing(true);
     setCloseError(null);
     try {
       const res = await fetch(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/close`, { method: "POST" });
-      // 404 = no active session (already closed) — navigate anyway
       if (res.ok || res.status === 404) {
         clearWaiterMesa();
         window.location.href = "/waiter";
@@ -174,6 +176,13 @@ export function WaiterBanner() {
     } finally {
       setClosing(false);
     }
+  }
+
+  function handleCloseTable() {
+    if (!mesaId || closing) return;
+    if (pagoEnCurso) { setCloseDialog('payment'); return; }
+    if (totalItems > 0) { setCloseDialog('cart'); return; }
+    setCloseDialog('confirm');
   }
 
   async function handleUnlockPayment() {
@@ -388,6 +397,57 @@ export function WaiterBanner() {
 
         </div>
       </div>
+
+      {/* Close table dialogs */}
+      <Dialog open={closeDialog === 'payment'} onOpenChange={() => setCloseDialog(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              Pago en curso
+            </DialogTitle>
+            <DialogDescription className="pt-2">
+              Hay un pago en proceso en esta mesa. Esperá a que se complete o desbloqueá el pago antes de cerrarla.
+            </DialogDescription>
+          </DialogHeader>
+          <Button className="w-full mt-2" onClick={() => setCloseDialog(null)}>Entendido</Button>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={closeDialog === 'cart'} onOpenChange={() => setCloseDialog(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              Hay ítems pendientes
+            </DialogTitle>
+            <DialogDescription className="pt-2">
+              El carrito tiene ítems que todavía no se enviaron como pedido. Enviálos antes de cerrar la mesa, o cerrala igualmente si no van a pedirse.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-2 mt-2">
+            <Button variant="outline" className="flex-1" onClick={() => setCloseDialog(null)}>Volver</Button>
+            <Button variant="destructive" className="flex-1" onClick={() => void doCloseTable()}>Cerrar igual</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={closeDialog === 'confirm'} onOpenChange={() => setCloseDialog(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t("waiterTableCloseConfirm", lang)}</DialogTitle>
+            <DialogDescription className="pt-2">
+              Se cerrará la sesión activa de la mesa.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-2 mt-2">
+            <Button variant="outline" className="flex-1" onClick={() => setCloseDialog(null)}>{t("cancel", lang)}</Button>
+            <Button variant="destructive" className="flex-1" onClick={() => void doCloseTable()} disabled={closing}>
+              {closing ? "Cerrando…" : t("waiterTableCloseAction", lang)}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

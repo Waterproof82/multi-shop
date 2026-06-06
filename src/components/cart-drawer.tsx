@@ -100,6 +100,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     clearCart,
     clearNonDeferred,
     toggleDeferred,
+    releaseAllDeferred,
     loadDeferredItems,
     totalPrice,
     isCartOpen,
@@ -121,9 +122,13 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
   const [isWaiterMode, setIsWaiterMode] = useState(false);
   const [qrGateState, setQrGateState] = useState<QRGateState | null>(null);
   const [showOrderToast, setShowOrderToast] = useState(false);
+  const [showLaunchDeferredConfirm, setShowLaunchDeferredConfirm] = useState(false);
+  const [showClearWithDeferredWarning, setShowClearWithDeferredWarning] = useState(false);
+  const [pendingLaunchDeferred, setPendingLaunchDeferred] = useState(false);
 
   // True when every item in cart is deferred
   const allDeferred = items.length > 0 && items.every(ci => ci.deferred);
+  const hasDeferredItems = items.some(ci => ci.deferred);
 
   // Detect ?mesa= param (client-side only, SSR safe)
   // Falls back to sessionStorage so waiter mode survives navigation without ?mesa= in the URL
@@ -466,6 +471,15 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     }
   }, [mesaToken, mesaInfo, isWaiterMode, nombre, telefono, countryCode, email, deliveryMethod, deliveryAddress, deliveryPostalCode, deliveryLatitude, deliveryLongitude, isRestaurant, pagosPickupHabilitados, items, language, discountCode, estimatedFeeCents, clearCart, clearNonDeferred, closeCart, router]);
 
+  // After releaseAllDeferred updates items, fire the order
+  useEffect(() => {
+    if (pendingLaunchDeferred && !items.some(ci => ci.deferred)) {
+      setPendingLaunchDeferred(false);
+      void handleConfirmOrder();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, pendingLaunchDeferred]);
+
   const isDeliveryIncomplete = isRestaurant && !mesaToken && deliveryMethod === 'delivery' && (deliveryLatitude === null || estimatedFeeCents === null);
 
   const handleDialogClose = useCallback((open: boolean) => {
@@ -517,6 +531,60 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
           }}
         />
       )}
+      {/* Launch all deferred confirmation */}
+      <Dialog open={showLaunchDeferredConfirm} onOpenChange={setShowLaunchDeferredConfirm}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>¿Lanzar todos los retenidos?</DialogTitle>
+            <DialogDescription className="pt-2">
+              Se enviará un pedido con todos los ítems retenidos. Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-2 mt-2">
+            <Button variant="outline" className="flex-1" onClick={() => setShowLaunchDeferredConfirm(false)}>
+              Cancelar
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={() => {
+                setShowLaunchDeferredConfirm(false);
+                releaseAllDeferred();
+                setPendingLaunchDeferred(true);
+              }}
+            >
+              Lanzar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Clear cart with deferred items warning */}
+      <Dialog open={showClearWithDeferredWarning} onOpenChange={setShowClearWithDeferredWarning}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Hay ítems retenidos</DialogTitle>
+            <DialogDescription className="pt-2">
+              Tenés ítems marcados como retenidos en el carrito. Si vaciás el carrito, se perderán también. ¿Querés continuar?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-2 mt-2">
+            <Button variant="outline" className="flex-1" onClick={() => setShowClearWithDeferredWarning(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              className="flex-1"
+              onClick={() => {
+                setShowClearWithDeferredWarning(false);
+                clearCart();
+              }}
+            >
+              Vaciar igual
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showActiveOrdersDialog} onOpenChange={setShowActiveOrdersDialog}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
@@ -979,6 +1047,17 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                 </p>
               )}
               <div className="flex flex-col gap-2">
+                {isWaiterMode && hasDeferredItems && (
+                  <Button
+                    variant="outline"
+                    className="w-full rounded-full py-3 font-semibold min-h-[44px] border-amber-500/40 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+                    onClick={() => setShowLaunchDeferredConfirm(true)}
+                    disabled={sending}
+                  >
+                    <Pause className="w-4 h-4 mr-2 shrink-0" />
+                    Lanzar todos los retenidos
+                  </Button>
+                )}
                  <Button
                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full py-3 text-lg font-semibold shadow-elegant transition-colors duration-150 min-h-[44px]"
                    size="lg"
@@ -997,7 +1076,13 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                   variant="ghost"
                   size="sm"
                   className="text-muted-foreground rounded-full py-2 font-medium hover:bg-muted/40 transition-colors duration-200"
-                  onClick={clearCart}
+                  onClick={() => {
+                    if (isWaiterMode && hasDeferredItems) {
+                      setShowClearWithDeferredWarning(true);
+                    } else {
+                      clearCart();
+                    }
+                  }}
                 >
                   {t("clearCart", language)}
                 </Button>

@@ -42,6 +42,7 @@ interface CartContextType {
   clearCart: () => void
   clearNonDeferred: () => void
   toggleDeferred: (cartId: string) => void
+  releaseAllDeferred: () => void
   loadDeferredItems: (items: Array<{
     itemId: string;
     itemName: string;
@@ -167,6 +168,10 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
     setItems(prev => prev.map(ci => ci.cartId === cartId ? { ...ci, deferred: !ci.deferred } : ci));
   }, [])
 
+  const releaseAllDeferred = useCallback(() => {
+    setItems(prev => prev.map(ci => ci.deferred ? { ...ci, deferred: false } : ci));
+  }, [])
+
   const loadDeferredItems = useCallback((deferredItems: Array<{
     itemId: string;
     itemName: string;
@@ -213,6 +218,7 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
     clearCart,
     clearNonDeferred,
     toggleDeferred,
+    releaseAllDeferred,
     loadDeferredItems,
     totalItems,
     totalPrice,
@@ -220,7 +226,7 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
     openCart,
     closeCart,
     lastAddedItem,
-  }), [items, addItem, removeItem, updateQuantity, clearCart, clearNonDeferred, toggleDeferred, loadDeferredItems, totalItems, totalPrice, isCartOpen, openCart, closeCart, lastAddedItem]);
+  }), [items, addItem, removeItem, updateQuantity, clearCart, clearNonDeferred, toggleDeferred, releaseAllDeferred, loadDeferredItems, totalItems, totalPrice, isCartOpen, openCart, closeCart, lastAddedItem]);
 
   return (
     <CartContext.Provider value={contextValue}>
