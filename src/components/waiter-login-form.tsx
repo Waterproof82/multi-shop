@@ -219,7 +219,7 @@ function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onViewTicket }: M
   const statusLabel = getMesaStatus(isPaid, isPaymentInProgress, isOpen);
   const nameSuffix = mesa.nombre ? ` — ${mesa.nombre}` : "";
   const pulsing = !isPaid && (isPaymentInProgress || isOpen);
-  const hasSession = !!mesa.sesionId;
+  const hasSession = mesa.activeOrderCount > 0;
 
   return (
     <div className="relative flex flex-col gap-1.5 w-full">

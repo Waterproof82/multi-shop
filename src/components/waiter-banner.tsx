@@ -56,7 +56,7 @@ export function WaiterBanner() {
   const pathname = usePathname();
   const { language } = useLanguage();
   const lang = language as Parameters<typeof t>[1];
-  const { openCart, closeCart, totalItems } = useCart();
+  const { openCart, totalItems } = useCart();
 
   const [mesaLabel, setMesaLabel]     = useState<string | null>(null);
   const [mesaId, setMesaId]           = useState<string | null>(null);
@@ -127,7 +127,6 @@ export function WaiterBanner() {
 
   async function handleToggleDropdown() {
     if (dropdownOpen) { setDropdownOpen(false); return; }
-    closeCart();
     setLoadingMesas(true);
     setDropdownOpen(true);
     try {
