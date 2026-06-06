@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
-import { UtensilsCrossed, KeyRound, Clock } from "lucide-react";
+import { UtensilsCrossed, KeyRound, Pause } from "lucide-react";
 import { formatPrice } from "@/lib/format-price";
 import type { MesaWithSession } from "@/core/domain/repositories/IMesaRepository";
 
@@ -226,9 +226,9 @@ function MesaCard({ mesa, isLoading, onClick }: MesaCardProps) {
             style={{ background: 'oklch(18% 0.05 62 / 0.7)', border: '1px solid oklch(38% 0.1 62 / 0.5)' }}
           >
             <div className="flex items-center gap-1 mb-0.5">
-              <Clock className="w-3 h-3 shrink-0" style={{ color: 'oklch(72% 0.16 62)' }} />
+              <Pause className="w-3 h-3 shrink-0" style={{ color: 'oklch(72% 0.16 62)' }} />
               <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'oklch(72% 0.16 62)' }}>
-                Para servir
+                Retenidos
               </span>
             </div>
             {mesa.itemsDiferidos.map((d, i) => (

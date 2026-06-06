@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, Check, Gift, UtensilsCrossed, Clock } from "lucide-react"
+import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, Check, Gift, UtensilsCrossed, Pause } from "lucide-react"
 import { useReducedMotion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -712,10 +712,10 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                               backgroundColor: ci.deferred ? 'oklch(28% 0.08 62 / 0.8)' : 'transparent',
                               color: ci.deferred ? 'oklch(75% 0.18 62)' : 'oklch(45% 0.04 252)',
                             }}
-                            aria-label={ci.deferred ? 'Quitar diferido' : 'Diferir ítem'}
-                            title={ci.deferred ? 'Quitar diferido' : 'Diferir para más tarde'}
+                            aria-label={ci.deferred ? 'Quitar retención' : 'Retener'}
+                            title={ci.deferred ? 'Quitar retención' : 'Retener para más tarde'}
                           >
-                            <Clock className="w-3.5 h-3.5" />
+                            <Pause className="w-3.5 h-3.5" />
                           </button>
                         )}
                       </div>
@@ -986,7 +986,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                    }}
                    disabled={sending || (mesaToken !== null && mesaError) || isDeliveryIncomplete || allDeferred}
                  >
-                   {sending ? t("sending", language) : allDeferred ? 'Todos los ítems están diferidos' : mesaToken ? t("mesaPlaceOrder", language) : t("sendOrder", language)}
+                   {sending ? t("sending", language) : allDeferred ? 'Todos los ítems están retenidos' : mesaToken ? t("mesaPlaceOrder", language) : t("sendOrder", language)}
                  </Button>
                 <Button
                   variant="ghost"

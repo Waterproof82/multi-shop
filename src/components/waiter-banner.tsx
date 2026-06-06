@@ -149,9 +149,8 @@ export function WaiterBanner() {
         if (!r.ok) { setSwitchingId(null); return; }
       }
       saveWaiterMesa({ mesaId: mesa.id, mesaNumero: mesa.numero, mesaNombre: mesa.nombre });
-      setMesaId(mesa.id);
-      setMesaLabel(mesa.nombre ?? `Mesa ${mesa.numero}`);
       setDropdownOpen(false);
+      window.location.href = `/?mesa=${mesa.id}`;
     } finally {
       setSwitchingId(null);
     }
