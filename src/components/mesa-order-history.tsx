@@ -67,7 +67,7 @@ export function MesaOrderHistory() {
     return () => window.removeEventListener("mesa-order-placed", handler);
   }, []);
 
-  if (!mesaId) return null;
+  if (!mesaId || orderCount === 0) return null;
 
   return (
     <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40">

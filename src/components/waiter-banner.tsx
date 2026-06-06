@@ -56,7 +56,7 @@ export function WaiterBanner() {
   const pathname = usePathname();
   const { language } = useLanguage();
   const lang = language as Parameters<typeof t>[1];
-  const { openCart, totalItems } = useCart();
+  const { openCart, closeCart, totalItems } = useCart();
 
   const [mesaLabel, setMesaLabel]     = useState<string | null>(null);
   const [mesaId, setMesaId]           = useState<string | null>(null);
@@ -127,6 +127,7 @@ export function WaiterBanner() {
 
   async function handleToggleDropdown() {
     if (dropdownOpen) { setDropdownOpen(false); return; }
+    closeCart();
     setLoadingMesas(true);
     setDropdownOpen(true);
     try {
@@ -310,36 +311,26 @@ export function WaiterBanner() {
                         <span className="flex-1 truncate">{t("waiterViewAllTables", lang)}</span>
                       </button>
                     </li>
-                    {mesas.map((mesa) => {
-                      const isActive = mesa.id === mesaId;
-                      const isOpen   = mesa.sesionId !== null;
-                      const label    = mesa.nombre ?? `Mesa ${mesa.numero}`;
-                      const busy     = switchingId === mesa.id;
+                    {mesas.filter(m => m.id !== mesaId).map((mesa) => {
+                      const isOpen = mesa.sesionId !== null;
+                      const label  = mesa.nombre ?? `Mesa ${mesa.numero}`;
+                      const busy   = switchingId === mesa.id;
                       return (
                         <li key={mesa.id}>
                           <button
                             onClick={() => handleSelectTable(mesa)}
-                            disabled={busy || isActive}
+                            disabled={busy}
                             className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-xs transition-colors duration-100 disabled:opacity-60"
-                            style={{
-                              color: TEXT_MAIN,
-                              backgroundColor: isActive ? DD_ITEM_ACT : "transparent",
-                            }}
-                            onMouseEnter={e => { if (!isActive) (e.currentTarget.style.backgroundColor = DD_ITEM_HV); }}
-                            onMouseLeave={e => { if (!isActive) (e.currentTarget.style.backgroundColor = "transparent"); }}
+                            style={{ color: TEXT_MAIN, backgroundColor: "transparent" }}
+                            onMouseEnter={e => { (e.currentTarget.style.backgroundColor = DD_ITEM_HV); }}
+                            onMouseLeave={e => { (e.currentTarget.style.backgroundColor = "transparent"); }}
                           >
-                            {/* Status dot */}
                             <Circle
                               className="w-2 h-2 shrink-0 fill-current"
                               style={{ color: isOpen ? DOT_COLOR : "oklch(38% 0.04 252)" }}
                             />
                             <span className="flex-1 truncate font-medium">{label}</span>
-                            {isActive && (
-                              <span className="text-[9px] font-semibold tracking-wide uppercase" style={{ color: BTN_TABLE_TEXT }}>
-                                activa
-                              </span>
-                            )}
-                            {!isActive && isOpen && (
+                            {isOpen && (
                               <span className="text-[9px]" style={{ color: TEXT_DIM }}>abierta</span>
                             )}
                           </button>

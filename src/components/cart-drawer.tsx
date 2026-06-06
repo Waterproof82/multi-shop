@@ -103,6 +103,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     loadDeferredItems,
     totalPrice,
     isCartOpen,
+    openCart,
     closeCart
   } = useCart()
   const { language } = useLanguage()
@@ -129,6 +130,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('mesa');
+    const shouldOpenCart = params.get('cart') === 'open';
 
     function applySessionStorage(): boolean {
       try {
@@ -150,6 +152,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
       // /api/mesas searches by id (not token column), so it succeeds for waiter
       // navigations and would never reach the old fallback path.
       const isWaiter = applySessionStorage();
+      if (shouldOpenCart) openCart();
       fetch(`/api/mesas?token=${encodeURIComponent(token)}`)
         .then(async (res) => {
           if (!res.ok) { if (!isWaiter) setMesaError(true); return; }
@@ -161,6 +164,8 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     }
 
     applySessionStorage();
+  // openCart is stable (useCallback with no deps) — safe to include
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

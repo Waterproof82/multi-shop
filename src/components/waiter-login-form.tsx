@@ -177,9 +177,10 @@ interface MesaCardProps {
   readonly mesa: MesaWithSession;
   readonly isLoading: boolean;
   readonly onClick: () => void;
+  readonly onClickDeferred: () => void;
 }
 
-function MesaCard({ mesa, isLoading, onClick }: MesaCardProps) {
+function MesaCard({ mesa, isLoading, onClick, onClickDeferred }: MesaCardProps) {
   const isOpen = !!mesa.sesionId && mesa.activeOrderCount > 0;
   const isPaid = mesa.sesionPagada;
   const isPaymentInProgress = mesa.pagoEnCurso && !mesa.sesionPagada;
@@ -222,7 +223,11 @@ function MesaCard({ mesa, isLoading, onClick }: MesaCardProps) {
         />
         {mesa.itemsDiferidos.length > 0 && (
           <div
-            className="w-full mt-1.5 rounded-lg px-2 py-1.5 flex flex-col gap-0.5"
+            role="button"
+            tabIndex={0}
+            onClick={(e) => { e.stopPropagation(); onClickDeferred(); }}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onClickDeferred(); } }}
+            className="w-full mt-1.5 rounded-lg px-2 py-1.5 flex flex-col gap-0.5 cursor-pointer hover:brightness-125 transition-all"
             style={{ background: 'oklch(18% 0.05 62 / 0.7)', border: '1px solid oklch(38% 0.1 62 / 0.5)' }}
           >
             <div className="flex items-center gap-1 mb-0.5">
@@ -328,7 +333,7 @@ export function WaiterLoginForm() {
     }
   }
 
-  async function handleMesaClick(mesa: MesaWithSession) {
+  async function handleMesaNav(mesa: MesaWithSession, openCart = false) {
     setMesaLoading(mesa.id);
     setError(null);
 
@@ -342,7 +347,7 @@ export function WaiterLoginForm() {
       if (res.ok) {
         const data = await res.json() as { mesaId: string; mesaNumero: number; mesaNombre: string | null };
         saveWaiterMesa({ mesaId: data.mesaId, mesaNumero: data.mesaNumero, mesaNombre: data.mesaNombre });
-        router.push(`/?mesa=${data.mesaId}`);
+        router.push(`/?mesa=${data.mesaId}${openCart ? '&cart=open' : ''}`);
       } else {
         setError("No se pudo acceder a la mesa");
       }
@@ -452,7 +457,8 @@ export function WaiterLoginForm() {
               key={mesa.id}
               mesa={mesa}
               isLoading={mesaLoading === mesa.id}
-              onClick={() => void handleMesaClick(mesa)}
+              onClick={() => void handleMesaNav(mesa)}
+              onClickDeferred={() => void handleMesaNav(mesa, true)}
             />
           ))}
         </div>
