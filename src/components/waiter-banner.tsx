@@ -208,8 +208,9 @@ export function WaiterBanner() {
       <div
         role="status"
         aria-live="polite"
-        className="fixed top-0 left-0 right-0 z-[100] flex h-12 items-center justify-between px-4 shadow-lg"
+        className="fixed top-0 left-0 right-0 z-[200] flex h-12 items-center justify-between px-4 shadow-lg"
         style={{ background: BG, borderBottom: `1px solid ${BORDER}` }}
+        onPointerDown={(e) => e.stopPropagation()}
       >
         {/* Left: live dot + icon + labels */}
         <div className="flex items-center gap-3 min-w-0">

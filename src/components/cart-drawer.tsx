@@ -582,7 +582,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
           </SheetDescription>
         </SheetHeader>
 
-        {items.length > 0 && deliveryMethod !== 'delivery' && !(pagosPickupHabilitados && (deliveryMethod === 'recogida' || !isRestaurant)) && (
+        {items.length > 0 && !isWaiterMode && deliveryMethod !== 'delivery' && !(pagosPickupHabilitados && (deliveryMethod === 'recogida' || !isRestaurant)) && (
           <div className="shrink-0 mx-4 mb-1.5 rounded-md bg-secondary border border-border px-2 py-1.5">
             <p className="text-xs text-secondary-foreground font-medium">
               {t("noPaymentRequired", language)}
