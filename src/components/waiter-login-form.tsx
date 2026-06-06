@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
-import { UtensilsCrossed, KeyRound, Pause } from "lucide-react";
+import { UtensilsCrossed, KeyRound, Pause, ReceiptText, X } from "lucide-react";
 import { formatPrice } from "@/lib/format-price";
 import type { MesaWithSession } from "@/core/domain/repositories/IMesaRepository";
 
@@ -30,6 +30,36 @@ export function getWaiterMesa(): WaiterMesaSession | null {
   } catch {
     return null;
   }
+}
+
+interface OrderItem {
+  nombre: string;
+  cantidad: number;
+  precio: number;
+  complementos?: { nombre: string; precio: number }[];
+}
+
+interface MesaOrder {
+  id: string;
+  items: OrderItem[];
+  createdAt: string;
+}
+
+function mergeOrderItems(items: OrderItem[]): OrderItem[] {
+  const map = new Map<string, OrderItem>();
+  for (const item of items) {
+    const key = `${item.nombre}||${item.precio}`;
+    const existing = map.get(key);
+    if (existing) {
+      existing.cantidad += item.cantidad;
+      if (item.complementos?.length) {
+        existing.complementos = [...(existing.complementos ?? []), ...item.complementos];
+      }
+    } else {
+      map.set(key, { ...item, complementos: item.complementos ? [...item.complementos] : undefined });
+    }
+  }
+  return [...map.values()];
 }
 
 type Step = "pin" | "tables";
@@ -178,9 +208,10 @@ interface MesaCardProps {
   readonly isLoading: boolean;
   readonly onClick: () => void;
   readonly onClickDeferred: () => void;
+  readonly onViewTicket: () => void;
 }
 
-function MesaCard({ mesa, isLoading, onClick, onClickDeferred }: MesaCardProps) {
+function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onViewTicket }: MesaCardProps) {
   const isOpen = !!mesa.sesionId && mesa.activeOrderCount > 0;
   const isPaid = mesa.sesionPagada;
   const isPaymentInProgress = mesa.pagoEnCurso && !mesa.sesionPagada;
@@ -188,68 +219,85 @@ function MesaCard({ mesa, isLoading, onClick, onClickDeferred }: MesaCardProps) 
   const statusLabel = getMesaStatus(isPaid, isPaymentInProgress, isOpen);
   const nameSuffix = mesa.nombre ? ` — ${mesa.nombre}` : "";
   const pulsing = !isPaid && (isPaymentInProgress || isOpen);
+  const hasSession = !!mesa.sesionId;
 
   return (
-    <button
-      onClick={onClick}
-      disabled={isLoading}
-      aria-label={`Mesa ${mesa.numero}${nameSuffix} (${statusLabel})`}
-      className="group relative flex flex-col items-center justify-between rounded-2xl p-4 transition-all duration-200 hover:scale-[1.04] active:scale-[0.97] focus-visible:outline-none disabled:opacity-60 disabled:cursor-not-allowed w-full"
-      style={{ minHeight: "128px", background: colors.bg, border: colors.border, boxShadow: colors.shadow }}
-    >
-      <div className="absolute top-3 right-3">
-        <MesaDot pulsing={pulsing} dotColor={colors.dot} />
-      </div>
+    <div className="relative flex flex-col gap-1.5 w-full">
+      {/* Main card button */}
+      <button
+        onClick={onClick}
+        disabled={isLoading}
+        aria-label={`Mesa ${mesa.numero}${nameSuffix} (${statusLabel})`}
+        className="group relative flex flex-col items-center justify-between rounded-2xl p-4 transition-all duration-200 hover:scale-[1.04] active:scale-[0.97] focus-visible:outline-none disabled:opacity-60 disabled:cursor-not-allowed w-full"
+        style={{ minHeight: "128px", background: colors.bg, border: colors.border, boxShadow: colors.shadow }}
+      >
+        <div className="absolute top-3 right-3">
+          <MesaDot pulsing={pulsing} dotColor={colors.dot} />
+        </div>
 
-      <div className="flex flex-col items-center gap-1 flex-1 justify-center">
-        <UtensilsCrossed className="w-5 h-5 mb-1" style={{ color: colors.icon }} />
-        <span className="text-3xl font-black leading-none tracking-tight" style={{ color: colors.num }}>
-          {isLoading ? "…" : mesa.numero}
-        </span>
-        {mesa.nombre && (
-          <span className="text-[10px] font-medium truncate max-w-full mt-0.5" style={{ color: colors.name }}>
-            {mesa.nombre}
+        <div className="flex flex-col items-center gap-1 flex-1 justify-center">
+          <UtensilsCrossed className="w-5 h-5 mb-1" style={{ color: colors.icon }} />
+          <span className="text-3xl font-black leading-none tracking-tight" style={{ color: colors.num }}>
+            {isLoading ? "…" : mesa.numero}
           </span>
-        )}
-      </div>
+          {mesa.nombre && (
+            <span className="text-[10px] font-medium truncate max-w-full mt-0.5" style={{ color: colors.name }}>
+              {mesa.nombre}
+            </span>
+          )}
+        </div>
 
-      <div className="w-full mt-2 min-h-[24px] flex flex-col items-center gap-0.5">
-        <MesaFooter
-          isPaid={isPaid}
-          isPaymentInProgress={isPaymentInProgress}
-          isOpen={isOpen}
-          sessionTotal={mesa.sessionTotal}
-          activeOrderCount={mesa.activeOrderCount}
-        />
-        {mesa.itemsDiferidos.length > 0 && (
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={(e) => { e.stopPropagation(); onClickDeferred(); }}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onClickDeferred(); } }}
-            className="w-full mt-1.5 rounded-lg px-2 py-1.5 flex flex-col gap-0.5 cursor-pointer hover:brightness-125 transition-all"
-            style={{ background: 'oklch(18% 0.05 62 / 0.7)', border: '1px solid oklch(38% 0.1 62 / 0.5)' }}
-          >
-            <div className="flex items-center gap-1 mb-0.5">
-              <Pause className="w-3 h-3 shrink-0" style={{ color: 'oklch(72% 0.16 62)' }} />
-              <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'oklch(72% 0.16 62)' }}>
-                Retenidos
+        <div className="w-full mt-2 min-h-[24px] flex flex-col items-center gap-0.5">
+          <MesaFooter
+            isPaid={isPaid}
+            isPaymentInProgress={isPaymentInProgress}
+            isOpen={isOpen}
+            sessionTotal={mesa.sessionTotal}
+            activeOrderCount={mesa.activeOrderCount}
+          />
+        </div>
+      </button>
+
+      {/* Deferred items */}
+      {mesa.itemsDiferidos.length > 0 && (
+        <button
+          onClick={onClickDeferred}
+          className="w-full rounded-lg px-2 py-1.5 flex flex-col gap-0.5 cursor-pointer hover:brightness-125 transition-all text-left"
+          style={{ background: 'oklch(18% 0.05 62 / 0.7)', border: '1px solid oklch(38% 0.1 62 / 0.5)' }}
+        >
+          <div className="flex items-center gap-1 mb-0.5">
+            <Pause className="w-3 h-3 shrink-0" style={{ color: 'oklch(72% 0.16 62)' }} />
+            <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'oklch(72% 0.16 62)' }}>
+              Retenidos
+            </span>
+          </div>
+          {mesa.itemsDiferidos.map((d, i) => (
+            <div key={i} className="flex items-baseline justify-between gap-1.5">
+              <span className="text-[11px] leading-snug break-words min-w-0" style={{ color: 'oklch(84% 0.05 62)', wordBreak: 'break-word' }}>
+                {d.itemName}
+              </span>
+              <span className="text-[11px] font-bold shrink-0" style={{ color: 'oklch(72% 0.16 62)' }}>
+                ×{d.quantity}
               </span>
             </div>
-            {mesa.itemsDiferidos.map((d, i) => (
-              <div key={i} className="flex items-baseline justify-between gap-1.5">
-                <span className="text-[11px] leading-snug break-words min-w-0" style={{ color: 'oklch(84% 0.05 62)', wordBreak: 'break-word' }}>
-                  {d.itemName}
-                </span>
-                <span className="text-[11px] font-bold shrink-0" style={{ color: 'oklch(72% 0.16 62)' }}>
-                  ×{d.quantity}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </button>
+          ))}
+        </button>
+      )}
+
+      {/* Ver ticket */}
+      {hasSession && (
+        <button
+          onClick={onViewTicket}
+          className="w-full rounded-lg px-2 py-1.5 flex items-center justify-center gap-1.5 hover:brightness-125 transition-all"
+          style={{ background: 'oklch(18% 0.04 252 / 0.7)', border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
+        >
+          <ReceiptText className="w-3 h-3 shrink-0" style={{ color: 'oklch(62% 0.08 252)' }} />
+          <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'oklch(62% 0.08 252)' }}>
+            Ver ticket
+          </span>
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -263,6 +311,9 @@ export function WaiterLoginForm() {
   const [loading, setLoading] = useState(false);
   const [mesaLoading, setMesaLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [ticketMesa, setTicketMesa] = useState<MesaWithSession | null>(null);
+  const [ticketOrders, setTicketOrders] = useState<MesaOrder[]>([]);
+  const [ticketLoading, setTicketLoading] = useState(false);
 
   const refresh = useCallback(async () => {
     const data = await fetchMesas();
@@ -330,6 +381,23 @@ export function WaiterLoginForm() {
       setError("Error de conexión");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleViewTicket(mesa: MesaWithSession) {
+    setTicketMesa(mesa);
+    setTicketOrders([]);
+    setTicketLoading(true);
+    try {
+      const res = await fetch(`/api/mesas/${encodeURIComponent(mesa.id)}/orders`);
+      if (res.ok) {
+        const data = await res.json() as { orders: MesaOrder[] };
+        setTicketOrders(data.orders ?? []);
+      }
+    } catch {
+      // best-effort
+    } finally {
+      setTicketLoading(false);
     }
   }
 
@@ -459,8 +527,91 @@ export function WaiterLoginForm() {
               isLoading={mesaLoading === mesa.id}
               onClick={() => void handleMesaNav(mesa)}
               onClickDeferred={() => void handleMesaNav(mesa, true)}
+              onViewTicket={() => void handleViewTicket(mesa)}
             />
           ))}
+        </div>
+      )}
+
+      {/* Ticket modal */}
+      {ticketMesa && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "oklch(0% 0 0 / 0.75)" }}
+          onClick={() => setTicketMesa(null)}
+        >
+          <div
+            className="relative w-full max-w-sm rounded-2xl overflow-hidden flex flex-col"
+            style={{ background: "oklch(14% 0.02 252)", border: "1px solid oklch(28% 0.04 252 / 0.8)", maxHeight: "85dvh" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 pt-5 pb-3" style={{ borderBottom: "1px solid oklch(28% 0.04 252 / 0.6)" }}>
+              <div className="flex items-center gap-2">
+                <ReceiptText className="w-4 h-4" style={{ color: "oklch(62% 0.08 252)" }} />
+                <span className="text-sm font-bold tracking-wide" style={{ color: "oklch(85% 0.04 252)" }}>
+                  Mesa {ticketMesa.numero}{ticketMesa.nombre ? ` — ${ticketMesa.nombre}` : ""}
+                </span>
+              </div>
+              <button
+                onClick={() => setTicketMesa(null)}
+                className="flex items-center justify-center w-7 h-7 rounded-full transition-all hover:brightness-125"
+                style={{ background: "oklch(22% 0.03 252 / 0.8)" }}
+                aria-label="Cerrar"
+              >
+                <X className="w-3.5 h-3.5" style={{ color: "oklch(60% 0.06 252)" }} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="overflow-y-auto flex-1 px-5 py-4">
+              {ticketLoading && (
+                <p className="text-center py-8 text-sm" style={{ color: "oklch(50% 0.05 252)" }}>Cargando…</p>
+              )}
+              {!ticketLoading && ticketOrders.length === 0 && (
+                <p className="text-center py-8 text-sm" style={{ color: "oklch(50% 0.05 252)" }}>Sin pedidos</p>
+              )}
+              {!ticketLoading && ticketOrders.length > 0 && (() => {
+                const allItems = mergeOrderItems(ticketOrders.flatMap((o) => o.items));
+                const total = allItems.reduce((sum, item) => {
+                  const compTotal = item.complementos?.reduce((s, c) => s + c.precio, 0) ?? 0;
+                  return sum + (item.precio + compTotal) * item.cantidad;
+                }, 0);
+                return (
+                  <div className="flex flex-col gap-0">
+                    {allItems.map((item) => {
+                      const compTotal = item.complementos?.reduce((s, c) => s + c.precio, 0) ?? 0;
+                      const lineTotal = (item.precio + compTotal) * item.cantidad;
+                      return (
+                        <div key={`${item.nombre}||${item.precio}`} className="flex items-baseline justify-between gap-3 py-2" style={{ borderBottom: "1px solid oklch(22% 0.03 252 / 0.6)" }}>
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-sm font-medium leading-snug" style={{ color: "oklch(82% 0.04 252)" }}>
+                              {item.cantidad > 1 && <span className="font-bold mr-1" style={{ color: "oklch(65% 0.08 252)" }}>×{item.cantidad}</span>}
+                              {item.nombre}
+                            </span>
+                            {item.complementos && item.complementos.length > 0 && (
+                              <span className="text-[10px] mt-0.5" style={{ color: "oklch(48% 0.05 252)" }}>
+                                {item.complementos.map((c) => c.nombre).join(", ")}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-sm font-bold shrink-0 tabular-nums" style={{ color: "oklch(72% 0.08 252)" }}>
+                            {formatPrice(lineTotal)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    <div className="flex items-center justify-between pt-3 mt-1">
+                      <span className="text-sm font-bold uppercase tracking-wide" style={{ color: "oklch(60% 0.06 252)" }}>Total</span>
+                      <span className="text-lg font-black tabular-nums" style={{ color: "oklch(88% 0.04 252)" }}>
+                        {formatPrice(total)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
         </div>
       )}
     </div>

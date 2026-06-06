@@ -48,6 +48,23 @@ type PendingAction = 'full' | 'division-modal' | 'division-pay';
 
 const PAGE_BG = "#f0ede8";
 
+function mergeOrderItems(items: OrderItem[]): OrderItem[] {
+  const map = new Map<string, OrderItem>();
+  for (const item of items) {
+    const key = `${item.nombre}||${item.precio}`;
+    const existing = map.get(key);
+    if (existing) {
+      existing.cantidad += item.cantidad;
+      if (item.complementos?.length) {
+        existing.complementos = [...(existing.complementos ?? []), ...item.complementos];
+      }
+    } else {
+      map.set(key, { ...item, complementos: item.complementos ? [...item.complementos] : undefined });
+    }
+  }
+  return [...map.values()];
+}
+
 function buildTotalMismatch(
   body: { code?: string; newTotalCents?: number },
   currentTotal: number,
@@ -594,7 +611,7 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
     return () => globalThis.removeEventListener('popstate', handlePopState);
   }, [shouldTrapBack]);
 
-  const allItems = sessionData?.orders.flatMap((o) => o.items) ?? [];
+  const allItems = mergeOrderItems(sessionData?.orders.flatMap((o) => o.items) ?? []);
 
   const firstOrderDate = sessionData?.orders[0]?.createdAt
     ? new Date(sessionData.orders[0].createdAt)
@@ -693,7 +710,7 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                   const lineTotal = (item.precio + complementoTotal) * item.cantidad;
                   return (
                     <li
-                      key={`${item.nombre}|${item.precio}|${item.cantidad}`}
+                      key={`${item.nombre}||${item.precio}`}
                       className="flex items-baseline gap-3 text-sm"
                       style={{ color: "#1a1612", fontFamily: "monospace" }}
                     >
