@@ -3,6 +3,7 @@ import { verifyRedsysWebhook } from '@/core/infrastructure/services/redsys.servi
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { logger } from '@/core/infrastructure/logging/logger';
 import { createGlovoOrderUseCase } from '@/core/application/use-cases/glovo/createGlovoOrderUseCase';
+import { autoCloseMesaAfterPayment } from './autoCloseMesaAfterPayment';
 
 export interface ProcessRedsysWebhookInput {
   dsParameters: string; // raw Base64 from POST body
@@ -162,6 +163,8 @@ export async function processRedsysWebhookUseCase(
             const { mesaNumero, mesaNombre, sessionTotal } = await fetchMesaContext(dp.sesion_id, dp.empresa_id);
             await sendTelegramPagoMesaCompleto(dp.sesion_id, mesaNumero, mesaNombre, sessionTotal, bebidasChatId);
           }
+
+          void autoCloseMesaAfterPayment(dp.sesion_id, dp.empresa_id);
         }
       }
 
@@ -217,6 +220,8 @@ export async function processRedsysWebhookUseCase(
         const { mesaNumero, mesaNombre, sessionTotal } = await fetchMesaContext(sesionId, input.empresaId);
         await sendTelegramPagoMesaCompleto(sesionId, mesaNumero, mesaNombre, sessionTotal, bebidasChatId);
       }
+
+      void autoCloseMesaAfterPayment(sesionId, input.empresaId);
     }
 
     // Unlock session regardless of paid/failed outcome

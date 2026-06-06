@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { formatPrice } from "@/lib/format-price";
-import { getWaiterMesa } from "@/components/waiter-login-form";
+import { getWaiterMesa, clearWaiterMesa } from "@/components/waiter-login-form";
 import { QRScannerGate, type QRGateState } from "@/components/qr-scanner-gate";
 
 interface OrderItem {
@@ -582,7 +582,12 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
     if (manualPaying) return;
     setManualPaying(true);
     try {
-      await fetch(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/manual-payment`, { method: 'POST' });
+      const res = await fetch(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/manual-payment`, { method: 'POST' });
+      if (res.ok) {
+        clearWaiterMesa();
+        window.location.href = '/waiter';
+        return;
+      }
       await refresh();
     } finally {
       setManualPaying(false);

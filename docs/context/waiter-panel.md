@@ -110,8 +110,11 @@ Waiter registers manual payment → POST /api/waiter/mesas/{mesaId}/manual-payme
       updates all pedidos payment_status = 'paid'
       sets sesion_pagada = true, clears pago_en_curso
       sends Telegram notification (fire-and-forget)
+      triggers autoCloseMesaAfterPayment (fire-and-forget) → see Auto-close on payment
   → returns { pagosRealizados, personas, fullyPaid }
 ```
+
+After a successful manual payment, the client clears `sessionStorage` (waiter mesa key) and redirects to `/waiter` — no mesa is left selected in the banner.
 
 Response codes: `404` no active session, `403` wrong empresa, `409` session already paid, `500` DB error.
 
@@ -125,7 +128,13 @@ The `WaiterBanner` component is rendered globally in the root layout. It appears
 - Pulsing live indicator dot
 - Shows active mesa name
 - **"Change table" dropdown** — fetches `GET /api/waiter/mesas` on open. First item is always **"Ver todas las mesas"** (navigates to `/waiter`). Remaining items list all mesas with open/libre status. Selecting a libre mesa calls `POST /api/waiter/mesas/{mesaId}/open` first.
-- **"Close table" button (X icon)** → shown when a session is active. Calls `window.confirm`, then `POST /api/waiter/mesas/{mesaId}/close`. On success (2xx or 404), clears local state and redirects to `/waiter`. On error, shows a localized error toast below the banner for 5 seconds without navigating. Triggers order consolidation + auto-reopen (see Session Lifecycle).
+- **"Close table" button (X icon)** → shown when a session is active. Before closing, runs a guard chain (all via modal dialogs, no blocking `confirm`):
+  1. `pagoEnCurso = true` → **payment dialog**: warns the waiter a Redsys payment is in progress; offers "Desbloquear y cerrar".
+  2. `totalItems > 0` (unsent cart items) → **cart dialog**: warns that unsent orders will be lost. "Eliminar pedidos" clears the cart and continues to the next check (step 3 or confirm).
+  3. `pagosHabilitados && !sesionPagada && orders.length > 0` → **unpaid dialog**: warns there are unpaid orders. "Ver ticket" navigates to `/mesa/{mesaId}/orders` where the waiter can trigger manual payment.
+  4. Otherwise → **confirm dialog**: standard close confirmation.
+
+  On close: `POST /api/waiter/mesas/{mesaId}/close`. On success (2xx or 404), clears local state and redirects to `/waiter`. On error, shows a localized error toast below the banner for 5 seconds without navigating. Triggers order consolidation + auto-reopen (see Session Lifecycle).
 - **"Unlock payment" button (🔓)** → shown only when `pago_en_curso = true` for the active mesa. Calls `DELETE /api/mesas/{mesaId}/lock` to release the payment lock.
 - "Logout" button → calls `/api/waiter/logout` and redirects to `/waiter`
 - Re-validates session on every route change (polls `/api/waiter/me`)
@@ -156,6 +165,10 @@ Mesa cards in `/waiter` (step 2) reflect four payment states with distinct color
 | Payment in progress | Pulsing amber dot | Amber | "En pago" | Session total |
 | Paid | Static violet dot | Violet | "Pagada" | Session total |
 
+Each mesa card exposes two secondary actions:
+- **"Ver ticket" button** — visible only when `activeOrderCount > 0`. Opens a receipt-style modal overlay. Fetches `GET /api/mesas/{mesaId}/orders`, merges items with the same name+price, and displays a line-item list with individual and session totals.
+- **Deferred items chip** — click navigates to `/?mesa={mesaId}` with the cart pre-opened, so the waiter can release or adjust deferred items directly.
+
 A mesa is considered **occupied** only if it has an active session AND `activeOrderCount > 0`. After a waiter closes a table, the auto-reopen creates a new empty session (`activeOrderCount = 0`), so the card immediately shows as **libre** on the next grid refresh.
 
 The `activeOrderCount` is computed per-session (not all-time) by querying `pedidos` filtered by `sesion_id IN (activeSesionIds)` and `estado != 'cerrado'`. The session IDs come from `get_mesas_with_sessions` RPC which reads `mesas.sesion_id` (the currently linked session).
@@ -169,6 +182,33 @@ The table grid uses two mechanisms in parallel:
 - **2-second polling** — fallback in case the WebSocket is unavailable. Fetches `GET /api/waiter/mesas` with `cache: 'no-store'`.
 
 Both mechanisms run simultaneously while the waiter is on the table grid. `empresaId` (returned by `/api/waiter/auth` and `/api/waiter/me`) is required to scope the Realtime subscription.
+
+---
+
+## Auto-close on Payment
+
+When a mesa session is fully paid (either via manual payment or Redsys), it is automatically closed and reopened without requiring waiter interaction.
+
+Implemented in `autoCloseMesaAfterPayment.ts` (fire-and-forget), called from:
+- `registerManualMesaPaymentUseCase` when `fullyPaid = true`
+- `processRedsysWebhookUseCase` on both Path 1 (división) and Path 2 (full payment) when `sesion_pagada = true`
+
+**Steps** (mirror the manual close route):
+1. Resolve `mesa_id` from `mesa_sesiones`
+2. Delete all Telegram order notifications for the session
+3. Consolidate individual pedidos into a single ticket
+4. Set `cerrada_at = now()` on the session
+5. Open a new empty session — invalidates all client QR tokens
+
+---
+
+## Cart UX (Waiter Mode)
+
+The cart drawer has additional waiter-specific controls:
+
+- **Payment banner hidden** — the "no payment required" info strip is hidden in waiter mode.
+- **"Lanzar todos los retenidos" button** — shown when `hasDeferredItems`. Opens a confirm dialog; on confirm calls `releaseAllDeferred()` (sets all `deferred = false`) then fires the order once the state update resolves (flag + `useEffect` pattern).
+- **Clear cart guard** — if the cart contains deferred items, clearing shows a warning dialog first instead of deleting silently.
 
 ---
 

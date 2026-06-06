@@ -2,6 +2,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { Result } from '@/core/domain/entities/types';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { logger } from '@/core/infrastructure/logging/logger';
+import { autoCloseMesaAfterPayment } from './autoCloseMesaAfterPayment';
 
 export interface RegisterManualMesaPaymentInput {
   mesaId: string;
@@ -125,8 +126,9 @@ export async function registerManualMesaPaymentUseCase(
         .update({ sesion_pagada: true, pago_en_curso: false, pago_iniciado_en: null })
         .eq('id', sesionId);
 
-      // Fire-and-forget Telegram notification
+      // Fire-and-forget Telegram notification + auto-close
       void sendTelegramCompletionNotification(supabase, sesionId, input.mesaId, input.empresaId);
+      void autoCloseMesaAfterPayment(sesionId, input.empresaId);
     } else {
       // Release lock if held (division payment not yet complete)
       await supabase

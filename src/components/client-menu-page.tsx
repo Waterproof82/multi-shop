@@ -119,7 +119,6 @@ function WaiterProductSearch({ menuData, showCart, empresa }: { menuData: MenuCa
         open={isDialogOpen}
         onOpenChange={(open) => {
           setIsDialogOpen(open);
-          if (!open) setSearch("");
         }}
       />
     </div>
