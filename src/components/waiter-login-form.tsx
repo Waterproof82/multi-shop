@@ -501,10 +501,6 @@ export function WaiterLoginForm() {
 
   return (
     <div className="flex flex-col gap-6 w-full">
-      <p className="text-xs font-semibold tracking-[0.18em] uppercase" style={{ color: "oklch(42% 0.06 252)" }}>
-        Seleccioná una mesa
-      </p>
-
       {error && (
         <p className="text-sm text-center" style={{ color: "oklch(65% 0.2 25)" }} role="alert">
           {error}
