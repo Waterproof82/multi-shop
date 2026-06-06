@@ -146,13 +146,17 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
 
     if (token) {
       setMesaToken(token);
+      // Always check waiter mode from sessionStorage before the async fetch.
+      // /api/mesas searches by id (not token column), so it succeeds for waiter
+      // navigations and would never reach the old fallback path.
+      const isWaiter = applySessionStorage();
       fetch(`/api/mesas?token=${encodeURIComponent(token)}`)
         .then(async (res) => {
-          if (!res.ok) { if (!applySessionStorage()) setMesaError(true); return; }
+          if (!res.ok) { if (!isWaiter) setMesaError(true); return; }
           const data = await res.json() as MesaInfo;
           setMesaInfo(data);
         })
-        .catch(() => { if (!applySessionStorage()) setMesaError(true); });
+        .catch(() => { if (!isWaiter) setMesaError(true); });
       return;
     }
 
