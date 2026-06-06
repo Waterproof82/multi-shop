@@ -59,7 +59,7 @@ export function WaiterBanner() {
   const { language } = useLanguage();
   const lang = language as Parameters<typeof t>[1];
   const { openCart, totalItems } = useCart();
-  const [closeDialog, setCloseDialog] = useState<'confirm' | 'cart' | 'payment' | null>(null);
+  const [closeDialog, setCloseDialog] = useState<'confirm' | 'cart' | 'payment' | 'unpaid' | null>(null);
 
   const [mesaLabel, setMesaLabel]     = useState<string | null>(null);
   const [mesaId, setMesaId]           = useState<string | null>(null);
@@ -178,10 +178,21 @@ export function WaiterBanner() {
     }
   }
 
-  function handleCloseTable() {
+  async function handleCloseTable() {
     if (!mesaId || closing) return;
     if (pagoEnCurso) { setCloseDialog('payment'); return; }
     if (totalItems > 0) { setCloseDialog('cart'); return; }
+    // Check if there are unpaid orders with payments enabled
+    try {
+      const r = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/orders`);
+      if (r.ok) {
+        const data = await r.json() as { orders: unknown[]; pagosHabilitados: boolean; sesionPagada: boolean };
+        if (data.pagosHabilitados && !data.sesionPagada && data.orders.length > 0) {
+          setCloseDialog('unpaid');
+          return;
+        }
+      }
+    } catch { /* best-effort */ }
     setCloseDialog('confirm');
   }
 
@@ -423,6 +434,24 @@ export function WaiterBanner() {
             </DialogTitle>
             <DialogDescription className="pt-2">
               El carrito tiene ítems que todavía no se enviaron como pedido. Enviálos antes de cerrar la mesa, o cerrala igualmente si no van a pedirse.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-2 mt-2">
+            <Button variant="outline" className="flex-1" onClick={() => setCloseDialog(null)}>Volver</Button>
+            <Button variant="destructive" className="flex-1" onClick={() => void doCloseTable()}>Cerrar igual</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={closeDialog === 'unpaid'} onOpenChange={() => setCloseDialog(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              Pago pendiente
+            </DialogTitle>
+            <DialogDescription className="pt-2">
+              Esta mesa tiene pedidos pendientes de pago. Realizá el pago manual antes de cerrarla para que quede registrado correctamente.
             </DialogDescription>
           </DialogHeader>
           <div className="flex gap-2 mt-2">
