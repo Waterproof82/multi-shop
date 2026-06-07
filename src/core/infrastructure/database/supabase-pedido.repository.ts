@@ -613,6 +613,44 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     }
   }
 
+  async saveTelegramBebidasMessageId(pedidoId: string, messageId: number): Promise<Result<void>> {
+    try {
+      const { error } = await this.supabase
+        .from('pedidos')
+        .update({ telegram_bebidas_message_id: String(messageId) })
+        .eq('id', pedidoId);
+
+      if (error) {
+        await logger.logAndReturnError('DB_UPDATE_ERROR', error.message, 'repository', 'SupabasePedidoRepository.saveTelegramBebidasMessageId', { details: { code: error.code, pedidoId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al guardar bebidas message_id', module: 'repository', method: 'saveTelegramBebidasMessageId' } };
+      }
+
+      return { success: true, data: undefined };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.saveTelegramBebidasMessageId', { details: { pedidoId } });
+      return { success: false, error: appError };
+    }
+  }
+
+  async saveTelegramPreparadoAlertMessageId(pedidoId: string, messageId: number): Promise<Result<void>> {
+    try {
+      const { error } = await this.supabase
+        .from('pedidos')
+        .update({ telegram_preparado_alert_message_id: String(messageId) })
+        .eq('id', pedidoId);
+
+      if (error) {
+        await logger.logAndReturnError('DB_UPDATE_ERROR', error.message, 'repository', 'SupabasePedidoRepository.saveTelegramPreparadoAlertMessageId', { details: { code: error.code, pedidoId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al guardar preparado alert message_id', module: 'repository', method: 'saveTelegramPreparadoAlertMessageId' } };
+      }
+
+      return { success: true, data: undefined };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.saveTelegramPreparadoAlertMessageId', { details: { pedidoId } });
+      return { success: false, error: appError };
+    }
+  }
+
   async findReadyPedidosWithTelegramMessage(): Promise<Result<{ id: string; telegram_message_id: string; telegram_chat_id: string }[]>> {
     try {
       const { data, error } = await this.supabase
@@ -783,16 +821,20 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     id: string;
     numero_pedido: number;
     total: number;
-    detalle_pedido: { nombre: string; cantidad: number; precio: number; complementos?: { nombre?: string; name?: string }[] }[];
+    estado: string;
+    detalle_pedido: { nombre: string; cantidad: number; precio: number; tipo_producto?: string; complementos?: { nombre?: string; name?: string }[] }[];
     telegram_message_id: string | null;
     telegram_chat_id: string | null;
+    telegram_bebidas_message_id: string | null;
+    telegram_bebidas_chat_id: string | null;
+    telegram_preparado_alert_message_id: string | null;
     mesa_numero: number | null;
     mesa_nombre: string | null;
   }[]>> {
     try {
       const { data, error } = await this.supabase
         .from('pedidos')
-        .select('id, numero_pedido, total, detalle_pedido, telegram_message_id, mesas(numero, nombre), empresas(telegram_mesa_chat_id, telegram_chat_id)')
+        .select('id, numero_pedido, total, estado, detalle_pedido, telegram_message_id, telegram_bebidas_message_id, telegram_preparado_alert_message_id, mesas(numero, nombre), empresas(telegram_mesa_chat_id, telegram_chat_id, telegram_bebidas_chat_id)')
         .eq('sesion_id', sesionId)
         .order('created_at', { ascending: true });
 
@@ -820,13 +862,18 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           const chatId = (empRaw?.['telegram_mesa_chat_id'] as string | null)
             ?? (empRaw?.['telegram_chat_id'] as string | null)
             ?? null;
+          const bebidasChatId = (empRaw?.['telegram_bebidas_chat_id'] as string | null) ?? null;
           return {
             id: row['id'] as string,
             numero_pedido: row['numero_pedido'] as number,
             total: row['total'] as number,
-            detalle_pedido: (row['detalle_pedido'] as { nombre: string; cantidad: number; precio: number; complementos?: { nombre?: string; name?: string }[] }[]) ?? [],
+            estado: (row['estado'] as string | null) ?? 'pendiente',
+            detalle_pedido: (row['detalle_pedido'] as { nombre: string; cantidad: number; precio: number; tipo_producto?: string; complementos?: { nombre?: string; name?: string }[] }[]) ?? [],
             telegram_message_id: (row['telegram_message_id'] as string | null) ?? null,
             telegram_chat_id: chatId,
+            telegram_bebidas_message_id: (row['telegram_bebidas_message_id'] as string | null) ?? null,
+            telegram_bebidas_chat_id: bebidasChatId,
+            telegram_preparado_alert_message_id: (row['telegram_preparado_alert_message_id'] as string | null) ?? null,
             mesa_numero: (mesaRaw?.['numero'] as number | null) ?? null,
             mesa_nombre: (mesaRaw?.['nombre'] as string | null) ?? null,
           };

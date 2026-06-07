@@ -4,6 +4,7 @@ import { pedidoRepository } from '@/core/infrastructure/database';
 import { logger } from '@/core/infrastructure/logging/logger';
 import {
   editTelegramForMesa,
+  editTelegramBebidasInfoForMesa,
   deleteMessage,
 } from '@/core/infrastructure/services/telegram.service';
 
@@ -62,13 +63,28 @@ export async function removeSessionItemUseCase(
 
       const mesaNumero = pedido.mesa_numero ?? 0;
       const mesaNombre = pedido.mesa_nombre ?? null;
-      const messageId = pedido.telegram_message_id ? Number(pedido.telegram_message_id) : null;
-      const chatId = pedido.telegram_chat_id;
+      // Cocina message was auto-deleted when preparado/servido — skip it
+      const cocinaActive = pedido.estado !== 'preparado' && pedido.estado !== 'servido';
+      const messageId = cocinaActive && pedido.telegram_message_id ? Number(pedido.telegram_message_id) : null;
+      const chatId = cocinaActive ? pedido.telegram_chat_id : null;
+      // Bebidas message may still be alive for preparado orders (bar may not have pressed Servido yet)
+      const bebidasActive = pedido.estado !== 'servido';
+      const bebidasMessageId = bebidasActive && pedido.telegram_bebidas_message_id ? Number(pedido.telegram_bebidas_message_id) : null;
+      const bebidasChatId = bebidasActive ? pedido.telegram_bebidas_chat_id : null;
+      // Preparado alert message sent to bar chat — only exists for preparado orders
+      const alertMessageId = pedido.estado === 'preparado' && pedido.telegram_preparado_alert_message_id ? Number(pedido.telegram_preparado_alert_message_id) : null;
+      const alertChatId = pedido.estado === 'preparado' ? pedido.telegram_bebidas_chat_id : null;
 
       if (newItems.length === 0) {
-        // Delete Telegram message first (best-effort), then delete pedido
+        // Delete all Telegram messages (best-effort), then delete pedido
         if (messageId && chatId) {
           await deleteMessage(chatId, messageId);
+        }
+        if (bebidasMessageId && bebidasChatId) {
+          await deleteMessage(bebidasChatId, bebidasMessageId);
+        }
+        if (alertMessageId && alertChatId) {
+          await deleteMessage(alertChatId, alertMessageId);
         }
         await supabase.from('pedidos').delete().eq('id', pedido.id);
       } else {
@@ -84,17 +100,29 @@ export async function removeSessionItemUseCase(
         const updateResult = await pedidoRepository.updateOrderItems(pedido.id, newItems, newTotal);
         if (!updateResult.success) return { success: false, error: updateResult.error };
 
-        // Edit Telegram message if one exists — only after DB write confirmed
+        // Edit or delete comida Telegram message (only after DB write confirmed)
+        const newComidaItems = newItems.filter(i => (i as { tipo_producto?: string }).tipo_producto !== 'bebida');
         if (messageId && chatId) {
-          await editTelegramForMesa(
-            pedido.id,
-            pedido.numero_pedido,
-            newItems,
-            mesaNumero,
-            mesaNombre,
-            chatId,
-            messageId
-          );
+          if (newComidaItems.length > 0) {
+            await editTelegramForMesa(pedido.id, pedido.numero_pedido, newComidaItems, mesaNumero, mesaNombre, chatId, messageId);
+          } else {
+            await deleteMessage(chatId, messageId);
+          }
+        }
+
+        // Edit or delete bebidas Telegram message
+        const newBebidasItems = newItems.filter(i => (i as { tipo_producto?: string }).tipo_producto === 'bebida');
+        if (bebidasMessageId && bebidasChatId) {
+          if (newBebidasItems.length > 0) {
+            await editTelegramBebidasInfoForMesa(pedido.id, pedido.numero_pedido, newBebidasItems, mesaNumero, mesaNombre, bebidasChatId, bebidasMessageId);
+          } else {
+            await deleteMessage(bebidasChatId, bebidasMessageId);
+          }
+        }
+
+        // Delete preparado alert message — it listed the comida items before deletion; no longer accurate
+        if (alertMessageId && alertChatId) {
+          await deleteMessage(alertChatId, alertMessageId);
         }
       }
 

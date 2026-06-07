@@ -327,6 +327,27 @@ export const editTelegramForMesa = async (
   await editMessageText(chatId, messageId, text, inlineKeyboard);
 };
 
+/** Edit the bebidas message in the bar group (called when a drink item is removed but others remain). */
+export const editTelegramBebidasInfoForMesa = async (
+  pedidoId: string,
+  numeroPedido: number,
+  items: { nombre: string; cantidad: number }[],
+  mesaNumero: number,
+  mesaNombre: string | null,
+  chatId: string,
+  messageId: number
+): Promise<void> => {
+  const tableLabel = mesaNombre ? `${sanitizeForMarkdown(mesaNombre)} \\(Mesa ${mesaNumero}\\)` : `Mesa ${mesaNumero}`;
+  const lines = [
+    `🥤 *Bebidas \\#${numeroPedido} — ${tableLabel}*`,
+    '',
+    ...items.map(item => `\\- ${item.cantidad}x ${sanitizeForMarkdown(item.nombre)}`),
+  ];
+  const text = lines.join('\n');
+  const inlineKeyboard = [[{ text: '🍽️ Servido', callback_data: `servido:${pedidoId}` }]];
+  await editMessageText(chatId, messageId, text, inlineKeyboard);
+};
+
 /**
  * Send a drinks-only message to the bar group with a Servido button.
  * The waiter uses this to mark drinks as served (auto-deletes after 5s).
@@ -399,8 +420,8 @@ export const sendTelegramPreparadoAlert = async (
   mesaNombre: string | null,
   comidaItems: { nombre: string; cantidad: number }[],
   chatId: string
-): Promise<void> => {
-  if (!TELEGRAM_BOT_TOKEN) return;
+): Promise<{ messageId: number } | null> => {
+  if (!TELEGRAM_BOT_TOKEN) return null;
   const tableLabel = mesaNombre ? `${sanitizeForMarkdown(mesaNombre)} \\(Mesa ${mesaNumero}\\)` : `Mesa ${mesaNumero}`;
   const itemLines = comidaItems.map(i => `\\- ${i.cantidad}x ${sanitizeForMarkdown(i.nombre)}`);
   const lines = [
@@ -411,7 +432,7 @@ export const sendTelegramPreparadoAlert = async (
   const message = lines.join('\n');
   const inlineKeyboard = [[{ text: '🍽️ Servido', callback_data: `servido:${pedidoId}` }]];
   try {
-    await fetch(
+    const response = await fetch(
       `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
       {
         method: 'POST',
@@ -419,8 +440,11 @@ export const sendTelegramPreparadoAlert = async (
         body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: 'MarkdownV2', reply_markup: { inline_keyboard: inlineKeyboard } }),
       }
     );
+    if (!response.ok) return null;
+    const json = await response.json() as { ok: boolean; result: { message_id: number } };
+    return { messageId: json.result.message_id };
   } catch {
-    // Best-effort — do not block order flow
+    return null;
   }
 };
 

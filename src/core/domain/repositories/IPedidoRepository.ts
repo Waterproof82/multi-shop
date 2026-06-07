@@ -20,6 +20,8 @@ export interface IPedidoRepository {
   updateEstimatedTime(pedidoId: string, minutes: number): Promise<Result<void>>;
   updateStatusById(pedidoId: string, estado: string): Promise<Result<void>>;
   saveTelegramMessageId(pedidoId: string, messageId: number): Promise<Result<void>>;
+  saveTelegramBebidasMessageId(pedidoId: string, messageId: number): Promise<Result<void>>;
+  saveTelegramPreparadoAlertMessageId(pedidoId: string, messageId: number): Promise<Result<void>>;
   findReadyPedidosWithTelegramMessage(): Promise<Result<{ id: string; telegram_message_id: string; telegram_chat_id: string }[]>>;
   clearTelegramMessageId(pedidoId: string): Promise<Result<void>>;
   deleteAllByTenant(empresaId: string): Promise<Result<number>>;
@@ -28,9 +30,13 @@ export interface IPedidoRepository {
     id: string;
     numero_pedido: number;
     total: number;
-    detalle_pedido: { nombre: string; cantidad: number; precio: number; complementos?: { nombre?: string; name?: string }[] }[];
+    estado: string;
+    detalle_pedido: { nombre: string; cantidad: number; precio: number; tipo_producto?: string; complementos?: { nombre?: string; name?: string }[] }[];
     telegram_message_id: string | null;
     telegram_chat_id: string | null;
+    telegram_bebidas_message_id: string | null;
+    telegram_bebidas_chat_id: string | null;
+    telegram_preparado_alert_message_id: string | null;
     mesa_numero: number | null;
     mesa_nombre: string | null;
   }[]>>;
