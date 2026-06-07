@@ -420,8 +420,13 @@ export const sendTelegramPreparadoAlert = async (
   mesaNombre: string | null,
   comidaItems: { nombre: string; cantidad: number }[],
   chatId: string
-): Promise<{ messageId: number } | null> => {
-  if (!TELEGRAM_BOT_TOKEN) return null;
+): Promise<Result<{ messageId: number }, AppError>> => {
+  if (!TELEGRAM_BOT_TOKEN) {
+    return {
+      success: false,
+      error: { code: 'TELEGRAM_NOT_CONFIGURED', message: 'TELEGRAM_BOT_TOKEN is not set.', module: 'infrastructure' },
+    };
+  }
   const tableLabel = mesaNombre ? `${sanitizeForMarkdown(mesaNombre)} \\(Mesa ${mesaNumero}\\)` : `Mesa ${mesaNumero}`;
   const itemLines = comidaItems.map(i => `\\- ${i.cantidad}x ${sanitizeForMarkdown(i.nombre)}`);
   const lines = [
@@ -440,11 +445,22 @@ export const sendTelegramPreparadoAlert = async (
         body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: 'MarkdownV2', reply_markup: { inline_keyboard: inlineKeyboard } }),
       }
     );
-    if (!response.ok) return null;
+    if (!response.ok) {
+      const responseBody = await response.json().catch(() => response.text());
+      const error = await logger.logAndReturnError(
+        'TELEGRAM_API_ERROR',
+        `Telegram API Error (preparado-alert): ${response.status}`,
+        'infrastructure',
+        'sendTelegramPreparadoAlert',
+        { details: { status: response.status, body: responseBody, chatId } }
+      );
+      return { success: false, error };
+    }
     const json = await response.json() as { ok: boolean; result: { message_id: number } };
-    return { messageId: json.result.message_id };
-  } catch {
-    return null;
+    return { success: true, data: { messageId: json.result.message_id } };
+  } catch (error) {
+    const appError = await logger.logFromCatch(error, 'infrastructure', 'sendTelegramPreparadoAlert');
+    return { success: false, error: appError };
   }
 };
 
@@ -490,7 +506,7 @@ export const sendTelegramPagoMesaCompleto = async (
 export const deleteMessage = async (chatId: string, messageId: number): Promise<void> => {
   if (!TELEGRAM_BOT_TOKEN) return;
   try {
-    await fetch(
+    const response = await fetch(
       `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/deleteMessage`,
       {
         method: 'POST',
@@ -498,8 +514,18 @@ export const deleteMessage = async (chatId: string, messageId: number): Promise<
         body: JSON.stringify({ chat_id: chatId, message_id: messageId }),
       }
     );
-  } catch {
-    // Best-effort — message may have already been deleted or is too old
+    if (!response.ok) {
+      const responseBody = await response.json().catch(() => response.text());
+      await logger.logAndReturnError(
+        'TELEGRAM_DELETE_ERROR',
+        `Telegram deleteMessage failed: ${response.status}`,
+        'infrastructure',
+        'deleteMessage',
+        { details: { status: response.status, body: responseBody, chatId, messageId } }
+      );
+    }
+  } catch (error) {
+    await logger.logFromCatch(error, 'infrastructure', 'deleteMessage');
   }
 };
 

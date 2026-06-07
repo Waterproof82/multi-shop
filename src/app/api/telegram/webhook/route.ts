@@ -117,30 +117,14 @@ export async function POST(request: Request) {
     // Notify bar immediately — save message ID synchronously so it can be deleted if cancelled
     if (mesaCtx?.telegram_bebidas_chat_id) {
       const alertResult = await sendTelegramPreparadoAlert(pedidoId, mesaCtx.numero_pedido, mesaCtx.mesa_numero, mesaCtx.mesa_nombre, mesaCtx.comidaItems, mesaCtx.telegram_bebidas_chat_id);
-      if (alertResult) {
-        await pedidoRepository.saveTelegramPreparadoAlertMessageId(pedidoId, alertResult.messageId);
+      if (alertResult.success) {
+        await pedidoRepository.saveTelegramPreparadoAlertMessageId(pedidoId, alertResult.data.messageId);
       }
     }
 
-    // Show countdown buttons on cocina message — keep original order text intact
+    // Delete cocina message immediately
     if (message) {
-      const chatId = String(message.chat.id);
-      const messageId = message.message_id;
-      await editMessageReplyMarkup(chatId, messageId, [
-        [
-          { text: '🍳 Preparado ✓', callback_data: 'noop' },
-          { text: '❌ Cancelar (5s)', callback_data: `cancelar_preparado:${pedidoId}` },
-        ],
-      ]);
-      // After 5s: delete cocina message only if not cancelled
-      after(async () => {
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        const { pedidoRepository: repo } = await import('@/core/infrastructure/database');
-        const statusResult = await repo.findStatusById(pedidoId);
-        if (statusResult.success && statusResult.data === 'preparado') {
-          await deleteMessage(chatId, messageId);
-        }
-      });
+      await deleteMessage(String(message.chat.id), message.message_id);
     }
     return NextResponse.json({ ok: true });
   }
@@ -172,46 +156,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  // Handle servido — mark as served; auto-delete message after 5s (cancellable)
+  // Handle servido — mark as served; auto-delete message after 5s
   const servidoMatch = callbackData.match(/^servido:([0-9a-f-]{36})$/);
   if (servidoMatch) {
     const [, pedidoId] = servidoMatch;
     const { pedidoRepository } = await import('@/core/infrastructure/database');
     await pedidoRepository.updateStatusById(pedidoId, 'servido');
-    await answerCallbackQuery(callbackQueryId, '🍽️ Pedido servido — eliminando en 5s');
+    await answerCallbackQuery(callbackQueryId, '🍽️ Pedido servido');
     if (message) {
-      const chatId = String(message.chat.id);
-      const messageId = message.message_id;
-      await editMessageReplyMarkup(chatId, messageId, [
-        [
-          { text: '🍽️ Servido ✓', callback_data: 'noop' },
-          { text: '❌ Cancelar (5s)', callback_data: `cancelar_servido:${pedidoId}` },
-        ],
-      ]);
-      // After 5s: delete only if status is still 'servido' (not cancelled)
-      after(async () => {
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        const { pedidoRepository: repo } = await import('@/core/infrastructure/database');
-        const statusResult = await repo.findStatusById(pedidoId);
-        if (statusResult.success && statusResult.data === 'servido') {
-          await deleteMessage(chatId, messageId);
-        }
-      });
-    }
-    return NextResponse.json({ ok: true });
-  }
-
-  // Handle cancelar_servido — cancel servido deletion, restore Servido button
-  const cancelarServidoMatch = callbackData.match(/^cancelar_servido:([0-9a-f-]{36})$/);
-  if (cancelarServidoMatch) {
-    const [, pedidoId] = cancelarServidoMatch;
-    const { pedidoRepository } = await import('@/core/infrastructure/database');
-    await pedidoRepository.updateStatusById(pedidoId, 'preparado');
-    await answerCallbackQuery(callbackQueryId, '↩️ Eliminación cancelada');
-    if (message) {
-      await editMessageReplyMarkup(String(message.chat.id), message.message_id, [
-        [{ text: '🍽️ Servido', callback_data: `servido:${pedidoId}` }],
-      ]);
+      await deleteMessage(String(message.chat.id), message.message_id);
     }
     return NextResponse.json({ ok: true });
   }

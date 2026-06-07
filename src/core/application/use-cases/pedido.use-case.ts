@@ -534,7 +534,10 @@ export class PedidoUseCase {
         }
 
         if (bebidasItems.length > 0) {
-          await sendTelegramBebidasInfo(pedidoId, numeroPedido, bebidasItems, mesaNumero, mesaNombre, telegramBebidasChatId!);
+          const bebidasResult = await sendTelegramBebidasInfo(pedidoId, numeroPedido, bebidasItems, mesaNumero, mesaNombre, telegramBebidasChatId!);
+          if (bebidasResult.success) {
+            await this.pedidoRepo.saveTelegramBebidasMessageId(pedidoId, bebidasResult.data.messageId);
+          }
         }
       } else if (cocinaChatId) {
         // Single group fallback: all items together

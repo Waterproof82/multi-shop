@@ -221,17 +221,23 @@ export class SupabaseMesaRepository implements IMesaRepository {
         .map(r => r.sesion_id)
         .filter((id): id is string => id !== null);
 
-      // Step 2: count active (non-cerrado) pedidos per session
+      // Step 2: count active (non-cerrado) pedidos per session + collect preparado numbers
       const countBySesion: Record<string, number> = {};
+      const preparadoBySesion: Record<string, number[]> = {};
       if (activeSesionIds.length > 0) {
         const { data: activeData } = await this.supabase
           .from('pedidos')
-          .select('sesion_id')
+          .select('sesion_id, estado, numero_pedido')
           .in('sesion_id', activeSesionIds)
           .neq('estado', 'cerrado');
         for (const p of activeData ?? []) {
           const sid = p['sesion_id'] as string;
           countBySesion[sid] = (countBySesion[sid] ?? 0) + 1;
+          if ((p['estado'] as string) === 'preparado') {
+            const nums = preparadoBySesion[sid] ?? [];
+            nums.push(p['numero_pedido'] as number);
+            preparadoBySesion[sid] = nums;
+          }
         }
       }
 
@@ -249,6 +255,7 @@ export class SupabaseMesaRepository implements IMesaRepository {
           pagoEnCurso: row.pago_en_curso ?? false,
           itemsDiferidos: (row.items_diferidos ?? []) as DeferredItem[],
           clienteActivo: row.cliente_activo ?? false,
+          preparadoPedidoNumbers: row.sesion_id ? (preparadoBySesion[row.sesion_id] ?? []) : [],
         })),
       };
     } catch (e) {

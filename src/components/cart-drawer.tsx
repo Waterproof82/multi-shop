@@ -177,8 +177,9 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     setActiveOrderTokens(getTrackingTokens());
   }, [isCartOpen]);
 
-  // Pre-load deferred items from DB when a mesa is identified
+  // Pre-load deferred items from DB when a mesa is identified — waiter mode only
   useEffect(() => {
+    if (!isWaiterMode) return; // customers must never see waiter's deferred items
     const mesaId = mesaInfo?.id ?? mesaToken;
     if (!mesaId || deferredLoadedRef.current === mesaId) return;
     deferredLoadedRef.current = mesaId;
@@ -192,7 +193,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
         }
       })
       .catch(() => null);
-  }, [mesaInfo, mesaToken, loadDeferredItems]);
+  }, [mesaInfo, mesaToken, loadDeferredItems, isWaiterMode]);
 
   // Explicitly persist a computed deferred list to DB. Called immediately at each action
   // (toggle, remove, quantity change) so there are no timing or race-condition issues.
