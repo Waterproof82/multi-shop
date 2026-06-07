@@ -326,6 +326,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
               showTabs={showTabs}
               tab={menuTab}
               onTabChange={handleTabChange}
+              isWaiterMode={showWaiterSearch}
             />
             <div id="menu-content" className="container mx-auto max-w-6xl px-4 py-8 md:px-6">
               <div className="space-y-12 md:space-y-16">

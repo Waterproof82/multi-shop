@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { useReducedMotion } from "framer-motion"
 import { cn } from "@/lib/utils"
 import type { MenuCategoryVM } from "@/core/application/dtos/menu-view-model"
 import { useLanguage } from "@/lib/language-context"
@@ -12,10 +11,11 @@ interface CategoryNavProps {
   showTabs?: boolean
   tab?: 'comida' | 'bebidas'
   onTabChange?: (tab: 'comida' | 'bebidas') => void
+  isWaiterMode?: boolean
 }
 
 export function CategoryNav(props: Readonly<CategoryNavProps>) {
-  const { categories, showTabs, tab, onTabChange } = props;
+  const { categories, showTabs, tab, onTabChange, isWaiterMode } = props;
   const [activeId, setActiveId] = useState(categories[0]?.id ?? "")
 
   // Reset active category when the visible categories list changes (e.g. tab switch)
@@ -26,7 +26,6 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
   const navRef = useRef<HTMLDivElement>(null)
   const isManualScrolling = useRef(false)
   const timeoutRef = useRef<NodeJS.Timeout>(null)
-  const shouldReduceMotion = useReducedMotion() ?? false
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -60,13 +59,13 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
       const activeBtn = navRef.current.querySelector(`button[data-id="${activeId}"]`)
       if (activeBtn) {
         activeBtn.scrollIntoView({
-          behavior: shouldReduceMotion ? "instant" : "smooth",
+          behavior: "instant",
           block: "nearest",
           inline: "center",
         })
       }
     }
-  }, [activeId, shouldReduceMotion])
+  }, [activeId])
 
   const scrollTo = (id: string) => {
     const el = document.getElementById(id)
@@ -79,18 +78,65 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
         const elementPosition = el.getBoundingClientRect().top + window.scrollY
         const offsetPosition = elementPosition - offset
 
-        window.scrollTo({
-          top: offsetPosition,
-          behavior: shouldReduceMotion ? "instant" : "smooth",
-        })
+        window.scrollTo({ top: offsetPosition, behavior: "instant" })
 
-        // Re-enable auto-scroll after scroll settles
         if (timeoutRef.current) clearTimeout(timeoutRef.current)
         timeoutRef.current = setTimeout(() => {
           isManualScrolling.current = false
-        }, 1000)
+        }, 300)
       })
     }
+  }
+
+  const catLabel = (cat: MenuCategoryVM) =>
+    (language !== "es" && cat.translations?.[language]?.name) || cat.label
+
+  if (isWaiterMode) {
+    return (
+      <nav
+        className="sticky top-16 z-40 w-full border-b border-border bg-background/95 backdrop-blur-sm md:top-20 lg:top-20"
+        aria-label={t("menuCategories", language)}
+      >
+        <div className="mx-auto max-w-6xl px-4 md:px-6">
+          <div className="flex items-center gap-2 py-2">
+            {showTabs && onTabChange && (
+              <>
+                {tab === 'bebidas' && (
+                  <button
+                    type="button"
+                    onClick={() => onTabChange('comida')}
+                    className="whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring min-h-[36px] text-muted-foreground bg-secondary"
+                  >
+                    🍳 {t("filterFood", language)}
+                  </button>
+                )}
+                {tab === 'comida' && (
+                  <button
+                    type="button"
+                    onClick={() => onTabChange('bebidas')}
+                    className="whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring min-h-[36px] text-muted-foreground bg-secondary"
+                  >
+                    🥤 {t("filterDrinks", language)}
+                  </button>
+                )}
+                <span className="h-5 w-px bg-border shrink-0" aria-hidden />
+              </>
+            )}
+            <select
+              value={activeId}
+              onChange={(e) => scrollTo(e.target.value)}
+              className="rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium outline-none focus:ring-2 focus:ring-ring cursor-pointer min-h-[36px] max-w-[200px]"
+            >
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {catLabel(cat)}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </nav>
+    )
   }
 
   return (
@@ -108,7 +154,7 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
                 <button
                   type="button"
                   onClick={() => onTabChange('comida')}
-                  className="whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-semibold transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
+                  className="whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
                 >
                   🍳 {t("filterFood", language)}
                 </button>
@@ -117,7 +163,7 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
                 <button
                   type="button"
                   onClick={() => onTabChange('bebidas')}
-                  className="whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-semibold transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
+                  className="whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
                 >
                   🥤 {t("filterDrinks", language)}
                 </button>
@@ -130,18 +176,15 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
               key={cat.id}
               data-id={cat.id}
               type="button"
-              onClick={() => {
-                setActiveId(cat.id)
-                scrollTo(cat.id)
-              }}
+              onClick={() => scrollTo(cat.id)}
               className={cn(
-                "whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px]",
+                "whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px]",
                 activeId === cat.id
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
               )}
             >
-              {(language !== "es" && cat.translations?.[language]?.name) || cat.label}
+              {catLabel(cat)}
             </button>
           ))}
         </div>
