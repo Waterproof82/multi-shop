@@ -44,10 +44,9 @@ interface MenuPageProps {
   isWaiterMode?: boolean;
 }
 
-function WaiterProductSearch({ menuData, showCart, empresa }: { menuData: MenuCategoryVM[]; showCart: boolean; empresa?: EmpresaPublic | null }) {
+function WaiterProductSearch({ menuData, showCart, empresa, search }: { menuData: MenuCategoryVM[]; showCart: boolean; empresa?: EmpresaPublic | null; search: string }) {
   const { language } = useLanguage();
   const lang = language as Parameters<typeof t>[1];
-  const [search, setSearch] = useState("");
   const [selectedItem, setSelectedItem] = useState<MenuItemVM | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -67,65 +66,50 @@ function WaiterProductSearch({ menuData, showCart, empresa }: { menuData: MenuCa
     setIsDialogOpen(true);
   };
 
-  return (
-    <div className="w-full">
-      {/* Sticky search bar */}
-      <div className="sticky top-16 md:top-20 z-30 w-full bg-background/95 backdrop-blur-sm border-b border-border">
-        <div className="max-w-2xl mx-auto px-4 py-2">
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none text-base">🔍</span>
-            <input
-              type="search"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar producto..."
-              autoFocus
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Scrollable results */}
-      {search.trim() && (
-        <div className="max-w-2xl mx-auto px-4 py-3 flex flex-col gap-2">
-          {filtered.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              Sin resultados para &ldquo;{search}&rdquo;
-            </p>
-          ) : (
-            filtered.map(product => (
-              <div
-                key={product.id}
-                className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3"
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{product.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatPrice(product.price, empresa?.moneda ?? "EUR", lang)}
-                  </p>
-                </div>
-                {showCart && (
-                  <button
-                    type="button"
-                    onClick={() => handleAdd(product)}
-                    className="min-h-[40px] px-4 rounded-lg bg-[var(--color-primary)] text-[var(--color-primary-foreground)] text-sm font-semibold shrink-0"
-                  >
-                    + {t("addToCart", lang)}
-                  </button>
-                )}
-              </div>
-            ))
-          )}
-        </div>
-      )}
-
+  if (!search.trim()) {
+    return (
       <QuantitySelectorDialog
         item={selectedItem}
         open={isDialogOpen}
-        onOpenChange={(open) => {
-          setIsDialogOpen(open);
-        }}
+        onOpenChange={(open) => { setIsDialogOpen(open); }}
+      />
+    );
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto w-full px-4 py-3 flex flex-col gap-2">
+      {filtered.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-4">
+          Sin resultados para &ldquo;{search}&rdquo;
+        </p>
+      ) : (
+        filtered.map(product => (
+          <div
+            key={product.id}
+            className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3"
+          >
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-foreground truncate">{product.name}</p>
+              <p className="text-xs text-muted-foreground">
+                {formatPrice(product.price, empresa?.moneda ?? "EUR", lang)}
+              </p>
+            </div>
+            {showCart && (
+              <button
+                type="button"
+                onClick={() => handleAdd(product)}
+                className="min-h-[40px] px-4 rounded-lg bg-[var(--color-primary)] text-[var(--color-primary-foreground)] text-sm font-semibold shrink-0"
+              >
+                + {t("addToCart", lang)}
+              </button>
+            )}
+          </div>
+        ))
+      )}
+      <QuantitySelectorDialog
+        item={selectedItem}
+        open={isDialogOpen}
+        onOpenChange={(open) => { setIsDialogOpen(open); }}
       />
     </div>
   );
@@ -146,6 +130,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
   // Mirror exactly the WaiterBanner condition: waiter_token (server) + mesa selected (sessionStorage)
   const [waiterHasMesa, setWaiterHasMesa] = useState(false);
   const [waiterMesaLocked, setWaiterMesaLocked] = useState(false);
+  const [waiterSearch, setWaiterSearch] = useState("");
   const [menuTab, setMenuTab] = useState<'comida' | 'bebidas'>('comida');
   const [mesaEsperandoActivacion, setMesaEsperandoActivacion] = useState(false);
   const [mesaPaymentLocked, setMesaPaymentLocked] = useState(false);
@@ -313,9 +298,28 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
         {t("skipToContent", language)}
       </a>
 
-      {/* Show waiter search only when WaiterBanner is active (token + mesa selected) */}
+      {/* Waiter sticky search bar — lives at the flex-root level so sticky works across the full page */}
+      {showWaiterSearch && (
+        <div className="sticky top-16 md:top-20 z-30 w-full bg-background/95 backdrop-blur-sm border-b border-border">
+          <div className="max-w-2xl mx-auto px-4 py-2">
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none text-base">🔍</span>
+              <input
+                type="search"
+                value={waiterSearch}
+                onChange={e => setWaiterSearch(e.target.value)}
+                placeholder="Buscar producto..."
+                autoFocus
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Show waiter results or normal header/banner */}
       {showWaiterSearch ? (
-        <WaiterProductSearch menuData={menuData} showCart={showCart} empresa={empresa} />
+        <WaiterProductSearch menuData={menuData} showCart={showCart} empresa={empresa} search={waiterSearch} />
       ) : (
         <>
           {header === undefined ? null : header}
