@@ -201,18 +201,41 @@ kitchen-alert → recogido (disappears)
 
 ---
 
-## 6. Telegram Removal (mesa orders only)
+## 6. Telegram Removal (mesa orders — complete removal)
 
-The following Telegram calls are removed for mesa orders:
-- `sendTelegramForMesa` — no longer called when a mesa pedido is created
-- `sendTelegramBebidasInfo` — no longer called for bebida items
-- `sendTelegramPreparadoAlert` — no longer called when kitchen marks preparado
-- `editTelegramForMesa` / `editTelegramBebidasInfoForMesa` — no longer called when waiter removes items
-- `deleteMessage` calls tied to mesa order lifecycle — removed
+**All** Telegram integration for mesa order management is removed. No Telegram messages are sent, edited, or deleted as part of the mesa order lifecycle. No Telegram buttons or state transitions exist in this flow.
 
-Telegram service file and non-mesa functions (tienda, recogida, delivery) are NOT modified.
+### Outbound calls removed (no longer sent)
 
-The DB columns `telegram_message_id` and `telegram_bebidas_message_id` on `pedidos` become unused for new orders. They are not deleted (non-destructive migration preference).
+- `sendTelegramForMesa` — was called on mesa pedido creation (comida items)
+- `sendTelegramBebidasInfo` — was called on mesa pedido creation (bebida items)
+- `sendTelegramPreparadoAlert` — was called when kitchen marked comida as preparado
+- `editTelegramForMesa` — was called when waiter removed comida items from an order
+- `editTelegramBebidasInfoForMesa` — was called when waiter removed bebida items
+- `deleteMessage` — was called to clean up Telegram messages on various events
+- `sendTelegramPagoMesaCompleto` — was called when mesa payment completed (includes "Cerrar mesa" button)
+
+### Inbound webhook handlers removed or updated
+
+The Telegram webhook at `/api/telegram/webhook` handles incoming button presses. The following callback actions are removed for mesa orders:
+- `anotado:<pedidoId>` — kitchen acknowledged order
+- `preparado:<pedidoId>` — kitchen marked order ready
+- `servido:<pedidoId>` — waiter marked drinks as served
+- `cerrar_mesa:<sesionId>` — close mesa session from Telegram
+
+These state transitions now happen exclusively through the in-app kitchen/bar pages.
+
+### What stays
+
+Telegram integration for **non-mesa** order types is untouched:
+- `tienda` orders
+- `recogida` orders
+- `delivery` orders
+- Any `sendTelegramWithInlineButtons` / `sendTelegramWithQuickReplies` flows
+
+### DB columns
+
+`telegram_message_id` and `telegram_bebidas_message_id` on `pedidos` become unused for new orders. They are not deleted (non-destructive preference).
 
 ---
 
