@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
-import { UtensilsCrossed, KeyRound, Pause, ReceiptText, X } from "lucide-react";
+import { UtensilsCrossed, KeyRound, Pause, ReceiptText, X, CheckSquare } from "lucide-react";
 import { formatPrice } from "@/lib/format-price";
 import type { MesaWithSession } from "@/core/domain/repositories/IMesaRepository";
 
@@ -41,6 +41,8 @@ interface OrderItem {
 
 interface MesaOrder {
   id: string;
+  numeroPedido: number;
+  estado: string;
   items: OrderItem[];
   createdAt: string;
 }
@@ -48,13 +50,11 @@ interface MesaOrder {
 function mergeOrderItems(items: OrderItem[]): OrderItem[] {
   const map = new Map<string, OrderItem>();
   for (const item of items) {
-    const key = `${item.nombre}||${item.precio}`;
+    const compsKey = (item.complementos ?? []).map(c => c.nombre).sort().join(',');
+    const key = `${item.nombre}||${item.precio}||${compsKey}`;
     const existing = map.get(key);
     if (existing) {
       existing.cantidad += item.cantidad;
-      if (item.complementos?.length) {
-        existing.complementos = [...(existing.complementos ?? []), ...item.complementos];
-      }
     } else {
       map.set(key, { ...item, complementos: item.complementos ? [...item.complementos] : undefined });
     }
@@ -283,6 +283,22 @@ function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onViewTicket, onC
         </div>
       </button>
 
+      {/* Preparado badge — shown when any pedido in session has been marked ready by kitchen */}
+      {mesa.preparadoPedidoNumbers.length > 0 && (
+        <div
+          className="w-full rounded-lg px-2 py-1.5 flex items-center gap-1.5"
+          style={{ background: 'oklch(18% 0.08 148 / 0.7)', border: '1px solid oklch(45% 0.15 148 / 0.5)' }}
+        >
+          <CheckSquare className="w-3 h-3 shrink-0" style={{ color: 'oklch(72% 0.20 148)' }} />
+          <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'oklch(72% 0.20 148)' }}>
+            Preparado
+          </span>
+          <span className="ml-auto text-[9px] font-bold" style={{ color: 'oklch(65% 0.18 148)' }}>
+            #{mesa.preparadoPedidoNumbers.join(', #')}
+          </span>
+        </div>
+      )}
+
       {/* Deferred items */}
       {mesa.itemsDiferidos.length > 0 && (
         <button
@@ -323,8 +339,8 @@ function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onViewTicket, onC
         </button>
       )}
 
-      {/* Cerrar mesa — solo cuando está pagada */}
-      {isPaid && onCloseMesa && (
+      {/* Cerrar mesa — pagada o con pedidos */}
+      {(isPaid || isOpen) && onCloseMesa && (
         <button
           onClick={onCloseMesa}
           className="w-full rounded-lg px-2 py-1.5 flex items-center justify-center gap-1.5 hover:brightness-125 transition-all"
@@ -353,7 +369,7 @@ export function WaiterLoginForm() {
   const [ticketMesa, setTicketMesa] = useState<MesaWithSession | null>(null);
   const [ticketOrders, setTicketOrders] = useState<MesaOrder[]>([]);
   const [ticketLoading, setTicketLoading] = useState(false);
-  const [ticketPendingDelete, setTicketPendingDelete] = useState<{ mesaId: string; nombre: string; precio: number; maxCantidad: number } | null>(null);
+  const [ticketPendingDelete, setTicketPendingDelete] = useState<{ mesaId: string; nombre: string; precio: number; maxCantidad: number; complementos?: { nombre: string; precio: number }[]; preparadoWarning?: boolean } | null>(null);
   const [ticketDeleteQty, setTicketDeleteQty] = useState(1);
   const [ticketDeleting, setTicketDeleting] = useState(false);
 
@@ -686,7 +702,10 @@ export function WaiterLoginForm() {
                           <button
                             type="button"
                             onClick={() => {
-                              setTicketPendingDelete({ mesaId: ticketMesa!.id, nombre: item.nombre, precio: item.precio, maxCantidad: item.cantidad });
+                              const isPreparado = ticketOrders.some(
+                                o => o.estado === 'preparado' && o.items.some(i => i.nombre === item.nombre && Math.abs(i.precio - item.precio) < 0.001)
+                              );
+                              setTicketPendingDelete({ mesaId: ticketMesa!.id, nombre: item.nombre, precio: item.precio, maxCantidad: item.cantidad, complementos: item.complementos, preparadoWarning: isPreparado });
                               setTicketDeleteQty(1);
                             }}
                             className="flex items-center justify-center shrink-0 w-5 h-5 rounded-full text-xs font-bold"
@@ -738,55 +757,93 @@ export function WaiterLoginForm() {
             style={{ background: "oklch(14% 0.02 252)", border: "1px solid oklch(28% 0.04 252 / 0.8)" }}
             onClick={e => e.stopPropagation()}
           >
-            <p className="text-sm font-bold text-center" style={{ color: "oklch(85% 0.04 252)" }}>
-              Eliminar: {ticketPendingDelete.nombre}
-            </p>
-            <div className="flex items-center justify-center gap-4">
-              <button
-                type="button"
-                onClick={() => setTicketDeleteQty(q => Math.max(1, q - 1))}
-                disabled={ticketDeleteQty <= 1}
-                className="w-9 h-9 rounded-full text-lg font-bold flex items-center justify-center disabled:opacity-30"
-                style={{ background: "oklch(22% 0.04 252 / 0.6)", color: "oklch(82% 0.04 252)" }}
-              >
-                −
-              </button>
-              <span className="text-2xl font-black w-8 text-center tabular-nums" style={{ color: "oklch(88% 0.04 252)" }}>
-                {ticketDeleteQty}
-              </span>
-              <button
-                type="button"
-                onClick={() => setTicketDeleteQty(q => Math.min(ticketPendingDelete.maxCantidad, q + 1))}
-                disabled={ticketDeleteQty >= ticketPendingDelete.maxCantidad}
-                className="w-9 h-9 rounded-full text-lg font-bold flex items-center justify-center disabled:opacity-30"
-                style={{ background: "oklch(22% 0.04 252 / 0.6)", color: "oklch(82% 0.04 252)" }}
-              >
-                +
-              </button>
-            </div>
-            <p className="text-xs text-center" style={{ color: "oklch(50% 0.05 252)" }}>
-              de {ticketPendingDelete.maxCantidad} unidades
-            </p>
-            <div className="flex gap-2 mt-1">
-              <button
-                type="button"
-                onClick={() => setTicketPendingDelete(null)}
-                disabled={ticketDeleting}
-                className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
-                style={{ background: "oklch(22% 0.04 252 / 0.5)", color: "oklch(60% 0.06 252)" }}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={() => { void handleTicketDeleteItem(); }}
-                disabled={ticketDeleting}
-                className="flex-1 py-2.5 rounded-xl text-sm font-bold"
-                style={{ background: "oklch(35% 0.14 25 / 0.9)", color: "oklch(85% 0.08 25)" }}
-              >
-                {ticketDeleting ? "…" : "Confirmar"}
-              </button>
-            </div>
+            {ticketPendingDelete.preparadoWarning ? (
+              <>
+                <p className="text-sm font-bold text-center" style={{ color: "oklch(85% 0.04 252)" }}>⚠️ Pedido ya preparado</p>
+                <p className="text-xs text-center" style={{ color: "oklch(50% 0.05 252)" }}>
+                  Este ítem ya fue marcado como listo en cocina. ¿Querés eliminarlo igualmente?
+                </p>
+                <div className="flex gap-2 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => setTicketPendingDelete(null)}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
+                    style={{ background: "oklch(22% 0.04 252 / 0.5)", color: "oklch(60% 0.06 252)" }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTicketPendingDelete(d => d ? { ...d, preparadoWarning: false } : d)}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-bold"
+                    style={{ background: "oklch(35% 0.14 25 / 0.9)", color: "oklch(85% 0.08 25)" }}
+                  >
+                    Continuar
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex flex-col gap-1 text-center">
+                  <p className="text-sm font-bold" style={{ color: "oklch(85% 0.04 252)" }}>
+                    Eliminar: {ticketPendingDelete.nombre}
+                  </p>
+                  {ticketPendingDelete.complementos && ticketPendingDelete.complementos.length > 0 && (
+                    <ul className="flex flex-col gap-0.5">
+                      {ticketPendingDelete.complementos.map((c, i) => (
+                        <li key={i} className="text-xs" style={{ color: "oklch(50% 0.05 252)" }}>↳ {c.nombre}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div className="flex items-center justify-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setTicketDeleteQty(q => Math.max(1, q - 1))}
+                    disabled={ticketDeleteQty <= 1}
+                    className="w-9 h-9 rounded-full text-lg font-bold flex items-center justify-center disabled:opacity-30"
+                    style={{ background: "oklch(22% 0.04 252 / 0.6)", color: "oklch(82% 0.04 252)" }}
+                  >
+                    −
+                  </button>
+                  <span className="text-2xl font-black w-8 text-center tabular-nums" style={{ color: "oklch(88% 0.04 252)" }}>
+                    {ticketDeleteQty}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setTicketDeleteQty(q => Math.min(ticketPendingDelete.maxCantidad, q + 1))}
+                    disabled={ticketDeleteQty >= ticketPendingDelete.maxCantidad}
+                    className="w-9 h-9 rounded-full text-lg font-bold flex items-center justify-center disabled:opacity-30"
+                    style={{ background: "oklch(22% 0.04 252 / 0.6)", color: "oklch(82% 0.04 252)" }}
+                  >
+                    +
+                  </button>
+                </div>
+                <p className="text-xs text-center" style={{ color: "oklch(50% 0.05 252)" }}>
+                  de {ticketPendingDelete.maxCantidad} unidades
+                </p>
+                <div className="flex gap-2 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => setTicketPendingDelete(null)}
+                    disabled={ticketDeleting}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
+                    style={{ background: "oklch(22% 0.04 252 / 0.5)", color: "oklch(60% 0.06 252)" }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { void handleTicketDeleteItem(); }}
+                    disabled={ticketDeleting}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-bold"
+                    style={{ background: "oklch(35% 0.14 25 / 0.9)", color: "oklch(85% 0.08 25)" }}
+                  >
+                    {ticketDeleting ? "…" : "Confirmar"}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

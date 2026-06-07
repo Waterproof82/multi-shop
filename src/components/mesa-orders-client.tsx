@@ -19,7 +19,9 @@ interface OrderItem {
 
 interface MesaOrder {
   id: string;
+  numeroPedido: number;
   items: OrderItem[];
+  estado: string;
   createdAt: string;
 }
 
@@ -51,13 +53,11 @@ const PAGE_BG = "#f0ede8";
 function mergeOrderItems(items: OrderItem[]): OrderItem[] {
   const map = new Map<string, OrderItem>();
   for (const item of items) {
-    const key = `${item.nombre}||${item.precio}`;
+    const compsKey = (item.complementos ?? []).map(c => c.nombre).sort().join(',');
+    const key = `${item.nombre}||${item.precio}||${compsKey}`;
     const existing = map.get(key);
     if (existing) {
       existing.cantidad += item.cantidad;
-      if (item.complementos?.length) {
-        existing.complementos = [...(existing.complementos ?? []), ...item.complementos];
-      }
     } else {
       map.set(key, { ...item, complementos: item.complementos ? [...item.complementos] : undefined });
     }
@@ -330,7 +330,7 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
   const [settingDivision, setSettingDivision] = useState(false);
   const [cancellingDivision, setCancellingDivision] = useState(false);
   const [manualPaying, setManualPaying] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState<{ nombre: string; precio: number; maxCantidad: number } | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ nombre: string; precio: number; maxCantidad: number; complementos?: { nombre: string; precio: number }[]; preparadoWarning?: boolean } | null>(null);
   const [deleteQty, setDeleteQty] = useState(1);
   const [deleting, setDeleting] = useState(false);
   const [verifyingTotal, setVerifyingTotal] = useState(false);
@@ -726,22 +726,25 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                 <span>{t("mesaTicketPrice", lang)}</span>
               </div>
 
-              {/* Items */}
-              <ul className="flex flex-col gap-1 pb-4">
-                {allItems.map((item) => {
-                  const complementoTotal = item.complementos?.reduce((s, c) => s + c.precio, 0) ?? 0;
-                  const lineTotal = (item.precio + complementoTotal) * item.cantidad;
-                  return (
-                    <li
-                      key={`${item.nombre}||${item.precio}`}
-                      className="flex items-center gap-2 text-sm"
-                      style={{ color: "#1a1612", fontFamily: "monospace" }}
-                    >
-                      {isWaiterMode && (
+              {/* Items — waiter: merged with delete buttons; customer: grouped by order with status */}
+              {isWaiterMode ? (
+                <ul className="flex flex-col gap-1 pb-4">
+                  {allItems.map((item) => {
+                    const complementoTotal = item.complementos?.reduce((s, c) => s + c.precio, 0) ?? 0;
+                    const lineTotal = (item.precio + complementoTotal) * item.cantidad;
+                    return (
+                      <li
+                        key={`${item.nombre}||${item.precio}`}
+                        className="flex items-center gap-2 text-sm"
+                        style={{ color: "#1a1612", fontFamily: "monospace" }}
+                      >
                         <button
                           type="button"
                           onClick={() => {
-                            setPendingDelete({ nombre: item.nombre, precio: item.precio, maxCantidad: item.cantidad });
+                            const isPreparado = sessionData?.orders.some(
+                              o => o.estado === 'preparado' && o.items.some(i => i.nombre === item.nombre && Math.abs(i.precio - item.precio) < 0.001)
+                            ) ?? false;
+                            setPendingDelete({ nombre: item.nombre, precio: item.precio, maxCantidad: item.cantidad, complementos: item.complementos, preparadoWarning: isPreparado });
                             setDeleteQty(1);
                           }}
                           className="flex items-center justify-center shrink-0 w-5 h-5 rounded-full text-xs font-bold"
@@ -750,28 +753,79 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                         >
                           −
                         </button>
-                      )}
-                      <span
-                        className="tabular-nums w-4 text-right shrink-0"
-                        style={{ color: "#8a7560" }}
-                      >
-                        {item.cantidad}
-                      </span>
-                      <span className="flex flex-col flex-1 min-w-0">
-                        <span>{(language !== "es" && item.translations?.[language]?.name) || item.nombre}</span>
-                        {item.complementos && item.complementos.length > 0 && (
-                          <span className="text-xs" style={{ color: "#b0a090" }}>
-                            + {item.complementos.map(c => c.nombre).join(", ")}
+                        <span className="tabular-nums w-4 text-right shrink-0" style={{ color: "#8a7560" }}>
+                          {item.cantidad}
+                        </span>
+                        <span className="flex flex-col flex-1 min-w-0">
+                          <span>{(language !== "es" && item.translations?.[language]?.name) || item.nombre}</span>
+                          {item.complementos && item.complementos.length > 0 && (
+                            <span className="text-xs" style={{ color: "#b0a090" }}>
+                              + {item.complementos.map(c => c.nombre).join(", ")}
+                            </span>
+                          )}
+                        </span>
+                        <span className="tabular-nums shrink-0 text-right" style={{ color: "#1a1612" }}>
+                          {formatPrice(lineTotal, "EUR", lang)}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <div className="flex flex-col pb-4">
+                  {sessionData.orders.map((order, oi) => {
+                    const statusBadge = (() => {
+                      if (order.estado === 'preparado') return { label: '✓ Listo', color: '#3a7a50' };
+                      if (order.estado === 'servido')   return { label: '✓ Servido', color: '#8a7560' };
+                      if (order.estado === 'anotado')   return { label: '· Preparando', color: '#6a7a9a' };
+                      return null;
+                    })();
+                    return (
+                      <div key={order.id}>
+                        {oi > 0 && <div className="border-t border-dashed my-2" style={{ borderColor: "#ddd8d0" }} />}
+                        <div className="flex items-center justify-between pt-1 pb-1">
+                          <span className="text-[10px] uppercase tracking-widest" style={{ color: "#b0a090", fontFamily: "monospace" }}>
+                            #{order.numeroPedido}
                           </span>
-                        )}
-                      </span>
-                      <span className="tabular-nums shrink-0 text-right" style={{ color: "#1a1612" }}>
-                        {formatPrice(lineTotal, "EUR", lang)}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
+                          {statusBadge && (
+                            <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: statusBadge.color, fontFamily: "monospace" }}>
+                              {statusBadge.label}
+                            </span>
+                          )}
+                        </div>
+                        <ul className="flex flex-col gap-1">
+                          {order.items.map((item) => {
+                            const complementoTotal = item.complementos?.reduce((s, c) => s + c.precio, 0) ?? 0;
+                            const lineTotal = (item.precio + complementoTotal) * item.cantidad;
+                            return (
+                              <li
+                                key={`${item.nombre}||${item.precio}`}
+                                className="flex items-center gap-2 text-sm"
+                                style={{ color: "#1a1612", fontFamily: "monospace" }}
+                              >
+                                <span className="tabular-nums w-4 text-right shrink-0" style={{ color: "#8a7560" }}>
+                                  {item.cantidad}
+                                </span>
+                                <span className="flex flex-col flex-1 min-w-0">
+                                  <span>{(language !== "es" && item.translations?.[language]?.name) || item.nombre}</span>
+                                  {item.complementos && item.complementos.length > 0 && (
+                                    <span className="text-xs" style={{ color: "#b0a090" }}>
+                                      + {item.complementos.map(c => c.nombre).join(", ")}
+                                    </span>
+                                  )}
+                                </span>
+                                <span className="tabular-nums shrink-0 text-right" style={{ color: "#1a1612" }}>
+                                  {formatPrice(lineTotal, "EUR", lang)}
+                                </span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
               <DottedRule />
 
@@ -1101,55 +1155,93 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
             style={{ backgroundColor: "#fffcf7", fontFamily: "monospace" }}
             onClick={e => e.stopPropagation()}
           >
-            <p className="text-sm font-bold text-center" style={{ color: "#1a1612" }}>
-              Eliminar: {pendingDelete.nombre}
-            </p>
-            <div className="flex items-center justify-center gap-4">
-              <button
-                type="button"
-                onClick={() => setDeleteQty(q => Math.max(1, q - 1))}
-                disabled={deleteQty <= 1}
-                className="w-9 h-9 rounded-full text-lg font-bold flex items-center justify-center disabled:opacity-30"
-                style={{ background: "oklch(22% 0.03 252 / 0.15)", color: "#1a1612" }}
-              >
-                −
-              </button>
-              <span className="text-2xl font-black w-8 text-center tabular-nums" style={{ color: "#1a1612" }}>
-                {deleteQty}
-              </span>
-              <button
-                type="button"
-                onClick={() => setDeleteQty(q => Math.min(pendingDelete.maxCantidad, q + 1))}
-                disabled={deleteQty >= pendingDelete.maxCantidad}
-                className="w-9 h-9 rounded-full text-lg font-bold flex items-center justify-center disabled:opacity-30"
-                style={{ background: "oklch(22% 0.03 252 / 0.15)", color: "#1a1612" }}
-              >
-                +
-              </button>
-            </div>
-            <p className="text-xs text-center" style={{ color: "#8a7560" }}>
-              de {pendingDelete.maxCantidad} unidades
-            </p>
-            <div className="flex gap-2 mt-1">
-              <button
-                type="button"
-                onClick={() => setPendingDelete(null)}
-                disabled={deleting}
-                className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
-                style={{ background: "oklch(22% 0.03 252 / 0.12)", color: "#8a7560" }}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={() => { void handleDeleteItem(); }}
-                disabled={deleting}
-                className="flex-1 py-2.5 rounded-xl text-sm font-bold"
-                style={{ background: "oklch(35% 0.14 25 / 0.9)", color: "oklch(85% 0.08 25)" }}
-              >
-                {deleting ? "…" : "Confirmar"}
-              </button>
-            </div>
+            {pendingDelete.preparadoWarning ? (
+              <>
+                <p className="text-sm font-bold text-center" style={{ color: "#1a1612" }}>⚠️ Pedido ya preparado</p>
+                <p className="text-xs text-center" style={{ color: "#8a7560" }}>
+                  Este ítem ya fue marcado como listo en cocina. ¿Querés eliminarlo igualmente?
+                </p>
+                <div className="flex gap-2 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => setPendingDelete(null)}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
+                    style={{ background: "oklch(22% 0.03 252 / 0.12)", color: "#8a7560" }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPendingDelete(d => d ? { ...d, preparadoWarning: false } : d)}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-bold"
+                    style={{ background: "oklch(35% 0.14 25 / 0.9)", color: "oklch(85% 0.08 25)" }}
+                  >
+                    Continuar
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex flex-col gap-1 text-center">
+                  <p className="text-sm font-bold" style={{ color: "#1a1612" }}>
+                    Eliminar: {pendingDelete.nombre}
+                  </p>
+                  {pendingDelete.complementos && pendingDelete.complementos.length > 0 && (
+                    <ul className="flex flex-col gap-0.5">
+                      {pendingDelete.complementos.map((c, i) => (
+                        <li key={i} className="text-xs" style={{ color: "#8a7560" }}>↳ {c.nombre}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div className="flex items-center justify-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteQty(q => Math.max(1, q - 1))}
+                    disabled={deleteQty <= 1}
+                    className="w-9 h-9 rounded-full text-lg font-bold flex items-center justify-center disabled:opacity-30"
+                    style={{ background: "oklch(22% 0.03 252 / 0.15)", color: "#1a1612" }}
+                  >
+                    −
+                  </button>
+                  <span className="text-2xl font-black w-8 text-center tabular-nums" style={{ color: "#1a1612" }}>
+                    {deleteQty}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteQty(q => Math.min(pendingDelete.maxCantidad, q + 1))}
+                    disabled={deleteQty >= pendingDelete.maxCantidad}
+                    className="w-9 h-9 rounded-full text-lg font-bold flex items-center justify-center disabled:opacity-30"
+                    style={{ background: "oklch(22% 0.03 252 / 0.15)", color: "#1a1612" }}
+                  >
+                    +
+                  </button>
+                </div>
+                <p className="text-xs text-center" style={{ color: "#8a7560" }}>
+                  de {pendingDelete.maxCantidad} unidades
+                </p>
+                <div className="flex gap-2 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => setPendingDelete(null)}
+                    disabled={deleting}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
+                    style={{ background: "oklch(22% 0.03 252 / 0.12)", color: "#8a7560" }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { void handleDeleteItem(); }}
+                    disabled={deleting}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-bold"
+                    style={{ background: "oklch(35% 0.14 25 / 0.9)", color: "oklch(85% 0.08 25)" }}
+                  >
+                    {deleting ? "…" : "Confirmar"}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
