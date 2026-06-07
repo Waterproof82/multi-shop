@@ -22,6 +22,8 @@ export interface IPedidoRepository {
   saveTelegramMessageId(pedidoId: string, messageId: number): Promise<Result<void>>;
   saveTelegramBebidasMessageId(pedidoId: string, messageId: number): Promise<Result<void>>;
   saveTelegramPreparadoAlertMessageId(pedidoId: string, messageId: number): Promise<Result<void>>;
+  findTelegramPreparadoAlertContext(pedidoId: string): Promise<Result<{ messageId: number; chatId: string } | null>>;
+  clearTelegramPreparadoAlertMessageId(pedidoId: string): Promise<Result<void>>;
   findReadyPedidosWithTelegramMessage(): Promise<Result<{ id: string; telegram_message_id: string; telegram_chat_id: string }[]>>;
   clearTelegramMessageId(pedidoId: string): Promise<Result<void>>;
   deleteAllByTenant(empresaId: string): Promise<Result<number>>;

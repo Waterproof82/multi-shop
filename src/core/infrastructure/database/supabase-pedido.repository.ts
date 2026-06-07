@@ -651,6 +651,55 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     }
   }
 
+  async findTelegramPreparadoAlertContext(pedidoId: string): Promise<Result<{ messageId: number; chatId: string } | null>> {
+    try {
+      const { data, error } = await this.supabase
+        .from('pedidos')
+        .select('telegram_preparado_alert_message_id, empresas(telegram_bebidas_chat_id)')
+        .eq('id', pedidoId)
+        .maybeSingle();
+
+      if (error) {
+        return { success: false, error: { code: 'DB_ERROR', message: error.message, module: 'repository', method: 'findTelegramPreparadoAlertContext' } };
+      }
+
+      if (!data) return { success: true, data: null };
+
+      const alertMessageId = (data as Record<string, unknown>)['telegram_preparado_alert_message_id'] as string | null;
+      if (!alertMessageId) return { success: true, data: null };
+
+      const empRaw = Array.isArray((data as Record<string, unknown>)['empresas'])
+        ? ((data as Record<string, unknown>)['empresas'] as Record<string, unknown>[])[0] ?? null
+        : ((data as Record<string, unknown>)['empresas'] as Record<string, unknown> | null);
+      const chatId = (empRaw?.['telegram_bebidas_chat_id'] as string | null) ?? null;
+
+      if (!chatId) return { success: true, data: null };
+
+      return { success: true, data: { messageId: Number(alertMessageId), chatId } };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findTelegramPreparadoAlertContext', { details: { pedidoId } });
+      return { success: false, error: appError };
+    }
+  }
+
+  async clearTelegramPreparadoAlertMessageId(pedidoId: string): Promise<Result<void>> {
+    try {
+      const { error } = await this.supabase
+        .from('pedidos')
+        .update({ telegram_preparado_alert_message_id: null })
+        .eq('id', pedidoId);
+
+      if (error) {
+        return { success: false, error: { code: 'DB_ERROR', message: error.message, module: 'repository', method: 'clearTelegramPreparadoAlertMessageId' } };
+      }
+
+      return { success: true, data: undefined };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.clearTelegramPreparadoAlertMessageId', { details: { pedidoId } });
+      return { success: false, error: appError };
+    }
+  }
+
   async findReadyPedidosWithTelegramMessage(): Promise<Result<{ id: string; telegram_message_id: string; telegram_chat_id: string }[]>> {
     try {
       const { data, error } = await this.supabase

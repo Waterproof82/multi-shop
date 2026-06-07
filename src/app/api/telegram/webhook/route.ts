@@ -102,7 +102,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  // Handle preparado — food ready; auto-delete comida message after 5s; notify bar only if not cancelled
+  // Handle preparado — food ready; notify bar immediately; auto-delete comida message after 5s
   const preparadoMatch = callbackData.match(/^preparado:([0-9a-f-]{36})$/);
   if (preparadoMatch) {
     const [, pedidoId] = preparadoMatch;
@@ -110,11 +110,19 @@ export async function POST(request: Request) {
     await pedidoRepository.updateStatusById(pedidoId, 'preparado');
     await answerCallbackQuery(callbackQueryId, '🍳 Comida preparada — eliminando en 5s');
 
-    // Fetch mesa context now — used inside after() to notify bar if not cancelled
+    // Fetch mesa context for the bar alert
     const mesaCtxResult = await pedidoRepository.findMesaContextForWebhook(pedidoId);
     const mesaCtx = mesaCtxResult.success ? mesaCtxResult.data : null;
 
-    // Show countdown buttons — keep original order text intact
+    // Notify bar immediately — save message ID synchronously so it can be deleted if cancelled
+    if (mesaCtx?.telegram_bebidas_chat_id) {
+      const alertResult = await sendTelegramPreparadoAlert(pedidoId, mesaCtx.numero_pedido, mesaCtx.mesa_numero, mesaCtx.mesa_nombre, mesaCtx.comidaItems, mesaCtx.telegram_bebidas_chat_id);
+      if (alertResult) {
+        await pedidoRepository.saveTelegramPreparadoAlertMessageId(pedidoId, alertResult.messageId);
+      }
+    }
+
+    // Show countdown buttons on cocina message — keep original order text intact
     if (message) {
       const chatId = String(message.chat.id);
       const messageId = message.message_id;
@@ -124,18 +132,12 @@ export async function POST(request: Request) {
           { text: '❌ Cancelar (5s)', callback_data: `cancelar_preparado:${pedidoId}` },
         ],
       ]);
-      // After 5s: only proceed if not cancelled; then notify bar + delete
+      // After 5s: delete cocina message only if not cancelled
       after(async () => {
         await new Promise(resolve => setTimeout(resolve, 5000));
         const { pedidoRepository: repo } = await import('@/core/infrastructure/database');
         const statusResult = await repo.findStatusById(pedidoId);
         if (statusResult.success && statusResult.data === 'preparado') {
-          if (mesaCtx?.telegram_bebidas_chat_id) {
-            const alertResult = await sendTelegramPreparadoAlert(pedidoId, mesaCtx.numero_pedido, mesaCtx.mesa_numero, mesaCtx.mesa_nombre, mesaCtx.comidaItems, mesaCtx.telegram_bebidas_chat_id);
-            if (alertResult) {
-              await repo.saveTelegramPreparadoAlertMessageId(pedidoId, alertResult.messageId);
-            }
-          }
           await deleteMessage(chatId, messageId);
         }
       });
@@ -150,6 +152,14 @@ export async function POST(request: Request) {
     const { pedidoRepository } = await import('@/core/infrastructure/database');
     await pedidoRepository.updateStatusById(pedidoId, 'anotado');
     await answerCallbackQuery(callbackQueryId, '↩️ Eliminación cancelada');
+
+    // Delete the bar alert that was sent immediately when preparado was pressed
+    const alertCtx = await pedidoRepository.findTelegramPreparadoAlertContext(pedidoId);
+    if (alertCtx.success && alertCtx.data) {
+      await deleteMessage(alertCtx.data.chatId, alertCtx.data.messageId);
+      await pedidoRepository.clearTelegramPreparadoAlertMessageId(pedidoId);
+    }
+
     if (message) {
       await editMessageReplyMarkup(String(message.chat.id), message.message_id, [
         [
