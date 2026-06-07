@@ -330,6 +330,9 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
   const [settingDivision, setSettingDivision] = useState(false);
   const [cancellingDivision, setCancellingDivision] = useState(false);
   const [manualPaying, setManualPaying] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<{ nombre: string; precio: number; maxCantidad: number } | null>(null);
+  const [deleteQty, setDeleteQty] = useState(1);
+  const [deleting, setDeleting] = useState(false);
   const [verifyingTotal, setVerifyingTotal] = useState(false);
   const [totalMismatch, setTotalMismatch] = useState<{
     oldTotal: number;
@@ -578,6 +581,26 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
     }
   };
 
+  const handleDeleteItem = useCallback(async () => {
+    if (!pendingDelete || deleting) return;
+    setDeleting(true);
+    try {
+      await fetch(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/orders/items`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre: pendingDelete.nombre,
+          precio: pendingDelete.precio,
+          cantidadAEliminar: deleteQty,
+        }),
+      });
+      setPendingDelete(null);
+      await refresh();
+    } finally {
+      setDeleting(false);
+    }
+  }, [pendingDelete, deleteQty, deleting, mesaId, refresh]);
+
   const handleManualPayment = async () => {
     if (manualPaying) return;
     setManualPaying(true);
@@ -711,9 +734,23 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                   return (
                     <li
                       key={`${item.nombre}||${item.precio}`}
-                      className="flex items-baseline gap-3 text-sm"
+                      className="flex items-center gap-2 text-sm"
                       style={{ color: "#1a1612", fontFamily: "monospace" }}
                     >
+                      {isWaiterMode && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPendingDelete({ nombre: item.nombre, precio: item.precio, maxCantidad: item.cantidad });
+                            setDeleteQty(1);
+                          }}
+                          className="flex items-center justify-center shrink-0 w-5 h-5 rounded-full text-xs font-bold"
+                          style={{ background: "oklch(35% 0.14 25 / 0.8)", color: "oklch(80% 0.10 25)" }}
+                          aria-label={`Eliminar ${item.nombre}`}
+                        >
+                          −
+                        </button>
+                      )}
                       <span
                         className="tabular-nums w-4 text-right shrink-0"
                         style={{ color: "#8a7560" }}
@@ -1052,6 +1089,71 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
       </div>
 
       {/* Division modal */}
+      {/* Delete item confirmation modal */}
+      {pendingDelete && (
+        <div
+          className="fixed inset-0 z-[300] flex items-center justify-center p-6"
+          style={{ backgroundColor: "rgba(10, 8, 6, 0.85)" }}
+          onClick={() => { if (!deleting) setPendingDelete(null); }}
+        >
+          <div
+            className="w-full max-w-xs rounded-2xl p-5 flex flex-col gap-4"
+            style={{ backgroundColor: "#fffcf7", fontFamily: "monospace" }}
+            onClick={e => e.stopPropagation()}
+          >
+            <p className="text-sm font-bold text-center" style={{ color: "#1a1612" }}>
+              Eliminar: {pendingDelete.nombre}
+            </p>
+            <div className="flex items-center justify-center gap-4">
+              <button
+                type="button"
+                onClick={() => setDeleteQty(q => Math.max(1, q - 1))}
+                disabled={deleteQty <= 1}
+                className="w-9 h-9 rounded-full text-lg font-bold flex items-center justify-center disabled:opacity-30"
+                style={{ background: "oklch(22% 0.03 252 / 0.15)", color: "#1a1612" }}
+              >
+                −
+              </button>
+              <span className="text-2xl font-black w-8 text-center tabular-nums" style={{ color: "#1a1612" }}>
+                {deleteQty}
+              </span>
+              <button
+                type="button"
+                onClick={() => setDeleteQty(q => Math.min(pendingDelete.maxCantidad, q + 1))}
+                disabled={deleteQty >= pendingDelete.maxCantidad}
+                className="w-9 h-9 rounded-full text-lg font-bold flex items-center justify-center disabled:opacity-30"
+                style={{ background: "oklch(22% 0.03 252 / 0.15)", color: "#1a1612" }}
+              >
+                +
+              </button>
+            </div>
+            <p className="text-xs text-center" style={{ color: "#8a7560" }}>
+              de {pendingDelete.maxCantidad} unidades
+            </p>
+            <div className="flex gap-2 mt-1">
+              <button
+                type="button"
+                onClick={() => setPendingDelete(null)}
+                disabled={deleting}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
+                style={{ background: "oklch(22% 0.03 252 / 0.12)", color: "#8a7560" }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => { void handleDeleteItem(); }}
+                disabled={deleting}
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold"
+                style={{ background: "oklch(35% 0.14 25 / 0.9)", color: "oklch(85% 0.08 25)" }}
+              >
+                {deleting ? "…" : "Confirmar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showDivisionModal && sessionData && (
         <DivisionModal
           total={sessionData.total}
