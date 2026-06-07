@@ -797,6 +797,13 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         .order('created_at', { ascending: true });
 
       if (error) {
+        await logger.logAndReturnError(
+          'DB_SELECT_ERROR',
+          error.message,
+          'repository',
+          'SupabasePedidoRepository.findBySesionIdWithTelegram',
+          { details: { code: error.code, sesionId } }
+        );
         return { success: false, error: { code: 'DB_ERROR', message: error.message, module: 'repository', method: 'findBySesionIdWithTelegram' } };
       }
 
@@ -843,6 +850,13 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         .eq('id', pedidoId);
 
       if (error) {
+        await logger.logAndReturnError(
+          'DB_UPDATE_ERROR',
+          error.message,
+          'repository',
+          'SupabasePedidoRepository.updateOrderItems',
+          { details: { code: error.code, pedidoId } }
+        );
         return { success: false, error: { code: 'DB_ERROR', message: error.message, module: 'repository', method: 'updateOrderItems' } };
       }
       return { success: true, data: undefined };
