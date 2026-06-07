@@ -81,9 +81,10 @@ export async function removeSessionItemUseCase(
           return s + (i.precio + compExtra) * i.cantidad;
         }, 0);
 
-        await pedidoRepository.updateOrderItems(pedido.id, newItems, newTotal);
+        const updateResult = await pedidoRepository.updateOrderItems(pedido.id, newItems, newTotal);
+        if (!updateResult.success) return { success: false, error: updateResult.error };
 
-        // Edit Telegram message if one exists
+        // Edit Telegram message if one exists — only after DB write confirmed
         if (messageId && chatId) {
           await editTelegramForMesa(
             pedido.id,
