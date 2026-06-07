@@ -289,12 +289,15 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
               </div>
             )}
           </div>
-          <QuantitySelectorDialog
-            item={waiterSelectedItem}
-            open={waiterDialogOpen}
-            onOpenChange={(open) => { setWaiterDialogOpen(open); }}
-          />
         </div>
+      )}
+      {/* Dialog outside the sticky stacking context so it renders above everything */}
+      {showWaiterSearch && (
+        <QuantitySelectorDialog
+          item={waiterSelectedItem}
+          open={waiterDialogOpen}
+          onOpenChange={(open) => { setWaiterDialogOpen(open); }}
+        />
       )}
 
       {/* Normal header/banner — only when not in waiter search mode */}
