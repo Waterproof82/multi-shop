@@ -480,6 +480,14 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, pendingLaunchDeferred]);
 
+  // Signal "Activa" state: when a real customer (non-waiter) adds their first item
+  useEffect(() => {
+    if (isWaiterMode || !mesaToken || items.length !== 1) return;
+    const mesaId = mesaInfo?.id ?? mesaToken;
+    void fetch(`/api/mesas/${encodeURIComponent(mesaId)}/activate`, { method: 'POST' });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items.length]);
+
   const isDeliveryIncomplete = isRestaurant && !mesaToken && deliveryMethod === 'delivery' && (deliveryLatitude === null || estimatedFeeCents === null);
 
   const handleDialogClose = useCallback((open: boolean) => {
@@ -564,7 +572,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
           <DialogHeader>
             <DialogTitle>Hay ítems retenidos</DialogTitle>
             <DialogDescription className="pt-2">
-              Tenés ítems marcados como retenidos en el carrito. Si vaciás el carrito, se perderán también. ¿Querés continuar?
+              Hay ítems marcados como retenidos en el carrito. Si lo vacías, se perderán también. ¿Quieres continuar?
             </DialogDescription>
           </DialogHeader>
           <div className="flex gap-2 mt-2">

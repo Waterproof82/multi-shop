@@ -200,7 +200,7 @@ export class SupabaseMesaRepository implements IMesaRepository {
       type RpcRow = {
         id: string; empresa_id: string; numero: number; nombre: string | null;
         sesion_id: string | null; sesion_pagada: boolean; pago_en_curso: boolean;
-        session_total: number; items_diferidos: unknown[] | null;
+        session_total: number; items_diferidos: unknown[] | null; cliente_activo: boolean;
       };
       const { data: rpcData, error: rpcError } = await this.supabase
         .rpc('get_mesas_with_sessions', { p_empresa_id: empresaId });
@@ -248,6 +248,7 @@ export class SupabaseMesaRepository implements IMesaRepository {
           sesionPagada: row.sesion_pagada ?? false,
           pagoEnCurso: row.pago_en_curso ?? false,
           itemsDiferidos: (row.items_diferidos ?? []) as DeferredItem[],
+          clienteActivo: row.cliente_activo ?? false,
         })),
       };
     } catch (e) {

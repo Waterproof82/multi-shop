@@ -20,6 +20,7 @@ export interface MesaWithSession {
   sesionPagada: boolean;
   pagoEnCurso: boolean;
   itemsDiferidos: DeferredItem[];
+  clienteActivo: boolean;
 }
 
 export interface IMesaRepository {

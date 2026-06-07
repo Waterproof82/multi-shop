@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { mesaSesionUseCase, mesaSesionRepository, pedidoRepository } from '@/core/infrastructure/database';
-import { deleteMessage } from '@/core/infrastructure/services/telegram.service';
 
 const mesaIdSchema = z.string().uuid('El mesaId debe ser un UUID válido');
 
@@ -30,14 +29,6 @@ export async function POST(
 
   const sesionId = sesionResult.data.id;
 
-  // Delete all Telegram notifications for this session (best-effort, fire-and-forget)
-  const telegramMessages = await pedidoRepository.findSesionTelegramMessages(sesionId);
-  if (telegramMessages.success) {
-    await Promise.all(
-      telegramMessages.data.map(({ messageId, chatId }) => deleteMessage(chatId, messageId))
-    );
-  }
-
   // Merge all individual orders into a single ticket
   await pedidoRepository.consolidateSesionOrders(sesionId);
 
@@ -45,10 +36,6 @@ export async function POST(
   if (!result.success) {
     return NextResponse.json({ error: 'Error al cerrar la sesión de mesa' }, { status: 500 });
   }
-
-  // Auto-reopen: rotate session so the table is immediately available for new customers.
-  // Old client tokens are invalidated because they reference the closed session (cerrada_at check).
-  await mesaSesionUseCase.openSesion(parsed.data, empresaId);
 
   return NextResponse.json({ ok: true });
 }

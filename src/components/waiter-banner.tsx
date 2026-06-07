@@ -59,7 +59,7 @@ export function WaiterBanner() {
   const { language } = useLanguage();
   const lang = language as Parameters<typeof t>[1];
   const { openCart, totalItems, clearCart } = useCart();
-  const [closeDialog, setCloseDialog] = useState<'confirm' | 'cart' | 'payment' | 'unpaid' | null>(null);
+  const [closeDialog, setCloseDialog] = useState<'confirm' | 'cart' | 'payment' | 'unpaid' | 'free' | null>(null);
 
   const [mesaLabel, setMesaLabel]     = useState<string | null>(null);
   const [mesaId, setMesaId]           = useState<string | null>(null);
@@ -182,12 +182,13 @@ export function WaiterBanner() {
     if (!mesaId || closing) return;
     if (pagoEnCurso) { setCloseDialog('payment'); return; }
     if (totalItems > 0) { setCloseDialog('cart'); return; }
-    // Check if there are unpaid orders with payments enabled
+    // Check orders to detect free mesa or unpaid state
     try {
       const r = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/orders`);
       if (r.ok) {
         const data = await r.json() as { orders: unknown[]; pagosHabilitados: boolean; sesionPagada: boolean };
-        if (data.pagosHabilitados && !data.sesionPagada && data.orders.length > 0) {
+        if (data.orders.length === 0) { setCloseDialog('free'); return; }
+        if (data.pagosHabilitados && !data.sesionPagada) {
           setCloseDialog('unpaid');
           return;
         }
@@ -281,22 +282,24 @@ export function WaiterBanner() {
         {/* Right: actions */}
         <div className="flex items-center gap-1.5 shrink-0">
 
-          {/* Cart */}
-          <button
-            onClick={openCart}
-            className="relative flex items-center justify-center rounded-md p-2 transition-colors duration-150 min-h-[32px] min-w-[32px]"
-            style={{ color: BTN_CART_TEXT, backgroundColor: BTN_CART_BG }}
-            onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_CART_HOVER)}
-            onMouseLeave={e => (e.currentTarget.style.backgroundColor = BTN_CART_BG)}
-            aria-label={t("openCart", lang)}
-          >
-            <ShoppingCart className="w-4 h-4 shrink-0" />
-            {totalItems > 0 && (
-              <span className="absolute -top-1 -right-1 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-destructive px-0.5 text-[10px] font-bold text-destructive-foreground">
-                {totalItems}
-              </span>
-            )}
-          </button>
+          {/* Cart — hidden on the waiter grid */}
+          {pathname !== '/waiter' && (
+            <button
+              onClick={openCart}
+              className="relative flex items-center justify-center rounded-md p-2 transition-colors duration-150 min-h-[32px] min-w-[32px]"
+              style={{ color: BTN_CART_TEXT, backgroundColor: BTN_CART_BG }}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_CART_HOVER)}
+              onMouseLeave={e => (e.currentTarget.style.backgroundColor = BTN_CART_BG)}
+              aria-label={t("openCart", lang)}
+            >
+              <ShoppingCart className="w-4 h-4 shrink-0" />
+              {totalItems > 0 && (
+                <span className="absolute -top-1 -right-1 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-destructive px-0.5 text-[10px] font-bold text-destructive-foreground">
+                  {totalItems}
+                </span>
+              )}
+            </button>
+          )}
 
           {/* Change table — dropdown trigger */}
           <div className="relative" ref={dropdownRef}>
@@ -425,6 +428,24 @@ export function WaiterBanner() {
 
         </div>
       </div>
+
+      {/* Mesa already free */}
+      <Dialog open={closeDialog === 'free'} onOpenChange={() => setCloseDialog(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-green-500" />
+              Mesa libre
+            </DialogTitle>
+            <DialogDescription className="pt-2">
+              Esta mesa ya está libre y no tiene pedidos activos. No es necesario cerrar la sesión.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-2 mt-2">
+            <Button className="flex-1" onClick={() => setCloseDialog(null)}>Entendido</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Close table dialogs */}
       <Dialog open={closeDialog === 'payment'} onOpenChange={() => setCloseDialog(null)}>

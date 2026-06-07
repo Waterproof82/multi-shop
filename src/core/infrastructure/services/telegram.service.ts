@@ -19,16 +19,15 @@ const buildOrderMessage = (pedido: Pedido): string => {
   if (cliente?.email) {
     lines.push(`*Email:* ${sanitizeForMarkdown(cliente.email)}`);
   }
-  lines.push(
-    '\\-\\-\\-',
-    '*Items:*',
-    ...items.map(
-      (item: PedidoItem) =>
-        `\\- ${item.cantidad}x ${sanitizeForMarkdown(item.nombre)} \\(${sanitizeForMarkdown(item.precio.toFixed(2))} €\\)`
-    ),
-    '\\-\\-\\-',
-    `*Total:* ${sanitizeForMarkdown(total.toFixed(2))} €`,
-  );
+  const itemLines: string[] = [];
+  for (const item of items) {
+    itemLines.push(`\\- ${item.cantidad}x ${sanitizeForMarkdown(item.nombre)} \\(${sanitizeForMarkdown(item.precio.toFixed(2))} €\\)`);
+    for (const c of item.complementos ?? []) {
+      const cName = c.nombre ?? (c as unknown as { name?: string }).name ?? '';
+      if (cName) itemLines.push(`  ↳ ${sanitizeForMarkdown(cName)}`);
+    }
+  }
+  lines.push('\\-\\-\\-', '*Items:*', ...itemLines, '\\-\\-\\-', `*Total:* ${sanitizeForMarkdown(total.toFixed(2))} €`);
   return lines.join('\n');
 };
 
