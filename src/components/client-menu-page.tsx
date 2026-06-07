@@ -56,7 +56,7 @@ function getCategoryTab(cat: MenuCategoryVM): 'comida' | 'bebida' | 'both' | 'em
 
 export function MenuPage({ menuData, header, showCart = false, empresa, isWaiterMode = false }: Readonly<MenuPageProps>) {
   const { language } = useLanguage();
-  const { clearCart, closeCart } = useCart();
+  const { clearCart, closeCart, isCartOpen } = useCart();
   // Mirror exactly the WaiterBanner condition: waiter_token (server) + mesa selected (sessionStorage)
   const [waiterHasMesa, setWaiterHasMesa] = useState(false);
   const [waiterMesaLocked, setWaiterMesaLocked] = useState(false);
@@ -72,6 +72,11 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
       setWaiterHasMesa(!!getWaiterMesa());
     }
   }, [isWaiterMode]);
+
+  // Close search when cart opens in waiter mode
+  useEffect(() => {
+    if (isCartOpen) setWaiterSearch("");
+  }, [isCartOpen]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);

@@ -223,16 +223,20 @@ export const editMessageReplyMarkup = async (
 const buildMesaOrderMessage = (
   pedidoId: string,
   numeroPedido: number,
-  items: { nombre: string; cantidad: number }[],
+  items: { nombre: string; cantidad: number; complementos?: { nombre?: string; name?: string }[] }[],
   mesaNumero: number,
   mesaNombre: string | null
 ): string => {
   const tableLabel = mesaNombre ? `${sanitizeForMarkdown(mesaNombre)} \\(Mesa ${mesaNumero}\\)` : `Mesa ${mesaNumero}`;
-  const lines = [
-    `*Pedido \\#${numeroPedido} — ${tableLabel}*`,
-    '',
-    ...items.map(item => `\\- ${item.cantidad}x ${sanitizeForMarkdown(item.nombre)}`),
-  ];
+  const itemLines: string[] = [];
+  for (const item of items) {
+    itemLines.push(`\\- ${item.cantidad}x ${sanitizeForMarkdown(item.nombre)}`);
+    for (const c of item.complementos ?? []) {
+      const cName = c.nombre ?? c.name ?? '';
+      if (cName) itemLines.push(`  ↳ ${sanitizeForMarkdown(cName)}`);
+    }
+  }
+  const lines = [`*Pedido \\#${numeroPedido} — ${tableLabel}*`, '', ...itemLines];
   void pedidoId;
   return lines.join('\n');
 };
@@ -244,7 +248,7 @@ const buildMesaOrderMessage = (
 export const sendTelegramForMesa = async (
   pedidoId: string,
   numeroPedido: number,
-  items: { nombre: string; cantidad: number }[],
+  items: { nombre: string; cantidad: number; complementos?: { nombre?: string; name?: string }[] }[],
   mesaNumero: number,
   mesaNombre: string | null,
   chatId: string
