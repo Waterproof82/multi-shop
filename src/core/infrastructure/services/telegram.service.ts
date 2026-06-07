@@ -305,6 +305,29 @@ export const sendTelegramForMesa = async (
 };
 
 /**
+ * Edit an existing mesa order Telegram message with updated items.
+ * Used when a waiter removes items from an order that was already sent.
+ */
+export const editTelegramForMesa = async (
+  pedidoId: string,
+  numeroPedido: number,
+  items: { nombre: string; cantidad: number; complementos?: { nombre?: string; name?: string }[] }[],
+  mesaNumero: number,
+  mesaNombre: string | null,
+  chatId: string,
+  messageId: number
+): Promise<void> => {
+  const text = buildMesaOrderMessage(pedidoId, numeroPedido, items, mesaNumero, mesaNombre);
+  const inlineKeyboard = [
+    [
+      { text: '✅ Anotado', callback_data: `anotado:${pedidoId}` },
+      { text: '🍳 Preparado', callback_data: `preparado:${pedidoId}` },
+    ],
+  ];
+  await editMessageText(chatId, messageId, text, inlineKeyboard);
+};
+
+/**
  * Send a drinks-only message to the bar group with a Servido button.
  * The waiter uses this to mark drinks as served (auto-deletes after 5s).
  */
