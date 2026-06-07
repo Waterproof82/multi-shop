@@ -24,6 +24,17 @@ export interface IPedidoRepository {
   clearTelegramMessageId(pedidoId: string): Promise<Result<void>>;
   deleteAllByTenant(empresaId: string): Promise<Result<number>>;
   findBySesionId(sesionId: string): Promise<Result<{ id: string; numero_pedido: number; total: number; estado: string; detalle_pedido: unknown[]; created_at: string }[]>>;
+  findBySesionIdWithTelegram(sesionId: string): Promise<Result<{
+    id: string;
+    numero_pedido: number;
+    total: number;
+    detalle_pedido: { nombre: string; cantidad: number; precio: number; complementos?: { nombre?: string; name?: string }[] }[];
+    telegram_message_id: string | null;
+    telegram_chat_id: string | null;
+    mesa_numero: number | null;
+    mesa_nombre: string | null;
+  }[]>>;
+  updateOrderItems(pedidoId: string, items: { nombre: string; cantidad: number; precio: number; complementos?: { nombre?: string; name?: string }[] }[], newTotal: number): Promise<Result<void>>;
   consolidateSesionOrders(sesionId: string): Promise<Result<void>>;
   findSesionTelegramMessages(sesionId: string): Promise<Result<{ messageId: number; chatId: string }[]>>;
   findMesaContextForWebhook(pedidoId: string): Promise<Result<{ empresa_id: string; numero_pedido: number; mesa_numero: number; mesa_nombre: string | null; telegram_bebidas_chat_id: string | null; comidaItems: { nombre: string; cantidad: number }[] } | null>>;

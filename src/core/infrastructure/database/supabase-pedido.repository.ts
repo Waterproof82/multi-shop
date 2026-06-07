@@ -779,6 +779,79 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     }
   }
 
+  async findBySesionIdWithTelegram(sesionId: string): Promise<Result<{
+    id: string;
+    numero_pedido: number;
+    total: number;
+    detalle_pedido: { nombre: string; cantidad: number; precio: number; complementos?: { nombre?: string; name?: string }[] }[];
+    telegram_message_id: string | null;
+    telegram_chat_id: string | null;
+    mesa_numero: number | null;
+    mesa_nombre: string | null;
+  }[]>> {
+    try {
+      const { data, error } = await this.supabase
+        .from('pedidos')
+        .select('id, numero_pedido, total, detalle_pedido, telegram_message_id, mesas(numero, nombre), empresas(telegram_mesa_chat_id, telegram_chat_id)')
+        .eq('sesion_id', sesionId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        return { success: false, error: { code: 'DB_ERROR', message: error.message, module: 'repository', method: 'findBySesionIdWithTelegram' } };
+      }
+
+      const rows = (data ?? []) as Record<string, unknown>[];
+      return {
+        success: true,
+        data: rows.map(row => {
+          const mesaRaw = Array.isArray(row['mesas'])
+            ? (row['mesas'][0] as Record<string, unknown> | undefined) ?? null
+            : (row['mesas'] as Record<string, unknown> | null);
+          const empRaw = Array.isArray(row['empresas'])
+            ? (row['empresas'][0] as Record<string, unknown> | undefined) ?? null
+            : (row['empresas'] as Record<string, unknown> | null);
+          const chatId = (empRaw?.['telegram_mesa_chat_id'] as string | null)
+            ?? (empRaw?.['telegram_chat_id'] as string | null)
+            ?? null;
+          return {
+            id: row['id'] as string,
+            numero_pedido: row['numero_pedido'] as number,
+            total: row['total'] as number,
+            detalle_pedido: (row['detalle_pedido'] as { nombre: string; cantidad: number; precio: number; complementos?: { nombre?: string; name?: string }[] }[]) ?? [],
+            telegram_message_id: (row['telegram_message_id'] as string | null) ?? null,
+            telegram_chat_id: chatId,
+            mesa_numero: (mesaRaw?.['numero'] as number | null) ?? null,
+            mesa_nombre: (mesaRaw?.['nombre'] as string | null) ?? null,
+          };
+        }),
+      };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findBySesionIdWithTelegram', { details: { sesionId } });
+      return { success: false, error: appError };
+    }
+  }
+
+  async updateOrderItems(
+    pedidoId: string,
+    items: { nombre: string; cantidad: number; precio: number; complementos?: { nombre?: string; name?: string }[] }[],
+    newTotal: number
+  ): Promise<Result<void>> {
+    try {
+      const { error } = await this.supabase
+        .from('pedidos')
+        .update({ detalle_pedido: items, total: Math.round(newTotal * 100) / 100 })
+        .eq('id', pedidoId);
+
+      if (error) {
+        return { success: false, error: { code: 'DB_ERROR', message: error.message, module: 'repository', method: 'updateOrderItems' } };
+      }
+      return { success: true, data: undefined };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.updateOrderItems', { details: { pedidoId } });
+      return { success: false, error: appError };
+    }
+  }
+
   async consolidateSesionOrders(sesionId: string): Promise<Result<void>> {
     try {
       const ordersResult = await this.findBySesionId(sesionId);
