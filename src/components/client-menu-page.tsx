@@ -255,8 +255,8 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
               />
             </div>
-            {/* Floating dropdown — always near input regardless of scroll position */}
-            {waiterSearch.trim() && (
+            {/* Floating dropdown — hidden while dialog is open to avoid z-index conflict */}
+            {waiterSearch.trim() && !waiterDialogOpen && (
               <div className="absolute top-full left-4 right-4 mt-1 bg-background border border-border rounded-xl shadow-xl z-10 max-h-72 overflow-y-auto">
                 {waiterFiltered.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-4 px-4">
