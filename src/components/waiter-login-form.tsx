@@ -353,6 +353,9 @@ export function WaiterLoginForm() {
   const [ticketMesa, setTicketMesa] = useState<MesaWithSession | null>(null);
   const [ticketOrders, setTicketOrders] = useState<MesaOrder[]>([]);
   const [ticketLoading, setTicketLoading] = useState(false);
+  const [ticketPendingDelete, setTicketPendingDelete] = useState<{ mesaId: string; nombre: string; precio: number; maxCantidad: number } | null>(null);
+  const [ticketDeleteQty, setTicketDeleteQty] = useState(1);
+  const [ticketDeleting, setTicketDeleting] = useState(false);
 
   const refresh = useCallback(async () => {
     const data = await fetchMesas();
@@ -449,6 +452,37 @@ export function WaiterLoginForm() {
       setTicketLoading(false);
     }
   }
+
+  const handleTicketDeleteItem = useCallback(async () => {
+    if (!ticketPendingDelete || ticketDeleting) return;
+    setTicketDeleting(true);
+    try {
+      await fetch(`/api/waiter/mesas/${encodeURIComponent(ticketPendingDelete.mesaId)}/orders/items`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre: ticketPendingDelete.nombre,
+          precio: ticketPendingDelete.precio,
+          cantidadAEliminar: ticketDeleteQty,
+        }),
+      });
+      setTicketPendingDelete(null);
+      if (ticketMesa) {
+        setTicketLoading(true);
+        try {
+          const res = await fetch(`/api/waiter/mesas/${encodeURIComponent(ticketPendingDelete.mesaId)}/orders`);
+          if (res.ok) {
+            const data = await res.json() as { orders: MesaOrder[] };
+            setTicketOrders(data.orders ?? []);
+          }
+        } finally {
+          setTicketLoading(false);
+        }
+      }
+    } finally {
+      setTicketDeleting(false);
+    }
+  }, [ticketPendingDelete, ticketDeleteQty, ticketDeleting, ticketMesa]);
 
   async function handleMesaNav(mesa: MesaWithSession, openCart = false) {
     setMesaLoading(mesa.id);
@@ -648,10 +682,22 @@ export function WaiterLoginForm() {
                       const compTotal = item.complementos?.reduce((s, c) => s + c.precio, 0) ?? 0;
                       const lineTotal = (item.precio + compTotal) * item.cantidad;
                       return (
-                        <div key={`${item.nombre}||${item.precio}`} className="flex items-baseline justify-between gap-3 py-2" style={{ borderBottom: "1px solid oklch(22% 0.03 252 / 0.6)" }}>
-                          <div className="flex flex-col min-w-0">
+                        <div key={`${item.nombre}||${item.precio}`} className="flex items-center gap-2 py-2" style={{ borderBottom: "1px solid oklch(22% 0.03 252 / 0.6)" }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTicketPendingDelete({ mesaId: ticketMesa!.id, nombre: item.nombre, precio: item.precio, maxCantidad: item.cantidad });
+                              setTicketDeleteQty(1);
+                            }}
+                            className="flex items-center justify-center shrink-0 w-5 h-5 rounded-full text-xs font-bold"
+                            style={{ background: "oklch(35% 0.14 25 / 0.8)", color: "oklch(80% 0.10 25)" }}
+                            aria-label={`Eliminar ${item.nombre}`}
+                          >
+                            −
+                          </button>
+                          <div className="flex flex-col min-w-0 flex-1">
                             <span className="text-sm font-medium leading-snug" style={{ color: "oklch(82% 0.04 252)" }}>
-                              {item.cantidad > 1 && <span className="font-bold mr-1" style={{ color: "oklch(65% 0.08 252)" }}>×{item.cantidad}</span>}
+                              <span className="font-bold mr-1" style={{ color: "oklch(65% 0.08 252)" }}>×{item.cantidad}</span>
                               {item.nombre}
                             </span>
                             {item.complementos && item.complementos.length > 0 && (
@@ -660,7 +706,7 @@ export function WaiterLoginForm() {
                               </span>
                             )}
                           </div>
-                          <span className="text-sm font-bold shrink-0 tabular-nums" style={{ color: "oklch(72% 0.08 252)" }}>
+                          <span className="text-sm font-bold shrink-0 tabular-nums ml-auto" style={{ color: "oklch(72% 0.08 252)" }}>
                             {formatPrice(lineTotal)}
                           </span>
                         </div>
@@ -675,6 +721,71 @@ export function WaiterLoginForm() {
                   </div>
                 );
               })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete item confirmation modal — grid ticket */}
+      {ticketPendingDelete && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-6"
+          style={{ background: "oklch(0% 0 0 / 0.75)" }}
+          onClick={() => { if (!ticketDeleting) setTicketPendingDelete(null); }}
+        >
+          <div
+            className="w-full max-w-xs rounded-2xl p-5 flex flex-col gap-4"
+            style={{ background: "oklch(14% 0.02 252)", border: "1px solid oklch(28% 0.04 252 / 0.8)" }}
+            onClick={e => e.stopPropagation()}
+          >
+            <p className="text-sm font-bold text-center" style={{ color: "oklch(85% 0.04 252)" }}>
+              Eliminar: {ticketPendingDelete.nombre}
+            </p>
+            <div className="flex items-center justify-center gap-4">
+              <button
+                type="button"
+                onClick={() => setTicketDeleteQty(q => Math.max(1, q - 1))}
+                disabled={ticketDeleteQty <= 1}
+                className="w-9 h-9 rounded-full text-lg font-bold flex items-center justify-center disabled:opacity-30"
+                style={{ background: "oklch(22% 0.04 252 / 0.6)", color: "oklch(82% 0.04 252)" }}
+              >
+                −
+              </button>
+              <span className="text-2xl font-black w-8 text-center tabular-nums" style={{ color: "oklch(88% 0.04 252)" }}>
+                {ticketDeleteQty}
+              </span>
+              <button
+                type="button"
+                onClick={() => setTicketDeleteQty(q => Math.min(ticketPendingDelete.maxCantidad, q + 1))}
+                disabled={ticketDeleteQty >= ticketPendingDelete.maxCantidad}
+                className="w-9 h-9 rounded-full text-lg font-bold flex items-center justify-center disabled:opacity-30"
+                style={{ background: "oklch(22% 0.04 252 / 0.6)", color: "oklch(82% 0.04 252)" }}
+              >
+                +
+              </button>
+            </div>
+            <p className="text-xs text-center" style={{ color: "oklch(50% 0.05 252)" }}>
+              de {ticketPendingDelete.maxCantidad} unidades
+            </p>
+            <div className="flex gap-2 mt-1">
+              <button
+                type="button"
+                onClick={() => setTicketPendingDelete(null)}
+                disabled={ticketDeleting}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
+                style={{ background: "oklch(22% 0.04 252 / 0.5)", color: "oklch(60% 0.06 252)" }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => { void handleTicketDeleteItem(); }}
+                disabled={ticketDeleting}
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold"
+                style={{ background: "oklch(35% 0.14 25 / 0.9)", color: "oklch(85% 0.08 25)" }}
+              >
+                {ticketDeleting ? "…" : "Confirmar"}
+              </button>
             </div>
           </div>
         </div>
