@@ -1,83 +1,85 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
-import { Upload, Loader2, Pencil, Trash2 } from 'lucide-react';
+import { Upload, Loader2, Pencil, Trash2, Camera, ChevronDown, Maximize2 } from 'lucide-react';
 import { getCsrfToken } from '@/lib/csrf-client';
+import { useLanguage } from '@/lib/language-context';
+import { t } from '@/lib/translations';
+import { optimizeImage, optimizeBannerImage } from '@/lib/image-utils';
+import { useAdmin } from '@/lib/admin-context';
+import { ImageFit } from '@/core/application/dtos/menu-view-model';
+import { useCameraCapture } from '@/core/infrastructure/camera/camera-capture';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface ImageUploaderProps {
   readonly value: string;
   readonly onChange: (url: string) => void;
   readonly label?: string;
   readonly empresaSlug?: string;
+  readonly empresaIdProp?: string;
   readonly previewClassName?: string;
   readonly previewStyle?: React.CSSProperties;
+  readonly isBannerImage?: boolean;
+  readonly aspectRatio?: string;
+  readonly helpText?: string;
+  readonly objectFit?: ImageFit;
+  readonly onObjectFitChange?: (fit: ImageFit) => void;
 }
 
-const MAX_WIDTH = 480;
-const MAX_HEIGHT = 480;
-const QUALITY = 0.8;
-
-async function optimizeImage(file: File): Promise<{ file: File; type: string }> {
-  return new Promise((resolve, reject) => {
-    const img = document.createElement('img');
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      let width = img.width;
-      let height = img.height;
-
-      if (width > MAX_WIDTH) {
-        height = (height * MAX_WIDTH) / width;
-        width = MAX_WIDTH;
-      }
-      if (height > MAX_HEIGHT) {
-        width = (width * MAX_HEIGHT) / height;
-        height = MAX_HEIGHT;
-      }
-
-      canvas.width = width;
-      canvas.height = height;
-
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        reject(new Error('No se pudo crear el contexto de canvas'));
-        return;
-      }
-
-      ctx.drawImage(img, 0, 0, width, height);
-
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) {
-            reject(new Error('Error al comprimir imagen'));
-            return;
-          }
-          const optimizedFile = new File([blob], file.name, {
-            type: 'image/webp',
-          });
-          resolve({ file: optimizedFile, type: 'image/webp' });
-        },
-        'image/webp',
-        QUALITY
-      );
-    };
-    img.onerror = () => reject(new Error('Error al cargar imagen'));
-    img.src = URL.createObjectURL(file);
-  });
-}
 
 export function ImageUploader({
   value,
   onChange,
   label = 'Imagen',
   empresaSlug = 'default',
+  empresaIdProp,
   previewClassName = 'relative group rounded-lg overflow-hidden border h-48',
   previewStyle,
+  isBannerImage = false,
+  aspectRatio = '16/10',
+  helpText,
+  objectFit: propObjectFit,
+  onObjectFitChange,
 }: ImageUploaderProps) {
+  const { language } = useLanguage();
+  const { overrideEmpresaId, empresaId: defaultEmpresaId } = useAdmin();
+  const efectivoEmpresaId = empresaIdProp || overrideEmpresaId || defaultEmpresaId;
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [dragOver, setDragOver] = useState(false);
+  const [objectFit, setObjectFit] = useState<ImageFit>(propObjectFit || 'contain');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { capture: captureFromCamera, isCapturing: isCapturingCamera, isSupported: isCameraSupported } = useCameraCapture();
+
+  // Manejar la foto capturada desde la cámara
+  const handleCameraCapture = async () => {
+    const result = await captureFromCamera({ sourceType: 'camera' });
+    
+    if (result.error) {
+      // Si el usuario canceló, no mostrar error
+      if (result.error !== 'Captura cancelada' && result.error !== 'No se seleccionó ninguna imagen') {
+        setError(result.error);
+      }
+      return;
+    }
+
+    if (result.file) {
+      // Procesar la imagen capturada igual que un archivo subido
+      await handleFileSelect(result.file);
+    }
+  };
+
+  useEffect(() => {
+    if (propObjectFit) {
+      setObjectFit(propObjectFit);
+    }
+  }, [propObjectFit]);
 
   const handleFileSelect = async (file: File) => {
     if (!file) return;
@@ -96,13 +98,16 @@ export function ImageUploader({
     setError('');
 
     try {
-      const optimized = await optimizeImage(file);
+      const optimized = isBannerImage ? await optimizeBannerImage(file) : await optimizeImage(file);
 
       const formData = new FormData();
       formData.append('file', optimized.file);
 
       const csrfToken = getCsrfToken();
-      const response = await fetch('/api/admin/upload-image', {
+      const uploadUrl = efectivoEmpresaId 
+        ? `/api/admin/upload-image?empresaId=${efectivoEmpresaId}` 
+        : '/api/admin/upload-image';
+      const response = await fetch(uploadUrl, {
         method: 'POST',
         headers: csrfToken ? { 'x-csrf-token': csrfToken } : {},
         body: formData,
@@ -168,79 +173,184 @@ export function ImageUploader({
       )}
 
       {value ? (
-        <div className={previewClassName} style={previewStyle}>
+        <div 
+          className={previewClassName} 
+          style={{ 
+            ...previewStyle,
+            aspectRatio: aspectRatio 
+          }}
+        >
           <Image
             src={value}
             alt={`${label} preview`}
             fill
-            className="object-cover"
-            unoptimized
+            className={`object-${objectFit}`}
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            priority={false}
+            loading="lazy"
           />
-          <div className="absolute inset-0 bg-overlay opacity-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
-            <button
-              type="button"
-              onClick={handleClick}
-              className="px-3 py-1.5 bg-card text-card-foreground rounded-md text-sm hover:bg-muted"
-            >
-              Cambiar
-            </button>
-            <button
-              type="button"
-              onClick={handleRemove}
-              className="px-3 py-1.5 bg-destructive text-destructive-foreground rounded-md text-sm hover:bg-destructive/90"
-            >
-              Eliminar
-            </button>
+          <div className="absolute inset-0 bg-overlay opacity-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-2">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleClick}
+                className="px-3 py-1.5 bg-card text-card-foreground rounded-md text-sm hover:bg-muted"
+              >
+                Cambiar
+              </button>
+              <button
+                type="button"
+                onClick={handleRemove}
+                className="px-3 py-1.5 bg-destructive text-destructive-foreground rounded-md text-sm hover:bg-destructive/90"
+              >
+                Eliminar
+              </button>
+            </div>
+            {onObjectFitChange && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-card/90 backdrop-blur-sm text-card-foreground text-xs rounded-md hover:bg-muted transition-colors"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5" />
+                    <span className="capitalize">{objectFit === 'scale-down' ? 'Scale' : objectFit}</span>
+                    <ChevronDown className="w-3 h-3 opacity-50" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="min-w-[100px]">
+                  <DropdownMenuItem onClick={() => onObjectFitChange('contain')}>
+                    Contain
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onObjectFitChange('cover')}>
+                    Cover
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onObjectFitChange('fill')}>
+                    Fill
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onObjectFitChange('none')}>
+                    None
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onObjectFitChange('scale-down')}>
+                    Scale
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
           <div className="md:hidden absolute bottom-2 right-2 flex gap-2">
+            {onObjectFitChange && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="p-3 min-h-[44px] min-w-[44px] flex items-center justify-center bg-card/90 backdrop-blur-sm rounded-full shadow-elegant outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    aria-label={t("objectFit", language) || "Ajustar imagen"}
+                  >
+                    <Maximize2 className="w-4 h-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-[100px]">
+                  <DropdownMenuItem onClick={() => onObjectFitChange('contain')}>
+                    Contain {objectFit === 'contain' && '✓'}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onObjectFitChange('cover')}>
+                    Cover {objectFit === 'cover' && '✓'}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onObjectFitChange('fill')}>
+                    Fill {objectFit === 'fill' && '✓'}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onObjectFitChange('none')}>
+                    None {objectFit === 'none' && '✓'}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onObjectFitChange('scale-down')}>
+                    Scale {objectFit === 'scale-down' && '✓'}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             <button
               type="button"
               onClick={handleClick}
-              className="p-3 bg-card/90 backdrop-blur-sm rounded-full shadow-elegant outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              aria-label="Cambiar imagen"
+              className="p-3 min-h-[44px] min-w-[44px] flex items-center justify-center bg-card/90 backdrop-blur-sm rounded-full shadow-elegant outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              aria-label={t("changeImage", language)}
             >
               <Pencil className="w-4 h-4" />
             </button>
             <button
               type="button"
               onClick={handleRemove}
-              className="p-3 bg-destructive/90 backdrop-blur-sm rounded-full shadow-elegant outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              aria-label="Eliminar imagen"
+              className="p-3 min-h-[44px] min-w-[44px] flex items-center justify-center bg-destructive/90 backdrop-blur-sm rounded-full shadow-elegant outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              aria-label={t("deleteImage", language)}
             >
               <Trash2 className="w-4 h-4 text-destructive-foreground" />
             </button>
           </div>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={handleClick}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          disabled={uploading}
-          className={`
-            border-2 border-dashed rounded-lg h-32 flex flex-col items-center justify-center cursor-pointer transition-colors
-            ${dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/40'}
-            ${uploading ? 'pointer-events-none opacity-50' : ''}
-          `}
-          aria-label="Subir imagen"
-        >
-          {uploading ? (
-            <>
-              <Loader2 className="h-8 w-8 text-primary animate-spin" />
-              <span className="text-sm text-muted-foreground mt-1">Subiendo...</span>
-            </>
-          ) : (
-            <>
-              <Upload className="h-8 w-8 text-muted-foreground/50" />
-              <span className="text-sm text-muted-foreground mt-1">
-                Arrastra o click para subir
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleClick}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            disabled={uploading || isCapturingCamera}
+            className={`
+              flex-1 border-2 border-dashed rounded-lg h-32 flex flex-col items-center justify-center cursor-pointer transition-colors
+              ${dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/40'}
+              ${uploading || isCapturingCamera ? 'pointer-events-none opacity-50' : ''}
+            `}
+            aria-label={t("uploadImage", language)}
+          >
+            {uploading ? (
+              <>
+                <Loader2 className="h-8 w-8 text-primary animate-spin motion-reduce:animate-none" />
+                <span className="text-sm text-muted-foreground mt-1">Subiendo...</span>
+              </>
+            ) : (
+              <>
+                <Upload className="h-8 w-8 text-muted-foreground/50" />
+                <span className="text-sm text-muted-foreground mt-1">
+                  Arrastra o click
+                </span>
+              </>
+            )}
+          </button>
+
+          {isCameraSupported && (
+            <div className="flex-1 flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={handleCameraCapture}
+                disabled={uploading || isCapturingCamera}
+                className={`
+                  flex-1 border-2 border-dashed rounded-lg h-32 flex flex-col items-center justify-center cursor-pointer transition-colors
+                  ${dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/40'}
+                  ${uploading || isCapturingCamera ? 'pointer-events-none opacity-50' : ''}
+                `}
+                aria-label={t("takePhoto", language) || "Tomar foto"}
+              >
+                {isCapturingCamera ? (
+                  <>
+                    <Loader2 className="h-8 w-8 text-primary animate-spin motion-reduce:animate-none" />
+                    <span className="text-sm text-muted-foreground mt-1">Capturando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Camera className="h-8 w-8 text-muted-foreground/50" />
+                    <span className="text-sm text-muted-foreground mt-1">
+                      {t("takePhoto", language) || "Tomar foto"}
+                    </span>
+                  </>
+                )}
+              </button>
+              <span className="text-xs text-muted-foreground/70 text-center">
+                {t("horizontalPhoto", language) || "📐 Horizontal"}
               </span>
-              <span className="text-xs text-muted-foreground/50">JPEG, PNG, WEBP (max 10MB)</span>
-            </>
+            </div>
           )}
-        </button>
+        </div>
       )}
 
       <input
@@ -253,6 +363,9 @@ export function ImageUploader({
 
       {error && (
         <p className="text-sm text-destructive">{error}</p>
+      )}
+      {helpText && (
+        <p className="text-xs text-muted-foreground mt-1">{helpText}</p>
       )}
     </div>
   );

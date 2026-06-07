@@ -12,12 +12,23 @@ export const updateEmpresaSchema = z.object({
   url_mapa: httpsUrlMax500.optional().or(z.literal('')),
   direccion: z.string().max(300).optional().nullable(),
   logo_url: httpsUrl.optional().or(z.literal('')).or(z.null()),
+  mostrar_logo: z.boolean().optional(),
   url_image: httpsUrl.optional().or(z.literal('')).or(z.null()),
   descripcion_es: z.string().max(1000).optional().nullable(),
   descripcion_en: z.string().max(1000).optional().nullable(),
   descripcion_fr: z.string().max(1000).optional().nullable(),
   descripcion_it: z.string().max(1000).optional().nullable(),
   descripcion_de: z.string().max(1000).optional().nullable(),
+  mostrar_promociones: z.boolean().optional(),
+  mostrar_tgtg: z.boolean().optional(),
+  tipo: z.enum(['tienda', 'restaurante']).optional(),
+  descuento_bienvenida_activo: z.boolean().optional(),
+  descuento_bienvenida_porcentaje: z.number().min(1).max(50).optional(),
+  descuento_bienvenida_duracion: z.number().min(1).max(365).optional(),
+  banner_fit: z.enum(['contain', 'cover', 'fill']).optional().or(z.literal('')).or(z.null()),
+  pagos_mesa_habilitados: z.boolean().optional(),
+  pagos_pickup_habilitados: z.boolean().optional(),
+  mesas_habilitadas: z.boolean().optional(),
 });
 
 export type UpdateEmpresaDTO = z.infer<typeof updateEmpresaSchema>;

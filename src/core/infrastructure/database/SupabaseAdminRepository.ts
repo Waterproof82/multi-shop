@@ -1,5 +1,5 @@
 import { SupabaseClient } from "@supabase/supabase-js";
-import { IAdminRepository, AdminWithEmpresa } from "@/core/domain/repositories/IAdminRepository";
+import { IAdminRepository, AdminWithEmpresa, SUPERADMIN_ROLE } from "@/core/domain/repositories/IAdminRepository";
 import { Empresa, Result } from "@/core/domain/entities/types";
 import { DEFAULT_EMPRESA_COLORES } from "@/core/domain/constants/empresa-defaults";
 import { logger } from "@/core/infrastructure/logging/logger";
@@ -88,6 +88,34 @@ export class SupabaseAdminRepository implements IAdminRepository {
         return { success: true, data: null };
       }
 
+      const isSuperAdmin = perfil.rol === SUPERADMIN_ROLE;
+
+      if (isSuperAdmin) {
+        return {
+          success: true,
+          data: {
+            id: perfil.id,
+            empresaId: null,
+            nombreCompleto: perfil.nombre_completo,
+            rol: perfil.rol,
+            email: "",
+            empresa: null,
+          },
+        };
+      }
+
+      if (!perfil.empresa_id) {
+        return { 
+          success: false, 
+          error: { 
+            code: 'EMPRESA_NOT_FOUND', 
+            message: 'Empresa no encontrada para el admin', 
+            module: 'repository', 
+            method: 'findById' 
+          } 
+        };
+      }
+
       const { data: empresa } = await this.supabase
         .from("empresas")
         .select("*")
@@ -152,12 +180,18 @@ export class SupabaseAdminRepository implements IAdminRepository {
       id: row.id as string,
       nombre: row.nombre as string,
       dominio: row.dominio as string,
+      tipo: row.tipo === 'restaurante' ? 'restaurante' : 'tienda',
       slug: (row.slug as string | null) ?? null,
       logoUrl: row.logo_url as string | null,
+      mostrarLogo: (row.mostrar_logo as boolean) ?? true,
       mostrarCarrito: (row.mostrar_carrito as boolean) ?? true,
+      mostrarPromociones: (row.mostrar_promociones as boolean) ?? true,
+      mostrarTgtg: (row.mostrar_tgtg as boolean) ?? true,
+      mesasHabilitadas: (row.mesas_habilitadas as boolean) ?? true,
       moneda: (row.moneda as string) ?? "EUR",
       emailNotification: (row.email_notification as string | null) ?? null,
       urlImage: (row.url_image as string | null) ?? null,
+      bannerFit: (row.banner_fit as "contain" | "cover" | "fill" | null) ?? "contain",
       descripcion,
       colores,
       fb: (row.fb as string | null) ?? null,
@@ -165,6 +199,9 @@ export class SupabaseAdminRepository implements IAdminRepository {
       urlMapa: (row.url_mapa as string | null) ?? null,
       direccion: (row.direccion as string | null) ?? null,
       telefonoWhatsapp: (row.telefono_whatsapp as string | null) ?? null,
+      descuentoBienvenidaActivo: (row.descuento_bienvenida_activo as boolean) ?? false,
+      descuentoBienvenidaPorcentaje: Number(row.descuento_bienvenida_porcentaje ?? 5),
+      descuentoBienvenidaDuracion: Number(row.descuento_bienvenida_duracion ?? 30),
     };
   }
 }

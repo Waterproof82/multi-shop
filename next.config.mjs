@@ -4,6 +4,11 @@ import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Bundle analyzer - only run when ANALYZE=true
+const withBundleAnalyzer = process.env.ANALYZE === 'true'
+  ? (await import('@next/bundle-analyzer')).default
+  : (config) => config;
+
 // Build CSP fallback for static assets (pages get a nonce-based CSP from middleware)
 function normalizeR2Origin(raw) {
   if (!raw) return '';
@@ -11,14 +16,16 @@ function normalizeR2Origin(raw) {
   return `https://${stripped}`;
 }
 const r2Origin = normalizeR2Origin(process.env.NEXT_PUBLIC_R2_DOMAIN);
+const r2Hostname = r2Origin ? (() => { try { return new URL(r2Origin).hostname; } catch { return null; } })() : null;
 const imgSrc = ["'self'", r2Origin, "https://*.supabase.co", "data:", "blob:"]
   .filter(Boolean).join(' ');
 const mediaSrc = ["'self'", r2Origin]
   .filter(Boolean).join(' ');
 
+const isDev = process.env.NODE_ENV !== 'production';
 const cspFallback = [
   "default-src 'self'",
-  `script-src 'self'${process.env.NODE_ENV !== 'production' ? " 'unsafe-eval'" : ''}`,
+  `script-src 'self'${isDev ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline'",
   `img-src ${imgSrc}`,
   `media-src ${mediaSrc}`,
@@ -32,12 +39,15 @@ const cspFallback = [
   "report-uri /api/csp-report",
 ].join('; ') + ';';
 
-const nextConfig = {
+const nextConfig = withBundleAnalyzer({
   typescript: {
     ignoreBuildErrors: false,
   },
   images: {
-    unoptimized: true,
+    remotePatterns: [
+      ...(r2Hostname ? [{ protocol: 'https', hostname: r2Hostname }] : []),
+      { protocol: 'https', hostname: '**.supabase.co' },
+    ],
   },
   logging: {
     fetches: {
@@ -61,7 +71,7 @@ const nextConfig = {
             // Fallback CSP for static assets; middleware overrides this for page requests with a per-request nonce
             value: cspFallback,
           },
-          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=(), usb=()' },
+          { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=(), payment=(), usb=()' },
           { key: 'X-XSS-Protection', value: '1; mode=block' },
         ],
       },
@@ -81,6 +91,6 @@ const nextConfig = {
       },
     ];
   },
-}
+});
 
 export default nextConfig

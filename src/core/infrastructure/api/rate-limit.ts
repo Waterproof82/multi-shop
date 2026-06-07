@@ -69,6 +69,65 @@ function getPublicLimiter(): Ratelimit | null {
 }
 
 /**
+ * Rate limiter for order tracking polling: 60 requests per minute per token.
+ * Keyed by token (not IP) so multiple users don't share the same bucket.
+ */
+let trackingLimiter: Ratelimit | null = null;
+
+function getTrackingLimiter(): Ratelimit | null {
+  if (trackingLimiter) return trackingLimiter;
+
+  const client = getRedis();
+  if (!client) return null;
+
+  trackingLimiter = new Ratelimit({
+    redis: client,
+    limiter: Ratelimit.slidingWindow(60, "1 m"),
+    prefix: "ratelimit:tracking",
+  });
+  return trackingLimiter;
+}
+
+/**
+ * Rate limiter for mesa polling endpoints (orders, token lookup): 120 requests per minute per mesaId.
+ * Keyed by mesaId (UUID) so polling from the customer's table does not exhaust the shared IP bucket.
+ */
+let mesaPollingLimiter: Ratelimit | null = null;
+
+function getMesaPollingLimiter(): Ratelimit | null {
+  if (mesaPollingLimiter) return mesaPollingLimiter;
+
+  const client = getRedis();
+  if (!client) return null;
+
+  mesaPollingLimiter = new Ratelimit({
+    redis: client,
+    limiter: Ratelimit.slidingWindow(120, "1 m"),
+    prefix: "ratelimit:mesa-polling",
+  });
+  return mesaPollingLimiter;
+}
+
+/**
+ * Apply rate limiting to mesa polling endpoints. Keyed by mesaId (not IP).
+ * Returns NextResponse 429 if exceeded, or null if passed.
+ */
+export async function rateLimitMesaPolling(mesaId: string): Promise<NextResponse | null> {
+  const limiter = getMesaPollingLimiter();
+  if (!limiter) return null;
+
+  const { success } = await limiter.limit(mesaId);
+  if (!success) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      { status: 429 }
+    );
+  }
+
+  return null;
+}
+
+/**
  * Rate limiter for admin routes: 60 requests per minute per IP.
  */
 let adminLimiter: Ratelimit | null = null;
@@ -173,6 +232,82 @@ export async function rateLimitPublic(request: Request): Promise<NextResponse | 
 }
 
 /**
+ * Apply rate limiting to tracking polling, keyed by token.
+ * Returns NextResponse 429 if exceeded, or null if passed.
+ */
+export async function rateLimitTracking(token: string): Promise<NextResponse | null> {
+  const limiter = getTrackingLimiter();
+  if (!limiter) return null;
+
+  const { success } = await limiter.limit(token);
+
+  if (!success) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      { status: 429 }
+    );
+  }
+
+  return null;
+}
+
+/**
+ * Rate limiter for waiter login: 5 attempts per minute per IP.
+ * Fail-closed: blocks requests in production if Redis is unavailable.
+ */
+let waiterLoginLimiter: Ratelimit | null = null;
+
+function getWaiterLoginLimiter(): Ratelimit | null {
+  if (waiterLoginLimiter) return waiterLoginLimiter;
+
+  const client = getRedis();
+  if (!client) return null;
+
+  waiterLoginLimiter = new Ratelimit({
+    redis: client,
+    limiter: Ratelimit.slidingWindow(5, "1 m"),
+    prefix: "ratelimit:waiter-login",
+  });
+  return waiterLoginLimiter;
+}
+
+/**
+ * Apply rate limiting to waiter login. Returns NextResponse 429 if exceeded, or null if passed.
+ */
+export async function rateLimitWaiterLogin(request: Request): Promise<NextResponse | null> {
+  const limiter = getWaiterLoginLimiter();
+  if (!limiter) {
+    if (isFailClosed()) {
+      return NextResponse.json(
+        { error: "Service temporarily unavailable. Please try again later." },
+        { status: 503 }
+      );
+    }
+    return null;
+  }
+
+  const ip = getClientIp(request);
+  const { success, limit, remaining, reset } = await limiter.limit(ip);
+
+  if (!success) {
+    return NextResponse.json(
+      { error: "Too many login attempts. Please try again later." },
+      {
+        status: 429,
+        headers: {
+          "X-RateLimit-Limit": limit.toString(),
+          "X-RateLimit-Remaining": remaining.toString(),
+          "X-RateLimit-Reset": reset.toString(),
+          "Retry-After": Math.ceil((reset - Date.now()) / 1000).toString(),
+        },
+      }
+    );
+  }
+
+  return null;
+}
+
+/**
  * Apply rate limiting to admin routes. Returns NextResponse 429 if exceeded, or null if passed.
  */
 export async function rateLimitAdmin(request: Request): Promise<NextResponse | null> {
@@ -194,6 +329,45 @@ export async function rateLimitAdmin(request: Request): Promise<NextResponse | n
           "Retry-After": Math.ceil((reset - Date.now()) / 1000).toString(),
         },
       }
+    );
+  }
+
+  return null;
+}
+
+/**
+ * Rate limiter for mesa client token issuance: 10 tokens per hour per mesaId.
+ * Keyed by mesaId to prevent abuse even with physical QR access.
+ */
+let mesaTokenLimiter: Ratelimit | null = null;
+
+function getMesaTokenLimiter(): Ratelimit | null {
+  if (mesaTokenLimiter) return mesaTokenLimiter;
+
+  const client = getRedis();
+  if (!client) return null;
+
+  mesaTokenLimiter = new Ratelimit({
+    redis: client,
+    limiter: Ratelimit.slidingWindow(30, "1 h"),
+    prefix: "ratelimit:mesa-token",
+  });
+  return mesaTokenLimiter;
+}
+
+/**
+ * Apply rate limiting to mesa token issuance. Keyed by mesaId.
+ * Returns NextResponse 429 if exceeded, or null if passed.
+ */
+export async function rateLimitMesaTokenIssuance(mesaId: string): Promise<NextResponse | null> {
+  const limiter = getMesaTokenLimiter();
+  if (!limiter) return null;
+
+  const { success } = await limiter.limit(mesaId);
+  if (!success) {
+    return NextResponse.json(
+      { error: "Too many QR scans. Please try again later." },
+      { status: 429 }
     );
   }
 

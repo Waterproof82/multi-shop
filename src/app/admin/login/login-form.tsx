@@ -56,10 +56,20 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || t('loginErrorDefault', language));
+        if (res.status === 429) throw new Error(t('loginRateLimit', language));
+        throw new Error(t('loginErrorDefault', language));
       }
 
-      router.push('/admin');
+      // Save the CSRF token returned by login so it's available immediately for admin actions
+      if (data.data?.csrfToken) {
+        saveCsrfToken(data.data.csrfToken);
+      }
+
+      if (data.data?.admin?.rol === 'superadmin') {
+        router.push('/superadmin');
+      } else {
+        router.push('/admin');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : t('unknownError', language));
     } finally {
@@ -112,7 +122,7 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
 
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-foreground">
-              {t("password", language)}
+              {t("passwordLabel", language)}
             </label>
             <Input
               id="password"
@@ -131,11 +141,11 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring dark:focus-visible:ring-offset-background disabled:opacity-50 transition-all duration-150 ease-out active:scale-[0.98]"
+            className="w-full flex justify-center py-3 px-4 min-h-[44px] border border-transparent rounded-md text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring disabled:opacity-50 transition-all duration-150 ease-out active:scale-[0.98]"
           >
             {loading ? (
               <>
-                <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                <Loader2 className="animate-spin motion-reduce:animate-none h-4 w-4 mr-2" />
                 {t("signingIn", language)}
               </>
             ) : (

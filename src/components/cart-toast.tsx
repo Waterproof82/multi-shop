@@ -5,6 +5,7 @@ import { X, Check } from 'lucide-react';
 import { useCart } from '@/lib/cart-context';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
+import { formatPrice } from '@/lib/format-price';
 
 export function CartToast() {
   const { lastAddedItem, totalPrice, isCartOpen, openCart } = useCart();
@@ -26,7 +27,9 @@ export function CartToast() {
       return;
     }
     if (!isCartOpen) {
-      setItemName(lastAddedItem.name);
+      const lang = language as 'en' | 'fr' | 'it' | 'de';
+      const translatedName = language !== 'es' ? lastAddedItem.translations?.[lang]?.name : undefined;
+      setItemName(translatedName ?? lastAddedItem.name);
       setVisible(true);
       setExiting(false);
 
@@ -51,13 +54,18 @@ export function CartToast() {
     }, 200);
   }, []);
 
-  if (!visible) return null;
-
   return (
-    <div className={`fixed bottom-4 left-4 right-4 z-40 md:left-auto md:right-6 md:w-80 ${
-      exiting ? 'animate-toast-out' : 'animate-toast-in'
-    }`}>
-      <div className="bg-card border border-border rounded-xl shadow-elegant-lg overflow-hidden">
+    <div
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      className={`fixed bottom-4 left-4 right-4 z-40 md:left-auto md:right-6 md:w-80 transition-all duration-200 ${
+        visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'
+      }`}
+    >
+      <div className={`bg-card border border-border rounded-xl shadow-elegant-lg overflow-hidden ${
+        exiting ? 'animate-toast-out' : 'animate-toast-in'
+      }`}>
         <div className="flex items-center justify-between p-3 bg-primary/5 border-b border-border">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center animate-quantity-pulse">
@@ -83,7 +91,7 @@ export function CartToast() {
           </p>
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground">
-              Total: {totalPrice.toFixed(2).replace('.', ',')}€
+              {t('trackingTotal', language)}: {formatPrice(totalPrice, 'EUR', language)}
             </span>
             <button
               type="button"

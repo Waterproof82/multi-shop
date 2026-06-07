@@ -8,18 +8,37 @@ export interface UpdateEmpresaData {
   url_mapa?: string;
   direccion?: string | null;
   logo_url?: string | null;
+  mostrar_logo?: boolean;
   url_image?: string | null;
+  banner_fit?: string | null;
   descripcion_es?: string | null;
   descripcion_en?: string | null;
   descripcion_fr?: string | null;
   descripcion_it?: string | null;
   descripcion_de?: string | null;
+  mostrar_promociones?: boolean;
+  mostrar_tgtg?: boolean;
+  descuento_bienvenida_activo?: boolean;
+  descuento_bienvenida_porcentaje?: number;
+  descuento_bienvenida_duracion?: number;
+  tipo?: 'tienda' | 'restaurante';
 }
 
 export interface IEmpresaRepository {
   getById(empresaId: string): Promise<Result<Partial<Empresa> | null>>;
-  findByDomain(dominio: string): Promise<Result<{ id: string; nombre: string; email_notification: string | null; telefono_whatsapp: string | null } | null>>;
+  findByDomain(dominio: string): Promise<Result<{
+    id: string;
+    nombre: string;
+    email_notification: string | null;
+    telefono_whatsapp: string | null;
+    tipo: string;
+    telegram_chat_id: string | null;
+    telegram_mesa_chat_id: string | null;
+    telegram_bebidas_chat_id: string | null;
+    mesas_habilitadas: boolean;
+  } | null>>;
   findByDomainPublic(domain: string): Promise<Result<EmpresaPublic | null>>;
   update(empresaId: string, data: UpdateEmpresaData): Promise<Result<void>>;
   updateColores(empresaId: string, colores: EmpresaColores): Promise<Result<boolean>>;
+  updateWaiterPin(empresaId: string, pinHash: string): Promise<Result<void>>;
 }

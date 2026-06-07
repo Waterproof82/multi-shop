@@ -2,16 +2,33 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Result } from '@/core/domain/entities/types';
 import { AUTH_ERRORS, createErrorResponse } from '@/core/domain/constants/api-errors';
 
+/**
+ * Result type for requireAuth - returned from authentication middleware.
+ * - When authenticated: { empresaId, error: null, isSuperAdmin }
+ * - When unauthorized: { empresaId: null, error: NextResponse (401), isSuperAdmin }
+ */
+export type AuthResult = {
+  empresaId: string | null;
+  error: NextResponse | null;
+  isSuperAdmin?: boolean;
+};
+
 // Auth middleware helper
-export async function requireAuth(request: NextRequest): Promise<{ empresaId: string | null; error: NextResponse | null }> {
+export async function requireAuth(request: NextRequest): Promise<AuthResult> {
   const empresaId = request.headers.get('x-empresa-id');
-  if (!empresaId) {
+  const adminRol = request.headers.get('x-admin-rol');
+  const isSuperAdmin = adminRol === 'superadmin';
+  
+  // Superadmin can have empty empresaId (set by proxy when JWT has null)
+  // They will use query params to specify which empresa to operate on
+  if (!empresaId && !isSuperAdmin) {
     return { 
       empresaId: null, 
-      error: NextResponse.json(createErrorResponse(AUTH_ERRORS.UNAUTHORIZED), { status: 401 }) 
+      error: NextResponse.json(createErrorResponse(AUTH_ERRORS.UNAUTHORIZED), { status: 401 }),
+      isSuperAdmin 
     };
   }
-  return { empresaId, error: null };
+  return { empresaId: empresaId || null, error: null, isSuperAdmin };
 }
 
 // Response helpers
@@ -32,7 +49,11 @@ function errorCodeToStatus(code: string): number {
   if (code === 'VALIDATION_ERROR') return 400;
   if (code === 'PRODUCT_NOT_FOUND' || code === 'NOT_FOUND') return 404;
   if (code === 'AUTH_003' || code === 'AUTH_FORBIDDEN' || code === 'FORBIDDEN') return 403;
+  if (code === 'PAYMENT_IN_PROGRESS') return 423;
   if (code.startsWith('AUTH_')) return 401;
+  if (code.startsWith('DEL_')) return 400;
+  if (code.startsWith('GLV_') || code.startsWith('PAY_')) return 503;
+  if (code.startsWith('DLV_')) return 422;
   return 500;
 }
 

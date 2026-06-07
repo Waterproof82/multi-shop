@@ -11,6 +11,15 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  SelectGroup,
+  SelectLabel,
+} from '@/components/ui/select';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 
@@ -19,6 +28,8 @@ interface Categoria {
   nombre_es: string;
   categoria_padre_id: string | null;
 }
+
+type ImageFit = 'contain' | 'cover' | 'fill' | 'none' | 'scale-down';
 
 interface ProductoFormData {
   titulo_es: string;
@@ -33,9 +44,11 @@ interface ProductoFormData {
   descripcion_de: string;
   precio: string;
   foto_url: string;
+  foto_object_fit: ImageFit;
   categoria_id: string;
   es_especial: boolean;
   activo: boolean;
+  tipo_producto: 'comida' | 'bebida';
 }
 
 interface TranslationFieldsProps {
@@ -74,6 +87,7 @@ function TranslationFields({ formData, onChange, show }: Readonly<TranslationFie
               value={formData[`descripcion_${key}` as keyof ProductoFormData] as string}
               onChange={(e) => onChange({ ...formData, [`descripcion_${key}`]: e.target.value })}
               rows={2}
+              maxLength={2000}
             />
           </div>
         </div>
@@ -94,6 +108,7 @@ interface ProductFormDialogProps {
   saving: boolean;
   onSubmit: (e: React.SyntheticEvent) => void;
   empresaSlug: string;
+  isRestaurante?: boolean;
 }
 
 export function ProductFormDialog({
@@ -108,6 +123,7 @@ export function ProductFormDialog({
   saving,
   onSubmit,
   empresaSlug,
+  isRestaurante = false,
 }: Readonly<ProductFormDialogProps>) {
   const { language } = useLanguage();
   const handleClose = () => onOpenChange(false);
@@ -154,6 +170,7 @@ export function ProductFormDialog({
                 value={formData.descripcion_es}
                 onChange={(e) => onFormChange({ ...formData, descripcion_es: e.target.value })}
                 rows={2}
+                maxLength={2000}
               />
             </div>
 
@@ -176,46 +193,53 @@ export function ProductFormDialog({
               <label htmlFor="categoria_id" className="block text-sm font-medium text-foreground mb-1">
                 {t("category", language)}
               </label>
-              <select
-                id="categoria_id"
-                name="categoria_id"
+              <Select
                 value={formData.categoria_id}
-                onChange={(e) => handleSelectChange(e.target.value)}
-                className="w-full px-3 py-2 rounded-md border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background cursor-pointer min-h-[44px]"
-                aria-label={t("category", language)}
+                onValueChange={handleSelectChange}
               >
-                <option value="">{t("noCategory", language)}</option>
-                {parents.map(parent => {
-                  const childCats = children.filter(c => c.categoria_padre_id === parent.id);
-                  if (childCats.length > 0) {
+                <SelectTrigger
+                  id="categoria_id"
+                  aria-label={t("category", language)}
+                >
+                  <SelectValue placeholder={t("noCategory", language)} />
+                </SelectTrigger>
+                <SelectContent>
+                  {parents.map(parent => {
+                    const childCats = children.filter(c => c.categoria_padre_id === parent.id);
+                    if (childCats.length > 0) {
+                      return (
+                        <SelectGroup key={parent.id}>
+                          <SelectLabel>{parent.nombre_es}</SelectLabel>
+                          <SelectItem value={parent.id}>
+                            {parent.nombre_es} ({t("mainCategory", language)})
+                          </SelectItem>
+                          {childCats.map(sub => (
+                            <SelectItem key={sub.id} value={sub.id} isSubcategory>
+                              └─ {sub.nombre_es}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      );
+                    }
                     return (
-                      <optgroup key={parent.id} label={parent.nombre_es}>
-                        <option key={`${parent.id}-self`} value={parent.id}>
-                          {parent.nombre_es} ({t("mainCategory", language)})
-                        </option>
-                        {childCats.map(sub => (
-                          <option key={sub.id} value={sub.id}>
-                            └─ {sub.nombre_es}
-                          </option>
-                        ))}
-                      </optgroup>
+                      <SelectItem key={parent.id} value={parent.id}>
+                        {parent.nombre_es}
+                      </SelectItem>
                     );
-                  }
-                  return (
-                    <option key={parent.id} value={parent.id}>
-                      {parent.nombre_es}
-                    </option>
-                  );
-                })}
-              </select>
+                  })}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="col-span-2">
               <ImageUploader
                 value={formData.foto_url}
                 onChange={(url) => onFormChange({ ...formData, foto_url: url })}
+                objectFit={formData.foto_object_fit}
+                onObjectFitChange={(fit) => onFormChange({ ...formData, foto_object_fit: fit })}
                 label={t("productImage", language)}
                 empresaSlug={empresaSlug}
+                helpText={t("productImageHelp", language)}
               />
             </div>
 
@@ -237,7 +261,7 @@ export function ProductFormDialog({
               show={showTranslations}
             />
 
-            <div className="col-span-2 flex gap-6 mt-4">
+            <div className="col-span-2 flex flex-wrap gap-6 mt-4">
               <label htmlFor="es_especial" className="flex items-center gap-2 cursor-pointer">
                 <input
                   id="es_especial"
@@ -246,7 +270,9 @@ export function ProductFormDialog({
                   onChange={(e) => onFormChange({ ...formData, es_especial: e.target.checked })}
                   className="w-4 h-4 rounded border-border text-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background cursor-pointer accent-primary"
                 />
-                <span className="text-sm text-foreground">{t("specialProduct", language)}</span>
+                <span className="text-sm bg-red-500/20 text-red-400 border border-red-400/30 px-2 py-0.5 rounded-full">
+                  {t("specialProduct", language)}
+                </span>
               </label>
               <label htmlFor="activo" className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -258,6 +284,20 @@ export function ProductFormDialog({
                 />
                 <span className="text-sm text-foreground">{t("active", language)}</span>
               </label>
+              {isRestaurante && (
+                <label htmlFor="tipo_producto" className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    id="tipo_producto"
+                    type="checkbox"
+                    checked={formData.tipo_producto === 'bebida'}
+                    onChange={(e) => onFormChange({ ...formData, tipo_producto: e.target.checked ? 'bebida' : 'comida' })}
+                    className="w-4 h-4 rounded border-border text-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background cursor-pointer accent-primary"
+                  />
+                  <span className="text-sm bg-blue-500/20 text-blue-400 border border-blue-400/30 px-2 py-0.5 rounded-full">
+                    🥤 Bebida
+                  </span>
+                </label>
+              )}
             </div>
           </div>
 
@@ -324,14 +364,14 @@ export function DeleteConfirmDialog({
           <button
             type="button"
             onClick={handleClose}
-            className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg min-h-[44px]"
+            className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg min-h-[44px] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             {t("cancel", language)}
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg min-h-[44px]"
+            className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg min-h-[44px] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             {t("delete", language)}
           </button>

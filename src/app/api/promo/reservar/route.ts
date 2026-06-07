@@ -1,0 +1,81 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { tgtgUseCase } from '@/core/infrastructure/database';
+import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
+import { logApiError } from '@/core/infrastructure/api/api-logger';
+import { verifyReservaToken } from '@/lib/reserva-token';
+import { claimCuponSchema } from '@/core/application/dtos/tgtg.dto';
+
+export async function POST(request: NextRequest) {
+  const rateLimited = await rateLimitPublic(request);
+  if (rateLimited) return rateLimited;
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+  }
+
+  const parsed = claimCuponSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
+  }
+
+  const { itemId, tgtgPromoId, email, token } = parsed.data;
+
+  // Verify HMAC token before any DB operation
+  let tokenValid = false;
+  try {
+    tokenValid = verifyReservaToken(token, email, itemId, tgtgPromoId);
+  } catch {
+    return NextResponse.json({ error: 'token_invalid' }, { status: 400 });
+  }
+
+  if (!tokenValid) {
+    return NextResponse.json({ error: 'token_invalid' }, { status: 400 });
+  }
+
+  try {
+    // Check if pickup window has passed
+    const promoResult = await tgtgUseCase.getPublicPromo(tgtgPromoId);
+    if (!promoResult.success || !promoResult.data) {
+      return NextResponse.json({ error: 'not_found' }, { status: 404 });
+    }
+    const promo = promoResult.data;
+    // Normalize horaRecogidaFin: DB may return "HH:MM:SS" or "HH:MM"
+    const horaFinNorm = promo.horaRecogidaFin.length === 5
+      ? `${promo.horaRecogidaFin}:00`
+      : promo.horaRecogidaFin;
+    // Compare date and time components against current UTC.
+    // NOTE: The primary expiry gating is done client-side (browser local time = restaurant timezone).
+    // This server check is defense-in-depth; it uses UTC so may have up to ~2h tolerance
+    // depending on the restaurant's timezone. A proper fix requires storing empresa timezone.
+    const nowUtc = new Date();
+    const nowDateStr = nowUtc.toISOString().split('T')[0]; // YYYY-MM-DD in UTC
+    const nowTimeStr = nowUtc.toISOString().split('T')[1].slice(0, 8); // HH:MM:SS in UTC
+    const isDatePast = nowDateStr > promo.fechaActivacion;
+    const isSameDateTimePast = nowDateStr === promo.fechaActivacion && nowTimeStr > horaFinNorm;
+    if (isDatePast || isSameDateTimePast) {
+      return NextResponse.json({ result: 'expired' }, { status: 200 });
+    }
+
+    const result = await tgtgUseCase.claimCupon({ itemId, tgtgPromoId, email, token });
+
+    if (!result.success) {
+      return NextResponse.json({ error: result.error.message }, { status: 500 });
+    }
+
+    const outcome = result.data;
+    if (outcome === 'token_used') {
+      return NextResponse.json({ result: 'token_used' }, { status: 409 });
+    }
+    if (outcome === 'no_cupones') {
+      return NextResponse.json({ result: 'no_cupones' }, { status: 200 });
+    }
+
+    return NextResponse.json({ result: 'ok' }, { status: 200 });
+  } catch (error) {
+    await logApiError('Claim TGTG cupon', error, 'POST');
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
+  }
+}

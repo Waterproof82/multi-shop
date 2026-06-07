@@ -3,17 +3,24 @@
 import { motion, useReducedMotion } from "framer-motion"
 import Image from "next/image"
 import { useLanguage } from "@/lib/language-context"
+import { t } from "@/lib/translations"
 import type { EmpresaPublic } from "@/core/domain/entities/types"
 
 interface HeroBannerProps {
   readonly empresa?: EmpresaPublic | null;
+  readonly bannerFit?: "contain" | "cover" | "fill";
 }
 
-export function HeroBanner({ empresa }: HeroBannerProps) {
+function getBannerHeight(): string {
+  // Fixed height: 200px mobile, 280px desktop - same proportion always
+  return "h-[200px] md:h-[280px]";
+}
+
+export function HeroBanner({ empresa, bannerFit }: HeroBannerProps) {
   const { language } = useLanguage()
   const shouldReduceMotion = useReducedMotion() ?? false
   
-  const logoUrl = empresa?.logoUrl ?? null
+  const logoUrl = empresa?.mostrarLogo !== false ? (empresa?.logoUrl ?? null) : null
   const urlImage = empresa?.urlImage ?? null
   
   const titulo = empresa?.titulo ?? null
@@ -32,22 +39,22 @@ export function HeroBanner({ empresa }: HeroBannerProps) {
     ? { initial: {}, animate: {} }
     : { initial: { opacity: 0 }, animate: { opacity: 1 } };
 
+  const heightClass = getBannerHeight();
+
+  // Get background size based on user selection
+  const getBackgroundSize = (fit?: string): string => {
+    if (fit === "contain") return "contain";
+    if (fit === "cover") return "cover";
+    return "100% 100%"; // fill - stretch to fit
+  };
+
+  const bgSize = getBackgroundSize(bannerFit ?? "fill");
+
   return (
-    <div className="relative flex flex-col items-center justify-center overflow-hidden bg-primary px-4 py-16 text-center md:py-24">
-      {urlImage && (
-        <div className="absolute inset-0 z-0">
-          <Image
-            src={urlImage}
-            alt={empresa?.nombre ?? "Imagen de fondo del restaurante"}
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover"
-            unoptimized
-          />
-          <div className="absolute inset-0 bg-foreground/70" />
-        </div>
-      )}
+    <div 
+      className={`relative flex flex-col items-center justify-center overflow-hidden bg-primary text-center ${heightClass}`}
+      style={urlImage ? { backgroundImage: `url(${urlImage})`, backgroundSize: bgSize, backgroundPosition: 'center', backgroundRepeat: bannerFit === "contain" ? 'no-repeat' : 'no-repeat' } : undefined}
+    >
 
       <motion.div
         variants={titleVariants}
@@ -57,11 +64,10 @@ export function HeroBanner({ empresa }: HeroBannerProps) {
         {logoUrl && (
           <Image
             src={logoUrl}
-            alt={empresa?.nombre ?? "Logo"}
+            alt={empresa?.nombre ?? t("companyLogo", language)}
             width={200}
             height={100}
             className="mx-auto mb-6 h-24 w-auto md:h-32"
-            unoptimized
           />
         )}
       </motion.div>

@@ -10,22 +10,43 @@ let loggerInstance: ErrorLogger | null = null;
  * 
  * Usar para capturar y almacenar errores en la tabla log_errors de Supabase.
  * Implementa patrón singleton para mantener una única instancia.
+ * 
+ * IMPORTANT: Only initialize on server-side. Client-side logging falls back to console.
  */
 export class ErrorLogger {
-  private readonly repository: SupabaseLogErrorRepository;
+  private readonly repository: SupabaseLogErrorRepository | null;
+  private readonly supabaseAvailable: boolean;
 
   constructor() {
-    const supabase = getSupabaseClient();
-    this.repository = new SupabaseLogErrorRepository(supabase);
+    // Only try to initialize Supabase on server-side
+    if (globalThis.window !== undefined) {
+      this.repository = null;
+      this.supabaseAvailable = false;
+      return;
+    }
+
+    let repository: SupabaseLogErrorRepository | null = null;
+    let supabaseAvailable = false;
+
+    try {
+      const supabase = getSupabaseClient();
+      repository = new SupabaseLogErrorRepository(supabase);
+      supabaseAvailable = true;
+    } catch (error) {
+      console.warn('[ERROR_LOGGER] Supabase not configured, logging to console only:', error);
+      repository = null;
+      supabaseAvailable = false;
+    }
+
+    this.repository = repository;
+    this.supabaseAvailable = supabaseAvailable;
   }
 
   /**
    * Obtiene la instancia singleton del logger
    */
   static getInstance(): ErrorLogger {
-    if (!loggerInstance) {
-      loggerInstance = new ErrorLogger();
-    }
+    loggerInstance ??= new ErrorLogger();
     return loggerInstance;
   }
 
@@ -34,10 +55,21 @@ export class ErrorLogger {
    * @param data Datos del error a loguear
    */
   async logError(data: LogErrorData): Promise<void> {
-    try {
-      await this.repository.log(data);
-    } catch (e) {
-      console.error('[ERROR_LOGGER_FAILED]', e);
+    if (this.repository) {
+      try {
+        await this.repository.log(data);
+      } catch (e) {
+        console.error('[ERROR_LOGGER_FAILED]', e);
+      }
+    } else {
+      // Fallback to console logging when Supabase is not available
+      console.error('[ERROR_LOG]', {
+        codigo: data.codigo,
+        mensaje: data.mensaje,
+        modulo: data.modulo,
+        severity: data.severity,
+        metadata: data.metadata,
+      });
     }
   }
 

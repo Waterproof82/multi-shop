@@ -1,207 +1,8 @@
-import { Empresa, Cliente, EmpresaColores, EmpresaPublic, Result } from "@/core/domain/entities/types";
+import { Empresa, EmpresaColores, EmpresaPublic, Result } from "@/core/domain/entities/types";
 import { DEFAULT_PEDIDOS_SUBDOMAIN } from "@/core/domain/constants/empresa-defaults";
-import { IClienteRepository, CreateClienteData, UpdateClienteData } from "@/core/domain/repositories/IClienteRepository";
 import { IEmpresaRepository, UpdateEmpresaData } from "@/core/domain/repositories/IEmpresaRepository";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "../logging/logger";
-
-interface ClienteWithPedidos extends Cliente {
-  numero_pedidos: number;
-}
-
-export class SupabaseClienteRepository implements IClienteRepository {
-  constructor(private readonly supabase: SupabaseClient) {}
-
-  async findAllByTenant(empresaId: string): Promise<Result<ClienteWithPedidos[]>> {
-    try {
-      const { data: clientes, error } = await this.supabase
-        .from('clientes')
-        .select('*')
-        .eq('empresa_id', empresaId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        await logger.logAndReturnError(
-          'DB_SELECT_ERROR',
-          error.message,
-          'repository',
-          'SupabaseClienteRepository.findAllByTenant',
-          { empresaId, details: { code: error.code } }
-        );
-        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener clientes', module: 'repository', method: 'findAllByTenant' } };
-      }
-
-      const { data: pedidos } = await this.supabase
-        .from('pedidos')
-        .select('cliente_id')
-        .eq('empresa_id', empresaId);
-
-      const pedidosCount: Record<string, number> = {};
-      pedidos?.forEach(p => {
-        if (p.cliente_id) {
-          pedidosCount[p.cliente_id] = (pedidosCount[p.cliente_id] || 0) + 1;
-        }
-      });
-
-      const mapped = clientes?.map(c => ({
-        ...c,
-        empresaId: c.empresa_id as string,
-        numero_pedidos: pedidosCount[c.id] || 0,
-      })) ?? [];
-
-      return { success: true, data: mapped.sort((a, b) => b.numero_pedidos - a.numero_pedidos) };
-    } catch (e) {
-      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseClienteRepository.findAllByTenant', { empresaId });
-      return { success: false, error: appError };
-    }
-  }
-
-  async findByEmail(email: string, empresaId: string): Promise<Result<Cliente | null>> {
-    try {
-      const normalizedEmail = email.trim().toLowerCase();
-
-      const { data: cliente } = await this.supabase
-        .from('clientes')
-        .select('*')
-        .eq('empresa_id', empresaId)
-        .ilike('email', normalizedEmail)
-        .single();
-
-      if (!cliente) return { success: true, data: null };
-      return { success: true, data: { ...cliente, empresaId: cliente.empresa_id } };
-    } catch (e) {
-      // Not found is not an error
-      if (e instanceof Object && 'code' in e && e.code === 'PGRST116') {
-        return { success: true, data: null };
-      }
-      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseClienteRepository.findByEmail', { empresaId });
-      return { success: false, error: appError };
-    }
-  }
-
-  async findByTelefono(telefono: string, empresaId: string): Promise<Result<Cliente | null>> {
-    try {
-      const { data: cliente, error } = await this.supabase
-        .from('clientes')
-        .select('*')
-        .eq('empresa_id', empresaId)
-        .eq('telefono', telefono)
-        .single();
-
-      if (error) {
-        if (error.code === 'PGRST116') {
-          return { success: true, data: null };
-        }
-        await logger.logAndReturnError(
-          'DB_SELECT_ERROR',
-          error.message,
-          'repository',
-          'SupabaseClienteRepository.findByTelefono',
-          { empresaId, details: { code: error.code } }
-        );
-        return { success: false, error: { code: 'DB_ERROR', message: 'Error al buscar cliente', module: 'repository', method: 'findByTelefono' } };
-      }
-      return { success: true, data: { ...cliente, empresaId: cliente.empresa_id } };
-    } catch (e) {
-      if (e instanceof Object && 'code' in e && e.code === 'PGRST116') {
-        return { success: true, data: null };
-      }
-      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseClienteRepository.findByTelefono', { empresaId });
-      return { success: false, error: appError };
-    }
-  }
-
-  async create(data: CreateClienteData): Promise<Result<Cliente>> {
-    try {
-      const { data: cliente, error } = await this.supabase
-        .from('clientes')
-        .insert({
-          empresa_id: data.empresaId,
-          nombre: data.nombre || null,
-          email: data.email || null,
-          telefono: data.telefono || null,
-          direccion: data.direccion || null,
-          aceptar_promociones: false,
-        })
-        .select()
-        .single();
-
-      if (error) {
-        await logger.logAndReturnError(
-          'DB_INSERT_ERROR',
-          error.message,
-          'repository',
-          'SupabaseClienteRepository.create',
-          { empresaId: data.empresaId, details: { code: error.code } }
-        );
-        return { success: false, error: { code: 'DB_ERROR', message: 'Error al crear cliente', module: 'repository', method: 'create' } };
-      }
-      return { success: true, data: { ...cliente, empresaId: cliente.empresa_id } };
-    } catch (e) {
-      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseClienteRepository.create', { empresaId: data.empresaId });
-      return { success: false, error: appError };
-    }
-  }
-
-  async update(id: string, empresaId: string, data: Partial<UpdateClienteData>): Promise<Result<Cliente>> {
-    try {
-      const updatePayload: Record<string, unknown> = {};
-      if (data.nombre !== undefined) updatePayload.nombre = data.nombre;
-      if (data.email !== undefined) updatePayload.email = data.email || null;
-      if (data.telefono !== undefined) updatePayload.telefono = data.telefono;
-      if (data.direccion !== undefined) updatePayload.direccion = data.direccion;
-      if (data.aceptar_promociones !== undefined) updatePayload.aceptar_promociones = data.aceptar_promociones;
-
-      const { data: updated, error } = await this.supabase
-        .from('clientes')
-        .update(updatePayload)
-        .eq('id', id)
-        .eq('empresa_id', empresaId)
-        .select()
-        .single();
-
-      if (error) {
-        await logger.logAndReturnError(
-          'DB_UPDATE_ERROR',
-          error.message,
-          'repository',
-          'SupabaseClienteRepository.update',
-          { empresaId, details: { code: error.code, clienteId: id } }
-        );
-        return { success: false, error: { code: 'DB_ERROR', message: 'Error al actualizar cliente', module: 'repository', method: 'update' } };
-      }
-      return { success: true, data: { ...updated, empresaId: updated.empresa_id } };
-    } catch (e) {
-      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseClienteRepository.update', { empresaId });
-      return { success: false, error: appError };
-    }
-  }
-
-  async delete(id: string, empresaId: string): Promise<Result<void>> {
-    try {
-      const { error } = await this.supabase
-        .from('clientes')
-        .delete()
-        .eq('id', id)
-        .eq('empresa_id', empresaId);
-
-      if (error) {
-        await logger.logAndReturnError(
-          'DB_DELETE_ERROR',
-          error.message,
-          'repository',
-          'SupabaseClienteRepository.delete',
-          { empresaId, details: { code: error.code, clienteId: id } }
-        );
-        return { success: false, error: { code: 'DB_ERROR', message: 'Error al eliminar cliente', module: 'repository', method: 'delete' } };
-      }
-      return { success: true, data: undefined };
-    } catch (e) {
-      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseClienteRepository.delete', { empresaId });
-      return { success: false, error: appError };
-    }
-  }
-}
 
 export class SupabaseEmpresaRepository implements IEmpresaRepository {
   constructor(private readonly supabase: SupabaseClient) {}
@@ -210,11 +11,22 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
     try {
       const { data: empresa } = await this.supabase
         .from('empresas')
-        .select('email_notification, telefono_whatsapp, nombre, logo_url, fb, instagram, url_mapa, direccion, dominio, slug, url_image, descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de, mostrar_carrito, moneda, subdomain_pedidos')
+        .select('email_notification, telefono_whatsapp, nombre, logo_url, mostrar_logo, fb, instagram, url_mapa, direccion, dominio, slug, url_image, banner_fit, descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de, mostrar_carrito, mostrar_promociones, mostrar_tgtg, mesas_habilitadas, moneda, subdomain_pedidos, tipo, color_primary, color_primary_foreground, color_secondary, color_secondary_foreground, color_accent, color_accent_foreground, color_background, color_foreground, descuento_bienvenida_activo, descuento_bienvenida_porcentaje, descuento_bienvenida_duracion')
         .eq('id', empresaId)
         .single();
 
       if (!empresa) return { success: true, data: null };
+
+      const colores: EmpresaColores | null = empresa.color_primary ? {
+        primary: empresa.color_primary,
+        primaryForeground: empresa.color_primary_foreground,
+        secondary: empresa.color_secondary,
+        secondaryForeground: empresa.color_secondary_foreground,
+        accent: empresa.color_accent,
+        accentForeground: empresa.color_accent_foreground,
+        background: empresa.color_background,
+        foreground: empresa.color_foreground,
+      } : null;
 
       return {
         success: true,
@@ -222,18 +34,27 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
           id: empresaId,
           nombre: empresa.nombre,
           dominio: empresa.dominio || '',
+          tipo: (empresa.tipo as 'tienda' | 'restaurante' | null) ?? null,
           slug: (empresa.slug as string | null) ?? null,
           logoUrl: empresa.logo_url,
+          mostrarLogo: empresa.mostrar_logo ?? true,
           mostrarCarrito: empresa.mostrar_carrito ?? false,
+          mostrarPromociones: empresa.mostrar_promociones ?? true,
+          mostrarTgtg: empresa.mostrar_tgtg ?? true,
+          mesasHabilitadas: empresa.mesas_habilitadas ?? true,
           moneda: empresa.moneda ?? 'EUR',
           emailNotification: empresa.email_notification,
-          colores: null,
+          colores,
           fb: empresa.fb ?? null,
           instagram: empresa.instagram ?? null,
           urlMapa: empresa.url_mapa ?? null,
           direccion: empresa.direccion ?? null,
           telefonoWhatsapp: empresa.telefono_whatsapp ?? null,
           urlImage: empresa.url_image ?? null,
+          bannerFit: (empresa.banner_fit as "contain" | "cover" | "fill" | null) ?? "contain",
+          descuentoBienvenidaActivo: empresa.descuento_bienvenida_activo ?? false,
+          descuentoBienvenidaPorcentaje: empresa.descuento_bienvenida_porcentaje ?? 5,
+          descuentoBienvenidaDuracion: empresa.descuento_bienvenida_duracion ?? 30,
           descripcion: {
             es: empresa.descripcion_es as string | null,
             en: empresa.descripcion_en as string | null,
@@ -259,12 +80,21 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
       if (data.url_mapa !== undefined) updatePayload.url_mapa = data.url_mapa || null;
       if (data.direccion !== undefined) updatePayload.direccion = data.direccion || null;
       if (data.logo_url !== undefined) updatePayload.logo_url = data.logo_url || null;
+      if (data.mostrar_logo !== undefined) updatePayload.mostrar_logo = data.mostrar_logo;
       if (data.url_image !== undefined) updatePayload.url_image = data.url_image || null;
+      if (data.banner_fit !== undefined) updatePayload.banner_fit = data.banner_fit || null;
       if (data.descripcion_es !== undefined) updatePayload.descripcion_es = data.descripcion_es || null;
       if (data.descripcion_en !== undefined) updatePayload.descripcion_en = data.descripcion_en || null;
       if (data.descripcion_fr !== undefined) updatePayload.descripcion_fr = data.descripcion_fr || null;
       if (data.descripcion_it !== undefined) updatePayload.descripcion_it = data.descripcion_it || null;
       if (data.descripcion_de !== undefined) updatePayload.descripcion_de = data.descripcion_de || null;
+      // Boolean fields: must NOT use `|| null` — false is a valid value and must reach the DB.
+      if (data.mostrar_promociones !== undefined) updatePayload.mostrar_promociones = data.mostrar_promociones;
+      if (data.mostrar_tgtg !== undefined) updatePayload.mostrar_tgtg = data.mostrar_tgtg;
+      if (data.descuento_bienvenida_activo !== undefined) updatePayload.descuento_bienvenida_activo = data.descuento_bienvenida_activo;
+      if (data.descuento_bienvenida_porcentaje !== undefined) updatePayload.descuento_bienvenida_porcentaje = data.descuento_bienvenida_porcentaje;
+      if (data.descuento_bienvenida_duracion !== undefined) updatePayload.descuento_bienvenida_duracion = data.descuento_bienvenida_duracion;
+      if (data.tipo !== undefined) updatePayload.tipo = data.tipo;
 
       const { error } = await this.supabase
         .from('empresas')
@@ -288,15 +118,26 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
     }
   }
 
-  async findByDomain(dominio: string): Promise<Result<{ id: string; nombre: string; email_notification: string | null; telefono_whatsapp: string | null } | null>> {
+  async findByDomain(dominio: string): Promise<Result<{ id: string; nombre: string; email_notification: string | null; telefono_whatsapp: string | null; tipo: string; telegram_chat_id: string | null; telegram_mesa_chat_id: string | null; telegram_bebidas_chat_id: string | null; mesas_habilitadas: boolean; pagos_pickup_habilitados: boolean } | null>> {
     try {
       const { data: empresa } = await this.supabase
         .from('empresas')
-        .select('id, nombre, email_notification, telefono_whatsapp')
+        .select('id, nombre, email_notification, telefono_whatsapp, tipo, telegram_chat_id, telegram_mesa_chat_id, telegram_bebidas_chat_id, mesas_habilitadas, pagos_pickup_habilitados')
         .eq('dominio', dominio)
         .single();
 
-      if (empresa) return { success: true, data: empresa };
+      if (empresa) return { success: true, data: {
+        id: empresa.id as string,
+        nombre: empresa.nombre as string,
+        email_notification: empresa.email_notification as string | null,
+        telefono_whatsapp: empresa.telefono_whatsapp as string | null,
+        tipo: (empresa.tipo as string) ?? 'tienda',
+        telegram_chat_id: empresa.telegram_chat_id as string | null,
+        telegram_mesa_chat_id: (empresa.telegram_mesa_chat_id as string | null) ?? null,
+        telegram_bebidas_chat_id: (empresa.telegram_bebidas_chat_id as string | null) ?? null,
+        mesas_habilitadas: (empresa.mesas_habilitadas as boolean) ?? true,
+        pagos_pickup_habilitados: (empresa.pagos_pickup_habilitados as boolean) ?? false,
+      }};
 
       const isPedidos = dominio.startsWith(`${DEFAULT_PEDIDOS_SUBDOMAIN}.`) || dominio.endsWith('-pedidos');
 
@@ -304,11 +145,22 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
         const mainDomainFromSubdomain = dominio.split('.').slice(1).join('.');
         const { data: empresaSubdomain } = await this.supabase
           .from('empresas')
-          .select('id, nombre, email_notification, telefono_whatsapp')
+          .select('id, nombre, email_notification, telefono_whatsapp, tipo, telegram_chat_id, telegram_mesa_chat_id, telegram_bebidas_chat_id, mesas_habilitadas, pagos_pickup_habilitados')
           .eq('dominio', mainDomainFromSubdomain)
           .single();
 
-        return { success: true, data: empresaSubdomain || null };
+        return { success: true, data: empresaSubdomain ? {
+          id: empresaSubdomain.id as string,
+          nombre: empresaSubdomain.nombre as string,
+          email_notification: empresaSubdomain.email_notification as string | null,
+          telefono_whatsapp: empresaSubdomain.telefono_whatsapp as string | null,
+          tipo: (empresaSubdomain.tipo as string) ?? 'tienda',
+          telegram_chat_id: empresaSubdomain.telegram_chat_id as string | null,
+          telegram_mesa_chat_id: (empresaSubdomain.telegram_mesa_chat_id as string | null) ?? null,
+          telegram_bebidas_chat_id: (empresaSubdomain.telegram_bebidas_chat_id as string | null) ?? null,
+          mesas_habilitadas: (empresaSubdomain.mesas_habilitadas as boolean) ?? true,
+          pagos_pickup_habilitados: (empresaSubdomain.pagos_pickup_habilitados as boolean) ?? false,
+        } : null };
       }
 
       return { success: true, data: null };
@@ -323,8 +175,8 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
   }
 
   private static readonly PUBLIC_SELECT = `
-    id, nombre, dominio, mostrar_carrito, moneda, subdomain_pedidos,
-    logo_url, url_image,
+    id, nombre, dominio, tipo, mostrar_carrito, moneda, subdomain_pedidos,
+    logo_url, mostrar_logo, url_image, banner_fit,
     color_primary, color_primary_foreground, color_secondary, color_secondary_foreground,
     color_accent, color_accent_foreground, color_background, color_foreground,
     descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de,
@@ -333,7 +185,9 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
     footer1_es, footer1_en, footer1_fr, footer1_it, footer1_de,
     footer2_es, footer2_en, footer2_fr, footer2_it, footer2_de,
     fb, instagram, url_mapa,
-    direccion, telefono_whatsapp, email_notification
+    direccion, telefono_whatsapp, email_notification,
+    descuento_bienvenida_activo, descuento_bienvenida_porcentaje, descuento_bienvenida_duracion,
+    mesas_habilitadas, pagos_pickup_habilitados
   `;
 
   private static mapTranslations(data: Record<string, unknown>, prefix: string): { es?: string | null; en?: string | null; fr?: string | null; it?: string | null; de?: string | null } | null {
@@ -363,11 +217,14 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
       id: data.id as string,
       nombre: data.nombre as string,
       dominio: data.dominio as string,
+      tipo: (data.tipo as string | null) ?? null,
       mostrarCarrito: (data.mostrar_carrito as boolean) ?? false,
       moneda: (data.moneda as string) ?? 'EUR',
       subdomainPedidos: (data.subdomain_pedidos as string | null) ?? null,
       logoUrl: (data.logo_url as string | null) ?? null,
+      mostrarLogo: (data.mostrar_logo as boolean) ?? true,
       urlImage: (data.url_image as string | null) ?? null,
+      bannerFit: (data.banner_fit as "contain" | "cover" | "fill" | null) ?? "contain",
       colores,
       descripcion: SupabaseEmpresaRepository.mapTranslations(data, 'descripcion'),
       titulo: (data.titulo as string | null) ?? null,
@@ -381,6 +238,11 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
       direccion: (data.direccion as string | null) ?? null,
       telefono: (data.telefono_whatsapp as string | null) ?? null,
       emailNotification: (data.email_notification as string | null) ?? null,
+      descuentoBienvenidaActivo: (data.descuento_bienvenida_activo as boolean) ?? false,
+      descuentoBienvenidaPorcentaje: Number(data.descuento_bienvenida_porcentaje ?? 5),
+      descuentoBienvenidaDuracion: Number(data.descuento_bienvenida_duracion ?? 30),
+      mesasHabilitadas: (data.mesas_habilitadas as boolean) ?? true,
+      pagosPickupHabilitados: (data.pagos_pickup_habilitados as boolean) ?? false,
     };
   }
 
@@ -443,6 +305,31 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
       return { success: true, data: true };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabaseEmpresaRepository.updateColores', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
+  async updateWaiterPin(empresaId: string, pinHash: string): Promise<Result<void>> {
+    try {
+      const { error } = await this.supabase
+        .from('empresas')
+        .update({ waiter_pin_hash: pinHash })
+        .eq('id', empresaId);
+
+      if (error) {
+        await logger.logAndReturnError(
+          'DB_UPDATE_ERROR',
+          error.message,
+          'repository',
+          'SupabaseEmpresaRepository.updateWaiterPin',
+          { empresaId, details: { code: error.code } }
+        );
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al actualizar PIN', module: 'repository', method: 'updateWaiterPin' } };
+      }
+
+      return { success: true, data: undefined };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseEmpresaRepository.updateWaiterPin', { empresaId });
       return { success: false, error: appError };
     }
   }

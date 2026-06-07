@@ -6,11 +6,20 @@ import { EmpresaThemeProvider } from "@/components/empresa-theme-provider";
 import { getDomainFromHeaders } from "@/lib/domain-utils";
 import { logger } from "@/core/infrastructure/logging/logger";
 import { JsonLd } from "@/components/json-ld";
+import { cookies } from "next/headers";
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const resolvedParams = await searchParams;
+  const rawMesaParam = typeof resolvedParams.mesa === 'string' && resolvedParams.mesa.length > 0;
+  const cookieStore = await cookies();
+  const isWaiterMode = !!cookieStore.get('waiter_token')?.value;
   const fullDomain = await getDomainFromHeaders();
 
   let empresa = fullDomain ? await getEmpresaByDomain(fullDomain) : null;
@@ -36,8 +45,20 @@ export default async function Home() {
     );
   }
 
+  // If mesas are disabled for this empresa, treat mesa param as absent
+  const mesasHabilitadas = empresa?.mesasHabilitadas ?? true;
+  const hasMesaParam = rawMesaParam && mesasHabilitadas;
   const mostrarCarritoEmpresa = empresa?.mostrarCarrito ?? false;
-  const showCart = isPedidos || mostrarCarritoEmpresa;
+  const isRestaurant = empresa?.tipo === 'restaurante';
+  // When a mesa URL is present but mesas are disabled, suppress the cart for customers.
+  // Waiter mode bypasses this — staff can always place orders regardless of the toggle.
+  const mesaDisabledContext = rawMesaParam && !mesasHabilitadas && !isWaiterMode;
+  // - pedidos subdomain: always
+  // - waiter session or mesa QR: always (regardless of mostrarCarritoEmpresa)
+  // - tienda with mostrarCarritoEmpresa=true: yes
+  // - restaurante on main domain with no table/waiter: never (must come via QR or waiter)
+  // - mesa URL with mesas disabled: never (overrides all the above)
+  const showCart = !mesaDisabledContext && (isPedidos || isWaiterMode || hasMesaParam || (mostrarCarritoEmpresa && !isRestaurant));
 
   let menuData: MenuCategoryVM[] = [];
 
@@ -64,7 +85,7 @@ export default async function Home() {
   return (
     <EmpresaThemeProvider colores={empresa?.colores || null}>
       {empresa && <JsonLd empresa={empresa} menuData={menuData} baseUrl={baseUrl} />}
-      <MenuPage menuData={menuData} header={header} showCart={showCart} empresa={empresa} />
+      <MenuPage menuData={menuData} header={header} showCart={showCart} empresa={empresa} isWaiterMode={isWaiterMode} />
     </EmpresaThemeProvider>
   );
 }

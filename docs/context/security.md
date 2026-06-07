@@ -146,7 +146,7 @@ export function requireRole(request: NextRequest, allowedRoles: string[]): NextR
 
 ### Aplicación en routes
 
-`requireRole(request, ['admin'])` se aplica en **todos los handlers mutativos** (POST, PUT, PATCH, DELETE) de las siguientes routes:
+`requireRole(request, ['admin', 'superadmin'])` se aplica en **todos los handlers mutativos** (POST, PUT, PATCH, DELETE) de las siguientes routes:
 
 | Route | Handlers protegidos |
 |-------|-------------------|
@@ -162,9 +162,52 @@ export function requireRole(request: NextRequest, allowedRoles: string[]): NextR
 
 Los handlers GET (solo lectura) no requieren verificación de rol. Los handlers PUT usados como lectura (stats) sí requieren `requireRole` dado que exponen métricas financieras del tenant.
 
-### Rol actual en DB
+Las rutas `/api/superadmin/*` requieren adicionalmente `rol === 'superadmin'` validado en el proxy antes de llegar al handler:
 
-La tabla `perfiles_admin` tiene `rol TEXT DEFAULT 'admin'`. Actualmente existe un único rol: `admin`. Con el RBAC en su lugar, cualquier nuevo rol añadido al sistema (ej. `viewer`) recibirá automáticamente 403 en todas las operaciones destructivas sin cambios adicionales en el código.
+| Route | Handlers protegidos |
+|-------|-------------------|
+| `/api/superadmin/empresas` | GET (todas las empresas) |
+| `/api/superadmin/empresas/[id]` | GET, PUT |
+| `/api/superadmin/switch-empresa` | GET (establece cookie de contexto de tenant) |
+
+### Roles del sistema
+
+La tabla `perfiles_admin` soporta dos roles definidos en `rol TEXT`:
+
+| Rol | Descripción | Acceso |
+|-----|-------------|--------|
+| `admin` | Admin de empresa | Panel `/admin`, solo datos de su tenant |
+| `superadmin` | Super Admin | Panel `/superadmin`, acceso global a todas las empresas |
+
+El rol se verifica en:
+1. `auth-admin.use-case.ts` - En `verifyToken()`, si `rol === 'superadmin'` no busca empresa asociada (`empresaId: null`)
+2. Layout del admin - Redirige a `/superadmin` si el rol es `superadmin`
+3. `proxy.ts` - Las rutas `/api/superadmin/*` requieren `rol === 'superadmin'`
+
+### Super Admin Panel
+
+Rutas protegidas (`proxy.ts`):
+- `/api/superadmin/empresas` — GET todas las empresas con stats
+- `/api/superadmin/empresas/[id]` — GET/PUT empresa específica
+
+Pages:
+- `/superadmin` — Dashboard global
+- `/superadmin/empresas/[id]` — Editor de empresa
+
+El superadmin tiene acceso a través de `SUPABASE_SERVICE_ROLE_KEY` (bypass RLS) para consultar y modificar cualquier empresa.
+
+**APIs admin que soportan superadmin con query param:**
+
+| Route | Handlers | Query param requerido |
+|-------|----------|----------------------|
+| `/api/admin/empresa` | GET, PUT | `empresaId` |
+| `/api/admin/upload-image` | POST | `empresaId` |
+| `/api/admin/productos` | GET, POST, PUT, DELETE | `empresaId` |
+| `/api/admin/categorias` | GET, POST, PUT, DELETE | `empresaId` |
+| `/api/admin/clientes` | GET, POST, PUT, DELETE | `empresaId` |
+| `/api/admin/pedidos` | GET, POST, PUT, DELETE | `empresaId` |
+
+El frontend usa `overrideEmpresaId` del context admin para enviar automáticamente el query param cuando hay un superadmin activo.
 
 ---
 
@@ -265,7 +308,7 @@ Configurados en `next.config.mjs` para todas las rutas:
 | `X-Frame-Options` | `SAMEORIGIN` (páginas) / `DENY` (admin y API) |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |
 | `Strict-Transport-Security` | `max-age=31536000; includeSubDomains; preload` |
-| `Permissions-Policy` | `camera=(), microphone=(), geolocation=(), payment=(), usb=()` |
+| `Permissions-Policy` | `camera=(self), microphone=(), geolocation=(), payment=(), usb=()` — `camera=(self)` required for `QRScannerGate` |
 | `X-XSS-Protection` | `1; mode=block` |
 | `Cache-Control` (API) | `no-store, private` |
 
@@ -296,6 +339,8 @@ Cada route handler aplica su propio rate limiter como segunda capa:
 | `rateLimitLogin` | `POST /api/admin/login` | 5 intentos / 15 min por IP |
 | `rateLimitPublic` | `GET /api/admin/login`, `/api/pedidos`, `/api/unsubscribe`, `/api/csp-report` | 20 req / min por IP |
 | `rateLimitAdmin` | Todas las rutas `/api/admin/*` | 60 req / min por IP |
+| `rateLimitMesaPolling` | `GET /api/mesas/{mesaId}/orders` | 120 req / min por mesa UUID |
+| `rateLimitMesaTokenIssuance` | `POST /api/mesas/{mesaId}/token` | 10 tokens / hora por mesa UUID |
 
 La IP real se extrae del header `cf-connecting-ip` (Cloudflare) con fallback al **primer** entry de `x-forwarded-for` (nunca el último, que sería IP de Cloudflare).
 
@@ -463,6 +508,34 @@ La ruta pública `POST /api/pedidos` intercepta `PRODUCT_NOT_FOUND` y retorna un
 
 ---
 
+## Row Level Security (RLS)
+
+RLS está habilitado en todas las tablas de `public`. La app usa `service_role` para escrituras (bypassa RLS) y `anon` para lecturas públicas (respeta RLS).
+
+### Políticas de denegación anónima (RESTRICTIVE)
+
+Las tablas sensibles tienen políticas `AS RESTRICTIVE FOR ALL TO anon USING (false)`. Las políticas RESTRICTIVE usan lógica AND — garantizan denegación incluso si otras políticas permissivas concedieran acceso:
+
+| Tabla | Política |
+|-------|---------|
+| `clientes` | `No direct anon access to clientes` — RESTRICTIVE |
+| `pedidos` | `No direct anon access to pedidos` — RESTRICTIVE |
+| `perfiles_admin` | `No direct anon access to perfiles_admin` — RESTRICTIVE |
+| `promociones` | `No direct anon access to promociones` — RESTRICTIVE |
+| `log_errors` | `No direct anon access to log_errors` — RESTRICTIVE |
+
+> Estas políticas fueron convertidas de PERMISSIVE a RESTRICTIVE para garantizar que `anon` nunca acceda a estos datos, independientemente de otras políticas que puedan existir.
+
+### Lecturas públicas
+
+`categorias`, `productos` y `empresas` tienen políticas SELECT `qual=true` para `anon` — necesarias para el menú público. Las operaciones de escritura (INSERT/UPDATE/DELETE) están restringidas por `get_mi_empresa_id()`.
+
+### RLS e `auth.uid()` en políticas
+
+Las políticas de `perfiles_admin` y `promociones` usan `(SELECT auth.uid())` (con SELECT) en lugar de `auth.uid()` directo para evitar re-evaluación por fila y mejorar el rendimiento de los planes de query.
+
+---
+
 ## JSON-LD Sanitization
 
 El componente `json-ld.tsx` sanitiza datos antes de insertar en `<script type="application/ld+json">`:
@@ -470,9 +543,9 @@ El componente `json-ld.tsx` sanitiza datos antes de insertar en `<script type="a
 ```typescript
 function safeJsonStringify(data: Record<string, unknown>): string {
   return JSON.stringify(data)
-    .replace(/</g, '\\u003c')
-    .replace(/>/g, '\\u003e')
-    .replace(/&/g, '\\u0026');
+    .replaceAll(String.raw`<`, String.raw`\u003c`)
+    .replaceAll(String.raw`>`, String.raw`\u003e`)
+    .replaceAll(String.raw`&`, String.raw`\u0026`);
 }
 ```
 
@@ -598,6 +671,41 @@ Configurado en el proxy para todas las rutas `/api/*`. Solo orígenes en:
 
 ---
 
+## Mesa Client Tokens
+
+Token-based physical presence enforcement for dine-in ordering. See [`qr-session-enforcement.md`](./qr-session-enforcement.md) for the full feature documentation.
+
+### `mesa_client_tokens` table
+
+```sql
+id          uuid PRIMARY KEY
+mesa_id     uuid NOT NULL REFERENCES mesas(id) ON DELETE CASCADE
+sesion_id   uuid NOT NULL REFERENCES mesa_sesiones(id) ON DELETE CASCADE
+token       text NOT NULL UNIQUE   -- cryptographically random, base64url
+expires_at  timestamptz NOT NULL   -- issued_at + 20 minutes
+```
+
+RLS: `anon` access explicitly denied (RESTRICTIVE policy). `service_role` has full access via explicit GRANT.
+
+### Validation middleware
+
+`validateMesaClientToken(request)` in `src/core/infrastructure/api/validate-mesa-client-token.ts` is applied before all mesa order endpoints:
+- Reads `Authorization: Bearer {token}`
+- Queries `mesa_client_tokens JOIN mesa_sesiones` — checks `expires_at > now()` AND `cerrada_at IS NULL`
+- Returns `401` with code `TOKEN_EXPIRED` or `SESSION_CLOSED` on failure
+
+Session rotation on waiter close (`POST /api/waiter/mesas/{mesaId}/close`) immediately reopens the session. All tokens tied to the previous session fail validation because `cerrada_at IS NULL` is no longer true.
+
+### Rate limiter
+
+`rateLimitMesaTokenIssuance`: `slidingWindow(10, "1 h")` — 10 tokens/hour per mesa UUID. Prefix: `ratelimit:mesa-token`.
+
+### Camera permission
+
+`next.config.mjs` sets `Permissions-Policy: camera=(self)` — required for `QRScannerGate` (`@zxing/browser`) to access the device camera. Without this, the browser would throw `NotAllowedError` even if the user grants camera permission.
+
+---
+
 ## Pendientes conocidos
 
 | Item | Severidad | Notas |
@@ -606,3 +714,4 @@ Configurado en el proxy para todas las rutas `/api/*`. Solo orígenes en:
 | `unsafe-inline` en `style-src` | Low | Estándar para la mayoría de aplicaciones Next.js. Mejorable con style nonces si el framework lo soporta en el futuro. |
 | Order number gaps | Low | Si el INSERT falla tras `get_next_pedido_number`, el número se pierde. Operacionalmente menor, no es riesgo de seguridad. |
 | Rate limit por tenant en pedidos públicos | Low | La creación de pedidos y clientes usa rate limit por IP. Para tenants con mucho tráfico legítimo desde IPs compartidas (NAT corporativo), considerar rate limit compuesto `empresaId:ip`. |
+| Leaked password protection (Supabase Auth) | Info | Supabase advierte que la protección contra contraseñas filtradas (HaveIBeenPwned) está deshabilitada. **Requiere plan Pro** — no disponible en el plan actual. No aplica tampoco porque el login de admin usa credenciales de `auth.users` de Supabase gestionadas internamente, no contraseñas definidas por usuarios finales. |

@@ -10,6 +10,15 @@
 -- Helper function used by policies:
 --   get_mi_empresa_id() → returns empresa_id from perfiles_admin where id = auth.uid()
 --   (SECURITY DEFINER, search_path = 'public')
+--
+-- === SUPERADMIN SUPPORT ===
+-- perfiles_admin.empresa_id must be nullable (NULL for superadmins)
+-- Run this migration to enable superadmin:
+--
+-- ALTER TABLE public.perfiles_admin ALTER COLUMN empresa_id DROP NOT NULL;
+-- ALTER TABLE public.perfiles_admin DROP CONSTRAINT IF EXISTS perfiles_admin_empresa_id_fkey;
+--
+-- Roles: 'admin' (per-tenants) or 'superadmin' (global access)
 
 CREATE TABLE public.empresas (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -58,19 +67,23 @@ CREATE TABLE public.empresas (
   fb text,
   instagram text,
   url_mapa text,
+  mostrar_promociones boolean DEFAULT true,
+  mostrar_tgtg boolean DEFAULT true,
+  descuento_bienvenida_activo boolean DEFAULT false,
+  descuento_bienvenida_porcentaje numeric(5,2) DEFAULT 5.00,
   CONSTRAINT empresas_pkey PRIMARY KEY (id)
 );
 -- RLS: SELECT public (true) | UPDATE admin (id = get_mi_empresa_id())
 
 CREATE TABLE public.perfiles_admin (
   id uuid NOT NULL,
-  empresa_id uuid NOT NULL,
+  empresa_id uuid NULL,  -- NULL for superadmins
   nombre_completo text,
-  rol text DEFAULT 'admin'::text,
+  rol text DEFAULT 'admin'::text CHECK (rol IN ('admin', 'superadmin')),
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()),
   CONSTRAINT perfiles_admin_pkey PRIMARY KEY (id),
-  CONSTRAINT perfiles_admin_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id),
-  CONSTRAINT perfiles_admin_empresa_id_fkey FOREIGN KEY (empresa_id) REFERENCES public.empresas(id)
+  CONSTRAINT perfiles_admin_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
+  -- empresa_id FK removed to allow NULL for superadmins
 );
 -- RLS: SELECT/INSERT/UPDATE own (id = auth.uid()) | No DELETE
 
@@ -138,6 +151,24 @@ CREATE TABLE public.clientes (
 );
 -- RLS: ALL admin (empresa_id = get_mi_empresa_id()) | INSERT public (empresa_id IS NOT NULL)
 
+CREATE TABLE public.codigos_descuento (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  empresa_id uuid NOT NULL,
+  cliente_email text NOT NULL,
+  codigo text NOT NULL,
+  porcentaje_descuento numeric(5,2) DEFAULT 5.00,
+  fecha_expiracion timestamp with time zone NOT NULL,
+  usado boolean DEFAULT false,
+  pedido_id uuid,
+  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()),
+  CONSTRAINT codigos_descuento_pkey PRIMARY KEY (id),
+  CONSTRAINT codigos_descuento_empresa_id_fkey FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE,
+  CONSTRAINT codigos_descuento_pedido_id_fkey FOREIGN KEY (pedido_id) REFERENCES public.pedidos(id) ON DELETE SET NULL,
+  CONSTRAINT codigos_descuento_empresa_codigo_unique UNIQUE (empresa_id, codigo),
+  CONSTRAINT codigos_descuento_empresa_email_unique UNIQUE (empresa_id, cliente_email)
+);
+-- RLS: All TO anon USING (false) — deny all access (service_role only)
+
 CREATE TABLE public.pedidos (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
   numero_pedido integer NOT NULL DEFAULT nextval('pedidos_numero_pedido_seq'::regclass),
@@ -148,6 +179,9 @@ CREATE TABLE public.pedidos (
   estado text DEFAULT 'pendiente'::text,
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()),
   cliente_id uuid,
+  codigo_descuento_id uuid REFERENCES codigos_descuento(id) ON DELETE SET NULL,
+  descuento_porcentaje numeric(5,2),
+  total_sin_descuento numeric(10,2),
   CONSTRAINT pedidos_pkey PRIMARY KEY (id),
   CONSTRAINT pedidos_empresa_id_fkey FOREIGN KEY (empresa_id) REFERENCES public.empresas(id),
   CONSTRAINT pedidos_cliente_id_fkey FOREIGN KEY (cliente_id) REFERENCES public.clientes(id)

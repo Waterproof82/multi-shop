@@ -38,10 +38,29 @@ export async function POST(request: NextRequest) {
   const rateLimited = await rateLimitAdmin(request);
   if (rateLimited) return rateLimited;
 
-  const { empresaId, error: authError } = await requireAuth(request);
-  if (authError || !empresaId) return authError ?? NextResponse.json(createErrorResponse(AUTH_ERRORS.UNAUTHORIZED), { status: 401 });
-  const roleError = requireRole(request, ['admin']);
+  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request);
+  if (authError) return authError;
+  
+  const roleError = requireRole(request, ['admin', 'superadmin']);
   if (roleError) return roleError;
+
+  const url = new URL(request.url);
+  const queryEmpresaId = url.searchParams.get('empresaId');
+  
+  // For superadmin, require empresaId from query param
+  let empresaId: string | null;
+  if (isSuperAdmin) {
+    if (!queryEmpresaId) {
+      return NextResponse.json(createErrorResponse(AUTH_ERRORS.UNAUTHORIZED), { status: 401 });
+    }
+    empresaId = queryEmpresaId;
+  } else {
+    empresaId = authEmpresaId;
+  }
+  
+  if (!empresaId) {
+    return NextResponse.json(createErrorResponse(AUTH_ERRORS.UNAUTHORIZED), { status: 401 });
+  }
 
   const { publicDomain } = getR2Config();
   if (!publicDomain) {

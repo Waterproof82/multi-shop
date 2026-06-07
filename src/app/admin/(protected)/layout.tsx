@@ -3,9 +3,12 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { AdminSidebar } from './admin-sidebar';
 import { AdminProvider } from '@/lib/admin-context';
-import { authAdminUseCase } from '@/core/infrastructure/database';
+import { authAdminUseCase, empresaUseCase } from '@/core/infrastructure/database';
 import { AdminThemeProvider } from '@/components/admin-theme-provider';
-import { EmpresaThemeProvider } from '@/components/empresa-theme-provider';
+import { SUPERADMIN_ROLE } from '@/core/domain/repositories/IAdminRepository';
+import { SuperadminBanner } from '@/components/superadmin-banner';
+
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
@@ -29,28 +32,64 @@ export default async function AdminProtectedLayout({
     redirect('/admin/login');
   }
 
-  const empresa = admin.empresa;
-  const empresaId = admin.empresaId;
+  let empresaId: string;
+  let empresa = admin.empresa;
+  let isSuperAdminView = false;
+  let mostrarPromociones = empresa?.mostrarPromociones ?? true;
+  let mostrarTgtg = empresa?.mostrarTgtg ?? true;
+  let mesasHabilitadas = empresa?.mesasHabilitadas ?? true;
+  let empresaTipo: 'tienda' | 'restaurante' = (empresa?.tipo === 'restaurante') ? 'restaurante' : 'tienda';
+
+  if (admin.rol === SUPERADMIN_ROLE) {
+    const cookieList = await cookies();
+    const superadminEmpresaId = cookieList.get('superadmin_empresa_id')?.value;
+
+    if (!superadminEmpresaId) {
+      redirect('/superadmin');
+    }
+    empresaId = superadminEmpresaId;
+    isSuperAdminView = true;
+    const empresaResult = await empresaUseCase.getById(empresaId);
+    if (empresaResult.success && empresaResult.data) {
+      empresa = empresaResult.data as unknown as typeof empresa;
+      mostrarPromociones = empresaResult.data.mostrarPromociones ?? true;
+      mostrarTgtg = empresaResult.data.mostrarTgtg ?? true;
+      mesasHabilitadas = empresaResult.data.mesasHabilitadas ?? true;
+      empresaTipo = (empresaResult.data.tipo === 'restaurante') ? 'restaurante' : 'tienda';
+    }
+  } else {
+    empresaId = admin.empresaId!;
+  }
 
   return (
     <AdminThemeProvider>
-      <EmpresaThemeProvider colores={empresa?.colores || null}>
-        <AdminProvider empresaId={empresaId} empresaNombre={empresa?.nombre || 'default'} empresaLogo={empresa?.logoUrl}>
-          <div className="min-h-screen bg-muted">
-            {/* Skip to main content link for accessibility */}
-            <a
-              href="#main-content"
-              className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-4 focus:left-4 focus:bg-primary focus:text-primary-foreground focus:px-4 focus:py-2 focus:rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-            >
-              Saltar al contenido principal
-            </a>
-            <AdminSidebar empresaId={empresaId} />
-            <main id="main-content" className="lg:ml-64 min-h-screen">
-              {children}
-            </main>
-          </div>
-        </AdminProvider>
-      </EmpresaThemeProvider>
+      <AdminProvider
+        empresaId={empresaId}
+        empresaNombre={empresa?.nombre ?? 'default'}
+        empresaLogo={empresa?.logoUrl ?? undefined}
+        empresaTipo={empresaTipo}
+        mostrarPromociones={mostrarPromociones}
+        mostrarTgtg={mostrarTgtg}
+        mesasHabilitadas={mesasHabilitadas}
+        overrideEmpresaId={isSuperAdminView ? empresaId : undefined}
+        isSuperAdmin={isSuperAdminView}
+      >
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+          {isSuperAdminView && (
+            <SuperadminBanner empresaNombre={empresa?.nombre ?? ''} />
+          )}
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-4 focus:left-4 focus:bg-cyan-500 focus:text-white focus:px-4 focus:py-2 focus:rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-900"
+          >
+            Saltar al contenido principal
+          </a>
+          <AdminSidebar empresaId={empresaId} />
+          <main id="main-content" className={`lg:ml-64 min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 ${isSuperAdminView ? 'pt-20' : 'pt-16'}`}>
+            {children}
+          </main>
+        </div>
+      </AdminProvider>
     </AdminThemeProvider>
   );
 }

@@ -1,15 +1,26 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Image from 'next/image';
-import { Plus, Pencil, Trash2, Loader2, Image as ImageIcon, Search, ArrowUpDown, ArrowUp, ArrowDown, Utensils, Star } from 'lucide-react';
+import { Plus, Pencil, Trash2, Image as ImageIcon, Search, ArrowUpDown, ArrowUp, ArrowDown, Package, Star, Video } from 'lucide-react';
+
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.avif'];
+
+function isValidImageUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  const lowerUrl = url.toLowerCase();
+  return IMAGE_EXTENSIONS.some(ext => lowerUrl.endsWith(ext));
+}
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { useAdmin } from '@/lib/admin-context';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import { ProductFormDialog, DeleteConfirmDialog } from '@/components/admin/product-form-dialog';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import type { ProductoFormData } from '@/components/admin/product-form-dialog';
+import type { ImageFit } from '@/core/application/dtos/menu-view-model';
+import { SkeletonTable, SkeletonStats, Skeleton } from '@/components/ui/skeleton';
 import { formatPrice } from '@/lib/format-price';
 
 interface Categoria {
@@ -32,9 +43,11 @@ interface Producto {
   descripcion_de: string | null;
   precio: number;
   foto_url: string | null;
+  foto_object_fit: ImageFit | null;
   categoria_id: string | null;
   es_especial: boolean;
   activo: boolean;
+  tipo_producto: 'comida' | 'bebida';
 }
 
 const emptyForm: ProductoFormData = {
@@ -50,9 +63,11 @@ const emptyForm: ProductoFormData = {
   descripcion_de: '',
   precio: '',
   foto_url: '',
+  foto_object_fit: 'contain',
   categoria_id: '',
   es_especial: false,
   activo: true,
+  tipo_producto: 'comida',
 };
 
 const SortIndicator = ({ field, currentField, direction }: { field: keyof Producto | 'categoria'; currentField: keyof Producto | 'categoria'; direction: 'asc' | 'desc' }) => {
@@ -65,8 +80,9 @@ const SortIndicator = ({ field, currentField, direction }: { field: keyof Produc
 };
 
 export default function ProductosPage() {
-  const { empresaSlug } = useAdmin();
+  const { empresaId, empresaSlug, overrideEmpresaId, empresaTipo } = useAdmin();
   const { language } = useLanguage();
+  const effectiveEmpresaId = overrideEmpresaId || empresaId;
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,22 +97,26 @@ export default function ProductosPage() {
   const [showTranslations, setShowTranslations] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; id: string | null; nombre: string | null }>({ show: false, id: null, nombre: null });
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [prodRes, catRes] = await Promise.all([
-        fetch('/api/admin/productos'),
-        fetch('/api/admin/categorias'),
+        fetchWithCsrf(`/api/admin/productos?empresaId=${effectiveEmpresaId}`, {}, {
+          maxRetries: 3,
+          baseDelay: 1000,
+          retryOn: (response) => response.status >= 500 || response.status === 429 || response.status === 408
+        }),
+        fetchWithCsrf(`/api/admin/categorias?empresaId=${effectiveEmpresaId}`, {}, {
+          maxRetries: 3,
+          baseDelay: 1000,
+          retryOn: (response) => response.status >= 500 || response.status === 429 || response.status === 408
+        }),
       ]);
-      
+
       if (prodRes.ok) {
         const prodData = await prodRes.json();
         setProductos(prodData);
       }
-      
+
       if (catRes.ok) {
         const catData = await catRes.json();
         setCategorias(catData);
@@ -106,7 +126,11 @@ export default function ProductosPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [language, effectiveEmpresaId]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleSubmit = async (e: { preventDefault: () => void }) => {
     e.preventDefault();
@@ -115,8 +139,8 @@ export default function ProductosPage() {
 
     try {
       const url = editingId 
-        ? `/api/admin/productos?id=${editingId}` 
-        : '/api/admin/productos';
+        ? `/api/admin/productos?id=${editingId}&empresaId=${effectiveEmpresaId}` 
+        : `/api/admin/productos?empresaId=${effectiveEmpresaId}`;
       
       const method = editingId ? 'PUT' : 'POST';
 
@@ -134,11 +158,16 @@ export default function ProductosPage() {
         descripcion_it: formData.descripcion_it || null,
         descripcion_de: formData.descripcion_de || null,
         foto_url: formData.foto_url || null,
+        foto_object_fit: formData.foto_object_fit || 'contain',
       };
 
       const res = await fetchWithCsrf(url, {
         method,
         body: JSON.stringify(payload),
+      }, {
+        maxRetries: 2,
+        baseDelay: 1000,
+        retryOn: (response) => response.status >= 500 || response.status === 429
       });
 
       if (!res.ok) {
@@ -171,9 +200,11 @@ export default function ProductosPage() {
       descripcion_de: producto.descripcion_de || '',
       precio: producto.precio.toString(),
       foto_url: producto.foto_url || '',
+      foto_object_fit: producto.foto_object_fit || 'contain',
       categoria_id: producto.categoria_id || '',
       es_especial: producto.es_especial,
       activo: producto.activo,
+      tipo_producto: producto.tipo_producto ?? 'comida',
     });
     setEditingId(producto.id);
     setIsModalOpen(true);
@@ -195,9 +226,13 @@ export default function ProductosPage() {
     const newActivo = !prod.activo;
     setProductos(prev => prev.map(p => p.id === prod.id ? { ...p, activo: newActivo } : p));
     try {
-      const res = await fetchWithCsrf(`/api/admin/productos?id=${prod.id}`, {
+      const res = await fetchWithCsrf(`/api/admin/productos?id=${prod.id}&empresaId=${effectiveEmpresaId}`, {
         method: 'PUT',
         body: JSON.stringify({ activo: newActivo }),
+      }, {
+        maxRetries: 2,
+        baseDelay: 500,
+        retryOn: (response) => response.status >= 500 || response.status === 429
       });
       if (!res.ok) {
         setProductos(prev => prev.map(p => p.id === prod.id ? { ...p, activo: prod.activo } : p));
@@ -235,8 +270,12 @@ export default function ProductosPage() {
   const confirmDeleteProduct = async () => {
     if (!deleteConfirm.id) return;
     try {
-      const res = await fetchWithCsrf(`/api/admin/productos?id=${deleteConfirm.id}`, {
+      const res = await fetchWithCsrf(`/api/admin/productos?id=${deleteConfirm.id}&empresaId=${effectiveEmpresaId}`, {
         method: 'DELETE',
+      }, {
+        maxRetries: 2,
+        baseDelay: 1000,
+        retryOn: (response) => response.status >= 500 || response.status === 429
       });
       if (!res.ok) throw new Error(t("deleteError", language));
       await fetchData();
@@ -296,8 +335,33 @@ export default function ProductosPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="pt-16 lg:pt-0 px-6 py-8 space-y-8 min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+        {/* Header con stats skeleton */}
+        <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-6 sm:p-8 shadow-2xl">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-48 bg-white/20" />
+              <Skeleton className="h-4 w-64 bg-white/10" />
+            </div>
+            <SkeletonStats count={2} itemClassName="bg-white/10" />
+          </div>
+        </div>
+
+        {/* Buscador skeleton */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <Skeleton className="h-10 w-full sm:w-80" />
+          <Skeleton className="h-10 w-full sm:w-32" />
+        </div>
+
+        {/* Tabla skeleton */}
+        <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl overflow-hidden">
+          <div className="p-4 border-b border-white/10">
+            <Skeleton className="h-6 w-32" />
+          </div>
+          <div className="p-4">
+            <SkeletonTable rows={8} columns={6} />
+          </div>
+        </div>
       </div>
     );
   }
@@ -305,70 +369,67 @@ export default function ProductosPage() {
   const productosEspeciales = productos.filter(p => p.es_especial).length;
 
   return (
-    <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
+    <div className="pt-16 lg:pt-0 px-6 py-8 space-y-8 min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Header con stats */}
-      <div className="bg-primary rounded-lg p-4 sm:p-6">
+      <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-6 sm:p-8 shadow-2xl">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">{t("productsTitle", language)}</h1>
-            <p className="text-primary-foreground/80 text-sm mt-1">{t("productsSubtitle", language)}</p>
+            <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">{t("productsTitle", language)}</h1>
+            <p className="text-slate-300 text-sm mt-1">{t("productsSubtitle", language)}</p>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
-              <Utensils className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
-              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{productos.length}</span>
-              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">{t("total", language)}</p>
-            </div>
-            <div className="bg-primary-foreground/20 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center">
-              <Star className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground mx-auto mb-1" />
-              <span className="text-lg sm:text-2xl font-semibold text-primary-foreground">{productosEspeciales}</span>
-              <p className="text-primary-foreground/80 text-[10px] sm:text-xs">{t("destacados", language)}</p>
-            </div>
+            <section className="backdrop-blur-xl bg-gradient-to-br from-cyan-500/20 to-cyan-700/20 border border-cyan-400/30 rounded-xl px-3 sm:px-4 py-3 text-center hover:shadow-[0_0_20px_rgba(34,211,238,0.3)] transition-shadow duration-300">
+              <Package className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-300 mx-auto mb-2" />
+              <span className="text-lg sm:text-2xl font-semibold text-white">{productos.length}</span>
+              <p className="text-cyan-300 text-[10px] sm:text-xs">{t("total", language)}</p>
+            </section>
+            <section className="backdrop-blur-xl bg-gradient-to-br from-amber-500/20 to-amber-700/20 border border-amber-400/30 rounded-xl px-3 sm:px-4 py-3 text-center hover:shadow-[0_0_20px_rgba(217,119,6,0.3)] transition-shadow duration-300">
+              <Star className="w-5 h-5 sm:w-6 sm:h-6 text-amber-300 mx-auto mb-2" />
+              <span className="text-lg sm:text-2xl font-semibold text-white">{productosEspeciales}</span>
+              <p className="text-amber-300 text-[10px] sm:text-xs">{t("destacados", language)}</p>
+            </section>
           </div>
         </div>
       </div>
 
       {/* Buscador y acciones */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="relative flex-1 w-full sm:max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <div className="relative flex-1 w-full sm:max-w-xs backdrop-blur-xl bg-white/10 border border-white/20 rounded-xl px-3 py-2">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
             type="text"
             placeholder={t("searchProducts", language)}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             aria-label={t("searchProducts", language)}
-            className="pl-10 w-full"
+            className="pl-10 w-full bg-transparent border-0 text-white placeholder:text-slate-400 focus:outline-none focus:ring-0"
           />
         </div>
-        <button
-          onClick={openCreateModal}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 w-full sm:w-auto justify-center outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px]"
-        >
+        <Button onClick={openCreateModal} className="w-full sm:w-auto">
           <Plus className="h-4 w-4" />
           <span>{t("newProduct", language)}</span>
-        </button>
+        </Button>
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 text-destructive rounded-md">
+        <div className="mb-4 p-3 bg-red-500/20 border border-red-400/30 text-red-300 rounded-md">
           {error}
         </div>
       )}
 
       {categorias.length === 0 && (
-        <div className="mb-4 p-4 bg-secondary border border-border text-secondary-foreground rounded-md">
+        <div className="mb-4 p-4 bg-yellow-500/20 border border-yellow-400/30 text-yellow-300 rounded-md">
           {t("noCategoriesWarning", language)}
         </div>
       )}
 
-      <div className="bg-card rounded-lg shadow-elegant border border-border overflow-hidden">
+      <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl overflow-hidden">
         {/* Desktop table */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="min-w-full divide-y divide-border">
-            <thead className="bg-muted">
+        <div className="hidden md:block overflow-x-auto scrollbar scrollbar-thumb-white/20 scrollbar-track-transparent scrollbar-thin">
+          <table className="min-w-full divide-y divide-white/10">
+            <thead className="bg-white/5 border-b border-white/10">
               <tr>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">
                   {t("image", language)}
                 </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase" aria-sort={getAriaSortValue('titulo_es')}>
@@ -416,27 +477,38 @@ export default function ProductosPage() {
               {filteredProductos.map((prod) => (
                 <tr key={prod.id} className="hover:bg-muted/50">
                   <td className="px-4 py-3 whitespace-nowrap">
-                    {prod.foto_url ? (
-                      <Image 
-                        src={prod.foto_url} 
-                        alt={prod.titulo_es}
-                        width={40}
-                        height={40}
-                        className="h-10 w-10 rounded-md object-cover"
-                        loading="lazy"
-                        unoptimized
-                      />
-                    ) : (
-                      <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center">
-                        <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                    )}
+                    {(() => {
+                      if (isValidImageUrl(prod.foto_url)) {
+                        return (
+                          <Image 
+                            src={prod.foto_url!} 
+                            alt={prod.titulo_es}
+                            width={40}
+                            height={40}
+                            className="h-10 w-10 rounded-md object-cover"
+                            loading="lazy"
+                          />
+                        );
+                      } else if (prod.foto_url) {
+                        return (
+                          <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center">
+                            <Video className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center">
+                            <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                        );
+                      }
+                    })()}
                   </td>
                   <td className="px-4 py-3">
                     <div className="text-sm font-medium text-foreground">
                       {prod.titulo_es}
                       {prod.es_especial && (
-                        <span className="ml-2 px-2 py-0.5 text-xs bg-accent/10 text-accent rounded-full">
+                        <span className="ml-2 px-2 py-0.5 text-xs bg-red-500/20 text-red-400 border border-red-400/30 rounded-full">
                           {t("especial", language)}
                         </span>
                       )}
@@ -460,7 +532,7 @@ export default function ProductosPage() {
                       className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                         prod.activo
                           ? 'bg-primary/10 text-primary hover:bg-primary/20'
-                          : 'bg-muted text-foreground hover:bg-muted/80'
+                          : 'bg-destructive/10 text-destructive hover:bg-destructive/20'
                       }`}
                     >
                       {prod.activo ? t("active", language) : t("inactive", language)}
@@ -470,14 +542,14 @@ export default function ProductosPage() {
                     <button
                       onClick={() => openEditModal(prod)}
                       className="p-2 text-primary hover:text-primary/80 mr-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
-                      aria-label={`Editar ${prod.titulo_es}`}
+                      aria-label={`${t("edit", language)} ${prod.titulo_es}`}
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => handleDeleteProduct(prod.id)}
                       className="p-2 text-destructive hover:text-destructive/80 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
-                      aria-label={`Eliminar ${prod.titulo_es}`}
+                      aria-label={`${t("delete", language)} ${prod.titulo_es}`}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -501,21 +573,32 @@ export default function ProductosPage() {
             <div key={prod.id} className="p-4 hover:bg-muted/50">
               <div className="flex gap-3">
                   <div className="flex-shrink-0">
-                    {prod.foto_url ? (
-                      <Image 
-                        src={prod.foto_url} 
-                        alt={prod.titulo_es}
-                        width={64}
-                        height={64}
-                        className="h-16 w-16 rounded-md object-cover"
-                        loading="lazy"
-                        unoptimized
-                      />
-                    ) : (
-                      <div className="h-16 w-16 rounded-md bg-muted flex items-center justify-center">
-                        <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                      </div>
-                    )}
+                    {(() => {
+                      if (isValidImageUrl(prod.foto_url)) {
+                        return (
+                          <Image 
+                            src={prod.foto_url!} 
+                            alt={prod.titulo_es}
+                            width={64}
+                            height={64}
+                            className="h-16 w-16 rounded-md object-cover"
+                            loading="lazy"
+                          />
+                        );
+                      } else if (prod.foto_url) {
+                        return (
+                          <div className="h-16 w-16 rounded-md bg-muted flex items-center justify-center">
+                            <Video className="h-8 w-8 text-muted-foreground" />
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div className="h-16 w-16 rounded-md bg-muted flex items-center justify-center">
+                            <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                          </div>
+                        );
+                      }
+                    })()}
                   </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between">
@@ -523,7 +606,7 @@ export default function ProductosPage() {
                       <p className="text-sm font-medium text-foreground">
                         {prod.titulo_es}
                         {prod.es_especial && (
-                          <span className="ml-2 px-2 py-0.5 text-xs bg-accent/10 text-accent rounded-full">
+                          <span className="ml-2 px-2 py-0.5 text-xs bg-red-500/20 text-red-400 border border-red-400/30 rounded-full">
                             {t("especial", language)}
                           </span>
                         )}
@@ -534,21 +617,21 @@ export default function ProductosPage() {
                       <button
                         onClick={() => openEditModal(prod)}
                         className="p-1.5 min-h-[44px] min-w-[44px] flex items-center justify-center text-primary hover:bg-primary/10 dark:hover:bg-primary/20 rounded outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                        aria-label={`Editar ${prod.titulo_es}`}
+                        aria-label={`${t("edit", language)} ${prod.titulo_es}`}
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => handleDeleteProduct(prod.id)}
                         className="p-1.5 min-h-[44px] min-w-[44px] flex items-center justify-center text-destructive hover:bg-destructive/10 rounded outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                        aria-label={`Eliminar ${prod.titulo_es}`}
+                        aria-label={`${t("delete", language)} ${prod.titulo_es}`}
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
                   </div>
                   <div className="mt-2 flex items-center justify-between">
-                    <span className="text-sm font-medium text-foreground">{prod.precio.toFixed(2)} €</span>
+                    <span className="text-sm font-medium text-foreground">{formatPrice(prod.precio, 'EUR', language)}</span>
                     <button
                       onClick={(e) => { e.stopPropagation(); toggleActivo(prod); }}
                       className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
@@ -587,6 +670,7 @@ export default function ProductosPage() {
         saving={saving}
         onSubmit={handleSubmit}
         empresaSlug={empresaSlug}
+        isRestaurante={empresaTipo === 'restaurante'}
       />
 
       <DeleteConfirmDialog

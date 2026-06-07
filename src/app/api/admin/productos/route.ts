@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { productUseCase } from '@/core/infrastructure/database';
 import { createProductSchema, updateProductSchema, productIdSchema } from '@/core/application/dtos/product.dto';
-import { requireAuth, requireRole, handleResult, handleResultWithStatus, validationErrorResponse } from '@/core/infrastructure/api/helpers';
+import { requireAuth, requireRole, handleResult, handleResultWithStatus, validationErrorResponse, type AuthResult } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import type { Product } from '@/core/domain/entities/types';
 
@@ -23,8 +23,10 @@ function toAdminProduct(prod: Product) {
     descripcion_de: prod.descripcion_de || null,
     precio: prod.precio,
     foto_url: prod.fotoUrl,
+    foto_object_fit: prod.fotoObjectFit || 'contain',
     es_especial: prod.esEspecial,
     activo: prod.activo,
+    tipo_producto: prod.tipoProducto,
   };
 }
 
@@ -32,10 +34,25 @@ export async function GET(request: NextRequest) {
   const rateLimited = await rateLimitAdmin(request);
   if (rateLimited) return rateLimited;
 
-  const { empresaId, error: authError } = await requireAuth(request);
+  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request) as AuthResult;
   if (authError) return authError;
+  const roleError = requireRole(request, ['admin', 'superadmin']);
+  if (roleError) return roleError;
 
-  const result = await productUseCase.getAll(empresaId!);
+  const { searchParams } = new URL(request.url);
+  const queryEmpresaId = searchParams.get('empresaId');
+  
+  if (isSuperAdmin && !queryEmpresaId) {
+    return validationErrorResponse('empresaId query param required for superadmin');
+  }
+  
+  const empresaId = queryEmpresaId || authEmpresaId;
+  
+  if (!empresaId) {
+    return validationErrorResponse('Empresa ID required');
+  }
+
+  const result = await productUseCase.getAll(empresaId);
   
   if (!result.success) {
     return handleResult(result);
@@ -50,10 +67,23 @@ export async function POST(request: NextRequest) {
   const rateLimited = await rateLimitAdmin(request);
   if (rateLimited) return rateLimited;
 
-  const { empresaId, error: authError } = await requireAuth(request);
+  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request) as AuthResult;
   if (authError) return authError;
-  const roleError = requireRole(request, ['admin']);
+  const roleError = requireRole(request, ['admin', 'superadmin']);
   if (roleError) return roleError;
+
+  const { searchParams } = new URL(request.url);
+  const queryEmpresaId = searchParams.get('empresaId');
+  
+  if (isSuperAdmin && !queryEmpresaId) {
+    return validationErrorResponse('empresaId query param required for superadmin');
+  }
+  
+  const empresaId = queryEmpresaId || authEmpresaId;
+  
+  if (!empresaId) {
+    return validationErrorResponse('Empresa ID required');
+  }
 
   let body: unknown;
   try {
@@ -80,17 +110,28 @@ export async function PUT(request: NextRequest) {
   const rateLimited = await rateLimitAdmin(request);
   if (rateLimited) return rateLimited;
 
-  const { empresaId, error: authError } = await requireAuth(request);
+  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request) as AuthResult;
   if (authError) return authError;
-  const roleError = requireRole(request, ['admin']);
+  const roleError = requireRole(request, ['admin', 'superadmin']);
   if (roleError) return roleError;
 
   const { searchParams } = new URL(request.url);
   const idParam = searchParams.get('id');
+  const queryEmpresaId = searchParams.get('empresaId');
   const idParsed = productIdSchema.safeParse({ id: idParam });
 
   if (!idParsed.success) {
     return validationErrorResponse('ID inválido');
+  }
+
+  if (isSuperAdmin && !queryEmpresaId) {
+    return validationErrorResponse('empresaId query param required for superadmin');
+  }
+  
+  const empresaId = queryEmpresaId || authEmpresaId;
+  
+  if (!empresaId) {
+    return validationErrorResponse('Empresa ID required');
   }
 
   let body: unknown;
@@ -122,20 +163,31 @@ export async function DELETE(request: NextRequest) {
   const rateLimited = await rateLimitAdmin(request);
   if (rateLimited) return rateLimited;
 
-  const { empresaId, error: authError } = await requireAuth(request);
+  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request) as AuthResult;
   if (authError) return authError;
-  const roleError = requireRole(request, ['admin']);
+  const roleError = requireRole(request, ['admin', 'superadmin']);
   if (roleError) return roleError;
 
   const { searchParams } = new URL(request.url);
   const idParam = searchParams.get('id');
+  const queryEmpresaId = searchParams.get('empresaId');
   const idParsed = productIdSchema.safeParse({ id: idParam });
 
   if (!idParsed.success) {
     return validationErrorResponse('ID inválido');
   }
 
-  const result = await productUseCase.delete(idParsed.data.id, empresaId!);
+  if (isSuperAdmin && !queryEmpresaId) {
+    return validationErrorResponse('empresaId query param required for superadmin');
+  }
+  
+  const empresaId = queryEmpresaId || authEmpresaId;
+  
+  if (!empresaId) {
+    return validationErrorResponse('Empresa ID required');
+  }
+  
+  const result = await productUseCase.delete(idParsed.data.id, empresaId);
   
   if (!result.success) {
     return handleResult(result);

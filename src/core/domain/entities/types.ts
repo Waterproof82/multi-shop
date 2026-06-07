@@ -1,3 +1,5 @@
+export type ImageFit = 'contain' | 'cover' | 'fill' | 'none' | 'scale-down';
+
 export interface Product {
   id: string;
   empresaId: string;
@@ -14,8 +16,10 @@ export interface Product {
   descripcion_de: string | null;
   precio: number;
   fotoUrl: string | null;
+  fotoObjectFit: ImageFit | null;
   esEspecial: boolean;
   activo: boolean;
+  tipoProducto: 'comida' | 'bebida';
   createdAt: Date;
 }
 
@@ -57,12 +61,18 @@ export interface Empresa {
   id: string;
   nombre: string;
   dominio: string;
+  tipo: 'tienda' | 'restaurante' | null;
   slug: string | null;
   logoUrl: string | null;
+  mostrarLogo: boolean;
   mostrarCarrito: boolean;
+  mostrarPromociones: boolean;
+  mostrarTgtg: boolean;
+  mesasHabilitadas: boolean;
   moneda: string;
   emailNotification: string | null;
   urlImage: string | null;
+  bannerFit: "contain" | "cover" | "fill" | null;
   colores: EmpresaColores | null;
   descripcion: {
     es?: string | null;
@@ -76,6 +86,9 @@ export interface Empresa {
   urlMapa?: string | null;
   direccion?: string | null;
   telefonoWhatsapp?: string | null;
+  descuentoBienvenidaActivo: boolean;
+  descuentoBienvenidaPorcentaje: number;
+  descuentoBienvenidaDuracion?: number | null;
 }
 
 interface TranslatableText {
@@ -90,11 +103,14 @@ export interface EmpresaPublic {
   id: string;
   nombre: string;
   dominio: string;
+  tipo: string | null;
   mostrarCarrito: boolean;
   moneda: string;
   subdomainPedidos: string | null;
   logoUrl: string | null;
+  mostrarLogo: boolean;
   urlImage: string | null;
+  bannerFit: "contain" | "cover" | "fill" | null;
   colores: EmpresaColores | null;
   descripcion: TranslatableText | null;
   titulo: string | null;
@@ -108,6 +124,11 @@ export interface EmpresaPublic {
   direccion: string | null;
   telefono: string | null;
   emailNotification: string | null;
+  descuentoBienvenidaActivo: boolean;
+  descuentoBienvenidaPorcentaje: number;
+  descuentoBienvenidaDuracion?: number | null;
+  mesasHabilitadas?: boolean;
+  pagosPickupHabilitados?: boolean;
 }
 
 export interface Cliente {
@@ -117,6 +138,7 @@ export interface Cliente {
   email: string | null;
   telefono: string | null;
   direccion: string | null;
+  idioma: string | null;
   aceptar_promociones: boolean | null;
   created_at: string;
 }
@@ -141,6 +163,7 @@ export interface CartItem {
     id: string;
     name: string;
     price: number;
+    translations?: { en?: { name: string }; fr?: { name: string }; it?: { name: string }; de?: { name: string } };
   };
   quantity: number;
   selectedComplements?: { name: string; price: number }[];
@@ -156,11 +179,25 @@ export interface Pedido {
   moneda: string | null;
   estado: string;
   created_at: string;
+  tracking_token: string | null;
+  estimated_minutes: number | null;
+  estimated_ready_at: string | null;
   clientes?: {
     nombre: string;
     email: string;
     telefono: string;
   };
+  // Delivery / rider fields
+  riderId?: string | null;
+  pickupEtaMinutes?: number | null;
+  assignedAt?: string | null;
+  direccionEntrega?: string | null;
+  codigoPostal?: string | null;
+  paymentStatus?: 'not_required' | 'pending' | 'paid' | 'failed';
+  paymentOrderRef?: string | null;
+  paymentAmountCents?: number | null;
+  delivery_fee_cents?: number | null;
+  origen?: string | null;
 }
 
 export interface Promocion {
@@ -170,7 +207,59 @@ export interface Promocion {
   texto_promocion: string;
   numero_envios: number;
   imagen_url: string | null;
+  fecha_fin: string | null;
   created_at: string;
+}
+
+export interface TgtgPromocion {
+  id: string;
+  empresaId: string;
+  horaRecogidaInicio: string; // HH:MM
+  horaRecogidaFin: string;   // HH:MM
+  fechaActivacion: string;   // YYYY-MM-DD
+  numeroEnvios: number;
+  emailEnviado: boolean;
+  createdAt: string;
+  items?: TgtgItem[];
+}
+
+export interface TgtgItem {
+  id: string;
+  tgtgPromoId: string;
+  empresaId: string;
+  titulo: string;
+  descripcion: string | null;
+  imagenUrl: string | null;
+  precioOriginal: number;
+  precioDescuento: number;
+  cuponesTotal: number;
+  cuponesDisponibles: number;
+  orden: number;
+  createdAt: string;
+  reservasCount?: number;
+}
+
+export interface TgtgReserva {
+  id: string;
+  itemId: string;
+  tgtgPromoId: string;
+  empresaId: string;
+  email: string;
+  nombre: string | null;
+  token: string;
+  createdAt: string;
+}
+
+export interface CodigoDescuento {
+  id: string;
+  empresaId: string;
+  clienteEmail: string;
+  codigo: string;
+  porcentajeDescuento: number;
+  fechaExpiracion: string;
+  usado: boolean;
+  pedidoId: string | null;
+  createdAt: string;
 }
 
 // ============================================
@@ -179,7 +268,7 @@ export interface Promocion {
 
 export type ErrorSeverity = 'error' | 'warning' | 'critical';
 
-export type ErrorModule = 'repository' | 'use-case' | 'api' | 'middleware';
+export type ErrorModule = 'repository' | 'use-case' | 'api' | 'middleware' | 'infrastructure';
 
 export interface AppError {
   code: string;

@@ -49,7 +49,9 @@ function mapProductToItem(product: Product, categoryName: string): MenuItemVM {
     price: product.precio,
     category: categoryName.toLowerCase().replaceAll(" ", "-"),
     image: product.fotoUrl || undefined,
+    imageFit: product.fotoObjectFit || undefined,
     highlight: product.esEspecial,
+    tipoProducto: product.tipoProducto,
     translations: mapProductTranslations(product),
   };
 }

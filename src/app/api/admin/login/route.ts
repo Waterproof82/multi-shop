@@ -17,10 +17,10 @@ export async function GET(request: NextRequest) {
   response.headers.set('Cache-Control', 'no-store, private');
 
   response.cookies.set('csrf_token', cookieValue, {
-    httpOnly: true,
+    httpOnly: false, // JS must read this to stay in sync across tabs; JWT stays httpOnly
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
-    maxAge: 3600,
+    maxAge: 60 * 60 * 24, // 24h — matches JWT lifetime so it never expires mid-session
     path: '/',
   });
 
@@ -57,22 +57,36 @@ export async function POST(request: NextRequest) {
 
   const { token, admin } = result.data;
 
-  const cookieStore = await cookies();
+  const csrfToken = generateCsrfToken();
+  const csrfSignature = signCsrfToken(csrfToken);
+  const csrfCookieValue = `${csrfToken}:${csrfSignature}`;
 
-  cookieStore.set('admin_token', token, {
+  const response = successResponse({
+    success: true,
+    csrfToken,
+    admin: {
+      id: admin.id,
+      nombre: admin.nombreCompleto,
+      empresa: admin.empresa?.nombre ?? 'Super Admin',
+      rol: admin.rol,
+    },
+  });
+
+  response.cookies.set('superadmin_empresa_id', '', { maxAge: 0, path: '/' });
+  response.cookies.set('admin_token', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
     maxAge: 60 * 60 * 24,
     path: '/',
   });
-
-  return successResponse({
-    success: true,
-    admin: {
-      id: admin.id,
-      nombre: admin.nombreCompleto,
-      empresa: admin.empresa.nombre,
-    },
+  response.cookies.set('csrf_token', csrfCookieValue, {
+    httpOnly: false, // JS must read this to stay in sync across tabs; JWT stays httpOnly
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 60 * 60 * 24, // 24h — matches JWT lifetime
+    path: '/',
   });
+
+  return response;
 }

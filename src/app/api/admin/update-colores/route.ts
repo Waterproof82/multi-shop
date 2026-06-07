@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { empresaUseCase } from '@/core/infrastructure/database';
-import { requireAuth, requireRole, handleResult, validationErrorResponse } from '@/core/infrastructure/api/helpers';
+import { requireAuth, requireRole, handleResult, validationErrorResponse, type AuthResult } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import type { EmpresaColores } from '@/core/domain/entities/types';
 
@@ -24,10 +24,14 @@ export async function POST(request: NextRequest) {
   const rateLimited = await rateLimitAdmin(request);
   if (rateLimited) return rateLimited;
 
-  const { empresaId, error: authError } = await requireAuth(request);
+  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request) as AuthResult;
   if (authError) return authError;
-  const roleError = requireRole(request, ['admin']);
+  const roleError = requireRole(request, ['admin', 'superadmin']);
   if (roleError) return roleError;
+
+  const { searchParams } = new URL(request.url);
+  const queryEmpresaId = searchParams.get('empresaId');
+  const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
 
   let body: unknown;
   try {

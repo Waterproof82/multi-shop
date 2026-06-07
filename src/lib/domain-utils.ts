@@ -7,6 +7,10 @@ export function parseMainDomain(domain: string): string {
     : domain;
 }
 
+export function isPedidosDomain(domain: string): boolean {
+  return domain !== parseMainDomain(domain);
+}
+
 export async function getDomainFromHeaders(): Promise<string> {
   const headersList = await headers();
   const host = headersList.get('host');

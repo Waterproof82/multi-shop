@@ -1,13 +1,29 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { BarChart3, ShoppingCart, Euro, TrendingUp, TrendingDown, Users, Calendar, ArrowUpRight, ArrowDownRight, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import dynamic from 'next/dynamic';
+import { BarChart3, ShoppingCart, Euro, TrendingUp, Users, ArrowUpRight, ArrowDownRight, ChevronLeft, ChevronRight, Loader2, UtensilsCrossed, ShoppingBag, Globe } from 'lucide-react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, LineChart, Line } from 'recharts';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { logClientError } from '@/lib/client-error';
 import { useLanguage } from '@/lib/language-context';
+import { useAdmin } from '@/lib/admin-context';
 import { t } from '@/lib/translations';
+import { formatPrice } from '@/lib/format-price';
+
+// Lazy load all Recharts visualizations (~100KB) to reduce initial bundle
+const AdminCharts = dynamic(
+  () => import('@/components/admin/admin-charts').then(mod => mod.AdminCharts),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+);
+
 
 interface Stats {
   pedidosHoy: number;
@@ -25,6 +41,38 @@ interface Stats {
   pedidosAnterior: number;
   ingresosAnterior: number;
   mesSeleccionado: string;
+  byOrigen?: {
+    mesa:     { pedidos: number; total: number };
+    recogida: { pedidos: number; total: number };
+    web:      { pedidos: number; total: number };
+  };
+}
+
+interface PromoStat {
+  id: string;
+  fecha_hora: string;
+  texto_promocion: string;
+  numero_envios: number;
+}
+
+interface TgtgItemStat {
+  id: string;
+  titulo: string;
+  precioOriginal: number;
+  precioDescuento: number;
+  cuponesTotal: number;
+  cuponesDisponibles: number;
+  reservasCount: number;
+}
+
+interface TgtgPromoStat {
+  id: string;
+  fechaActivacion: string;
+  horaRecogidaInicio: string;
+  horaRecogidaFin: string;
+  numeroEnvios: number;
+  emailEnviado: boolean;
+  items: TgtgItemStat[];
 }
 
 interface ChartTheme {
@@ -46,7 +94,7 @@ const DEFAULT_CHART_THEME: ChartTheme = {
 };
 
 function getChartTheme(): ChartTheme {
-  if (typeof window === 'undefined') return DEFAULT_CHART_THEME;
+  if (globalThis.window === undefined) return DEFAULT_CHART_THEME;
   const style = getComputedStyle(document.documentElement);
   const get = (v: string) => style.getPropertyValue(v).trim();
   return {
@@ -68,28 +116,42 @@ function getChartTheme(): ChartTheme {
   };
 }
 
-export default function EstadisticasPage() {
-  const { language } = useLanguage();
-  const meses = [t("monthJan", language), t("monthFeb", language), t("monthMar", language), t("monthApr", language), t("monthMay", language), t("monthJun", language), t("monthJul", language), t("monthAug", language), t("monthSep", language), t("monthOct", language), t("monthNov", language), t("monthDec", language)];
+function getKpiData(stats: Stats | null, lang: Parameters<typeof t>[1]) {
+  return [
+    { icon: ShoppingCart, label: t("ordersToday", lang), value: stats?.pedidosHoy || 0, iconClass: 'bg-muted', iconColor: 'text-foreground' },
+    { icon: BarChart3, label: t("ordersMonth", lang), value: stats?.pedidosMes || 0, iconClass: 'bg-primary/10', iconColor: 'text-primary' },
+    { icon: Euro, label: t("salesToday", lang), value: formatPrice(stats?.totalHoy || 0, 'EUR', lang), iconClass: 'bg-primary/10', iconColor: 'text-primary' },
+    { icon: BarChart3, label: t("salesMonth", lang), value: formatPrice(stats?.totalMes || 0, 'EUR', lang), iconClass: 'bg-muted', iconColor: 'text-foreground' },
+    { icon: TrendingUp, label: t("salesYear", lang), value: formatPrice(stats?.totalAno || 0, 'EUR', lang), iconClass: 'bg-secondary', iconColor: 'text-secondary-foreground' },
+  ];
+}
+
+function getMonthNavigation(selectedMonth: { mes: number; año: number }) {
+  const cambiarMes = (delta: number) => {
+    const nuevoMes = selectedMonth.mes + delta;
+    const nuevoAño = selectedMonth.año + Math.floor(nuevoMes / 12);
+    const mesAjustado = ((nuevoMes % 12) + 12) % 12;
+    return { mes: mesAjustado, año: nuevoAño };
+  };
+
+  const mesActual = selectedMonth.mes;
+  const añoActual = selectedMonth.año;
+  const esMesActual = mesActual === new Date().getMonth() && añoActual === new Date().getFullYear();
+
+  return { cambiarMes, mesActual, añoActual, esMesActual };
+}
+
+// Custom hook for fetching stats
+function useStatsFetching(empresaId: string, selectedMonth: { mes: number; año: number }) {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedMonth, setSelectedMonth] = useState({ mes: new Date().getMonth(), año: new Date().getFullYear() });
-  const [chartTheme, setChartTheme] = useState<ChartTheme>(DEFAULT_CHART_THEME);
-  const shouldReduceMotion = useReducedMotion() ?? false;
-  const motionProps = shouldReduceMotion
-    ? { initial: {}, animate: {} }
-    : { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } };
-
-  useEffect(() => {
-    setChartTheme(getChartTheme());
-  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
     async function fetchStats() {
       setLoading(true);
       try {
-        const res = await fetchWithCsrf(`/api/admin/pedidos?mes=${selectedMonth.mes}&año=${selectedMonth.año}`, { method: 'PUT', signal: controller.signal });
+        const res = await fetchWithCsrf(`/api/admin/pedidos?empresaId=${empresaId}&mes=${selectedMonth.mes}&año=${selectedMonth.año}`, { method: 'PUT', signal: controller.signal });
         if (res.ok) {
           const data = await res.json();
           setStats(data);
@@ -103,328 +165,355 @@ export default function EstadisticasPage() {
     }
     fetchStats();
     return () => controller.abort();
-  }, [selectedMonth]);
+  }, [selectedMonth, empresaId]);
 
-  const cambiarMes = (delta: number) => {
-    setSelectedMonth(prev => {
-      let nuevoMes = prev.mes + delta;
-      let nuevoAño = prev.año;
-      
-      if (nuevoMes < 0) {
-        nuevoMes = 11;
-        nuevoAño--;
-      } else if (nuevoMes > 11) {
-        nuevoMes = 0;
-        nuevoAño++;
-      }
-      
-      return { mes: nuevoMes, año: nuevoAño };
-    });
+  return { stats, loading };
+}
+
+// Custom hook for promo + TGTG stats
+function usePromoStats(empresaId: string, mostrarPromociones: boolean, mostrarTgtg: boolean) {
+  const [promos, setPromos] = useState<PromoStat[]>([]);
+  const [tgtgCampaigns, setTgtgCampaigns] = useState<TgtgPromoStat[]>([]);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const fetches: Promise<void>[] = [];
+        if (mostrarPromociones) {
+          fetches.push(
+            fetch(`/api/admin/promociones?empresaId=${empresaId}`)
+              .then(res => res.ok ? res.json() : null)
+              .then((data: { promociones?: PromoStat[] } | null) => { if (data) setPromos(data.promociones ?? []); })
+          );
+        }
+        if (mostrarTgtg) {
+          fetches.push(
+            fetch(`/api/admin/tgtg?empresaId=${empresaId}`)
+              .then(res => res.ok ? res.json() : null)
+              .then((data: { campaigns?: TgtgPromoStat[] } | null) => { if (data) setTgtgCampaigns(data.campaigns ?? []); })
+          );
+        }
+        await Promise.all(fetches);
+      } catch { /* silent */ }
+    }
+    fetchData();
+  }, [empresaId, mostrarPromociones, mostrarTgtg]);
+
+  return { promos, tgtgCampaigns };
+}
+
+// Custom hook for chart theme
+function useChartTheme() {
+  const [chartTheme, setChartTheme] = useState<ChartTheme>(DEFAULT_CHART_THEME);
+
+  useEffect(() => {
+    setChartTheme(getChartTheme());
+  }, []);
+
+  return chartTheme;
+}
+
+// Custom hook for motion props
+function useMotionProps() {
+  const shouldReduceMotion = useReducedMotion() ?? false;
+  const motionProps = shouldReduceMotion
+    ? { initial: {}, animate: {} }
+    : { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } };
+  return { motionProps, shouldReduceMotion };
+}
+
+// KPI Card component - color indexed for variety
+const KPI_GRADIENTS = [
+  'from-violet-500/20 to-violet-700/20 border-violet-400/30 hover:shadow-[0_0_20px_rgba(139,92,246,0.3)]',
+  'from-blue-500/20 to-blue-700/20 border-blue-400/30 hover:shadow-[0_0_20px_rgba(59,130,246,0.3)]',
+  'from-cyan-500/20 to-cyan-700/20 border-cyan-400/30 hover:shadow-[0_0_20px_rgba(34,211,238,0.3)]',
+  'from-teal-500/20 to-teal-700/20 border-teal-400/30 hover:shadow-[0_0_20px_rgba(20,184,166,0.3)]',
+  'from-emerald-500/20 to-emerald-700/20 border-emerald-400/30 hover:shadow-[0_0_20px_rgba(16,185,129,0.3)]',
+];
+
+const KPI_ICON_COLORS = [
+  'text-violet-300',
+  'text-blue-300', 
+  'text-cyan-300',
+  'text-teal-300',
+  'text-emerald-300',
+];
+
+function KpiCard({ kpi, motionProps, shouldReduceMotion, index }: Readonly<{ 
+  kpi: ReturnType<typeof getKpiData>[number]; 
+  motionProps: object;
+  shouldReduceMotion: boolean;
+  index: number;
+}>) {
+  const colorIndex = index % KPI_GRADIENTS.length;
+  const gradientClass = KPI_GRADIENTS[colorIndex];
+  const iconColorClass = KPI_ICON_COLORS[colorIndex];
+  
+  return (
+    <motion.div
+      key={`kpi-${kpi.label}`}
+      {...motionProps}
+      transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: index * 0.05 }}
+      className={`backdrop-blur-xl bg-gradient-to-br ${gradientClass} rounded-xl p-6 transition-shadow duration-300`}
+    >
+      <div className="flex items-center gap-3">
+        <div className={`p-2 rounded-lg bg-white/10`}>
+          <kpi.icon className={`w-5 h-5 ${iconColorClass}`} />
+        </div>
+        <div>
+          <p className="text-sm text-slate-300">{kpi.label}</p>
+          <p className="text-2xl font-bold text-white">{kpi.value}</p>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// Average ticket card component
+function AvgTicketCard({ stats, language, motionProps, shouldReduceMotion }: Readonly<{
+  stats: Stats | null;
+  language: string;
+  motionProps: object;
+  shouldReduceMotion: boolean;
+}>) {
+  const lang = language as Parameters<typeof t>[1];
+  return (
+    <motion.div
+      {...motionProps}
+      transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.2 }}
+      className="backdrop-blur-xl bg-gradient-to-br from-amber-500/20 to-amber-700/20 border border-amber-400/30 rounded-xl p-4"
+    >
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-sm text-slate-300">{t("avgTicket", lang)}</p>
+        <Euro className="w-4 h-4 text-amber-300" />
+      </div>
+      <p className="text-2xl font-bold text-white">{formatPrice(stats?.ticketMedio || 0, 'EUR', lang)}</p>
+    </motion.div>
+  );
+}
+
+// Comparison card component - pink/red gradient
+function ComparisonCard({ stats, language, motionProps, shouldReduceMotion }: Readonly<{ 
+  stats: Stats | null; 
+  language: string;
+  motionProps: object;
+  shouldReduceMotion: boolean;
+}>) {
+  const lang = language as Parameters<typeof t>[1];
+  const pedidosChange = stats && stats.pedidosAnterior > 0
+    ? ((stats.pedidosMes - stats.pedidosAnterior) / stats.pedidosAnterior * 100)
+    : null;
+  const isPositive = pedidosChange !== null && pedidosChange >= 0;
+  const showComparison = stats && stats.pedidosAnterior > 0;
+
+  return (
+    <motion.div
+      {...motionProps}
+      transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.25 }}
+      className="backdrop-blur-xl bg-gradient-to-br from-pink-500/20 to-pink-700/20 border border-pink-400/30 rounded-xl p-4"
+    >
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-sm text-slate-300">{t("vsPreviousMonth", lang)}</p>
+        {showComparison && (
+          isPositive ? <ArrowUpRight className="w-4 h-4 text-emerald-400" /> : <ArrowDownRight className="w-4 h-4 text-red-400" />
+        )}
+      </div>
+      {showComparison ? (
+        <p className={`text-2xl font-bold ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+          {pedidosChange?.toFixed(1)}%
+        </p>
+      ) : (
+        <p className="text-2xl font-bold text-slate-500">--</p>
+      )}
+      <p className="text-xs text-slate-400 mt-1">
+        {stats?.pedidosAnterior || 0} {t("ordersPreviousMonth", lang)}
+      </p>
+    </motion.div>
+  );
+}
+
+// Clients card component - purple gradient
+function ClientsCard({ stats, language, motionProps, shouldReduceMotion }: Readonly<{
+  stats: Stats | null;
+  language: string;
+  motionProps: object;
+  shouldReduceMotion: boolean;
+}>) {
+  const lang = language as Parameters<typeof t>[1];
+  return (
+    <motion.div
+      {...motionProps}
+      transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.3 }}
+      className="backdrop-blur-xl bg-gradient-to-br from-purple-500/20 to-purple-700/20 border border-purple-400/30 rounded-xl p-4"
+    >
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-sm text-slate-300">{t("clientsTitle", lang)}</p>
+        <Users className="w-4 h-4 text-purple-300" />
+      </div>
+      <p className="text-2xl font-bold text-white">{(stats?.clientesNuevos || 0) + (stats?.clientesRecurrentes || 0)}</p>
+      <p className="text-xs text-slate-400 mt-1">
+        {(stats?.clientesNuevos || 0)} {t("newClientsLabel", lang)}, {(stats?.clientesRecurrentes || 0)} {t("returningClients", lang)}
+      </p>
+    </motion.div>
+  );
+}
+
+// Stats header component
+function StatsHeader({ language, meses, mesActual, añoActual, esMesActual, onMonthChange }: Readonly<{
+  language: string;
+  meses: string[];
+  mesActual: number;
+  añoActual: number;
+  esMesActual: boolean;
+  onMonthChange: (delta: number) => void;
+}>) {
+  const lang = language as Parameters<typeof t>[1];
+  return (
+    <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-4 sm:p-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">{t("statsTitle", lang)}</h1>
+          <p className="text-slate-300 text-sm mt-1">{t("statsSubtitle", lang)}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => onMonthChange(-1)}
+            aria-label={t("previousMonth", lang)}
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-slate-300 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <div className="px-4 py-2 bg-white/10 border border-white/20 rounded-lg min-w-[140px] text-center">
+            <span className="font-medium text-white">
+              {meses[mesActual]} {añoActual}
+            </span>
+          </div>
+          <button
+            onClick={() => onMonthChange(1)}
+            disabled={esMesActual}
+            aria-label={t("nextMonth", lang)}
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-slate-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Loading skeleton component
+function LoadingSkeleton() {
+  return (
+    <div className="pt-16 lg:pt-0 px-6 lg:px-8 flex items-center justify-center min-h-[50vh]">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
+}
+
+export default function EstadisticasPage() {
+  const { language } = useLanguage();
+  const { empresaId, overrideEmpresaId, empresaTipo, mostrarPromociones, mostrarTgtg } = useAdmin();
+  const effectiveEmpresaId = overrideEmpresaId || empresaId;
+  const lang = language;
+  const localeMap: Record<string, string> = { es: 'es-ES', en: 'en-US', fr: 'fr-FR', it: 'it-IT', de: 'de-DE' };
+  const dateLocale = localeMap[language] ?? 'es-ES';
+  const meses = [t("monthJan", lang), t("monthFeb", lang), t("monthMar", lang), t("monthApr", lang), t("monthMay", lang), t("monthJun", lang), t("monthJul", lang), t("monthAug", lang), t("monthSep", lang), t("monthOct", lang), t("monthNov", lang), t("monthDec", lang)];
+  const [selectedMonth, setSelectedMonth] = useState({ mes: new Date().getMonth(), año: new Date().getFullYear() });
+
+  const { stats, loading } = useStatsFetching(effectiveEmpresaId, selectedMonth);
+  const { promos, tgtgCampaigns } = usePromoStats(effectiveEmpresaId, mostrarPromociones, mostrarTgtg);
+  const chartTheme = useChartTheme();
+  const { motionProps, shouldReduceMotion } = useMotionProps();
+
+  const { cambiarMes, mesActual, añoActual, esMesActual } = getMonthNavigation(selectedMonth);
+
+  const handleCambiarMes = (delta: number) => {
+    setSelectedMonth(() => cambiarMes(delta));
   };
 
-  const mesActual = selectedMonth.mes;
-  const añoActual = selectedMonth.año;
-  const esMesActual = mesActual === new Date().getMonth() && añoActual === new Date().getFullYear();
+  const kpis = useMemo(() => getKpiData(stats, lang), [stats, lang]);
 
   if (loading) {
-    return (
-      <div className="pt-16 lg:pt-0 px-6 lg:px-8 flex items-center justify-center min-h-[50vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <LoadingSkeleton />;
   }
 
   return (
-    <div className="pt-16 lg:pt-0 px-6 py-6 space-y-6">
+    <div className="pt-16 lg:pt-0 px-6 py-8 space-y-8 min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Header con stats */}
-      <div className="bg-primary rounded-lg p-4 sm:p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-semibold text-primary-foreground">{t("statsTitle", language)}</h1>
-            <p className="text-primary-foreground/80 text-sm mt-1">{t("statsSubtitle", language)}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => cambiarMes(-1)}
-              aria-label={t("previousMonth", language)}
-              className="p-2 rounded-lg bg-primary-foreground/20 hover:bg-primary-foreground/30 transition-colors"
-            >
-              <ChevronLeft className="w-5 h-5 text-primary-foreground" />
-            </button>
-            <div className="px-4 py-2 bg-primary-foreground/20 rounded-lg min-w-[140px] text-center">
-              <span className="font-medium text-primary-foreground">
-                {meses[mesActual]} {añoActual}
-              </span>
-            </div>
-            <button
-              onClick={() => cambiarMes(1)}
-              disabled={esMesActual}
-              aria-label={t("nextMonth", language)}
-              className="p-2 rounded-lg bg-primary-foreground/20 hover:bg-primary-foreground/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <ChevronRight className="w-5 h-5 text-primary-foreground" />
-            </button>
-          </div>
-        </div>
-      </div>
+      <StatsHeader
+        language={language}
+        meses={meses}
+        mesActual={mesActual}
+        añoActual={añoActual}
+        esMesActual={esMesActual}
+        onMonthChange={handleCambiarMes}
+      />
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
-        {[
-          { icon: ShoppingCart, label: t("ordersToday", language), value: stats?.pedidosHoy || 0, iconClass: 'bg-muted', iconColor: 'text-foreground' },
-          { icon: BarChart3, label: t("ordersMonth", language), value: stats?.pedidosMes || 0, iconClass: 'bg-primary/10', iconColor: 'text-primary' },
-          { icon: Euro, label: t("salesToday", language), value: `${(stats?.totalHoy || 0).toFixed(2)}€`, iconClass: 'bg-primary/10', iconColor: 'text-primary' },
-          { icon: BarChart3, label: t("salesMonth", language), value: `${(stats?.totalMes || 0).toFixed(2)}€`, iconClass: 'bg-muted', iconColor: 'text-foreground' },
-          { icon: TrendingUp, label: t("salesYear", language), value: `${(stats?.totalAno || 0).toFixed(2)}€`, iconClass: 'bg-secondary', iconColor: 'text-secondary-foreground' },
-        ].map((kpi, i) => (
-          <motion.div
-            key={`kpi-${i}`}
-            {...motionProps}
-            transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: i * 0.05 }}
-            className="bg-card rounded-lg shadow-elegant border border-border p-6"
-          >
-            <div className="flex items-center gap-3">
-              <div className={`p-2 ${kpi.iconClass} rounded-lg`}>
-                <kpi.icon className={`w-5 h-5 ${kpi.iconColor}`} />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">{kpi.label}</p>
-                <p className="text-2xl font-bold text-foreground">{kpi.value}</p>
-              </div>
-            </div>
-          </motion.div>
+        {kpis.map((kpi, i) => (
+          <KpiCard key={`kpi-${kpi.label}`} kpi={kpi} motionProps={motionProps} shouldReduceMotion={shouldReduceMotion} index={i} />
         ))}
       </div>
 
-      {/* Comparison Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <motion.div
-          {...motionProps}
-          transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.2 }}
-          className="bg-card rounded-lg border border-border p-4"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm text-muted-foreground">{t("avgTicket", language)}</p>
-            <Euro className="w-4 h-4 text-muted-foreground" />
+      {/* Origin breakdown */}
+      {stats?.byOrigen && (
+        <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl p-5 shadow-2xl">
+          <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">
+            {t("ordersMonth", lang)} — {t("byOrigin", lang)}
+          </h3>
+          <div className={`grid gap-3 ${empresaTipo === 'restaurante' ? 'grid-cols-3' : 'grid-cols-2'}`}>
+            {empresaTipo === 'restaurante' && (
+              <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-400/20 rounded-xl px-4 py-3">
+                <UtensilsCrossed className="w-5 h-5 text-amber-400 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs text-amber-300/70 truncate">{t("orderTypeMesa", lang)}</p>
+                  <p className="text-lg font-bold text-white">{stats.byOrigen.mesa.pedidos}</p>
+                  <p className="text-xs text-amber-300/70">{formatPrice(stats.byOrigen.mesa.total)}</p>
+                </div>
+              </div>
+            )}
+            <div className="flex items-center gap-3 bg-blue-500/10 border border-blue-400/20 rounded-xl px-4 py-3">
+              <ShoppingBag className="w-5 h-5 text-blue-400 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs text-blue-300/70 truncate">{t("orderTypeRecogida", lang)}</p>
+                <p className="text-lg font-bold text-white">{stats.byOrigen.recogida.pedidos}</p>
+                <p className="text-xs text-blue-300/70">{formatPrice(stats.byOrigen.recogida.total)}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 bg-slate-500/10 border border-slate-400/20 rounded-xl px-4 py-3">
+              <Globe className="w-5 h-5 text-slate-400 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs text-slate-300/70 truncate">{t("orderTypeWeb", lang)}</p>
+                <p className="text-lg font-bold text-white">{stats.byOrigen.web.pedidos}</p>
+                <p className="text-xs text-slate-300/70">{formatPrice(stats.byOrigen.web.total)}</p>
+              </div>
+            </div>
           </div>
-          <p className="text-2xl font-bold text-foreground">{(stats?.ticketMedio || 0).toFixed(2)}€</p>
-        </motion.div>
-
-        <motion.div
-          {...motionProps}
-          transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.25 }}
-          className="bg-card rounded-lg border border-border p-4"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm text-muted-foreground">{t("vsPreviousMonth", language)}</p>
-            {stats && stats.pedidosAnterior > 0 ? (
-              stats.pedidosMes >= stats.pedidosAnterior ? (
-                <ArrowUpRight className="w-4 h-4 text-primary" />
-              ) : (
-                <ArrowDownRight className="w-4 h-4 text-destructive" />
-              )
-            ) : null}
-          </div>
-          {stats && stats.pedidosAnterior > 0 ? (
-            <p className={`text-2xl font-bold ${stats.pedidosMes >= stats.pedidosAnterior ? 'text-primary' : 'text-destructive'}`}>
-              {((stats.pedidosMes - stats.pedidosAnterior) / stats.pedidosAnterior * 100).toFixed(1)}%
-            </p>
-          ) : (
-            <p className="text-2xl font-bold text-muted-foreground">--</p>
-          )}
-          <p className="text-xs text-muted-foreground mt-1">
-            {stats?.pedidosAnterior || 0} {t("ordersPreviousMonth", language)}
-          </p>
-        </motion.div>
-
-        <motion.div
-          {...motionProps}
-          transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.3 }}
-          className="bg-card rounded-lg border border-border p-4"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm text-muted-foreground">{t("clientsTitle", language)}</p>
-            <Users className="w-4 h-4 text-muted-foreground" />
-          </div>
-          <p className="text-2xl font-bold text-foreground">{(stats?.clientesNuevos || 0) + (stats?.clientesRecurrentes || 0)}</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            {(stats?.clientesNuevos || 0)} {t("newClientsLabel", language)}, {(stats?.clientesRecurrentes || 0)} {t("returningClients", language)}
-          </p>
-        </motion.div>
-      </div>
-
-      {/* Daily Orders Chart */}
-      {stats?.pedidosPorDia && stats.pedidosPorDia.length > 0 && (
-        <motion.div
-          {...motionProps}
-          transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.35 }}
-          className="bg-card rounded-lg border border-border p-6 mb-6"
-        >
-          <h2 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
-            <Calendar className="w-5 h-5" />
-            {t("ordersByDay", language)} ({meses[mesActual]})
-          </h2>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={stats.pedidosPorDia}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartTheme.gridStroke} />
-                <XAxis
-                  dataKey="dia"
-                  tick={{ fontSize: 12, fill: chartTheme.tickFill }}
-                  tickFormatter={(value) => `${value}`}
-                  axisLine={{ stroke: chartTheme.gridStroke }}
-                  tickLine={{ stroke: chartTheme.gridStroke }}
-                />
-                <YAxis
-                  tick={{ fontSize: 12, fill: chartTheme.tickFill }}
-                  axisLine={{ stroke: chartTheme.gridStroke }}
-                  tickLine={{ stroke: chartTheme.gridStroke }}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: chartTheme.tooltipBg,
-                    border: `1px solid ${chartTheme.tooltipBorder}`,
-                    borderRadius: '8px',
-                  }}
-                  labelStyle={{ color: chartTheme.tooltipColor }}
-                  itemStyle={{ color: chartTheme.tooltipColor }}
-                  formatter={(value: number, name: string) => [
-                    name === 'pedidos' ? `${value} ${t("xOrders", language)}` : `${value.toFixed(2)}€`,
-                    name === 'pedidos' ? t("xOrders", language) : t("revenueLabel", language)
-                  ]}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="pedidos"
-                  stroke={chartTheme.colors[0]}
-                  strokeWidth={2}
-                  dot={{ fill: chartTheme.colors[0], r: 3 }}
-                  activeDot={{ r: 5 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
+        </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <motion.div
-          key="chart-bar"
-          {...motionProps}
-          transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.25 }}
-          className="bg-card rounded-lg shadow-elegant border border-border p-6"
-        >
-          <h2 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
-            <ShoppingCart className="w-5 h-5" />
-            {t("topDishes", language)} ({t("thisMonthLabel", language)})
-          </h2>
-          
-          {stats?.topPlatos && stats.topPlatos.length > 0 ? (
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.topPlatos.slice(0, 8)} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={chartTheme.gridStroke} />
-                  <XAxis type="number" hide axisLine={false} tickLine={false} />
-                  <YAxis
-                    type="category"
-                    dataKey="nombre"
-                    width={100}
-                    tick={{ fontSize: 12, fill: chartTheme.tickFill }}
-                    axisLine={{ stroke: chartTheme.gridStroke }}
-                    tickLine={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: chartTheme.tooltipBg,
-                      border: `1px solid ${chartTheme.tooltipBorder}`,
-                      borderRadius: '8px',
-                    }}
-                    labelStyle={{ color: chartTheme.tooltipColor }}
-                    itemStyle={{ color: chartTheme.tooltipColor }}
-                  />
-                  <Bar dataKey="cantidad" radius={[0, 4, 4, 0]} animationDuration={800}>
-                    {stats.topPlatos.slice(0, 8).map((plato, index) => (
-                      <Cell
-                        key={`${plato.nombre}-bar`}
-                        fill={chartTheme.colors[index % chartTheme.colors.length]}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <p className="text-muted-foreground text-center py-8">
-              {t("noStatsData", language)}
-            </p>
-          )}
-        </motion.div>
-
-        <motion.div
-          key="chart-pie"
-          {...motionProps}
-          transition={shouldReduceMotion ? undefined : { duration: 0.3, delay: 0.3 }}
-          className="bg-card rounded-lg shadow-elegant border border-border p-6"
-        >
-          <h2 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
-            <Euro className="w-5 h-5" />
-            {t("revenueByDish", language)} ({t("thisMonthLabel", language)})
-          </h2>
-          
-          {stats?.topPlatos && stats.topPlatos.length > 0 ? (
-            <>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart key="pie-chart">
-                    <Pie
-                      data={stats.topPlatos.slice(0, 8)}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={50}
-                      outerRadius={80}
-                      paddingAngle={2}
-                      dataKey="total"
-                      nameKey="nombre"
-                      animationDuration={800}
-                    >
-                      {stats.topPlatos.slice(0, 8).map((plato, index) => (
-                        <Cell
-                          key={`${plato.nombre}-pie`}
-                          fill={chartTheme.colors[index % chartTheme.colors.length]}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value: number) => `${value.toFixed(2)}€`}
-                      contentStyle={{
-                        backgroundColor: chartTheme.tooltipBg,
-                        border: `1px solid ${chartTheme.tooltipBorder}`,
-                        borderRadius: '8px',
-                      }}
-                      labelStyle={{ color: chartTheme.tooltipColor }}
-                      itemStyle={{ color: chartTheme.tooltipColor }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                {stats.topPlatos.slice(0, 6).map((plato, index) => (
-                  <div key={plato.nombre} className="flex items-center gap-2 text-sm">
-                    <div
-                      className="w-3 h-3 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: chartTheme.colors[index % chartTheme.colors.length] }}
-                    />
-                    <span className="truncate text-muted-foreground">{plato.nombre}</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <p className="text-muted-foreground text-center py-8">
-              {t("noStatsData", language)}
-            </p>
-          )}
-        </motion.div>
+      {/* Comparison Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <AvgTicketCard stats={stats} language={lang} motionProps={motionProps} shouldReduceMotion={shouldReduceMotion} />
+        <ComparisonCard stats={stats} language={lang} motionProps={motionProps} shouldReduceMotion={shouldReduceMotion} />
+        <ClientsCard stats={stats} language={lang} motionProps={motionProps} shouldReduceMotion={shouldReduceMotion} />
       </div>
+
+      {/* ── All Charts (lazy loaded) ──────────────────────────────── */}
+      <AdminCharts
+        stats={stats}
+        promos={promos}
+        tgtgCampaigns={tgtgCampaigns}
+        chartTheme={chartTheme}
+        language={language}
+        dateLocale={dateLocale}
+        meses={meses}
+        mesActual={mesActual}
+        t={t}
+        mostrarPromociones={mostrarPromociones}
+        mostrarTgtg={mostrarTgtg}
+      />
     </div>
   );
 }

@@ -5,7 +5,9 @@ import { verifyCsrfToken } from '@/lib/csrf';
 import { timingSafeEqual } from 'node:crypto';
 import { isTokenRevoked } from '@/lib/token-revocation';
 import { AUTH_ERRORS, SERVER_ERRORS, createErrorResponse } from '@/core/domain/constants/api-errors';
+import { errorResponse } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
+import { verifyWaiterToken } from '@/lib/waiter-auth';
 
 function getAdminTokenSecret(): string | undefined {
   return process.env.ACCESS_TOKEN_SECRET;
@@ -50,7 +52,9 @@ function isPublicRoute(path: string): boolean {
     path === '/api/unsubscribe' ||
     path === '/api/admin/promociones/unsubscribe' ||
     path === '/api/admin/login' ||
-    path === '/api/csp-report'
+    path === '/api/csp-report' ||
+    path === '/api/promo/reservar' ||
+    path.startsWith('/api/promo/item/')
   );
 }
 
@@ -74,9 +78,12 @@ async function handleAdminAuth(request: NextRequest, origin: string | null): Pro
     const secret = new TextEncoder().encode(tokenSecret);
     const { payload } = await jwtVerify(adminToken, secret);
 
-    if (!payload.empresaId || !payload.adminId) {
+    if (!payload.adminId) {
       return addCorsHeaders(NextResponse.json(createErrorResponse(AUTH_ERRORS.INVALID_TOKEN), { status: 401 }), origin);
     }
+
+    // Superadmin can have null empresaId - allow it
+    // For regular admins, empresaId is required
 
     // Reject tokens without jti — they cannot be revoked and are permanently valid.
     // Also reject tokens whose jti appears in the revocation list (logged-out sessions).
@@ -110,11 +117,14 @@ async function handleAdminAuth(request: NextRequest, origin: string | null): Pro
     }
 
     const requestHeaders = new Headers(request.headers);
-    requestHeaders.set('x-empresa-id', payload.empresaId as string);
+    requestHeaders.set('x-empresa-id', (payload.empresaId as string | undefined) ?? '');
     requestHeaders.set('x-admin-id', payload.adminId as string);
     requestHeaders.set('x-admin-rol', payload.rol as string);
 
     const response = NextResponse.next({ request: { headers: requestHeaders } });
+    response.headers.set('x-empresa-id', (payload.empresaId as string | undefined) ?? '');
+    response.headers.set('x-admin-id', payload.adminId as string);
+    response.headers.set('x-admin-rol', payload.rol as string);
     return addCorsHeaders(response, origin);
   } catch {
     return addCorsHeaders(NextResponse.json(createErrorResponse(AUTH_ERRORS.INVALID_TOKEN), { status: 401 }), origin);
@@ -194,6 +204,12 @@ function buildCsp(nonce: string, path: string): string {
   // set in next.config.mjs for /admin/* routes.
   const frameAncestors = path.startsWith('/admin') ? "frame-ancestors 'none'" : "frame-ancestors 'self'";
 
+  // In dev: allow localhost for API calls and hot module reloading
+  const devConnectSrc = isDev ? " http://localhost:* https://localhost:*" : "";
+
+  // Allow R2 origin in connect-src for fetching images via fetch()
+  const connectR2 = r2Origin ? ` ${r2Origin}` : "";
+
   return [
     "default-src 'self'",
     scriptSrc,
@@ -201,14 +217,42 @@ function buildCsp(nonce: string, path: string): string {
     `img-src ${imgSources}`,
     `media-src ${mediaSources}`,
     "font-src 'self'",
-    "connect-src 'self' https://*.supabase.co https://api.brevo.com https://*.upstash.io",
+    `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.brevo.com https://*.upstash.io https://api.mapbox.com https://events.mapbox.com${connectR2}${devConnectSrc}`,
     "frame-src 'self' https://www.google.com https://maps.google.com",
     "object-src 'none'",
     "base-uri 'self'",
-    "form-action 'self'",
+    "form-action 'self' https://sis-t.redsys.es:25443 https://sis.redsys.es",
     frameAncestors,
     "report-uri /api/csp-report",
   ].join('; ');
+}
+
+async function handleWaiterAuth(request: NextRequest, origin: string | null): Promise<NextResponse> {
+  const waiterToken = request.cookies.get('waiter_token')?.value;
+
+  if (!waiterToken) {
+    return addCorsHeaders(
+      NextResponse.json({ error: 'WAITER_UNAUTHORIZED' }, { status: 401 }),
+      origin
+    );
+  }
+
+  const payload = await verifyWaiterToken(waiterToken);
+  if (!payload) {
+    return addCorsHeaders(
+      NextResponse.json({ error: 'WAITER_UNAUTHORIZED' }, { status: 401 }),
+      origin
+    );
+  }
+
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-empresa-id', payload.empresaId);
+  requestHeaders.set('x-waiter-role', 'waiter');
+
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  response.headers.set('x-empresa-id', payload.empresaId);
+  response.headers.set('x-waiter-role', 'waiter');
+  return addCorsHeaders(response, origin);
 }
 
 export async function proxy(request: NextRequest) {
@@ -224,6 +268,24 @@ export async function proxy(request: NextRequest) {
   // Admin auth (protected routes)
   if (path.startsWith('/api/admin') && !isPublicRoute(path)) {
     return handleAdminAuth(request, origin);
+  }
+
+  // Waiter auth (protected routes — all /api/waiter/* except /api/waiter/auth and /api/waiter/logout)
+  if (path.startsWith('/api/waiter') && path !== '/api/waiter/auth' && path !== '/api/waiter/logout') {
+    return handleWaiterAuth(request, origin);
+  }
+
+  // Superadmin auth (protected routes)
+  if (path.startsWith('/api/superadmin')) {
+    const adminAuthResponse = await handleAdminAuth(request, origin);
+    if (adminAuthResponse.status !== 200) {
+      return adminAuthResponse;
+    }
+    const rol = adminAuthResponse.headers.get('x-admin-rol');
+    if (rol !== 'superadmin') {
+      return addCorsHeaders(errorResponse('Acceso denegado', 403), origin);
+    }
+    return adminAuthResponse;
   }
 
   // Access token for cart
