@@ -68,21 +68,27 @@ function WaiterProductSearch({ menuData, showCart, empresa }: { menuData: MenuCa
   };
 
   return (
-    <div className="w-full px-4 py-3 max-w-2xl mx-auto flex flex-col gap-3">
-      <div className="relative">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none text-base">🔍</span>
-        <input
-          type="search"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Buscar producto..."
-          autoFocus
-          className="w-full pl-10 pr-4 py-3 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-        />
+    <div className="w-full">
+      {/* Sticky search bar */}
+      <div className="sticky top-16 md:top-20 z-30 w-full bg-background/95 backdrop-blur-sm border-b border-border">
+        <div className="max-w-2xl mx-auto px-4 py-2">
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none text-base">🔍</span>
+            <input
+              type="search"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar producto..."
+              autoFocus
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            />
+          </div>
+        </div>
       </div>
 
+      {/* Scrollable results */}
       {search.trim() && (
-        <div className="flex flex-col gap-2">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex flex-col gap-2">
           {filtered.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-4">
               Sin resultados para &ldquo;{search}&rdquo;
@@ -103,7 +109,7 @@ function WaiterProductSearch({ menuData, showCart, empresa }: { menuData: MenuCa
                   <button
                     type="button"
                     onClick={() => handleAdd(product)}
-                    className="min-h-[40px] px-4 rounded-lg bg-[var(--color-primary)] text-[var(--color-primary-foreground)] text-sm font-semibold shrink-0 transition-opacity hover:opacity-90"
+                    className="min-h-[40px] px-4 rounded-lg bg-[var(--color-primary)] text-[var(--color-primary-foreground)] text-sm font-semibold shrink-0"
                   >
                     + {t("addToCart", lang)}
                   </button>
