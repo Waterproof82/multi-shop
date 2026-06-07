@@ -3,7 +3,6 @@ import { verifyRedsysWebhook } from '@/core/infrastructure/services/redsys.servi
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { logger } from '@/core/infrastructure/logging/logger';
 import { createGlovoOrderUseCase } from '@/core/application/use-cases/glovo/createGlovoOrderUseCase';
-import { autoCloseMesaAfterPayment } from './autoCloseMesaAfterPayment';
 
 export interface ProcessRedsysWebhookInput {
   dsParameters: string; // raw Base64 from POST body
@@ -44,7 +43,7 @@ export async function processRedsysWebhookUseCase(
     // Fetch empresa secret key + telegram chat ids + tipo for payment notification
     const { data: empresa, error: empresaError } = await supabase
       .from('empresas')
-      .select('redsys_secret_key, telegram_bebidas_chat_id, telegram_chat_id, tipo')
+      .select('redsys_secret_key, telegram_chat_id, tipo')
       .eq('id', input.empresaId)
       .single();
 
@@ -54,7 +53,6 @@ export async function processRedsysWebhookUseCase(
 
     const e = empresa as Record<string, unknown>;
     const secretKey = e['redsys_secret_key'] as string | null;
-    const bebidasChatId = e['telegram_bebidas_chat_id'] as string | null;
     const telegramChatId = e['telegram_chat_id'] as string | null;
     const empresaTipo = e['tipo'] as string | null;
 
@@ -79,43 +77,6 @@ export async function processRedsysWebhookUseCase(
     const responseNum = Number.parseInt(responseCode, 10);
     const newPaymentStatus: 'paid' | 'failed' =
       responseNum >= 0 && responseNum <= 99 ? 'paid' : 'failed';
-
-    // Helper: fetch mesa info and session total for Telegram notification
-    const fetchMesaContext = async (sesionId: string, empresaId: string): Promise<{
-      mesaNumero: number;
-      mesaNombre: string | null;
-      sessionTotal: number;
-    }> => {
-      const { data: sesionRow } = await supabase
-        .from('mesa_sesiones')
-        .select('mesa_id')
-        .eq('id', sesionId)
-        .maybeSingle();
-      const mesaId = (sesionRow as { mesa_id: string | null } | null)?.mesa_id ?? null;
-
-      let mesaNumero = 0;
-      let mesaNombre: string | null = null;
-      if (mesaId) {
-        const { data: mesaData } = await supabase
-          .from('mesas')
-          .select('numero, nombre')
-          .eq('id', mesaId)
-          .maybeSingle();
-        const m = mesaData as { numero: number; nombre: string | null } | null;
-        mesaNumero = m?.numero ?? 0;
-        mesaNombre = m?.nombre ?? null;
-      }
-
-      const { data: pedidosData } = await supabase
-        .from('pedidos')
-        .select('total')
-        .eq('sesion_id', sesionId)
-        .eq('empresa_id', empresaId);
-      const sessionTotal = (pedidosData as { total: string | number }[] | null)
-        ?.reduce((acc, row) => acc + Number(row.total), 0) ?? 0;
-
-      return { mesaNumero, mesaNombre, sessionTotal };
-    };
 
     // ── Path 1: Division payment (tracked in mesa_division_pagos) ──────────────
     const { data: divPago } = await supabase
@@ -157,14 +118,6 @@ export async function processRedsysWebhookUseCase(
             .from('mesa_sesiones')
             .update({ sesion_pagada: true })
             .eq('id', dp.sesion_id);
-
-          if (bebidasChatId) {
-            const { sendTelegramPagoMesaCompleto } = await import('@/core/infrastructure/services/telegram.service');
-            const { mesaNumero, mesaNombre, sessionTotal } = await fetchMesaContext(dp.sesion_id, dp.empresa_id);
-            await sendTelegramPagoMesaCompleto(dp.sesion_id, mesaNumero, mesaNombre, sessionTotal, bebidasChatId);
-          }
-
-          void autoCloseMesaAfterPayment(dp.sesion_id, dp.empresa_id);
         }
       }
 
@@ -214,14 +167,6 @@ export async function processRedsysWebhookUseCase(
         .from('mesa_sesiones')
         .update({ sesion_pagada: true })
         .eq('id', sesionId);
-
-      if (bebidasChatId) {
-        const { sendTelegramPagoMesaCompleto } = await import('@/core/infrastructure/services/telegram.service');
-        const { mesaNumero, mesaNombre, sessionTotal } = await fetchMesaContext(sesionId, input.empresaId);
-        await sendTelegramPagoMesaCompleto(sesionId, mesaNumero, mesaNombre, sessionTotal, bebidasChatId);
-      }
-
-      void autoCloseMesaAfterPayment(sesionId, input.empresaId);
     }
 
     // Unlock session regardless of paid/failed outcome
