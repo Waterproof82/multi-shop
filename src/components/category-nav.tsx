@@ -94,7 +94,7 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
   if (isWaiterMode) {
     return (
       <nav
-        className="sticky top-[calc(4rem+56px)] z-40 w-full border-b border-border bg-background/95 backdrop-blur-sm md:top-[calc(5rem+56px)] lg:top-[calc(5rem+56px)]"
+        className="sticky top-[calc(3rem+56px)] z-40 w-full border-b border-border bg-background/95 backdrop-blur-sm"
         aria-label={t("menuCategories", language)}
       >
         <div className="mx-auto max-w-6xl px-4 md:px-6">

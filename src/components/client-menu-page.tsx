@@ -44,76 +44,6 @@ interface MenuPageProps {
   isWaiterMode?: boolean;
 }
 
-function WaiterProductSearch({ menuData, showCart, empresa, search }: { menuData: MenuCategoryVM[]; showCart: boolean; empresa?: EmpresaPublic | null; search: string }) {
-  const { language } = useLanguage();
-  const lang = language as Parameters<typeof t>[1];
-  const [selectedItem, setSelectedItem] = useState<MenuItemVM | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-
-  const allProducts = useMemo<MenuItemVM[]>(() =>
-    menuData.flatMap(cat => cat.items),
-    [menuData]
-  );
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return [];
-    return allProducts.filter(p => p.name.toLowerCase().includes(q));
-  }, [allProducts, search]);
-
-  const handleAdd = (product: MenuItemVM) => {
-    setSelectedItem(product);
-    setIsDialogOpen(true);
-  };
-
-  if (!search.trim()) {
-    return (
-      <QuantitySelectorDialog
-        item={selectedItem}
-        open={isDialogOpen}
-        onOpenChange={(open) => { setIsDialogOpen(open); }}
-      />
-    );
-  }
-
-  return (
-    <div className="max-w-2xl mx-auto w-full px-4 py-3 flex flex-col gap-2">
-      {filtered.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-4">
-          Sin resultados para &ldquo;{search}&rdquo;
-        </p>
-      ) : (
-        filtered.map(product => (
-          <div
-            key={product.id}
-            className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3"
-          >
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">{product.name}</p>
-              <p className="text-xs text-muted-foreground">
-                {formatPrice(product.price, empresa?.moneda ?? "EUR", lang)}
-              </p>
-            </div>
-            {showCart && (
-              <button
-                type="button"
-                onClick={() => handleAdd(product)}
-                className="min-h-[40px] px-4 rounded-lg bg-[var(--color-primary)] text-[var(--color-primary-foreground)] text-sm font-semibold shrink-0"
-              >
-                + {t("addToCart", lang)}
-              </button>
-            )}
-          </div>
-        ))
-      )}
-      <QuantitySelectorDialog
-        item={selectedItem}
-        open={isDialogOpen}
-        onOpenChange={(open) => { setIsDialogOpen(open); }}
-      />
-    </div>
-  );
-}
 
 function getCategoryTab(cat: MenuCategoryVM): 'comida' | 'bebida' | 'both' | 'empty' {
   const hasBebida = cat.items.some(i => i.tipoProducto === 'bebida');
@@ -131,6 +61,8 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
   const [waiterHasMesa, setWaiterHasMesa] = useState(false);
   const [waiterMesaLocked, setWaiterMesaLocked] = useState(false);
   const [waiterSearch, setWaiterSearch] = useState("");
+  const [waiterSelectedItem, setWaiterSelectedItem] = useState<MenuItemVM | null>(null);
+  const [waiterDialogOpen, setWaiterDialogOpen] = useState(false);
   const [menuTab, setMenuTab] = useState<'comida' | 'bebidas'>('comida');
   const [mesaEsperandoActivacion, setMesaEsperandoActivacion] = useState(false);
   const [mesaPaymentLocked, setMesaPaymentLocked] = useState(false);
@@ -226,6 +158,16 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
 
   const showWaiterSearch = isWaiterMode && waiterHasMesa && !waiterMesaLocked;
 
+  const waiterAllProducts = useMemo<MenuItemVM[]>(
+    () => (showWaiterSearch ? menuData.flatMap(c => c.items) : []),
+    [menuData, showWaiterSearch]
+  );
+  const waiterFiltered = useMemo(() => {
+    const q = waiterSearch.trim().toLowerCase();
+    if (!q) return [];
+    return waiterAllProducts.filter(p => p.name.toLowerCase().includes(q));
+  }, [waiterAllProducts, waiterSearch]);
+
   const isRestaurant = empresa?.tipo === 'restaurante';
   const showTabs = isRestaurant && menuData.some(cat => cat.items.some(i => i.tipoProducto === 'bebida'));
 
@@ -298,10 +240,10 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
         {t("skipToContent", language)}
       </a>
 
-      {/* Waiter sticky search bar — lives at the flex-root level so sticky works across the full page */}
+      {/* Waiter sticky search bar — at flex-root level + z-[60] to cover site header strip */}
       {showWaiterSearch && (
-        <div className="sticky top-16 md:top-20 z-30 w-full bg-background/95 backdrop-blur-sm border-b border-border">
-          <div className="max-w-2xl mx-auto px-4 py-2">
+        <div className="sticky top-12 z-[60] w-full bg-background border-b border-border">
+          <div className="max-w-2xl mx-auto px-4 py-2 relative">
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none text-base">🔍</span>
               <input
@@ -313,14 +255,50 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
               />
             </div>
+            {/* Floating dropdown — always near input regardless of scroll position */}
+            {waiterSearch.trim() && (
+              <div className="absolute top-full left-4 right-4 mt-1 bg-background border border-border rounded-xl shadow-xl z-10 max-h-72 overflow-y-auto">
+                {waiterFiltered.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4 px-4">
+                    Sin resultados para &ldquo;{waiterSearch}&rdquo;
+                  </p>
+                ) : (
+                  waiterFiltered.map(product => (
+                    <div
+                      key={product.id}
+                      className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border last:border-0"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{product.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatPrice(product.price, empresa?.moneda ?? "EUR", language as Parameters<typeof t>[1])}
+                        </p>
+                      </div>
+                      {showCart && (
+                        <button
+                          type="button"
+                          onClick={() => { setWaiterSelectedItem(product); setWaiterDialogOpen(true); }}
+                          className="min-h-[36px] px-3 rounded-lg bg-[var(--color-primary)] text-[var(--color-primary-foreground)] text-sm font-semibold shrink-0"
+                        >
+                          +
+                        </button>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
+          <QuantitySelectorDialog
+            item={waiterSelectedItem}
+            open={waiterDialogOpen}
+            onOpenChange={(open) => { setWaiterDialogOpen(open); }}
+          />
         </div>
       )}
 
-      {/* Show waiter results or normal header/banner */}
-      {showWaiterSearch ? (
-        <WaiterProductSearch menuData={menuData} showCart={showCart} empresa={empresa} search={waiterSearch} />
-      ) : (
+      {/* Normal header/banner — only when not in waiter search mode */}
+      {!showWaiterSearch && (
         <>
           {header === undefined ? null : header}
           <PromoNotification />
