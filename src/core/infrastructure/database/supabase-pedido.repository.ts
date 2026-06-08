@@ -1,6 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Pedido, CartItem, PedidoItem, Result } from "@/core/domain/entities/types";
-import { IPedidoRepository, KitchenBarCounts, KitchenOrderItem, BarOrderItem, RetenidoItem } from "@/core/domain/repositories/IPedidoRepository";
+import { IPedidoRepository, KitchenBarCounts, KitchenOrderItem, BarOrderItem, RetenidoItem, KitchenItemRecord, ItemEstado } from "@/core/domain/repositories/IPedidoRepository";
 import { logger } from "../logging/logger";
 
 type DeliveryData = {
@@ -1094,9 +1094,27 @@ export class SupabasePedidoRepository implements IPedidoRepository {
 
   async countKitchenBarOrders(empresaId: string): Promise<Result<KitchenBarCounts>> {
     try {
+      // Cocina counts: per-item estado + deferred cart items
+      const [itemsResult, diferidosResult] = await Promise.all([
+        this.fetchAllComidaItems(empresaId),
+        this.findAllRetenidos(empresaId, 'comida'),
+      ]);
+      if (!itemsResult.success) return { success: false, error: itemsResult.error };
+
+      let cocinaTotal     = 0; // pendiente + en_preparacion
+      let cocinaListos    = 0; // listo
+      let cocinaRetenidos = diferidosResult.success ? diferidosResult.data.length : 0; // items_diferidos + retenido
+
+      for (const item of itemsResult.data) {
+        if (item.estado === 'pendiente' || item.estado === 'en_preparacion') cocinaTotal++;
+        else if (item.estado === 'listo')    cocinaListos++;
+        else if (item.estado === 'retenido') cocinaRetenidos++;
+      }
+
+      // Bar counts: pure bebida orders in pendiente state (unchanged)
       const { data: activeSessions, error: sessionsError } = await this.supabase
         .from('mesa_sesiones')
-        .select('id, items_diferidos')
+        .select('id')
         .eq('empresa_id', empresaId)
         .is('cerrada_at', null);
 
@@ -1106,59 +1124,26 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       }
 
       const sessionIds = (activeSessions ?? []).map(s => (s as Record<string, unknown>).id as string);
-
-      if (sessionIds.length === 0) {
-        return { success: true, data: { cocina: { total: 0, listos: 0, retenidos: 0 }, bebidas: { total: 0, listos: 0, retenidos: 0 } } };
-      }
-
-      const { data: pedidos, error: pedidosError } = await this.supabase
-        .from('pedidos')
-        .select('detalle_pedido, estado')
-        .in('sesion_id', sessionIds);
-
-      if (pedidosError) {
-        await logger.logAndReturnError('DB_SELECT_ERROR', pedidosError.message, 'repository', 'SupabasePedidoRepository.countKitchenBarOrders', { details: { code: pedidosError.code, empresaId } });
-        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pedidos', module: 'repository', method: 'countKitchenBarOrders' } };
-      }
-
-      let cocinaTotal = 0;
-      let cocinaListos = 0;
-      let cocinaRetenidos = 0;
       let bebidasTotal = 0;
-      let bebidasListos = 0;
-      let bebidasRetenidos = 0;
 
-      const terminalStates = new Set(['servido', 'cerrado', 'cancelado']);
+      if (sessionIds.length > 0) {
+        const { data: pedidos, error: pedidosError } = await this.supabase
+          .from('pedidos')
+          .select('detalle_pedido, estado')
+          .in('sesion_id', sessionIds)
+          .eq('estado', 'pendiente');
 
-      for (const pedido of pedidos ?? []) {
-        const row = pedido as Record<string, unknown>;
-        const items = (row['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
-        const estado = row['estado'] as string;
-        if (terminalStates.has(estado)) continue;
-
-        const hasComida = items.some(i => i['tipo_producto'] === 'comida');
-        const hasBebida = items.some(i => i['tipo_producto'] === 'bebida');
-
-        // Cocina: active (pending/anotado) vs done (preparado)
-        if (hasComida) {
-          if (estado === 'pendiente' || estado === 'anotado') cocinaTotal++;
-          if (estado === 'preparado') cocinaListos++;
+        if (pedidosError) {
+          await logger.logAndReturnError('DB_SELECT_ERROR', pedidosError.message, 'repository', 'SupabasePedidoRepository.countKitchenBarOrders', { details: { code: pedidosError.code, empresaId } });
+          return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pedidos', module: 'repository', method: 'countKitchenBarOrders' } };
         }
 
-        // Bar: active bebida orders (not yet kitchen-alert stage) + kitchen alerts
-        if (hasBebida && estado !== 'preparado') bebidasTotal++;
-        if (hasComida && estado === 'preparado') {
-          bebidasTotal++;    // kitchen alert needs bar attention
-          bebidasListos++;   // listos = food ready, waiter must pick up
-        }
-      }
-
-      for (const session of activeSessions ?? []) {
-        const row = session as Record<string, unknown>;
-        const deferred = (row['items_diferidos'] as Array<Record<string, unknown>>) ?? [];
-        for (const item of deferred) {
-          if (item['tipo'] === 'comida') cocinaRetenidos++;
-          if (item['tipo'] === 'bebida') bebidasRetenidos++;
+        for (const pedido of pedidos ?? []) {
+          const row = pedido as Record<string, unknown>;
+          const items = (row['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
+          const hasBebida = items.some(i => i['tipo_producto'] === 'bebida');
+          const hasComida = items.some(i => i['tipo_producto'] === 'comida');
+          if (hasBebida && !hasComida) bebidasTotal++;
         }
       }
 
@@ -1166,7 +1151,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         success: true,
         data: {
           cocina: { total: cocinaTotal, listos: cocinaListos, retenidos: cocinaRetenidos },
-          bebidas: { total: bebidasTotal, listos: bebidasListos, retenidos: bebidasRetenidos },
+          bebidas: { total: bebidasTotal, listos: 0, retenidos: 0 },
         },
       };
     } catch (e) {
@@ -1196,7 +1181,8 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         const deferred = (row['items_diferidos'] as Array<Record<string, unknown>>) ?? [];
 
         for (const item of deferred) {
-          if (item['tipo'] !== tipo) continue;
+          const itemTipo = (item['tipo'] as string | undefined) ?? 'comida';
+          if (itemTipo !== tipo) continue;
           const complements = (item['selectedComplements'] as Array<{ name: string }> | undefined);
           result.push({
             itemId: item['itemId'] as string,
@@ -1237,7 +1223,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         .from('pedidos')
         .select(`id, numero_pedido, sesion_id, detalle_pedido, estado, created_at, mesas!inner(numero, nombre)`)
         .in('sesion_id', sessionIds)
-        .in('estado', ['pendiente', 'anotado'])
+        .in('estado', ['pendiente', 'anotado', 'preparado'])
         .order('created_at', { ascending: true });
 
       if (ordersError) {
@@ -1296,9 +1282,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         .from('pedidos')
         .select(`id, numero_pedido, sesion_id, detalle_pedido, estado, created_at, mesas!inner(numero, nombre)`)
         .in('sesion_id', sessionIds)
-        .neq('estado', 'servido')
-        .neq('estado', 'cerrado')
-        .neq('estado', 'cancelado')
+        .eq('estado', 'pendiente')
         .order('created_at', { ascending: true });
 
       if (ordersError) {
@@ -1311,50 +1295,180 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         const row = order as Record<string, unknown>;
         const items = (row['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
         const mesaData = row['mesas'] as Record<string, unknown> ?? {};
-        const estado = row['estado'] as string;
 
-        const comidaItems = items.filter(i => i['tipo_producto'] === 'comida');
         const bebidaItems = items.filter(i => i['tipo_producto'] === 'bebida');
+        const hasComida = items.some(i => i['tipo_producto'] === 'comida');
 
-        // Kitchen alert: comida is preparado — waiter must pick up food (swipeable → servido)
-        if (comidaItems.length > 0 && estado === 'preparado') {
-          result.push({
-            id: row['id'] as string,
-            numeroPedido: row['numero_pedido'] as number,
-            mesaNumero: (mesaData['numero'] as number) ?? null,
-            mesaNombre: (mesaData['nombre'] as string | null) ?? null,
-            items: comidaItems.map(i => ({ nombre: i['nombre'] as string, cantidad: i['cantidad'] as number })),
-            estado,
-            createdAt: row['created_at'] as string,
-            sesionId: (row['sesion_id'] as string | null) ?? null,
-            tipo: 'kitchen-alert',
-          });
-          // Don't show bebida-info for this order — kitchen-alert card covers it
-          continue;
-        }
+        // Bar only shows pure drink orders (no food in the same order)
+        if (bebidaItems.length === 0 || hasComida) continue;
 
-        // Bebida rows: visible while kitchen is cooking (pendiente/anotado)
-        if (bebidaItems.length > 0) {
-          // Pure bebida order (no comida) → swipeable → servido
-          // Mixed order (has comida still cooking) → informational, no swipe
-          const tipo = comidaItems.length === 0 ? 'bebida' : 'bebida-info';
-          result.push({
-            id: row['id'] as string,
-            numeroPedido: row['numero_pedido'] as number,
-            mesaNumero: (mesaData['numero'] as number) ?? null,
-            mesaNombre: (mesaData['nombre'] as string | null) ?? null,
-            items: bebidaItems.map(i => ({ nombre: i['nombre'] as string, cantidad: i['cantidad'] as number })),
-            estado,
-            createdAt: row['created_at'] as string,
-            sesionId: (row['sesion_id'] as string | null) ?? null,
-            tipo,
-          });
-        }
+        result.push({
+          id: row['id'] as string,
+          numeroPedido: row['numero_pedido'] as number,
+          mesaNumero: (mesaData['numero'] as number) ?? null,
+          mesaNombre: (mesaData['nombre'] as string | null) ?? null,
+          items: bebidaItems.map(i => ({ nombre: i['nombre'] as string, cantidad: i['cantidad'] as number })),
+          estado: row['estado'] as string,
+          createdAt: row['created_at'] as string,
+          sesionId: (row['sesion_id'] as string | null) ?? null,
+          tipo: 'bebida',
+        });
       }
 
       return { success: true, data: result };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findBarOrders', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
+  // ── Per-item kitchen state ─────────────────────────────────────────────────
+
+  /** Shared helper: fetch all comida items from active sessions with their effective estado */
+  private async fetchAllComidaItems(empresaId: string): Promise<Result<KitchenItemRecord[]>> {
+    try {
+      const { data: activeSessions, error: sessionsError } = await this.supabase
+        .from('mesa_sesiones')
+        .select('id')
+        .eq('empresa_id', empresaId)
+        .is('cerrada_at', null);
+
+      if (sessionsError) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', sessionsError.message, 'repository', 'SupabasePedidoRepository.fetchAllComidaItems', { details: { code: sessionsError.code, empresaId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener sesiones', module: 'repository', method: 'fetchAllComidaItems' } };
+      }
+
+      const sessionIds = (activeSessions ?? []).map(s => (s as Record<string, unknown>).id as string);
+      if (sessionIds.length === 0) return { success: true, data: [] };
+
+      const { data: orders, error: ordersError } = await this.supabase
+        .from('pedidos')
+        .select('id, numero_pedido, sesion_id, detalle_pedido, created_at, mesas!inner(numero, nombre)')
+        .in('sesion_id', sessionIds)
+        .not('estado', 'in', '("servido","cerrado","cancelado")')
+        .order('created_at', { ascending: true });
+
+      if (ordersError) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', ordersError.message, 'repository', 'SupabasePedidoRepository.fetchAllComidaItems', { details: { code: ordersError.code, empresaId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pedidos', module: 'repository', method: 'fetchAllComidaItems' } };
+      }
+
+      const pedidoIds = (orders ?? [])
+        .filter(o => {
+          const items = (o as Record<string, unknown>)['detalle_pedido'] as Array<Record<string, unknown>>;
+          return items.some(i => i['tipo_producto'] === 'comida');
+        })
+        .map(o => (o as Record<string, unknown>)['id'] as string);
+
+      // Fetch item estados (empty Map if no pedidos)
+      const estadoMap = new Map<string, Map<number, string>>();
+      if (pedidoIds.length > 0) {
+        const { data: itemEstados, error: estadosError } = await this.supabase
+          .from('pedido_item_estados')
+          .select('pedido_id, item_idx, estado')
+          .in('pedido_id', pedidoIds);
+
+        if (estadosError) {
+          await logger.logAndReturnError('DB_SELECT_ERROR', estadosError.message, 'repository', 'SupabasePedidoRepository.fetchAllComidaItems', { details: { code: estadosError.code, empresaId } });
+          return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener estados de ítems', module: 'repository', method: 'fetchAllComidaItems' } };
+        }
+
+        for (const row of itemEstados ?? []) {
+          const r = row as Record<string, unknown>;
+          const pid = r['pedido_id'] as string;
+          if (!estadoMap.has(pid)) estadoMap.set(pid, new Map());
+          estadoMap.get(pid)!.set(r['item_idx'] as number, r['estado'] as string);
+        }
+      }
+
+      const result: KitchenItemRecord[] = [];
+      for (const order of orders ?? []) {
+        const row = order as Record<string, unknown>;
+        const items = (row['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
+        const mesaData = row['mesas'] as Record<string, unknown> ?? {};
+        const pedidoId = row['id'] as string;
+        const pedidoEstados = estadoMap.get(pedidoId) ?? new Map();
+
+        items.forEach((item, idx) => {
+          if (item['tipo_producto'] !== 'comida') return;
+          const estado = (pedidoEstados.get(idx) ?? 'pendiente') as ItemEstado;
+          const complements = item['complementos'] as Array<{ nombre?: string; name?: string }> | undefined;
+          result.push({
+            pedidoId,
+            numeroPedido: row['numero_pedido'] as number,
+            itemIdx: idx,
+            nombre: (item['nombre'] as string) ?? '',
+            cantidad: item['cantidad'] as number,
+            complementos: complements?.map(c => c.nombre ?? c.name).filter(Boolean).join(', '),
+            estado,
+            mesaNumero: (mesaData['numero'] as number) ?? null,
+            mesaNombre: (mesaData['nombre'] as string | null) ?? null,
+            createdAt: row['created_at'] as string,
+          });
+        });
+      }
+
+      return { success: true, data: result };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.fetchAllComidaItems', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
+  async findKitchenItems(empresaId: string): Promise<Result<KitchenItemRecord[]>> {
+    const result = await this.fetchAllComidaItems(empresaId);
+    if (!result.success) return result;
+    const active: ItemEstado[] = ['pendiente', 'en_preparacion'];
+    return { success: true, data: result.data.filter(i => active.includes(i.estado)) };
+  }
+
+  async findWaiterKitchenItems(empresaId: string): Promise<Result<KitchenItemRecord[]>> {
+    const [orderItemsResult, diferidosResult] = await Promise.all([
+      this.fetchAllComidaItems(empresaId),
+      this.findAllRetenidos(empresaId, 'comida'),
+    ]);
+
+    if (!orderItemsResult.success) return orderItemsResult;
+
+    const visible: ItemEstado[] = ['pendiente', 'en_preparacion', 'listo', 'retenido'];
+    const orderItems = orderItemsResult.data.filter(i => visible.includes(i.estado));
+
+    // Include deferred cart items (items_diferidos) as read-only retenido entries
+    const diferidoItems: KitchenItemRecord[] = (diferidosResult.success ? diferidosResult.data : [])
+      .map((d, idx) => ({
+        pedidoId:     d.itemId,
+        numeroPedido: 0,
+        itemIdx:      idx,
+        nombre:       d.nombre,
+        cantidad:     d.cantidad,
+        complementos: d.complementos,
+        estado:       'retenido' as ItemEstado,
+        mesaNumero:   d.mesaNumero,
+        mesaNombre:   d.mesaNombre,
+        createdAt:    d.sesionCreatedAt,
+        isDiferido:   true,
+      }));
+
+    return { success: true, data: [...orderItems, ...diferidoItems] };
+  }
+
+  async upsertItemEstado(empresaId: string, pedidoId: string, itemIdx: number, estado: ItemEstado): Promise<Result<void>> {
+    try {
+      const { error } = await this.supabase
+        .from('pedido_item_estados')
+        .upsert(
+          { pedido_id: pedidoId, item_idx: itemIdx, empresa_id: empresaId, estado, updated_at: new Date().toISOString() },
+          { onConflict: 'pedido_id,item_idx' }
+        );
+
+      if (error) {
+        await logger.logAndReturnError('DB_UPDATE_ERROR', error.message, 'repository', 'SupabasePedidoRepository.upsertItemEstado', { details: { code: error.code, pedidoId, itemIdx, estado } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al actualizar estado del ítem', module: 'repository', method: 'upsertItemEstado' } };
+      }
+
+      return { success: true, data: undefined };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.upsertItemEstado', { details: { pedidoId, itemIdx, estado } });
       return { success: false, error: appError };
     }
   }

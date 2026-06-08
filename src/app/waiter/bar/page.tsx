@@ -1,9 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+const COUNTDOWN_SECONDS = 5;
+const COUNTDOWN_COLOR   = { bg: 'oklch(22% 0.16 148)', border: 'oklch(50% 0.26 148 / 0.6)' };
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
-import { Wine, ChevronLeft, Clock, TimerOff } from 'lucide-react';
+import { Wine, ChevronLeft } from 'lucide-react';
 
 interface BarOrder {
   id: string;
@@ -14,17 +16,20 @@ interface BarOrder {
   estado: string;
   createdAt: string;
   sesionId: string | null;
-  tipo: 'bebida' | 'bebida-info' | 'kitchen-alert';
+  tipo: 'bebida';
 }
 
-interface RetenidoItem {
-  itemId: string;
-  nombre: string;
-  cantidad: number;
-  complementos?: string;
+interface FlatBarItem {
+  key: string;         // `${orderId}:${itemIdx}` — unique swipe key
+  orderId: string;
+  itemIdx: number;
+  totalInOrder: number;
+  numeroPedido: number;
   mesaNumero: number | null;
   mesaNombre: string | null;
-  sesionCreatedAt: string;
+  createdAt: string;
+  nombre: string;
+  cantidad: number;
 }
 
 const BG = "oklch(13% 0.02 252)";
@@ -40,11 +45,7 @@ const TIME_COLORS: { max: number; label: string; bg: string; border: string; tex
   { max: Infinity, label: '60+ min', bg: 'oklch(22% 0.18 15)',  border: 'oklch(50% 0.32 15 / 0.6)',  text: 'oklch(72% 0.26 15)'  },
 ];
 
-const KITCHEN_ALERT_BG     = 'oklch(22% 0.10 148)';
-const KITCHEN_ALERT_BORDER = 'oklch(50% 0.22 148 / 0.5)';
 const KITCHEN_ALERT_ACCENT = 'oklch(78% 0.20 148)';
-const BEBIDA_INFO_BG       = 'oklch(20% 0.05 252)';
-const BEBIDA_INFO_BORDER   = 'oklch(38% 0.08 252 / 0.35)';
 
 function getTimeColor(minutes: number) {
   for (const c of TIME_COLORS) {
@@ -67,18 +68,27 @@ const SWIPE_THRESHOLD = 80;
 export default function BarPage() {
   const { language } = useLanguage();
   const lang = language as Parameters<typeof t>[1];
-  const [orders, setOrders] = useState<BarOrder[]>([]);
-  const [retenidos, setRetenidos] = useState<RetenidoItem[]>([]);
+  const [orders, setOrders]         = useState<BarOrder[]>([]);
+  const [servedKeys, setServedKeys]  = useState<Set<string>>(new Set());
+  const [countdowns, setCountdowns]  = useState<Record<string, number>>({});
+  const timersRef     = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
   const pointerStartX = useRef<number | null>(null);
-  const swipingId = useRef<string | null>(null);
+  const swipingId     = useRef<string | null>(null);
+
+  // Refs for beforeunload — must be updated synchronously (useEffect is too late if user navigates immediately)
+  const ordersRef              = useRef<BarOrder[]>([]);
+  const servedKeysRef          = useRef<Set<string>>(new Set());
+  // pendingCountdownsRef is updated directly in startCountdown/cancelCountdown — no React batching delay
+  const pendingCountdownsRef   = useRef<Map<string, FlatBarItem>>(new Map());
+  useEffect(() => { ordersRef.current     = orders;     }, [orders]);
+  useEffect(() => { servedKeysRef.current = servedKeys; }, [servedKeys]);
 
   const fetchOrders = useCallback(async () => {
     try {
       const r = await fetch('/api/waiter/bar/orders');
       if (r.ok) {
-        const json = await r.json() as { orders: BarOrder[]; retenidos: RetenidoItem[] };
+        const json = await r.json() as { orders: BarOrder[] };
         setOrders(json.orders ?? []);
-        setRetenidos(json.retenidos ?? []);
       }
     } catch { /* ignore */ }
   }, []);
@@ -95,6 +105,106 @@ export default function BarPage() {
     return () => clearInterval(tick);
   }, []);
 
+  // Cleanup timers on unmount
+  useEffect(() => {
+    const timers = timersRef.current;
+    return () => { timers.forEach(id => clearInterval(id)); };
+  }, []);
+
+  // Fire pending countdown API calls if user navigates away (keepalive survives page unload)
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const pending = pendingCountdownsRef.current;
+      if (pending.size === 0) return;
+
+      // Tally covered items (in countdown + already served) per order
+      const byOrder = new Map<string, { count: number; total: number }>();
+      for (const item of pending.values()) {
+        const e = byOrder.get(item.orderId);
+        byOrder.set(item.orderId, { count: (e?.count ?? 0) + 1, total: item.totalInOrder });
+      }
+      for (const k of servedKeysRef.current) {
+        const oid = k.substring(0, k.lastIndexOf(':'));
+        const e = byOrder.get(oid);
+        if (e) byOrder.set(oid, { ...e, count: e.count + 1 });
+      }
+
+      for (const [orderId, { count, total }] of byOrder) {
+        if (count >= total) {
+          fetch(`/api/waiter/orders/${encodeURIComponent(orderId)}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ estado: 'servido' }),
+            keepalive: true,
+          }).catch(() => {});
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
+  // ── Countdown ─────────────────────────────────────────────────────────────
+
+  const startCountdown = useCallback((flatItem: FlatBarItem) => {
+    const key = flatItem.key;
+    if (timersRef.current.has(key)) return;
+    pendingCountdownsRef.current.set(key, flatItem); // sync — no React batching delay
+    setCountdowns(prev => ({ ...prev, [key]: COUNTDOWN_SECONDS }));
+    const interval = setInterval(() => {
+      setCountdowns(prev => {
+        const remaining = (prev[key] ?? 1) - 1;
+        if (remaining <= 0) {
+          clearInterval(timersRef.current.get(key));
+          timersRef.current.delete(key);
+          pendingCountdownsRef.current.delete(key); // countdown done — remove from pending
+          setTimeout(() => {
+            setServedKeys(prevServed => {
+              const next = new Set(prevServed);
+              next.add(key);
+              const servedCount = [...next].filter(k => k.startsWith(`${flatItem.orderId}:`)).length;
+              if (servedCount >= flatItem.totalInOrder) {
+                fetch(`/api/waiter/orders/${encodeURIComponent(flatItem.orderId)}/status`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ estado: 'servido' }),
+                }).then(r => {
+                  if (r.ok) {
+                    setOrders(prev => prev.filter(o => o.id !== flatItem.orderId));
+                    setServedKeys(s => {
+                      const cleaned = new Set(s);
+                      cleaned.forEach(k => { if (k.startsWith(`${flatItem.orderId}:`)) cleaned.delete(k); });
+                      return cleaned;
+                    });
+                  } else {
+                    setServedKeys(s => { const r = new Set(s); r.delete(key); return r; });
+                  }
+                }).catch(() => {
+                  setServedKeys(s => { const r = new Set(s); r.delete(key); return r; });
+                });
+              }
+              return next;
+            });
+          }, 0);
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        }
+        return { ...prev, [key]: remaining };
+      });
+    }, 1000);
+    timersRef.current.set(key, interval);
+  }, []);
+
+  const cancelCountdown = useCallback((key: string) => {
+    pendingCountdownsRef.current.delete(key); // sync — ensure beforeunload won't fire this
+    const interval = timersRef.current.get(key);
+    if (interval) clearInterval(interval);
+    timersRef.current.delete(key);
+    setCountdowns(prev => { const next = { ...prev }; delete next[key]; return next; });
+  }, []);
+
   // ── Swipe handlers ────────────────────────────────────────────────────────
 
   const handlePointerDown = useCallback((e: React.PointerEvent, id: string) => {
@@ -105,56 +215,63 @@ export default function BarPage() {
 
   const handlePointerMove = useCallback((e: React.PointerEvent, id: string) => {
     if (swipingId.current !== id || pointerStartX.current === null) return;
-    const delta = Math.min(0, e.clientX - pointerStartX.current);
-    const el = e.currentTarget as HTMLElement;
-    el.style.transform = `translateX(${delta}px)`;
-    el.style.transition = 'none';
+    const delta   = Math.min(0, e.clientX - pointerStartX.current); // only left drag
+    const el      = e.currentTarget as HTMLElement;
+    const content = el.querySelector<HTMLElement>('[data-card-content]');
+    const hint    = el.querySelector<HTMLElement>('[data-hint]');
+    // Translate inner content only — reveal-bg stays stationary, hint never overlaps card text
+    if (content) { content.style.transform = `translateX(${delta}px)`; content.style.transition = 'none'; }
+    if (hint) { hint.style.opacity = delta < -20 ? String(Math.min(1, (-delta - 20) / 40)) : '0'; }
   }, []);
 
-  const handlePointerUp = useCallback((e: React.PointerEvent, order: BarOrder) => {
-    if (swipingId.current !== order.id || pointerStartX.current === null) return;
+  const handlePointerUp = useCallback((e: React.PointerEvent, flatItem: FlatBarItem) => {
+    if (swipingId.current !== flatItem.key || pointerStartX.current === null) return;
     const delta = e.clientX - pointerStartX.current;
-    const el = e.currentTarget as HTMLElement;
+    const el    = e.currentTarget as HTMLElement;
     pointerStartX.current = null;
     swipingId.current = null;
 
-    if (delta > -SWIPE_THRESHOLD) {
-      el.style.transition = 'transform 0.25s ease';
-      el.style.transform = 'translateX(0)';
-      return;
-    }
+    const snapContentBack = () => {
+      const content = el.querySelector<HTMLElement>('[data-card-content]');
+      const hint    = el.querySelector<HTMLElement>('[data-hint]');
+      if (content) { content.style.transition = 'transform 0.25s ease'; content.style.transform = 'translateX(0)'; }
+      if (hint) { hint.style.opacity = '0'; }
+    };
 
-    el.style.transition = 'transform 0.18s ease';
-    el.style.transform = 'translateX(-100%)';
+    if (delta > -SWIPE_THRESHOLD) { snapContentBack(); return; }
 
-    fetch(`/api/waiter/orders/${encodeURIComponent(order.id)}/status`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ estado: 'servido' }),
-    }).then(r => {
-      if (r.ok) {
-        setOrders(prev => prev.filter(o => o.id !== order.id));
-      } else {
-        el.style.transition = 'transform 0.25s ease';
-        el.style.transform = 'translateX(0)';
-      }
-    }).catch(() => {
-      el.style.transition = 'transform 0.25s ease';
-      el.style.transform = 'translateX(0)';
-    });
-  }, []);
+    // Snap content back, then start countdown
+    snapContentBack();
+    startCountdown(flatItem);
+  }, [startCountdown]);
 
   const handlePointerCancel = useCallback((e: React.PointerEvent) => {
-    const el = e.currentTarget as HTMLElement;
-    el.style.transition = 'transform 0.25s ease';
-    el.style.transform = 'translateX(0)';
+    const el      = e.currentTarget as HTMLElement;
+    const content = el.querySelector<HTMLElement>('[data-card-content]');
+    const hint    = el.querySelector<HTMLElement>('[data-hint]');
+    if (content) { content.style.transition = 'transform 0.25s ease'; content.style.transform = 'translateX(0)'; }
+    if (hint) { hint.style.opacity = '0'; }
     pointerStartX.current = null;
-    swipingId.current = null;
+    swipingId.current     = null;
   }, []);
 
-  const swipeableOrders = orders.filter(o => o.tipo !== 'bebida-info');
-  const infoOrders      = orders.filter(o => o.tipo === 'bebida-info');
-  const hasAnyContent   = swipeableOrders.length > 0 || infoOrders.length > 0 || retenidos.length > 0;
+  // Flatten orders into one card per drink item, excluding locally served ones
+  const flatItems: FlatBarItem[] = orders.flatMap(order =>
+    order.items.map((item, idx) => ({
+      key:          `${order.id}:${idx}`,
+      orderId:      order.id,
+      itemIdx:      idx,
+      totalInOrder: order.items.length,
+      numeroPedido: order.numeroPedido,
+      mesaNumero:   order.mesaNumero,
+      mesaNombre:   order.mesaNombre,
+      createdAt:    order.createdAt,
+      nombre:       item.nombre,
+      cantidad:     item.cantidad,
+    }))
+  ).filter(item => !servedKeys.has(item.key));
+
+  const hasAnyContent = flatItems.length > 0;
 
   return (
     <div className="min-h-screen" style={{ background: BG }}>
@@ -169,7 +286,7 @@ export default function BarPage() {
         </a>
         <Wine className="w-4 h-4" style={{ color: "oklch(68% 0.14 252)" }} />
         <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{t("barTitle", lang)}</span>
-        <span className="text-[10px]" style={{ color: TEXT_DIM }}>({swipeableOrders.length})</span>
+        <span className="text-[10px]" style={{ color: TEXT_DIM }}>({flatItems.length})</span>
       </div>
 
       <div className="pt-12 px-3 pb-6">
@@ -186,154 +303,104 @@ export default function BarPage() {
           ))}
         </div>
 
-        {/* Bebida-info: mixed orders whose comida is still being cooked */}
-        {infoOrders.length > 0 && (
-          <div className="mb-4">
-            <div className="flex items-center gap-2 px-1 mb-2">
-              <Clock className="w-3.5 h-3.5" style={{ color: TEXT_DIM }} />
-              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: TEXT_DIM }}>
-                {t("barPreparando", lang)} ({infoOrders.length})
-              </span>
-            </div>
-            <div className="flex flex-col gap-2">
-              {infoOrders.map(order => {
-                const elapsed = getElapsedMinutes(order.createdAt);
-                const tableLabel = order.mesaNombre ?? `Mesa ${order.mesaNumero ?? '—'}`;
-                return (
-                  <div
-                    key={`info-${order.id}`}
-                    className="flex items-center justify-between rounded-lg px-3 py-2"
-                    style={{ background: BEBIDA_INFO_BG, border: `1px solid ${BEBIDA_INFO_BORDER}` }}
-                  >
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <span className="text-xs font-bold shrink-0" style={{ color: TEXT_DIM }}>#{order.numeroPedido}</span>
-                      <span className="text-[10px] shrink-0" style={{ color: TEXT_DIM }}>{tableLabel}</span>
-                      <div className="flex flex-wrap gap-x-2 gap-y-0 min-w-0">
-                        {order.items.map((item, i) => (
-                          <span key={i} className="text-xs" style={{ color: TEXT_MAIN }}>
-                            {item.cantidad}× {item.nombre}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <span className="text-[10px] font-mono shrink-0 ml-3" style={{ color: TEXT_DIM }}>
-                      {formatTimer(elapsed)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Retenidos — deferred items visible only to waiter */}
-        {retenidos.length > 0 && (
-          <div className="mb-4">
-            <div className="flex items-center gap-2 px-1 mb-2">
-              <TimerOff className="w-3.5 h-3.5" style={{ color: TEXT_DIM }} />
-              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: TEXT_DIM }}>
-                {t('waiterRetenidos', lang)} ({retenidos.length})
-              </span>
-            </div>
-            <div className="flex flex-col gap-2">
-              {retenidos.map((item, idx) => {
-                const tableLabel = item.mesaNombre ?? `Mesa ${item.mesaNumero ?? '—'}`;
-                const elapsed = getElapsedMinutes(item.sesionCreatedAt);
-                return (
-                  <div
-                    key={`${item.itemId}-${idx}`}
-                    className="flex items-center justify-between rounded-lg px-3 py-2"
-                    style={{ background: 'oklch(20% 0.05 252)', border: '1px solid oklch(38% 0.08 252 / 0.35)' }}
-                  >
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <span className="text-xs font-medium shrink-0" style={{ color: TEXT_MAIN }}>{item.cantidad}×</span>
-                      <span className="text-xs truncate" style={{ color: TEXT_MAIN }}>{item.nombre || '—'}</span>
-                      {item.complementos && (
-                        <span className="text-[10px] shrink-0" style={{ color: TEXT_DIM }}>({item.complementos})</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0 ml-2 text-[10px]" style={{ color: TEXT_DIM }}>
-                      <span>{tableLabel}</span>
-                      <span className="font-mono">{elapsed}m</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Swipeable orders */}
-        <div className="flex flex-col gap-3">
+        {/* Swipeable drink orders grouped by pedido */}
+        <div className="flex flex-col gap-4">
           {!hasAnyContent && (
             <div className="text-center py-10 text-sm" style={{ color: TEXT_DIM }}>
               {t("barEmpty", lang)}
             </div>
           )}
 
-          {swipeableOrders.map(order => {
-            const isAlert = order.tipo === 'kitchen-alert';
-            const elapsed = getElapsedMinutes(order.createdAt);
-            const timeColor = isAlert ? null : getTimeColor(elapsed);
-            const tableLabel = order.mesaNombre ?? `Mesa ${order.mesaNumero ?? '—'}`;
-
+          {Array.from(
+            flatItems.reduce<Map<string, { numeroPedido: number; mesaNumero: number | null; mesaNombre: string | null; createdAt: string; items: FlatBarItem[] }>>(
+              (acc, item) => {
+                if (!acc.has(item.orderId)) {
+                  acc.set(item.orderId, { numeroPedido: item.numeroPedido, mesaNumero: item.mesaNumero, mesaNombre: item.mesaNombre, createdAt: item.createdAt, items: [] });
+                }
+                acc.get(item.orderId)!.items.push(item);
+                return acc;
+              },
+              new Map()
+            ).entries()
+          ).map(([orderId, group]) => {
+            const tableLabel = group.mesaNombre ?? `Mesa ${group.mesaNumero ?? '—'}`;
+            const elapsed    = getElapsedMinutes(group.createdAt);
             return (
-              <div
-                key={`${order.tipo}-${order.id}`}
-                className="relative rounded-xl overflow-hidden select-none"
-                style={{
-                  background: isAlert ? KITCHEN_ALERT_BG : timeColor!.bg,
-                  border: `1px solid ${isAlert ? KITCHEN_ALERT_BORDER : timeColor!.border}`,
-                  touchAction: 'pan-y',
-                  willChange: 'transform',
-                }}
-                onPointerDown={e => handlePointerDown(e, order.id)}
-                onPointerMove={e => handlePointerMove(e, order.id)}
-                onPointerUp={e => handlePointerUp(e, order)}
-                onPointerCancel={handlePointerCancel}
-              >
-                {/* Swipe reveal background */}
-                <div
-                  className="absolute inset-0 flex items-center justify-end pr-5"
-                  style={{ background: isAlert ? 'oklch(30% 0.18 148)' : 'oklch(28% 0.16 148)' }}
-                >
-                  <span className="text-xs font-bold" style={{ color: KITCHEN_ALERT_ACCENT }}>
-                    {isAlert ? t("kitchenAlertPickup", lang) : t("orderStatusServido", lang)} ✓
-                  </span>
+              <div key={orderId}>
+                {/* Order header */}
+                <div className="flex items-center gap-2 px-1 mb-1.5">
+                  <span className="text-xs font-bold" style={{ color: TEXT_DIM }}>#{group.numeroPedido}</span>
+                  <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{tableLabel}</span>
+                  <span className="text-[10px] font-mono ml-auto" style={{ color: TEXT_DIM }}>{formatTimer(elapsed)}</span>
                 </div>
 
-                {/* Card */}
-                <div className="relative p-3" style={{ background: 'inherit' }}>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>#{order.numeroPedido}</span>
-                      <span className="text-xs" style={{ color: TEXT_DIM }}>{tableLabel}</span>
-                      {isAlert && (
-                        <span
-                          className="rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide"
-                          style={{ background: 'oklch(28% 0.16 148)', color: KITCHEN_ALERT_ACCENT }}
-                        >
-                          {t("kitchenAlertReady", lang)}
-                        </span>
-                      )}
-                    </div>
-                    {!isAlert && (
-                      <span
-                        className="text-xs font-mono font-bold shrink-0"
-                        style={{ color: timeColor === TIME_COLORS[0] ? TEXT_DIM : timeColor!.text }}
+                {/* Items */}
+                <div className="flex flex-col gap-2">
+                  {group.items.map(flatItem => {
+                    const timeColor   = getTimeColor(getElapsedMinutes(flatItem.createdAt));
+                    const isCountdown = flatItem.key in countdowns;
+                    const remaining   = countdowns[flatItem.key] ?? 0;
+                    const cardColor   = isCountdown ? COUNTDOWN_COLOR : timeColor;
+                    return (
+                      <div
+                        key={flatItem.key}
+                        className="relative rounded-xl overflow-hidden select-none"
+                        style={{
+                          background:  cardColor.bg,
+                          border:      `1px solid ${cardColor.border}`,
+                          touchAction: 'pan-y',
+                          willChange:  'transform',
+                        }}
+                        onPointerDown={isCountdown ? undefined : e => handlePointerDown(e, flatItem.key)}
+                        onPointerMove={isCountdown ? undefined : e => handlePointerMove(e, flatItem.key)}
+                        onPointerUp={isCountdown ? undefined : e => handlePointerUp(e, flatItem)}
+                        onPointerCancel={isCountdown ? undefined : handlePointerCancel}
                       >
-                        {formatTimer(elapsed)}
-                      </span>
-                    )}
-                  </div>
+                        {/* Reveal background — only when not counting down */}
+                        {!isCountdown && (
+                          <div
+                            className="absolute inset-0 flex items-center justify-end pr-3"
+                            style={{ background: 'oklch(28% 0.16 148)' }}
+                          >
+                            <span data-hint="" className="text-xs font-bold" style={{ color: KITCHEN_ALERT_ACCENT, opacity: 0 }}>
+                              {t("orderStatusServido", lang)} ✓
+                            </span>
+                          </div>
+                        )}
 
-                  <div className="space-y-0.5">
-                    {order.items.map((item, idx) => (
-                      <div key={idx} className="text-xs" style={{ color: TEXT_MAIN }}>
-                        <span className="font-medium">{item.cantidad}×</span> {item.nombre}
+                        {/* Card content — translates during drag */}
+                        <div data-card-content="" className="relative flex items-center gap-3 px-3 py-2.5" style={{ background: cardColor.bg }}>
+                          {isCountdown ? (
+                            <>
+                              <div
+                                className="shrink-0 flex items-center justify-center w-9 h-9 rounded-full text-base font-bold"
+                                style={{ background: 'oklch(32% 0.20 148)', color: 'oklch(80% 0.22 148)', border: '2px solid oklch(55% 0.28 148 / 0.7)' }}
+                              >
+                                {remaining}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{flatItem.cantidad}× {flatItem.nombre}</span>
+                              </div>
+                              <button
+                                className="rounded px-2 py-1 text-[10px] font-bold shrink-0"
+                                style={{ background: 'oklch(26% 0.08 25)', color: 'oklch(75% 0.18 25)' }}
+                                onClick={() => cancelCountdown(flatItem.key)}
+                              >
+                                {t('kitchenCountdownCancel', lang)}
+                              </button>
+                            </>
+                          ) : (
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-baseline gap-1.5">
+                                <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{flatItem.cantidad}×</span>
+                                <span className="text-xs truncate" style={{ color: TEXT_MAIN }}>{flatItem.nombre}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
               </div>
             );

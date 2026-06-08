@@ -305,7 +305,17 @@ export function WaiterBanner() {
   // Not a waiter at all → hide everything
   if (!isWaiter) return null;
 
+  // Kitchen page has its own header — don't render the waiter banner there
+  if (pathname === '/kitchen') return null;
+
+  // Customer-facing pages — never show the waiter banner
+  if (pathname.startsWith('/mesa/')) return null;
+
   const hasMesa = mesaLabel !== null;
+
+  // On the customer store page, only show the banner if the waiter has a mesa selected.
+  // Without a mesa in sessionStorage we're in customer context — hide the waiter UI.
+  if (pathname === '/' && !hasMesa) return null;
 
   return (
     <>
@@ -326,52 +336,28 @@ export function WaiterBanner() {
         style={{ background: BG, borderBottom: `1px solid ${BORDER}`, pointerEvents: 'all' }}
         onPointerDown={(e) => e.stopPropagation()}
       >
-        {/* Left: live dot + icon + labels — only when mesa selected */}
+        {/* Left: mesa name (clickable → impersonate) or just icon when no mesa */}
         {hasMesa ? (
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="relative flex h-2 w-2 shrink-0">
-              <span
-                className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-60"
-                style={{ backgroundColor: DOT_COLOR }}
-              />
-              <span
-                className="relative inline-flex h-2 w-2 rounded-full"
-                style={{ backgroundColor: DOT_COLOR }}
-              />
-            </span>
-
+          <button
+            className="flex items-center gap-2 min-w-0 rounded-md px-2 py-1 transition-colors duration-150"
+            style={{ color: TEXT_MAIN }}
+            onClick={() => { window.location.href = `/?mesa=${mesaId ?? ''}`; }}
+            aria-label={mesaLabel ?? undefined}
+          >
             <UtensilsCrossed className="w-3.5 h-3.5 shrink-0" style={{ color: TEXT_DIM }} />
-
-            <span
-              className="hidden xs:inline text-[10px] font-semibold tracking-[0.14em] uppercase shrink-0"
-              style={{ color: TEXT_DIM }}
-            >
-              {t("waiterModeActive", lang)}
-            </span>
-
-            <span className="hidden xs:inline text-[10px]" style={{ color: TEXT_DIM }}>·</span>
-
-            <span className="text-sm font-bold truncate" style={{ color: TEXT_MAIN }}>
-              {mesaLabel}
-            </span>
-          </div>
+            <span className="text-sm font-bold truncate">{mesaLabel}</span>
+          </button>
         ) : (
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center px-2">
             <UtensilsCrossed className="w-3.5 h-3.5 shrink-0" style={{ color: TEXT_DIM }} />
-            <span
-              className="text-[10px] font-semibold tracking-[0.14em] uppercase shrink-0"
-              style={{ color: TEXT_DIM }}
-            >
-              {t("waiterModeActive", lang)}
-            </span>
           </div>
         )}
 
         {/* Right: actions */}
         <div className="flex items-center gap-1.5 shrink-0">
 
-          {/* Cart — only when mesa selected and not on waiter grid */}
-          {hasMesa && pathname !== '/waiter' && (
+          {/* Cart — only when mesa selected and not on waiter/kitchen/bar pages */}
+          {hasMesa && pathname !== '/waiter' && pathname !== '/waiter/kitchen' && pathname !== '/waiter/bar' && (
             <button
               onClick={openCart}
               className="relative flex items-center justify-center rounded-md p-2 transition-colors duration-150 min-h-[32px] min-w-[32px]"
@@ -427,8 +413,7 @@ export function WaiterBanner() {
             )}
           </button>
 
-          {/* Change table — dropdown trigger — only when mesa selected */}
-          {hasMesa && (
+          {/* Change table — dropdown trigger */}
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={handleToggleDropdown}
@@ -509,7 +494,6 @@ export function WaiterBanner() {
               </div>
             )}
           </div>
-          )}
 
           {/* Unlock payment — visible only when pago_en_curso */}
           {pagoEnCurso && (
@@ -529,18 +513,18 @@ export function WaiterBanner() {
 
           {/* Close table — only when mesa selected */}
           {hasMesa && (
-          <button
-            onClick={handleCloseTable}
-            disabled={closing}
-            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150 min-h-[32px] disabled:opacity-40"
-            style={{ color: BTN_CLOSE_TEXT, backgroundColor: BTN_CLOSE_BG }}
-            onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_CLOSE_HOVER)}
-            onMouseLeave={e => (e.currentTarget.style.backgroundColor = BTN_CLOSE_BG)}
-            aria-label={t("waiterTableCloseAction", lang)}
-          >
-            <X className="w-3.5 h-3.5 shrink-0" />
-            <span className="hidden sm:inline">{t("waiterTableCloseAction", lang)}</span>
-          </button>
+            <button
+              onClick={handleCloseTable}
+              disabled={closing}
+              className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150 min-h-[32px] disabled:opacity-40"
+              style={{ color: BTN_CLOSE_TEXT, backgroundColor: BTN_CLOSE_BG }}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_CLOSE_HOVER)}
+              onMouseLeave={e => (e.currentTarget.style.backgroundColor = BTN_CLOSE_BG)}
+              aria-label={t("waiterTableCloseAction", lang)}
+            >
+              <X className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden sm:inline">{t("waiterTableCloseAction", lang)}</span>
+            </button>
           )}
 
           {/* Logout */}
@@ -654,14 +638,14 @@ export function WaiterBanner() {
 function BadgeCircle({ count, color }: { count: number; color: 'neutral' | 'green' | 'orange' }) {
   if (count === 0) return null;
   const colors = {
-    neutral: { bg: 'oklch(40% 0.02 252)', text: 'oklch(80% 0.02 252)' },
-    green: { bg: 'oklch(30% 0.15 148)', text: 'oklch(80% 0.15 148)' },
-    orange: { bg: 'oklch(30% 0.15 62)', text: 'oklch(80% 0.15 62)' },
+    neutral: { bg: 'oklch(45% 0.04 252)', text: 'oklch(90% 0.02 252)' },
+    green:   { bg: 'oklch(35% 0.18 148)', text: 'oklch(88% 0.18 148)' },
+    orange:  { bg: 'oklch(35% 0.18 62)',  text: 'oklch(88% 0.18 62)'  },
   };
   const c = colors[color];
   return (
     <span
-      className="inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1 text-[9px] font-bold"
+      className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1 text-[11px] font-bold"
       style={{ backgroundColor: c.bg, color: c.text }}
     >
       {count}

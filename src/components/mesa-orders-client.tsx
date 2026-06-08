@@ -774,25 +774,8 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
               ) : (
                 <div className="flex flex-col pb-4">
                   {sessionData.orders.map((order, oi) => {
-                    const statusBadge = (() => {
-                      if (order.estado === 'preparado') return { label: '✓ Listo', color: '#3a7a50' };
-                      if (order.estado === 'servido')   return { label: '✓ Servido', color: '#8a7560' };
-                      if (order.estado === 'anotado')   return { label: '· Preparando', color: '#6a7a9a' };
-                      return null;
-                    })();
                     return (
                       <div key={order.id}>
-                        {oi > 0 && <div className="border-t border-dashed my-2" style={{ borderColor: "#ddd8d0" }} />}
-                        <div className="flex items-center justify-between pt-1 pb-1">
-                          <span className="text-[10px] uppercase tracking-widest" style={{ color: "#b0a090", fontFamily: "monospace" }}>
-                            #{order.numeroPedido}
-                          </span>
-                          {statusBadge && (
-                            <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: statusBadge.color, fontFamily: "monospace" }}>
-                              {statusBadge.label}
-                            </span>
-                          )}
-                        </div>
                         <ul className="flex flex-col gap-1">
                           {order.items.map((item) => {
                             const complementoTotal = item.complementos?.reduce((s, c) => s + c.precio, 0) ?? 0;
@@ -1159,7 +1142,7 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
               <>
                 <p className="text-sm font-bold text-center" style={{ color: "#1a1612" }}>⚠️ Pedido ya preparado</p>
                 <p className="text-xs text-center" style={{ color: "#8a7560" }}>
-                  Este ítem ya fue marcado como listo en cocina. ¿Querés eliminarlo igualmente?
+                  Este ítem ya fue marcado como listo en cocina. ¿Quieres eliminarlo igualmente?
                 </p>
                 <div className="flex gap-2 mt-1">
                   <button

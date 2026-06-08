@@ -291,10 +291,7 @@ function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onViewTicket, onC
         >
           <CheckSquare className="w-3 h-3 shrink-0" style={{ color: 'oklch(72% 0.20 148)' }} />
           <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'oklch(72% 0.20 148)' }}>
-            Preparado
-          </span>
-          <span className="ml-auto text-[9px] font-bold" style={{ color: 'oklch(65% 0.18 148)' }}>
-            #{mesa.preparadoPedidoNumbers.join(', #')}
+            Platos listos
           </span>
         </div>
       )}
@@ -761,7 +758,7 @@ export function WaiterLoginForm() {
               <>
                 <p className="text-sm font-bold text-center" style={{ color: "oklch(85% 0.04 252)" }}>⚠️ Pedido ya preparado</p>
                 <p className="text-xs text-center" style={{ color: "oklch(50% 0.05 252)" }}>
-                  Este ítem ya fue marcado como listo en cocina. ¿Querés eliminarlo igualmente?
+                  Este ítem ya fue marcado como listo en cocina. ¿Quieres eliminarlo igualmente?
                 </p>
                 <div className="flex gap-2 mt-1">
                   <button

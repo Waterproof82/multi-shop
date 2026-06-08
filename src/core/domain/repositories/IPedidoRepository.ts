@@ -35,12 +35,26 @@ export interface BarOrderItem {
   estado: string;
   createdAt: string;
   sesionId: string | null;
-  /**
-   * bebida        — pure drink order, swipeable → servido
-   * bebida-info   — drinks inside a mixed order (comida still being cooked), informational only
-   * kitchen-alert — comida is preparado, waiter must pick up food (+ drinks if any), swipeable → servido
-   */
-  tipo: 'bebida' | 'bebida-info' | 'kitchen-alert';
+  tipo: 'bebida';
+}
+
+/** Estado values for per-item kitchen tracking */
+export type ItemEstado = 'pendiente' | 'en_preparacion' | 'listo' | 'servido' | 'retenido';
+
+/** A single food item from a mesa order, with its kitchen estado */
+export interface KitchenItemRecord {
+  pedidoId: string;
+  numeroPedido: number;
+  itemIdx: number;
+  nombre: string;
+  cantidad: number;
+  complementos?: string;
+  estado: ItemEstado;
+  mesaNumero: number | null;
+  mesaNombre: string | null;
+  createdAt: string;
+  /** true = item from mesa_sesiones.items_diferidos (deferred cart item, read-only in waiter kitchen) */
+  isDiferido?: boolean;
 }
 
 export interface IPedidoRepository {
@@ -87,6 +101,12 @@ export interface IPedidoRepository {
   findKitchenOrders(empresaId: string): Promise<Result<KitchenOrderItem[]>>;
   findAllRetenidos(empresaId: string, tipo: 'comida' | 'bebida'): Promise<Result<RetenidoItem[]>>;
   findBarOrders(empresaId: string): Promise<Result<BarOrderItem[]>>;
+  /** Returns food items in pendiente|en_preparacion (for /kitchen cook view) */
+  findKitchenItems(empresaId: string): Promise<Result<KitchenItemRecord[]>>;
+  /** Returns food items in pendiente|en_preparacion|listo|retenido (for /waiter/kitchen view) */
+  findWaiterKitchenItems(empresaId: string): Promise<Result<KitchenItemRecord[]>>;
+  /** Upsert a per-item kitchen estado */
+  upsertItemEstado(empresaId: string, pedidoId: string, itemIdx: number, estado: ItemEstado): Promise<Result<void>>;
   getStats(empresaId: string, mes: number, año: number): Promise<Result<{
     pedidosHoy: number;
     pedidosMes: number;
