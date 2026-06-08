@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { UtensilsCrossed, ArrowLeftRight, LogOut, X, ShoppingCart, ChevronDown, Circle, LockOpen, AlertTriangle } from "lucide-react";
+import { UtensilsCrossed, ArrowLeftRight, LogOut, X, ShoppingCart, ChevronDown, Circle, LockOpen, AlertTriangle, Wine } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { getWaiterMesa, clearWaiterMesa, saveWaiterMesa } from "@/components/waiter-login-form";
@@ -41,6 +41,16 @@ const BTN_UNLOCK_BG    = "oklch(22% 0.07 40)";
 const BTN_UNLOCK_HOVER = "oklch(28% 0.11 40)";
 const BTN_UNLOCK_TEXT  = "oklch(75% 0.20 40)";
 
+// Kitchen — warm amber
+const BTN_KITCHEN_BG    = "oklch(22% 0.07 62)";
+const BTN_KITCHEN_HOVER = "oklch(28% 0.10 62)";
+const BTN_KITCHEN_TEXT  = "oklch(72% 0.14 62)";
+
+// Bar — cool indigo
+const BTN_BAR_BG    = "oklch(20% 0.06 252)";
+const BTN_BAR_HOVER = "oklch(26% 0.09 252)";
+const BTN_BAR_TEXT  = "oklch(68% 0.14 252)";
+
 // Dropdown
 const DD_BG        = "oklch(19% 0.025 252)";
 const DD_BORDER    = "oklch(38% 0.10 252 / 0.5)";
@@ -68,12 +78,31 @@ export function WaiterBanner() {
   const [pagoEnCurso, setPagoEnCurso] = useState(false);
   const [unlocking, setUnlocking]     = useState(false);
 
+  // Waiter auth — independent of mesa selection
+  const [isWaiter, setIsWaiter]       = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  // Kitchen/bar badge counts
+  const [counts, setCounts] = useState<{
+    cocina: { total: number; listos: number; retenidos: number };
+    bebidas: { total: number; listos: number; retenidos: number };
+  } | null>(null);
+  const prevCountsRef = useRef<typeof counts>(null);
+
   // Table dropdown
   const [dropdownOpen, setDropdownOpen]   = useState(false);
   const [mesas, setMesas]                 = useState<Mesa[]>([]);
   const [loadingMesas, setLoadingMesas]   = useState(false);
   const [switchingId, setSwitchingId]     = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Check waiter auth on mount and path change
+  useEffect(() => {
+    fetch('/api/waiter/me')
+      .then(r => { setIsWaiter(r.ok); })
+      .catch(() => setIsWaiter(false))
+      .finally(() => setAuthChecked(true));
+  }, [pathname]);
 
   useEffect(() => {
     const stored = getWaiterMesa();
@@ -125,8 +154,48 @@ export function WaiterBanner() {
     return () => clearInterval(interval);
   }, [mesaId, fetchLock]);
 
+  // Poll kitchen/bar counts (works even without mesa selected)
+  useEffect(() => {
+    if (!isWaiter) return;
+    const fetchCounts = async () => {
+      try {
+        const r = await fetch('/api/waiter/orders/counts');
+        if (r.ok) {
+          const json = await r.json() as {
+            cocina: { total: number; listos: number; retenidos: number };
+            bebidas: { total: number; listos: number; retenidos: number };
+          };
+          const prev = prevCountsRef.current;
+          if (prev) {
+            const totalUp = json.cocina.total > prev.cocina.total || json.bebidas.total > prev.bebidas.total;
+            const listosUp = json.cocina.listos > prev.cocina.listos || json.bebidas.listos > prev.bebidas.listos;
+            if (totalUp || listosUp) {
+              try {
+                const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, ctx.currentTime);
+                gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.15);
+              } catch { /* audio not available */ }
+            }
+          }
+          prevCountsRef.current = json;
+          setCounts(json);
+        }
+      } catch { /* ignore */ }
+    };
+    void fetchCounts();
+    const interval = setInterval(fetchCounts, 10_000);
+    return () => clearInterval(interval);
+  }, [isWaiter]);
 
-  if (!mesaLabel) return null;
+  // ── helper functions ──────────────────────────────────
 
   async function handleToggleDropdown() {
     if (dropdownOpen) { setDropdownOpen(false); return; }
@@ -182,7 +251,6 @@ export function WaiterBanner() {
     if (!mesaId || closing) return;
     if (pagoEnCurso) { setCloseDialog('payment'); return; }
     if (totalItems > 0) { setCloseDialog('cart'); return; }
-    // Check orders to detect free mesa or unpaid state
     try {
       const r = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/orders`);
       if (r.ok) {
@@ -231,6 +299,14 @@ export function WaiterBanner() {
     window.location.href = "/waiter";
   }
 
+  // Not ready yet
+  if (!authChecked) return null;
+
+  // Not a waiter at all → hide everything
+  if (!isWaiter) return null;
+
+  const hasMesa = mesaLabel !== null;
+
   return (
     <>
       <div aria-hidden className="h-12" />
@@ -250,40 +326,52 @@ export function WaiterBanner() {
         style={{ background: BG, borderBottom: `1px solid ${BORDER}`, pointerEvents: 'all' }}
         onPointerDown={(e) => e.stopPropagation()}
       >
-        {/* Left: live dot + icon + labels */}
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="relative flex h-2 w-2 shrink-0">
+        {/* Left: live dot + icon + labels — only when mesa selected */}
+        {hasMesa ? (
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="relative flex h-2 w-2 shrink-0">
+              <span
+                className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-60"
+                style={{ backgroundColor: DOT_COLOR }}
+              />
+              <span
+                className="relative inline-flex h-2 w-2 rounded-full"
+                style={{ backgroundColor: DOT_COLOR }}
+              />
+            </span>
+
+            <UtensilsCrossed className="w-3.5 h-3.5 shrink-0" style={{ color: TEXT_DIM }} />
+
             <span
-              className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-60"
-              style={{ backgroundColor: DOT_COLOR }}
-            />
+              className="hidden xs:inline text-[10px] font-semibold tracking-[0.14em] uppercase shrink-0"
+              style={{ color: TEXT_DIM }}
+            >
+              {t("waiterModeActive", lang)}
+            </span>
+
+            <span className="hidden xs:inline text-[10px]" style={{ color: TEXT_DIM }}>·</span>
+
+            <span className="text-sm font-bold truncate" style={{ color: TEXT_MAIN }}>
+              {mesaLabel}
+            </span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 min-w-0">
+            <UtensilsCrossed className="w-3.5 h-3.5 shrink-0" style={{ color: TEXT_DIM }} />
             <span
-              className="relative inline-flex h-2 w-2 rounded-full"
-              style={{ backgroundColor: DOT_COLOR }}
-            />
-          </span>
-
-          <UtensilsCrossed className="w-3.5 h-3.5 shrink-0" style={{ color: TEXT_DIM }} />
-
-          <span
-            className="hidden xs:inline text-[10px] font-semibold tracking-[0.14em] uppercase shrink-0"
-            style={{ color: TEXT_DIM }}
-          >
-            {t("waiterModeActive", lang)}
-          </span>
-
-          <span className="hidden xs:inline text-[10px]" style={{ color: TEXT_DIM }}>·</span>
-
-          <span className="text-sm font-bold truncate" style={{ color: TEXT_MAIN }}>
-            {mesaLabel}
-          </span>
-        </div>
+              className="text-[10px] font-semibold tracking-[0.14em] uppercase shrink-0"
+              style={{ color: TEXT_DIM }}
+            >
+              {t("waiterModeActive", lang)}
+            </span>
+          </div>
+        )}
 
         {/* Right: actions */}
         <div className="flex items-center gap-1.5 shrink-0">
 
-          {/* Cart — hidden on the waiter grid */}
-          {pathname !== '/waiter' && (
+          {/* Cart — only when mesa selected and not on waiter grid */}
+          {hasMesa && pathname !== '/waiter' && (
             <button
               onClick={openCart}
               className="relative flex items-center justify-center rounded-md p-2 transition-colors duration-150 min-h-[32px] min-w-[32px]"
@@ -301,7 +389,54 @@ export function WaiterBanner() {
             </button>
           )}
 
-          {/* Change table — dropdown trigger */}
+          {/* Kitchen — always visible for authenticated waiters */}
+          <button
+            onClick={() => { window.location.href = '/waiter/kitchen'; }}
+            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150 min-h-[32px]"
+            style={{ color: BTN_KITCHEN_TEXT, backgroundColor: BTN_KITCHEN_BG }}
+            onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_KITCHEN_HOVER)}
+            onMouseLeave={e => (e.currentTarget.style.backgroundColor = BTN_KITCHEN_BG)}
+            aria-label={t("waiterKitchen", lang)}
+          >
+            <UtensilsCrossed className="w-3.5 h-3.5 shrink-0" />
+            {counts && (
+              <div className="flex items-center gap-0.5">
+                <BadgeCircle count={counts.cocina.total} color="neutral" />
+                <BadgeCircle count={counts.cocina.listos} color="green" />
+                <BadgeCircle count={counts.cocina.retenidos} color="orange" />
+              </div>
+            )}
+          </button>
+
+          {/* Bar — always visible for authenticated waiters */}
+          <button
+            onClick={() => { window.location.href = '/waiter/bar'; }}
+            className="relative flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150 min-h-[32px]"
+            style={{ color: BTN_BAR_TEXT, backgroundColor: BTN_BAR_BG }}
+            onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_BAR_HOVER)}
+            onMouseLeave={e => (e.currentTarget.style.backgroundColor = BTN_BAR_BG)}
+            aria-label={t("waiterBar", lang)}
+          >
+            <Wine className="w-3.5 h-3.5 shrink-0" />
+            {counts && (
+              <div className="flex items-center gap-0.5">
+                <BadgeCircle count={counts.bebidas.total} color="neutral" />
+                <BadgeCircle count={counts.bebidas.retenidos} color="orange" />
+              </div>
+            )}
+            {/* Listos badge — notification-style */}
+            {counts && counts.bebidas.listos > 0 && (
+              <span
+                className="absolute -top-1 -right-1 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1 text-[9px] font-bold"
+                style={{ backgroundColor: "oklch(70% 0.19 148)", color: "oklch(98% 0.01 148)" }}
+              >
+                {counts.bebidas.listos}
+              </span>
+            )}
+          </button>
+
+          {/* Change table — dropdown trigger — only when mesa selected */}
+          {hasMesa && (
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={handleToggleDropdown}
@@ -382,6 +517,7 @@ export function WaiterBanner() {
               </div>
             )}
           </div>
+          )}
 
           {/* Unlock payment — visible only when pago_en_curso */}
           {pagoEnCurso && (
@@ -399,7 +535,8 @@ export function WaiterBanner() {
             </button>
           )}
 
-          {/* Close table */}
+          {/* Close table — only when mesa selected */}
+          {hasMesa && (
           <button
             onClick={handleCloseTable}
             disabled={closing}
@@ -412,6 +549,7 @@ export function WaiterBanner() {
             <X className="w-3.5 h-3.5 shrink-0" />
             <span className="hidden sm:inline">{t("waiterTableCloseAction", lang)}</span>
           </button>
+          )}
 
           {/* Logout */}
           <button
@@ -518,5 +656,23 @@ export function WaiterBanner() {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function BadgeCircle({ count, color }: { count: number; color: 'neutral' | 'green' | 'orange' }) {
+  if (count === 0) return null;
+  const colors = {
+    neutral: { bg: 'oklch(40% 0.02 252)', text: 'oklch(80% 0.02 252)' },
+    green: { bg: 'oklch(30% 0.15 148)', text: 'oklch(80% 0.15 148)' },
+    orange: { bg: 'oklch(30% 0.15 62)', text: 'oklch(80% 0.15 62)' },
+  };
+  const c = colors[color];
+  return (
+    <span
+      className="inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1 text-[9px] font-bold"
+      style={{ backgroundColor: c.bg, color: c.text }}
+    >
+      {count}
+    </span>
   );
 }

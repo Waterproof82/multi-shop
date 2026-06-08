@@ -123,10 +123,7 @@ async function handleMesaOrder(empresa: EmpresaOrderData, data: MesaData, reques
     empresa.id,
     { items: data.items, mesa_id: data.mesa_id, idioma: data.idioma },
     mesaResult.data.numero,
-    mesaResult.data.nombre,
-    empresa.telegram_mesa_chat_id ?? null,
-    empresa.telegram_chat_id ?? null,
-    empresa.telegram_bebidas_chat_id ?? null
+    mesaResult.data.nombre
   );
 
   if (!pedidoResult.success) {

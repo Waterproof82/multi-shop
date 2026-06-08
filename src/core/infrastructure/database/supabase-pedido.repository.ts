@@ -1,6 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Pedido, CartItem, PedidoItem, Result } from "@/core/domain/entities/types";
-import { IPedidoRepository } from "@/core/domain/repositories/IPedidoRepository";
+import { IPedidoRepository, KitchenBarCounts, KitchenOrderItem, BarOrderItem, RetenidoItem } from "@/core/domain/repositories/IPedidoRepository";
 import { logger } from "../logging/logger";
 
 type DeliveryData = {
@@ -1088,6 +1088,273 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findMesaContextForWebhook', { details: { pedidoId } });
+      return { success: false, error: appError };
+    }
+  }
+
+  async countKitchenBarOrders(empresaId: string): Promise<Result<KitchenBarCounts>> {
+    try {
+      const { data: activeSessions, error: sessionsError } = await this.supabase
+        .from('mesa_sesiones')
+        .select('id, items_diferidos')
+        .eq('empresa_id', empresaId)
+        .is('cerrada_at', null);
+
+      if (sessionsError) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', sessionsError.message, 'repository', 'SupabasePedidoRepository.countKitchenBarOrders', { details: { code: sessionsError.code, empresaId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener sesiones activas', module: 'repository', method: 'countKitchenBarOrders' } };
+      }
+
+      const sessionIds = (activeSessions ?? []).map(s => (s as Record<string, unknown>).id as string);
+
+      if (sessionIds.length === 0) {
+        return { success: true, data: { cocina: { total: 0, listos: 0, retenidos: 0 }, bebidas: { total: 0, listos: 0, retenidos: 0 } } };
+      }
+
+      const { data: pedidos, error: pedidosError } = await this.supabase
+        .from('pedidos')
+        .select('detalle_pedido, estado')
+        .in('sesion_id', sessionIds);
+
+      if (pedidosError) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', pedidosError.message, 'repository', 'SupabasePedidoRepository.countKitchenBarOrders', { details: { code: pedidosError.code, empresaId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pedidos', module: 'repository', method: 'countKitchenBarOrders' } };
+      }
+
+      let cocinaTotal = 0;
+      let cocinaListos = 0;
+      let cocinaRetenidos = 0;
+      let bebidasTotal = 0;
+      let bebidasListos = 0;
+      let bebidasRetenidos = 0;
+
+      const terminalStates = new Set(['servido', 'cerrado', 'cancelado']);
+
+      for (const pedido of pedidos ?? []) {
+        const row = pedido as Record<string, unknown>;
+        const items = (row['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
+        const estado = row['estado'] as string;
+        if (terminalStates.has(estado)) continue;
+
+        const hasComida = items.some(i => i['tipo_producto'] === 'comida');
+        const hasBebida = items.some(i => i['tipo_producto'] === 'bebida');
+
+        // Cocina: active (pending/anotado) vs done (preparado)
+        if (hasComida) {
+          if (estado === 'pendiente' || estado === 'anotado') cocinaTotal++;
+          if (estado === 'preparado') cocinaListos++;
+        }
+
+        // Bar: active bebida orders (not yet kitchen-alert stage) + kitchen alerts
+        if (hasBebida && estado !== 'preparado') bebidasTotal++;
+        if (hasComida && estado === 'preparado') {
+          bebidasTotal++;    // kitchen alert needs bar attention
+          bebidasListos++;   // listos = food ready, waiter must pick up
+        }
+      }
+
+      for (const session of activeSessions ?? []) {
+        const row = session as Record<string, unknown>;
+        const deferred = (row['items_diferidos'] as Array<Record<string, unknown>>) ?? [];
+        for (const item of deferred) {
+          if (item['tipo'] === 'comida') cocinaRetenidos++;
+          if (item['tipo'] === 'bebida') bebidasRetenidos++;
+        }
+      }
+
+      return {
+        success: true,
+        data: {
+          cocina: { total: cocinaTotal, listos: cocinaListos, retenidos: cocinaRetenidos },
+          bebidas: { total: bebidasTotal, listos: bebidasListos, retenidos: bebidasRetenidos },
+        },
+      };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.countKitchenBarOrders', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
+  async findAllRetenidos(empresaId: string, tipo: 'comida' | 'bebida'): Promise<Result<RetenidoItem[]>> {
+    try {
+      const { data: sessions, error: sessionsError } = await this.supabase
+        .from('mesa_sesiones')
+        .select(`id, created_at, items_diferidos, mesa_id, mesas!inner(numero, nombre)`)
+        .eq('empresa_id', empresaId)
+        .is('cerrada_at', null);
+
+      if (sessionsError) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', sessionsError.message, 'repository', 'SupabasePedidoRepository.findAllRetenidos', { details: { code: sessionsError.code, empresaId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener sesiones', module: 'repository', method: 'findAllRetenidos' } };
+      }
+
+      const result: RetenidoItem[] = [];
+      for (const session of sessions ?? []) {
+        const row = session as Record<string, unknown>;
+        const mesaData = row['mesas'] as Record<string, unknown> ?? {};
+        const sesionCreatedAt = row['created_at'] as string ?? '';
+        const deferred = (row['items_diferidos'] as Array<Record<string, unknown>>) ?? [];
+
+        for (const item of deferred) {
+          if (item['tipo'] !== tipo) continue;
+          const complements = (item['selectedComplements'] as Array<{ name: string }> | undefined);
+          result.push({
+            itemId: item['itemId'] as string,
+            nombre: item['itemName'] as string,
+            cantidad: item['quantity'] as number,
+            complementos: complements?.map(c => c.name).join(', '),
+            mesaNumero: (mesaData['numero'] as number) ?? null,
+            mesaNombre: (mesaData['nombre'] as string | null) ?? null,
+            sesionCreatedAt,
+          });
+        }
+      }
+
+      return { success: true, data: result };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findAllRetenidos', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
+  async findKitchenOrders(empresaId: string): Promise<Result<KitchenOrderItem[]>> {
+    try {
+      const { data: activeSessions, error: sessionsError } = await this.supabase
+        .from('mesa_sesiones')
+        .select('id')
+        .eq('empresa_id', empresaId)
+        .is('cerrada_at', null);
+
+      if (sessionsError) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', sessionsError.message, 'repository', 'SupabasePedidoRepository.findKitchenOrders', { details: { code: sessionsError.code, empresaId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener sesiones', module: 'repository', method: 'findKitchenOrders' } };
+      }
+
+      const sessionIds = (activeSessions ?? []).map(s => (s as Record<string, unknown>).id as string);
+      if (sessionIds.length === 0) return { success: true, data: [] };
+
+      const { data: orders, error: ordersError } = await this.supabase
+        .from('pedidos')
+        .select(`id, numero_pedido, sesion_id, detalle_pedido, estado, created_at, mesas!inner(numero, nombre)`)
+        .in('sesion_id', sessionIds)
+        .in('estado', ['pendiente', 'anotado'])
+        .order('created_at', { ascending: true });
+
+      if (ordersError) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', ordersError.message, 'repository', 'SupabasePedidoRepository.findKitchenOrders', { details: { code: ordersError.code, empresaId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pedidos de cocina', module: 'repository', method: 'findKitchenOrders' } };
+      }
+
+      const result: KitchenOrderItem[] = [];
+      for (const order of orders ?? []) {
+        const row = order as Record<string, unknown>;
+        const items = (row['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
+        const comidaItems = items.filter(i => i['tipo_producto'] === 'comida');
+        if (comidaItems.length === 0) continue;
+
+        const mesaData = row['mesas'] as Record<string, unknown> ?? {};
+        result.push({
+          id: row['id'] as string,
+          numeroPedido: row['numero_pedido'] as number,
+          mesaNumero: (mesaData['numero'] as number) ?? null,
+          mesaNombre: (mesaData['nombre'] as string | null) ?? null,
+          items: comidaItems.map(i => ({
+            nombre: i['nombre'] as string,
+            cantidad: i['cantidad'] as number,
+            complementos: i['complementos'] as { nombre?: string; name?: string }[] | undefined,
+          })),
+          estado: row['estado'] as string,
+          createdAt: row['created_at'] as string,
+          sesionId: (row['sesion_id'] as string | null) ?? null,
+        });
+      }
+
+      return { success: true, data: result };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findKitchenOrders', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
+  async findBarOrders(empresaId: string): Promise<Result<BarOrderItem[]>> {
+    try {
+      const { data: activeSessions, error: sessionsError } = await this.supabase
+        .from('mesa_sesiones')
+        .select('id')
+        .eq('empresa_id', empresaId)
+        .is('cerrada_at', null);
+
+      if (sessionsError) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', sessionsError.message, 'repository', 'SupabasePedidoRepository.findBarOrders', { details: { code: sessionsError.code, empresaId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener sesiones', module: 'repository', method: 'findBarOrders' } };
+      }
+
+      const sessionIds = (activeSessions ?? []).map(s => (s as Record<string, unknown>).id as string);
+      if (sessionIds.length === 0) return { success: true, data: [] };
+
+      const { data: orders, error: ordersError } = await this.supabase
+        .from('pedidos')
+        .select(`id, numero_pedido, sesion_id, detalle_pedido, estado, created_at, mesas!inner(numero, nombre)`)
+        .in('sesion_id', sessionIds)
+        .neq('estado', 'servido')
+        .neq('estado', 'cerrado')
+        .neq('estado', 'cancelado')
+        .order('created_at', { ascending: true });
+
+      if (ordersError) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', ordersError.message, 'repository', 'SupabasePedidoRepository.findBarOrders', { details: { code: ordersError.code, empresaId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pedidos de bar', module: 'repository', method: 'findBarOrders' } };
+      }
+
+      const result: BarOrderItem[] = [];
+      for (const order of orders ?? []) {
+        const row = order as Record<string, unknown>;
+        const items = (row['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
+        const mesaData = row['mesas'] as Record<string, unknown> ?? {};
+        const estado = row['estado'] as string;
+
+        const comidaItems = items.filter(i => i['tipo_producto'] === 'comida');
+        const bebidaItems = items.filter(i => i['tipo_producto'] === 'bebida');
+
+        // Kitchen alert: comida is preparado — waiter must pick up food (swipeable → servido)
+        if (comidaItems.length > 0 && estado === 'preparado') {
+          result.push({
+            id: row['id'] as string,
+            numeroPedido: row['numero_pedido'] as number,
+            mesaNumero: (mesaData['numero'] as number) ?? null,
+            mesaNombre: (mesaData['nombre'] as string | null) ?? null,
+            items: comidaItems.map(i => ({ nombre: i['nombre'] as string, cantidad: i['cantidad'] as number })),
+            estado,
+            createdAt: row['created_at'] as string,
+            sesionId: (row['sesion_id'] as string | null) ?? null,
+            tipo: 'kitchen-alert',
+          });
+          // Don't show bebida-info for this order — kitchen-alert card covers it
+          continue;
+        }
+
+        // Bebida rows: visible while kitchen is cooking (pendiente/anotado)
+        if (bebidaItems.length > 0) {
+          // Pure bebida order (no comida) → swipeable → servido
+          // Mixed order (has comida still cooking) → informational, no swipe
+          const tipo = comidaItems.length === 0 ? 'bebida' : 'bebida-info';
+          result.push({
+            id: row['id'] as string,
+            numeroPedido: row['numero_pedido'] as number,
+            mesaNumero: (mesaData['numero'] as number) ?? null,
+            mesaNombre: (mesaData['nombre'] as string | null) ?? null,
+            items: bebidaItems.map(i => ({ nombre: i['nombre'] as string, cantidad: i['cantidad'] as number })),
+            estado,
+            createdAt: row['created_at'] as string,
+            sesionId: (row['sesion_id'] as string | null) ?? null,
+            tipo,
+          });
+        }
+      }
+
+      return { success: true, data: result };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findBarOrders', { empresaId });
       return { success: false, error: appError };
     }
   }

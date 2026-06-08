@@ -209,6 +209,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
           itemName: ci.item.name,
           price: ci.item.price,
           quantity: ci.quantity,
+          tipo: ci.item.tipoProducto,
           translations: ci.item.translations,
           selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
         })),

@@ -10,6 +10,7 @@ const deferredItemSchema = z.object({
   itemName: z.string().max(200),
   price: z.number().min(0),
   quantity: z.number().int().min(1),
+  tipo: z.enum(['comida', 'bebida']).optional(),
   translations: z.record(z.object({ name: z.string().max(200) })).optional(),
   selectedComplements: z.array(z.object({
     id: z.string().max(100),

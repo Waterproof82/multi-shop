@@ -1,6 +1,6 @@
 import { NextResponse, after } from 'next/server';
 import { z } from 'zod';
-import { answerCallbackQuery, editMessageText, editMessageReplyMarkup, buildTimeButtons, sendTelegramPreparadoAlert, deleteMessage } from '@/core/infrastructure/services/telegram.service';
+import { answerCallbackQuery, editMessageText, editMessageReplyMarkup, buildTimeButtons, deleteMessage } from '@/core/infrastructure/services/telegram.service';
 
 const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
 
@@ -83,147 +83,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  // Handle anotado — mark as noted; keep Preparado button visible
-  const anotadoMatch = callbackData.match(/^anotado:([0-9a-f-]{36})$/);
-  if (anotadoMatch) {
-    const [, pedidoId] = anotadoMatch;
-    const { pedidoRepository } = await import('@/core/infrastructure/database');
-    await pedidoRepository.updateStatusById(pedidoId, 'anotado');
-    await answerCallbackQuery(callbackQueryId, '✅ Pedido anotado');
-    if (message) {
-      await editMessageReplyMarkup(String(message.chat.id), message.message_id, [
-        [
-          { text: '✅ Anotado ✓', callback_data: 'noop' },
-          { text: '🍳 Preparado', callback_data: `preparado:${pedidoId}` },
-        ],
-        [{ text: '🔄 Modificar', callback_data: `modify_mesa:${pedidoId}` }],
-      ]);
-    }
-    return NextResponse.json({ ok: true });
-  }
-
-  // Handle preparado — food ready; notify bar immediately; auto-delete comida message after 5s
-  const preparadoMatch = callbackData.match(/^preparado:([0-9a-f-]{36})$/);
-  if (preparadoMatch) {
-    const [, pedidoId] = preparadoMatch;
-    const { pedidoRepository } = await import('@/core/infrastructure/database');
-    await pedidoRepository.updateStatusById(pedidoId, 'preparado');
-    await answerCallbackQuery(callbackQueryId, '🍳 Comida preparada — eliminando en 5s');
-
-    // Fetch mesa context for the bar alert
-    const mesaCtxResult = await pedidoRepository.findMesaContextForWebhook(pedidoId);
-    const mesaCtx = mesaCtxResult.success ? mesaCtxResult.data : null;
-
-    // Notify bar immediately — save message ID synchronously so it can be deleted if cancelled
-    if (mesaCtx?.telegram_bebidas_chat_id) {
-      const alertResult = await sendTelegramPreparadoAlert(pedidoId, mesaCtx.numero_pedido, mesaCtx.mesa_numero, mesaCtx.mesa_nombre, mesaCtx.comidaItems, mesaCtx.telegram_bebidas_chat_id);
-      if (alertResult.success) {
-        await pedidoRepository.saveTelegramPreparadoAlertMessageId(pedidoId, alertResult.data.messageId);
-      }
-    }
-
-    // Delete cocina message immediately
-    if (message) {
-      await deleteMessage(String(message.chat.id), message.message_id);
-    }
-    return NextResponse.json({ ok: true });
-  }
-
-  // Handle cancelar_preparado — cancel comida deletion, restore to pre-preparado buttons
-  const cancelarPreparadoMatch = callbackData.match(/^cancelar_preparado:([0-9a-f-]{36})$/);
-  if (cancelarPreparadoMatch) {
-    const [, pedidoId] = cancelarPreparadoMatch;
-    const { pedidoRepository } = await import('@/core/infrastructure/database');
-    await pedidoRepository.updateStatusById(pedidoId, 'anotado');
-    await answerCallbackQuery(callbackQueryId, '↩️ Eliminación cancelada');
-
-    // Delete the bar alert that was sent immediately when preparado was pressed
-    const alertCtx = await pedidoRepository.findTelegramPreparadoAlertContext(pedidoId);
-    if (alertCtx.success && alertCtx.data) {
-      await deleteMessage(alertCtx.data.chatId, alertCtx.data.messageId);
-      await pedidoRepository.clearTelegramPreparadoAlertMessageId(pedidoId);
-    }
-
-    if (message) {
-      await editMessageReplyMarkup(String(message.chat.id), message.message_id, [
-        [
-          { text: '✅ Anotado ✓', callback_data: 'noop' },
-          { text: '🍳 Preparado', callback_data: `preparado:${pedidoId}` },
-        ],
-        [{ text: '🔄 Modificar', callback_data: `modify_mesa:${pedidoId}` }],
-      ]);
-    }
-    return NextResponse.json({ ok: true });
-  }
-
-  // Handle servido — mark as served; auto-delete message after 5s
-  const servidoMatch = callbackData.match(/^servido:([0-9a-f-]{36})$/);
-  if (servidoMatch) {
-    const [, pedidoId] = servidoMatch;
-    const { pedidoRepository } = await import('@/core/infrastructure/database');
-    await pedidoRepository.updateStatusById(pedidoId, 'servido');
-    await answerCallbackQuery(callbackQueryId, '🍽️ Pedido servido');
-    if (message) {
-      await deleteMessage(String(message.chat.id), message.message_id);
-    }
-    return NextResponse.json({ ok: true });
-  }
-
-  // Handle cerrar_mesa — close the session immediately, delete messages, auto-delete this one in 5s
-  const cerrarMesaMatch = callbackData.match(/^cerrar_mesa:([0-9a-f-]{36})$/);
-  if (cerrarMesaMatch) {
-    const [, sesionId] = cerrarMesaMatch;
-    const { mesaSesionUseCase, pedidoRepository: repo } = await import('@/core/infrastructure/database');
-    await answerCallbackQuery(callbackQueryId, '🔒 Cerrando mesa...');
-
-    // Delete all order Telegram messages for this session (best-effort)
-    const telegramMessages = await repo.findSesionTelegramMessages(sesionId);
-    if (telegramMessages.success) {
-      await Promise.all(
-        telegramMessages.data.map(({ messageId: msgId, chatId: cId }) => deleteMessage(cId, msgId))
-      );
-    }
-    await repo.consolidateSesionOrders(sesionId);
-    await mesaSesionUseCase.closeSesion(sesionId);
-
-    if (message) {
-      const chatId = String(message.chat.id);
-      const messageId = message.message_id;
-      await editMessageReplyMarkup(chatId, messageId, [
-        [{ text: '🔒 Mesa cerrada ✓', callback_data: 'noop' }],
-      ]);
-      after(async () => {
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        await deleteMessage(chatId, messageId);
-      });
-    }
-    return NextResponse.json({ ok: true });
-  }
-
   // Handle eliminar — delete the Telegram message
   const eliminarMatch = callbackData.match(/^eliminar:([0-9a-f-]{36})$/);
   if (eliminarMatch) {
     await answerCallbackQuery(callbackQueryId, '🗑️ Mensaje eliminado');
     if (message) {
       await deleteMessage(String(message.chat.id), message.message_id);
-    }
-    return NextResponse.json({ ok: true });
-  }
-
-  // Handle modify_mesa — restore initial Anotado/Preparado buttons
-  const modifyMesaMatch = callbackData.match(/^modify_mesa:([0-9a-f-]{36})$/);
-  if (modifyMesaMatch) {
-    const [, pedidoId] = modifyMesaMatch;
-    const { pedidoRepository } = await import('@/core/infrastructure/database');
-    await pedidoRepository.updateStatusById(pedidoId, 'pendiente');
-    await answerCallbackQuery(callbackQueryId, 'Selecciona una opción');
-    if (message) {
-      await editMessageReplyMarkup(String(message.chat.id), message.message_id, [
-        [
-          { text: '✅ Anotado', callback_data: `anotado:${pedidoId}` },
-          { text: '🍳 Preparado', callback_data: `preparado:${pedidoId}` },
-        ],
-      ]);
     }
     return NextResponse.json({ ok: true });
   }
