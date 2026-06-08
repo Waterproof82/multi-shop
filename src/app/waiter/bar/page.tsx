@@ -1,6 +1,33 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+
+const STORAGE_KEY = 'bar_served_keys';
+
+function loadServedKeys(): Set<string> {
+  try {
+    const raw = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
+    return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function persistServedKeys(keys: Set<string>) {
+  try {
+    if (keys.size === 0) { localStorage.removeItem(STORAGE_KEY); return; }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([...keys]));
+  } catch { /* ignore */ }
+}
+
+function clearServedKeysForOrder(orderId: string) {
+  try {
+    const existing = loadServedKeys();
+    const updated = new Set([...existing].filter(k => !k.startsWith(`${orderId}:`)));
+    persistServedKeys(updated);
+  } catch { /* ignore */ }
+}
+
 const COUNTDOWN_SECONDS = 5;
 const COUNTDOWN_COLOR   = { bg: 'oklch(22% 0.16 148)', border: 'oklch(50% 0.26 148 / 0.6)' };
 import { useLanguage } from '@/lib/language-context';
@@ -69,7 +96,7 @@ export default function BarPage() {
   const { language } = useLanguage();
   const lang = language as Parameters<typeof t>[1];
   const [orders, setOrders]         = useState<BarOrder[]>([]);
-  const [servedKeys, setServedKeys]  = useState<Set<string>>(new Set());
+  const [servedKeys, setServedKeys]  = useState<Set<string>>(loadServedKeys);
   const [countdowns, setCountdowns]  = useState<Record<string, number>>({});
   const timersRef     = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
   const pointerStartX = useRef<number | null>(null);
@@ -111,19 +138,27 @@ export default function BarPage() {
     return () => { timers.forEach(id => clearInterval(id)); };
   }, []);
 
-  // Fire pending countdown API calls if user navigates away (keepalive survives page unload)
+  // On navigation: persist in-flight countdowns to localStorage, then fire PATCH only if order is complete.
   useEffect(() => {
     const handleBeforeUnload = () => {
       const pending = pendingCountdownsRef.current;
-      if (pending.size === 0) return;
+      const served  = servedKeysRef.current;
+      if (pending.size === 0 && served.size === 0) return;
 
-      // Tally covered items (in countdown + already served) per order
+      // Persist any in-flight countdown items so they stay hidden on next visit
+      if (pending.size > 0) {
+        const current = loadServedKeys();
+        for (const key of pending.keys()) current.add(key);
+        persistServedKeys(current);
+      }
+
+      // Fire PATCH only for orders where ALL items are now covered (pending + already served)
       const byOrder = new Map<string, { count: number; total: number }>();
       for (const item of pending.values()) {
         const e = byOrder.get(item.orderId);
         byOrder.set(item.orderId, { count: (e?.count ?? 0) + 1, total: item.totalInOrder });
       }
-      for (const k of servedKeysRef.current) {
+      for (const k of served) {
         const oid = k.substring(0, k.lastIndexOf(':'));
         const e = byOrder.get(oid);
         if (e) byOrder.set(oid, { ...e, count: e.count + 1 });
@@ -131,6 +166,7 @@ export default function BarPage() {
 
       for (const [orderId, { count, total }] of byOrder) {
         if (count >= total) {
+          clearServedKeysForOrder(orderId);
           fetch(`/api/waiter/orders/${encodeURIComponent(orderId)}/status`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -163,6 +199,7 @@ export default function BarPage() {
             setServedKeys(prevServed => {
               const next = new Set(prevServed);
               next.add(key);
+              persistServedKeys(next);
               const servedCount = [...next].filter(k => k.startsWith(`${flatItem.orderId}:`)).length;
               if (servedCount >= flatItem.totalInOrder) {
                 fetch(`/api/waiter/orders/${encodeURIComponent(flatItem.orderId)}/status`, {
@@ -171,17 +208,27 @@ export default function BarPage() {
                   body: JSON.stringify({ estado: 'servido' }),
                 }).then(r => {
                   if (r.ok) {
+                    clearServedKeysForOrder(flatItem.orderId);
                     setOrders(prev => prev.filter(o => o.id !== flatItem.orderId));
                     setServedKeys(s => {
                       const cleaned = new Set(s);
                       cleaned.forEach(k => { if (k.startsWith(`${flatItem.orderId}:`)) cleaned.delete(k); });
+                      persistServedKeys(cleaned);
                       return cleaned;
                     });
                   } else {
-                    setServedKeys(s => { const r = new Set(s); r.delete(key); return r; });
+                    setServedKeys(s => {
+                      const r = new Set(s); r.delete(key);
+                      persistServedKeys(r);
+                      return r;
+                    });
                   }
                 }).catch(() => {
-                  setServedKeys(s => { const r = new Set(s); r.delete(key); return r; });
+                  setServedKeys(s => {
+                    const r = new Set(s); r.delete(key);
+                    persistServedKeys(r);
+                    return r;
+                  });
                 });
               }
               return next;
