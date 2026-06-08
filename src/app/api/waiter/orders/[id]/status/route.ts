@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { pedidoRepository } from '@/core/infrastructure/database';
 
 const bodySchema = z.object({
-  estado: z.enum(['anotado', 'preparado', 'servido']),
+  estado: z.enum(['pendiente', 'anotado', 'preparado', 'servido']),
 });
 
 export async function PATCH(

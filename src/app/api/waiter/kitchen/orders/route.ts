@@ -9,17 +9,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 
-  const [ordersResult, retenidosResult] = await Promise.all([
-    pedidoRepository.findKitchenOrders(empresaId),
-    pedidoRepository.findAllRetenidos(empresaId, 'comida'),
-  ]);
+  const ordersResult = await pedidoRepository.findKitchenOrders(empresaId);
 
   if (!ordersResult.success) {
     return NextResponse.json({ error: 'Error al obtener pedidos de cocina' }, { status: 500 });
   }
 
-  return NextResponse.json({
-    orders: ordersResult.data,
-    retenidos: retenidosResult.success ? retenidosResult.data : [],
-  });
+  return NextResponse.json({ orders: ordersResult.data });
 }

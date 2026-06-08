@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
-import { Wine, ChevronLeft, Clock } from 'lucide-react';
+import { Wine, ChevronLeft, Clock, TimerOff } from 'lucide-react';
 
 interface BarOrder {
   id: string;
@@ -15,6 +15,16 @@ interface BarOrder {
   createdAt: string;
   sesionId: string | null;
   tipo: 'bebida' | 'bebida-info' | 'kitchen-alert';
+}
+
+interface RetenidoItem {
+  itemId: string;
+  nombre: string;
+  cantidad: number;
+  complementos?: string;
+  mesaNumero: number | null;
+  mesaNombre: string | null;
+  sesionCreatedAt: string;
 }
 
 const BG = "oklch(13% 0.02 252)";
@@ -58,13 +68,18 @@ export default function BarPage() {
   const { language } = useLanguage();
   const lang = language as Parameters<typeof t>[1];
   const [orders, setOrders] = useState<BarOrder[]>([]);
+  const [retenidos, setRetenidos] = useState<RetenidoItem[]>([]);
   const pointerStartX = useRef<number | null>(null);
   const swipingId = useRef<string | null>(null);
 
   const fetchOrders = useCallback(async () => {
     try {
       const r = await fetch('/api/waiter/bar/orders');
-      if (r.ok) setOrders(await r.json() as BarOrder[]);
+      if (r.ok) {
+        const json = await r.json() as { orders: BarOrder[]; retenidos: RetenidoItem[] };
+        setOrders(json.orders ?? []);
+        setRetenidos(json.retenidos ?? []);
+      }
     } catch { /* ignore */ }
   }, []);
 
@@ -139,6 +154,7 @@ export default function BarPage() {
 
   const swipeableOrders = orders.filter(o => o.tipo !== 'bebida-info');
   const infoOrders      = orders.filter(o => o.tipo === 'bebida-info');
+  const hasAnyContent   = swipeableOrders.length > 0 || infoOrders.length > 0 || retenidos.length > 0;
 
   return (
     <div className="min-h-screen" style={{ background: BG }}>
@@ -210,9 +226,46 @@ export default function BarPage() {
           </div>
         )}
 
+        {/* Retenidos — deferred items visible only to waiter */}
+        {retenidos.length > 0 && (
+          <div className="mb-4">
+            <div className="flex items-center gap-2 px-1 mb-2">
+              <TimerOff className="w-3.5 h-3.5" style={{ color: TEXT_DIM }} />
+              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: TEXT_DIM }}>
+                {t('waiterRetenidos', lang)} ({retenidos.length})
+              </span>
+            </div>
+            <div className="flex flex-col gap-2">
+              {retenidos.map((item, idx) => {
+                const tableLabel = item.mesaNombre ?? `Mesa ${item.mesaNumero ?? '—'}`;
+                const elapsed = getElapsedMinutes(item.sesionCreatedAt);
+                return (
+                  <div
+                    key={`${item.itemId}-${idx}`}
+                    className="flex items-center justify-between rounded-lg px-3 py-2"
+                    style={{ background: 'oklch(20% 0.05 252)', border: '1px solid oklch(38% 0.08 252 / 0.35)' }}
+                  >
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span className="text-xs font-medium shrink-0" style={{ color: TEXT_MAIN }}>{item.cantidad}×</span>
+                      <span className="text-xs truncate" style={{ color: TEXT_MAIN }}>{item.nombre || '—'}</span>
+                      {item.complementos && (
+                        <span className="text-[10px] shrink-0" style={{ color: TEXT_DIM }}>({item.complementos})</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 ml-2 text-[10px]" style={{ color: TEXT_DIM }}>
+                      <span>{tableLabel}</span>
+                      <span className="font-mono">{elapsed}m</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Swipeable orders */}
         <div className="flex flex-col gap-3">
-          {swipeableOrders.length === 0 && infoOrders.length === 0 && (
+          {!hasAnyContent && (
             <div className="text-center py-10 text-sm" style={{ color: TEXT_DIM }}>
               {t("barEmpty", lang)}
             </div>
