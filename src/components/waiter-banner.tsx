@@ -411,7 +411,7 @@ export function WaiterBanner() {
           {/* Bar — always visible for authenticated waiters */}
           <button
             onClick={() => { window.location.href = '/waiter/bar'; }}
-            className="relative flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150 min-h-[32px]"
+            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150 min-h-[32px]"
             style={{ color: BTN_BAR_TEXT, backgroundColor: BTN_BAR_BG }}
             onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_BAR_HOVER)}
             onMouseLeave={e => (e.currentTarget.style.backgroundColor = BTN_BAR_BG)}
@@ -421,17 +421,9 @@ export function WaiterBanner() {
             {counts && (
               <div className="flex items-center gap-0.5">
                 <BadgeCircle count={counts.bebidas.total} color="neutral" />
+                <BadgeCircle count={counts.bebidas.listos} color="green" />
                 <BadgeCircle count={counts.bebidas.retenidos} color="orange" />
               </div>
-            )}
-            {/* Listos badge — notification-style */}
-            {counts && counts.bebidas.listos > 0 && (
-              <span
-                className="absolute -top-1 -right-1 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1 text-[9px] font-bold"
-                style={{ backgroundColor: "oklch(70% 0.19 148)", color: "oklch(98% 0.01 148)" }}
-              >
-                {counts.bebidas.listos}
-              </span>
             )}
           </button>
 

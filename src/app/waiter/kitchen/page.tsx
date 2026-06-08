@@ -313,7 +313,7 @@ export default function KitchenPage() {
                     {order.items.map((item, idx) => (
                       <div key={idx} className="text-xs" style={{ color: TEXT_MAIN }}>
                         <span className="font-medium">{item.cantidad}x</span>{' '}
-                        {item.nombre}
+                        {item.nombre || <span style={{ color: TEXT_DIM }}>—</span>}
                         {item.complementos && item.complementos.length > 0 && (
                           <span className="text-[10px]" style={{ color: TEXT_DIM }}>
                             {' '}({item.complementos.map(c => c.nombre ?? c.name).join(', ')})
