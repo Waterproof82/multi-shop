@@ -714,6 +714,7 @@ export function WaiterLoginForm() {
                       const lineTotal = (item.precio + compTotal) * item.cantidad;
                       return (
                         <div key={`${item.nombre}||${item.precio}`} className="flex items-center gap-2 py-2" style={{ borderBottom: "1px solid oklch(22% 0.03 252 / 0.6)" }}>
+                          {!ticketMesa?.sesionPagada && (
                           <button
                             type="button"
                             onClick={() => {
@@ -729,6 +730,7 @@ export function WaiterLoginForm() {
                           >
                             −
                           </button>
+                        )}
                           <div className="flex flex-col min-w-0 flex-1">
                             <span className="text-sm font-medium leading-snug" style={{ color: "oklch(82% 0.04 252)" }}>
                               <span className="font-bold mr-1" style={{ color: "oklch(65% 0.08 252)" }}>×{item.cantidad}</span>
