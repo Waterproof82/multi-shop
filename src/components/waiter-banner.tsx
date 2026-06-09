@@ -312,6 +312,10 @@ export function WaiterBanner() {
   if (pathname.startsWith('/mesa/')) return null;
 
   const hasMesa = mesaLabel !== null;
+  const sectionLabel =
+    pathname === '/waiter/kitchen' ? t('waiterKitchen', lang) :
+    pathname === '/waiter/bar'     ? t('waiterBar', lang) :
+    null;
 
   // On the customer store page, only show the banner if the waiter has a mesa selected.
   // Without a mesa in sessionStorage we're in customer context — hide the waiter UI.
@@ -336,22 +340,33 @@ export function WaiterBanner() {
         style={{ background: BG, borderBottom: `1px solid ${BORDER}`, pointerEvents: 'all' }}
         onPointerDown={(e) => e.stopPropagation()}
       >
-        {/* Left: mesa name (clickable → impersonate) or just icon when no mesa */}
-        {hasMesa ? (
-          <button
-            className="flex items-center gap-2 min-w-0 rounded-md px-2 py-1 transition-colors duration-150"
-            style={{ color: TEXT_MAIN }}
-            onClick={() => { window.location.href = `/?mesa=${mesaId ?? ''}`; }}
-            aria-label={mesaLabel ?? undefined}
-          >
-            <UtensilsCrossed className="w-3.5 h-3.5 shrink-0" style={{ color: TEXT_DIM }} />
-            <span className="text-sm font-bold truncate">{mesaLabel}</span>
-          </button>
-        ) : (
-          <div className="flex items-center px-2">
-            <UtensilsCrossed className="w-3.5 h-3.5 shrink-0" style={{ color: TEXT_DIM }} />
-          </div>
-        )}
+        {/* Left: section label (Cocina/Bar) and/or mesa name */}
+        <div className="flex items-center gap-1.5 min-w-0">
+          {sectionLabel && (
+            <div className="flex items-center gap-1.5 px-2 py-1 shrink-0">
+              {pathname === '/waiter/bar'
+                ? <Wine className="w-3.5 h-3.5 shrink-0" style={{ color: BTN_BAR_TEXT }} />
+                : <UtensilsCrossed className="w-3.5 h-3.5 shrink-0" style={{ color: BTN_KITCHEN_TEXT }} />
+              }
+              <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{sectionLabel}</span>
+            </div>
+          )}
+          {hasMesa ? (
+            <button
+              className="flex items-center gap-1.5 min-w-0 rounded-md px-2 py-1 transition-colors duration-150"
+              style={{ color: TEXT_MAIN }}
+              onClick={() => { window.location.href = `/?mesa=${mesaId ?? ''}`; }}
+              aria-label={mesaLabel ?? undefined}
+            >
+              {!sectionLabel && <UtensilsCrossed className="w-3.5 h-3.5 shrink-0" style={{ color: TEXT_DIM }} />}
+              <span className="text-xs truncate" style={{ color: TEXT_DIM }}>{mesaLabel}</span>
+            </button>
+          ) : !sectionLabel && (
+            <div className="flex items-center px-2">
+              <UtensilsCrossed className="w-3.5 h-3.5 shrink-0" style={{ color: TEXT_DIM }} />
+            </div>
+          )}
+        </div>
 
         {/* Right: actions */}
         <div className="flex items-center gap-1.5 shrink-0">
