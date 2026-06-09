@@ -369,6 +369,7 @@ export function WaiterLoginForm() {
   const [ticketDeleteQty, setTicketDeleteQty] = useState(1);
   const [ticketDeleting, setTicketDeleting] = useState(false);
   const [closeBlockedError, setCloseBlockedError] = useState<string | null>(null);
+  const [manualPaying, setManualPaying] = useState(false);
 
   const refresh = useCallback(async () => {
     const data = await fetchMesas();
@@ -441,6 +442,18 @@ export function WaiterLoginForm() {
       await refresh();
     } finally {
       setMesaLoading(null);
+    }
+  }
+
+  async function handleGridManualPayment() {
+    if (!ticketMesa || manualPaying) return;
+    setManualPaying(true);
+    try {
+      await fetch(`/api/waiter/mesas/${encodeURIComponent(ticketMesa.id)}/manual-payment`, { method: 'POST' });
+      setTicketMesa(null);
+      await refresh();
+    } finally {
+      setManualPaying(false);
     }
   }
 
@@ -739,6 +752,17 @@ export function WaiterLoginForm() {
                         {formatPrice(total)}
                       </span>
                     </div>
+                    {ticketMesa && !ticketMesa.sesionPagada && (
+                      <button
+                        type="button"
+                        onClick={() => { void handleGridManualPayment(); }}
+                        disabled={manualPaying}
+                        className="w-full mt-4 py-3 rounded-xl text-sm font-bold tracking-widest uppercase transition-opacity disabled:opacity-50"
+                        style={{ backgroundColor: "oklch(22% 0.06 148 / 0.8)", color: "oklch(82% 0.18 148)", border: "1px solid oklch(45% 0.20 148 / 0.5)" }}
+                      >
+                        {manualPaying ? "Registrando..." : "Marcar pagada (efectivo)"}
+                      </button>
+                    )}
                   </div>
                 );
               })()}
