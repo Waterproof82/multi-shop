@@ -744,21 +744,23 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                         className="flex items-center gap-2 text-sm"
                         style={{ color: "#1a1612", fontFamily: "monospace" }}
                       >
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const isPreparado = sessionData?.orders.some(
-                              o => o.estado === 'preparado' && o.items.some(i => i.nombre === item.nombre && Math.abs(i.precio - item.precio) < 0.001)
-                            ) ?? false;
-                            setPendingDelete({ nombre: item.nombre, precio: item.precio, maxCantidad: item.cantidad, complementos: item.complementos, preparadoWarning: isPreparado });
-                            setDeleteQty(1);
-                          }}
-                          className="flex items-center justify-center shrink-0 w-5 h-5 rounded-full text-xs font-bold"
-                          style={{ background: "oklch(35% 0.14 25 / 0.8)", color: "oklch(80% 0.10 25)" }}
-                          aria-label={`Eliminar ${item.nombre}`}
-                        >
-                          −
-                        </button>
+                        {!fullyPaid && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const isPreparado = sessionData?.orders.some(
+                                o => o.estado === 'preparado' && o.items.some(i => i.nombre === item.nombre && Math.abs(i.precio - item.precio) < 0.001)
+                              ) ?? false;
+                              setPendingDelete({ nombre: item.nombre, precio: item.precio, maxCantidad: item.cantidad, complementos: item.complementos, preparadoWarning: isPreparado });
+                              setDeleteQty(1);
+                            }}
+                            className="flex items-center justify-center shrink-0 w-5 h-5 rounded-full text-xs font-bold"
+                            style={{ background: "oklch(35% 0.14 25 / 0.8)", color: "oklch(80% 0.10 25)" }}
+                            aria-label={`Eliminar ${item.nombre}`}
+                          >
+                            −
+                          </button>
+                        )}
                         <span className="tabular-nums w-4 text-right shrink-0" style={{ color: "#8a7560" }}>
                           {item.cantidad}
                         </span>
