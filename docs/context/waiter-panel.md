@@ -66,6 +66,41 @@ Single entry point. Two-step flow managed by `WaiterLoginForm`:
 1. **PIN step** — dark centered card, large password input, `autoComplete="off"` (prevents Chrome password-manager breach warnings). Submit calls `POST /api/waiter/auth`.
 2. **Table step** — live grid of all mesas with payment state. Each card shows table number, status dot, pill badge, and session total. Clicking a card calls `POST /api/waiter/mesa` and redirects to `/?mesa={mesaId}`.
 
+### `/waiter/kitchen`
+
+In-app kitchen view. Shows all in-flight `comida` items grouped by order (default) or by table (`Por mesa`). A third filter button **Listos** shows only items ready to serve.
+
+**States per item (swiped via pointer gestures):**
+
+| Estado | Trigger |
+|--------|---------|
+| `pendiente` | Initial |
+| `en_preparacion` | Swipe right |
+| `preparado` | Swipe right again (listos) |
+| `servido` | Swipe right on listos item |
+| Restore | Swipe left |
+
+Items can also be **retenidos** (held/deferred by the kitchen). A retenidos section shows items the waiter set aside; they have an amber tint and can be released back to pending.
+
+**Time-based card colors (oklch, hue progression):**
+- `< 10 min` → cool blue (hue 228)
+- `10 – 20 m` → teal (hue 168)
+- `20 – 30 m` → yellow-green (hue 100)
+- `30 – 45 m` → amber (hue 68)
+- `45 – 60 m` → orange (hue 35)
+- `60+ min` → red (hue 16)
+
+`anotado` orders (waiter-confirmed but not yet submitted) always show yellow regardless of time.
+
+**GroupBy modes:**
+- `Por pedido` (default) — one group per order, sorted by `numero_pedido`
+- `Por mesa` — grouped by table; within each group, listos items appear first
+- `Listos` — filters to show only `preparado` items awaiting service
+
+### `/waiter/bar`
+
+Same UX as `/waiter/kitchen` but shows `bebida` items only. Same time-based color scheme and swipe mechanics. No groupBy toggle (single list).
+
 ---
 
 ## Session Lifecycle
@@ -127,6 +162,7 @@ The `WaiterBanner` component is rendered globally in the root layout. It appears
 **Features:**
 - Pulsing live indicator dot
 - Shows active mesa name
+- **Kitchen & Bar buttons** — always visible for authenticated waiters. Navigate to `/waiter/kitchen` and `/waiter/bar`. Each shows three live badge counts (neutral = total in-flight, green = listos, orange = retenidos). Polled every 10 s; plays a short audio ping when counts increase.
 - **"Change table" dropdown** — fetches `GET /api/waiter/mesas` on open. First item is always **"Ver todas las mesas"** (navigates to `/waiter`). Remaining items list all mesas with open/libre status. Selecting a libre mesa calls `POST /api/waiter/mesas/{mesaId}/open` first.
 - **"Close table" button (X icon)** → shown when a session is active. Before closing, runs a guard chain (all via modal dialogs, no blocking `confirm`):
   1. `pagoEnCurso = true` → **payment dialog**: warns the waiter a Redsys payment is in progress; offers "Desbloquear y cerrar".
@@ -195,8 +231,7 @@ Implemented in `autoCloseMesaAfterPayment.ts` (fire-and-forget), called from:
 
 **Steps** (mirror the manual close route):
 1. Resolve `mesa_id` from `mesa_sesiones`
-2. Delete all Telegram order notifications for the session
-3. Consolidate individual pedidos into a single ticket
+2. Consolidate individual pedidos into a single ticket
 4. Set `cerrada_at = now()` on the session
 5. Open a new empty session — invalidates all client QR tokens
 

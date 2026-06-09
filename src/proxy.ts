@@ -275,6 +275,11 @@ export async function proxy(request: NextRequest) {
     return handleWaiterAuth(request, origin);
   }
 
+  // Kitchen auth — same PIN as waiter
+  if (path.startsWith('/api/kitchen')) {
+    return handleWaiterAuth(request, origin);
+  }
+
   // Superadmin auth (protected routes)
   if (path.startsWith('/api/superadmin')) {
     const adminAuthResponse = await handleAdminAuth(request, origin);

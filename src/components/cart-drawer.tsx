@@ -778,7 +778,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                         >
                           <Trash2 className="size-4" />
                         </RippleButton>
-                        {mesaToken && (
+                        {mesaToken && isWaiterMode && (
                           <button
                             type="button"
                             onClick={() => {

@@ -221,22 +221,40 @@ export class SupabaseMesaRepository implements IMesaRepository {
         .map(r => r.sesion_id)
         .filter((id): id is string => id !== null);
 
-      // Step 2: count active (non-cerrado) pedidos per session + collect preparado numbers
+      // Step 2: count active (non-cerrado) pedidos per session
+      // + collect pedido numbers that have at least one item in 'listo' state (per-item kitchen state)
       const countBySesion: Record<string, number> = {};
       const preparadoBySesion: Record<string, number[]> = {};
       if (activeSesionIds.length > 0) {
         const { data: activeData } = await this.supabase
           .from('pedidos')
-          .select('sesion_id, estado, numero_pedido')
+          .select('id, sesion_id, estado, numero_pedido')
           .in('sesion_id', activeSesionIds)
           .neq('estado', 'cerrado');
+
+        const pedidoIdToSesion: Record<string, { sesionId: string; numeroPedido: number }> = {};
         for (const p of activeData ?? []) {
           const sid = p['sesion_id'] as string;
           countBySesion[sid] = (countBySesion[sid] ?? 0) + 1;
-          if ((p['estado'] as string) === 'preparado') {
-            const nums = preparadoBySesion[sid] ?? [];
-            nums.push(p['numero_pedido'] as number);
-            preparadoBySesion[sid] = nums;
+          pedidoIdToSesion[p['id'] as string] = { sesionId: sid, numeroPedido: p['numero_pedido'] as number };
+        }
+
+        // Check pedido_item_estados for any item in 'listo' state
+        const pedidoIds = Object.keys(pedidoIdToSesion);
+        if (pedidoIds.length > 0) {
+          const { data: listoItems } = await this.supabase
+            .from('pedido_item_estados')
+            .select('pedido_id')
+            .in('pedido_id', pedidoIds)
+            .eq('estado', 'listo');
+
+          const listoSet = new Set<string>((listoItems ?? []).map(i => i['pedido_id'] as string));
+          for (const [pid, { sesionId, numeroPedido }] of Object.entries(pedidoIdToSesion)) {
+            if (listoSet.has(pid)) {
+              const nums = preparadoBySesion[sesionId] ?? [];
+              if (!nums.includes(numeroPedido)) nums.push(numeroPedido);
+              preparadoBySesion[sesionId] = nums;
+            }
           }
         }
       }

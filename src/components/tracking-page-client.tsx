@@ -365,7 +365,7 @@ export function TrackingPageClient({ token, initialStatus }: TrackingPageClientP
 
   const sorted = sortOrders(orders);
   const primaryOrder = sorted[0];
-  const otherOrders = sorted.slice(1);
+  const otherOrders = sorted.slice(1).filter(o => o.status?.tipo !== 'mesa');
   const primaryReady = isReady(primaryOrder.status?.estimated_ready_at ?? null);
   const primaryRemaining = primaryOrder.status?.estimated_ready_at
     ? getRemainingMinutes(primaryOrder.status.estimated_ready_at)

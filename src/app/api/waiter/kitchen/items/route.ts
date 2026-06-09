@@ -9,11 +9,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 
-  const ordersResult = await pedidoRepository.findBarOrders(empresaId);
+  const result = await pedidoRepository.findWaiterKitchenItems(empresaId);
 
-  if (!ordersResult.success) {
-    return NextResponse.json({ error: 'Error al obtener pedidos de bar' }, { status: 500 });
+  if (!result.success) {
+    return NextResponse.json({ error: 'Error al obtener ítems de cocina' }, { status: 500 });
   }
 
-  return NextResponse.json({ orders: ordersResult.data });
+  return NextResponse.json({ items: result.data });
 }

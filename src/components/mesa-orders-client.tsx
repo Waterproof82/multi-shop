@@ -50,6 +50,12 @@ type PendingAction = 'full' | 'division-modal' | 'division-pay';
 
 const PAGE_BG = "#f0ede8";
 
+/**
+ * Merges items across all orders in a session so the customer ticket shows
+ * one consolidated line per product+complement combination.
+ * Key = nombre + precio + sorted complement names — same product ordered in
+ * multiple rounds collapses into a single line with summed quantities.
+ */
 function mergeOrderItems(items: OrderItem[]): OrderItem[] {
   const map = new Map<string, OrderItem>();
   for (const item of items) {
@@ -738,21 +744,23 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                         className="flex items-center gap-2 text-sm"
                         style={{ color: "#1a1612", fontFamily: "monospace" }}
                       >
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const isPreparado = sessionData?.orders.some(
-                              o => o.estado === 'preparado' && o.items.some(i => i.nombre === item.nombre && Math.abs(i.precio - item.precio) < 0.001)
-                            ) ?? false;
-                            setPendingDelete({ nombre: item.nombre, precio: item.precio, maxCantidad: item.cantidad, complementos: item.complementos, preparadoWarning: isPreparado });
-                            setDeleteQty(1);
-                          }}
-                          className="flex items-center justify-center shrink-0 w-5 h-5 rounded-full text-xs font-bold"
-                          style={{ background: "oklch(35% 0.14 25 / 0.8)", color: "oklch(80% 0.10 25)" }}
-                          aria-label={`Eliminar ${item.nombre}`}
-                        >
-                          −
-                        </button>
+                        {!fullyPaid && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const isPreparado = sessionData?.orders.some(
+                                o => o.estado === 'preparado' && o.items.some(i => i.nombre === item.nombre && Math.abs(i.precio - item.precio) < 0.001)
+                              ) ?? false;
+                              setPendingDelete({ nombre: item.nombre, precio: item.precio, maxCantidad: item.cantidad, complementos: item.complementos, preparadoWarning: isPreparado });
+                              setDeleteQty(1);
+                            }}
+                            className="flex items-center justify-center shrink-0 w-5 h-5 rounded-full text-xs font-bold"
+                            style={{ background: "oklch(35% 0.14 25 / 0.8)", color: "oklch(80% 0.10 25)" }}
+                            aria-label={`Eliminar ${item.nombre}`}
+                          >
+                            −
+                          </button>
+                        )}
                         <span className="tabular-nums w-4 text-right shrink-0" style={{ color: "#8a7560" }}>
                           {item.cantidad}
                         </span>
@@ -772,59 +780,35 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                   })}
                 </ul>
               ) : (
-                <div className="flex flex-col pb-4">
-                  {sessionData.orders.map((order, oi) => {
-                    const statusBadge = (() => {
-                      if (order.estado === 'preparado') return { label: '✓ Listo', color: '#3a7a50' };
-                      if (order.estado === 'servido')   return { label: '✓ Servido', color: '#8a7560' };
-                      if (order.estado === 'anotado')   return { label: '· Preparando', color: '#6a7a9a' };
-                      return null;
-                    })();
+                <ul className="flex flex-col gap-1 pb-4">
+                  {allItems.map((item) => {
+                    const complementoTotal = item.complementos?.reduce((s, c) => s + c.precio, 0) ?? 0;
+                    const lineTotal = (item.precio + complementoTotal) * item.cantidad;
+                    const compsKey = (item.complementos ?? []).map(c => c.nombre).sort().join(',');
                     return (
-                      <div key={order.id}>
-                        {oi > 0 && <div className="border-t border-dashed my-2" style={{ borderColor: "#ddd8d0" }} />}
-                        <div className="flex items-center justify-between pt-1 pb-1">
-                          <span className="text-[10px] uppercase tracking-widest" style={{ color: "#b0a090", fontFamily: "monospace" }}>
-                            #{order.numeroPedido}
-                          </span>
-                          {statusBadge && (
-                            <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: statusBadge.color, fontFamily: "monospace" }}>
-                              {statusBadge.label}
+                      <li
+                        key={`${item.nombre}||${item.precio}||${compsKey}`}
+                        className="flex items-center gap-2 text-sm"
+                        style={{ color: "#1a1612", fontFamily: "monospace" }}
+                      >
+                        <span className="tabular-nums w-4 text-right shrink-0" style={{ color: "#8a7560" }}>
+                          {item.cantidad}
+                        </span>
+                        <span className="flex flex-col flex-1 min-w-0">
+                          <span>{(language !== "es" && item.translations?.[language]?.name) || item.nombre}</span>
+                          {item.complementos && item.complementos.length > 0 && (
+                            <span className="text-xs" style={{ color: "#b0a090" }}>
+                              + {item.complementos.map(c => c.nombre).join(", ")}
                             </span>
                           )}
-                        </div>
-                        <ul className="flex flex-col gap-1">
-                          {order.items.map((item) => {
-                            const complementoTotal = item.complementos?.reduce((s, c) => s + c.precio, 0) ?? 0;
-                            const lineTotal = (item.precio + complementoTotal) * item.cantidad;
-                            return (
-                              <li
-                                key={`${item.nombre}||${item.precio}`}
-                                className="flex items-center gap-2 text-sm"
-                                style={{ color: "#1a1612", fontFamily: "monospace" }}
-                              >
-                                <span className="tabular-nums w-4 text-right shrink-0" style={{ color: "#8a7560" }}>
-                                  {item.cantidad}
-                                </span>
-                                <span className="flex flex-col flex-1 min-w-0">
-                                  <span>{(language !== "es" && item.translations?.[language]?.name) || item.nombre}</span>
-                                  {item.complementos && item.complementos.length > 0 && (
-                                    <span className="text-xs" style={{ color: "#b0a090" }}>
-                                      + {item.complementos.map(c => c.nombre).join(", ")}
-                                    </span>
-                                  )}
-                                </span>
-                                <span className="tabular-nums shrink-0 text-right" style={{ color: "#1a1612" }}>
-                                  {formatPrice(lineTotal, "EUR", lang)}
-                                </span>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </div>
+                        </span>
+                        <span className="tabular-nums shrink-0 text-right" style={{ color: "#1a1612" }}>
+                          {formatPrice(lineTotal, "EUR", lang)}
+                        </span>
+                      </li>
                     );
                   })}
-                </div>
+                </ul>
               )}
 
               <DottedRule />
@@ -1159,7 +1143,7 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
               <>
                 <p className="text-sm font-bold text-center" style={{ color: "#1a1612" }}>⚠️ Pedido ya preparado</p>
                 <p className="text-xs text-center" style={{ color: "#8a7560" }}>
-                  Este ítem ya fue marcado como listo en cocina. ¿Querés eliminarlo igualmente?
+                  Este ítem ya fue marcado como listo en cocina. ¿Quieres eliminarlo igualmente?
                 </p>
                 <div className="flex gap-2 mt-1">
                   <button

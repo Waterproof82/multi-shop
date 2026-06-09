@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
 import { UtensilsCrossed, KeyRound, Pause, ReceiptText, X, CheckSquare } from "lucide-react";
 import { formatPrice } from "@/lib/format-price";
 import type { MesaWithSession } from "@/core/domain/repositories/IMesaRepository";
@@ -291,10 +290,7 @@ function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onViewTicket, onC
         >
           <CheckSquare className="w-3 h-3 shrink-0" style={{ color: 'oklch(72% 0.20 148)' }} />
           <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'oklch(72% 0.20 148)' }}>
-            Preparado
-          </span>
-          <span className="ml-auto text-[9px] font-bold" style={{ color: 'oklch(65% 0.18 148)' }}>
-            #{mesa.preparadoPedidoNumbers.join(', #')}
+            Platos listos
           </span>
         </div>
       )}
@@ -372,6 +368,8 @@ export function WaiterLoginForm() {
   const [ticketPendingDelete, setTicketPendingDelete] = useState<{ mesaId: string; nombre: string; precio: number; maxCantidad: number; complementos?: { nombre: string; precio: number }[]; preparadoWarning?: boolean } | null>(null);
   const [ticketDeleteQty, setTicketDeleteQty] = useState(1);
   const [ticketDeleting, setTicketDeleting] = useState(false);
+  const [closeBlockedError, setCloseBlockedError] = useState<string | null>(null);
+  const [manualPaying, setManualPaying] = useState(false);
 
   const refresh = useCallback(async () => {
     const data = await fetchMesas();
@@ -384,23 +382,8 @@ export function WaiterLoginForm() {
     void refresh();
     const interval = setInterval(() => { void refresh(); }, 2000);
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-    const channel = supabase
-      .channel(`waiter-grid:${empresaId}`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'mesa_sesiones',
-        filter: `empresa_id=eq.${empresaId}`,
-      }, () => { void refresh(); })
-      .subscribe();
-
     return () => {
       clearInterval(interval);
-      void supabase.removeChannel(channel);
     };
   }, [step, empresaId, refresh]);
 
@@ -445,10 +428,32 @@ export function WaiterLoginForm() {
   async function handleCloseMesa(mesa: MesaWithSession) {
     setMesaLoading(mesa.id);
     try {
+      // Guard: check if payment is required before allowing close
+      const r = await fetch(`/api/mesas/${encodeURIComponent(mesa.id)}/orders`);
+      if (r.ok) {
+        const data = await r.json() as { orders: unknown[]; pagosHabilitados: boolean; sesionPagada: boolean };
+        if (data.orders.length > 0 && data.pagosHabilitados && !data.sesionPagada) {
+          setCloseBlockedError('Hay pedidos sin pagar. Registra el pago antes de cerrar la mesa.');
+          setTimeout(() => setCloseBlockedError(null), 5000);
+          return;
+        }
+      }
       await fetch(`/api/waiter/mesas/${encodeURIComponent(mesa.id)}/close`, { method: 'POST' });
       await refresh();
     } finally {
       setMesaLoading(null);
+    }
+  }
+
+  async function handleGridManualPayment() {
+    if (!ticketMesa || manualPaying) return;
+    setManualPaying(true);
+    try {
+      await fetch(`/api/waiter/mesas/${encodeURIComponent(ticketMesa.id)}/manual-payment`, { method: 'POST' });
+      setTicketMesa(null);
+      await refresh();
+    } finally {
+      setManualPaying(false);
     }
   }
 
@@ -625,6 +630,16 @@ export function WaiterLoginForm() {
         ))}
       </div>
 
+      {closeBlockedError && (
+        <div
+          role="alert"
+          className="mb-2 rounded-lg px-3 py-2 text-xs font-medium text-center"
+          style={{ background: 'oklch(22% 0.08 25)', color: 'oklch(88% 0.14 25)', border: '1px solid oklch(45% 0.18 25 / 0.5)' }}
+        >
+          {closeBlockedError}
+        </div>
+      )}
+
       {mesas.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-12">
           <UtensilsCrossed className="w-10 h-10 opacity-20" style={{ color: "oklch(60% 0.05 252)" }} />
@@ -699,6 +714,7 @@ export function WaiterLoginForm() {
                       const lineTotal = (item.precio + compTotal) * item.cantidad;
                       return (
                         <div key={`${item.nombre}||${item.precio}`} className="flex items-center gap-2 py-2" style={{ borderBottom: "1px solid oklch(22% 0.03 252 / 0.6)" }}>
+                          {!ticketMesa?.sesionPagada && (
                           <button
                             type="button"
                             onClick={() => {
@@ -714,6 +730,7 @@ export function WaiterLoginForm() {
                           >
                             −
                           </button>
+                        )}
                           <div className="flex flex-col min-w-0 flex-1">
                             <span className="text-sm font-medium leading-snug" style={{ color: "oklch(82% 0.04 252)" }}>
                               <span className="font-bold mr-1" style={{ color: "oklch(65% 0.08 252)" }}>×{item.cantidad}</span>
@@ -737,6 +754,17 @@ export function WaiterLoginForm() {
                         {formatPrice(total)}
                       </span>
                     </div>
+                    {ticketMesa && !ticketMesa.sesionPagada && (
+                      <button
+                        type="button"
+                        onClick={() => { void handleGridManualPayment(); }}
+                        disabled={manualPaying}
+                        className="w-full mt-4 py-3 rounded-xl text-sm font-bold tracking-widest uppercase transition-opacity disabled:opacity-50"
+                        style={{ backgroundColor: "oklch(22% 0.06 148 / 0.8)", color: "oklch(82% 0.18 148)", border: "1px solid oklch(45% 0.20 148 / 0.5)" }}
+                      >
+                        {manualPaying ? "Registrando..." : "Marcar pagada (efectivo)"}
+                      </button>
+                    )}
                   </div>
                 );
               })()}
@@ -761,7 +789,7 @@ export function WaiterLoginForm() {
               <>
                 <p className="text-sm font-bold text-center" style={{ color: "oklch(85% 0.04 252)" }}>⚠️ Pedido ya preparado</p>
                 <p className="text-xs text-center" style={{ color: "oklch(50% 0.05 252)" }}>
-                  Este ítem ya fue marcado como listo en cocina. ¿Querés eliminarlo igualmente?
+                  Este ítem ya fue marcado como listo en cocina. ¿Quieres eliminarlo igualmente?
                 </p>
                 <div className="flex gap-2 mt-1">
                   <button

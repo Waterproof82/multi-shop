@@ -26,21 +26,50 @@ export interface RetenidoItem {
   sesionCreatedAt: string;
 }
 
+/**
+ * A pending bar order as seen by the bar page.
+ *
+ * `items` contains only bebida items not yet served (filtered server-side
+ * by pedido_item_estados so all bar screens share the same view).
+ *
+ * `detallePedidoIdx` — real position of each item inside detalle_pedido.
+ * Used as a stable swipe key and as the PATCH path param for per-item status.
+ *
+ * `hasComida` — true when the parent pedido also contains comida items.
+ * The bar page uses this to choose the correct order-level estado transition:
+ *   - false → PATCH pedido to `servido` (all done)
+ *   - true  → PATCH pedido to `anotado` (kitchen items must remain visible)
+ */
 export interface BarOrderItem {
   id: string;
   numeroPedido: number;
   mesaNumero: number | null;
   mesaNombre: string | null;
-  items: { nombre: string; cantidad: number }[];
+  items: { nombre: string; cantidad: number; detallePedidoIdx: number }[];
   estado: string;
   createdAt: string;
   sesionId: string | null;
-  /**
-   * bebida        — pure drink order, swipeable → servido
-   * bebida-info   — drinks inside a mixed order (comida still being cooked), informational only
-   * kitchen-alert — comida is preparado, waiter must pick up food (+ drinks if any), swipeable → servido
-   */
-  tipo: 'bebida' | 'bebida-info' | 'kitchen-alert';
+  tipo: 'bebida';
+  hasComida: boolean;
+}
+
+/** Estado values for per-item kitchen tracking */
+export type ItemEstado = 'pendiente' | 'en_preparacion' | 'listo' | 'servido' | 'retenido';
+
+/** A single food item from a mesa order, with its kitchen estado */
+export interface KitchenItemRecord {
+  pedidoId: string;
+  numeroPedido: number;
+  itemIdx: number;
+  nombre: string;
+  cantidad: number;
+  complementos?: string;
+  estado: ItemEstado;
+  mesaNumero: number | null;
+  mesaNombre: string | null;
+  createdAt: string;
+  /** true = item from mesa_sesiones.items_diferidos (deferred cart item, read-only in waiter kitchen) */
+  isDiferido?: boolean;
 }
 
 export interface IPedidoRepository {
@@ -87,6 +116,12 @@ export interface IPedidoRepository {
   findKitchenOrders(empresaId: string): Promise<Result<KitchenOrderItem[]>>;
   findAllRetenidos(empresaId: string, tipo: 'comida' | 'bebida'): Promise<Result<RetenidoItem[]>>;
   findBarOrders(empresaId: string): Promise<Result<BarOrderItem[]>>;
+  /** Returns food items in pendiente|en_preparacion (for /kitchen cook view) */
+  findKitchenItems(empresaId: string): Promise<Result<KitchenItemRecord[]>>;
+  /** Returns food items in pendiente|en_preparacion|listo|retenido (for /waiter/kitchen view) */
+  findWaiterKitchenItems(empresaId: string): Promise<Result<KitchenItemRecord[]>>;
+  /** Upsert a per-item kitchen estado */
+  upsertItemEstado(empresaId: string, pedidoId: string, itemIdx: number, estado: ItemEstado): Promise<Result<void>>;
   getStats(empresaId: string, mes: number, año: number): Promise<Result<{
     pedidosHoy: number;
     pedidosMes: number;

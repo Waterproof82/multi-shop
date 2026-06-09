@@ -2,7 +2,7 @@
 
 ## Overview
 
-Restaurant-mode domains support QR-based table ordering. Customers scan a QR code at their table, browse the menu, and place orders directly — no waiter interaction needed. All orders are grouped by table session and sent to the kitchen via Telegram.
+Restaurant-mode domains support QR-based table ordering. Customers scan a QR code at their table, browse the menu, and place orders directly — no waiter interaction needed. All orders are grouped by table session and managed in-app via `/waiter/kitchen` and `/waiter/bar` (no Telegram).
 
 This feature is only active when:
 - The empresa `tipo` is `'restaurante'`
@@ -41,9 +41,7 @@ sesion_id   uuid NULL REFERENCES mesa_sesiones(id)
 
 ### `empresas` (delta)
 ```sql
-telegram_mesa_chat_id        text NULL   -- Telegram chat for mesa orders (kitchen)
-telegram_bebidas_chat_id     text NULL   -- Telegram chat for bar/drinks (optional)
-waiter_pin_hash              text NULL   -- bcrypt hash of waiter PIN
+waiter_pin_hash   text NULL   -- bcrypt hash of waiter PIN
 ```
 
 ### `productos` (delta)
@@ -60,7 +58,7 @@ Customer scans QR
   → /?mesa={token}
   → Cart mode: mesa (items stored per mesa token)
   → POST /api/pedidos  (includes mesa_id + sesion_id)
-  → Telegram notification sent to telegram_mesa_chat_id
+  → Order appears in /waiter/kitchen or /waiter/bar for staff
   → Customer can view ticket at /mesa/{mesaId}/orders
 ```
 
@@ -149,33 +147,21 @@ Mesa orders follow a **session-based visibility** model in `/admin/pedidos`:
 
 ---
 
-## Telegram Notification
+## In-App Kitchen & Bar Flow
 
-When a mesa order is placed, items are routed based on `tipo_producto` and group configuration:
+Mesa orders are managed entirely within the app — no Telegram involved.
 
-**With two groups configured (`telegram_mesa_chat_id` + `telegram_bebidas_chat_id`):**
-- Comida items → kitchen group (`telegram_mesa_chat_id`)
-- Bebida items → bar group (`telegram_bebidas_chat_id`)
+Items are routed by `tipo_producto`:
+- `comida` → `/waiter/kitchen`
+- `bebida` → `/waiter/bar`
 
-**With only one group:** all items → `telegram_mesa_chat_id` (backwards-compatible).
+Each page shows a live list of in-flight items per order/table (polling every 10 s). Waiters swipe items through states via pointer gestures:
 
-Example kitchen message:
 ```
-Pedido #42 — Terraza 1 (Mesa 3)
-
-- 2x Spaghetti Carbonara
+pendiente → en_preparacion → preparado (listos) → servido
 ```
 
-Inline buttons (3-state flow):
-```
-[ ✅ Anotado ]  [ 🍳 Preparado ]
-```
-→ Anotado: `[ ✅ Anotado ✓ ] [ 🍳 Preparado ] [ 🔄 Modificar ]`
-→ Preparado: `[ 🍳 Preparado ✓ ] [ 🍽️ Servido ] [ 🔄 Modificar ]` + alerta al bar
-→ Servido: `[ 🍽️ Servido ✓ ] [ 🗑️ Eliminar ] [ 🔄 Modificar ]`
-→ Eliminar: borra el mensaje del chat
-
-See [telegram-notifications.md](../telegram-notifications.md) for the full callback flow.
+Items can also be **deferred** (retenidos) by the waiter and released later as a group. See [waiter-panel.md](./waiter-panel.md) for the full kitchen/bar UX.
 
 ---
 
