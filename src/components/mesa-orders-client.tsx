@@ -744,7 +744,7 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                         className="flex items-center gap-2 text-sm"
                         style={{ color: "#1a1612", fontFamily: "monospace" }}
                       >
-                        {!fullyPaid && (
+                        {!fullyPaid && !externalPaymentInProgress && (
                           <button
                             type="button"
                             onClick={() => {
