@@ -714,7 +714,7 @@ export function WaiterLoginForm() {
                       const lineTotal = (item.precio + compTotal) * item.cantidad;
                       return (
                         <div key={`${item.nombre}||${item.precio}`} className="flex items-center gap-2 py-2" style={{ borderBottom: "1px solid oklch(22% 0.03 252 / 0.6)" }}>
-                          {!ticketMesa?.sesionPagada && !ticketMesa?.pagoEnCurso && (
+                          {!ticketMesa?.sesionPagada && (
                           <button
                             type="button"
                             onClick={() => {
