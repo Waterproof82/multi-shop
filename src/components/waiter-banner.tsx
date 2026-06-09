@@ -354,12 +354,14 @@ export function WaiterBanner() {
           {hasMesa ? (
             <button
               className="flex items-center gap-1.5 min-w-0 rounded-md px-2 py-1 transition-colors duration-150"
-              style={{ color: TEXT_MAIN }}
+              style={{ backgroundColor: 'oklch(22% 0.06 148 / 0.5)', border: '1px solid oklch(45% 0.18 148 / 0.4)' }}
               onClick={() => { window.location.href = `/?mesa=${mesaId ?? ''}`; }}
               aria-label={mesaLabel ?? undefined}
             >
               {!sectionLabel && <UtensilsCrossed className="w-3.5 h-3.5 shrink-0" style={{ color: TEXT_DIM }} />}
-              <span className="text-xs truncate" style={{ color: TEXT_DIM }}>{mesaLabel}</span>
+              {/* Active indicator */}
+              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: 'oklch(68% 0.26 148)', boxShadow: '0 0 4px oklch(68% 0.26 148 / 0.7)' }} />
+              <span className="text-xs font-semibold truncate" style={{ color: 'oklch(82% 0.14 148)' }}>{mesaLabel}</span>
             </button>
           ) : !sectionLabel && (
             <div className="flex items-center px-2">
