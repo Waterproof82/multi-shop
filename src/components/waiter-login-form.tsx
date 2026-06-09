@@ -432,9 +432,8 @@ export function WaiterLoginForm() {
       if (r.ok) {
         const data = await r.json() as { orders: unknown[]; pagosHabilitados: boolean; sesionPagada: boolean };
         if (data.orders.length > 0 && data.pagosHabilitados && !data.sesionPagada) {
-          setCloseBlockedError('Hay pedidos sin pagar. Registrá el pago antes de cerrar la mesa.');
+          setCloseBlockedError('Hay pedidos sin pagar. Registra el pago antes de cerrar la mesa.');
           setTimeout(() => setCloseBlockedError(null), 5000);
-          void handleViewTicket(mesa);
           return;
         }
       }
