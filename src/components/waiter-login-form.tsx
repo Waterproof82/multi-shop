@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
 import { UtensilsCrossed, KeyRound, Pause, ReceiptText, X, CheckSquare } from "lucide-react";
 import { formatPrice } from "@/lib/format-price";
 import type { MesaWithSession } from "@/core/domain/repositories/IMesaRepository";
@@ -381,23 +380,8 @@ export function WaiterLoginForm() {
     void refresh();
     const interval = setInterval(() => { void refresh(); }, 2000);
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-    const channel = supabase
-      .channel(`waiter-grid:${empresaId}`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'mesa_sesiones',
-        filter: `empresa_id=eq.${empresaId}`,
-      }, () => { void refresh(); })
-      .subscribe();
-
     return () => {
       clearInterval(interval);
-      void supabase.removeChannel(channel);
     };
   }, [step, empresaId, refresh]);
 
