@@ -99,12 +99,12 @@ const TEXT_MAIN = "oklch(92% 0.02 252)";
 const TEXT_DIM = "oklch(55% 0.04 252)";
 
 const TIME_COLORS: { max: number; label: string; bg: string; border: string; text: string }[] = [
-  { max: 10,       label: '<10 min', bg: 'oklch(22% 0.03 252)', border: 'oklch(40% 0.05 252 / 0.4)', text: 'oklch(60% 0.03 252)' },
-  { max: 20,       label: '10 min',  bg: 'oklch(25% 0.10 85)',  border: 'oklch(55% 0.20 85 / 0.5)',  text: 'oklch(75% 0.18 85)'  },
-  { max: 30,       label: '20 min',  bg: 'oklch(25% 0.12 65)',  border: 'oklch(55% 0.25 65 / 0.5)',  text: 'oklch(75% 0.20 65)'  },
-  { max: 45,       label: '30 min',  bg: 'oklch(25% 0.14 40)',  border: 'oklch(55% 0.28 40 / 0.5)',  text: 'oklch(75% 0.22 40)'  },
-  { max: 60,       label: '45 min',  bg: 'oklch(25% 0.16 25)',  border: 'oklch(55% 0.30 25 / 0.5)',  text: 'oklch(75% 0.24 25)'  },
-  { max: Infinity, label: '60+ min', bg: 'oklch(22% 0.18 15)',  border: 'oklch(50% 0.32 15 / 0.6)',  text: 'oklch(72% 0.26 15)'  },
+  { max: 10,       label: '< 10 min',  bg: 'oklch(18% 0.06 228)', border: 'oklch(50% 0.22 228 / 0.55)', text: 'oklch(72% 0.20 228)' },
+  { max: 20,       label: '10 – 20 m', bg: 'oklch(19% 0.09 168)', border: 'oklch(52% 0.26 168 / 0.55)', text: 'oklch(74% 0.24 168)' },
+  { max: 30,       label: '20 – 30 m', bg: 'oklch(22% 0.14 100)', border: 'oklch(56% 0.28 100 / 0.55)', text: 'oklch(78% 0.26 100)' },
+  { max: 45,       label: '30 – 45 m', bg: 'oklch(24% 0.18 68)',  border: 'oklch(58% 0.30 68  / 0.60)', text: 'oklch(80% 0.28 68)'  },
+  { max: 60,       label: '45 – 60 m', bg: 'oklch(24% 0.20 35)',  border: 'oklch(58% 0.33 35  / 0.65)', text: 'oklch(80% 0.30 35)'  },
+  { max: Infinity, label: '60+ min',   bg: 'oklch(22% 0.22 16)',  border: 'oklch(56% 0.36 16  / 0.70)', text: 'oklch(78% 0.34 16)'  },
 ];
 
 const KITCHEN_ALERT_ACCENT = 'oklch(78% 0.20 148)';

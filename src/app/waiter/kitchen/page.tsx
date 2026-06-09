@@ -26,15 +26,14 @@ const TEXT_DIM  = 'oklch(55% 0.04 252)';
 
 // Time-based colors for "nuevo" items (pendiente / en_preparacion)
 const TIME_COLORS = [
-  { max: 10,       label: '<10 min',  bg: 'oklch(20% 0.06 240)', border: 'oklch(42% 0.12 240 / 0.45)', text: 'oklch(60% 0.08 240)' },
-  { max: 20,       label: '10 min',   bg: 'oklch(28% 0.18 85)',  border: 'oklch(58% 0.26 85  / 0.55)', text: 'oklch(75% 0.18 85)'  },
-  { max: 30,       label: '20 min',   bg: 'oklch(27% 0.15 60)',  border: 'oklch(56% 0.26 60  / 0.55)', text: 'oklch(75% 0.20 60)'  },
-  { max: 45,       label: '30 min',   bg: 'oklch(26% 0.17 38)',  border: 'oklch(56% 0.29 38  / 0.55)', text: 'oklch(75% 0.22 38)'  },
-  { max: 60,       label: '45 min',   bg: 'oklch(24% 0.18 22)',  border: 'oklch(54% 0.31 22  / 0.55)', text: 'oklch(73% 0.24 22)'  },
-  { max: Infinity, label: '60+ min',  bg: 'oklch(22% 0.20 12)',  border: 'oklch(52% 0.34 12  / 0.65)', text: 'oklch(70% 0.26 12)'  },
+  { max: 10,       label: '< 10 min',  bg: 'oklch(18% 0.06 228)', border: 'oklch(50% 0.22 228 / 0.55)', text: 'oklch(72% 0.20 228)' },
+  { max: 20,       label: '10 – 20 m', bg: 'oklch(19% 0.09 168)', border: 'oklch(52% 0.26 168 / 0.55)', text: 'oklch(74% 0.24 168)' },
+  { max: 30,       label: '20 – 30 m', bg: 'oklch(22% 0.14 100)', border: 'oklch(56% 0.28 100 / 0.55)', text: 'oklch(78% 0.26 100)' },
+  { max: 45,       label: '30 – 45 m', bg: 'oklch(24% 0.18 68)',  border: 'oklch(58% 0.30 68  / 0.60)', text: 'oklch(80% 0.28 68)'  },
+  { max: 60,       label: '45 – 60 m', bg: 'oklch(24% 0.20 35)',  border: 'oklch(58% 0.33 35  / 0.65)', text: 'oklch(80% 0.30 35)'  },
+  { max: Infinity, label: '60+ min',   bg: 'oklch(22% 0.22 16)',  border: 'oklch(56% 0.36 16  / 0.70)', text: 'oklch(78% 0.34 16)'  },
 ];
 
-const EN_PREP_COLOR  = { bg: 'oklch(28% 0.22 90)',  border: 'oklch(62% 0.30 90  / 0.65)' };
 const LISTO_COLOR    = { bg: 'oklch(22% 0.18 148)', border: 'oklch(52% 0.26 148 / 0.65)' };
 const RETENIDO_COLOR = { bg: 'oklch(20% 0.05 252)', border: 'oklch(38% 0.08 252 / 0.35)' };
 
@@ -73,6 +72,21 @@ function groupByPedido(items: KitchenItem[]) {
   );
 }
 
+function groupByMesa(items: KitchenItem[]) {
+  const map = new Map<string, { mesaNumero: number | null; mesaNombre: string | null; firstCreatedAt: string; items: KitchenItem[] }>();
+  for (const item of items) {
+    const key = item.mesaNombre ?? `Mesa ${item.mesaNumero ?? '—'}`;
+    if (!map.has(key)) {
+      map.set(key, { mesaNumero: item.mesaNumero, mesaNombre: item.mesaNombre, firstCreatedAt: item.createdAt, items: [] });
+    }
+    const group = map.get(key)!;
+    if (item.createdAt < group.firstCreatedAt) group.firstCreatedAt = item.createdAt;
+    group.items.push(item);
+  }
+  // Sort mesas by earliest order arrival
+  return new Map([...map.entries()].sort((a, b) => a[1].firstCreatedAt.localeCompare(b[1].firstCreatedAt)));
+}
+
 function makeKey(pedidoId: string, itemIdx: number) {
   return `${pedidoId}:${itemIdx}`;
 }
@@ -81,6 +95,7 @@ export default function WaiterKitchenPage() {
   const { language } = useLanguage();
   const lang = language as Parameters<typeof t>[1];
   const [items, setItems] = useState<KitchenItem[]>([]);
+  const [groupBy, setGroupBy] = useState<'order' | 'mesa' | 'listos'>('order');
   const pointerStartX = useRef<number | null>(null);
   const swipingKey    = useRef<string | null>(null);
 
@@ -227,8 +242,7 @@ export default function WaiterKitchenPage() {
     const elapsed = getElapsedMinutes(item.createdAt);
 
     const baseTimeColor = getTimeColor(elapsed);
-    const cardColor: { bg: string; border: string } = isEnPrep    ? EN_PREP_COLOR
-      : isListo    ? LISTO_COLOR
+    const cardColor: { bg: string; border: string } = isListo    ? LISTO_COLOR
       : isRetenido ? RETENIDO_COLOR
       : baseTimeColor;
 
@@ -275,7 +289,7 @@ export default function WaiterKitchenPage() {
             </div>
             {item.complementos && (
               <div className="mt-0.5">
-                <span className="text-[10px]" style={{ color: TEXT_DIM }}>({item.complementos})</span>
+                <span className="text-[10px]" style={{ color: 'oklch(78% 0.03 252)' }}>({item.complementos})</span>
               </div>
             )}
           </div>
@@ -341,92 +355,182 @@ export default function WaiterKitchenPage() {
           ))}
         </div>
 
+        {/* Group-by / filter toggle */}
+        <div className="flex gap-1 px-1 pb-3">
+          {(['order', 'mesa', 'listos'] as const).map(mode => {
+            const isActive = groupBy === mode;
+            const isListos = mode === 'listos';
+            const label = mode === 'order' ? t('kitchenGroupByOrder', lang)
+              : mode === 'mesa' ? t('kitchenGroupByTable', lang)
+              : t('kitchenListos', lang);
+            return (
+              <button
+                key={mode}
+                onClick={() => setGroupBy(mode)}
+                className="rounded px-3 py-1 text-[11px] font-semibold transition-colors"
+                style={isActive ? {
+                  background: isListos ? 'oklch(26% 0.16 148)' : 'oklch(32% 0.10 252)',
+                  color: isListos ? 'oklch(80% 0.22 148)' : TEXT_MAIN,
+                  border: `1px solid ${isListos ? 'oklch(52% 0.26 148 / 0.7)' : 'oklch(50% 0.10 252 / 0.6)'}`,
+                } : {
+                  background: 'transparent',
+                  color: TEXT_DIM,
+                  border: '1px solid oklch(35% 0.06 252 / 0.4)',
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
         {!hasAny && (
           <div className="text-center py-10 text-sm" style={{ color: TEXT_DIM }}>
             {t('kitchenEmpty', lang)}
           </div>
         )}
 
-        {/* Nuevos */}
-        {nuevosItems.length > 0 && (
-          <div className="mb-4">
-            <div className="px-1 py-2">
-              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: TEXT_DIM }}>
-                {t('kitchenNuevos', lang)} ({nuevosItems.length})
-              </span>
-            </div>
-            <div className="flex flex-col gap-4">
-              {Array.from(groupByPedido(nuevosItems).entries()).map(([pedidoId, group]) => {
-                const tableLabel = group.mesaNombre ?? `Mesa ${group.mesaNumero ?? '—'}`;
-                const elapsed    = getElapsedMinutes(group.createdAt);
-                return (
-                  <div key={pedidoId}>
-                    <div className="flex items-center gap-2 px-1 mb-1.5">
-                      <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>#{group.numeroPedido}</span>
-                      <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{tableLabel}</span>
-                      <span className="text-[10px] font-mono ml-auto" style={{ color: TEXT_DIM }}>{formatTimer(elapsed)}</span>
+        {groupBy === 'order' && (<>
+          {/* Nuevos */}
+          {nuevosItems.length > 0 && (
+            <div className="mb-4">
+              <div className="px-1 py-2">
+                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: TEXT_DIM }}>
+                  {t('kitchenNuevos', lang)} ({nuevosItems.length})
+                </span>
+              </div>
+              <div className="flex flex-col gap-4">
+                {Array.from(groupByPedido(nuevosItems).entries()).map(([pedidoId, group]) => {
+                  const tableLabel = group.mesaNombre ?? `Mesa ${group.mesaNumero ?? '—'}`;
+                  const elapsed    = getElapsedMinutes(group.createdAt);
+                  return (
+                    <div key={pedidoId}>
+                      <div className="flex items-center gap-2 px-1 mb-1.5">
+                        <span className="text-xs font-bold" style={{ color: 'oklch(72% 0.14 62)' }}>#{group.numeroPedido}</span>
+                        <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{tableLabel}</span>
+                        <span className="text-[10px] font-mono ml-auto" style={{ color: TEXT_DIM }}>{formatTimer(elapsed)}</span>
+                      </div>
+                      <div className="flex flex-col gap-2">{group.items.map(renderItemCard)}</div>
                     </div>
-                    <div className="flex flex-col gap-2">{group.items.map(renderItemCard)}</div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
+          )}
+
+          {/* Listos */}
+          {listosItems.length > 0 && (
+            <div className="mb-4">
+              <div className="px-1 py-2">
+                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'oklch(65% 0.18 148)' }}>
+                  {t('kitchenListos', lang)} ({listosItems.length})
+                </span>
+              </div>
+              <div className="flex flex-col gap-4">
+                {Array.from(groupByPedido(listosItems).entries()).map(([pedidoId, group]) => {
+                  const tableLabel = group.mesaNombre ?? `Mesa ${group.mesaNumero ?? '—'}`;
+                  const elapsed    = getElapsedMinutes(group.createdAt);
+                  return (
+                    <div key={pedidoId}>
+                      <div className="flex items-center gap-2 px-1 mb-1.5">
+                        <span className="text-xs font-bold" style={{ color: 'oklch(72% 0.14 62)' }}>#{group.numeroPedido}</span>
+                        <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{tableLabel}</span>
+                        <span className="text-[10px] font-mono ml-auto" style={{ color: TEXT_DIM }}>{formatTimer(elapsed)}</span>
+                      </div>
+                      <div className="flex flex-col gap-2">{group.items.map(renderItemCard)}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Retenidos */}
+          {retenidoItems.length > 0 && (
+            <div className="mb-4">
+              <div className="flex items-center gap-2 px-1 py-2">
+                <TimerOff className="w-3.5 h-3.5" style={{ color: TEXT_DIM }} />
+                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: TEXT_DIM }}>
+                  {t('waiterRetenidos', lang)} ({retenidoItems.length})
+                </span>
+              </div>
+              <div className="flex flex-col gap-4">
+                {Array.from(groupByPedido(retenidoItems).entries()).map(([pedidoId, group]) => {
+                  const tableLabel = group.mesaNombre ?? `Mesa ${group.mesaNumero ?? '—'}`;
+                  const elapsed    = getElapsedMinutes(group.createdAt);
+                  const hasOrder   = group.items.some(i => !i.isDiferido);
+                  return (
+                    <div key={pedidoId}>
+                      <div className="flex items-center gap-2 px-1 mb-1.5">
+                        {hasOrder && <span className="text-xs font-bold" style={{ color: 'oklch(72% 0.14 62)' }}>#{group.numeroPedido}</span>}
+                        <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{tableLabel}</span>
+                        <span className="text-[10px] font-mono ml-auto" style={{ color: TEXT_DIM }}>{formatTimer(elapsed)}</span>
+                      </div>
+                      <div className="flex flex-col gap-2">{group.items.map(renderItemCard)}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>)}
+
+        {groupBy === 'mesa' && hasAny && (
+          <div className="flex flex-col gap-5">
+            {Array.from(groupByMesa(items).entries()).map(([mesaKey, group]) => {
+              const elapsed = getElapsedMinutes(group.firstCreatedAt);
+              // Sort items within mesa: listos first, then nuevos (by createdAt), then retenidos
+              const sorted = [...group.items].sort((a, b) => {
+                const order = (i: KitchenItem) => i.estado === 'listo' ? 0 : i.estado === 'retenido' ? 2 : 1;
+                const diff = order(a) - order(b);
+                return diff !== 0 ? diff : a.createdAt.localeCompare(b.createdAt);
+              });
+              return (
+                <div
+                  key={mesaKey}
+                  className="rounded-xl overflow-hidden"
+                  style={{ border: '1px solid oklch(35% 0.08 252 / 0.5)' }}
+                >
+                  <div
+                    className="flex items-center gap-2 px-3 py-2"
+                    style={{ background: 'oklch(18% 0.03 252)', borderBottom: '1px solid oklch(35% 0.08 252 / 0.4)' }}
+                  >
+                    <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{mesaKey}</span>
+                    <span className="text-[10px] font-mono ml-auto" style={{ color: TEXT_DIM }}>{formatTimer(elapsed)}</span>
+                  </div>
+                  <div className="flex flex-col gap-2 p-2">
+                    {sorted.map(renderItemCard)}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
-        {/* Listos */}
-        {listosItems.length > 0 && (
+        {groupBy === 'listos' && (
           <div className="mb-4">
-            <div className="px-1 py-2">
-              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'oklch(65% 0.18 148)' }}>
-                {t('kitchenListos', lang)} ({listosItems.length})
-              </span>
-            </div>
-            <div className="flex flex-col gap-4">
-              {Array.from(groupByPedido(listosItems).entries()).map(([pedidoId, group]) => {
-                const tableLabel = group.mesaNombre ?? `Mesa ${group.mesaNumero ?? '—'}`;
-                const elapsed    = getElapsedMinutes(group.createdAt);
-                return (
-                  <div key={pedidoId}>
-                    <div className="flex items-center gap-2 px-1 mb-1.5">
-                      <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>#{group.numeroPedido}</span>
-                      <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{tableLabel}</span>
-                      <span className="text-[10px] font-mono ml-auto" style={{ color: TEXT_DIM }}>{formatTimer(elapsed)}</span>
+            {listosItems.length === 0 ? (
+              <div className="text-center py-10 text-sm" style={{ color: TEXT_DIM }}>
+                {t('kitchenEmpty', lang)}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {Array.from(groupByPedido(listosItems).entries()).map(([pedidoId, group]) => {
+                  const tableLabel = group.mesaNombre ?? `Mesa ${group.mesaNumero ?? '—'}`;
+                  const elapsed    = getElapsedMinutes(group.createdAt);
+                  return (
+                    <div key={pedidoId}>
+                      <div className="flex items-center gap-2 px-1 mb-1.5">
+                        <span className="text-xs font-bold" style={{ color: 'oklch(72% 0.14 62)' }}>#{group.numeroPedido}</span>
+                        <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{tableLabel}</span>
+                        <span className="text-[10px] font-mono ml-auto" style={{ color: TEXT_DIM }}>{formatTimer(elapsed)}</span>
+                      </div>
+                      <div className="flex flex-col gap-2">{group.items.map(renderItemCard)}</div>
                     </div>
-                    <div className="flex flex-col gap-2">{group.items.map(renderItemCard)}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Retenidos */}
-        {retenidoItems.length > 0 && (
-          <div className="mb-4">
-            <div className="flex items-center gap-2 px-1 py-2">
-              <TimerOff className="w-3.5 h-3.5" style={{ color: TEXT_DIM }} />
-              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: TEXT_DIM }}>
-                {t('waiterRetenidos', lang)} ({retenidoItems.length})
-              </span>
-            </div>
-            <div className="flex flex-col gap-4">
-              {Array.from(groupByPedido(retenidoItems).entries()).map(([pedidoId, group]) => {
-                const tableLabel = group.mesaNombre ?? `Mesa ${group.mesaNumero ?? '—'}`;
-                const elapsed    = getElapsedMinutes(group.createdAt);
-                const hasOrder   = group.items.some(i => !i.isDiferido);
-                return (
-                  <div key={pedidoId}>
-                    <div className="flex items-center gap-2 px-1 mb-1.5">
-                      {hasOrder && <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>#{group.numeroPedido}</span>}
-                      <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{tableLabel}</span>
-                      <span className="text-[10px] font-mono ml-auto" style={{ color: TEXT_DIM }}>{formatTimer(elapsed)}</span>
-                    </div>
-                    <div className="flex flex-col gap-2">{group.items.map(renderItemCard)}</div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>

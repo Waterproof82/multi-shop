@@ -43,12 +43,27 @@ function formatTimer(minutes: number): string {
   return `${Math.floor(minutes / 60)}h ${minutes % 60}min`;
 }
 
+function groupByMesa(items: KitchenItem[]) {
+  const map = new Map<string, { mesaNumero: number | null; mesaNombre: string | null; firstCreatedAt: string; items: KitchenItem[] }>();
+  for (const item of items) {
+    const key = item.mesaNombre ?? `Mesa ${item.mesaNumero ?? '—'}`;
+    if (!map.has(key)) {
+      map.set(key, { mesaNumero: item.mesaNumero, mesaNombre: item.mesaNombre, firstCreatedAt: item.createdAt, items: [] });
+    }
+    const group = map.get(key)!;
+    if (item.createdAt < group.firstCreatedAt) group.firstCreatedAt = item.createdAt;
+    group.items.push(item);
+  }
+  return new Map([...map.entries()].sort((a, b) => a[1].firstCreatedAt.localeCompare(b[1].firstCreatedAt)));
+}
+
 export default function KitchenPage() {
   const { language } = useLanguage();
   const lang = language as Parameters<typeof t>[1];
 
   const [items, setItems] = useState<KitchenItem[]>([]);
   const [countdowns, setCountdowns] = useState<Record<string, number>>({});
+  const [groupBy, setGroupBy] = useState<'order' | 'mesa'>('order');
   const timersRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
 
   const pointerStartX = useRef<number | null>(null);
@@ -264,6 +279,112 @@ export default function KitchenPage() {
           </div>
         )}
 
+        {/* Group-by toggle */}
+        {items.length > 0 && (
+          <div className="flex gap-1 px-1 pt-2 pb-3">
+            {(['order', 'mesa'] as const).map(mode => (
+              <button
+                key={mode}
+                onClick={() => setGroupBy(mode)}
+                className="rounded px-3 py-1 text-[11px] font-semibold transition-colors"
+                style={groupBy === mode ? {
+                  background: 'oklch(32% 0.10 252)',
+                  color: TEXT_MAIN,
+                  border: '1px solid oklch(50% 0.10 252 / 0.6)',
+                } : {
+                  background: 'transparent',
+                  color: TEXT_DIM,
+                  border: '1px solid oklch(35% 0.06 252 / 0.4)',
+                }}
+              >
+                {mode === 'order' ? t('kitchenGroupByOrder', lang) : t('kitchenGroupByTable', lang)}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {groupBy === 'mesa' && items.length > 0 && (
+          <div className="flex flex-col gap-5">
+            {Array.from(groupByMesa(items).entries()).map(([mesaKey, mesaGroup]) => {
+              const elapsed = getElapsedMinutes(mesaGroup.firstCreatedAt);
+              const sorted  = [...mesaGroup.items].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+              return (
+                <div key={mesaKey} className="rounded-xl overflow-hidden" style={{ border: '1px solid oklch(35% 0.08 252 / 0.5)' }}>
+                  <div
+                    className="flex items-center gap-2 px-3 py-2"
+                    style={{ background: 'oklch(18% 0.03 252)', borderBottom: '1px solid oklch(35% 0.08 252 / 0.4)' }}
+                  >
+                    <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{mesaKey}</span>
+                    <span className="text-[10px] font-mono ml-auto" style={{ color: TEXT_DIM }}>{formatTimer(elapsed)}</span>
+                  </div>
+                  <div className="flex flex-col gap-2 p-2">
+                    {sorted.map(item => {
+                      const key         = makeKey(item.pedidoId, item.itemIdx);
+                      const isCountdown = key in countdowns;
+                      const remaining   = countdowns[key] ?? 0;
+                      const isEnPrep    = item.estado === 'en_preparacion';
+                      const cardColor   = isCountdown ? COUNTDOWN_COLOR : isEnPrep ? EN_PREP_COLOR : PENDIENTE_COLOR;
+
+                      return (
+                        <div
+                          key={key}
+                          className="relative rounded-xl overflow-hidden select-none"
+                          style={{ background: cardColor.bg, border: `1px solid ${cardColor.border}`, touchAction: 'pan-y', willChange: 'transform' }}
+                          onPointerDown={isCountdown ? undefined : e => handlePointerDown(e, key)}
+                          onPointerMove={isCountdown ? undefined : e => handlePointerMove(e, key)}
+                          onPointerUp={isCountdown ? undefined : e => handlePointerUp(e, item)}
+                          onPointerCancel={isCountdown ? undefined : handlePointerCancel}
+                        >
+                          {!isCountdown && (
+                            <>
+                              <div className="absolute inset-0 flex items-center px-3">
+                                <span data-hint-back="" className="pointer-events-none text-[10px] font-bold" style={{ opacity: 0, color: 'oklch(68% 0.12 252)', transition: 'opacity 0.1s' }}>
+                                  {isEnPrep ? '← ' + t('orderStatusPending', lang) : ''}
+                                </span>
+                              </div>
+                              <div className="absolute inset-0 flex items-center justify-end px-3">
+                                <span data-hint-fwd="" className="pointer-events-none text-[10px] font-bold" style={{ opacity: 0, color: 'oklch(75% 0.18 148)', transition: 'opacity 0.1s' }}>
+                                  {isEnPrep ? '✓ ' + t('kitchenItemListo', lang) : '→ ' + t('orderStatusAnotado', lang)}
+                                </span>
+                              </div>
+                            </>
+                          )}
+                          <div data-card-content="" className="relative flex items-center gap-3 px-3 py-2.5" style={{ background: cardColor.bg }}>
+                            {isCountdown && (
+                              <div className="shrink-0 flex items-center justify-center w-9 h-9 rounded-full text-base font-bold" style={{ background: 'oklch(32% 0.20 148)', color: 'oklch(80% 0.22 148)', border: '2px solid oklch(55% 0.28 148 / 0.7)' }}>
+                                {remaining}
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-baseline gap-1.5">
+                                <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{item.cantidad}×</span>
+                                <span className="text-xs font-medium truncate" style={{ color: TEXT_MAIN }}>{item.nombre || '—'}</span>
+                              </div>
+                              {item.complementos && <span className="text-[10px]" style={{ color: 'oklch(78% 0.03 252)' }}>({item.complementos})</span>}
+                            </div>
+                            <div className="shrink-0">
+                              {isCountdown ? (
+                                <button className="rounded px-2 py-1 text-[10px] font-bold" style={{ background: 'oklch(26% 0.08 25)', color: 'oklch(75% 0.18 25)' }} onClick={() => cancelCountdown(item.pedidoId, item.itemIdx)}>
+                                  {t('kitchenCountdownCancel', lang)}
+                                </button>
+                              ) : (
+                                <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold" style={isEnPrep ? { background: 'oklch(32% 0.16 90 / 0.5)', color: 'oklch(82% 0.20 90)' } : { background: 'oklch(30% 0.10 252 / 0.4)', color: 'oklch(75% 0.12 252)' }}>
+                                  {isEnPrep ? t('orderStatusAnotado', lang) : t('orderStatusPending', lang)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {groupBy === 'order' && (
         <div className="flex flex-col gap-4 pt-2">
           {Array.from(grouped.entries()).map(([pedidoId, group]) => {
             const tableLabel = group.mesaNombre ?? `Mesa ${group.mesaNumero ?? '—'}`;
@@ -273,8 +394,8 @@ export default function KitchenPage() {
               <div key={pedidoId}>
                 {/* Order header */}
                 <div className="flex items-center gap-2 px-1 mb-2">
-                  <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>#{group.numeroPedido}</span>
-                  <span className="text-[10px]" style={{ color: TEXT_DIM }}>{tableLabel}</span>
+                  <span className="text-xs font-bold" style={{ color: 'oklch(72% 0.14 62)' }}>#{group.numeroPedido}</span>
+                  <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{tableLabel}</span>
                   <span className="text-[10px] font-mono ml-auto" style={{ color: TEXT_DIM }}>{formatTimer(elapsed)}</span>
                 </div>
 
@@ -351,7 +472,7 @@ export default function KitchenPage() {
                               </span>
                             </div>
                             {item.complementos && (
-                              <span className="text-[10px]" style={{ color: TEXT_DIM }}>({item.complementos})</span>
+                              <span className="text-[10px]" style={{ color: 'oklch(78% 0.03 252)' }}>({item.complementos})</span>
                             )}
                           </div>
 
@@ -391,6 +512,7 @@ export default function KitchenPage() {
             );
           })}
         </div>
+        )}
       </div>
     </div>
   );
