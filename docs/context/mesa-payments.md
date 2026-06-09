@@ -55,44 +55,74 @@ payment_amount_cents int   -- importe en céntimos enviado a Redsys
 ### RPC: `increment_division_pagos(p_sesion_id UUID)`
 Incremento atómico de `division_pagos_realizados`. Retorna `(pagos_realizados INT, personas INT)`. Usa `SECURITY DEFINER` para ejecutarse en contexto de servicio desde el webhook. Garantiza que el contador no se incrementa dos veces si el webhook llega duplicado.
 
+### RPC: `claim_and_create_division_pago(p_sesion_id, p_empresa_id, p_payment_order_ref, p_session_total_cents)`
+Reclama un slot de división e inserta la fila en `mesa_division_pagos` de forma atómica en una sola transacción. Usa `FOR UPDATE` sobre `mesa_sesiones` para serializar pagadores concurrentes:
+
+1. Bloquea la fila de sesión con `FOR UPDATE`
+2. Cuenta slots activos (non-failed) en `mesa_division_pagos`
+3. Si ya no hay slots: retorna `(claimed=false, amount_cents=0)`
+4. Calcula el importe — el último pagador absorbe el resto del redondeo
+5. Inserta la fila con `status='pending'` y retorna `(claimed=true, amount_cents=N)`
+
+Elimina el race condition donde dos personas reclaman simultáneamente el mismo slot.
+
 ### RPC: `get_mesas_with_sessions(p_empresa_id UUID)`
 Retorna todas las mesas de la empresa con el estado de sesión activa. Usada por el waiter grid.
+
+Incluye el campo `division_activa BOOLEAN` = `(division_personas IS NOT NULL)`. Esto permite que el grid del camarero muestre estado "pagando" aunque `pago_en_curso = false` — lo que ocurre durante el flujo de división donde cada persona paga de forma independiente sin lock global.
 
 **Importante:** `session_total` se computa como `SUM(pedidos.total)` desde la tabla `pedidos` — NO desde `mesa_sesiones.total`. Esto garantiza que el importe es correcto en todos los estados, incluyendo `pago_en_curso = true`, donde `mesa_sesiones.total` puede ser 0.
 
 ```sql
 -- session_total siempre refleja la suma real de pedidos
 COALESCE((SELECT SUM(p.total) FROM pedidos p WHERE p.sesion_id = ms.id), 0) AS session_total
+-- division_activa para el grid del camarero
+(ms.division_personas IS NOT NULL) AS division_activa
 ```
 
 ---
 
 ## Sistema de Bloqueo de Pago (`pago_en_curso`)
 
-Cuando alguien inicia el proceso de pago, **todos los usuarios de la misma mesa quedan bloqueados inmediatamente**. El bloqueo es DB-level, no client-side.
+El lock `pago_en_curso` aplica **solo al pago total**. Los pagos de división son independientes y no usan este lock — cada parte se gestiona con el RPC atómico `claim_and_create_division_pago`.
 
-### Flujo completo del lock
+### Flujo del lock — pago total
 
 ```
-Usuario pulsa "Pagar total" / "Dividir cuenta" / "Pagar mi parte"
+Usuario pulsa "Pagar total" / "Dividir cuenta"
   │
   ├─ POST /api/mesas/{mesaId}/lock
   │    ├─ Si ya hay lock fresco (< 15 min): 423 → otro usuario está pagando
   │    └─ Si no: SET pago_en_curso=true, pago_iniciado_en=now() → 200
   │
   ├─ Todos los demás usuarios en el menú:
-  │    └─ próximo poll (≤ 3s si pagoEnCurso, ≤ 10s si no) detecta pago_en_curso=true
+  │    └─ próximo poll/realtime detecta pago_en_curso=true
   │         → clearCart() + redirect a /mesa/{mesaId}/orders
   │
   ├─ Todos los demás usuarios en el ticket:
-  │    └─ poll detecta pagoEnCurso=true → overlay 💳 full-screen + back button bloqueado
+  │    └─ pago_en_curso=true → overlay 💳 full-screen + back button bloqueado
   │
   ├─ GET /api/mesas/{mesaId}/orders  (verificación de total)
-  │    ├─ Si total cambió: mostrar warning con importe antiguo → nuevo → esperar confirmación
+  │    ├─ Si total cambió: warning con importe antiguo → nuevo → esperar confirmación
   │    └─ Si total igual: proceder directamente
   │
   └─ POST /api/redsys/initiate-mesa  (pago real)
        └─ Lock ya activo → grace period de 2 min permite continuar al mismo cliente
+```
+
+### Flujo de división — sin lock global
+
+```
+Usuario pulsa "Pagar mi parte"
+  │
+  ├─ NO se llama a /api/mesas/{mesaId}/lock
+  │
+  ├─ POST /api/redsys/initiate-mesa  { esDivision: true }
+  │    └─ RPC claim_and_create_division_pago (FOR UPDATE en mesa_sesiones)
+  │         ├─ Slot disponible: INSERT mesa_division_pagos + retorna amountCents
+  │         └─ Sin slots: retorna ALREADY_PAID (concurrente llegó primero)
+  │
+  └─ Cada pago es independiente — múltiples personas pueden pagar simultáneamente
 ```
 
 ### Cancelación
@@ -183,35 +213,52 @@ Cliente en /mesa/{mesaId}/orders
 
 Por cada persona que paga:
   → click "Pagar mi parte"
-  → POST /api/mesas/{mesaId}/lock  (lock mientras paga esta persona)
-  → Verificación de total
+  → (sin lock de mesa — personas concurrentes pueden pagar simultáneamente)
   → POST /api/redsys/initiate-mesa  { mesaId, esDivision: true }
-  → Use case: calcula importe = total / N
-    (última persona: paga el residuo para cuadrar al céntimo)
-  → INSERT INTO mesa_division_pagos (payment_order_ref UNIQUE — previene duplicados)
-  → Activa lock: pago_en_curso=true, pago_iniciado_en=now()
+  → Use case: RPC claim_and_create_division_pago (FOR UPDATE — serializado en DB)
+    - Cuenta slots activos no-fallidos
+    - Si sin slots: retorna ALREADY_PAID
+    - Calcula importe = total / N (última persona: absorbe residuo de redondeo)
+    - INSERT INTO mesa_division_pagos con status='pending' (atomic)
   → Redsys procesa → POST /api/redsys/webhook
   → Webhook Path 1 (división):
     - Busca mesa_division_pagos por payment_order_ref
-    - UPDATE status='paid'
-    - Llama RPC increment_division_pagos (atómica)
-    - Si pagos_realizados < personas: solo libera lock
-    - Si pagos_realizados >= personas: marca TODOS los pedidos como 'paid' + Telegram + libera lock
-  → Cliente regresa a /mesa/{mesaId}/orders y ve el progreso actualizado
+    - UPDATE status='paid' WHERE status='pending' (atómico — idempotencia contra webhooks duplicados)
+    - Si ya no era 'pending': retorna skipped=true (idempotente)
+    - Llama RPC increment_division_pagos (atómico)
+    - Si pagos_realizados < personas: libera lock si había
+    - Si pagos_realizados >= personas: marca TODOS los pedidos como 'paid' + Telegram
+  → Cliente regresa a /mesa/{mesaId}/orders y ve el progreso actualizado (Realtime)
 ```
 
 ---
 
-## Polling Adaptativo
+## Polling Adaptativo + Realtime
 
-El ticket `/mesa/{mesaId}/orders` usa polling para detectar cambios de estado:
+El ticket `/mesa/{mesaId}/orders` combina polling adaptativo y suscripción Realtime para detectar cambios de estado.
+
+### Polling adaptativo
 
 | Estado | Intervalo |
 |--------|-----------|
 | Normal (sin pago activo) | 10 segundos |
 | Pago en curso (`pagoEnCurso = true`) | **3 segundos** |
 
-Cuando un pago termina o se cancela, el overlay 💳 desaparece en **máximo 3 segundos** — sin esperar el ciclo completo de 10s.
+### Supabase Realtime
+
+Además del polling, el ticket se suscribe a cambios `UPDATE` en `mesa_sesiones` filtrando por `mesa_id`. Cuando Redsys confirma un pago y el webhook actualiza la sesión, el cliente recibe la notificación en tiempo real (< 200ms) sin esperar el próximo ciclo de poll:
+
+```typescript
+supabase
+  .channel(`mesa-orders-${mesaId}`)
+  .on('postgres_changes',
+    { event: 'UPDATE', schema: 'public', table: 'mesa_sesiones', filter: `mesa_id=eq.${mesaId}` },
+    () => { void refresh(); }
+  )
+  .subscribe();
+```
+
+Esto es especialmente importante en pagos de división donde múltiples personas ven el progreso actualizarse en tiempo real después de cada pago confirmado.
 
 ---
 
@@ -356,7 +403,8 @@ POST /api/redsys/webhook
   → Ds_Response '0000'-'0099' = éxito
 
 Path 1 — División (mesa_division_pagos row encontrada):
-  → UPDATE mesa_division_pagos SET status='paid'/'failed'
+  → UPDATE mesa_division_pagos SET status='paid'/'failed' WHERE status='pending'
+      (atómico — si no era 'pending', el webhook ya fue procesado → retorna skipped=true)
   → Llama RPC increment_division_pagos (atómica)
   → Si todos pagaron: UPDATE todos los pedidos SET payment_status='paid'
                        + Telegram notification
@@ -383,6 +431,32 @@ Redsys no puede alcanzar `localhost`. Para pruebas locales usar:
 ngrok http 3000
 # La URL pública de ngrok va como webhookUrl en el use case
 ```
+
+---
+
+## Waiter Grid — Estado "pagando" en división
+
+El grid del camarero (`/waiter`) debe mostrar las mesas en estado "pagando" no solo cuando hay un pago total en curso (`pago_en_curso = true`) sino también cuando hay una división activa — incluso si ninguna persona está procesando su parte en ese momento.
+
+```typescript
+// waiter-login-form.tsx
+const isPaymentInProgress = (mesa.pagoEnCurso || mesa.divisionActiva) && !mesa.sesionPagada;
+```
+
+`divisionActiva` viene del campo calculado en la RPC `get_mesas_with_sessions`:
+```sql
+(ms.division_personas IS NOT NULL) AS division_activa
+```
+
+Esto cubre el caso donde el primer usuario confirma la división (liberando el lock) y otros usuarios todavía no han pagado su parte — sin `divisionActiva`, el grid mostraría la mesa como "libre" incorrectamente.
+
+---
+
+## Posibles Mejoras Futuras
+
+- **Timeout de slots pending**: actualmente un slot `pending` sin confirmar (usuario que inicia pago y cierra la app sin completarlo ni cancelarlo) bloquea el slot indefinidamente. Una mejora sería expirar automáticamente filas `pending` en `mesa_division_pagos` pasados X minutos (similar al TTL de `pago_en_curso`).
+- **Realtime en el waiter grid**: el grid del camarero usa polling. Añadir suscripción Realtime reduciría la latencia para detectar cambios de estado de mesas.
+- **Cancelación de división individual**: actualmente no hay mecanismo para que un usuario cancele su parte específica de la división sin que el camarero intervenga.
 
 ---
 
@@ -440,8 +514,13 @@ La notificación de Telegram solo se envía cuando `fullyPaid = true` (pago comp
 | `supabase/migrations/20260601000003_mesa_division_pagos.sql` | Tabla mesa_division_pagos |
 | `supabase/migrations/20260601000004_mesa_sesion_pago_en_curso.sql` | Columnas pago_en_curso + pago_iniciado_en |
 | `supabase/migrations/20260603000001_fix_get_mesas_with_sessions_total.sql` | Fix RPC: session_total desde SUM(pedidos) en vez de mesa_sesiones.total |
-| `src/core/application/use-cases/payment/initiateRedsysMesaPaymentUseCase.ts` | Use case de inicio de pago (lock + grace period) |
-| `src/core/application/use-cases/payment/processRedsysWebhookUseCase.ts` | Webhook — Path 1 (división) + Path 2 (total) |
+| `supabase/migrations/20260610000001_get_mesas_with_sessions_division_activa.sql` | Añade `division_activa` al RPC get_mesas_with_sessions para el waiter grid |
+| `supabase/migrations/20260610000002_claim_and_create_division_pago.sql` | RPC atómico: reclama slot + inserta fila en mesa_division_pagos (FOR UPDATE) |
+| `src/core/application/use-cases/payment/initiateRedsysMesaPaymentUseCase.ts` | Use case de inicio de pago — lock solo para pago total, RPC atómico para división |
+| `src/core/application/use-cases/payment/processRedsysWebhookUseCase.ts` | Webhook — idempotencia atómica en Path 1 (división) + Path 2 (total) |
+| `src/core/domain/repositories/IMesaRepository.ts` | Interfaz MesaWithSession: campo divisionActiva |
+| `src/core/infrastructure/database/supabase-mesa.repository.ts` | Mapea division_activa desde el RPC a divisionActiva |
+| `src/components/waiter-login-form.tsx` | isPaymentInProgress incluye divisionActiva además de pagoEnCurso |
 | `src/app/api/redsys/initiate-mesa/route.ts` | Endpoint de inicio de pago |
 | `src/app/api/redsys/cancel-mesa/route.ts` | urlKo — libera lock y redirige |
 | `src/app/api/redsys/confirm-mesa/route.ts` | urlOk — fallback de confirmación |

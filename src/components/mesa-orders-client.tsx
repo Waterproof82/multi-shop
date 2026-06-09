@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { createClient } from "@supabase/supabase-js";
 import { CreditCard } from "lucide-react";
 import Link from "next/link";
 import { useLanguage } from "@/lib/language-context";
@@ -397,6 +398,24 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
     return () => clearInterval(interval);
   }, [refresh, pagoEnCursoForPoll]);
 
+  // Realtime: refresh immediately when the session row changes (division progress,
+  // sesion_pagada, pago_en_curso). This eliminates the 10s polling gap for concurrent payers.
+  useEffect(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) return;
+    const supabase = createClient(url, key);
+    const channel = supabase
+      .channel(`mesa-orders-${mesaId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'mesa_sesiones', filter: `mesa_id=eq.${mesaId}` },
+        () => { void refresh(); }
+      )
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [mesaId, refresh]);
+
   // Refs to read current state in the unmount cleanup (avoids stale closures)
   const isInitiatingPaymentRef = useRef(isInitiatingPayment);
   const payingRef = useRef(paying);
@@ -535,8 +554,10 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
     setVerifyingTotal(true);
     try {
       // Acquire checkout lock — signals all other users on this mesa to redirect to ticket.
+      // Skip for division-pay: each share is independent and the DB-level mesa_division_pagos
+      // table already handles concurrency. Using a global lock would block simultaneous payers.
       // Skip if we already own it (e.g. re-checking after a totalMismatch confirmation).
-      if (!isInitiatingPayment) {
+      if (!isInitiatingPayment && action !== 'division-pay') {
         const lockRes = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/lock`, { method: 'POST' });
         if (lockRes.status === 423) {
           void refresh();
@@ -620,7 +641,9 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
 
   // Another user is paying — we should wait without being able to navigate away.
   // Exclude: when WE own the lock (isInitiatingPayment) or we're submitting the form (paying).
-  const externalPaymentInProgress = (sessionData?.pagoEnCurso ?? false) && !paying && !isInitiatingPayment;
+  // Division mode: each person pays their share independently — a concurrent payer
+  // must not see this as a blocker. Only block for full (non-division) payments.
+  const externalPaymentInProgress = (sessionData?.pagoEnCurso ?? false) && !paying && !isInitiatingPayment && !division;
 
   const division = sessionData?.division ?? null;
   const fullyPaid = (sessionData?.sesionPagada ?? false) || (division

@@ -235,7 +235,7 @@ interface MesaCardProps {
 
 function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onViewTicket, onCloseMesa }: MesaCardProps) {
   const isPaid = mesa.sesionPagada;
-  const isPaymentInProgress = mesa.pagoEnCurso && !mesa.sesionPagada;
+  const isPaymentInProgress = (mesa.pagoEnCurso || mesa.divisionActiva) && !mesa.sesionPagada;
   const isOpen = !!mesa.sesionId && mesa.activeOrderCount > 0 && !isPaid && !isPaymentInProgress;
   const isActive = !!mesa.sesionId && mesa.clienteActivo && mesa.activeOrderCount === 0 && !isPaid && !isPaymentInProgress;
   const colors = getMesaColors(isPaid, isPaymentInProgress, isOpen, isActive);
