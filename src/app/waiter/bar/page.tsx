@@ -38,7 +38,7 @@ const STORAGE_KEY = 'bar_served_keys';
 
 function loadServedKeys(): Set<string> {
   try {
-    const raw = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
+    const raw = globalThis.window ? localStorage.getItem(STORAGE_KEY) : null;
     return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
   } catch {
     return new Set();
@@ -113,7 +113,7 @@ function getTimeColor(minutes: number) {
   for (const c of TIME_COLORS) {
     if (minutes < c.max) return c;
   }
-  return TIME_COLORS[TIME_COLORS.length - 1];
+  return TIME_COLORS.at(-1)!;
 }
 
 function getElapsedMinutes(createdAt: string): number {
@@ -129,7 +129,7 @@ const SWIPE_THRESHOLD = 80;
 
 export default function BarPage() {
   const { language } = useLanguage();
-  const lang = language as Parameters<typeof t>[1];
+  const lang = language;
   const [orders, setOrders]         = useState<BarOrder[]>([]);
   const [servedKeys, setServedKeys]  = useState<Set<string>>(loadServedKeys);
   const [countdowns, setCountdowns]  = useState<Record<string, number>>({});
@@ -229,6 +229,63 @@ export default function BarPage() {
 
   // ── Countdown ─────────────────────────────────────────────────────────────
 
+  /** Called once a single-item countdown reaches zero. Fires per-item PATCH
+   *  and, if all bebidas in the order are now served, the order-level PATCH.
+   *  Uses servedKeysRef directly (not a state-updater form) to keep nesting shallow. */
+  const finishServingItem = useCallback((flatItem: FlatBarItem, key: string) => {
+    const { orderId, detallePedidoIdx, totalInOrder, hasComida } = flatItem;
+
+    // Add key to served set via ref to avoid nested state-updater
+    const next = new Set(servedKeysRef.current);
+    next.add(key);
+    persistServedKeys(next);
+    servedKeysRef.current = next;
+    setServedKeys(new Set(next));
+
+    // Per-item PATCH — always fires when a single item countdown completes
+    fetch(`/api/waiter/kitchen/items/${encodeURIComponent(orderId)}/${detallePedidoIdx}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ estado: 'servido' }),
+    }).catch(() => {});
+
+    const servedCount = [...next].filter(k => k.startsWith(`${orderId}:`)).length;
+    if (servedCount < totalInOrder) return;
+
+    // All bebidas served — update order-level estado.
+    // Mixed: → 'anotado' (kitchen keeps comida items visible).
+    // Pure bebida: → 'servido' (fully done).
+    const nuevoEstado = hasComida ? 'anotado' : 'servido';
+    const isNotCurrentOrder = (o: BarOrder) => o.id !== orderId;
+    fetch(`/api/waiter/orders/${encodeURIComponent(orderId)}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ estado: nuevoEstado }),
+    }).then(r => {
+      if (r.ok) {
+        clearServedKeysForOrder(orderId);
+        setOrders(prev => prev.filter(isNotCurrentOrder));
+        const cleaned = new Set(servedKeysRef.current);
+        cleaned.forEach(k => { if (k.startsWith(`${orderId}:`)) cleaned.delete(k); });
+        persistServedKeys(cleaned);
+        servedKeysRef.current = cleaned;
+        setServedKeys(new Set(cleaned));
+      } else {
+        const rolled = new Set(servedKeysRef.current);
+        rolled.delete(key);
+        persistServedKeys(rolled);
+        servedKeysRef.current = rolled;
+        setServedKeys(new Set(rolled));
+      }
+    }).catch(() => {
+      const rolled = new Set(servedKeysRef.current);
+      rolled.delete(key);
+      persistServedKeys(rolled);
+      servedKeysRef.current = rolled;
+      setServedKeys(new Set(rolled));
+    });
+  }, []);
+
   const startCountdown = useCallback((flatItem: FlatBarItem) => {
     const key = flatItem.key;
     if (timersRef.current.has(key)) return;
@@ -241,56 +298,7 @@ export default function BarPage() {
           clearInterval(timersRef.current.get(key));
           timersRef.current.delete(key);
           pendingCountdownsRef.current.delete(key); // countdown done — remove from pending
-          setTimeout(() => {
-            setServedKeys(prevServed => {
-              const next = new Set(prevServed);
-              next.add(key);
-              persistServedKeys(next);
-              // Per-item PATCH — always fires when a single item countdown completes
-              fetch(`/api/waiter/kitchen/items/${encodeURIComponent(flatItem.orderId)}/${flatItem.detallePedidoIdx}/status`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ estado: 'servido' }),
-              }).catch(() => {});
-
-              const servedCount = [...next].filter(k => k.startsWith(`${flatItem.orderId}:`)).length;
-              if (servedCount >= flatItem.totalInOrder) {
-                // All bebidas served — update order-level estado.
-                // Mixed: → 'anotado' (kitchen keeps comida items visible).
-                // Pure bebida: → 'servido' (fully done).
-                const nuevoEstado = flatItem.hasComida ? 'anotado' : 'servido';
-                fetch(`/api/waiter/orders/${encodeURIComponent(flatItem.orderId)}/status`, {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ estado: nuevoEstado }),
-                }).then(r => {
-                  if (r.ok) {
-                    clearServedKeysForOrder(flatItem.orderId);
-                    setOrders(prev => prev.filter(o => o.id !== flatItem.orderId));
-                    setServedKeys(s => {
-                      const cleaned = new Set(s);
-                      cleaned.forEach(k => { if (k.startsWith(`${flatItem.orderId}:`)) cleaned.delete(k); });
-                      persistServedKeys(cleaned);
-                      return cleaned;
-                    });
-                  } else {
-                    setServedKeys(s => {
-                      const r = new Set(s); r.delete(key);
-                      persistServedKeys(r);
-                      return r;
-                    });
-                  }
-                }).catch(() => {
-                  setServedKeys(s => {
-                    const r = new Set(s); r.delete(key);
-                    persistServedKeys(r);
-                    return r;
-                  });
-                });
-              }
-              return next;
-            });
-          }, 0);
+          setTimeout(finishServingItem.bind(null, flatItem, key), 0);
           const next = { ...prev };
           delete next[key];
           return next;
@@ -299,7 +307,7 @@ export default function BarPage() {
       });
     }, 1000);
     timersRef.current.set(key, interval);
-  }, []);
+  }, [finishServingItem]);
 
   const cancelCountdown = useCallback((key: string) => {
     pendingCountdownsRef.current.delete(key); // sync — ensure beforeunload won't fire this
@@ -398,9 +406,9 @@ export default function BarPage() {
       <div className="pt-12 px-3 pb-6">
         {/* Color legend */}
         <div className="flex flex-wrap gap-1.5 py-3 px-1">
-          {TIME_COLORS.map((c, idx) => (
+          {TIME_COLORS.map((c) => (
             <span
-              key={idx}
+              key={c.label}
               className="rounded px-2 py-0.5 text-[10px] font-medium"
               style={{ background: c.bg, color: c.text, border: `1px solid ${c.border}` }}
             >
