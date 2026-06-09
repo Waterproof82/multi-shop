@@ -1,5 +1,37 @@
 'use client';
 
+/**
+ * Bar page — waiter view for serving pending drink orders.
+ *
+ * ## Serving flow
+ * 1. Waiter swipes a drink card left → 5-second countdown starts.
+ * 2. Countdown completes → per-item PATCH (`/waiter/kitchen/items/:id/:idx/status`,
+ *    estado = `servido`) written to `pedido_item_estados`.
+ * 3. Once ALL bebidas in an order are served, order-level PATCH fires:
+ *    - pure-bebida order → estado = `servido` (fully done, disappears everywhere)
+ *    - mixed order (also has comida) → estado = `anotado` so kitchen items
+ *      remain visible for the cook. The bar page filters by pedido.estado = `pendiente`,
+ *      so the order drops off the bar list after this PATCH.
+ *
+ * ## Multi-device sync
+ * `pedido_item_estados` is the source of truth. `findBarOrders` already filters
+ * out items marked `servido` server-side, so any bar screen that polls sees the
+ * same remaining work. localStorage (`bar_served_keys`) is only an optimistic
+ * cache that prevents a served item from reappearing between polls.
+ *
+ * ## Key stability
+ * Swipe keys are `${orderId}:${detallePedidoIdx}` where `detallePedidoIdx` is the
+ * item's real index in detalle_pedido, NOT the index in the filtered bebida array.
+ * This prevents key collisions when items are filtered out server-side (e.g. item
+ * at real idx=1 would otherwise shift to idx=0 after its sibling is served).
+ *
+ * ## Background processing (navigation mid-countdown)
+ * `beforeunload` fires per-item PATCHes for any in-flight countdowns using
+ * `keepalive: true` so requests survive the page unload. Items are persisted to
+ * localStorage so they stay hidden on the next visit. Order-level PATCHes are only
+ * sent when all bebidas in the order are covered (pending + already served).
+ */
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 const STORAGE_KEY = 'bar_served_keys';
@@ -39,17 +71,19 @@ interface BarOrder {
   numeroPedido: number;
   mesaNumero: number | null;
   mesaNombre: string | null;
-  items: { nombre: string; cantidad: number }[];
+  items: { nombre: string; cantidad: number; detallePedidoIdx: number }[];
   estado: string;
   createdAt: string;
   sesionId: string | null;
   tipo: 'bebida';
+  hasComida: boolean;
 }
 
 interface FlatBarItem {
-  key: string;         // `${orderId}:${itemIdx}` — unique swipe key
+  key: string;              // `${orderId}:${itemIdx}` — unique swipe key
   orderId: string;
   itemIdx: number;
+  detallePedidoIdx: number; // actual index in detalle_pedido (for per-item PATCH)
   totalInOrder: number;
   numeroPedido: number;
   mesaNumero: number | null;
@@ -57,6 +91,7 @@ interface FlatBarItem {
   createdAt: string;
   nombre: string;
   cantidad: number;
+  hasComida: boolean;
 }
 
 const BG = "oklch(13% 0.02 252)";
@@ -146,9 +181,18 @@ export default function BarPage() {
       if (pending.size === 0 && served.size === 0) return;
 
       // Persist any in-flight countdown items so they stay hidden on next visit
+      // and fire per-item PATCH for each one
       if (pending.size > 0) {
         const current = loadServedKeys();
-        for (const key of pending.keys()) current.add(key);
+        for (const [key, item] of pending.entries()) {
+          current.add(key);
+          fetch(`/api/waiter/kitchen/items/${encodeURIComponent(item.orderId)}/${item.detallePedidoIdx}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ estado: 'servido' }),
+            keepalive: true,
+          }).catch(() => {});
+        }
         persistServedKeys(current);
       }
 
@@ -166,11 +210,13 @@ export default function BarPage() {
 
       for (const [orderId, { count, total }] of byOrder) {
         if (count >= total) {
+          const order = ordersRef.current.find(o => o.id === orderId);
+          const nuevoEstado = order?.hasComida ? 'anotado' : 'servido';
           clearServedKeysForOrder(orderId);
           fetch(`/api/waiter/orders/${encodeURIComponent(orderId)}/status`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ estado: 'servido' }),
+            body: JSON.stringify({ estado: nuevoEstado }),
             keepalive: true,
           }).catch(() => {});
         }
@@ -200,12 +246,23 @@ export default function BarPage() {
               const next = new Set(prevServed);
               next.add(key);
               persistServedKeys(next);
+              // Per-item PATCH — always fires when a single item countdown completes
+              fetch(`/api/waiter/kitchen/items/${encodeURIComponent(flatItem.orderId)}/${flatItem.detallePedidoIdx}/status`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ estado: 'servido' }),
+              }).catch(() => {});
+
               const servedCount = [...next].filter(k => k.startsWith(`${flatItem.orderId}:`)).length;
               if (servedCount >= flatItem.totalInOrder) {
+                // All bebidas served — update order-level estado.
+                // Mixed: → 'anotado' (kitchen keeps comida items visible).
+                // Pure bebida: → 'servido' (fully done).
+                const nuevoEstado = flatItem.hasComida ? 'anotado' : 'servido';
                 fetch(`/api/waiter/orders/${encodeURIComponent(flatItem.orderId)}/status`, {
                   method: 'PATCH',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ estado: 'servido' }),
+                  body: JSON.stringify({ estado: nuevoEstado }),
                 }).then(r => {
                   if (r.ok) {
                     clearServedKeysForOrder(flatItem.orderId);
@@ -305,16 +362,18 @@ export default function BarPage() {
   // Flatten orders into one card per drink item, excluding locally served ones
   const flatItems: FlatBarItem[] = orders.flatMap(order =>
     order.items.map((item, idx) => ({
-      key:          `${order.id}:${idx}`,
-      orderId:      order.id,
-      itemIdx:      idx,
-      totalInOrder: order.items.length,
-      numeroPedido: order.numeroPedido,
-      mesaNumero:   order.mesaNumero,
-      mesaNombre:   order.mesaNombre,
-      createdAt:    order.createdAt,
-      nombre:       item.nombre,
-      cantidad:     item.cantidad,
+      key:               `${order.id}:${item.detallePedidoIdx}`,
+      orderId:           order.id,
+      itemIdx:           idx,
+      detallePedidoIdx:  item.detallePedidoIdx,
+      totalInOrder:      order.items.length,
+      numeroPedido:      order.numeroPedido,
+      mesaNumero:        order.mesaNumero,
+      mesaNombre:        order.mesaNombre,
+      createdAt:         order.createdAt,
+      nombre:            item.nombre,
+      cantidad:          item.cantidad,
+      hasComida:         order.hasComida,
     }))
   ).filter(item => !servedKeys.has(item.key));
 
