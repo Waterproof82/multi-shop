@@ -26,16 +26,31 @@ export interface RetenidoItem {
   sesionCreatedAt: string;
 }
 
+/**
+ * A pending bar order as seen by the bar page.
+ *
+ * `items` contains only bebida items not yet served (filtered server-side
+ * by pedido_item_estados so all bar screens share the same view).
+ *
+ * `detallePedidoIdx` — real position of each item inside detalle_pedido.
+ * Used as a stable swipe key and as the PATCH path param for per-item status.
+ *
+ * `hasComida` — true when the parent pedido also contains comida items.
+ * The bar page uses this to choose the correct order-level estado transition:
+ *   - false → PATCH pedido to `servido` (all done)
+ *   - true  → PATCH pedido to `anotado` (kitchen items must remain visible)
+ */
 export interface BarOrderItem {
   id: string;
   numeroPedido: number;
   mesaNumero: number | null;
   mesaNombre: string | null;
-  items: { nombre: string; cantidad: number }[];
+  items: { nombre: string; cantidad: number; detallePedidoIdx: number }[];
   estado: string;
   createdAt: string;
   sesionId: string | null;
   tipo: 'bebida';
+  hasComida: boolean;
 }
 
 /** Estado values for per-item kitchen tracking */

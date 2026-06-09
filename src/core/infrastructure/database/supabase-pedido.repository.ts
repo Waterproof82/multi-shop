@@ -1092,6 +1092,17 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     }
   }
 
+  /**
+   * Returns live badge counts for the waiter banner (cocina + bebidas).
+   *
+   * Bebidas total = bebida items in pendiente orders that have NOT yet been
+   * marked `servido` in pedido_item_estados. This query is per-item (not per-order)
+   * so partial serving (e.g. 1 of 2 drinks) is reflected correctly.
+   *
+   * Mixed orders (comida + bebida) are counted here for bebidas even though
+   * the parent pedido.estado remains `pendiente`; the bar page is responsible
+   * for PATCHing it to `anotado` once all bebidas are served.
+   */
   async countKitchenBarOrders(empresaId: string): Promise<Result<KitchenBarCounts>> {
     try {
       // Cocina counts: per-item estado + deferred cart items
@@ -1129,7 +1140,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       if (sessionIds.length > 0) {
         const { data: pedidos, error: pedidosError } = await this.supabase
           .from('pedidos')
-          .select('detalle_pedido, estado')
+          .select('id, detalle_pedido, estado')
           .in('sesion_id', sessionIds)
           .eq('estado', 'pendiente');
 
@@ -1138,12 +1149,37 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pedidos', module: 'repository', method: 'countKitchenBarOrders' } };
         }
 
-        for (const pedido of pedidos ?? []) {
-          const row = pedido as Record<string, unknown>;
-          const items = (row['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
-          const hasBebida = items.some(i => i['tipo_producto'] === 'bebida');
-          const hasComida = items.some(i => i['tipo_producto'] === 'comida');
-          if (hasBebida && !hasComida) bebidasTotal++;
+        const pedidoRows = (pedidos ?? []) as Record<string, unknown>[];
+
+        // Collect pedido IDs that have bebida items to fetch their per-item states
+        const pedidoIdsWithBebida = pedidoRows
+          .filter(row => (row['detalle_pedido'] as Array<Record<string, unknown>>).some(i => i['tipo_producto'] === 'bebida'))
+          .map(row => row['id'] as string);
+
+        const estadoMap = new Map<string, Map<number, string>>();
+        if (pedidoIdsWithBebida.length > 0) {
+          const { data: itemEstados } = await this.supabase
+            .from('pedido_item_estados')
+            .select('pedido_id, item_idx, estado')
+            .in('pedido_id', pedidoIdsWithBebida);
+
+          for (const row of itemEstados ?? []) {
+            const r = row as Record<string, unknown>;
+            const pid = r['pedido_id'] as string;
+            if (!estadoMap.has(pid)) estadoMap.set(pid, new Map());
+            estadoMap.get(pid)!.set(r['item_idx'] as number, r['estado'] as string);
+          }
+        }
+
+        for (const pedido of pedidoRows) {
+          const items = (pedido['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
+          const pedidoId = pedido['id'] as string;
+          const pedidoEstados = estadoMap.get(pedidoId) ?? new Map();
+          items.forEach((item, idx) => {
+            if (item['tipo_producto'] === 'bebida' && pedidoEstados.get(idx) !== 'servido') {
+              bebidasTotal++;
+            }
+          });
         }
       }
 
@@ -1262,6 +1298,20 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     }
   }
 
+  /**
+   * Returns bebida items still pending for the bar page.
+   *
+   * Architecture notes:
+   * - Mixed orders (comida + bebida) ARE included. `hasComida` flag lets the bar
+   *   page PATCH the parent pedido to `anotado` (not `servido`) so kitchen items
+   *   remain visible. Pure-bebida orders get PATCHed to `servido`.
+   * - Per-item estado is the source of truth for multi-device sync:
+   *   items already marked `servido` in pedido_item_estados are excluded here
+   *   so every bar screen shows the same remaining work regardless of localStorage.
+   * - `detallePedidoIdx` is the item's real position in detalle_pedido (not the
+   *   filtered-array index). The bar page uses it as the stable swipe key and
+   *   as the path param for per-item PATCH `/waiter/kitchen/items/:id/:idx/status`.
+   */
   async findBarOrders(empresaId: string): Promise<Result<BarOrderItem[]>> {
     try {
       const { data: activeSessions, error: sessionsError } = await this.supabase
@@ -1290,28 +1340,58 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pedidos de bar', module: 'repository', method: 'findBarOrders' } };
       }
 
+      // Fetch per-item estados for all orders that have bebida items
+      const orderRows = (orders ?? []) as Record<string, unknown>[];
+      const pedidoIdsWithBebida = orderRows
+        .filter(row => (row['detalle_pedido'] as Array<Record<string, unknown>>).some(i => i['tipo_producto'] === 'bebida'))
+        .map(row => row['id'] as string);
+
+      const estadoMap = new Map<string, Map<number, string>>();
+      if (pedidoIdsWithBebida.length > 0) {
+        const { data: itemEstados } = await this.supabase
+          .from('pedido_item_estados')
+          .select('pedido_id, item_idx, estado')
+          .in('pedido_id', pedidoIdsWithBebida);
+
+        for (const row of itemEstados ?? []) {
+          const r = row as Record<string, unknown>;
+          const pid = r['pedido_id'] as string;
+          if (!estadoMap.has(pid)) estadoMap.set(pid, new Map());
+          estadoMap.get(pid)!.set(r['item_idx'] as number, r['estado'] as string);
+        }
+      }
+
       const result: BarOrderItem[] = [];
-      for (const order of orders ?? []) {
+      for (const order of orderRows) {
         const row = order as Record<string, unknown>;
         const items = (row['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
         const mesaData = row['mesas'] as Record<string, unknown> ?? {};
+        const pedidoId = row['id'] as string;
+        const pedidoEstados = estadoMap.get(pedidoId) ?? new Map();
 
-        const bebidaItems = items.filter(i => i['tipo_producto'] === 'bebida');
         const hasComida = items.some(i => i['tipo_producto'] === 'comida');
 
-        // Bar only shows pure drink orders (no food in the same order)
-        if (bebidaItems.length === 0 || hasComida) continue;
+        // Only include bebida items not yet marked servido in pedido_item_estados
+        const bebidaItems: { nombre: string; cantidad: number; detallePedidoIdx: number }[] = [];
+        items.forEach((item, fullIdx) => {
+          if (item['tipo_producto'] === 'bebida' && pedidoEstados.get(fullIdx) !== 'servido') {
+            bebidaItems.push({ nombre: item['nombre'] as string, cantidad: item['cantidad'] as number, detallePedidoIdx: fullIdx });
+          }
+        });
+
+        if (bebidaItems.length === 0) continue;
 
         result.push({
           id: row['id'] as string,
           numeroPedido: row['numero_pedido'] as number,
           mesaNumero: (mesaData['numero'] as number) ?? null,
           mesaNombre: (mesaData['nombre'] as string | null) ?? null,
-          items: bebidaItems.map(i => ({ nombre: i['nombre'] as string, cantidad: i['cantidad'] as number })),
+          items: bebidaItems,
           estado: row['estado'] as string,
           createdAt: row['created_at'] as string,
           sesionId: (row['sesion_id'] as string | null) ?? null,
           tipo: 'bebida',
+          hasComida,
         });
       }
 
