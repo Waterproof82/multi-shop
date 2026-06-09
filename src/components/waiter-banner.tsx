@@ -308,8 +308,8 @@ export function WaiterBanner() {
   // Kitchen page has its own header — don't render the waiter banner there
   if (pathname === '/kitchen') return null;
 
-  // Customer-facing pages — never show the waiter banner
-  if (pathname.startsWith('/mesa/')) return null;
+  // Customer-facing pages — hide banner unless the waiter is impersonating a mesa
+  if (pathname.startsWith('/mesa/') && !hasMesa) return null;
 
   const hasMesa = mesaLabel !== null;
   const sectionLabel =
