@@ -50,6 +50,12 @@ type PendingAction = 'full' | 'division-modal' | 'division-pay';
 
 const PAGE_BG = "#f0ede8";
 
+/**
+ * Merges items across all orders in a session so the customer ticket shows
+ * one consolidated line per product+complement combination.
+ * Key = nombre + precio + sorted complement names — same product ordered in
+ * multiple rounds collapses into a single line with summed quantities.
+ */
 function mergeOrderItems(items: OrderItem[]): OrderItem[] {
   const map = new Map<string, OrderItem>();
   for (const item of items) {
@@ -772,42 +778,35 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                   })}
                 </ul>
               ) : (
-                <div className="flex flex-col pb-4">
-                  {sessionData.orders.map((order, oi) => {
+                <ul className="flex flex-col gap-1 pb-4">
+                  {allItems.map((item) => {
+                    const complementoTotal = item.complementos?.reduce((s, c) => s + c.precio, 0) ?? 0;
+                    const lineTotal = (item.precio + complementoTotal) * item.cantidad;
+                    const compsKey = (item.complementos ?? []).map(c => c.nombre).sort().join(',');
                     return (
-                      <div key={order.id}>
-                        <ul className="flex flex-col gap-1">
-                          {order.items.map((item) => {
-                            const complementoTotal = item.complementos?.reduce((s, c) => s + c.precio, 0) ?? 0;
-                            const lineTotal = (item.precio + complementoTotal) * item.cantidad;
-                            return (
-                              <li
-                                key={`${item.nombre}||${item.precio}`}
-                                className="flex items-center gap-2 text-sm"
-                                style={{ color: "#1a1612", fontFamily: "monospace" }}
-                              >
-                                <span className="tabular-nums w-4 text-right shrink-0" style={{ color: "#8a7560" }}>
-                                  {item.cantidad}
-                                </span>
-                                <span className="flex flex-col flex-1 min-w-0">
-                                  <span>{(language !== "es" && item.translations?.[language]?.name) || item.nombre}</span>
-                                  {item.complementos && item.complementos.length > 0 && (
-                                    <span className="text-xs" style={{ color: "#b0a090" }}>
-                                      + {item.complementos.map(c => c.nombre).join(", ")}
-                                    </span>
-                                  )}
-                                </span>
-                                <span className="tabular-nums shrink-0 text-right" style={{ color: "#1a1612" }}>
-                                  {formatPrice(lineTotal, "EUR", lang)}
-                                </span>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </div>
+                      <li
+                        key={`${item.nombre}||${item.precio}||${compsKey}`}
+                        className="flex items-center gap-2 text-sm"
+                        style={{ color: "#1a1612", fontFamily: "monospace" }}
+                      >
+                        <span className="tabular-nums w-4 text-right shrink-0" style={{ color: "#8a7560" }}>
+                          {item.cantidad}
+                        </span>
+                        <span className="flex flex-col flex-1 min-w-0">
+                          <span>{(language !== "es" && item.translations?.[language]?.name) || item.nombre}</span>
+                          {item.complementos && item.complementos.length > 0 && (
+                            <span className="text-xs" style={{ color: "#b0a090" }}>
+                              + {item.complementos.map(c => c.nombre).join(", ")}
+                            </span>
+                          )}
+                        </span>
+                        <span className="tabular-nums shrink-0 text-right" style={{ color: "#1a1612" }}>
+                          {formatPrice(lineTotal, "EUR", lang)}
+                        </span>
+                      </li>
                     );
                   })}
-                </div>
+                </ul>
               )}
 
               <DottedRule />
