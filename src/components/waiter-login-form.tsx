@@ -368,6 +368,7 @@ export function WaiterLoginForm() {
   const [ticketPendingDelete, setTicketPendingDelete] = useState<{ mesaId: string; nombre: string; precio: number; maxCantidad: number; complementos?: { nombre: string; precio: number }[]; preparadoWarning?: boolean } | null>(null);
   const [ticketDeleteQty, setTicketDeleteQty] = useState(1);
   const [ticketDeleting, setTicketDeleting] = useState(false);
+  const [closeBlockedError, setCloseBlockedError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const data = await fetchMesas();
@@ -426,6 +427,17 @@ export function WaiterLoginForm() {
   async function handleCloseMesa(mesa: MesaWithSession) {
     setMesaLoading(mesa.id);
     try {
+      // Guard: check if payment is required before allowing close
+      const r = await fetch(`/api/mesas/${encodeURIComponent(mesa.id)}/orders`);
+      if (r.ok) {
+        const data = await r.json() as { orders: unknown[]; pagosHabilitados: boolean; sesionPagada: boolean };
+        if (data.orders.length > 0 && data.pagosHabilitados && !data.sesionPagada) {
+          setCloseBlockedError('Hay pedidos sin pagar. Registrá el pago antes de cerrar la mesa.');
+          setTimeout(() => setCloseBlockedError(null), 5000);
+          void handleViewTicket(mesa);
+          return;
+        }
+      }
       await fetch(`/api/waiter/mesas/${encodeURIComponent(mesa.id)}/close`, { method: 'POST' });
       await refresh();
     } finally {
@@ -605,6 +617,16 @@ export function WaiterLoginForm() {
           </span>
         ))}
       </div>
+
+      {closeBlockedError && (
+        <div
+          role="alert"
+          className="mb-2 rounded-lg px-3 py-2 text-xs font-medium text-center"
+          style={{ background: 'oklch(22% 0.08 25)', color: 'oklch(88% 0.14 25)', border: '1px solid oklch(45% 0.18 25 / 0.5)' }}
+        >
+          {closeBlockedError}
+        </div>
+      )}
 
       {mesas.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-12">
