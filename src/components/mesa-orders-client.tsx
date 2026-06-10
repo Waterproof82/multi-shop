@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { CreditCard } from "lucide-react";
+import Image from "next/image";
+import { CreditCard, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
@@ -900,7 +901,24 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
 
         {/* Payment section */}
         {allItems.length > 0 && (sessionData?.pagosHabilitados || isWaiterMode) && (
-          <div className="mt-6 flex flex-col gap-3">
+          <div
+            className="mt-6 rounded-3xl overflow-hidden"
+            style={{ border: "1px solid #e8e0d8" }}
+          >
+          <div className="flex flex-col gap-3 p-5">
+
+            {/* Secure payment header — customer-facing only, not waiter */}
+            {sessionData?.pagosHabilitados && !isWaiterMode && !fullyPaid && (
+              <div className="flex items-center gap-1.5 mb-1">
+                <ShieldCheck size={12} strokeWidth={2} style={{ color: "#8a7560" }} />
+                <span
+                  className="text-[10px] uppercase tracking-[0.18em]"
+                  style={{ color: "#8a7560", fontFamily: "monospace" }}
+                >
+                  Pago seguro
+                </span>
+              </div>
+            )}
 
             {/* Division block */}
             {division && (
@@ -1002,7 +1020,7 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                 className="rounded-2xl p-5 flex items-center gap-4"
                 style={{ backgroundColor: '#1a1612', fontFamily: 'monospace' }}
               >
-                <span style={{ fontSize: 24, flexShrink: 0 }}>💳</span>
+                <CreditCard size={22} strokeWidth={1.5} style={{ color: '#fffcf7', flexShrink: 0 }} />
                 <div className="flex flex-col gap-1">
                   <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#fffcf7' }}>
                     {t('mesaPagoEnCurso', lang)}
@@ -1065,18 +1083,15 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                   type="button"
                   onClick={() => { void handlePrePaymentCheck('full'); }}
                   disabled={paying || settingDivision || verifyingTotal}
-                  className="flex-1 py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-opacity disabled:opacity-50 flex flex-col items-center gap-0.5"
+                  className="flex-1 py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
                   style={{ backgroundColor: "#1a1612", color: "#fffcf7", fontFamily: "monospace" }}
                 >
                   {paying || verifyingTotal ? (
                     t("loading", lang)
                   ) : (
                     <>
-                      <span className="flex items-center gap-1.5">
-                        <CreditCard size={14} strokeWidth={2} />
-                        {t("mesaPayTotal", lang)}
-                      </span>
-                      <span className="text-[10px] font-normal tracking-wide normal-case opacity-60">Pago seguro · Redsys</span>
+                      <CreditCard size={14} strokeWidth={2} />
+                      {t("mesaPayTotal", lang)}
                     </>
                   )}
                 </button>
@@ -1086,7 +1101,7 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                   type="button"
                   onClick={() => { void handlePrePaymentCheck('division-modal'); }}
                   disabled={paying || settingDivision || verifyingTotal}
-                  className="flex-1 py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-opacity disabled:opacity-50 flex flex-col items-center gap-0.5"
+                  className="flex-1 py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
                   style={{
                     backgroundColor: "transparent",
                     color: "#1a1612",
@@ -1098,11 +1113,8 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                     t("loading", lang)
                   ) : (
                     <>
-                      <span className="flex items-center gap-1.5">
-                        <CreditCard size={14} strokeWidth={2} />
-                        {t("mesaDivideCheck", lang)}
-                      </span>
-                      <span className="text-[10px] font-normal tracking-wide normal-case opacity-40">Pago seguro · Redsys</span>
+                      <CreditCard size={14} strokeWidth={2} />
+                      {t("mesaDivideCheck", lang)}
                     </>
                   )}
                 </button>
@@ -1115,18 +1127,15 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                 type="button"
                 onClick={() => { void handlePrePaymentCheck('division-pay'); }}
                 disabled={paying || verifyingTotal}
-                className="w-full py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-opacity disabled:opacity-50 flex flex-col items-center gap-0.5"
+                className="w-full py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
                 style={{ backgroundColor: "#1a1612", color: "#fffcf7", fontFamily: "monospace" }}
               >
                 {paying || verifyingTotal ? (
                   t("loading", lang)
                 ) : (
                   <>
-                    <span className="flex items-center gap-1.5">
-                      <CreditCard size={14} strokeWidth={2} />
-                      {`${t("mesaPayShare", lang)} ${formatPrice(division.importePorPersona, "EUR", lang)}`}
-                    </span>
-                    <span className="text-[10px] font-normal tracking-wide normal-case opacity-60">Pago seguro · Redsys</span>
+                    <CreditCard size={14} strokeWidth={2} />
+                    {`${t("mesaPayShare", lang)} ${formatPrice(division.importePorPersona, "EUR", lang)}`}
                   </>
                 )}
               </button>
@@ -1172,6 +1181,23 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
               </div>
             )}
 
+          </div>
+
+            {/* Trust badge — Redsys + Visa + Mastercard */}
+            {sessionData?.pagosHabilitados && !isWaiterMode && (
+              <div
+                className="flex justify-center items-center py-3"
+                style={{ borderTop: "1px dashed #e8e0d8", backgroundColor: "#ffffff" }}
+              >
+                <Image
+                  src="/tpv-redsys-woocommerce.jpg"
+                  alt="Pago procesado por Redsys. Aceptamos Visa y Mastercard."
+                  width={128}
+                  height={40}
+                  style={{ opacity: 0.6, objectFit: "contain" }}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>
