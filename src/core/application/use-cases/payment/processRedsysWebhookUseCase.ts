@@ -88,16 +88,22 @@ export async function processRedsysWebhookUseCase(
     if (divPago) {
       const dp = divPago as { id: string; sesion_id: string; empresa_id: string; status: string };
 
-      // Idempotency: already processed
-      if (dp.status !== 'pending') {
-        return { success: true, data: { verified: true, skipped: true } };
-      }
-
+      // Idempotency: atomically claim the row — only proceed if it was still 'pending'.
+      // A separate non-atomic read+write would allow concurrent webhook retries to both
+      // pass the check and double-increment division_pagos_realizados for the same payment.
       const newDivStatus = newPaymentStatus === 'paid' ? 'paid' : 'failed';
-      await supabase
+      const { data: claimed } = await supabase
         .from('mesa_division_pagos')
         .update({ status: newDivStatus })
-        .eq('id', dp.id);
+        .eq('id', dp.id)
+        .eq('status', 'pending')
+        .select('id')
+        .maybeSingle();
+
+      if (!claimed) {
+        // Another webhook request already processed this payment — skip safely.
+        return { success: true, data: { verified: true, skipped: true } };
+      }
 
       if (newPaymentStatus === 'paid') {
         const { data: rpcResult } = await supabase

@@ -22,7 +22,7 @@ Plataforma **multi-tenant** de gestión de negocios de hostelería y retail. Cad
 - **Pedidos desde la mesa** mediante QR: el cliente escanea el código QR de la mesa con la cámara del móvil, sin instalar nada, y hace su pedido directamente.
 - **Validación de presencia física**: los pedidos en mesa requieren escaneo in-app del QR impreso (token de sesión de 20 min, rotación automática al cerrar la sesión).
 - **Panel de sala para camareros** con login por PIN: grid de mesas con estado en tiempo real, apertura y cierre de sesión, búsqueda rápida de productos para tomar pedidos.
-- **Pago en mesa** vía Redsys TPV: pago total o división de cuenta entre 2 y 20 personas. Sistema de lock atómico para evitar pagos simultáneos. Verificación de total antes de pagar (detecta productos nuevos añadidos en el último momento).
+- **Pago en mesa** vía Redsys TPV: pago total o división de cuenta entre 2 y 20 personas. Lock atómico (PostgreSQL `FOR UPDATE`) para pago total; división permite pagos simultáneos independientes mediante RPC transaccional. Verificación de total antes de pagar (detecta productos añadidos en el último momento). Idempotencia de webhook garantizada con update atómico `WHERE status='pending'`. Actualización en tiempo real vía Supabase Realtime.
 - **Registro manual de pagos** por el camarero (efectivo / pago externo) para desbloquear la sesión en escenarios de división.
 - **Gestión de pedidos takeaway** desde un entorno de chat de Telegram: con un solo botón se indica el tiempo de recogida (10, 15, 20, 30 o 45 minutos). El cliente recibe la notificación automáticamente en su pantalla de seguimiento, sin necesidad de llamar por teléfono.
 - **Gestión de pedidos en mesa (cocina y bar)** íntegramente en la app:

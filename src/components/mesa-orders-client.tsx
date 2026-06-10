@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { CreditCard } from "lucide-react";
+import { createClient } from "@supabase/supabase-js";
+import Image from "next/image";
+import { ArrowLeft, CreditCard, Receipt, Users, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
@@ -397,6 +399,45 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
     return () => clearInterval(interval);
   }, [refresh, pagoEnCursoForPoll]);
 
+  // Realtime: refresh immediately when the session row changes (division progress,
+  // sesion_pagada, pago_en_curso). This eliminates the 10s polling gap for concurrent payers.
+  useEffect(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) return;
+    const supabase = createClient(url, key);
+    const channel = supabase
+      .channel(`mesa-orders-${mesaId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'mesa_sesiones', filter: `mesa_id=eq.${mesaId}` },
+        () => { void refresh(); }
+      )
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [mesaId, refresh]);
+
+  // On mount: if there is a stored division paymentOrderRef from a previous payment
+  // attempt, release that pending slot. Covers two cases:
+  //   1. User cancelled at Redsys (urlKo redirect back to this page).
+  //   2. User silently abandoned (closed the app, lost connectivity).
+  // The update is atomic (WHERE status='pending') — a no-op if the webhook
+  // already marked the row as 'paid' or 'failed'.
+  useEffect(() => {
+    const storedRef = (() => {
+      try { return sessionStorage.getItem(`mesa-division-ref-${mesaId}`); }
+      catch { return null; }
+    })();
+    if (!storedRef) return;
+    void fetch(`/api/mesas/${encodeURIComponent(mesaId)}/division-slot`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentOrderRef: storedRef }),
+    }).then(() => {
+      try { sessionStorage.removeItem(`mesa-division-ref-${mesaId}`); } catch { /* ignore */ }
+    }).catch(() => { /* non-blocking */ });
+  }, [mesaId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Refs to read current state in the unmount cleanup (avoids stale closures)
   const isInitiatingPaymentRef = useRef(isInitiatingPayment);
   const payingRef = useRef(paying);
@@ -476,7 +517,13 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
         DS_MERCHANT_PARAMETERS: string;
         DS_SIGNATURE: string;
         DS_SIGNATURE_VERSION: string;
+        paymentOrderRef?: string;
       };
+      // Store the ref so we can release the pending slot if the user cancels or abandons
+      // the Redsys flow. The cleanup runs automatically on the next mount of this component.
+      if (esDivision && formData.paymentOrderRef) {
+        try { sessionStorage.setItem(`mesa-division-ref-${mesaId}`, formData.paymentOrderRef); } catch { /* ignore */ }
+      }
       const redsysUrl = process.env.NEXT_PUBLIC_REDSYS_URL ?? 'https://sis-t.redsys.es:25443/sis/realizarPago';
       submitRedsysForm(formData, redsysUrl);
     } catch {
@@ -535,8 +582,10 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
     setVerifyingTotal(true);
     try {
       // Acquire checkout lock — signals all other users on this mesa to redirect to ticket.
+      // Skip for division-pay: each share is independent and the DB-level mesa_division_pagos
+      // table already handles concurrency. Using a global lock would block simultaneous payers.
       // Skip if we already own it (e.g. re-checking after a totalMismatch confirmation).
-      if (!isInitiatingPayment) {
+      if (!isInitiatingPayment && action !== 'division-pay') {
         const lockRes = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/lock`, { method: 'POST' });
         if (lockRes.status === 423) {
           void refresh();
@@ -618,11 +667,13 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
     }
   };
 
+  const division = sessionData?.division ?? null;
+
   // Another user is paying — we should wait without being able to navigate away.
   // Exclude: when WE own the lock (isInitiatingPayment) or we're submitting the form (paying).
-  const externalPaymentInProgress = (sessionData?.pagoEnCurso ?? false) && !paying && !isInitiatingPayment;
-
-  const division = sessionData?.division ?? null;
+  // Division mode: each person pays their share independently — a concurrent payer
+  // must not see this as a blocker. Only block for full (non-division) payments.
+  const externalPaymentInProgress = (sessionData?.pagoEnCurso ?? false) && !paying && !isInitiatingPayment && !division;
   const fullyPaid = (sessionData?.sesionPagada ?? false) || (division
     ? division.pagosRealizados >= division.personas
     : false);
@@ -667,21 +718,39 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
         onTokenIssued={handleTokenIssued}
       />
     )}
+
+    {/* Sticky back bar — hidden during payment flows */}
+    {!fullyPaid && !externalPaymentInProgress && !division && (
+      <div
+        className="sticky z-[199]"
+        style={{
+          top: isWaiterMode ? '3rem' : '0',
+          backgroundColor: PAGE_BG,
+          borderBottom: "1px solid #e8e0d8",
+        }}
+      >
+        <div className="mx-auto max-w-xs px-4 py-3">
+          <Link
+            href={`/?mesa=${mesaId}`}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl transition-all active:scale-[0.97]"
+            style={{
+              backgroundColor: "#fffcf7",
+              border: "1px solid #e8e0d8",
+              color: "#1a1612",
+              fontFamily: "monospace",
+            }}
+          >
+            <ArrowLeft size={14} strokeWidth={2} />
+            <span className="text-xs font-bold tracking-widest uppercase">
+              {t("mesaBackToMenu", lang)}
+            </span>
+          </Link>
+        </div>
+      </div>
+    )}
+
     <div className="min-h-screen py-8 px-4" style={{ backgroundColor: PAGE_BG }}>
       <div className="mx-auto max-w-xs">
-
-        {/* Back link — hidden when session is fully paid, payment in progress, or division is active */}
-        {!fullyPaid && !externalPaymentInProgress && !division && (
-          <div className="mb-5">
-            <Link
-              href={`/?mesa=${mesaId}`}
-              className="text-sm font-medium transition-colors"
-              style={{ color: "#8a7560" }}
-            >
-              {t("mesaBackToMenu", lang)}
-            </Link>
-          </div>
-        )}
 
         {/* Loading / empty */}
         {loading && allItems.length === 0 && (
@@ -850,7 +919,24 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
 
         {/* Payment section */}
         {allItems.length > 0 && (sessionData?.pagosHabilitados || isWaiterMode) && (
-          <div className="mt-6 flex flex-col gap-3">
+          <div
+            className="mt-6 rounded-3xl overflow-hidden"
+            style={{ border: "1px solid #e8e0d8" }}
+          >
+          <div className="flex flex-col gap-3 p-5">
+
+            {/* Secure payment header — customer-facing only, not waiter */}
+            {sessionData?.pagosHabilitados && !isWaiterMode && !fullyPaid && (
+              <div className="flex items-center gap-1.5 mb-1">
+                <ShieldCheck size={12} strokeWidth={2} style={{ color: "#8a7560" }} />
+                <span
+                  className="text-[10px] uppercase tracking-[0.18em]"
+                  style={{ color: "#8a7560", fontFamily: "monospace" }}
+                >
+                  Pago seguro
+                </span>
+              </div>
+            )}
 
             {/* Division block */}
             {division && (
@@ -952,7 +1038,7 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                 className="rounded-2xl p-5 flex items-center gap-4"
                 style={{ backgroundColor: '#1a1612', fontFamily: 'monospace' }}
               >
-                <span style={{ fontSize: 24, flexShrink: 0 }}>💳</span>
+                <CreditCard size={22} strokeWidth={1.5} style={{ color: '#fffcf7', flexShrink: 0 }} />
                 <div className="flex flex-col gap-1">
                   <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#fffcf7' }}>
                     {t('mesaPagoEnCurso', lang)}
@@ -1015,18 +1101,15 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                   type="button"
                   onClick={() => { void handlePrePaymentCheck('full'); }}
                   disabled={paying || settingDivision || verifyingTotal}
-                  className="flex-1 py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-opacity disabled:opacity-50 flex flex-col items-center gap-0.5"
+                  className="flex-1 py-5 rounded-2xl text-xs font-bold tracking-widest uppercase transition-all disabled:opacity-50 flex flex-col items-center gap-2 active:scale-[0.98]"
                   style={{ backgroundColor: "#1a1612", color: "#fffcf7", fontFamily: "monospace" }}
                 >
                   {paying || verifyingTotal ? (
                     t("loading", lang)
                   ) : (
                     <>
-                      <span className="flex items-center gap-1.5">
-                        <CreditCard size={14} strokeWidth={2} />
-                        {t("mesaPayTotal", lang)}
-                      </span>
-                      <span className="text-[10px] font-normal tracking-wide normal-case opacity-60">Pago seguro · Redsys</span>
+                      <Receipt size={20} strokeWidth={1.5} />
+                      {t("mesaPayTotal", lang)}
                     </>
                   )}
                 </button>
@@ -1036,7 +1119,7 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                   type="button"
                   onClick={() => { void handlePrePaymentCheck('division-modal'); }}
                   disabled={paying || settingDivision || verifyingTotal}
-                  className="flex-1 py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-opacity disabled:opacity-50 flex flex-col items-center gap-0.5"
+                  className="flex-1 py-5 rounded-2xl text-xs font-bold tracking-widest uppercase transition-all disabled:opacity-50 flex flex-col items-center gap-2 active:scale-[0.98]"
                   style={{
                     backgroundColor: "transparent",
                     color: "#1a1612",
@@ -1048,11 +1131,8 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                     t("loading", lang)
                   ) : (
                     <>
-                      <span className="flex items-center gap-1.5">
-                        <CreditCard size={14} strokeWidth={2} />
-                        {t("mesaDivideCheck", lang)}
-                      </span>
-                      <span className="text-[10px] font-normal tracking-wide normal-case opacity-40">Pago seguro · Redsys</span>
+                      <Users size={20} strokeWidth={1.5} />
+                      {t("mesaDivideCheck", lang)}
                     </>
                   )}
                 </button>
@@ -1065,18 +1145,15 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                 type="button"
                 onClick={() => { void handlePrePaymentCheck('division-pay'); }}
                 disabled={paying || verifyingTotal}
-                className="w-full py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-opacity disabled:opacity-50 flex flex-col items-center gap-0.5"
+                className="w-full py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
                 style={{ backgroundColor: "#1a1612", color: "#fffcf7", fontFamily: "monospace" }}
               >
                 {paying || verifyingTotal ? (
                   t("loading", lang)
                 ) : (
                   <>
-                    <span className="flex items-center gap-1.5">
-                      <CreditCard size={14} strokeWidth={2} />
-                      {`${t("mesaPayShare", lang)} ${formatPrice(division.importePorPersona, "EUR", lang)}`}
-                    </span>
-                    <span className="text-[10px] font-normal tracking-wide normal-case opacity-60">Pago seguro · Redsys</span>
+                    <CreditCard size={14} strokeWidth={2} />
+                    {`${t("mesaPayShare", lang)} ${formatPrice(division.importePorPersona, "EUR", lang)}`}
                   </>
                 )}
               </button>
@@ -1122,6 +1199,23 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
               </div>
             )}
 
+          </div>
+
+            {/* Trust badge — Redsys + Visa + Mastercard */}
+            {sessionData?.pagosHabilitados && !isWaiterMode && (
+              <div
+                className="flex justify-center items-center py-3"
+                style={{ borderTop: "1px dashed #e8e0d8", backgroundColor: "#ffffff" }}
+              >
+                <Image
+                  src="/tpv-redsys-woocommerce.jpg"
+                  alt="Pago procesado por Redsys. Aceptamos Visa y Mastercard."
+                  width={128}
+                  height={40}
+                  style={{ opacity: 0.6, objectFit: "contain" }}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -135,32 +135,32 @@ export async function initiateRedsysMesaPaymentUseCase(
       };
     }
 
-    // Reject if another payment is already in progress (lock not expired).
-    // Allow if the lock is within GRACE_PERIOD_MS — the UI pre-locks via
-    // POST /api/mesas/[mesaId]/lock before total verification, and then this
-    // use case is called immediately after. A fresh lock means it's the same client.
-    const pagoEnCurso = s['pago_en_curso'] as boolean;
-    const pagoIniciadoEn = s['pago_iniciado_en'] as string | null;
-    const LOCK_EXPIRY_MS = 15 * 60 * 1000;
-    // Grace period: the UI pre-locks when the user clicks "Pagar" / "Dividir cuenta",
-    // then calls this use case after total verification + optional division modal.
-    // A fresh lock (< 5 min) means it's the same client — let them through.
-    const GRACE_PERIOD_MS = 5 * 60 * 1000;
-    const lockAge = pagoIniciadoEn
-      ? Date.now() - new Date(pagoIniciadoEn).getTime()
-      : Infinity;
-    const lockFresh = lockAge < LOCK_EXPIRY_MS;
-    const lockInGrace = lockAge < GRACE_PERIOD_MS;
-    if (pagoEnCurso && lockFresh && !lockInGrace) {
-      return {
-        success: false,
-        error: {
-          code: 'PAYMENT_IN_PROGRESS',
-          message: 'Ya hay un pago en curso para esta mesa',
-          module: 'use-case',
-          method: 'initiateRedsysMesaPaymentUseCase',
-        },
-      };
+    // For full payments: reject if another payment is already in progress (lock not expired).
+    // Division payments skip this check — each share is independent and concurrent payers
+    // are allowed. The DB-level mesa_division_pagos table handles concurrency safely.
+    if (!input.esDivision) {
+      const pagoEnCurso = s['pago_en_curso'] as boolean;
+      const pagoIniciadoEn = s['pago_iniciado_en'] as string | null;
+      const LOCK_EXPIRY_MS = 15 * 60 * 1000;
+      // Grace period: the UI pre-locks when the user clicks "Pagar", then calls this
+      // use case after total verification. A fresh lock (< 5 min) = same client, let through.
+      const GRACE_PERIOD_MS = 5 * 60 * 1000;
+      const lockAge = pagoIniciadoEn
+        ? Date.now() - new Date(pagoIniciadoEn).getTime()
+        : Infinity;
+      const lockFresh = lockAge < LOCK_EXPIRY_MS;
+      const lockInGrace = lockAge < GRACE_PERIOD_MS;
+      if (pagoEnCurso && lockFresh && !lockInGrace) {
+        return {
+          success: false,
+          error: {
+            code: 'PAYMENT_IN_PROGRESS',
+            message: 'Ya hay un pago en curso para esta mesa',
+            module: 'use-case',
+            method: 'initiateRedsysMesaPaymentUseCase',
+          },
+        };
+      }
     }
 
     // Fetch all pedidos in the session
@@ -203,22 +203,7 @@ export async function initiateRedsysMesaPaymentUseCase(
       };
     }
 
-    // Determine the charge amount: full total or one person's share
-    let amountCents: number;
-    if (input.esDivision && divisionPersonas && divisionPersonas > 1) {
-      const perPersonaCents = Math.round((sessionTotal / divisionPersonas) * 100);
-      const sharesRemaining = divisionPersonas - divisionPagosRealizados;
-      const isLastShare = sharesRemaining === 1;
-      if (isLastShare) {
-        // Last person pays the remainder to avoid rounding gaps
-        const alreadyPaidCents = perPersonaCents * divisionPagosRealizados;
-        amountCents = Math.round(sessionTotal * 100) - alreadyPaidCents;
-      } else {
-        amountCents = perPersonaCents;
-      }
-    } else {
-      amountCents = Math.round(sessionTotal * 100);
-    }
+    const sessionTotalCents = Math.round(sessionTotal * 100);
 
     // Use the highest numero_pedido as anchor for the payment ref
     const maxNumeroPedido = rows.reduce(
@@ -228,27 +213,29 @@ export async function initiateRedsysMesaPaymentUseCase(
     const anchorPedido = rows.find(p => Number(p.numero_pedido) === maxNumeroPedido) ?? rows[0];
     const paymentOrderRef = generatePaymentOrderRef(maxNumeroPedido || undefined);
 
+    let amountCents: number;
+
     if (input.esDivision && divisionPersonas && divisionPersonas > 1) {
-      // Division payment: each person's share gets its own row in mesa_division_pagos.
-      // This prevents the race condition where concurrent initiations overwrite the same
-      // anchor pedido's payment_order_ref, causing one payment to be silently lost.
-      const { error: divInsertError } = await supabase
-        .from('mesa_division_pagos')
-        .insert({
-          sesion_id: sesionId,
-          empresa_id: input.empresaId,
-          payment_order_ref: paymentOrderRef,
-          payment_amount_cents: amountCents,
-          status: 'pending',
+      // Atomically claim a slot and insert the mesa_division_pagos row.
+      // The RPC uses FOR UPDATE on mesa_sesiones to serialize concurrent payers:
+      // - checks active (non-failed) claims against division_personas
+      // - calculates this payer's share (last payer absorbs rounding gap)
+      // - inserts the row — all in one transaction, no race condition.
+      const { data: claimData, error: claimError } = await supabase
+        .rpc('claim_and_create_division_pago', {
+          p_sesion_id:           sesionId,
+          p_empresa_id:          input.empresaId,
+          p_payment_order_ref:   paymentOrderRef,
+          p_session_total_cents: sessionTotalCents,
         });
 
-      if (divInsertError) {
+      if (claimError) {
         await logger.logAndReturnError(
           'DB_INSERT_ERROR',
-          divInsertError.message,
+          claimError.message,
           'use-case',
           'initiateRedsysMesaPaymentUseCase',
-          { details: { code: divInsertError.code, sesionId } }
+          { details: { code: claimError.code, sesionId } }
         );
         return {
           success: false,
@@ -260,9 +247,25 @@ export async function initiateRedsysMesaPaymentUseCase(
           },
         };
       }
+
+      const claimRow = (claimData as { claimed: boolean; amount_cents: number }[] | null)?.[0];
+      if (!claimRow?.claimed) {
+        return {
+          success: false,
+          error: {
+            code: 'ALREADY_PAID',
+            message: 'Todos los pagos de la división ya han sido realizados',
+            module: 'use-case',
+            method: 'initiateRedsysMesaPaymentUseCase',
+          },
+        };
+      }
+
+      amountCents = claimRow.amount_cents;
     } else {
       // Full (non-division) payment: mark all pedidos as pending and set payment_order_ref
       // on the anchor so the webhook can reconcile against pedidos as before.
+      amountCents = sessionTotalCents;
       const pedidoIds = rows.map(p => p.id);
 
       const { error: updatePendingError } = await supabase
@@ -337,13 +340,23 @@ export async function initiateRedsysMesaPaymentUseCase(
       }
     );
 
-    // Lock the session so concurrent initiations and new orders are blocked
-    await supabase
-      .from('mesa_sesiones')
-      .update({ pago_en_curso: true, pago_iniciado_en: new Date().toISOString() })
-      .eq('id', sesionId);
+    // Lock the session for full payments only — blocks new orders and concurrent initiations.
+    // Division payments don't set this flag: each share is independent, concurrent payers
+    // are allowed, and the waiter grid already shows "pagando" via divisionActiva.
+    if (!input.esDivision) {
+      await supabase
+        .from('mesa_sesiones')
+        .update({ pago_en_curso: true, pago_iniciado_en: new Date().toISOString() })
+        .eq('id', sesionId);
+    }
 
-    return { success: true, data: formData };
+    // For division payments, return the paymentOrderRef so the client can store it
+    // and release the pending slot if the user cancels or abandons the Redsys flow.
+    const responseData = input.esDivision
+      ? { ...formData, paymentOrderRef }
+      : formData;
+
+    return { success: true, data: responseData };
   } catch (e) {
     const appError = await logger.logFromCatch(
       e,
