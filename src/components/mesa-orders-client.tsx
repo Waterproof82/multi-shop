@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
 import Image from "next/image";
-import { CreditCard, Receipt, Users, ShieldCheck } from "lucide-react";
+import { ArrowLeft, CreditCard, Receipt, Users, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
@@ -718,21 +718,35 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
         onTokenIssued={handleTokenIssued}
       />
     )}
+
+    {/* Sticky back bar — hidden during payment flows */}
+    {!fullyPaid && !externalPaymentInProgress && !division && (
+      <div
+        className="sticky top-0 z-10"
+        style={{ backgroundColor: PAGE_BG, borderBottom: "1px solid #e8e0d8" }}
+      >
+        <div className="mx-auto max-w-xs px-4 py-3">
+          <Link
+            href={`/?mesa=${mesaId}`}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl transition-all active:scale-[0.97]"
+            style={{
+              backgroundColor: "#fffcf7",
+              border: "1px solid #e8e0d8",
+              color: "#1a1612",
+              fontFamily: "monospace",
+            }}
+          >
+            <ArrowLeft size={14} strokeWidth={2} />
+            <span className="text-xs font-bold tracking-widest uppercase">
+              {t("mesaBackToMenu", lang)}
+            </span>
+          </Link>
+        </div>
+      </div>
+    )}
+
     <div className="min-h-screen py-8 px-4" style={{ backgroundColor: PAGE_BG }}>
       <div className="mx-auto max-w-xs">
-
-        {/* Back link — hidden when session is fully paid, payment in progress, or division is active */}
-        {!fullyPaid && !externalPaymentInProgress && !division && (
-          <div className="mb-5">
-            <Link
-              href={`/?mesa=${mesaId}`}
-              className="text-sm font-medium transition-colors"
-              style={{ color: "#8a7560" }}
-            >
-              {t("mesaBackToMenu", lang)}
-            </Link>
-          </div>
-        )}
 
         {/* Loading / empty */}
         {loading && allItems.length === 0 && (
