@@ -722,8 +722,12 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
     {/* Sticky back bar — hidden during payment flows */}
     {!fullyPaid && !externalPaymentInProgress && !division && (
       <div
-        className="sticky top-0 z-10"
-        style={{ backgroundColor: PAGE_BG, borderBottom: "1px solid #e8e0d8" }}
+        className="sticky z-[199]"
+        style={{
+          top: isWaiterMode ? '3rem' : '0',
+          backgroundColor: PAGE_BG,
+          borderBottom: "1px solid #e8e0d8",
+        }}
       >
         <div className="mx-auto max-w-xs px-4 py-3">
           <Link
