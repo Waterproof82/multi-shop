@@ -639,13 +639,13 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
     }
   };
 
+  const division = sessionData?.division ?? null;
+
   // Another user is paying — we should wait without being able to navigate away.
   // Exclude: when WE own the lock (isInitiatingPayment) or we're submitting the form (paying).
   // Division mode: each person pays their share independently — a concurrent payer
   // must not see this as a blocker. Only block for full (non-division) payments.
   const externalPaymentInProgress = (sessionData?.pagoEnCurso ?? false) && !paying && !isInitiatingPayment && !division;
-
-  const division = sessionData?.division ?? null;
   const fullyPaid = (sessionData?.sesionPagada ?? false) || (division
     ? division.pagosRealizados >= division.personas
     : false);
