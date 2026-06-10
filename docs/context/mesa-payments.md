@@ -452,11 +452,51 @@ Esto cubre el caso donde el primer usuario confirma la división (liberando el l
 
 ---
 
+## Liberación de Slots Pendientes (Cancelación / Abandono)
+
+Cuando un usuario inicia un pago de división y no lo completa (cancela en Redsys o cierra la app), el slot queda en estado `pending` y bloquea ese puesto hasta que se libere.
+
+### Mecanismo (Opción B — liberación por el propio cliente)
+
+**Al iniciar el pago:**
+- `initiateRedsysMesaPaymentUseCase` devuelve `paymentOrderRef` en la respuesta para pagos de división.
+- El cliente almacena este valor en `sessionStorage` bajo la clave `mesa-division-ref-{mesaId}`.
+
+**Al volver a la página (urlKo o reapertura de app):**
+- `mesa-orders-client` ejecuta un `useEffect` de un único disparo al montar.
+- Si existe un ref almacenado, llama a `DELETE /api/mesas/{mesaId}/division-slot` con ese ref.
+- El endpoint hace `UPDATE mesa_division_pagos SET status='failed' WHERE payment_order_ref=? AND status='pending'` — atómico e idempotente.
+- Si el webhook ya marcó la fila como `paid`, el UPDATE no afecta ninguna fila → pago preservado.
+- El ref se elimina de `sessionStorage` tras la llamada.
+
+```
+Usuario cancela en Redsys → urlKo redirect → componente monta
+  → useEffect lee ref de sessionStorage
+  → DELETE /api/mesas/{mesaId}/division-slot { paymentOrderRef }
+  → slot: 'pending' → 'failed'  (o no-op si ya era 'paid')
+  → usuario puede reintentar "Pagar mi parte"
+```
+
+### Garantía de seguridad con urlOk
+
+Redsys garantiza que el webhook servidor-a-servidor se envía **antes** de redirigir al usuario a urlOk. Por lo tanto, cuando el componente monta desde urlOk, el slot ya es `paid` y el cleanup es un no-op.
+
+El único escenario donde esto podría fallar es una falla de infraestructura de Redsys (webhook no entregado), que requiere soporte manual independientemente de esta implementación.
+
+### Archivos involucrados
+
+| Archivo | Rol |
+|---|---|
+| `src/app/api/mesas/[mesaId]/division-slot/route.ts` | DELETE: libera slot pending de forma atómica |
+| `src/components/mesa-orders-client.tsx` | Almacena ref en sessionStorage + cleanup on mount |
+| `src/core/application/use-cases/payment/initiateRedsysMesaPaymentUseCase.ts` | Devuelve `paymentOrderRef` en la respuesta para división |
+
+---
+
 ## Posibles Mejoras Futuras
 
-- **Timeout de slots pending**: actualmente un slot `pending` sin confirmar (usuario que inicia pago y cierra la app sin completarlo ni cancelarlo) bloquea el slot indefinidamente. Una mejora sería expirar automáticamente filas `pending` en `mesa_division_pagos` pasados X minutos (similar al TTL de `pago_en_curso`).
 - **Realtime en el waiter grid**: el grid del camarero usa polling. Añadir suscripción Realtime reduciría la latencia para detectar cambios de estado de mesas.
-- **Cancelación de división individual**: actualmente no hay mecanismo para que un usuario cancele su parte específica de la división sin que el camarero intervenga.
+- **Cancelación de parte individual con reembolso**: actualmente no hay mecanismo de reembolso si alguien ya pagó su parte y quiere cancelar la división. Requeriría integración con la API de devoluciones de Redsys.
 
 ---
 
@@ -516,6 +556,7 @@ La notificación de Telegram solo se envía cuando `fullyPaid = true` (pago comp
 | `supabase/migrations/20260603000001_fix_get_mesas_with_sessions_total.sql` | Fix RPC: session_total desde SUM(pedidos) en vez de mesa_sesiones.total |
 | `supabase/migrations/20260610000001_get_mesas_with_sessions_division_activa.sql` | Añade `division_activa` al RPC get_mesas_with_sessions para el waiter grid |
 | `supabase/migrations/20260610000002_claim_and_create_division_pago.sql` | RPC atómico: reclama slot + inserta fila en mesa_division_pagos (FOR UPDATE) |
+| `src/app/api/mesas/[mesaId]/division-slot/route.ts` | DELETE: libera slot pending al cancelar o abandonar el flujo de Redsys |
 | `src/core/application/use-cases/payment/initiateRedsysMesaPaymentUseCase.ts` | Use case de inicio de pago — lock solo para pago total, RPC atómico para división |
 | `src/core/application/use-cases/payment/processRedsysWebhookUseCase.ts` | Webhook — idempotencia atómica en Path 1 (división) + Path 2 (total) |
 | `src/core/domain/repositories/IMesaRepository.ts` | Interfaz MesaWithSession: campo divisionActiva |
