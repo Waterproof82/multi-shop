@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
 import Image from "next/image";
-import { CreditCard, ShieldCheck } from "lucide-react";
+import { CreditCard, Receipt, Users, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
@@ -1083,14 +1083,14 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                   type="button"
                   onClick={() => { void handlePrePaymentCheck('full'); }}
                   disabled={paying || settingDivision || verifyingTotal}
-                  className="flex-1 py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
+                  className="flex-1 py-5 rounded-2xl text-xs font-bold tracking-widest uppercase transition-all disabled:opacity-50 flex flex-col items-center gap-2 active:scale-[0.98]"
                   style={{ backgroundColor: "#1a1612", color: "#fffcf7", fontFamily: "monospace" }}
                 >
                   {paying || verifyingTotal ? (
                     t("loading", lang)
                   ) : (
                     <>
-                      <CreditCard size={14} strokeWidth={2} />
+                      <Receipt size={20} strokeWidth={1.5} />
                       {t("mesaPayTotal", lang)}
                     </>
                   )}
@@ -1101,7 +1101,7 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                   type="button"
                   onClick={() => { void handlePrePaymentCheck('division-modal'); }}
                   disabled={paying || settingDivision || verifyingTotal}
-                  className="flex-1 py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
+                  className="flex-1 py-5 rounded-2xl text-xs font-bold tracking-widest uppercase transition-all disabled:opacity-50 flex flex-col items-center gap-2 active:scale-[0.98]"
                   style={{
                     backgroundColor: "transparent",
                     color: "#1a1612",
@@ -1113,7 +1113,7 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                     t("loading", lang)
                   ) : (
                     <>
-                      <CreditCard size={14} strokeWidth={2} />
+                      <Users size={20} strokeWidth={1.5} />
                       {t("mesaDivideCheck", lang)}
                     </>
                   )}
