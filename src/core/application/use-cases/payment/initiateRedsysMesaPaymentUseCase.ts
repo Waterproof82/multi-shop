@@ -350,7 +350,13 @@ export async function initiateRedsysMesaPaymentUseCase(
         .eq('id', sesionId);
     }
 
-    return { success: true, data: formData };
+    // For division payments, return the paymentOrderRef so the client can store it
+    // and release the pending slot if the user cancels or abandons the Redsys flow.
+    const responseData = input.esDivision
+      ? { ...formData, paymentOrderRef }
+      : formData;
+
+    return { success: true, data: responseData };
   } catch (e) {
     const appError = await logger.logFromCatch(
       e,

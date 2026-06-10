@@ -416,6 +416,27 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
     return () => { void supabase.removeChannel(channel); };
   }, [mesaId, refresh]);
 
+  // On mount: if there is a stored division paymentOrderRef from a previous payment
+  // attempt, release that pending slot. Covers two cases:
+  //   1. User cancelled at Redsys (urlKo redirect back to this page).
+  //   2. User silently abandoned (closed the app, lost connectivity).
+  // The update is atomic (WHERE status='pending') — a no-op if the webhook
+  // already marked the row as 'paid' or 'failed'.
+  useEffect(() => {
+    const storedRef = (() => {
+      try { return sessionStorage.getItem(`mesa-division-ref-${mesaId}`); }
+      catch { return null; }
+    })();
+    if (!storedRef) return;
+    void fetch(`/api/mesas/${encodeURIComponent(mesaId)}/division-slot`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentOrderRef: storedRef }),
+    }).then(() => {
+      try { sessionStorage.removeItem(`mesa-division-ref-${mesaId}`); } catch { /* ignore */ }
+    }).catch(() => { /* non-blocking */ });
+  }, [mesaId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Refs to read current state in the unmount cleanup (avoids stale closures)
   const isInitiatingPaymentRef = useRef(isInitiatingPayment);
   const payingRef = useRef(paying);
@@ -495,7 +516,13 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
         DS_MERCHANT_PARAMETERS: string;
         DS_SIGNATURE: string;
         DS_SIGNATURE_VERSION: string;
+        paymentOrderRef?: string;
       };
+      // Store the ref so we can release the pending slot if the user cancels or abandons
+      // the Redsys flow. The cleanup runs automatically on the next mount of this component.
+      if (esDivision && formData.paymentOrderRef) {
+        try { sessionStorage.setItem(`mesa-division-ref-${mesaId}`, formData.paymentOrderRef); } catch { /* ignore */ }
+      }
       const redsysUrl = process.env.NEXT_PUBLIC_REDSYS_URL ?? 'https://sis-t.redsys.es:25443/sis/realizarPago';
       submitRedsysForm(formData, redsysUrl);
     } catch {
