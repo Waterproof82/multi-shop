@@ -27,7 +27,10 @@ export async function POST(
 
   const result = await initiateCustomTurnUseCase({ mesaId, empresaId });
   if (!result.success) {
-    const status = result.error.code === 'ALREADY_PAID' ? 409 : result.error.code === 'NOT_FOUND' ? 404 : 500;
+    const status = result.error.code === 'ALREADY_PAID' ? 409
+      : result.error.code === 'NOT_FOUND' ? 404
+      : result.error.code === 'FORBIDDEN' ? 403
+      : 500;
     return NextResponse.json({ error: result.error.message }, { status });
   }
   if (!result.data.claimed) {
