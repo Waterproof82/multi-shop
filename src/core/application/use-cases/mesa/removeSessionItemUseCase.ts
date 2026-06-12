@@ -82,6 +82,50 @@ export async function removeSessionItemUseCase(
       totalRemoved += unitsToRemove;
     }
 
+    // Personalizado: after removal, check if pagadoCents now covers the full session total.
+    // This handles the case where the waiter removes the last unpaid item.
+    if (totalRemoved > 0) {
+      const { data: sesionRow } = await supabase
+        .from('mesa_sesiones')
+        .select('division_tipo, sesion_pagada')
+        .eq('id', input.sesionId)
+        .maybeSingle();
+      const sr = sesionRow as { division_tipo: string | null; sesion_pagada: boolean } | null;
+
+      if (sr?.division_tipo === 'personalizado' && !sr.sesion_pagada) {
+        const { data: pedidosRows } = await supabase
+          .from('pedidos')
+          .select('total')
+          .eq('sesion_id', input.sesionId)
+          .eq('empresa_id', input.empresaId);
+        const newSessionTotalCents = Math.round(
+          ((pedidosRows ?? []) as { total: number }[]).reduce((s, p) => s + Number(p.total), 0) * 100
+        );
+
+        if (newSessionTotalCents > 0) {
+          const { data: pagadoRows } = await supabase
+            .from('mesa_pagos_personalizados')
+            .select('importe_cents')
+            .eq('sesion_id', input.sesionId)
+            .eq('status', 'pagado');
+          const pagadoCents = ((pagadoRows ?? []) as { importe_cents: number | null }[])
+            .reduce((s, t) => s + (t.importe_cents ?? 0), 0);
+
+          if (pagadoCents >= newSessionTotalCents) {
+            await supabase
+              .from('pedidos')
+              .update({ payment_status: 'paid' })
+              .eq('sesion_id', input.sesionId)
+              .eq('empresa_id', input.empresaId);
+            await supabase
+              .from('mesa_sesiones')
+              .update({ sesion_pagada: true, pago_en_curso: false, pago_iniciado_en: null })
+              .eq('id', input.sesionId);
+          }
+        }
+      }
+    }
+
     return { success: true, data: { totalRemoved } };
   } catch (e) {
     const appError = await logger.logFromCatch(e, 'use-case', 'removeSessionItemUseCase', {

@@ -56,6 +56,15 @@ async function processAndRedirect(
             .maybeSingle();
           if (divPago) {
             empresaId = (divPago as Record<string, unknown>)['empresa_id'] as string;
+          } else {
+            const { data: customPago } = await supabase
+              .from('mesa_pagos_personalizados')
+              .select('empresa_id')
+              .eq('payment_order_ref', dsOrder)
+              .maybeSingle();
+            if (customPago) {
+              empresaId = (customPago as Record<string, unknown>)['empresa_id'] as string;
+            }
           }
         }
 

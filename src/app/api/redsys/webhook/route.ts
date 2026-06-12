@@ -50,17 +50,39 @@ export async function POST(request: NextRequest) {
 
     if (!dsOrder) return OK();
 
-    // Find empresaId by payment_order_ref
+    // Find empresaId by payment_order_ref — check all three payment tables
     const supabase = getSupabaseClient();
+    let empresaId: string | null = null;
+
     const { data: pedido } = await supabase
       .from('pedidos')
       .select('empresa_id')
       .eq('payment_order_ref', dsOrder)
       .maybeSingle();
 
-    if (!pedido) return OK();
+    if (pedido) {
+      empresaId = (pedido as Record<string, unknown>)['empresa_id'] as string;
+    } else {
+      const { data: divPago } = await supabase
+        .from('mesa_division_pagos')
+        .select('empresa_id')
+        .eq('payment_order_ref', dsOrder)
+        .maybeSingle();
+      if (divPago) {
+        empresaId = (divPago as Record<string, unknown>)['empresa_id'] as string;
+      } else {
+        const { data: customPago } = await supabase
+          .from('mesa_pagos_personalizados')
+          .select('empresa_id')
+          .eq('payment_order_ref', dsOrder)
+          .maybeSingle();
+        if (customPago) {
+          empresaId = (customPago as Record<string, unknown>)['empresa_id'] as string;
+        }
+      }
+    }
 
-    const empresaId = (pedido as Record<string, unknown>)['empresa_id'] as string;
+    if (!empresaId) return OK();
 
     await processRedsysWebhookUseCase({
       dsParameters,

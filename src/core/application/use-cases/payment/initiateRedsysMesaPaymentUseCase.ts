@@ -84,7 +84,7 @@ export async function initiateRedsysMesaPaymentUseCase(
     // Find active sesion for the mesa (including division state + payment lock)
     const { data: sesion, error: sesionError } = await supabase
       .from('mesa_sesiones')
-      .select('id, empresa_id, division_personas, division_pagos_realizados, sesion_pagada, pago_en_curso, pago_iniciado_en, division_base_cents')
+      .select('id, empresa_id, division_personas, division_pagos_realizados, sesion_pagada, pago_en_curso, pago_iniciado_en, division_base_cents, division_tipo')
       .eq('mesa_id', input.mesaId)
       .is('cerrada_at', null)
       .maybeSingle();
@@ -185,26 +185,39 @@ export async function initiateRedsysMesaPaymentUseCase(
 
     const rows = pedidos as { id: string; total: unknown; numero_pedido: unknown }[];
     const sessionTotal = rows.reduce((sum, p) => sum + Number(p.total), 0);
+    const sessionTotalCents = Math.round(sessionTotal * 100);
+
+    // For personalizado mode: compute confirmed custom payments so we charge only what remains.
+    const divisionTipo = s['division_tipo'] as string | null;
+    let serverPagadoCents = 0;
+    if (divisionTipo === 'personalizado') {
+      const { data: pagadoTurnos } = await supabase
+        .from('mesa_pagos_personalizados')
+        .select('importe_cents')
+        .eq('sesion_id', sesionId)
+        .eq('status', 'pagado');
+      serverPagadoCents = ((pagadoTurnos ?? []) as { importe_cents: number | null }[])
+        .reduce((acc, t) => acc + (t.importe_cents ?? 0), 0);
+    }
+    // remainingCents = full total for regular payments, or (total - already paid) for personalizado
+    const remainingCents = Math.max(0, sessionTotalCents - serverPagadoCents);
 
     // Guard against in-flight orders that committed after the client's last fetch.
-    // If the caller provided expectedTotalCents and it differs by more than 1 cent,
-    // abort and return a typed error so the client can show the updated total.
+    // For personalizado the client sends the remaining amount as expectedTotalCents.
     if (
       input.expectedTotalCents !== undefined &&
-      Math.abs(Math.round(sessionTotal * 100) - input.expectedTotalCents) > 1
+      Math.abs(remainingCents - input.expectedTotalCents) > 1
     ) {
       return {
         success: false,
         error: {
           code: 'TOTAL_MISMATCH',
-          message: JSON.stringify({ newTotalCents: Math.round(sessionTotal * 100) }),
+          message: JSON.stringify({ newTotalCents: remainingCents }),
           module: 'use-case',
           method: 'initiateRedsysMesaPaymentUseCase',
         },
       };
     }
-
-    const sessionTotalCents = Math.round(sessionTotal * 100);
 
     // Use the highest numero_pedido as anchor for the payment ref
     const maxNumeroPedido = rows.reduce(
@@ -266,7 +279,8 @@ export async function initiateRedsysMesaPaymentUseCase(
     } else {
       // Full (non-division) payment: mark all pedidos as pending and set payment_order_ref
       // on the anchor so the webhook can reconcile against pedidos as before.
-      amountCents = sessionTotalCents;
+      // For personalizado mode remainingCents already has confirmed payments subtracted.
+      amountCents = remainingCents;
       const pedidoIds = rows.map(p => p.id);
 
       const { error: updatePendingError } = await supabase

@@ -106,12 +106,17 @@ export async function GET(
     if (customTurnoId) {
       const { data: turnoRow } = await supabaseAdmin
         .from('mesa_pagos_personalizados')
-        .select('id, status, importe_cents')
+        .select('id, status, importe_cents, expires_at')
         .eq('id', customTurnoId)
         .maybeSingle();
       if (turnoRow) {
-        const tr = turnoRow as { id: string; status: string; importe_cents: number | null };
-        customTurno = { id: tr.id, status: tr.status, importeCents: tr.importe_cents };
+        const tr = turnoRow as { id: string; status: string; importe_cents: number | null; expires_at: string | null };
+        // Ignore expired turns in active states — they'll be cleaned up on the next claim.
+        // This prevents the "waiting" overlay from showing due to stale DB state.
+        const isExpired = tr.expires_at ? new Date(tr.expires_at) < new Date() : false;
+        if (!isExpired || (tr.status !== 'en_seleccion' && tr.status !== 'en_pago')) {
+          customTurno = { id: tr.id, status: tr.status, importeCents: tr.importe_cents };
+        }
       }
     }
 
@@ -143,6 +148,20 @@ export async function GET(
       const paymentRows = (paymentRowsResult.data ?? []) as { payment_status: string }[];
       if (paymentRows.length > 0) {
         sesionPagada = paymentRows.every(r => r.payment_status === 'paid');
+      }
+    }
+
+    // Personalizado fallback: if pagadoCents fully covers the session total
+    // (e.g. waiter removed an item that was the last unpaid one), treat as fully paid.
+    if (!sesionPagada && divisionTipo === 'personalizado' && pagadoCents > 0) {
+      const sessionTotalCents = Math.round(total * 100);
+      if (sessionTotalCents > 0 && pagadoCents >= sessionTotalCents) {
+        sesionPagada = true;
+        // Sync to DB so the waiter grid (which reads sesion_pagada directly) picks it up
+        void supabaseAdmin
+          .from('mesa_sesiones')
+          .update({ sesion_pagada: true, pago_en_curso: false, pago_iniciado_en: null })
+          .eq('id', sesion.id);
       }
     }
     const LOCK_EXPIRY_MS = 15 * 60 * 1000;
