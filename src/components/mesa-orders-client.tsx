@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback, type ReactElement } from "react";
 import { createClient } from "@supabase/supabase-js";
 import Image from "next/image";
-import { ArrowLeft, CreditCard, Receipt, Users, ShieldCheck } from "lucide-react";
+import { ArrowLeft, CreditCard, Receipt, Users, ShieldCheck, Plus, Minus } from "lucide-react";
 import Link from "next/link";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
@@ -406,14 +406,25 @@ function CustomItemRow({
           {formatPrice(precio, "EUR", lang)} · {disponibles} disponible{disponibles !== 1 ? "s" : ""}
         </p>
       </div>
-      <div className="flex items-center gap-2 ml-4">
-        <button onClick={() => onChangeUnidades(Math.max(0, unidadesSeleccionadas - 1))}
+      <div className="flex items-center gap-1 ml-4 rounded-2xl border border-[#e8e0d8] bg-white p-1">
+        <button
+          onClick={() => onChangeUnidades(Math.max(0, unidadesSeleccionadas - 1))}
           disabled={unidadesSeleccionadas === 0}
-          className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e8e0d8] text-[#1a1612] disabled:opacity-30">−</button>
-        <span className="w-6 text-center text-sm font-semibold">{unidadesSeleccionadas}</span>
-        <button onClick={() => onChangeUnidades(Math.min(disponibles, unidadesSeleccionadas + 1))}
+          className="flex h-9 w-9 items-center justify-center rounded-xl transition-colors disabled:opacity-25 active:bg-[#f0ede8]"
+          style={{ color: "#1a1612" }}
+        >
+          <Minus size={14} strokeWidth={2.5} />
+        </button>
+        <span className="w-8 text-center text-sm font-bold tabular-nums" style={{ color: "#1a1612" }}>
+          {unidadesSeleccionadas}
+        </span>
+        <button
+          onClick={() => onChangeUnidades(Math.min(disponibles, unidadesSeleccionadas + 1))}
           disabled={unidadesSeleccionadas >= disponibles}
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1a1612] text-white disabled:opacity-30">+</button>
+          className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#1a1612] text-white transition-colors disabled:opacity-25 active:bg-[#3a3128]"
+        >
+          <Plus size={14} strokeWidth={2.5} />
+        </button>
       </div>
     </div>
   );
@@ -478,15 +489,12 @@ function CustomSelectionView({
     try {
       const res = await fetch(
         `/api/mesas/${encodeURIComponent(mesaId)}/custom-turn/${encodeURIComponent(turnoId)}/commit`,
-        { method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ importeCents: subtotalCents }) }
+        { method: 'POST' }
       );
       if (!res.ok) { setCommitting(false); return; }
-      const body = await res.json() as { type?: string; DS_MERCHANT_PARAMETERS?: string; DS_SIGNATURE?: string; DS_SIGNATURE_VERSION?: string; paymentOrderRef?: string };
+      const body = await res.json() as { DS_MERCHANT_PARAMETERS?: string; DS_SIGNATURE?: string; DS_SIGNATURE_VERSION?: string; paymentOrderRef?: string };
       if (body.DS_MERCHANT_PARAMETERS && body.DS_SIGNATURE && body.DS_SIGNATURE_VERSION) {
-        if (body.paymentOrderRef) {
-          try { sessionStorage.setItem(`mesa-custom-turno-${mesaId}`, turnoId); } catch { /* ignore */ }
-        }
+        try { sessionStorage.setItem(`mesa-custom-turno-${mesaId}`, turnoId); } catch { /* ignore */ }
         onCommitted({ DS_MERCHANT_PARAMETERS: body.DS_MERCHANT_PARAMETERS, DS_SIGNATURE: body.DS_SIGNATURE, DS_SIGNATURE_VERSION: body.DS_SIGNATURE_VERSION });
       }
     } catch { setCommitting(false); }

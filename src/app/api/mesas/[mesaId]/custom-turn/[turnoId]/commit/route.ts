@@ -9,12 +9,6 @@ const paramsSchema = z.object({
   turnoId: z.string().uuid(),
 });
 
-const bodySchema = z.object({
-  urlOk:      z.string().url().max(500),
-  urlKo:      z.string().url().max(500),
-  webhookUrl: z.string().url().max(500),
-});
-
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ mesaId: string; turnoId: string }> }
@@ -28,14 +22,6 @@ export async function POST(
   const rateLimited = await rateLimitPublic(request as Parameters<typeof rateLimitPublic>[0]);
   if (rateLimited) return rateLimited;
 
-  let body: unknown;
-  try { body = await request.json(); } catch { return NextResponse.json({ error: 'JSON inválido' }, { status: 400 }); }
-
-  const parsedBody = bodySchema.safeParse(body);
-  if (!parsedBody.success) {
-    return NextResponse.json({ error: parsedBody.error.errors[0].message }, { status: 400 });
-  }
-
   // Resolve empresaId from turno
   const supabase = getSupabaseClient();
   const { data: turnoRow } = await supabase
@@ -46,13 +32,19 @@ export async function POST(
   const empresaId = (turnoRow as { empresa_id: string } | null)?.empresa_id;
   if (!empresaId) return NextResponse.json({ error: 'Turno no encontrado' }, { status: 404 });
 
+  // Build Redsys callback URLs server-side (same pattern as initiate-mesa)
+  const origin = new URL(request.url).origin;
+  const urlOk      = `${origin}/api/redsys/confirm-mesa?redirect=/mesa/${mesaId}/orders`;
+  const urlKo      = `${origin}/api/redsys/cancel-mesa?mesaId=${mesaId}&redirect=/mesa/${mesaId}/orders`;
+  const webhookUrl = `${origin}/api/redsys/webhook`;
+
   const result = await commitCustomPaymentUseCase({
     turnoId,
     mesaId,
     empresaId,
-    urlOk:      parsedBody.data.urlOk,
-    urlKo:      parsedBody.data.urlKo,
-    webhookUrl: parsedBody.data.webhookUrl,
+    urlOk,
+    urlKo,
+    webhookUrl,
   });
 
   if (!result.success) {
