@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, type ReactElement } from "react";
 import { createClient } from "@supabase/supabase-js";
 import Image from "next/image";
 import { ArrowLeft, CreditCard, Receipt, Users, ShieldCheck } from "lucide-react";
@@ -351,7 +351,7 @@ function DivisionTypeModal({
   onSelectEqual: () => void;
   onSelectCustom: () => void;
   onClose: () => void;
-  lang: string;
+  lang: Parameters<typeof t>[1];
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm"
@@ -385,7 +385,7 @@ function CustomItemRow({
   nombre, precio, totalUnidades, unidadesPagadas, unidadesSeleccionadas, onChangeUnidades, lang,
 }: {
   nombre: string; precio: number; totalUnidades: number; unidadesPagadas: number;
-  unidadesSeleccionadas: number; onChangeUnidades: (n: number) => void; lang: string;
+  unidadesSeleccionadas: number; onChangeUnidades: (n: number) => void; lang: Parameters<typeof t>[1];
 }) {
   const disponibles = totalUnidades - unidadesPagadas;
 
@@ -426,7 +426,7 @@ function CustomSelectionView({
   itemsPagados: ItemPagado[];
   turnoId: string;
   mesaId: string;
-  lang: string;
+  lang: Parameters<typeof t>[1];
   onCancelled: () => void;
   onCommitted: (formData: { DS_MERCHANT_PARAMETERS: string; DS_SIGNATURE: string; DS_SIGNATURE_VERSION: string }) => void;
 }) {
@@ -542,7 +542,7 @@ function CustomSelectionView({
   );
 }
 
-function CustomWaitingView({ lang }: { lang: string }) {
+function CustomWaitingView({ lang }: { lang: Parameters<typeof t>[1] }) {
   return (
     <div className="flex flex-col items-center justify-center gap-4 px-6 py-16 text-center">
       <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#1a1612] border-t-transparent" />
@@ -557,7 +557,7 @@ function RemainingItemsActions({
   orders: MesaOrder[];
   itemsPagados: ItemPagado[];
   total: number;
-  lang: string;
+  lang: Parameters<typeof t>[1];
   onClaimTurn: () => void;
   onSwitchToEqual: (numPersonas: number) => void;
 }) {
@@ -587,7 +587,7 @@ function RemainingItemsActions({
                   <span>{formatPrice(item.precio * remaining, "EUR", lang)}</span>
                 </div>
               );
-            }).filter((x): x is JSX.Element => x !== null)
+            }).filter((x): x is ReactElement => x !== null)
           )}
         </div>
       </div>
