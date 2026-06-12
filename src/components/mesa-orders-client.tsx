@@ -485,6 +485,25 @@ function CustomSelectionView({
   };
 
   const handlePay = async () => {
+    if (subtotalCents === 0) return;
+
+    // Flush any pending debounce save synchronously before committing.
+    // Without this, clicking "Pagar" before the 500ms timer fires would
+    // commit with importe_cents = null → EMPTY_SELECTION 409.
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    const seleccion = Array.from(selection.entries()).map(([k, u]) => {
+      const [pid, idx] = k.split(':');
+      return { pedido_id: pid, item_idx: Number(idx), unidades: u };
+    });
+    await fetch(
+      `/api/mesas/${encodeURIComponent(mesaId)}/custom-turn/${encodeURIComponent(turnoId)}/selection`,
+      { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seleccion, importeCents: subtotalCents }) }
+    );
+
     setCommitting(true);
     try {
       const res = await fetch(
