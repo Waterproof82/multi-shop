@@ -258,6 +258,10 @@ BEGIN
   FROM public.mesa_pagos_personalizados
   WHERE sesion_id = p_sesion_id AND status = 'pagado';
 
+  IF p_num_personas <= 0 THEN
+    RETURN QUERY SELECT false, 0, 'INVALID_PERSONAS'; RETURN;
+  END IF;
+
   v_remaining  := v_total_cents - v_paid_cents;
   v_per_person := ROUND(v_remaining::NUMERIC / p_num_personas);
 
