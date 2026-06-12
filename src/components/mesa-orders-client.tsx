@@ -498,11 +498,15 @@ function CustomSelectionView({
       const [pid, idx] = k.split(':');
       return { pedido_id: pid, item_idx: Number(idx), unidades: u };
     });
-    await fetch(
+    const patchRes = await fetch(
       `/api/mesas/${encodeURIComponent(mesaId)}/custom-turn/${encodeURIComponent(turnoId)}/selection`,
       { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ seleccion, importeCents: subtotalCents }) }
     );
+    if (!patchRes.ok) {
+      console.error('[selection patch] failed', patchRes.status, await patchRes.text().catch(() => ''));
+      return;
+    }
 
     setCommitting(true);
     try {
@@ -510,13 +514,20 @@ function CustomSelectionView({
         `/api/mesas/${encodeURIComponent(mesaId)}/custom-turn/${encodeURIComponent(turnoId)}/commit`,
         { method: 'POST' }
       );
-      if (!res.ok) { setCommitting(false); return; }
+      if (!res.ok) {
+        console.error('[commit] failed', res.status, await res.text().catch(() => ''));
+        setCommitting(false);
+        return;
+      }
       const body = await res.json() as { DS_MERCHANT_PARAMETERS?: string; DS_SIGNATURE?: string; DS_SIGNATURE_VERSION?: string; paymentOrderRef?: string };
       if (body.DS_MERCHANT_PARAMETERS && body.DS_SIGNATURE && body.DS_SIGNATURE_VERSION) {
         try { sessionStorage.setItem(`mesa-custom-turno-${mesaId}`, turnoId); } catch { /* ignore */ }
         onCommitted({ DS_MERCHANT_PARAMETERS: body.DS_MERCHANT_PARAMETERS, DS_SIGNATURE: body.DS_SIGNATURE, DS_SIGNATURE_VERSION: body.DS_SIGNATURE_VERSION });
+      } else {
+        console.error('[commit] unexpected response shape', body);
+        setCommitting(false);
       }
-    } catch { setCommitting(false); }
+    } catch (e) { console.error('[commit] exception', e); setCommitting(false); }
   };
 
   const handleCancel = async () => {
@@ -579,7 +590,7 @@ function CustomWaitingView({ lang }: { lang: Parameters<typeof t>[1] }) {
 }
 
 function RemainingItemsActions({
-  orders, itemsPagados, total, lang, onClaimTurn, onSwitchToEqual,
+  orders, itemsPagados, total, lang, onClaimTurn, onSwitchToEqual, onBack,
 }: {
   orders: MesaOrder[];
   itemsPagados: ItemPagado[];
@@ -587,68 +598,122 @@ function RemainingItemsActions({
   lang: Parameters<typeof t>[1];
   onClaimTurn: () => void;
   onSwitchToEqual: (numPersonas: number) => void;
+  onBack: () => void;
 }) {
   const [showSplitInput, setShowSplitInput] = useState(false);
   const [numPersonas, setNumPersonas] = useState(2);
 
   const remainingCents = Math.round(total * 100);
+  const perPersonCents = Math.round(remainingCents / numPersonas);
+
+  const remainingItems = orders.flatMap(order =>
+    order.items.map((item, idx) => {
+      const paid = itemsPagados
+        .filter(p => p.pedido_id === order.id && p.item_idx === idx)
+        .reduce((s, p) => s + p.unidades_pagadas, 0);
+      const remaining = item.cantidad - paid;
+      return remaining > 0 ? { key: `${order.id}:${idx}`, nombre: item.nombre, precio: item.precio, remaining } : null;
+    }).filter(Boolean)
+  ) as { key: string; nombre: string; precio: number; remaining: number }[];
 
   return (
-    <div className="flex flex-col gap-4 p-4">
-      <div className="rounded-xl bg-[#f8f4ef] p-4">
-        <p className="mb-2 text-sm font-semibold text-[#1a1612]">
-          {t("mesaRemainingAmount", lang).replace("{amount}", formatPrice(remainingCents / 100, "EUR", lang))}
-        </p>
-        <div className="divide-y divide-[#e8e0d8]">
-          {orders.flatMap(order =>
-            order.items.map((item, idx) => {
-              const paid = itemsPagados
-                .filter(p => p.pedido_id === order.id && p.item_idx === idx)
-                .reduce((s, p) => s + p.unidades_pagadas, 0);
-              const remaining = item.cantidad - paid;
-              if (remaining <= 0) return null;
-              return (
-                <div key={`${order.id}:${idx}`} className="flex justify-between py-2 text-sm">
-                  <span>{remaining}× {item.nombre}</span>
-                  <span>{formatPrice(item.precio * remaining, "EUR", lang)}</span>
-                </div>
-              );
-            }).filter((x): x is ReactElement => x !== null)
-          )}
+    <div className="flex flex-col min-h-screen bg-[#f0ede8]">
+      {/* Header */}
+      <div className="sticky top-0 z-10 flex items-center gap-3 bg-[#f0ede8] px-4 pt-5 pb-3 border-b border-[#e8e0d8]">
+        <button onClick={onBack} className="flex h-9 w-9 items-center justify-center rounded-full bg-white border border-[#e8e0d8] active:bg-[#f0ede8]">
+          <ArrowLeft size={16} strokeWidth={2} style={{ color: "#1a1612" }} />
+        </button>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs uppercase tracking-widest font-medium" style={{ color: "#8a7560", fontFamily: "monospace" }}>
+            Pago personalizado
+          </p>
+          <p className="text-base font-bold" style={{ color: "#1a1612" }}>
+            Pendiente: {formatPrice(remainingCents / 100, "EUR", lang)}
+          </p>
         </div>
       </div>
 
-      <button onClick={onClaimTurn}
-        className="w-full rounded-xl bg-[#1a1612] py-4 text-sm font-semibold text-white">
-        {t("mesaRemainingMyTurn", lang)}
-      </button>
+      {/* Remaining items */}
+      <div className="flex-1 overflow-y-auto px-4 py-4">
+        <p className="text-xs uppercase tracking-widest mb-3" style={{ color: "#b0a090", fontFamily: "monospace" }}>
+          Sin pagar
+        </p>
+        <div className="rounded-2xl overflow-hidden border border-[#e8e0d8] bg-white divide-y divide-[#f0ede8]">
+          {remainingItems.map(({ key, nombre, precio, remaining }) => (
+            <div key={key} className="flex items-center justify-between px-4 py-3">
+              <div className="flex items-center gap-3">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold bg-[#f0ede8]" style={{ color: "#8a7560" }}>
+                  {remaining}
+                </span>
+                <span className="text-sm font-medium" style={{ color: "#1a1612" }}>{nombre}</span>
+              </div>
+              <span className="text-sm tabular-nums" style={{ color: "#8a7560", fontFamily: "monospace" }}>
+                {formatPrice(precio * remaining, "EUR", lang)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
 
-      {!showSplitInput ? (
-        <button onClick={() => setShowSplitInput(true)}
-          className="w-full rounded-xl border border-[#1a1612] py-4 text-sm font-semibold text-[#1a1612]">
-          {t("mesaRemainingEqualSplit", lang)}
+      {/* Actions */}
+      <div className="sticky bottom-0 bg-[#f0ede8] border-t border-[#e8e0d8] px-4 py-4 flex flex-col gap-3">
+        {/* Primary: claim turn */}
+        <button
+          onClick={onClaimTurn}
+          className="w-full rounded-2xl py-4 text-sm font-bold tracking-wide text-white active:scale-[0.98] transition-transform"
+          style={{ backgroundColor: "#1a1612", fontFamily: "monospace" }}
+        >
+          {t("mesaRemainingMyTurn", lang)}
         </button>
-      ) : (
-        <div className="rounded-xl border border-[#e8e0d8] p-4 flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm">{t("mesaDivisionPersonas", lang)}</span>
-            <div className="flex items-center gap-3">
-              <button onClick={() => setNumPersonas(n => Math.max(2, n - 1))}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e8e0d8]">−</button>
-              <span className="w-6 text-center font-semibold">{numPersonas}</span>
-              <button onClick={() => setNumPersonas(n => Math.min(20, n + 1))}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1a1612] text-white">+</button>
+
+        {/* Secondary: equal split */}
+        {!showSplitInput ? (
+          <button
+            onClick={() => setShowSplitInput(true)}
+            className="w-full rounded-2xl border-2 py-4 text-sm font-bold tracking-wide active:bg-[#f8f4ef] transition-colors"
+            style={{ borderColor: "#1a1612", color: "#1a1612", fontFamily: "monospace" }}
+          >
+            {t("mesaRemainingEqualSplit", lang)}
+          </button>
+        ) : (
+          <div className="rounded-2xl border-2 border-[#1a1612] bg-white overflow-hidden">
+            <div className="px-4 pt-4 pb-2">
+              <p className="text-xs uppercase tracking-widest mb-3 font-medium" style={{ color: "#8a7560", fontFamily: "monospace" }}>
+                {t("mesaDivisionPersonas", lang)}
+              </p>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1 rounded-2xl border border-[#e8e0d8] p-1">
+                  <button onClick={() => setNumPersonas(n => Math.max(2, n - 1))}
+                    className="flex h-9 w-9 items-center justify-center rounded-xl transition-colors active:bg-[#f0ede8]" style={{ color: "#1a1612" }}>
+                    <Minus size={14} strokeWidth={2.5} />
+                  </button>
+                  <span className="w-8 text-center text-lg font-bold tabular-nums" style={{ color: "#1a1612" }}>{numPersonas}</span>
+                  <button onClick={() => setNumPersonas(n => Math.min(20, n + 1))}
+                    className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#1a1612] text-white active:bg-[#3a3128]">
+                    <Plus size={14} strokeWidth={2.5} />
+                  </button>
+                </div>
+                <div className="text-right">
+                  <p className="text-xl font-bold tabular-nums" style={{ color: "#1a1612" }}>
+                    {formatPrice(perPersonCents / 100, "EUR", lang)}
+                  </p>
+                  <p className="text-xs" style={{ color: "#8a7560" }}>{t("mesaDivisionPorPersona", lang)}</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2 px-4 pb-4 pt-2">
+              <button onClick={() => setShowSplitInput(false)}
+                className="flex-1 rounded-xl border border-[#e8e0d8] py-3 text-sm font-semibold" style={{ color: "#8a7560" }}>
+                Cancelar
+              </button>
+              <button onClick={() => onSwitchToEqual(numPersonas)}
+                className="flex-1 rounded-xl bg-[#1a1612] py-3 text-sm font-semibold text-white">
+                {t("mesaDivisionConfirm", lang)}
+              </button>
             </div>
           </div>
-          <p className="text-center text-xs text-[#8a7d6b]">
-            {formatPrice(remainingCents / 100 / numPersonas, "EUR", lang)} {t("mesaDivisionPorPersona", lang)}
-          </p>
-          <button onClick={() => onSwitchToEqual(numPersonas)}
-            className="w-full rounded-xl bg-[#1a1612] py-3 text-sm font-semibold text-white">
-            {t("mesaDivisionConfirm", lang)}
-          </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -664,6 +729,7 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
   const [showDivisionModal, setShowDivisionModal] = useState(false);
   const [showDivisionTypeModal, setShowDivisionTypeModal] = useState(false);
   const [claimingTurn, setClaimingTurn] = useState(false);
+  const [hidingRemainingActions, setHidingRemainingActions] = useState(false);
   const [activeTurnoId, setActiveTurnoId] = useState<string | null>(() => {
     try { return sessionStorage.getItem(`mesa-custom-turno-${mesaId}`); } catch { return null; }
   });
@@ -1122,19 +1188,19 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
   if (
     sessionData?.divisionTipo === 'personalizado' &&
     !sessionData?.customTurno &&
-    !sessionData?.sesionPagada
+    !sessionData?.sesionPagada &&
+    !hidingRemainingActions
   ) {
     return (
-      <div className="min-h-screen bg-[#f0ede8]">
-        <RemainingItemsActions
-          orders={sessionData.orders}
-          itemsPagados={sessionData.itemsPagados ?? []}
-          total={sessionData.total}
-          lang={lang}
-          onClaimTurn={() => { void handleClaimCustomTurn(); }}
-          onSwitchToEqual={numPersonas => { void handleSwitchToEqualRemaining(numPersonas); }}
-        />
-      </div>
+      <RemainingItemsActions
+        orders={sessionData.orders}
+        itemsPagados={sessionData.itemsPagados ?? []}
+        total={Math.max(0, sessionData.total - (sessionData.pagadoCents ?? 0) / 100)}
+        lang={lang}
+        onClaimTurn={() => { void handleClaimCustomTurn(); }}
+        onSwitchToEqual={numPersonas => { void handleSwitchToEqualRemaining(numPersonas); }}
+        onBack={() => setHidingRemainingActions(true)}
+      />
     );
   }
 
@@ -1617,7 +1683,7 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                 {/* Dividir cuenta */}
                 <button
                   type="button"
-                  onClick={() => { setShowDivisionTypeModal(true); }}
+                  onClick={() => { setHidingRemainingActions(false); setShowDivisionTypeModal(true); }}
                   disabled={paying || settingDivision || verifyingTotal}
                   className="flex-1 py-5 rounded-2xl text-xs font-bold tracking-widest uppercase transition-all disabled:opacity-50 flex flex-col items-center gap-2 active:scale-[0.98]"
                   style={{
