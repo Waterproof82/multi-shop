@@ -18,6 +18,7 @@ CREATE TABLE public.mesa_pagos_personalizados (
 
 CREATE INDEX mpp_sesion_idx ON public.mesa_pagos_personalizados(sesion_id);
 CREATE INDEX mpp_status_idx ON public.mesa_pagos_personalizados(status);
+CREATE INDEX mpp_empresa_idx ON public.mesa_pagos_personalizados(empresa_id);
 
 -- mesa_item_pagos: accumulated paid item units (source of truth for remaining)
 CREATE TABLE public.mesa_item_pagos (
@@ -28,11 +29,14 @@ CREATE TABLE public.mesa_item_pagos (
   item_idx             INTEGER NOT NULL,
   unidades_pagadas     INTEGER NOT NULL,
   importe_pagado_cents INTEGER NOT NULL DEFAULT 0,
-  turno_id             UUID    NOT NULL REFERENCES public.mesa_pagos_personalizados(id)
+  turno_id             UUID    NOT NULL REFERENCES public.mesa_pagos_personalizados(id),
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT mip_unique_item_per_turno UNIQUE (pedido_id, item_idx, turno_id)
 );
 
 CREATE INDEX mip_sesion_idx ON public.mesa_item_pagos(sesion_id);
 CREATE INDEX mip_turno_idx  ON public.mesa_item_pagos(turno_id);
+CREATE INDEX mip_empresa_idx ON public.mesa_item_pagos(empresa_id);
 
 -- Extend mesa_sesiones
 ALTER TABLE public.mesa_sesiones
@@ -43,18 +47,24 @@ ALTER TABLE public.mesa_sesiones
   ADD COLUMN IF NOT EXISTS division_base_cents INTEGER NULL;
   -- used when switching remaining amount to equal split
 
+ALTER TABLE public.mesa_sesiones
+  ADD CONSTRAINT mesa_sesiones_division_tipo_check
+    CHECK (division_tipo IN ('igual', 'personalizado'));
+
 -- RLS: deny anon, grant service_role (same pattern as mesa_division_pagos)
 ALTER TABLE public.mesa_pagos_personalizados ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "No direct anon access to mesa_pagos_personalizados"
   ON public.mesa_pagos_personalizados FOR ALL TO anon
   USING (false) WITH CHECK (false);
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.mesa_pagos_personalizados TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.mesa_pagos_personalizados TO authenticated;
 
 ALTER TABLE public.mesa_item_pagos ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "No direct anon access to mesa_item_pagos"
   ON public.mesa_item_pagos FOR ALL TO anon
   USING (false) WITH CHECK (false);
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.mesa_item_pagos TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.mesa_item_pagos TO authenticated;
 
 -- Enable Realtime so the client can subscribe to item payment updates
 ALTER PUBLICATION supabase_realtime ADD TABLE public.mesa_item_pagos;
