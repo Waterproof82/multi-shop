@@ -84,7 +84,7 @@ export async function initiateRedsysMesaPaymentUseCase(
     // Find active sesion for the mesa (including division state + payment lock)
     const { data: sesion, error: sesionError } = await supabase
       .from('mesa_sesiones')
-      .select('id, empresa_id, division_personas, division_pagos_realizados, sesion_pagada, pago_en_curso, pago_iniciado_en')
+      .select('id, empresa_id, division_personas, division_pagos_realizados, sesion_pagada, pago_en_curso, pago_iniciado_en, division_base_cents')
       .eq('mesa_id', input.mesaId)
       .is('cerrada_at', null)
       .maybeSingle();
@@ -105,6 +105,7 @@ export async function initiateRedsysMesaPaymentUseCase(
     const sesionId = s['id'] as string;
     const divisionPersonas = (s['division_personas'] as number | null) ?? null;
     const divisionPagosRealizados = (s['division_pagos_realizados'] as number) ?? 0;
+    const divisionBaseCents = (s['division_base_cents'] as number | null) ?? null;
     const sesionPagada = (s['sesion_pagada'] as boolean) ?? false;
 
     // Reject if the session is already fully paid (covers both full and division payments,
@@ -226,7 +227,7 @@ export async function initiateRedsysMesaPaymentUseCase(
           p_sesion_id:           sesionId,
           p_empresa_id:          input.empresaId,
           p_payment_order_ref:   paymentOrderRef,
-          p_session_total_cents: sessionTotalCents,
+          p_session_total_cents: divisionBaseCents ?? sessionTotalCents,
         });
 
       if (claimError) {
