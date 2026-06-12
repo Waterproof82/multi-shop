@@ -27,6 +27,19 @@ interface MesaOrder {
   createdAt: string;
 }
 
+interface CustomTurno {
+  id: string;
+  status: 'en_seleccion' | 'en_pago' | 'pagado' | 'cancelado';
+  importeCents: number | null;
+}
+
+interface ItemPagado {
+  pedido_id: string;
+  item_idx: number;
+  unidades_pagadas: number;
+  importe_pagado_cents: number;
+}
+
 interface DivisionState {
   personas: number;
   pagosRealizados: number;
@@ -41,6 +54,9 @@ interface MesaSessionData {
   division: DivisionState | null;
   sesionPagada: boolean;
   pagoEnCurso?: boolean;
+  divisionTipo?: 'igual' | 'personalizado' | null;
+  customTurno?: CustomTurno | null;
+  itemsPagados?: ItemPagado[];
 }
 
 interface MesaInfo {
@@ -326,6 +342,291 @@ function DivisionModal({
   );
 }
 
+function DivisionTypeModal({
+  onSelectEqual,
+  onSelectCustom,
+  onClose,
+  lang,
+}: {
+  onSelectEqual: () => void;
+  onSelectCustom: () => void;
+  onClose: () => void;
+  lang: string;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm"
+         onClick={onClose}>
+      <div className="w-full max-w-md rounded-t-2xl bg-white p-6 shadow-2xl"
+           onClick={e => e.stopPropagation()}>
+        <h2 className="mb-5 text-center text-lg font-semibold text-[#1a1612]">
+          {t("mesaDivisionTypeTitle", lang)}
+        </h2>
+        <div className="flex flex-col gap-3">
+          <button onClick={onSelectEqual}
+            className="flex flex-col items-start rounded-xl border border-[#e8e0d8] bg-[#f8f4ef] p-4 text-left active:scale-[0.98]">
+            <span className="font-semibold text-[#1a1612]">{t("mesaDivisionTypeEqual", lang)}</span>
+            <span className="text-sm text-[#8a7d6b]">{t("mesaDivisionTypeEqualDesc", lang)}</span>
+          </button>
+          <button onClick={onSelectCustom}
+            className="flex flex-col items-start rounded-xl border border-[#1a1612] bg-[#1a1612] p-4 text-left active:scale-[0.98]">
+            <span className="font-semibold text-white">{t("mesaDivisionTypeCustom", lang)}</span>
+            <span className="text-sm text-[#c8b99a]">{t("mesaDivisionTypeCustomDesc", lang)}</span>
+          </button>
+        </div>
+        <button onClick={onClose} className="mt-4 w-full py-2 text-sm text-[#8a7d6b]">
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CustomItemRow({
+  nombre, precio, totalUnidades, unidadesPagadas, unidadesSeleccionadas, onChangeUnidades, lang,
+}: {
+  nombre: string; precio: number; totalUnidades: number; unidadesPagadas: number;
+  unidadesSeleccionadas: number; onChangeUnidades: (n: number) => void; lang: string;
+}) {
+  const disponibles = totalUnidades - unidadesPagadas;
+
+  if (disponibles <= 0) {
+    return (
+      <div className="flex items-center justify-between py-2 opacity-40">
+        <span className="text-sm line-through">{totalUnidades}× {nombre}</span>
+        <span className="text-xs text-[#8a7d6b]">{t("mesaCustomItemPaid", lang)}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-between py-3">
+      <div className="flex-1">
+        <p className="text-sm font-medium text-[#1a1612]">{nombre}</p>
+        <p className="text-xs text-[#8a7d6b]">
+          {formatPrice(precio, "EUR", lang)} · {disponibles} disponible{disponibles !== 1 ? "s" : ""}
+        </p>
+      </div>
+      <div className="flex items-center gap-2 ml-4">
+        <button onClick={() => onChangeUnidades(Math.max(0, unidadesSeleccionadas - 1))}
+          disabled={unidadesSeleccionadas === 0}
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e8e0d8] text-[#1a1612] disabled:opacity-30">−</button>
+        <span className="w-6 text-center text-sm font-semibold">{unidadesSeleccionadas}</span>
+        <button onClick={() => onChangeUnidades(Math.min(disponibles, unidadesSeleccionadas + 1))}
+          disabled={unidadesSeleccionadas >= disponibles}
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1a1612] text-white disabled:opacity-30">+</button>
+      </div>
+    </div>
+  );
+}
+
+function CustomSelectionView({
+  orders, itemsPagados, turnoId, mesaId, lang, onCancelled, onCommitted,
+}: {
+  orders: MesaOrder[];
+  itemsPagados: ItemPagado[];
+  turnoId: string;
+  mesaId: string;
+  lang: string;
+  onCancelled: () => void;
+  onCommitted: (formData: { DS_MERCHANT_PARAMETERS: string; DS_SIGNATURE: string; DS_SIGNATURE_VERSION: string }) => void;
+}) {
+  const [selection, setSelection] = useState<Map<string, number>>(new Map());
+  const [committing, setCommitting] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const getPaidUnits = (pedidoId: string, itemIdx: number) =>
+    itemsPagados
+      .filter(p => p.pedido_id === pedidoId && p.item_idx === itemIdx)
+      .reduce((s, p) => s + p.unidades_pagadas, 0);
+
+  const subtotalCents = Array.from(selection.entries()).reduce((sum, [key, units]) => {
+    const [pedidoId, idxStr] = key.split(':');
+    const order = orders.find(o => o.id === pedidoId);
+    const item = order?.items[Number(idxStr)];
+    return sum + Math.round((item?.precio ?? 0) * 100) * units;
+  }, 0);
+
+  const handleChange = (pedidoId: string, itemIdx: number, units: number) => {
+    const key = `${pedidoId}:${itemIdx}`;
+    const next = new Map(selection);
+    if (units === 0) next.delete(key); else next.set(key, units);
+    setSelection(next);
+
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    const seleccion = Array.from(next.entries()).map(([k, u]) => {
+      const [pid, idx] = k.split(':');
+      return { pedido_id: pid, item_idx: Number(idx), unidades: u };
+    });
+    const totalCents = Array.from(next.entries()).reduce((sum, [k, u]) => {
+      const [pid, idxStr] = k.split(':');
+      const order = orders.find(o => o.id === pid);
+      const item = order?.items[Number(idxStr)];
+      return sum + Math.round((item?.precio ?? 0) * 100) * u;
+    }, 0);
+    saveTimerRef.current = setTimeout(() => {
+      void fetch(
+        `/api/mesas/${encodeURIComponent(mesaId)}/custom-turn/${encodeURIComponent(turnoId)}/selection`,
+        { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ seleccion, importeCents: totalCents }) }
+      );
+    }, 500);
+  };
+
+  const handlePay = async () => {
+    setCommitting(true);
+    try {
+      const res = await fetch(
+        `/api/mesas/${encodeURIComponent(mesaId)}/custom-turn/${encodeURIComponent(turnoId)}/commit`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ importeCents: subtotalCents }) }
+      );
+      if (!res.ok) { setCommitting(false); return; }
+      const body = await res.json() as { type?: string; DS_MERCHANT_PARAMETERS?: string; DS_SIGNATURE?: string; DS_SIGNATURE_VERSION?: string; paymentOrderRef?: string };
+      if (body.DS_MERCHANT_PARAMETERS && body.DS_SIGNATURE && body.DS_SIGNATURE_VERSION) {
+        if (body.paymentOrderRef) {
+          try { sessionStorage.setItem(`mesa-custom-turno-${mesaId}`, turnoId); } catch { /* ignore */ }
+        }
+        onCommitted({ DS_MERCHANT_PARAMETERS: body.DS_MERCHANT_PARAMETERS, DS_SIGNATURE: body.DS_SIGNATURE, DS_SIGNATURE_VERSION: body.DS_SIGNATURE_VERSION });
+      }
+    } catch { setCommitting(false); }
+  };
+
+  const handleCancel = async () => {
+    setCancelling(true);
+    await fetch(
+      `/api/mesas/${encodeURIComponent(mesaId)}/custom-turn/${encodeURIComponent(turnoId)}`,
+      { method: 'DELETE' }
+    );
+    try { sessionStorage.removeItem(`mesa-custom-turno-${mesaId}`); } catch { /* ignore */ }
+    onCancelled();
+  };
+
+  return (
+    <div className="flex flex-col min-h-screen bg-[#f0ede8]">
+      <div className="sticky top-0 z-10 bg-[#f0ede8] px-4 pt-4 pb-2 border-b border-[#e8e0d8]">
+        <h2 className="text-lg font-semibold text-[#1a1612]">{t("mesaCustomSelectTitle", lang)}</h2>
+      </div>
+      <div className="flex-1 overflow-y-auto px-4 py-2 divide-y divide-[#e8e0d8]">
+        {orders.map(order =>
+          order.items.map((item, idx) => (
+            <CustomItemRow
+              key={`${order.id}:${idx}`}
+              nombre={item.nombre}
+              precio={item.precio}
+              totalUnidades={item.cantidad}
+              unidadesPagadas={getPaidUnits(order.id, idx)}
+              unidadesSeleccionadas={selection.get(`${order.id}:${idx}`) ?? 0}
+              onChangeUnidades={units => handleChange(order.id, idx, units)}
+              lang={lang}
+            />
+          ))
+        )}
+      </div>
+      <div className="sticky bottom-0 bg-white border-t border-[#e8e0d8] p-4 flex flex-col gap-2">
+        <div className="flex justify-between text-sm text-[#8a7d6b] mb-1">
+          <span>{t("mesaCustomSubtotal", lang)}</span>
+          <span className="font-semibold text-[#1a1612]">{formatPrice(subtotalCents / 100, "EUR", lang)}</span>
+        </div>
+        <button onClick={() => { void handlePay(); }}
+          disabled={subtotalCents === 0 || committing}
+          className="w-full rounded-xl bg-[#1a1612] py-4 text-sm font-semibold text-white disabled:opacity-40">
+          {t("mesaCustomPay", lang).replace("{amount}", formatPrice(subtotalCents / 100, "EUR", lang))}
+        </button>
+        <button onClick={() => { void handleCancel(); }} disabled={cancelling}
+          className="w-full py-2 text-sm text-[#8a7d6b]">
+          {t("mesaCustomCancel", lang)}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CustomWaitingView({ lang }: { lang: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-4 px-6 py-16 text-center">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#1a1612] border-t-transparent" />
+      <p className="font-medium text-[#1a1612]">{t("mesaCustomWaiting", lang)}</p>
+    </div>
+  );
+}
+
+function RemainingItemsActions({
+  orders, itemsPagados, total, lang, onClaimTurn, onSwitchToEqual,
+}: {
+  orders: MesaOrder[];
+  itemsPagados: ItemPagado[];
+  total: number;
+  lang: string;
+  onClaimTurn: () => void;
+  onSwitchToEqual: (numPersonas: number) => void;
+}) {
+  const [showSplitInput, setShowSplitInput] = useState(false);
+  const [numPersonas, setNumPersonas] = useState(2);
+
+  const paidCents = itemsPagados.reduce((s, p) => s + p.importe_pagado_cents, 0);
+  const remainingCents = Math.round(total * 100) - paidCents;
+
+  return (
+    <div className="flex flex-col gap-4 p-4">
+      <div className="rounded-xl bg-[#f8f4ef] p-4">
+        <p className="mb-2 text-sm font-semibold text-[#1a1612]">
+          {t("mesaRemainingAmount", lang).replace("{amount}", formatPrice(remainingCents / 100, "EUR", lang))}
+        </p>
+        <div className="divide-y divide-[#e8e0d8]">
+          {orders.flatMap(order =>
+            order.items.map((item, idx) => {
+              const paid = itemsPagados
+                .filter(p => p.pedido_id === order.id && p.item_idx === idx)
+                .reduce((s, p) => s + p.unidades_pagadas, 0);
+              const remaining = item.cantidad - paid;
+              if (remaining <= 0) return null;
+              return (
+                <div key={`${order.id}:${idx}`} className="flex justify-between py-2 text-sm">
+                  <span>{remaining}× {item.nombre}</span>
+                  <span>{formatPrice(item.precio * remaining, "EUR", lang)}</span>
+                </div>
+              );
+            }).filter((x): x is JSX.Element => x !== null)
+          )}
+        </div>
+      </div>
+
+      <button onClick={onClaimTurn}
+        className="w-full rounded-xl bg-[#1a1612] py-4 text-sm font-semibold text-white">
+        {t("mesaRemainingMyTurn", lang)}
+      </button>
+
+      {!showSplitInput ? (
+        <button onClick={() => setShowSplitInput(true)}
+          className="w-full rounded-xl border border-[#1a1612] py-4 text-sm font-semibold text-[#1a1612]">
+          {t("mesaRemainingEqualSplit", lang)}
+        </button>
+      ) : (
+        <div className="rounded-xl border border-[#e8e0d8] p-4 flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm">{t("mesaDivisionPersonas", lang)}</span>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setNumPersonas(n => Math.max(2, n - 1))}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e8e0d8]">−</button>
+              <span className="w-6 text-center font-semibold">{numPersonas}</span>
+              <button onClick={() => setNumPersonas(n => Math.min(20, n + 1))}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1a1612] text-white">+</button>
+            </div>
+          </div>
+          <p className="text-center text-xs text-[#8a7d6b]">
+            {formatPrice(remainingCents / 100 / numPersonas, "EUR", lang)} {t("mesaDivisionPorPersona", lang)}
+          </p>
+          <button onClick={() => onSwitchToEqual(numPersonas)}
+            className="w-full rounded-xl bg-[#1a1612] py-3 text-sm font-semibold text-white">
+            {t("mesaDivisionConfirm", lang)}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
   const { language } = useLanguage();
   const lang = language;
@@ -335,6 +636,11 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
   const [showDivisionModal, setShowDivisionModal] = useState(false);
+  const [showDivisionTypeModal, setShowDivisionTypeModal] = useState(false);
+  const [claimingTurn, setClaimingTurn] = useState(false);
+  const [activeTurnoId, setActiveTurnoId] = useState<string | null>(() => {
+    try { return sessionStorage.getItem(`mesa-custom-turno-${mesaId}`); } catch { return null; }
+  });
   const [settingDivision, setSettingDivision] = useState(false);
   const [cancellingDivision, setCancellingDivision] = useState(false);
   const [manualPaying, setManualPaying] = useState(false);
@@ -417,6 +723,24 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
     return () => { void supabase.removeChannel(channel); };
   }, [mesaId, refresh]);
 
+  useEffect(() => {
+    const sesionId = sessionData?.sesionId;
+    if (!sesionId) return;
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) return;
+    const supabase = createClient(url, key);
+    const channel = supabase
+      .channel(`mesa-item-pagos-${sesionId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'mesa_item_pagos', filter: `sesion_id=eq.${sesionId}` },
+        () => { void refresh(); }
+      )
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [sessionData?.sesionId, refresh]);
+
   // On mount: if there is a stored division paymentOrderRef from a previous payment
   // attempt, release that pending slot. Covers two cases:
   //   1. User cancelled at Redsys (urlKo redirect back to this page).
@@ -436,7 +760,7 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
     }).then(() => {
       try { sessionStorage.removeItem(`mesa-division-ref-${mesaId}`); } catch { /* ignore */ }
     }).catch(() => { /* non-blocking */ });
-  }, [mesaId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mesaId]);
 
   // Refs to read current state in the unmount cleanup (avoids stale closures)
   const isInitiatingPaymentRef = useRef(isInitiatingPayment);
@@ -636,6 +960,29 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
     }
   };
 
+  const handleClaimCustomTurn = useCallback(async () => {
+    setClaimingTurn(true);
+    try {
+      const res = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/custom-turn`, { method: 'POST' });
+      if (!res.ok) { void refresh(); return; } // 409 means lock held — refresh to show waiting view
+      const body = await res.json() as { turnoId: string };
+      setActiveTurnoId(body.turnoId);
+      try { sessionStorage.setItem(`mesa-custom-turno-${mesaId}`, body.turnoId); } catch { /* ignore */ }
+      void refresh();
+    } finally {
+      setClaimingTurn(false);
+    }
+  }, [mesaId, refresh]);
+
+  const handleSwitchToEqualRemaining = useCallback(async (numPersonas: number) => {
+    const res = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/equal-split-remaining`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ numPersonas }),
+    });
+    if (res.ok) void refresh();
+  }, [mesaId, refresh]);
+
   const handleDeleteItem = useCallback(async () => {
     if (!pendingDelete || deleting) return;
     setDeleting(true);
@@ -707,6 +1054,57 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
     manualPayLabel = `Pago manual · ${formatPrice(division.importePorPersona, "EUR", lang)}`;
   } else {
     manualPayLabel = "Marcar pagada (efectivo)";
+  }
+
+  // Custom selection: this user holds the lock
+  if (activeTurnoId && sessionData?.customTurno?.id === activeTurnoId && sessionData.customTurno.status === 'en_seleccion') {
+    const redsysUrl = process.env.NEXT_PUBLIC_REDSYS_URL ?? 'https://sis-t.redsys.es:25443/sis/realizarPago';
+    return (
+      <CustomSelectionView
+        orders={sessionData.orders}
+        itemsPagados={sessionData.itemsPagados ?? []}
+        turnoId={activeTurnoId}
+        mesaId={mesaId}
+        lang={lang}
+        onCancelled={() => {
+          setActiveTurnoId(null);
+          try { sessionStorage.removeItem(`mesa-custom-turno-${mesaId}`); } catch { /* ignore */ }
+          void refresh();
+        }}
+        onCommitted={(formData) => {
+          submitRedsysForm(formData, redsysUrl);
+        }}
+      />
+    );
+  }
+
+  // Waiting: someone else holds the lock
+  if (sessionData?.customTurno?.status === 'en_seleccion' && !activeTurnoId) {
+    return (
+      <div className="min-h-screen bg-[#f0ede8]">
+        <CustomWaitingView lang={lang} />
+      </div>
+    );
+  }
+
+  // Between turns: personalizado mode, no active lock, not fully paid
+  if (
+    sessionData?.divisionTipo === 'personalizado' &&
+    !sessionData?.customTurno &&
+    !sessionData?.sesionPagada
+  ) {
+    return (
+      <div className="min-h-screen bg-[#f0ede8]">
+        <RemainingItemsActions
+          orders={sessionData.orders}
+          itemsPagados={sessionData.itemsPagados ?? []}
+          total={sessionData.total}
+          lang={lang}
+          onClaimTurn={() => { void handleClaimCustomTurn(); }}
+          onSwitchToEqual={numPersonas => { void handleSwitchToEqualRemaining(numPersonas); }}
+        />
+      </div>
+    );
   }
 
   return (
@@ -1117,7 +1515,7 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                 {/* Dividir cuenta */}
                 <button
                   type="button"
-                  onClick={() => { void handlePrePaymentCheck('division-modal'); }}
+                  onClick={() => { setShowDivisionTypeModal(true); }}
                   disabled={paying || settingDivision || verifyingTotal}
                   className="flex-1 py-5 rounded-2xl text-xs font-bold tracking-widest uppercase transition-all disabled:opacity-50 flex flex-col items-center gap-2 active:scale-[0.98]"
                   style={{
@@ -1157,6 +1555,46 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                   </>
                 )}
               </button>
+            )}
+
+            {/* Waiter: custom split breakdown */}
+            {isWaiterMode && sessionData?.divisionTipo === 'personalizado' && (
+              <div className="mx-4 mb-4 rounded-xl border border-[#e8e0d8] bg-white overflow-hidden">
+                <div className="border-b border-[#e8e0d8] bg-[#f8f4ef] px-4 py-3">
+                  <p className="text-sm font-semibold text-[#1a1612]">Pago personalizado</p>
+                </div>
+                <div className="divide-y divide-[#e8e0d8]">
+                  {sessionData.orders.flatMap(order =>
+                    order.items.map((item, idx) => {
+                      const paid = (sessionData.itemsPagados ?? [])
+                        .filter(p => p.pedido_id === order.id && p.item_idx === idx)
+                        .reduce((s, p) => s + p.unidades_pagadas, 0);
+                      const isPaid = paid >= item.cantidad;
+                      return (
+                        <div key={`${order.id}:${idx}`}
+                          className={`flex items-center justify-between px-4 py-2 text-sm ${isPaid ? 'opacity-50' : ''}`}>
+                          <span className={isPaid ? 'line-through' : ''}>{item.cantidad}× {item.nombre}</span>
+                          <div className="flex items-center gap-2">
+                            <span>{formatPrice(item.precio * item.cantidad, "EUR", lang)}</span>
+                            <span className={`rounded-full px-2 py-0.5 text-xs ${isPaid ? 'bg-green-100 text-green-700' : 'bg-[#f8f4ef] text-[#8a7d6b]'}`}>
+                              {isPaid ? 'pagado' : 'pendiente'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+                <div className="flex justify-between border-t border-[#e8e0d8] bg-[#f8f4ef] px-4 py-3 text-sm">
+                  <span className="text-[#8a7d6b]">Pendiente</span>
+                  <span className="font-semibold text-[#1a1612]">
+                    {formatPrice(
+                      (Math.round(sessionData.total * 100) - (sessionData.itemsPagados ?? []).reduce((s, p) => s + p.importe_pagado_cents, 0)) / 100,
+                      "EUR", lang
+                    )}
+                  </span>
+                </div>
+              </div>
             )}
 
             {/* Waiter: manual payment button */}
@@ -1322,6 +1760,21 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
             )}
           </div>
         </div>
+      )}
+
+      {showDivisionTypeModal && (
+        <DivisionTypeModal
+          lang={lang}
+          onClose={() => setShowDivisionTypeModal(false)}
+          onSelectEqual={() => {
+            setShowDivisionTypeModal(false);
+            void handlePrePaymentCheck('division-modal');
+          }}
+          onSelectCustom={() => {
+            setShowDivisionTypeModal(false);
+            void handleClaimCustomTurn();
+          }}
+        />
       )}
 
       {showDivisionModal && sessionData && (
