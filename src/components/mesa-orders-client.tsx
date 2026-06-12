@@ -37,7 +37,6 @@ interface ItemPagado {
   pedido_id: string;
   item_idx: number;
   unidades_pagadas: number;
-  importe_pagado_cents: number;
 }
 
 interface DivisionState {
@@ -57,6 +56,7 @@ interface MesaSessionData {
   divisionTipo?: 'igual' | 'personalizado' | null;
   customTurno?: CustomTurno | null;
   itemsPagados?: ItemPagado[];
+  pagadoCents?: number;
 }
 
 interface MesaInfo {
@@ -572,8 +572,7 @@ function RemainingItemsActions({
   const [showSplitInput, setShowSplitInput] = useState(false);
   const [numPersonas, setNumPersonas] = useState(2);
 
-  const paidCents = itemsPagados.reduce((s, p) => s + p.importe_pagado_cents, 0);
-  const remainingCents = Math.round(total * 100) - paidCents;
+  const remainingCents = Math.round(total * 100);
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -684,8 +683,13 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
     catch { return false; }
   })();
 
-  // Derived early so the polling effect can use it as a dependency
-  const pagoEnCursoForPoll = sessionData?.pagoEnCurso ?? false;
+  // Derived early so the polling effect can use it as a dependency.
+  // Poll at 3s when: (a) a payment lock is active, or (b) waiting for someone
+  // else's custom turn (en_seleccion) — so the screen unlocks promptly.
+  const waitingForCustomTurn =
+    (sessionData?.customTurno?.status === 'en_seleccion' || sessionData?.customTurno?.status === 'en_pago') &&
+    !activeTurnoId;
+  const pagoEnCursoForPoll = (sessionData?.pagoEnCurso ?? false) || waitingForCustomTurn;
 
   const refresh = useCallback(async () => {
     try {
@@ -1254,58 +1258,129 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                     );
                   })}
                 </ul>
-              ) : (
-                <ul className="flex flex-col gap-1 pb-4">
-                  {allItems.map((item) => {
-                    const complementoTotal = item.complementos?.reduce((s, c) => s + c.precio, 0) ?? 0;
-                    const lineTotal = (item.precio + complementoTotal) * item.cantidad;
-                    const compsKey = (item.complementos ?? []).map(c => c.nombre).sort().join(',');
-                    return (
-                      <li
-                        key={`${item.nombre}||${item.precio}||${compsKey}`}
-                        className="flex items-center gap-2 text-sm"
-                        style={{ color: "#1a1612", fontFamily: "monospace" }}
-                      >
-                        <span className="tabular-nums w-4 text-right shrink-0" style={{ color: "#8a7560" }}>
-                          {item.cantidad}
-                        </span>
-                        <span className="flex flex-col flex-1 min-w-0">
-                          <span>{(language !== "es" && item.translations?.[language]?.name) || item.nombre}</span>
-                          {item.complementos && item.complementos.length > 0 && (
-                            <span className="text-xs" style={{ color: "#b0a090" }}>
-                              + {item.complementos.map(c => c.nombre).join(", ")}
-                            </span>
+              ) : (() => {
+                // Build paid-units map by merge key (only confirmed pagado turns)
+                const paidByKey = new Map<string, number>();
+                if (sessionData?.divisionTipo === 'personalizado') {
+                  for (const order of sessionData.orders) {
+                    for (let idx = 0; idx < order.items.length; idx++) {
+                      const itm = order.items[idx];
+                      const ck = (itm.complementos ?? []).map(c => c.nombre).sort().join(',');
+                      const k = `${itm.nombre}||${itm.precio}||${ck}`;
+                      const paid = (sessionData.itemsPagados ?? [])
+                        .filter(ip => ip.pedido_id === order.id && ip.item_idx === idx)
+                        .reduce((s, ip) => s + ip.unidades_pagadas, 0);
+                      if (paid > 0) paidByKey.set(k, (paidByKey.get(k) ?? 0) + paid);
+                    }
+                  }
+                }
+                return (
+                  <ul className="flex flex-col gap-1 pb-4">
+                    {allItems.map((item) => {
+                      const complementoTotal = item.complementos?.reduce((s, c) => s + c.precio, 0) ?? 0;
+                      const compsKey = (item.complementos ?? []).map(c => c.nombre).sort().join(',');
+                      const mergeKey = `${item.nombre}||${item.precio}||${compsKey}`;
+                      const paidUnits = paidByKey.get(mergeKey) ?? 0;
+                      const pendingUnits = item.cantidad - paidUnits;
+                      const allPaid = pendingUnits <= 0;
+                      const lineTotal = (item.precio + complementoTotal) * (allPaid ? item.cantidad : pendingUnits);
+                      const itemName = (language !== "es" && item.translations?.[language]?.name) || item.nombre;
+                      return (
+                        <li key={mergeKey} style={{ fontFamily: "monospace" }}>
+                          {/* Pending units row */}
+                          {!allPaid && (
+                            <div className="flex items-center gap-2 text-sm" style={{ color: "#1a1612" }}>
+                              <span className="tabular-nums w-4 text-right shrink-0" style={{ color: "#8a7560" }}>
+                                {pendingUnits}
+                              </span>
+                              <span className="flex flex-col flex-1 min-w-0">
+                                <span>{itemName}</span>
+                                {item.complementos && item.complementos.length > 0 && (
+                                  <span className="text-xs" style={{ color: "#b0a090" }}>
+                                    + {item.complementos.map(c => c.nombre).join(", ")}
+                                  </span>
+                                )}
+                              </span>
+                              <span className="tabular-nums shrink-0 text-right" style={{ color: "#1a1612" }}>
+                                {formatPrice(lineTotal, "EUR", lang)}
+                              </span>
+                            </div>
                           )}
-                        </span>
-                        <span className="tabular-nums shrink-0 text-right" style={{ color: "#1a1612" }}>
-                          {formatPrice(lineTotal, "EUR", lang)}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
+                          {/* Paid units row */}
+                          {paidUnits > 0 && (
+                            <div className="flex items-center gap-2 text-sm mt-0.5" style={{ opacity: allPaid ? 1 : 0.6 }}>
+                              <span className="tabular-nums w-4 text-right shrink-0" style={{ color: "#6aaa7a" }}>
+                                {paidUnits}
+                              </span>
+                              <span className="flex-1 min-w-0 flex items-center gap-1.5">
+                                <span style={{ color: "#6aaa7a", textDecoration: allPaid ? undefined : 'line-through', fontSize: allPaid ? undefined : '0.75rem' }}>
+                                  {allPaid ? itemName : item.nombre}
+                                </span>
+                                <span className="text-[10px] font-bold uppercase tracking-wider rounded px-1 py-0.5" style={{ background: "#d4edda", color: "#4a8a5a" }}>
+                                  ✓ pagado
+                                </span>
+                              </span>
+                              <span className="tabular-nums shrink-0 text-right text-xs" style={{ color: "#6aaa7a" }}>
+                                {formatPrice((item.precio + complementoTotal) * paidUnits, "EUR", lang)}
+                              </span>
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                );
+              })()}
 
               <DottedRule />
 
               {/* Total */}
-              <div
-                className="flex justify-between items-baseline py-4"
-                style={{ fontFamily: "monospace" }}
-              >
-                <span
-                  className="text-xs uppercase tracking-[0.2em]"
-                  style={{ color: "#8a7560" }}
+              {sessionData?.divisionTipo === 'personalizado' && (sessionData.pagadoCents ?? 0) > 0 ? (
+                <div className="flex flex-col gap-1 py-4" style={{ fontFamily: "monospace" }}>
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-xs uppercase tracking-[0.2em]" style={{ color: "#b0a090" }}>
+                      {t("mesaRunningTotal", lang)}
+                    </span>
+                    <span className="text-sm tabular-nums" style={{ color: "#b0a090" }}>
+                      {formatPrice(sessionData.total, "EUR", lang)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-xs uppercase tracking-[0.2em]" style={{ color: "#6aaa7a" }}>
+                      Pagado
+                    </span>
+                    <span className="text-sm tabular-nums font-semibold" style={{ color: "#6aaa7a" }}>
+                      − {formatPrice((sessionData.pagadoCents ?? 0) / 100, "EUR", lang)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-baseline border-t pt-2" style={{ borderColor: "#e8e0d8" }}>
+                    <span className="text-xs uppercase tracking-[0.2em] font-bold" style={{ color: "#1a1612" }}>
+                      Pendiente
+                    </span>
+                    <span className="text-lg font-bold tabular-nums" style={{ color: "#1a1612" }}>
+                      {formatPrice(Math.max(0, sessionData.total - (sessionData.pagadoCents ?? 0) / 100), "EUR", lang)}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className="flex justify-between items-baseline py-4"
+                  style={{ fontFamily: "monospace" }}
                 >
-                  {t("mesaRunningTotal", lang)}
-                </span>
-                <span
-                  className="text-lg font-bold tabular-nums"
-                  style={{ color: "#1a1612" }}
-                >
-                  {formatPrice(sessionData.total, "EUR", lang)}
-                </span>
-              </div>
+                  <span
+                    className="text-xs uppercase tracking-[0.2em]"
+                    style={{ color: "#8a7560" }}
+                  >
+                    {t("mesaRunningTotal", lang)}
+                  </span>
+                  <span
+                    className="text-lg font-bold tabular-nums"
+                    style={{ color: "#1a1612" }}
+                  >
+                    {formatPrice(sessionData.total, "EUR", lang)}
+                  </span>
+                </div>
+              )}
 
               <DottedRule />
 
@@ -1597,7 +1672,7 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                   <span className="text-[#8a7d6b]">Pendiente</span>
                   <span className="font-semibold text-[#1a1612]">
                     {formatPrice(
-                      (Math.round(sessionData.total * 100) - (sessionData.itemsPagados ?? []).reduce((s, p) => s + p.importe_pagado_cents, 0)) / 100,
+                      Math.max(0, sessionData.total - (sessionData.pagadoCents ?? 0) / 100),
                       "EUR", lang
                     )}
                   </span>

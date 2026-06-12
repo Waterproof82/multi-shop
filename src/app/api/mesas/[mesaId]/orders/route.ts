@@ -65,10 +65,11 @@ export async function GET(
   let pagoEnCurso = false;
   let divisionTipo: string | null = null;
   let customTurno: { id: string; status: string; importeCents: number | null } | null = null;
-  let itemsPagados: { pedido_id: string; item_idx: number; unidades_pagadas: number; importe_pagado_cents: number }[] = [];
+  let itemsPagados: { pedido_id: string; item_idx: number; unidades_pagadas: number }[] = [];
+  let pagadoCents = 0;
   try {
     const supabaseAdmin = getSupabaseClient();
-    const [sesionRowResult, paymentRowsResult, itemsPagadosResult] = await Promise.all([
+    const [sesionRowResult, paymentRowsResult, itemsPagadosResult, pagadoTurnosResult] = await Promise.all([
       supabaseAdmin
         .from('mesa_sesiones')
         .select('division_personas, division_pagos_realizados, pago_en_curso, pago_iniciado_en, division_tipo, custom_turno_id, division_base_cents')
@@ -80,8 +81,13 @@ export async function GET(
         .eq('sesion_id', sesion.id),
       supabaseAdmin
         .from('mesa_item_pagos')
-        .select('pedido_id, item_idx, unidades_pagadas, importe_pagado_cents')
+        .select('pedido_id, item_idx, unidades_pagadas, turno_id')
         .eq('sesion_id', sesion.id),
+      supabaseAdmin
+        .from('mesa_pagos_personalizados')
+        .select('id, importe_cents')
+        .eq('sesion_id', sesion.id)
+        .eq('status', 'pagado'),
     ]);
 
     const row = sesionRowResult.data as {
@@ -109,9 +115,15 @@ export async function GET(
       }
     }
 
-    itemsPagados = (itemsPagadosResult.data ?? []) as {
-      pedido_id: string; item_idx: number; unidades_pagadas: number; importe_pagado_cents: number;
-    }[];
+    // Only expose items from confirmed (pagado) turns to the client
+    const pagadoTurnos = (pagadoTurnosResult.data ?? []) as { id: string; importe_cents: number | null }[];
+    const pagadoIds = new Set(pagadoTurnos.map(t => t.id));
+    pagadoCents = pagadoTurnos.reduce((s, t) => s + (t.importe_cents ?? 0), 0);
+
+    const rawItems = (itemsPagadosResult.data ?? []) as { pedido_id: string; item_idx: number; unidades_pagadas: number; turno_id: string }[];
+    itemsPagados = rawItems
+      .filter(ip => pagadoIds.has(ip.turno_id))
+      .map(({ pedido_id, item_idx, unidades_pagadas }) => ({ pedido_id, item_idx, unidades_pagadas }));
 
     if (row?.division_personas) {
       const personas = row.division_personas;
@@ -142,5 +154,5 @@ export async function GET(
     // best-effort
   }
 
-  return NextResponse.json({ orders, sesionId: sesion.id, total, pagosHabilitados, division, sesionPagada, pagoEnCurso, divisionTipo, customTurno, itemsPagados });
+  return NextResponse.json({ orders, sesionId: sesion.id, total, pagosHabilitados, division, sesionPagada, pagoEnCurso, divisionTipo, customTurno, itemsPagados, pagadoCents });
 }
