@@ -63,25 +63,61 @@ export async function GET(
   let division: { personas: number; pagosRealizados: number; importePorPersona: number } | null = null;
   let sesionPagada = false;
   let pagoEnCurso = false;
+  let divisionTipo: string | null = null;
+  let customTurno: { id: string; status: string; importeCents: number | null } | null = null;
+  let itemsPagados: { pedido_id: string; item_idx: number; unidades_pagadas: number; importe_pagado_cents: number }[] = [];
   try {
     const supabaseAdmin = getSupabaseClient();
-    const [sesionRowResult, paymentRowsResult] = await Promise.all([
+    const [sesionRowResult, paymentRowsResult, itemsPagadosResult] = await Promise.all([
       supabaseAdmin
         .from('mesa_sesiones')
-        .select('division_personas, division_pagos_realizados, pago_en_curso, pago_iniciado_en')
+        .select('division_personas, division_pagos_realizados, pago_en_curso, pago_iniciado_en, division_tipo, custom_turno_id, division_base_cents')
         .eq('id', sesion.id)
         .single(),
       supabaseAdmin
         .from('pedidos')
         .select('payment_status')
         .eq('sesion_id', sesion.id),
+      supabaseAdmin
+        .from('mesa_item_pagos')
+        .select('pedido_id, item_idx, unidades_pagadas, importe_pagado_cents')
+        .eq('sesion_id', sesion.id),
     ]);
 
-    const row = sesionRowResult.data as { division_personas: number | null; division_pagos_realizados: number; pago_en_curso: boolean; pago_iniciado_en: string | null } | null;
+    const row = sesionRowResult.data as {
+      division_personas: number | null;
+      division_pagos_realizados: number;
+      pago_en_curso: boolean;
+      pago_iniciado_en: string | null;
+      division_tipo: string | null;
+      custom_turno_id: string | null;
+      division_base_cents: number | null;
+    } | null;
+    divisionTipo = (row?.division_tipo as string | null) ?? null;
+    const customTurnoId = (row?.custom_turno_id as string | null) ?? null;
+    const divisionBaseCents = (row?.division_base_cents as number | null) ?? null;
+
+    if (customTurnoId) {
+      const { data: turnoRow } = await supabaseAdmin
+        .from('mesa_pagos_personalizados')
+        .select('id, status, importe_cents')
+        .eq('id', customTurnoId)
+        .maybeSingle();
+      if (turnoRow) {
+        const tr = turnoRow as { id: string; status: string; importe_cents: number | null };
+        customTurno = { id: tr.id, status: tr.status, importeCents: tr.importe_cents };
+      }
+    }
+
+    itemsPagados = (itemsPagadosResult.data ?? []) as {
+      pedido_id: string; item_idx: number; unidades_pagadas: number; importe_pagado_cents: number;
+    }[];
+
     if (row?.division_personas) {
       const personas = row.division_personas;
       const pagosRealizados = row.division_pagos_realizados;
-      const importePorPersona = Math.round((total / personas) * 100) / 100;
+      const baseTotal = divisionBaseCents != null ? divisionBaseCents / 100 : total;
+      const importePorPersona = Math.round((baseTotal / personas) * 100) / 100;
       division = { personas, pagosRealizados, importePorPersona };
     }
 
@@ -106,5 +142,5 @@ export async function GET(
     // best-effort
   }
 
-  return NextResponse.json({ orders, sesionId: sesion.id, total, pagosHabilitados, division, sesionPagada, pagoEnCurso });
+  return NextResponse.json({ orders, sesionId: sesion.id, total, pagosHabilitados, division, sesionPagada, pagoEnCurso, divisionTipo, customTurno, itemsPagados });
 }
