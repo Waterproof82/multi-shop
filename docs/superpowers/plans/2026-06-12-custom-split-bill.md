@@ -2059,4 +2059,85 @@ git commit -m "feat(mesa): custom split bill — pago personalizado por ítems (
 | Redsys webhook handles custom turns | Task 10 |
 | Manual payment handles custom turns | Task 11 |
 | i18n 5 languages | Task 13 |
+
+---
+
+## Post-Implementation Bug Fixes
+
+Bugs discovered and fixed after the initial implementation (Tasks 1–19).
+
+### DB: `complete_custom_payment` RPC — lost `sesion_pagada` write (migration 000004)
+
+**Migration:** `20260612190000_complete_custom_payment_set_sesion_pagada.sql`
+
+Migration `000004` (added `pago_en_curso` tracking) replaced the RPC but removed the atomic `sesion_pagada = true` + `payment_status = 'paid'` writes that existed in `000002`. The RPC only returned `sesion_completa = true` and relied on the webhook app layer to write to DB. If the webhook ran the old code (which ignored the result), `sesion_pagada` was never set and the session got stuck.
+
+**Fix:** Restored the DB writes inside the RPC itself — they are now atomic. The app layer is a redundant safety net, not the only path.
+
+### DB: `get_mesas_with_sessions` — `session_total` was `pending_total` (always 0 when served)
+
+**Migration:** `20260612191000_get_mesas_with_sessions_billing_total.sql`
+
+`pending_total` tracks items not yet served to the table. When all items are delivered, `pending_total = 0`. The waiter grid was reading `pending_total` as the bill total, so paid mesas showed "0.00€".
+
+**Fix:** `session_total` now reads `COALESCE((SELECT SUM(p.total) FROM pedidos p WHERE p.sesion_id = ms.id), 0)` — the actual billing total, always correct regardless of service state.
+
+### DB: `pago_en_curso` not tracked for custom turns (migration 000004)
+
+**Migration:** `20260613000004_custom_turn_pago_en_curso.sql`
+
+`claim_custom_turn` did not set `pago_en_curso = true`, so other users on the same session could not detect a payment was in progress. `complete_custom_payment` and `cancel_custom_turn` did not clear it either.
+
+**Fix:** `claim_custom_turn` sets `pago_en_curso = true, pago_iniciado_en = now()`. Both `complete_custom_payment` and `cancel_custom_turn` set `pago_en_curso = false`.
+
+### UI: Paid items not shown as green in `CustomItemRow`
+
+Paid items in the "Selecciona lo que vas a pagar" page were shown with `opacity-40` white, same as the empty state. Hard to distinguish.
+
+**Fix:** Paid items now render in green (`#6aaa7a`) with `line-through`. Badge "✓ pagado" aligned right alongside price.
+
+### UI: `fullyPaid` did not force all items to show as paid after a full payment
+
+When a full (non-itemised) payment completed after some custom turns, `paidByKey` only contained entries from `mesa_item_pagos`. Items not explicitly tracked as paid still showed as unpaid.
+
+**Fix:** `paidUnits = fullyPaid ? item.cantidad : (paidByKey.get(mergeKey) ?? 0)`.
+
+### UI: `externalPaymentInProgress` showed infinite spinner when session was fully paid
+
+`externalPaymentInProgress` was derived before `fullyPaid`, so a race where `pagoEnCurso = true` and `sesionPagada = true` simultaneously could trigger the spinner on an already-paid session.
+
+**Fix:** `fullyPaid` is derived first; `externalPaymentInProgress` is gated: `&& !fullyPaid`.
+
+### UI: Waiter grid showed "pagando" after full custom payment
+
+`get_mesas_with_sessions` reads `sesion_pagada` directly from DB. The `complete_custom_payment` fallback in `orders/route.ts` computed `sesionPagada = true` client-side but was a `void` fire-and-forget — it could race or fail silently, leaving `sesion_pagada = false` in DB.
+
+**Fix (combined):** The RPC now writes `sesion_pagada = true` atomically (see above). The fallback in `orders/route.ts` also writes `pago_en_curso = false` to cover stale lock state left by `initiateRedsysMesaPaymentUseCase`.
+
+### UI: Waiter ticket modal showed "Pagar la cuenta" button after payment
+
+`ticketMesa` was initialised from stale grid data. When the waiter opened the ticket, `sesionPagada` still had the old value.
+
+**Fix:** `handleViewTicket` reads fresh `sesionPagada` + `pagoEnCurso` from the orders API and patches `ticketMesa` state.
+
+### Use Case: `removeSessionItemUseCase` did not trigger `sesionPagada` after item removal
+
+When the waiter removed the last unpaid item from a personalizado session where everything else was already paid, the session could end up in "fully covered" state without `sesion_pagada = true` being set.
+
+**Fix:** After item removal, if `division_tipo = 'personalizado'` and `pagadoCents >= newSessionTotalCents`, the use case sets `sesion_pagada = true`, `pago_en_curso = false`.
+
+### Webhook: `processRedsysWebhookUseCase` Path 0 ignored `complete_custom_payment` result
+
+Path 0 called `complete_custom_payment` RPC but discarded the return value. When `sesion_completa = true`, `sesion_pagada` and `payment_status` were never updated.
+
+**Fix:** Result is now read. When `sesion_completa = true`, the webhook sets `payment_status = 'paid'` on all session pedidos and `sesion_pagada = true` on the session.
+
+### i18n: Voseo → Castilian Spanish
+
+5 translation keys in `translations.ts` used Rioplatense voseo forms. All updated to Castilian tuteo:
+- `"¿Cómo querés dividir?"` → `"¿Cómo quieres dividir?"`
+- `"Elegís el número de personas"` → `"Elige el número de personas"`
+- `"Esperá un momento."` → `"Espera un momento."`
+- `"Seleccioná lo que vas a pagar"` → `"Selecciona lo que vas a pagar"`
+- `"Seleccioná una dirección válida"` → `"Selecciona una dirección válida"`
 | Realtime updates for item_pagos | Task 18 |

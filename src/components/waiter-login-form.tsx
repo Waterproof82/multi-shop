@@ -464,8 +464,16 @@ export function WaiterLoginForm() {
     try {
       const res = await fetch(`/api/mesas/${encodeURIComponent(mesa.id)}/orders`);
       if (res.ok) {
-        const data = await res.json() as { orders: MesaOrder[] };
+        const data = await res.json() as { orders: MesaOrder[]; sesionPagada?: boolean; pagoEnCurso?: boolean };
         setTicketOrders(data.orders ?? []);
+        // Refresh payment state from the live API — the grid snapshot may be stale
+        if (data.sesionPagada !== undefined || data.pagoEnCurso !== undefined) {
+          setTicketMesa(prev => prev ? {
+            ...prev,
+            sesionPagada: data.sesionPagada ?? prev.sesionPagada,
+            pagoEnCurso: data.pagoEnCurso ?? prev.pagoEnCurso,
+          } : prev);
+        }
       }
     } catch {
       // best-effort
@@ -493,8 +501,15 @@ export function WaiterLoginForm() {
         try {
           const res = await fetch(`/api/waiter/mesas/${encodeURIComponent(ticketPendingDelete.mesaId)}/orders`);
           if (res.ok) {
-            const data = await res.json() as { orders: MesaOrder[] };
+            const data = await res.json() as { orders: MesaOrder[]; sesionPagada?: boolean; pagoEnCurso?: boolean };
             setTicketOrders(data.orders ?? []);
+            if (data.sesionPagada !== undefined || data.pagoEnCurso !== undefined) {
+              setTicketMesa(prev => prev ? {
+                ...prev,
+                sesionPagada: data.sesionPagada ?? prev.sesionPagada,
+                pagoEnCurso: data.pagoEnCurso ?? prev.pagoEnCurso,
+              } : prev);
+            }
           }
         } finally {
           setTicketLoading(false);

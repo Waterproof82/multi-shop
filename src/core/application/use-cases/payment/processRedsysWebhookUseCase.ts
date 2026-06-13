@@ -78,6 +78,43 @@ export async function processRedsysWebhookUseCase(
     const newPaymentStatus: 'paid' | 'failed' =
       responseNum >= 0 && responseNum <= 99 ? 'paid' : 'failed';
 
+    // ── Path 0: Custom turn payment (tracked in mesa_pagos_personalizados) ────────
+    const { data: customPago } = await supabase
+      .from('mesa_pagos_personalizados')
+      .select('id, status, sesion_id, empresa_id')
+      .eq('payment_order_ref', dsOrder)
+      .maybeSingle();
+
+    if (customPago) {
+      const cp = customPago as { id: string; status: string; sesion_id: string; empresa_id: string };
+
+      // Idempotency: only process if still en_pago
+      if (cp.status !== 'en_pago') {
+        return { success: true, data: { verified: true, skipped: true } };
+      }
+
+      if (newPaymentStatus === 'paid') {
+        const { data: completeResult } = await supabase.rpc('complete_custom_payment', { p_turno_id: cp.id });
+        const completeRow = (completeResult as { success: boolean; sesion_completa: boolean; out_sesion_id: string | null }[] | null)?.[0];
+        if (completeRow?.sesion_completa && completeRow.out_sesion_id) {
+          await supabase
+            .from('pedidos')
+            .update({ payment_status: 'paid' })
+            .eq('sesion_id', completeRow.out_sesion_id)
+            .eq('empresa_id', cp.empresa_id);
+          await supabase
+            .from('mesa_sesiones')
+            .update({ sesion_pagada: true })
+            .eq('id', completeRow.out_sesion_id);
+        }
+      } else {
+        // Failed payment: mark turno as cancelado, clear lock
+        await supabase.rpc('cancel_custom_turn', { p_turno_id: cp.id });
+      }
+
+      return { success: true, data: { verified: true, paymentStatus: newPaymentStatus } };
+    }
+
     // ── Path 1: Division payment (tracked in mesa_division_pagos) ──────────────
     const { data: divPago } = await supabase
       .from('mesa_division_pagos')
