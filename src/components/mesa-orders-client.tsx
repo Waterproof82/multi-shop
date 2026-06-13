@@ -778,6 +778,7 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
   const activeTurnoConfirmedRef = useRef(false);
   const [settingDivision, setSettingDivision] = useState(false);
   const [cancellingDivision, setCancellingDivision] = useState(false);
+  const [cancellingCustomTurn, setCancellingCustomTurn] = useState(false);
   const [manualPaying, setManualPaying] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<{ nombre: string; precio: number; maxCantidad: number; complementos?: { nombre: string; precio: number }[]; preparadoWarning?: boolean } | null>(null);
   const [deleteQty, setDeleteQty] = useState(1);
@@ -970,6 +971,50 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
       }
     };
   }, [mesaId]);
+
+  const cancelCustomTurn = useCallback(async () => {
+    setCancellingCustomTurn(true);
+    try {
+      await fetch(`/api/redsys/cancel-mesa?mesaId=${encodeURIComponent(mesaId)}`).catch(() => null);
+      setActiveTurnoId(null);
+      try { sessionStorage.removeItem(`mesa-custom-turno-${mesaId}`); } catch { /* ignore */ }
+      await refresh();
+    } finally {
+      setCancellingCustomTurn(false);
+    }
+  }, [mesaId, refresh]);
+
+  // On mount: if isInitiatingPayment is still true it means the user had navigated to
+  // Redsys (paying=true kept the lock) and then did a full-page back navigation.
+  // Release the stale lock immediately so the ticket is usable again.
+  useEffect(() => {
+    if (isInitiatingPayment) {
+      releaseCheckoutLock();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // bfcache recovery: on mobile the browser often restores the page from cache instead
+  // of doing a full reload. The pageshow event fires with persisted=true in that case,
+  // leaving paying=true in memory (spinner stuck forever). Reset all payment state.
+  useEffect(() => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      setPaying(false);
+      if (isInitiatingPaymentRef.current) {
+        releaseCheckoutLock();
+      }
+      const storedTurno = (() => { try { return sessionStorage.getItem(`mesa-custom-turno-${mesaId}`); } catch { return null; } })();
+      if (storedTurno) {
+        void fetch(`/api/redsys/cancel-mesa?mesaId=${encodeURIComponent(mesaId)}`).catch(() => null);
+        setActiveTurnoId(null);
+        try { sessionStorage.removeItem(`mesa-custom-turno-${mesaId}`); } catch { /* ignore */ }
+      }
+      void refresh();
+    };
+    window.addEventListener('pageshow', handlePageShow);
+    return () => window.removeEventListener('pageshow', handlePageShow);
+  }, [mesaId, releaseCheckoutLock, refresh]);
 
   useEffect(() => {
     fetch(`/api/mesas?token=${encodeURIComponent(mesaId)}`)
@@ -1277,12 +1322,25 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
     );
   }
 
-  // Own turn in payment: returned from Redsys, waiting for webhook to confirm
+  // Own turn in payment: waiting for Redsys webhook to confirm the payment.
+  // If the user pressed back from Redsys without completing payment the bfcache
+  // and mount effects above will have already cleared this state. The cancel button
+  // below is a last-resort escape for the rare full-reload case where those effects
+  // run before the server poll reflects the cancellation.
   if (activeTurnoId && sessionData?.customTurno?.id === activeTurnoId && sessionData?.customTurno?.status === 'en_pago') {
     return (
       <div className="min-h-screen bg-[#f0ede8] flex flex-col items-center justify-center gap-4 px-6 py-16 text-center">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#1a1612] border-t-transparent" />
         <p className="font-medium text-[#1a1612]">{t("mesaPagoEnCurso", lang)}</p>
+        <button
+          type="button"
+          onClick={() => { void cancelCustomTurn(); }}
+          disabled={cancellingCustomTurn}
+          className="mt-2 text-xs underline disabled:opacity-50"
+          style={{ color: '#8a7560' }}
+        >
+          {cancellingCustomTurn ? t('loading', lang) : t('cancel', lang)}
+        </button>
       </div>
     );
   }
