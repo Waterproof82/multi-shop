@@ -41,24 +41,31 @@ export async function removeSessionItemUseCase(
       const unitsInPedido = matching.reduce((s: number, i: Record<string, unknown>) => s + Number(i.cantidad), 0);
       const unitsToRemove = Math.min(unitsInPedido, cantidadRestante);
 
-      // Rebuild detalle_pedido: remove exactly unitsToRemove units
+      // Rebuild detalle_pedido: remove exactly unitsToRemove units.
+      // Track old→new index mapping so mesa_item_pagos can be kept in sync.
       let toRemove = unitsToRemove;
       const newItems: Array<Record<string, unknown>> = [];
-      for (const item of items) {
+      const indexRemap = new Map<number, number>(); // old idx → new idx
+      let newIdx = 0;
+      for (const [oldIdx, item] of items.entries()) {
         const isMatch =
           item.nombre === input.nombre && Math.abs(Number(item.precio) - input.precio) < 0.001;
         if (!isMatch || toRemove === 0) {
           newItems.push(item);
+          indexRemap.set(oldIdx, newIdx++);
         } else if (Number(item.cantidad) > toRemove) {
           newItems.push({ ...item, cantidad: Number(item.cantidad) - toRemove });
+          indexRemap.set(oldIdx, newIdx++);
           toRemove = 0;
         } else {
           toRemove -= Number(item.cantidad);
-          // item fully removed — don't push
+          // item fully removed — not in indexRemap
         }
       }
 
       if (newItems.length === 0) {
+        // Pedido fully removed — delete all its item payment rows
+        await supabase.from('mesa_item_pagos').delete().eq('pedido_id', pedido.id);
         await supabase.from('pedidos').delete().eq('id', pedido.id);
       } else {
         // Recalculate total
@@ -76,6 +83,24 @@ export async function removeSessionItemUseCase(
           newTotal
         );
         if (!updateResult.success) return { success: false, error: updateResult.error };
+
+        // Fix mesa_item_pagos indices that shifted due to item removal.
+        // 1. Delete rows for items that were fully removed.
+        const removedIndices = [...Array(items.length).keys()].filter(i => !indexRemap.has(i));
+        if (removedIndices.length > 0) {
+          await supabase.from('mesa_item_pagos').delete()
+            .eq('pedido_id', pedido.id)
+            .in('item_idx', removedIndices);
+        }
+        // 2. Update shifted indices (high→low to avoid conflicts).
+        const shifted = Array.from(indexRemap.entries())
+          .filter(([old, nw]) => old !== nw)
+          .sort((a, b) => b[0] - a[0]); // descending old index
+        for (const [oldI, newI] of shifted) {
+          await supabase.from('mesa_item_pagos').update({ item_idx: newI })
+            .eq('pedido_id', pedido.id)
+            .eq('item_idx', oldI);
+        }
       }
 
       cantidadRestante -= unitsToRemove;
