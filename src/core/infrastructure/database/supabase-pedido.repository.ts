@@ -943,7 +943,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     try {
       const { data: sessions, error: sessionsError } = await this.supabase
         .from('mesa_sesiones')
-        .select(`id, created_at, items_diferidos, mesa_id, mesas!inner(numero, nombre)`)
+        .select(`id, created_at, items_diferidos, mesa_id, mesas!mesa_id(numero, nombre)`)
         .eq('empresa_id', empresaId)
         .is('cerrada_at', null);
 
@@ -968,6 +968,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
             nombre: item['itemName'] as string,
             cantidad: item['quantity'] as number,
             complementos: complements?.map(c => c.name).join(', '),
+            mesaId: (row['mesa_id'] as string | null) ?? null,
             mesaNumero: (mesaData['numero'] as number) ?? null,
             mesaNombre: (mesaData['nombre'] as string | null) ?? null,
             sesionCreatedAt,
@@ -984,24 +985,13 @@ export class SupabasePedidoRepository implements IPedidoRepository {
 
   async findKitchenOrders(empresaId: string): Promise<Result<KitchenOrderItem[]>> {
     try {
-      const { data: activeSessions, error: sessionsError } = await this.supabase
-        .from('mesa_sesiones')
-        .select('id')
-        .eq('empresa_id', empresaId)
-        .is('cerrada_at', null);
-
-      if (sessionsError) {
-        await logger.logAndReturnError('DB_SELECT_ERROR', sessionsError.message, 'repository', 'SupabasePedidoRepository.findKitchenOrders', { details: { code: sessionsError.code, empresaId } });
-        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener sesiones', module: 'repository', method: 'findKitchenOrders' } };
-      }
-
-      const sessionIds = (activeSessions ?? []).map(s => (s as Record<string, unknown>).id as string);
-      if (sessionIds.length === 0) return { success: true, data: [] };
-
+      // Filter by empresa_id + estado directly — do NOT filter by active session.
+      // Orders must remain visible in the kitchen after a mesa closes until they
+      // are marked servido/cerrado/cancelado.
       const { data: orders, error: ordersError } = await this.supabase
         .from('pedidos')
         .select(`id, numero_pedido, sesion_id, detalle_pedido, estado, created_at, mesas!inner(numero, nombre)`)
-        .in('sesion_id', sessionIds)
+        .eq('empresa_id', empresaId)
         .in('estado', ['pendiente', 'anotado', 'preparado'])
         .order('created_at', { ascending: true });
 
@@ -1057,24 +1047,12 @@ export class SupabasePedidoRepository implements IPedidoRepository {
    */
   async findBarOrders(empresaId: string): Promise<Result<BarOrderItem[]>> {
     try {
-      const { data: activeSessions, error: sessionsError } = await this.supabase
-        .from('mesa_sesiones')
-        .select('id')
-        .eq('empresa_id', empresaId)
-        .is('cerrada_at', null);
-
-      if (sessionsError) {
-        await logger.logAndReturnError('DB_SELECT_ERROR', sessionsError.message, 'repository', 'SupabasePedidoRepository.findBarOrders', { details: { code: sessionsError.code, empresaId } });
-        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener sesiones', module: 'repository', method: 'findBarOrders' } };
-      }
-
-      const sessionIds = (activeSessions ?? []).map(s => (s as Record<string, unknown>).id as string);
-      if (sessionIds.length === 0) return { success: true, data: [] };
-
+      // Filter by empresa_id + estado directly — do NOT filter by active session.
+      // Bar orders must remain visible after a mesa closes until served.
       const { data: orders, error: ordersError } = await this.supabase
         .from('pedidos')
         .select(`id, numero_pedido, sesion_id, detalle_pedido, estado, created_at, mesas!inner(numero, nombre)`)
-        .in('sesion_id', sessionIds)
+        .eq('empresa_id', empresaId)
         .eq('estado', 'pendiente')
         .order('created_at', { ascending: true });
 
@@ -1147,27 +1125,14 @@ export class SupabasePedidoRepository implements IPedidoRepository {
 
   // ── Per-item kitchen state ─────────────────────────────────────────────────
 
-  /** Shared helper: fetch all comida items from active sessions with their effective estado */
+  /** Shared helper: fetch all comida items with their effective estado.
+   * Does NOT filter by active session — orders must remain visible after mesa closes. */
   private async fetchAllComidaItems(empresaId: string): Promise<Result<KitchenItemRecord[]>> {
     try {
-      const { data: activeSessions, error: sessionsError } = await this.supabase
-        .from('mesa_sesiones')
-        .select('id')
-        .eq('empresa_id', empresaId)
-        .is('cerrada_at', null);
-
-      if (sessionsError) {
-        await logger.logAndReturnError('DB_SELECT_ERROR', sessionsError.message, 'repository', 'SupabasePedidoRepository.fetchAllComidaItems', { details: { code: sessionsError.code, empresaId } });
-        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener sesiones', module: 'repository', method: 'fetchAllComidaItems' } };
-      }
-
-      const sessionIds = (activeSessions ?? []).map(s => (s as Record<string, unknown>).id as string);
-      if (sessionIds.length === 0) return { success: true, data: [] };
-
       const { data: orders, error: ordersError } = await this.supabase
         .from('pedidos')
         .select('id, numero_pedido, sesion_id, detalle_pedido, created_at, mesas!inner(numero, nombre)')
-        .in('sesion_id', sessionIds)
+        .eq('empresa_id', empresaId)
         .not('estado', 'in', '("servido","cerrado","cancelado")')
         .order('created_at', { ascending: true });
 
@@ -1266,6 +1231,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         cantidad:     d.cantidad,
         complementos: d.complementos,
         estado:       'retenido' as ItemEstado,
+        mesaId:       d.mesaId,
         mesaNumero:   d.mesaNumero,
         mesaNombre:   d.mesaNombre,
         createdAt:    d.sesionCreatedAt,

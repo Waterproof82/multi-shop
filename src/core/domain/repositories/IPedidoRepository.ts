@@ -21,6 +21,7 @@ export interface RetenidoItem {
   nombre: string;
   cantidad: number;
   complementos?: string;
+  mesaId: string | null;
   mesaNumero: number | null;
   mesaNombre: string | null;
   sesionCreatedAt: string;
@@ -65,6 +66,7 @@ export interface KitchenItemRecord {
   cantidad: number;
   complementos?: string;
   estado: ItemEstado;
+  mesaId?: string | null;
   mesaNumero: number | null;
   mesaNombre: string | null;
   createdAt: string;
