@@ -67,9 +67,11 @@ export async function GET(
   let customTurno: { id: string; status: string; importeCents: number | null } | null = null;
   let itemsPagados: { pedido_id: string; item_idx: number; unidades_pagadas: number }[] = [];
   let pagadoCents = 0;
+  let itemsDiferidos: unknown[] = [];
   try {
     const supabaseAdmin = getSupabaseClient();
-    const [sesionRowResult, paymentRowsResult, itemsPagadosResult, pagadoTurnosResult] = await Promise.all([
+
+    const [sesionRowResult, paymentRowsResult, itemsPagadosResult, pagadoTurnosResult, deferredRowResult] = await Promise.all([
       supabaseAdmin
         .from('mesa_sesiones')
         .select('division_personas, division_pagos_realizados, pago_en_curso, pago_iniciado_en, division_tipo, custom_turno_id, division_base_cents')
@@ -88,7 +90,14 @@ export async function GET(
         .select('id, importe_cents')
         .eq('sesion_id', sesion.id)
         .eq('status', 'pagado'),
+      supabaseAdmin
+        .from('mesa_sesiones')
+        .select('items_diferidos')
+        .eq('id', sesion.id)
+        .maybeSingle(),
     ]);
+
+    itemsDiferidos = (deferredRowResult.data as { items_diferidos: unknown[] } | null)?.items_diferidos ?? [];
 
     const row = sesionRowResult.data as {
       division_personas: number | null;
@@ -138,24 +147,46 @@ export async function GET(
       division = { personas, pagosRealizados, importePorPersona };
     }
 
-    if (division) {
-      // Division: sesionPagada when the RPC counter says all shares are paid.
-      // Do NOT use payment_status here — after the first share, the anchor pedido
-      // is already 'paid' which would give a false positive on a single-pedido session.
-      sesionPagada = division.pagosRealizados >= division.personas;
-    } else {
-      // Full payment: sesionPagada when every pedido in the session is 'paid'.
-      const paymentRows = (paymentRowsResult.data ?? []) as { payment_status: string }[];
-      if (paymentRows.length > 0) {
-        sesionPagada = paymentRows.every(r => r.payment_status === 'paid');
+    // Trust the DB flag first — it's the authoritative source set by RPCs.
+    // Re-derive only when DB says not paid, to catch cases where the flag
+    // wasn't synced (e.g. partial personalizado followed by waiter item deletion).
+    sesionPagada = sesion.sesionPagada;
+
+    if (!sesionPagada) {
+      if (division) {
+        // Division: sesionPagada when the RPC counter says all shares are paid.
+        // Do NOT use payment_status here — after the first share, the anchor pedido
+        // is already 'paid' which would give a false positive on a single-pedido session.
+        sesionPagada = division.pagosRealizados >= division.personas;
+      } else {
+        // Full payment: sesionPagada when every pedido in the session is 'paid'.
+        const paymentRows = (paymentRowsResult.data ?? []) as { payment_status: string }[];
+        if (paymentRows.length > 0) {
+          sesionPagada = paymentRows.every(r => r.payment_status === 'paid');
+        }
       }
     }
 
-    // Personalizado fallback: if pagadoCents fully covers the session total
-    // (e.g. waiter removed an item that was the last unpaid one), treat as fully paid.
-    if (!sesionPagada && divisionTipo === 'personalizado' && pagadoCents > 0) {
-      const sessionTotalCents = Math.round(total * 100);
-      if (sessionTotalCents > 0 && pagadoCents >= sessionTotalCents) {
+    // Personalizado fallback: all CURRENT items must be individually covered by
+    // itemsPagados. Using total-vs-pagadoCents was wrong — if the waiter deletes a
+    // paid item, pagadoCents stays the same but total drops, triggering a false positive.
+    if (!sesionPagada && divisionTipo === 'personalizado' && itemsPagados.length > 0) {
+      const currentItems = ordersResult.data.flatMap((o) =>
+        (o.detalle_pedido as { cantidad: number }[]).map((it, idx) => ({
+          pedido_id: o.id as string,
+          item_idx: idx,
+          cantidad: it.cantidad,
+        }))
+      );
+      const allItemsPaid =
+        currentItems.length > 0 &&
+        currentItems.every(({ pedido_id, item_idx, cantidad }) => {
+          const paidUnits = itemsPagados
+            .filter(ip => ip.pedido_id === pedido_id && ip.item_idx === item_idx)
+            .reduce((s, ip) => s + ip.unidades_pagadas, 0);
+          return paidUnits >= cantidad;
+        });
+      if (allItemsPaid) {
         sesionPagada = true;
         // Sync to DB so the waiter grid (which reads sesion_pagada directly) picks it up
         void supabaseAdmin
@@ -173,5 +204,5 @@ export async function GET(
     // best-effort
   }
 
-  return NextResponse.json({ orders, sesionId: sesion.id, total, pagosHabilitados, division, sesionPagada, pagoEnCurso, divisionTipo, customTurno, itemsPagados, pagadoCents });
+  return NextResponse.json({ orders, sesionId: sesion.id, total, pagosHabilitados, division, sesionPagada, pagoEnCurso, divisionTipo, customTurno, itemsPagados, pagadoCents, itemsDiferidos });
 }

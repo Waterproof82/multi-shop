@@ -43,6 +43,22 @@ export async function POST(
   }
 
   const supabase = getSupabaseClient();
+
+  // Block if a payment is currently in progress (someone is at Redsys)
+  const LOCK_EXPIRY_MS = 15 * 60 * 1000;
+  const { data: sesionRow } = await supabase
+    .from('mesa_sesiones')
+    .select('pago_en_curso, pago_iniciado_en')
+    .eq('id', sesionResult.data.id)
+    .single();
+
+  const lockFresh = sesionRow?.pago_iniciado_en
+    ? Date.now() - new Date(sesionRow.pago_iniciado_en as string).getTime() < LOCK_EXPIRY_MS
+    : false;
+  if (sesionRow?.pago_en_curso && lockFresh) {
+    return NextResponse.json({ error: 'PAGO_EN_CURSO' }, { status: 409 });
+  }
+
   const { error } = await supabase
     .from('mesa_sesiones')
     .update({

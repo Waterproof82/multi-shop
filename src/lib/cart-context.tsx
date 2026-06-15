@@ -36,7 +36,7 @@ export interface AddedItemInfo {
 
 interface CartContextType {
   items: CartItem[]
-  addItem: (item: MenuItemVM, quantity?: number, selectedComplements?: Complement[]) => void
+  addItem: (item: MenuItemVM, quantity?: number, selectedComplements?: Complement[], deferred?: boolean) => void
   removeItem: (cartId: string) => void
   updateQuantity: (cartId: string, quantity: number) => void
   clearCart: () => void
@@ -102,7 +102,7 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
     }
   }, [])
 
-  const addItem = useCallback((item: MenuItemVM, quantity = 1, selectedComplements?: Complement[]) => {
+  const addItem = useCallback((item: MenuItemVM, quantity = 1, selectedComplements?: Complement[], deferred?: boolean) => {
     const itemKey = getItemKey(item, selectedComplements);
     const complementPrice = selectedComplements?.reduce((s, c) => s + c.price, 0) || 0;
     const totalItemPrice = (item.price + complementPrice) * quantity;
@@ -126,7 +126,7 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
           index === existingIndex ? { ...ci, quantity: ci.quantity + quantity } : ci
         )
       }
-      return [...prev, { cartId: newCartId(), item, quantity, selectedComplements, justAdded: true }]
+      return [...prev, { cartId: newCartId(), item, quantity, selectedComplements, justAdded: true, deferred: deferred ?? undefined }]
     })
   }, [])
 

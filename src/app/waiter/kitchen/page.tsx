@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
-import { UtensilsCrossed, ChevronLeft, TimerOff } from 'lucide-react';
+import { UtensilsCrossed, ChevronLeft, TimerOff, CheckCheck, PlayCircle } from 'lucide-react';
 import type { ItemEstado } from '@/core/domain/repositories/IPedidoRepository';
 
 interface KitchenItem {
@@ -14,6 +14,7 @@ interface KitchenItem {
   cantidad: number;
   complementos?: string;
   estado: ItemEstado;
+  mesaId?: string | null;
   mesaNumero: number | null;
   mesaNombre: string | null;
   createdAt: string;
@@ -34,8 +35,9 @@ const TIME_COLORS = [
   { max: Infinity, label: '60+ min',   bg: 'oklch(22% 0.22 16)',  border: 'oklch(56% 0.36 16  / 0.70)', text: 'oklch(78% 0.34 16)'  },
 ];
 
-const LISTO_COLOR    = { bg: 'oklch(22% 0.18 148)', border: 'oklch(52% 0.26 148 / 0.65)' };
-const RETENIDO_COLOR = { bg: 'oklch(20% 0.05 252)', border: 'oklch(38% 0.08 252 / 0.35)' };
+const LISTO_COLOR         = { bg: 'oklch(22% 0.18 148)', border: 'oklch(52% 0.26 148 / 0.65)' };
+const RETENIDO_COLOR      = { bg: 'oklch(20% 0.05 252)', border: 'oklch(38% 0.08 252 / 0.35)' };
+const DIFERIDO_CART_COLOR = { bg: 'oklch(21% 0.10 65)',  border: 'oklch(50% 0.22 65  / 0.55)' };
 
 const THRESHOLD = 80;
 
@@ -96,6 +98,8 @@ export default function WaiterKitchenPage() {
   const lang = language as Parameters<typeof t>[1];
   const [items, setItems] = useState<KitchenItem[]>([]);
   const [groupBy, setGroupBy] = useState<'order' | 'mesa' | 'listos'>('order');
+  const [servingMesas, setServingMesas] = useState<Set<string>>(new Set());
+  const [liberatingMesas, setLiberatingMesas] = useState<Set<string>>(new Set());
   const pointerStartX = useRef<number | null>(null);
   const swipingKey    = useRef<string | null>(null);
 
@@ -233,6 +237,35 @@ export default function WaiterKitchenPage() {
   const retenidoItems = items.filter(i => i.estado === 'retenido');
   const hasAny        = items.length > 0;
 
+  const handleTodosServidos = useCallback(async (mesaKey: string, listosInMesa: KitchenItem[]) => {
+    if (listosInMesa.length === 0) return;
+    setServingMesas(prev => new Set(prev).add(mesaKey));
+    try {
+      await Promise.all(listosInMesa.map(item =>
+        fetch(`/api/waiter/kitchen/items/${encodeURIComponent(item.pedidoId)}/${item.itemIdx}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ estado: 'servido' }),
+        })
+      ));
+      setItems(prev => prev.filter(i => !listosInMesa.some(l => l.pedidoId === i.pedidoId && l.itemIdx === i.itemIdx)));
+    } finally {
+      setServingMesas(prev => { const next = new Set(prev); next.delete(mesaKey); return next; });
+    }
+  }, []);
+
+  const handleLiberarRetenidos = useCallback(async (mesaKey: string, mesaId: string) => {
+    setLiberatingMesas(prev => new Set(prev).add(mesaKey));
+    try {
+      const r = await fetch(`/api/waiter/kitchen/mesas/${encodeURIComponent(mesaId)}/release-deferred`, { method: 'POST' });
+      if (r.ok) {
+        setItems(prev => prev.filter(i => !(i.isDiferido && (i.mesaNombre ?? `Mesa ${i.mesaNumero ?? '—'}`) === mesaKey)));
+      }
+    } finally {
+      setLiberatingMesas(prev => { const next = new Set(prev); next.delete(mesaKey); return next; });
+    }
+  }, []);
+
   function renderItemCard(item: KitchenItem) {
     const key        = item.isDiferido ? `dif-${item.pedidoId}-${item.itemIdx}` : makeKey(item.pedidoId, item.itemIdx);
     const isEnPrep   = item.estado === 'en_preparacion';
@@ -242,8 +275,9 @@ export default function WaiterKitchenPage() {
     const elapsed = getElapsedMinutes(item.createdAt);
 
     const baseTimeColor = getTimeColor(elapsed);
-    const cardColor: { bg: string; border: string } = isListo    ? LISTO_COLOR
-      : isRetenido ? RETENIDO_COLOR
+    const cardColor: { bg: string; border: string } = isListo              ? LISTO_COLOR
+      : isRetenido && item.isDiferido ? DIFERIDO_CART_COLOR
+      : isRetenido                    ? RETENIDO_COLOR
       : baseTimeColor;
 
     const hintText = isListo
@@ -303,6 +337,9 @@ export default function WaiterKitchenPage() {
               } : isEnPrep ? {
                 background: 'oklch(32% 0.16 90 / 0.5)',
                 color:      'oklch(82% 0.20 90)',
+              } : isRetenido && item.isDiferido ? {
+                background: 'oklch(28% 0.14 65 / 0.5)',
+                color:      'oklch(78% 0.20 65)',
               } : isRetenido ? {
                 background: 'oklch(28% 0.08 252 / 0.5)',
                 color:      TEXT_DIM,
@@ -313,11 +350,13 @@ export default function WaiterKitchenPage() {
             >
               {isListo
                 ? t('kitchenItemListo', lang)
-                : isRetenido
-                  ? t('kitchenItemRetenido', lang)
-                  : isEnPrep
-                    ? t('orderStatusAnotado', lang)
-                    : t('orderStatusPending', lang)}
+                : isRetenido && item.isDiferido
+                  ? t('kitchenItemCarrito', lang)
+                  : isRetenido
+                    ? t('kitchenItemRetenido', lang)
+                    : isEnPrep
+                      ? t('orderStatusAnotado', lang)
+                      : t('orderStatusPending', lang)}
             </span>
           </div>
         </div>
@@ -485,6 +524,11 @@ export default function WaiterKitchenPage() {
                 const diff = order(a) - order(b);
                 return diff !== 0 ? diff : a.createdAt.localeCompare(b.createdAt);
               });
+              const listosInMesa = group.items.filter(i => i.estado === 'listo');
+              const diferidosInMesa = group.items.filter(i => i.isDiferido);
+              const diferidoMesaId = diferidosInMesa[0]?.mesaId ?? null;
+              const isServing    = servingMesas.has(mesaKey);
+              const isLiberating = liberatingMesas.has(mesaKey);
               return (
                 <div
                   key={mesaKey}
@@ -501,6 +545,33 @@ export default function WaiterKitchenPage() {
                   <div className="flex flex-col gap-2 p-2">
                     {sorted.map(renderItemCard)}
                   </div>
+                  {(listosInMesa.length > 0 || diferidoMesaId) && (
+                    <div
+                      className="flex gap-2 px-2 pb-2"
+                      style={{ borderTop: '1px solid oklch(35% 0.08 252 / 0.4)', paddingTop: '0.5rem' }}
+                    >
+                      {listosInMesa.length > 0 && (
+                        <button
+                          onClick={() => void handleTodosServidos(mesaKey, listosInMesa)}
+                          disabled={isServing}
+                          className="flex-1 rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:opacity-50"
+                          style={{ background: 'oklch(26% 0.16 148)', color: 'oklch(80% 0.22 148)', border: '1px solid oklch(45% 0.22 148 / 0.6)' }}
+                        >
+                          {isServing ? '…' : <span className="flex items-center justify-center gap-1.5"><CheckCheck className="w-3.5 h-3.5" />{t('kitchenTodosServidos', lang)}</span>}
+                        </button>
+                      )}
+                      {diferidoMesaId && (
+                        <button
+                          onClick={() => void handleLiberarRetenidos(mesaKey, diferidoMesaId)}
+                          disabled={isLiberating}
+                          className="flex-1 rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:opacity-50"
+                          style={{ background: 'oklch(24% 0.12 65)', color: 'oklch(78% 0.20 65)', border: '1px solid oklch(48% 0.20 65 / 0.6)' }}
+                        >
+                          {isLiberating ? '…' : <span className="flex items-center justify-center gap-1.5"><PlayCircle className="w-3.5 h-3.5" />{t('kitchenLiberarRetenidos', lang)}</span>}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
