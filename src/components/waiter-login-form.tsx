@@ -31,36 +31,6 @@ export function getWaiterMesa(): WaiterMesaSession | null {
   }
 }
 
-interface OrderItem {
-  nombre: string;
-  cantidad: number;
-  precio: number;
-  complementos?: { nombre: string; precio: number }[];
-}
-
-interface MesaOrder {
-  id: string;
-  numeroPedido: number;
-  estado: string;
-  items: OrderItem[];
-  createdAt: string;
-}
-
-function mergeOrderItems(items: OrderItem[]): OrderItem[] {
-  const map = new Map<string, OrderItem>();
-  for (const item of items) {
-    const compsKey = (item.complementos ?? []).map(c => c.nombre).sort().join(',');
-    const key = `${item.nombre}||${item.precio}||${compsKey}`;
-    const existing = map.get(key);
-    if (existing) {
-      existing.cantidad += item.cantidad;
-    } else {
-      map.set(key, { ...item, complementos: item.complementos ? [...item.complementos] : undefined });
-    }
-  }
-  return [...map.values()];
-}
-
 type Step = "pin" | "tables";
 
 async function fetchMesas(): Promise<MesaWithSession[]> {
@@ -335,8 +305,8 @@ function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onViewTicket, onC
         </button>
       )}
 
-      {/* Cerrar mesa — pagada o con pedidos */}
-      {(isPaid || isOpen) && onCloseMesa && (
+      {/* Cerrar mesa — visible siempre que haya sesión activa y no haya pago en curso */}
+      {!!mesa.sesionId && !isPaymentInProgress && onCloseMesa && (
         <button
           onClick={onCloseMesa}
           className="w-full rounded-lg px-2 py-1.5 flex items-center justify-center gap-1.5 hover:brightness-125 transition-all"
@@ -362,14 +332,7 @@ export function WaiterLoginForm() {
   const [loading, setLoading] = useState(false);
   const [mesaLoading, setMesaLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [ticketMesa, setTicketMesa] = useState<MesaWithSession | null>(null);
-  const [ticketOrders, setTicketOrders] = useState<MesaOrder[]>([]);
-  const [ticketLoading, setTicketLoading] = useState(false);
-  const [ticketPendingDelete, setTicketPendingDelete] = useState<{ mesaId: string; nombre: string; precio: number; maxCantidad: number; complementos?: { nombre: string; precio: number }[]; preparadoWarning?: boolean } | null>(null);
-  const [ticketDeleteQty, setTicketDeleteQty] = useState(1);
-  const [ticketDeleting, setTicketDeleting] = useState(false);
   const [closeBlockedError, setCloseBlockedError] = useState<string | null>(null);
-  const [manualPaying, setManualPaying] = useState(false);
 
   const refresh = useCallback(async () => {
     const data = await fetchMesas();
@@ -426,6 +389,11 @@ export function WaiterLoginForm() {
   }
 
   async function handleCloseMesa(mesa: MesaWithSession) {
+    if (mesa.itemsDiferidos.length > 0) {
+      setCloseBlockedError('Hay ítems retenidos. Libéralos o elimínalos antes de cerrar la mesa.');
+      setTimeout(() => setCloseBlockedError(null), 5000);
+      return;
+    }
     setMesaLoading(mesa.id);
     try {
       // Guard: check if payment is required before allowing close
@@ -445,80 +413,23 @@ export function WaiterLoginForm() {
     }
   }
 
-  async function handleGridManualPayment() {
-    if (!ticketMesa || manualPaying) return;
-    setManualPaying(true);
-    try {
-      await fetch(`/api/waiter/mesas/${encodeURIComponent(ticketMesa.id)}/manual-payment`, { method: 'POST' });
-      setTicketMesa(null);
-      await refresh();
-    } finally {
-      setManualPaying(false);
-    }
-  }
-
   async function handleViewTicket(mesa: MesaWithSession) {
-    setTicketMesa(mesa);
-    setTicketOrders([]);
-    setTicketLoading(true);
+    setMesaLoading(mesa.id);
     try {
-      const res = await fetch(`/api/mesas/${encodeURIComponent(mesa.id)}/orders`);
+      const res = await fetch("/api/waiter/mesa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mesaNumero: mesa.numero }),
+      });
       if (res.ok) {
-        const data = await res.json() as { orders: MesaOrder[]; sesionPagada?: boolean; pagoEnCurso?: boolean };
-        setTicketOrders(data.orders ?? []);
-        // Refresh payment state from the live API — the grid snapshot may be stale
-        if (data.sesionPagada !== undefined || data.pagoEnCurso !== undefined) {
-          setTicketMesa(prev => prev ? {
-            ...prev,
-            sesionPagada: data.sesionPagada ?? prev.sesionPagada,
-            pagoEnCurso: data.pagoEnCurso ?? prev.pagoEnCurso,
-          } : prev);
-        }
+        const data = await res.json() as { mesaId: string; mesaNumero: number; mesaNombre: string | null };
+        saveWaiterMesa({ mesaId: data.mesaId, mesaNumero: data.mesaNumero, mesaNombre: data.mesaNombre });
+        router.push(`/mesa/${data.mesaId}/orders`);
       }
-    } catch {
-      // best-effort
     } finally {
-      setTicketLoading(false);
+      setMesaLoading(null);
     }
   }
-
-  const handleTicketDeleteItem = useCallback(async () => {
-    if (!ticketPendingDelete || ticketDeleting) return;
-    setTicketDeleting(true);
-    try {
-      await fetch(`/api/waiter/mesas/${encodeURIComponent(ticketPendingDelete.mesaId)}/orders/items`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nombre: ticketPendingDelete.nombre,
-          precio: ticketPendingDelete.precio,
-          cantidadAEliminar: ticketDeleteQty,
-        }),
-      });
-      setTicketPendingDelete(null);
-      if (ticketMesa) {
-        setTicketLoading(true);
-        try {
-          const res = await fetch(`/api/waiter/mesas/${encodeURIComponent(ticketPendingDelete.mesaId)}/orders`);
-          if (res.ok) {
-            const data = await res.json() as { orders: MesaOrder[]; sesionPagada?: boolean; pagoEnCurso?: boolean };
-            setTicketOrders(data.orders ?? []);
-            if (data.sesionPagada !== undefined || data.pagoEnCurso !== undefined) {
-              setTicketMesa(prev => prev ? {
-                ...prev,
-                sesionPagada: data.sesionPagada ?? prev.sesionPagada,
-                pagoEnCurso: data.pagoEnCurso ?? prev.pagoEnCurso,
-              } : prev);
-            }
-          }
-        } finally {
-          setTicketLoading(false);
-        }
-      }
-    } finally {
-      setTicketDeleting(false);
-    }
-  }, [ticketPendingDelete, ticketDeleteQty, ticketDeleting, ticketMesa]);
 
   async function handleMesaNav(mesa: MesaWithSession, openCart = false) {
     setMesaLoading(mesa.id);
@@ -678,218 +589,6 @@ export function WaiterLoginForm() {
         </div>
       )}
 
-      {/* Ticket modal */}
-      {ticketMesa && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "oklch(0% 0 0 / 0.75)" }}
-          onClick={() => setTicketMesa(null)}
-        >
-          <div
-            className="relative w-full max-w-sm rounded-2xl overflow-hidden flex flex-col"
-            style={{ background: "oklch(14% 0.02 252)", border: "1px solid oklch(28% 0.04 252 / 0.8)", maxHeight: "85dvh" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 pt-5 pb-3" style={{ borderBottom: "1px solid oklch(28% 0.04 252 / 0.6)" }}>
-              <div className="flex items-center gap-2">
-                <ReceiptText className="w-4 h-4" style={{ color: "oklch(62% 0.08 252)" }} />
-                <span className="text-sm font-bold tracking-wide" style={{ color: "oklch(85% 0.04 252)" }}>
-                  Mesa {ticketMesa.numero}{ticketMesa.nombre ? ` — ${ticketMesa.nombre}` : ""}
-                </span>
-              </div>
-              <button
-                onClick={() => setTicketMesa(null)}
-                className="flex items-center justify-center w-7 h-7 rounded-full transition-all hover:brightness-125"
-                style={{ background: "oklch(22% 0.03 252 / 0.8)" }}
-                aria-label="Cerrar"
-              >
-                <X className="w-3.5 h-3.5" style={{ color: "oklch(60% 0.06 252)" }} />
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="overflow-y-auto flex-1 px-5 py-4">
-              {ticketLoading && (
-                <p className="text-center py-8 text-sm" style={{ color: "oklch(50% 0.05 252)" }}>Cargando…</p>
-              )}
-              {!ticketLoading && ticketOrders.length === 0 && (
-                <p className="text-center py-8 text-sm" style={{ color: "oklch(50% 0.05 252)" }}>Sin pedidos</p>
-              )}
-              {!ticketLoading && ticketOrders.length > 0 && (() => {
-                const allItems = mergeOrderItems(ticketOrders.flatMap((o) => o.items));
-                const total = allItems.reduce((sum, item) => {
-                  const compTotal = item.complementos?.reduce((s, c) => s + c.precio, 0) ?? 0;
-                  return sum + (item.precio + compTotal) * item.cantidad;
-                }, 0);
-                return (
-                  <div className="flex flex-col gap-0">
-                    {allItems.map((item) => {
-                      const compTotal = item.complementos?.reduce((s, c) => s + c.precio, 0) ?? 0;
-                      const lineTotal = (item.precio + compTotal) * item.cantidad;
-                      return (
-                        <div key={`${item.nombre}||${item.precio}`} className="flex items-center gap-2 py-2" style={{ borderBottom: "1px solid oklch(22% 0.03 252 / 0.6)" }}>
-                          {!ticketMesa?.sesionPagada && !ticketMesa?.pagoEnCurso && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const isPreparado = ticketOrders.some(
-                                o => o.estado === 'preparado' && o.items.some(i => i.nombre === item.nombre && Math.abs(i.precio - item.precio) < 0.001)
-                              );
-                              setTicketPendingDelete({ mesaId: ticketMesa!.id, nombre: item.nombre, precio: item.precio, maxCantidad: item.cantidad, complementos: item.complementos, preparadoWarning: isPreparado });
-                              setTicketDeleteQty(1);
-                            }}
-                            className="flex items-center justify-center shrink-0 w-5 h-5 rounded-full text-xs font-bold"
-                            style={{ background: "oklch(35% 0.14 25 / 0.8)", color: "oklch(80% 0.10 25)" }}
-                            aria-label={`Eliminar ${item.nombre}`}
-                          >
-                            −
-                          </button>
-                        )}
-                          <div className="flex flex-col min-w-0 flex-1">
-                            <span className="text-sm font-medium leading-snug" style={{ color: "oklch(82% 0.04 252)" }}>
-                              <span className="font-bold mr-1" style={{ color: "oklch(65% 0.08 252)" }}>×{item.cantidad}</span>
-                              {item.nombre}
-                            </span>
-                            {item.complementos && item.complementos.length > 0 && (
-                              <span className="text-[10px] mt-0.5" style={{ color: "oklch(48% 0.05 252)" }}>
-                                {item.complementos.map((c) => c.nombre).join(", ")}
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-sm font-bold shrink-0 tabular-nums ml-auto" style={{ color: "oklch(72% 0.08 252)" }}>
-                            {formatPrice(lineTotal)}
-                          </span>
-                        </div>
-                      );
-                    })}
-                    <div className="flex items-center justify-between pt-3 mt-1">
-                      <span className="text-sm font-bold uppercase tracking-wide" style={{ color: "oklch(60% 0.06 252)" }}>Total</span>
-                      <span className="text-lg font-black tabular-nums" style={{ color: "oklch(88% 0.04 252)" }}>
-                        {formatPrice(total)}
-                      </span>
-                    </div>
-                    {ticketMesa && !ticketMesa.sesionPagada && (
-                      <button
-                        type="button"
-                        onClick={() => { void handleGridManualPayment(); }}
-                        disabled={manualPaying}
-                        className="w-full mt-4 py-3 rounded-xl text-sm font-bold tracking-widest uppercase transition-opacity disabled:opacity-50"
-                        style={{ backgroundColor: "oklch(22% 0.06 148 / 0.8)", color: "oklch(82% 0.18 148)", border: "1px solid oklch(45% 0.20 148 / 0.5)" }}
-                      >
-                        {manualPaying ? "Registrando..." : "Marcar pagada (efectivo)"}
-                      </button>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete item confirmation modal — grid ticket */}
-      {ticketPendingDelete && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-6"
-          style={{ background: "oklch(0% 0 0 / 0.75)" }}
-          onClick={() => { if (!ticketDeleting) setTicketPendingDelete(null); }}
-        >
-          <div
-            className="w-full max-w-xs rounded-2xl p-5 flex flex-col gap-4"
-            style={{ background: "oklch(14% 0.02 252)", border: "1px solid oklch(28% 0.04 252 / 0.8)" }}
-            onClick={e => e.stopPropagation()}
-          >
-            {ticketPendingDelete.preparadoWarning ? (
-              <>
-                <p className="text-sm font-bold text-center" style={{ color: "oklch(85% 0.04 252)" }}>⚠️ Pedido ya preparado</p>
-                <p className="text-xs text-center" style={{ color: "oklch(50% 0.05 252)" }}>
-                  Este ítem ya fue marcado como listo en cocina. ¿Quieres eliminarlo igualmente?
-                </p>
-                <div className="flex gap-2 mt-1">
-                  <button
-                    type="button"
-                    onClick={() => setTicketPendingDelete(null)}
-                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
-                    style={{ background: "oklch(22% 0.04 252 / 0.5)", color: "oklch(60% 0.06 252)" }}
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTicketPendingDelete(d => d ? { ...d, preparadoWarning: false } : d)}
-                    className="flex-1 py-2.5 rounded-xl text-sm font-bold"
-                    style={{ background: "oklch(35% 0.14 25 / 0.9)", color: "oklch(85% 0.08 25)" }}
-                  >
-                    Continuar
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="flex flex-col gap-1 text-center">
-                  <p className="text-sm font-bold" style={{ color: "oklch(85% 0.04 252)" }}>
-                    Eliminar: {ticketPendingDelete.nombre}
-                  </p>
-                  {ticketPendingDelete.complementos && ticketPendingDelete.complementos.length > 0 && (
-                    <ul className="flex flex-col gap-0.5">
-                      {ticketPendingDelete.complementos.map((c, i) => (
-                        <li key={i} className="text-xs" style={{ color: "oklch(50% 0.05 252)" }}>↳ {c.nombre}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-                <div className="flex items-center justify-center gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setTicketDeleteQty(q => Math.max(1, q - 1))}
-                    disabled={ticketDeleteQty <= 1}
-                    className="w-9 h-9 rounded-full text-lg font-bold flex items-center justify-center disabled:opacity-30"
-                    style={{ background: "oklch(22% 0.04 252 / 0.6)", color: "oklch(82% 0.04 252)" }}
-                  >
-                    −
-                  </button>
-                  <span className="text-2xl font-black w-8 text-center tabular-nums" style={{ color: "oklch(88% 0.04 252)" }}>
-                    {ticketDeleteQty}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setTicketDeleteQty(q => Math.min(ticketPendingDelete.maxCantidad, q + 1))}
-                    disabled={ticketDeleteQty >= ticketPendingDelete.maxCantidad}
-                    className="w-9 h-9 rounded-full text-lg font-bold flex items-center justify-center disabled:opacity-30"
-                    style={{ background: "oklch(22% 0.04 252 / 0.6)", color: "oklch(82% 0.04 252)" }}
-                  >
-                    +
-                  </button>
-                </div>
-                <p className="text-xs text-center" style={{ color: "oklch(50% 0.05 252)" }}>
-                  de {ticketPendingDelete.maxCantidad} unidades
-                </p>
-                <div className="flex gap-2 mt-1">
-                  <button
-                    type="button"
-                    onClick={() => setTicketPendingDelete(null)}
-                    disabled={ticketDeleting}
-                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
-                    style={{ background: "oklch(22% 0.04 252 / 0.5)", color: "oklch(60% 0.06 252)" }}
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { void handleTicketDeleteItem(); }}
-                    disabled={ticketDeleting}
-                    className="flex-1 py-2.5 rounded-xl text-sm font-bold"
-                    style={{ background: "oklch(35% 0.14 25 / 0.9)", color: "oklch(85% 0.08 25)" }}
-                  >
-                    {ticketDeleting ? "…" : "Confirmar"}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
