@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ChevronLeft, Table2 } from 'lucide-react';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
+import type { Language } from '@/lib/language-context';
 
 interface PendienteItem {
   idx: number;
@@ -43,9 +44,52 @@ function formatTimer(minutes: number): string {
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
+function getConfirmLabel(lang: Language, isConfirming: boolean, sendCount: number): string {
+  if (isConfirming) return '...';
+  if (sendCount > 0) return t('pendientesConfirmar', lang).replace('{n}', String(sendCount));
+  return t('pendientesRetenerTodos', lang);
+}
+
+interface PedidoItemButtonProps {
+  item: PendienteItem;
+  isRetained: boolean;
+  lang: Language;
+  onToggle: () => void;
+}
+
+function PedidoItemButton({ item, isRetained, lang, onToggle }: PedidoItemButtonProps) {
+  return (
+    <button
+      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left"
+      style={{
+        background: isRetained ? 'oklch(21% 0.10 65)' : 'oklch(15% 0.04 148)',
+        border: `1px solid ${isRetained ? 'oklch(50% 0.22 65 / 0.55)' : 'oklch(40% 0.14 148 / 0.4)'}`,
+      }}
+      onClick={onToggle}>
+      <div className="w-4 h-4 rounded flex-shrink-0 flex items-center justify-center"
+        style={{
+          background: isRetained ? 'transparent' : 'oklch(50% 0.22 148)',
+          border: `2px solid ${isRetained ? 'oklch(55% 0.04 252)' : 'oklch(50% 0.22 148)'}`,
+        }}>
+        {!isRetained && <span style={{ color: '#fff', fontSize: 9, fontWeight: 'bold' }}>✓</span>}
+      </div>
+      <span className="flex-1 text-xs" style={{ color: isRetained ? 'oklch(65% 0.14 65)' : TEXT_MAIN }}>
+        {item.cantidad}× {item.nombre}
+      </span>
+      <span className="text-[10px] shrink-0" style={{ color: isRetained ? 'oklch(65% 0.14 65)' : TEXT_DIM }}>
+        {item.tipo}
+      </span>
+      {isRetained && (
+        <span className="text-[10px] shrink-0 font-medium" style={{ color: 'oklch(72% 0.18 65)' }}>
+          {t('kitchenItemRetenido', lang)}
+        </span>
+      )}
+    </button>
+  );
+}
+
 export default function WaiterPendientesPage() {
-  const { language } = useLanguage();
-  const lang = language as Parameters<typeof t>[1];
+  const { language: lang } = useLanguage();
   const [mesas, setMesas] = useState<PendienteMesa[]>([]);
   const [retainMap, setRetainMap] = useState<Record<string, Set<number>>>({});
   const [confirming, setConfirming] = useState<Set<string>>(new Set());
@@ -89,12 +133,8 @@ export default function WaiterPendientesPage() {
         body: JSON.stringify({ pedidoId, retainIndices }),
       });
       if (r.ok) {
-        setMesas(prev =>
-          prev.map(m => ({
-            ...m,
-            pedidos: m.pedidos.filter(p => p.id !== pedidoId),
-          })).filter(m => m.pedidos.length > 0)
-        );
+        const removePedido = (m: PendienteMesa) => ({ ...m, pedidos: m.pedidos.filter(p => p.id !== pedidoId) });
+        setMesas(prev => prev.map(removePedido).filter(m => m.pedidos.length > 0));
         setRetainMap(prev => { const n = { ...prev }; delete n[pedidoId]; return n; });
       }
     } finally {
@@ -151,40 +191,15 @@ export default function WaiterPendientesPage() {
                       </div>
 
                       <div className="flex flex-col gap-1.5 p-2">
-                        {pedido.items.map(item => {
-                          const isRetained = retained.has(item.idx);
-                          return (
-                            <button
-                              key={item.idx}
-                              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left"
-                              style={{
-                                background: isRetained ? 'oklch(21% 0.10 65)' : 'oklch(15% 0.04 148)',
-                                border: `1px solid ${isRetained ? 'oklch(50% 0.22 65 / 0.55)' : 'oklch(40% 0.14 148 / 0.4)'}`,
-                              }}
-                              onClick={() => toggleRetain(pedido.id, item.idx)}>
-                              <div className="w-4 h-4 rounded flex-shrink-0 flex items-center justify-center"
-                                style={{
-                                  background: isRetained ? 'transparent' : 'oklch(50% 0.22 148)',
-                                  border: `2px solid ${isRetained ? 'oklch(55% 0.04 252)' : 'oklch(50% 0.22 148)'}`,
-                                }}>
-                                {!isRetained && <span style={{ color: '#fff', fontSize: 9, fontWeight: 'bold' }}>✓</span>}
-                              </div>
-                              <span className="flex-1 text-xs" style={{ color: isRetained ? 'oklch(65% 0.14 65)' : TEXT_MAIN }}>
-                                {item.cantidad}× {item.nombre}
-                              </span>
-                              <span className="text-[10px] shrink-0"
-                                style={{ color: isRetained ? 'oklch(65% 0.14 65)' : TEXT_DIM }}>
-                                {item.tipo}
-                              </span>
-                              {isRetained && (
-                                <span className="text-[10px] shrink-0 font-medium"
-                                  style={{ color: 'oklch(72% 0.18 65)' }}>
-                                  {t('kitchenItemRetenido', lang)}
-                                </span>
-                              )}
-                            </button>
-                          );
-                        })}
+                        {pedido.items.map(item => (
+                          <PedidoItemButton
+                            key={item.idx}
+                            item={item}
+                            isRetained={retained.has(item.idx)}
+                            lang={lang}
+                            onToggle={() => toggleRetain(pedido.id, item.idx)}
+                          />
+                        ))}
                       </div>
 
                       <div className="px-2 pb-2" style={{ borderTop: '1px solid oklch(35% 0.08 252 / 0.4)', paddingTop: '0.5rem' }}>
@@ -198,12 +213,7 @@ export default function WaiterPendientesPage() {
                             opacity: isConfirming ? 0.6 : 1,
                           }}
                           onClick={() => { void handleConfirm(pedido.id); }}>
-                          {isConfirming
-                            ? '...'
-                            : sendCount > 0
-                              ? t('pendientesConfirmar', lang).replace('{n}', String(sendCount))
-                              : t('pendientesRetenerTodos', lang)
-                          }
+                          {getConfirmLabel(lang, isConfirming, sendCount)}
                         </button>
                       </div>
                     </div>
