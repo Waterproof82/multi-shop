@@ -410,7 +410,6 @@ export function WaiterBanner() {
               <div className="flex items-center gap-0.5">
                 <BadgeCircle count={counts.cocina.total} color="neutral" />
                 <BadgeCircle count={counts.cocina.listos} color="green" />
-                <BadgeCircle count={counts.cocina.retenidos} color="orange" />
               </div>
             )}
           </button>
@@ -429,7 +428,6 @@ export function WaiterBanner() {
               <div className="flex items-center gap-0.5">
                 <BadgeCircle count={counts.bebidas.total} color="neutral" />
                 <BadgeCircle count={counts.bebidas.listos} color="green" />
-                <BadgeCircle count={counts.bebidas.retenidos} color="orange" />
               </div>
             )}
           </button>
