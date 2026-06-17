@@ -847,10 +847,10 @@ export class SupabasePedidoRepository implements IPedidoRepository {
    * the parent pedido.estado remains `pendiente`; the bar page is responsible
    * for PATCHing it to `anotado` once all bebidas are served.
    */
-  private tallyCocinaItems(items: KitchenItemRecord[], retenidosBase: number): { total: number; listos: number; retenidos: number } {
+  private tallyCocinaItems(items: KitchenItemRecord[]): { total: number; listos: number; retenidos: number } {
     let total = 0;
     let listos = 0;
-    let retenidos = retenidosBase;
+    let retenidos = 0;
     for (const item of items) {
       if (item.estado === 'pendiente' || item.estado === 'en_preparacion') total++;
       else if (item.estado === 'listo')    listos++;
@@ -905,15 +905,11 @@ export class SupabasePedidoRepository implements IPedidoRepository {
 
   async countKitchenBarOrders(empresaId: string): Promise<Result<KitchenBarCounts>> {
     try {
-      // Cocina counts: per-item estado + deferred cart items
-      const [itemsResult, diferidosResult] = await Promise.all([
-        this.fetchAllComidaItems(empresaId),
-        this.findAllRetenidos(empresaId, 'comida'),
-      ]);
+      // Cocina counts: per-item estado from pedido_item_estados
+      const itemsResult = await this.fetchAllComidaItems(empresaId);
       if (!itemsResult.success) return { success: false, error: itemsResult.error };
 
-      const retenidosBase = diferidosResult.success ? diferidosResult.data.length : 0;
-      const cocina = this.tallyCocinaItems(itemsResult.data, retenidosBase);
+      const cocina = this.tallyCocinaItems(itemsResult.data);
 
       // Bar counts: pure bebida orders in pendiente state (unchanged)
       const { data: activeSessions, error: sessionsError } = await this.supabase
@@ -1146,9 +1142,9 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     try {
       const { data: orders, error: ordersError } = await this.supabase
         .from('pedidos')
-        .select('id, numero_pedido, sesion_id, detalle_pedido, created_at, mesas!inner(numero, nombre)')
+        .select('id, estado, numero_pedido, sesion_id, detalle_pedido, created_at, mesas!inner(numero, nombre)')
         .eq('empresa_id', empresaId)
-        .not('estado', 'in', '("servido","cerrado","cancelado")')
+        .not('estado', 'in', '("servido","cerrado","cancelado","pendiente_validacion")')
         .order('created_at', { ascending: true });
 
       if (ordersError) {
@@ -1191,10 +1187,12 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         const mesaData = row['mesas'] as Record<string, unknown> ?? {};
         const pedidoId = row['id'] as string;
         const pedidoEstados = estadoMap.get(pedidoId) ?? new Map<number, ItemEstado>();
+        const pedidoNivelEstado = row['estado'] as string;
 
         items.forEach((item, idx) => {
           if (item['tipo_producto'] !== 'comida') return;
-          const estado: ItemEstado = pedidoEstados.get(idx) ?? 'pendiente';
+          const defaultEstado: ItemEstado = pedidoNivelEstado === 'retenido' ? 'retenido' : 'pendiente';
+          const estado: ItemEstado = pedidoEstados.get(idx) ?? defaultEstado;
           const complements = item['complementos'] as Array<{ nombre?: string; name?: string }> | undefined;
           result.push({
             pedidoId,

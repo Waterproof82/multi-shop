@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { ChevronLeft, Table2 } from 'lucide-react';
+import { ChevronLeft, Table2, UtensilsCrossed, Wine } from 'lucide-react';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import type { Language } from '@/lib/language-context';
@@ -44,11 +44,6 @@ function formatTimer(minutes: number): string {
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
-function getConfirmLabel(lang: Language, isConfirming: boolean, sendCount: number): string {
-  if (isConfirming) return '...';
-  if (sendCount > 0) return t('pendientesConfirmar', lang).replace('{n}', String(sendCount));
-  return t('pendientesRetenerTodos', lang);
-}
 
 interface PedidoItemButtonProps {
   item: PendienteItem;
@@ -76,9 +71,10 @@ function PedidoItemButton({ item, isRetained, lang, onToggle }: PedidoItemButton
       <span className="flex-1 text-xs" style={{ color: isRetained ? 'oklch(65% 0.14 65)' : TEXT_MAIN }}>
         {item.cantidad}× {item.nombre}
       </span>
-      <span className="text-[10px] shrink-0" style={{ color: isRetained ? 'oklch(65% 0.14 65)' : TEXT_DIM }}>
-        {item.tipo}
-      </span>
+      {item.tipo === 'comida'
+        ? <UtensilsCrossed className="w-3 h-3 shrink-0" style={{ color: isRetained ? 'oklch(65% 0.14 65)' : 'oklch(62% 0.14 62)' }} />
+        : <Wine className="w-3 h-3 shrink-0" style={{ color: isRetained ? 'oklch(65% 0.14 65)' : 'oklch(62% 0.14 252)' }} />
+      }
       {isRetained && (
         <span className="text-[10px] shrink-0 font-medium" style={{ color: 'oklch(72% 0.18 65)' }}>
           {t('kitchenItemRetenido', lang)}
@@ -123,10 +119,31 @@ export default function WaiterPendientesPage() {
     });
   }, []);
 
-  const handleConfirm = useCallback(async (pedidoId: string) => {
+  const toggleAllRetain = useCallback((pedidoId: string, items: PendienteItem[]) => {
+    setRetainMap(prev => {
+      const current = prev[pedidoId] ?? new Set<number>();
+      const allRetained = items.every(i => current.has(i.idx));
+      if (allRetained) {
+        const n = { ...prev };
+        delete n[pedidoId];
+        return n;
+      }
+      return { ...prev, [pedidoId]: new Set(items.map(i => i.idx)) };
+    });
+  }, []);
+
+  const handleConfirm = useCallback(async (pedidoId: string, sendTipo?: 'comida' | 'bebida') => {
     setConfirming(prev => new Set(prev).add(pedidoId));
     try {
-      const retainIndices = Array.from(retainMap[pedidoId] ?? []);
+      const manualRetain = Array.from(retainMap[pedidoId] ?? []);
+      let retainIndices = manualRetain;
+      if (sendTipo) {
+        const pedido = mesas.flatMap(m => m.pedidos).find(p => p.id === pedidoId);
+        if (pedido) {
+          const autoRetain = pedido.items.filter(i => i.tipo !== sendTipo).map(i => i.idx);
+          retainIndices = [...new Set([...autoRetain, ...manualRetain])];
+        }
+      }
       const r = await fetch('/api/waiter/pendientes/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -140,7 +157,7 @@ export default function WaiterPendientesPage() {
     } finally {
       setConfirming(prev => { const n = new Set(prev); n.delete(pedidoId); return n; });
     }
-  }, [retainMap]);
+  }, [retainMap, mesas]);
 
   const totalItems = mesas.reduce((s, m) => s + m.pedidos.reduce((sp, p) => sp + p.items.length, 0), 0);
 
@@ -178,9 +195,14 @@ export default function WaiterPendientesPage() {
               <div className="flex flex-col gap-3">
                 {mesa.pedidos.map(pedido => {
                   const retained = retainMap[pedido.id] ?? new Set<number>();
-                  const sendCount = pedido.items.length - retained.size;
                   const isConfirming = confirming.has(pedido.id);
                   const elapsed = getElapsedMinutes(pedido.createdAt);
+                  const allRetained = pedido.items.every(i => retained.has(i.idx));
+
+                  const cocinaItems = pedido.items.filter(i => i.tipo === 'comida');
+                  const barItems = pedido.items.filter(i => i.tipo === 'bebida');
+                  const sendCocinaCount = cocinaItems.filter(i => !retained.has(i.idx)).length;
+                  const sendBarCount = barItems.filter(i => !retained.has(i.idx)).length;
 
                   return (
                     <div key={pedido.id} className="rounded-xl overflow-hidden"
@@ -188,6 +210,16 @@ export default function WaiterPendientesPage() {
                       <div className="flex items-center gap-2 px-3 py-2"
                         style={{ background: 'oklch(18% 0.03 252)', borderBottom: '1px solid oklch(35% 0.08 252 / 0.4)' }}>
                         <span className="text-[10px] font-mono" style={{ color: TEXT_DIM }}>{formatTimer(elapsed)}</span>
+                        <button
+                          className="ml-auto text-[10px] px-2 py-0.5 rounded font-medium"
+                          style={{
+                            background: allRetained ? 'oklch(21% 0.10 65)' : 'oklch(20% 0.05 252)',
+                            color: allRetained ? 'oklch(72% 0.18 65)' : TEXT_DIM,
+                            border: `1px solid ${allRetained ? 'oklch(50% 0.22 65 / 0.4)' : 'oklch(38% 0.06 252 / 0.5)'}`,
+                          }}
+                          onClick={() => toggleAllRetain(pedido.id, pedido.items)}>
+                          {allRetained ? t('pendientesSeleccionarTodos', lang) : t('pendientesDeseleccionarTodos', lang)}
+                        </button>
                       </div>
 
                       <div className="flex flex-col gap-1.5 p-2">
@@ -202,19 +234,37 @@ export default function WaiterPendientesPage() {
                         ))}
                       </div>
 
-                      <div className="px-2 pb-2" style={{ borderTop: '1px solid oklch(35% 0.08 252 / 0.4)', paddingTop: '0.5rem' }}>
-                        <button
-                          className="w-full rounded-lg py-2 text-xs font-semibold"
-                          disabled={isConfirming}
-                          style={{
-                            background: sendCount > 0 ? 'oklch(22% 0.14 148)' : 'oklch(21% 0.10 65)',
-                            color: sendCount > 0 ? 'oklch(74% 0.20 148)' : 'oklch(72% 0.18 65)',
-                            border: `1px solid ${sendCount > 0 ? 'oklch(46% 0.22 148 / 0.6)' : 'oklch(50% 0.22 65 / 0.5)'}`,
-                            opacity: isConfirming ? 0.6 : 1,
-                          }}
-                          onClick={() => { void handleConfirm(pedido.id); }}>
-                          {getConfirmLabel(lang, isConfirming, sendCount)}
-                        </button>
+                      <div className="px-2 pb-2 flex gap-2" style={{ borderTop: '1px solid oklch(35% 0.08 252 / 0.4)', paddingTop: '0.5rem' }}>
+                        {cocinaItems.length > 0 && (
+                          <button
+                            className="flex-1 rounded-lg py-2 text-xs font-semibold flex items-center justify-center gap-1.5"
+                            disabled={isConfirming}
+                            style={{
+                              background: sendCocinaCount > 0 ? 'oklch(22% 0.14 148)' : 'oklch(21% 0.10 65)',
+                              color: sendCocinaCount > 0 ? 'oklch(74% 0.20 148)' : 'oklch(72% 0.18 65)',
+                              border: `1px solid ${sendCocinaCount > 0 ? 'oklch(46% 0.22 148 / 0.6)' : 'oklch(50% 0.22 65 / 0.5)'}`,
+                              opacity: isConfirming ? 0.6 : 1,
+                            }}
+                            onClick={() => { void handleConfirm(pedido.id, 'comida'); }}>
+                            <UtensilsCrossed className="w-3 h-3 shrink-0" />
+                            {isConfirming ? '...' : sendCocinaCount > 0 ? t('pendientesConfirmar', lang).replace('{n}', String(sendCocinaCount)) : t('pendientesRetenerTodos', lang)}
+                          </button>
+                        )}
+                        {barItems.length > 0 && (
+                          <button
+                            className="flex-1 rounded-lg py-2 text-xs font-semibold flex items-center justify-center gap-1.5"
+                            disabled={isConfirming}
+                            style={{
+                              background: sendBarCount > 0 ? 'oklch(20% 0.10 252)' : 'oklch(21% 0.10 65)',
+                              color: sendBarCount > 0 ? 'oklch(70% 0.16 252)' : 'oklch(72% 0.18 65)',
+                              border: `1px solid ${sendBarCount > 0 ? 'oklch(45% 0.18 252 / 0.6)' : 'oklch(50% 0.22 65 / 0.5)'}`,
+                              opacity: isConfirming ? 0.6 : 1,
+                            }}
+                            onClick={() => { void handleConfirm(pedido.id, 'bebida'); }}>
+                            <Wine className="w-3 h-3 shrink-0" />
+                            {isConfirming ? '...' : sendBarCount > 0 ? t('pendientesConfirmarBar', lang).replace('{n}', String(sendBarCount)) : t('pendientesRetenerTodos', lang)}
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
