@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect, useRef } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, Check, Gift, UtensilsCrossed, Pause } from "lucide-react"
 import { useReducedMotion } from "framer-motion"
@@ -98,11 +98,8 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     updateQuantity,
     removeItem,
     clearCart,
-    clearNonDeferred,
     toggleDeferred,
     releaseAllDeferred,
-    loadDeferredItems,
-    syncDeferredItems,
     totalPrice,
     isCartOpen,
     openCart,
@@ -111,8 +108,6 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
   const { language } = useLanguage()
   const router = useRouter();
   const shouldReduceMotion = useReducedMotion() ?? false;
-  // Keyed to mesaId so a mesa-switch also triggers a reload
-  const deferredLoadedRef = useRef<string | null>(null);
   const [sending, setSending] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState<{ numeroPedido: number } | null>(null);
   const [activeOrderTokens, setActiveOrderTokens] = useState<string[]>([]);
@@ -178,60 +173,6 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     setActiveOrderTokens(getTrackingTokens());
   }, [isCartOpen]);
 
-  // Load/sync deferred items from DB when a mesa is identified or when the cart is opened.
-  // Uses syncDeferredItems (replace, not merge) so external changes (kitchen release) are reflected.
-  useEffect(() => {
-    if (!isWaiterMode) return;
-    const mesaId = mesaInfo?.id ?? mesaToken;
-    if (!mesaId) return;
-    // Force a fresh sync every time the cart opens; initial load when mesaId first detected.
-    if (isCartOpen) deferredLoadedRef.current = null;
-    if (deferredLoadedRef.current === mesaId) return;
-    deferredLoadedRef.current = mesaId;
-
-    fetch(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/deferred`)
-      .then(async r => {
-        if (!r.ok) return;
-        const data = await r.json() as { items: Array<{ itemId: string; itemName: string; price: number; quantity: number; translations?: Record<string, { name: string }>; selectedComplements?: Array<{ id: string; name: string; price: number }> }> };
-        syncDeferredItems(data.items ?? []);
-      })
-      .catch(() => null);
-  }, [mesaInfo, mesaToken, syncDeferredItems, isWaiterMode, isCartOpen]);
-
-  // Explicitly persist a computed deferred list to DB. Called immediately at each action
-  // (toggle, remove, quantity change) so there are no timing or race-condition issues.
-  const saveDeferredToDb = useCallback((deferredItems: CartItem[]) => {
-    if (!isWaiterMode || !mesaToken) return;
-    const mesaId = mesaInfo?.id ?? mesaToken;
-    void fetch(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/deferred`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        items: deferredItems.map(ci => ({
-          itemId: ci.item.id,
-          itemName: ci.item.name,
-          price: ci.item.price,
-          quantity: ci.quantity,
-          tipo: ci.item.tipoProducto,
-          translations: ci.item.translations,
-          selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
-        })),
-      }),
-    });
-  }, [isWaiterMode, mesaToken, mesaInfo]);
-
-  // Auto-save whenever deferred items change through any path (e.g. addItem from QuantitySelectorDialog).
-  // Explicit calls in toggle/remove/quantity handlers still fire too — all PUTs are idempotent.
-  const deferredSaveKeyRef = useRef('');
-  useEffect(() => {
-    if (!isWaiterMode || !mesaToken) return;
-    if (!deferredLoadedRef.current) return; // skip until initial DB load is triggered
-    const deferredItems = items.filter(ci => ci.deferred);
-    const key = deferredItems.map(ci => `${ci.item.id}:${ci.quantity}`).join(',');
-    if (key === deferredSaveKeyRef.current) return;
-    deferredSaveKeyRef.current = key;
-    saveDeferredToDb(deferredItems);
-  }, [items, isWaiterMode, mesaToken, saveDeferredToDb]);
 
   const [discountCode, setDiscountCode] = useState('');
   const [discountValid, setDiscountValid] = useState<{ valid: boolean; porcentaje: number } | null>(null);
@@ -324,23 +265,25 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
             // localStorage may be unavailable
           }
 
-          // Save deferred items to DB (empty array clears if none remain)
-          await fetch(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/deferred`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              items: toDefer.map(ci => ({
-                itemId: ci.item.id,
-                itemName: ci.item.name,
-                price: ci.item.price,
-                quantity: ci.quantity,
-                translations: ci.item.translations,
-                selectedComplements: ci.selectedComplements,
-              })),
-            }),
-          }).catch(() => null);
+          if (toDefer.length > 0) {
+            await fetch('/api/pedidos', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                tipo: 'mesa',
+                mesa_id: mesaId,
+                initialEstado: 'retenido',
+                items: toDefer.map((ci: CartItem) => ({
+                  item: { id: ci.item.id, name: ci.item.name, price: ci.item.price, translations: ci.item.translations },
+                  quantity: ci.quantity,
+                  selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
+                })),
+                idioma: language,
+              }),
+            }).catch(() => null); // fire-and-forget — failure is non-critical
+          }
 
-          clearNonDeferred();
+          clearCart();
           closeCart();
           setShowOrderToast(true);
           setTimeout(() => setShowOrderToast(false), 2000);
@@ -487,7 +430,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     } finally {
       setSending(false);
     }
-  }, [mesaToken, mesaInfo, isWaiterMode, nombre, telefono, countryCode, email, deliveryMethod, deliveryAddress, deliveryPostalCode, deliveryLatitude, deliveryLongitude, isRestaurant, pagosPickupHabilitados, items, language, discountCode, estimatedFeeCents, clearCart, clearNonDeferred, closeCart, router]);
+  }, [mesaToken, mesaInfo, isWaiterMode, nombre, telefono, countryCode, email, deliveryMethod, deliveryAddress, deliveryPostalCode, deliveryLatitude, deliveryLongitude, isRestaurant, pagosPickupHabilitados, items, language, discountCode, estimatedFeeCents, clearCart, closeCart, router]);
 
   // After releaseAllDeferred updates items, fire the order
   useEffect(() => {
@@ -748,13 +691,6 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                           onClick={() => {
                             const newQty = ci.quantity - 1;
                             updateQuantity(ci.cartId, newQty);
-                            if (ci.deferred) {
-                              saveDeferredToDb(
-                                newQty <= 0
-                                  ? items.filter(c => c.deferred && c.cartId !== ci.cartId)
-                                  : items.filter(c => c.deferred).map(c => c.cartId === ci.cartId ? { ...c, quantity: newQty } : c)
-                              );
-                            }
                           }}
                           aria-label={t("reduceQuantity", language)}
                         >
@@ -770,11 +706,6 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                           onClick={() => {
                             const newQty = ci.quantity + 1;
                             updateQuantity(ci.cartId, newQty);
-                            if (ci.deferred) {
-                              saveDeferredToDb(
-                                items.filter(c => c.deferred).map(c => c.cartId === ci.cartId ? { ...c, quantity: newQty } : c)
-                              );
-                            }
                           }}
                           aria-label={t("increaseQuantity", language)}
                         >
@@ -785,9 +716,6 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                           size="icon"
                           className="min-h-11 min-w-11 h-11 w-11 text-destructive hover:text-destructive hover:bg-destructive/10 transition-all duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => {
-                            if (ci.deferred) {
-                              saveDeferredToDb(items.filter(c => c.deferred && c.cartId !== ci.cartId));
-                            }
                             removeItem(ci.cartId);
                           }}
                           aria-label={`${t("remove", language)} ${(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}`}
@@ -798,13 +726,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                           <button
                             type="button"
                             onClick={() => {
-                              const willBeDeferred = !ci.deferred;
                               toggleDeferred(ci.cartId);
-                              saveDeferredToDb(
-                                willBeDeferred
-                                  ? [...items.filter(c => c.deferred), ci]
-                                  : items.filter(c => c.deferred && c.cartId !== ci.cartId)
-                              );
                             }}
                             className="flex items-center justify-center rounded-md p-1.5 transition-colors duration-150 min-h-[44px] min-w-[44px]"
                             style={{
