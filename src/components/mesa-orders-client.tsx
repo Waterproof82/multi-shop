@@ -373,8 +373,7 @@ function DivisionTypeModal({
         onClick={onClose}
         aria-label="Cerrar"
       />
-      <div className="w-full max-w-md rounded-t-2xl bg-white p-6 shadow-2xl relative z-10"
-           onClick={e => e.stopPropagation()}>
+      <div className="w-full max-w-md rounded-t-2xl bg-white p-6 shadow-2xl relative z-10">
         <h2 className="mb-5 text-center text-lg font-semibold text-[#1a1612]">
           {t("mesaDivisionTypeTitle", lang)}
         </h2>
@@ -654,6 +653,30 @@ function CustomWaitingView({ lang }: Readonly<{ lang: Parameters<typeof t>[1] }>
   );
 }
 
+function processOrderItem(
+  item: OrderItem,
+  idx: number,
+  order: MesaOrder,
+  itemsPagados: ItemPagado[],
+  remainingMap: Map<string, { nombre: string; precio: number; remaining: number }>,
+  paidMap: Map<string, { nombre: string; precio: number; paid: number }>,
+): void {
+  const paid = itemsPagados
+    .filter(p => p.pedido_id === order.id && p.item_idx === idx)
+    .reduce((s, p) => s + p.unidades_pagadas, 0);
+  const remaining = item.cantidad - paid;
+  const ck = (item.complementos ?? []).map(c => c.nombre).sort((a, b) => a.localeCompare(b)).join(',');
+  const k = `${item.nombre}||${item.precio}||${ck}`;
+  if (remaining > 0) {
+    const ex = remainingMap.get(k);
+    if (ex) { ex.remaining += remaining; } else { remainingMap.set(k, { nombre: item.nombre, precio: item.precio, remaining }); }
+  }
+  if (paid > 0) {
+    const ex = paidMap.get(k);
+    if (ex) { ex.paid += paid; } else { paidMap.set(k, { nombre: item.nombre, precio: item.precio, paid }); }
+  }
+}
+
 function buildRemainingAndPaidMaps(
   orders: MesaOrder[],
   itemsPagados: ItemPagado[],
@@ -663,27 +686,11 @@ function buildRemainingAndPaidMaps(
 } {
   const remainingMap = new Map<string, { nombre: string; precio: number; remaining: number }>();
   const paidMap = new Map<string, { nombre: string; precio: number; paid: number }>();
-
   for (const order of orders) {
     for (let idx = 0; idx < order.items.length; idx++) {
-      const item = order.items[idx];
-      const paid = itemsPagados
-        .filter(p => p.pedido_id === order.id && p.item_idx === idx)
-        .reduce((s, p) => s + p.unidades_pagadas, 0);
-      const remaining = item.cantidad - paid;
-      const ck = (item.complementos ?? []).map(c => c.nombre).sort((a, b) => a.localeCompare(b)).join(',');
-      const k = `${item.nombre}||${item.precio}||${ck}`;
-      if (remaining > 0) {
-        const ex = remainingMap.get(k);
-        if (ex) { ex.remaining += remaining; } else { remainingMap.set(k, { nombre: item.nombre, precio: item.precio, remaining }); }
-      }
-      if (paid > 0) {
-        const ex = paidMap.get(k);
-        if (ex) { ex.paid += paid; } else { paidMap.set(k, { nombre: item.nombre, precio: item.precio, paid }); }
-      }
+      processOrderItem(order.items[idx], idx, order, itemsPagados, remainingMap, paidMap);
     }
   }
-
   return {
     remainingItems: Array.from(remainingMap.entries()).map(([key, val]) => ({ key, ...val })),
     paidItems: Array.from(paidMap.entries()).map(([key, val]) => ({ key, ...val })),
@@ -883,6 +890,55 @@ function isItemInPreparadoOrder(
   );
 }
 
+function shouldPollFast(sessionData: MesaSessionData | null, activeTurnoId: string | null): boolean {
+  if (sessionData?.pagoEnCurso) return true;
+  const ct = sessionData?.customTurno;
+  if ((ct?.status === 'en_seleccion' || ct?.status === 'en_pago') && !activeTurnoId) return true;
+  if (activeTurnoId && ct?.id === activeTurnoId && ct?.status === 'en_pago') return true;
+  return sessionData?.divisionTipo === 'personalizado' && !sessionData?.sesionPagada;
+}
+
+function shouldClearActiveTurno(ct: CustomTurno | null | undefined): boolean {
+  return !ct || ct.status === 'pagado' || ct.status === 'cancelado';
+}
+
+function isInSelectionTurn(activeTurnoId: string | null, ct: CustomTurno | null | undefined): boolean {
+  return !!activeTurnoId && ct?.id === activeTurnoId && ct?.status === 'en_seleccion';
+}
+
+function isInPaymentTurn(activeTurnoId: string | null, ct: CustomTurno | null | undefined): boolean {
+  return !!activeTurnoId && ct?.id === activeTurnoId && ct?.status === 'en_pago';
+}
+
+function isWaitingForOtherTurn(ct: CustomTurno | null | undefined, activeTurnoId: string | null): boolean {
+  return (ct?.status === 'en_seleccion' || ct?.status === 'en_pago') && !activeTurnoId;
+}
+
+function shouldShowRemainingActions(sessionData: MesaSessionData | null, hidingRemainingActions: boolean): boolean {
+  return sessionData?.divisionTipo === 'personalizado'
+    && !sessionData.customTurno
+    && !sessionData.sesionPagada
+    && !hidingRemainingActions;
+}
+
+function createMesaChannel(
+  channelName: string,
+  table: string,
+  event: 'INSERT' | 'UPDATE' | 'DELETE' | '*',
+  filter: string,
+  callback: () => void,
+): (() => void) | undefined {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return undefined;
+  const supabase = createClient(url, key);
+  const channel = supabase
+    .channel(channelName)
+    .on('postgres_changes', { event, schema: 'public', table, filter }, callback)
+    .subscribe();
+  return () => { void supabase.removeChannel(channel); };
+}
+
 export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId: string; isWaiter?: boolean }>) {
   const { language } = useLanguage();
   const lang = language;
@@ -893,17 +949,16 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
   const [paying, setPaying] = useState(false);
   const [showDivisionModal, setShowDivisionModal] = useState(false);
   const [showDivisionTypeModal, setShowDivisionTypeModal] = useState(false);
-  const [, setClaimingTurn] = useState(false);
-  const [hidingRemainingActions, setHidingRemainingActionsRaw] = useState(() => {
+  const [_claimingTurn, setClaimingTurn] = useState(false);
+  const [hidingRemainingActions, setHidingRemainingActions] = useState(() => {
     try { return sessionStorage.getItem(`mesa-hide-rem-${mesaId}`) === '1'; } catch { return false; }
   });
-  const setHidingRemainingActions = (val: boolean) => {
-    setHidingRemainingActionsRaw(val);
+  useEffect(() => {
     try {
-      if (val) sessionStorage.setItem(`mesa-hide-rem-${mesaId}`, '1');
+      if (hidingRemainingActions) sessionStorage.setItem(`mesa-hide-rem-${mesaId}`, '1');
       else sessionStorage.removeItem(`mesa-hide-rem-${mesaId}`);
     } catch { /* ignore */ }
-  };
+  }, [hidingRemainingActions, mesaId]);
   const [activeTurnoId, setActiveTurnoId] = useState<string | null>(() => {
     try { return sessionStorage.getItem(`mesa-custom-turno-${mesaId}`); } catch { return null; }
   });
@@ -947,22 +1002,9 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
     catch { return false; }
   })();
 
-  // Derived early so the polling effect can use it as a dependency.
   // Poll at 3s when: (a) a payment lock is active, (b) waiting for someone else's
   // custom turn, or (c) own turn is en_pago (waiting for Redsys webhook).
-  const waitingForCustomTurn =
-    (sessionData?.customTurno?.status === 'en_seleccion' || sessionData?.customTurno?.status === 'en_pago') &&
-    !activeTurnoId;
-  const myTurnInPago =
-    !!activeTurnoId &&
-    sessionData?.customTurno?.id === activeTurnoId &&
-    sessionData?.customTurno?.status === 'en_pago';
-  // Also poll fast when in personalizado mode between turns — reduces the window where
-  // another user could pay the total before a new custom turn is claimed and pago_en_curso set.
-  const personalizedBetweenTurns =
-    sessionData?.divisionTipo === 'personalizado' && !sessionData?.sesionPagada;
-  const pagoEnCursoForPoll =
-    (sessionData?.pagoEnCurso ?? false) || waitingForCustomTurn || myTurnInPago || personalizedBetweenTurns;
+  const pagoEnCursoForPoll = shouldPollFast(sessionData, activeTurnoId);
 
   const refresh = useCallback(async () => {
     try {
@@ -993,37 +1035,13 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
   // Realtime: refresh immediately when the session row changes (division progress,
   // sesion_pagada, pago_en_curso). This eliminates the 10s polling gap for concurrent payers.
   useEffect(() => {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !key) return;
-    const supabase = createClient(url, key);
-    const channel = supabase
-      .channel(`mesa-orders-${mesaId}`)
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'mesa_sesiones', filter: `mesa_id=eq.${mesaId}` },
-        () => { void refresh(); }
-      )
-      .subscribe();
-    return () => { void supabase.removeChannel(channel); };
+    return createMesaChannel(`mesa-orders-${mesaId}`, 'mesa_sesiones', 'UPDATE', `mesa_id=eq.${mesaId}`, () => { void refresh(); });
   }, [mesaId, refresh]);
 
   useEffect(() => {
     const sesionId = sessionData?.sesionId;
     if (!sesionId) return;
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !key) return;
-    const supabase = createClient(url, key);
-    const channel = supabase
-      .channel(`mesa-item-pagos-${sesionId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'mesa_item_pagos', filter: `sesion_id=eq.${sesionId}` },
-        () => { void refresh(); }
-      )
-      .subscribe();
-    return () => { void supabase.removeChannel(channel); };
+    return createMesaChannel(`mesa-item-pagos-${sesionId}`, 'mesa_item_pagos', '*', `sesion_id=eq.${sesionId}`, () => { void refresh(); });
   }, [sessionData?.sesionId, refresh]);
 
   // Realtime: refresh immediately when a custom turn status changes (e.g. en_pago → pagado
@@ -1031,19 +1049,7 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
   useEffect(() => {
     const sesionId = sessionData?.sesionId;
     if (!sesionId) return;
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !key) return;
-    const supabase = createClient(url, key);
-    const channel = supabase
-      .channel(`mesa-custom-turno-${sesionId}`)
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'mesa_pagos_personalizados', filter: `sesion_id=eq.${sesionId}` },
-        () => { void refresh(); }
-      )
-      .subscribe();
-    return () => { void supabase.removeChannel(channel); };
+    return createMesaChannel(`mesa-custom-turno-${sesionId}`, 'mesa_pagos_personalizados', 'UPDATE', `sesion_id=eq.${sesionId}`, () => { void refresh(); });
   }, [sessionData?.sesionId, refresh]);
 
   // Auto-clear activeTurnoId when our turn is done.
@@ -1061,8 +1067,7 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
       activeTurnoConfirmedRef.current = true;
     }
     if (!activeTurnoConfirmedRef.current) return;
-    const done = !ct || ct.status === 'pagado' || ct.status === 'cancelado';
-    if (done) {
+    if (shouldClearActiveTurno(ct)) {
       activeTurnoConfirmedRef.current = false;
       setActiveTurnoId(null);
       try { sessionStorage.removeItem(`mesa-custom-turno-${mesaId}`); } catch { /* ignore */ }
@@ -1423,7 +1428,7 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
   const manualPayLabel = getManualPayLabel(manualPaying, division, lang);
 
   // Custom selection: this user holds the lock
-  if (activeTurnoId && sessionData?.customTurno?.id === activeTurnoId && sessionData.customTurno.status === 'en_seleccion') {
+  if (sessionData && isInSelectionTurn(activeTurnoId, sessionData.customTurno)) {
     const redsysUrl = process.env.NEXT_PUBLIC_REDSYS_URL ?? 'https://sis-t.redsys.es:25443/sis/realizarPago';
     return (
       <CustomSelectionView
@@ -1449,7 +1454,7 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
   // and mount effects above will have already cleared this state. The cancel button
   // below is a last-resort escape for the rare full-reload case where those effects
   // run before the server poll reflects the cancellation.
-  if (activeTurnoId && sessionData?.customTurno?.id === activeTurnoId && sessionData?.customTurno?.status === 'en_pago') {
+  if (sessionData && isInPaymentTurn(activeTurnoId, sessionData.customTurno)) {
     return (
       <div className="min-h-screen bg-[#f0ede8] flex flex-col items-center justify-center gap-4 px-6 py-16 text-center">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#1a1612] border-t-transparent" />
@@ -1468,7 +1473,7 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
   }
 
   // Waiting: someone else holds the lock (selecting or paying)
-  if ((sessionData?.customTurno?.status === 'en_seleccion' || sessionData?.customTurno?.status === 'en_pago') && !activeTurnoId) {
+  if (isWaitingForOtherTurn(sessionData?.customTurno, activeTurnoId)) {
     return (
       <div className="min-h-screen bg-[#f0ede8]">
         <CustomWaitingView lang={lang} />
@@ -1477,12 +1482,7 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
   }
 
   // Between turns: personalizado mode, no active lock, not fully paid
-  if (
-    sessionData?.divisionTipo === 'personalizado' &&
-    !sessionData?.customTurno &&
-    !sessionData?.sesionPagada &&
-    !hidingRemainingActions
-  ) {
+  if (shouldShowRemainingActions(sessionData, hidingRemainingActions)) {
     return (
       <RemainingItemsActions
         orders={sessionData.orders}
