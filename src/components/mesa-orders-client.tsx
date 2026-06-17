@@ -1423,7 +1423,7 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
   const timeStr = firstOrderDate?.toLocaleTimeString(language, { hour: "2-digit", minute: "2-digit", hour12: false }) ?? "";
   const tableLabel = mesaInfo?.nombre ?? (mesaInfo ? `Mesa ${mesaInfo.numero}` : "Mesa");
 
-  const hasDeferred = (sessionData?.itemsDiferidos ?? []).length > 0;
+  const hasDeferred = (sessionData?.orders ?? []).some(o => o.estado === 'retenido');
 
   const manualPayLabel = getManualPayLabel(manualPaying, division, lang);
 

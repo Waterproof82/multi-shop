@@ -67,11 +67,12 @@ export async function GET(
   let customTurno: { id: string; status: string; importeCents: number | null } | null = null;
   let itemsPagados: { pedido_id: string; item_idx: number; unidades_pagadas: number }[] = [];
   let pagadoCents = 0;
-  let itemsDiferidos: unknown[] = [];
+  // items_diferidos column was dropped; retenido orders are included in the orders array above.
+  const itemsDiferidos: unknown[] = [];
   try {
     const supabaseAdmin = getSupabaseClient();
 
-    const [sesionRowResult, paymentRowsResult, itemsPagadosResult, pagadoTurnosResult, deferredRowResult] = await Promise.all([
+    const [sesionRowResult, paymentRowsResult, itemsPagadosResult, pagadoTurnosResult] = await Promise.all([
       supabaseAdmin
         .from('mesa_sesiones')
         .select('division_personas, division_pagos_realizados, pago_en_curso, pago_iniciado_en, division_tipo, custom_turno_id, division_base_cents')
@@ -90,14 +91,7 @@ export async function GET(
         .select('id, importe_cents')
         .eq('sesion_id', sesion.id)
         .eq('status', 'pagado'),
-      supabaseAdmin
-        .from('mesa_sesiones')
-        .select('items_diferidos')
-        .eq('id', sesion.id)
-        .maybeSingle(),
     ]);
-
-    itemsDiferidos = (deferredRowResult.data as { items_diferidos: unknown[] } | null)?.items_diferidos ?? [];
 
     const row = sesionRowResult.data as {
       division_personas: number | null;

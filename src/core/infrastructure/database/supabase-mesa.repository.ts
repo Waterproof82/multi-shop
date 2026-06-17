@@ -200,8 +200,7 @@ export class SupabaseMesaRepository implements IMesaRepository {
       type RpcRow = {
         id: string; empresa_id: string; numero: number; nombre: string | null;
         sesion_id: string | null; sesion_pagada: boolean; pago_en_curso: boolean;
-        session_total: number; items_diferidos: unknown[] | null; cliente_activo: boolean;
-        division_activa: boolean;
+        session_total: number; cliente_activo: boolean; division_activa: boolean;
       };
       const { data: rpcData, error: rpcError } = await this.supabase
         .rpc('get_mesas_with_sessions', { p_empresa_id: empresaId });
@@ -224,20 +223,36 @@ export class SupabaseMesaRepository implements IMesaRepository {
 
       // Step 2: count active (non-cerrado) pedidos per session
       // + collect pedido numbers that have at least one item in 'listo' state (per-item kitchen state)
+      // + collect retenido pedido items (replaces the dropped items_diferidos JSONB column)
       const countBySesion: Record<string, number> = {};
       const preparadoBySesion: Record<string, number[]> = {};
+      const retenidoBySesion: Record<string, DeferredItem[]> = {};
       if (activeSesionIds.length > 0) {
+        type PedidoRow = { id: string; sesion_id: string; estado: string; numero_pedido: number; detalle_pedido: unknown };
         const { data: activeData } = await this.supabase
           .from('pedidos')
-          .select('id, sesion_id, estado, numero_pedido')
+          .select('id, sesion_id, estado, numero_pedido, detalle_pedido')
           .in('sesion_id', activeSesionIds)
           .neq('estado', 'cerrado');
 
         const pedidoIdToSesion: Record<string, { sesionId: string; numeroPedido: number }> = {};
-        for (const p of activeData ?? []) {
-          const sid = p['sesion_id'] as string;
+        for (const p of (activeData ?? []) as PedidoRow[]) {
+          const sid = p.sesion_id;
           countBySesion[sid] = (countBySesion[sid] ?? 0) + 1;
-          pedidoIdToSesion[p['id'] as string] = { sesionId: sid, numeroPedido: p['numero_pedido'] as number };
+          pedidoIdToSesion[p.id] = { sesionId: sid, numeroPedido: p.numero_pedido };
+
+          if (p.estado === 'retenido') {
+            const items = (p.detalle_pedido as Array<{ nombre: string; precio: number; cantidad: number; complementos?: Array<{ nombre: string; precio: number }>; translations?: Record<string, { name?: string }> }>) ?? [];
+            const mapped: DeferredItem[] = items.map(item => ({
+              itemId: `${item.nombre}-${item.precio}`,
+              itemName: item.nombre,
+              price: item.precio,
+              quantity: item.cantidad,
+              selectedComplements: item.complementos?.map(c => ({ id: c.nombre, name: c.nombre, price: c.precio })),
+              translations: item.translations as Record<string, { name: string }> | undefined,
+            }));
+            retenidoBySesion[sid] = [...(retenidoBySesion[sid] ?? []), ...mapped];
+          }
         }
 
         // Check pedido_item_estados for any item in 'listo' state
@@ -273,7 +288,7 @@ export class SupabaseMesaRepository implements IMesaRepository {
           sesionPagada: row.sesion_pagada ?? false,
           pagoEnCurso: row.pago_en_curso ?? false,
           divisionActiva: row.division_activa ?? false,
-          itemsDiferidos: (row.items_diferidos ?? []) as DeferredItem[],
+          itemsDiferidos: row.sesion_id ? (retenidoBySesion[row.sesion_id] ?? []) : [],
           clienteActivo: row.cliente_activo ?? false,
           preparadoPedidoNumbers: row.sesion_id ? (preparadoBySesion[row.sesion_id] ?? []) : [],
         })),
