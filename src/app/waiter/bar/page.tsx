@@ -33,6 +33,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Wine, ChevronLeft, ChevronDown, ChevronsUpDown, Table2 } from 'lucide-react';
 
 const STORAGE_KEY = 'bar_served_keys';
 
@@ -64,7 +65,6 @@ const COUNTDOWN_SECONDS = 5;
 const COUNTDOWN_COLOR   = { bg: 'oklch(22% 0.16 148)', border: 'oklch(50% 0.26 148 / 0.6)' };
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
-import { Wine, ChevronLeft } from 'lucide-react';
 
 interface BarOrder {
   id: string;
@@ -109,6 +109,28 @@ const TIME_COLORS: { max: number; label: string; bg: string; border: string; tex
 
 const KITCHEN_ALERT_ACCENT = 'oklch(78% 0.20 148)';
 
+function groupByMesa(items: FlatBarItem[]) {
+  const map = new Map<string, { mesaNumero: number | null; mesaNombre: string | null; firstCreatedAt: string; items: FlatBarItem[] }>();
+  for (const item of items) {
+    const key = item.mesaNombre ?? `Mesa ${item.mesaNumero ?? '—'}`;
+    if (!map.has(key)) map.set(key, { mesaNumero: item.mesaNumero, mesaNombre: item.mesaNombre, firstCreatedAt: item.createdAt, items: [] });
+    const g = map.get(key)!;
+    if (item.createdAt < g.firstCreatedAt) g.firstCreatedAt = item.createdAt;
+    g.items.push(item);
+  }
+  return new Map([...map.entries()].sort((a, b) => a[1].firstCreatedAt.localeCompare(b[1].firstCreatedAt)));
+}
+
+function groupByOrder(items: FlatBarItem[]) {
+  return items.reduce<Map<string, { numeroPedido: number; mesaNumero: number | null; mesaNombre: string | null; createdAt: string; items: FlatBarItem[] }>>(
+    (acc, item) => {
+      if (!acc.has(item.orderId)) acc.set(item.orderId, { numeroPedido: item.numeroPedido, mesaNumero: item.mesaNumero, mesaNombre: item.mesaNombre, createdAt: item.createdAt, items: [] });
+      acc.get(item.orderId)!.items.push(item);
+      return acc;
+    }, new Map()
+  );
+}
+
 function getTimeColor(minutes: number) {
   for (const c of TIME_COLORS) {
     if (minutes < c.max) return c;
@@ -133,6 +155,9 @@ export default function BarPage() {
   const [orders, setOrders]         = useState<BarOrder[]>([]);
   const [servedKeys, setServedKeys]  = useState<Set<string>>(loadServedKeys);
   const [countdowns, setCountdowns]  = useState<Record<string, number>>({});
+  const [groupBy, setGroupBy]        = useState<'order' | 'mesa'>('order');
+  const [collapsed, setCollapsed]    = useState<Set<string>>(new Set());
+  const [pendingServeAll, setPendingServeAll] = useState<string | null>(null);
   const timersRef     = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
   const pointerStartX = useRef<number | null>(null);
   const swipingId     = useRef<string | null>(null);
@@ -367,6 +392,15 @@ export default function BarPage() {
     swipingId.current     = null;
   }, []);
 
+  const toggleCollapse = useCallback((key: string) => {
+    setCollapsed(prev => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; });
+  }, []);
+
+  const handleServeAllMesa = useCallback((mesaItems: FlatBarItem[]) => {
+    mesaItems.forEach(item => startCountdown(item));
+    setPendingServeAll(null);
+  }, [startCountdown]);
+
   // Flatten orders into one card per drink item, excluding locally served ones
   const flatItems: FlatBarItem[] = orders.flatMap(order =>
     order.items.map((item, idx) => ({
@@ -387,139 +421,212 @@ export default function BarPage() {
 
   const hasAnyContent = flatItems.length > 0;
 
+  // ── Derived data ──────────────────────────────────────────────────────────
+  const mesaGroups  = groupByMesa(flatItems);
+  const orderGroups = groupByOrder(flatItems);
+  const allKeys     = groupBy === 'mesa'
+    ? Array.from(mesaGroups.keys())
+    : Array.from(orderGroups.keys());
+  const allCollapsed = allKeys.length > 0 && allKeys.every(k => collapsed.has(k));
+
+  // ── Item card renderer ─────────────────────────────────────────────────────
+  function renderDrinkCard(flatItem: FlatBarItem) {
+    const timeColor   = getTimeColor(getElapsedMinutes(flatItem.createdAt));
+    const isCountdown = flatItem.key in countdowns;
+    const remaining   = countdowns[flatItem.key] ?? 0;
+    const cardColor   = isCountdown ? COUNTDOWN_COLOR : timeColor;
+    return (
+      <div
+        key={flatItem.key}
+        className="relative rounded-xl overflow-hidden select-none"
+        style={{ background: cardColor.bg, border: `1px solid ${cardColor.border}`, touchAction: 'pan-y', willChange: 'transform' }}
+        onPointerDown={isCountdown ? undefined : e => handlePointerDown(e, flatItem.key)}
+        onPointerMove={isCountdown ? undefined : e => handlePointerMove(e, flatItem.key)}
+        onPointerUp={isCountdown ? undefined : e => handlePointerUp(e, flatItem)}
+        onPointerCancel={isCountdown ? undefined : handlePointerCancel}
+      >
+        {!isCountdown && (
+          <div className="absolute inset-0 flex items-center justify-end pr-3" style={{ background: 'oklch(28% 0.16 148)' }}>
+            <span data-hint="" className="text-xs font-bold" style={{ color: KITCHEN_ALERT_ACCENT, opacity: 0 }}>
+              {t('orderStatusServido', lang)} ✓
+            </span>
+          </div>
+        )}
+        <div data-card-content="" className="relative flex items-center gap-3 px-3 py-2.5" style={{ background: cardColor.bg }}>
+          {isCountdown ? (
+            <>
+              <div className="shrink-0 flex items-center justify-center w-9 h-9 rounded-full text-base font-bold"
+                style={{ background: 'oklch(32% 0.20 148)', color: 'oklch(80% 0.22 148)', border: '2px solid oklch(55% 0.28 148 / 0.7)' }}>
+                {remaining}
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{flatItem.cantidad}× {flatItem.nombre}</span>
+              </div>
+              <button className="rounded px-2 py-1 text-[10px] font-bold shrink-0"
+                style={{ background: 'oklch(26% 0.08 25)', color: 'oklch(75% 0.18 25)' }}
+                onClick={() => cancelCountdown(flatItem.key)}>
+                {t('kitchenCountdownCancel', lang)}
+              </button>
+            </>
+          ) : (
+            <div className="flex-1 min-w-0">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{flatItem.cantidad}×</span>
+                <span className="text-xs truncate" style={{ color: TEXT_MAIN }}>{flatItem.nombre}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen" style={{ background: BG }}>
       {/* Header */}
-      <div
-        className="fixed top-0 left-0 right-0 z-10 flex h-12 items-center gap-3 px-4 shadow-lg"
-        style={{ background: "oklch(17% 0.025 252)", borderBottom: "1px solid oklch(42% 0.10 252 / 0.35)" }}
-      >
-        <a href="/waiter" className="flex items-center gap-1 text-xs font-medium" style={{ color: TEXT_DIM }}>
-          <ChevronLeft className="w-4 h-4" />
-          {t("waiterLogout", lang)}
-        </a>
-        <Wine className="w-4 h-4" style={{ color: "oklch(68% 0.14 252)" }} />
-        <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{t("barTitle", lang)}</span>
-        <span className="text-[10px]" style={{ color: TEXT_DIM }}>({flatItems.length})</span>
-      </div>
-
-      <div className="pt-12 px-3 pb-6">
-        {/* Color legend */}
-        <div className="flex flex-wrap gap-1.5 py-3 px-1">
-          {TIME_COLORS.map((c) => (
-            <span
-              key={c.label}
-              className="rounded px-2 py-0.5 text-[10px] font-medium"
-              style={{ background: c.bg, color: c.text, border: `1px solid ${c.border}` }}
-            >
+      <div className="fixed top-0 left-0 right-0 z-10 shadow-lg"
+        style={{ background: 'oklch(17% 0.025 252)', borderBottom: '1px solid oklch(42% 0.10 252 / 0.35)' }}>
+        {/* Row 1: back + title */}
+        <div className="flex h-11 items-center gap-3 px-4">
+          <a href="/waiter" className="flex items-center gap-1 text-xs font-medium" style={{ color: TEXT_DIM }}>
+            <ChevronLeft className="w-4 h-4" />
+            {t('waiterLogout', lang)}
+          </a>
+          <Wine className="w-4 h-4" style={{ color: 'oklch(68% 0.14 252)' }} />
+          <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{t('barTitle', lang)}</span>
+          <span className="text-[10px]" style={{ color: TEXT_DIM }}>({flatItems.length})</span>
+        </div>
+        {/* Row 2: time legend */}
+        <div className="flex flex-wrap gap-1 py-2 px-3">
+          {TIME_COLORS.map(c => (
+            <span key={c.label} className="rounded px-1.5 py-0.5 text-[10px] font-medium"
+              style={{ background: c.bg, color: c.text, border: `1px solid ${c.border}` }}>
               {c.label}
             </span>
           ))}
         </div>
-
-        {/* Swipeable drink orders grouped by pedido */}
-        <div className="flex flex-col gap-4">
-          {!hasAnyContent && (
-            <div className="text-center py-10 text-sm" style={{ color: TEXT_DIM }}>
-              {t("barEmpty", lang)}
-            </div>
-          )}
-
-          {Array.from(
-            flatItems.reduce<Map<string, { numeroPedido: number; mesaNumero: number | null; mesaNombre: string | null; createdAt: string; items: FlatBarItem[] }>>(
-              (acc, item) => {
-                if (!acc.has(item.orderId)) {
-                  acc.set(item.orderId, { numeroPedido: item.numeroPedido, mesaNumero: item.mesaNumero, mesaNombre: item.mesaNombre, createdAt: item.createdAt, items: [] });
-                }
-                acc.get(item.orderId)!.items.push(item);
-                return acc;
-              },
-              new Map()
-            ).entries()
-          ).map(([orderId, group]) => {
-            const tableLabel = group.mesaNombre ?? `Mesa ${group.mesaNumero ?? '—'}`;
-            const elapsed    = getElapsedMinutes(group.createdAt);
+        {/* Row 3: filter toggles */}
+        <div className="flex items-center gap-1 px-3 pb-2">
+          {(['order', 'mesa'] as const).map(mode => {
+            const isActive = groupBy === mode;
+            const label = mode === 'order' ? t('kitchenGroupByOrder', lang) : t('kitchenGroupByTable', lang);
             return (
-              <div key={orderId}>
-                {/* Order header */}
-                <div className="flex items-center gap-2 px-1 mb-1.5">
-                  <span className="text-xs font-bold" style={{ color: TEXT_DIM }}>#{group.numeroPedido}</span>
-                  <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{tableLabel}</span>
-                  <span className="text-[10px] font-mono ml-auto" style={{ color: TEXT_DIM }}>{formatTimer(elapsed)}</span>
-                </div>
-
-                {/* Items */}
-                <div className="flex flex-col gap-2">
-                  {group.items.map(flatItem => {
-                    const timeColor   = getTimeColor(getElapsedMinutes(flatItem.createdAt));
-                    const isCountdown = flatItem.key in countdowns;
-                    const remaining   = countdowns[flatItem.key] ?? 0;
-                    const cardColor   = isCountdown ? COUNTDOWN_COLOR : timeColor;
-                    return (
-                      <div
-                        key={flatItem.key}
-                        className="relative rounded-xl overflow-hidden select-none"
-                        style={{
-                          background:  cardColor.bg,
-                          border:      `1px solid ${cardColor.border}`,
-                          touchAction: 'pan-y',
-                          willChange:  'transform',
-                        }}
-                        onPointerDown={isCountdown ? undefined : e => handlePointerDown(e, flatItem.key)}
-                        onPointerMove={isCountdown ? undefined : e => handlePointerMove(e, flatItem.key)}
-                        onPointerUp={isCountdown ? undefined : e => handlePointerUp(e, flatItem)}
-                        onPointerCancel={isCountdown ? undefined : handlePointerCancel}
-                      >
-                        {/* Reveal background — only when not counting down */}
-                        {!isCountdown && (
-                          <div
-                            className="absolute inset-0 flex items-center justify-end pr-3"
-                            style={{ background: 'oklch(28% 0.16 148)' }}
-                          >
-                            <span data-hint="" className="text-xs font-bold" style={{ color: KITCHEN_ALERT_ACCENT, opacity: 0 }}>
-                              {t("orderStatusServido", lang)} ✓
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Card content — translates during drag */}
-                        <div data-card-content="" className="relative flex items-center gap-3 px-3 py-2.5" style={{ background: cardColor.bg }}>
-                          {isCountdown ? (
-                            <>
-                              <div
-                                className="shrink-0 flex items-center justify-center w-9 h-9 rounded-full text-base font-bold"
-                                style={{ background: 'oklch(32% 0.20 148)', color: 'oklch(80% 0.22 148)', border: '2px solid oklch(55% 0.28 148 / 0.7)' }}
-                              >
-                                {remaining}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{flatItem.cantidad}× {flatItem.nombre}</span>
-                              </div>
-                              <button
-                                className="rounded px-2 py-1 text-[10px] font-bold shrink-0"
-                                style={{ background: 'oklch(26% 0.08 25)', color: 'oklch(75% 0.18 25)' }}
-                                onClick={() => cancelCountdown(flatItem.key)}
-                              >
-                                {t('kitchenCountdownCancel', lang)}
-                              </button>
-                            </>
-                          ) : (
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-baseline gap-1.5">
-                                <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{flatItem.cantidad}×</span>
-                                <span className="text-xs truncate" style={{ color: TEXT_MAIN }}>{flatItem.nombre}</span>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              <button key={mode} onClick={() => setGroupBy(mode)}
+                className="rounded px-3 py-1 text-[11px] font-semibold transition-colors"
+                style={isActive ? { background: 'oklch(32% 0.10 252)', color: TEXT_MAIN, border: '1px solid oklch(50% 0.10 252 / 0.6)' }
+                  : { background: 'transparent', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.4)' }}>
+                {label}
+              </button>
             );
           })}
+          {groupBy === 'mesa' && (
+            <button
+              className="ml-auto rounded p-1 transition-colors"
+              style={{ background: allCollapsed ? 'oklch(30% 0.08 252)' : 'transparent', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.4)' }}
+              onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(allKeys))}
+              title={allCollapsed ? 'Expandir todo' : 'Colapsar todo'}>
+              <ChevronsUpDown className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
+      </div>
+
+      {/* Serve-all confirmation modal */}
+      {pendingServeAll && (() => {
+        const mesaGroup = mesaGroups.get(pendingServeAll);
+        const mesaItems = mesaGroup ? mesaGroup.items.filter(item => !(item.key in countdowns) && !servedKeys.has(item.key)) : [];
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.7)' }}>
+            <div className="rounded-2xl p-5 mx-4 max-w-xs w-full flex flex-col gap-4"
+              style={{ background: 'oklch(18% 0.03 252)', border: '1px solid oklch(42% 0.10 252 / 0.5)' }}>
+              <p className="text-sm text-center" style={{ color: TEXT_MAIN }}>
+                {t('barServeAllConfirmMsg', lang)}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  className="flex-1 rounded-lg py-2 text-xs font-semibold"
+                  style={{ background: 'oklch(22% 0.04 252)', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
+                  onClick={() => setPendingServeAll(null)}>
+                  {t('kitchenCountdownCancel', lang)}
+                </button>
+                <button
+                  className="flex-1 rounded-lg py-2 text-xs font-semibold"
+                  style={{ background: 'oklch(22% 0.10 148)', color: 'oklch(74% 0.20 148)', border: '1px solid oklch(46% 0.22 148 / 0.6)' }}
+                  onClick={() => handleServeAllMesa(mesaItems)}>
+                  {t('barServeAllConfirmYes', lang)}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      <div className="pt-[112px] px-3 pb-6">
+        {!hasAnyContent && (
+          <div className="text-center py-10 text-sm" style={{ color: TEXT_DIM }}>
+            {t('barEmpty', lang)}
+          </div>
+        )}
+
+        {/* Por pedido */}
+        {groupBy === 'order' && hasAnyContent && (
+          <div className="flex flex-col gap-4">
+            {Array.from(orderGroups.entries()).map(([orderId, group]) => {
+              const tableLabel = group.mesaNombre ?? `Mesa ${group.mesaNumero ?? '—'}`;
+              const elapsed    = getElapsedMinutes(group.createdAt);
+              return (
+                <div key={orderId}>
+                  <div className="flex items-center gap-2 px-1 mb-1.5">
+                    <span className="text-xs font-bold" style={{ color: TEXT_DIM }}>#{group.numeroPedido}</span>
+                    <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{tableLabel}</span>
+                    <span className="text-[10px] font-mono ml-auto" style={{ color: TEXT_DIM }}>{formatTimer(elapsed)}</span>
+                  </div>
+                  <div className="flex flex-col gap-2">{group.items.map(renderDrinkCard)}</div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Por mesa */}
+        {groupBy === 'mesa' && hasAnyContent && (
+          <div className="flex flex-col gap-3">
+            {Array.from(mesaGroups.entries()).map(([mesaKey, group]) => {
+              const elapsed     = getElapsedMinutes(group.firstCreatedAt);
+              const isCollapsed = collapsed.has(mesaKey);
+              return (
+                <div key={mesaKey} className="rounded-xl overflow-hidden"
+                  style={{ border: '1px solid oklch(35% 0.08 252 / 0.5)' }}>
+                  <button
+                    className="w-full flex items-center gap-2 px-3 py-2 text-left"
+                    style={{ background: 'oklch(18% 0.03 252)', borderBottom: isCollapsed ? 'none' : '1px solid oklch(35% 0.08 252 / 0.4)' }}
+                    onClick={() => toggleCollapse(mesaKey)}>
+                    <Table2 className="w-3.5 h-3.5 shrink-0" style={{ color: 'oklch(62% 0.14 62)' }} />
+                    <span className="text-sm font-bold truncate" style={{ color: TEXT_MAIN }}>{mesaKey}</span>
+                    <span className="text-[10px] font-mono shrink-0" style={{ color: TEXT_DIM }}>{formatTimer(elapsed)}</span>
+                    <ChevronDown className="w-4 h-4 shrink-0" style={{ color: TEXT_DIM, transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }} />
+                  </button>
+                  {!isCollapsed && (
+                    <>
+                      <div className="flex flex-col gap-2 p-2">
+                        {group.items.map(renderDrinkCard)}
+                      </div>
+                      <div className="px-2 pb-2" style={{ borderTop: '1px solid oklch(35% 0.08 252 / 0.4)', paddingTop: '0.5rem' }}>
+                        <button
+                          className="w-full flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-semibold"
+                          style={{ background: 'oklch(22% 0.10 148)', color: 'oklch(74% 0.20 148)', border: '1px solid oklch(46% 0.22 148 / 0.6)' }}
+                          onClick={() => setPendingServeAll(mesaKey)}>
+                          <Wine className="w-3.5 h-3.5" />
+                          {t('barServeAllConfirmYes', lang)}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

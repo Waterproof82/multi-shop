@@ -102,6 +102,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     toggleDeferred,
     releaseAllDeferred,
     loadDeferredItems,
+    syncDeferredItems,
     totalPrice,
     isCartOpen,
     openCart,
@@ -177,23 +178,25 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     setActiveOrderTokens(getTrackingTokens());
   }, [isCartOpen]);
 
-  // Pre-load deferred items from DB when a mesa is identified — waiter mode only
+  // Load/sync deferred items from DB when a mesa is identified or when the cart is opened.
+  // Uses syncDeferredItems (replace, not merge) so external changes (kitchen release) are reflected.
   useEffect(() => {
-    if (!isWaiterMode) return; // customers must never see waiter's deferred items
+    if (!isWaiterMode) return;
     const mesaId = mesaInfo?.id ?? mesaToken;
-    if (!mesaId || deferredLoadedRef.current === mesaId) return;
+    if (!mesaId) return;
+    // Force a fresh sync every time the cart opens; initial load when mesaId first detected.
+    if (isCartOpen) deferredLoadedRef.current = null;
+    if (deferredLoadedRef.current === mesaId) return;
     deferredLoadedRef.current = mesaId;
 
     fetch(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/deferred`)
       .then(async r => {
         if (!r.ok) return;
         const data = await r.json() as { items: Array<{ itemId: string; itemName: string; price: number; quantity: number; translations?: Record<string, { name: string }>; selectedComplements?: Array<{ id: string; name: string; price: number }> }> };
-        if (data.items?.length > 0) {
-          loadDeferredItems(data.items);
-        }
+        syncDeferredItems(data.items ?? []);
       })
       .catch(() => null);
-  }, [mesaInfo, mesaToken, loadDeferredItems, isWaiterMode]);
+  }, [mesaInfo, mesaToken, syncDeferredItems, isWaiterMode, isCartOpen]);
 
   // Explicitly persist a computed deferred list to DB. Called immediately at each action
   // (toggle, remove, quantity change) so there are no timing or race-condition issues.
@@ -216,6 +219,19 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
       }),
     });
   }, [isWaiterMode, mesaToken, mesaInfo]);
+
+  // Auto-save whenever deferred items change through any path (e.g. addItem from QuantitySelectorDialog).
+  // Explicit calls in toggle/remove/quantity handlers still fire too — all PUTs are idempotent.
+  const deferredSaveKeyRef = useRef('');
+  useEffect(() => {
+    if (!isWaiterMode || !mesaToken) return;
+    if (!deferredLoadedRef.current) return; // skip until initial DB load is triggered
+    const deferredItems = items.filter(ci => ci.deferred);
+    const key = deferredItems.map(ci => `${ci.item.id}:${ci.quantity}`).join(',');
+    if (key === deferredSaveKeyRef.current) return;
+    deferredSaveKeyRef.current = key;
+    saveDeferredToDb(deferredItems);
+  }, [items, isWaiterMode, mesaToken, saveDeferredToDb]);
 
   const [discountCode, setDiscountCode] = useState('');
   const [discountValid, setDiscountValid] = useState<{ valid: boolean; porcentaje: number } | null>(null);

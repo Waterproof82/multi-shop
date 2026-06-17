@@ -51,6 +51,14 @@ interface CartContextType {
     translations?: Record<string, { name: string }>;
     selectedComplements?: Array<{ id: string; name: string; price: number }>;
   }>) => void
+  syncDeferredItems: (items: Array<{
+    itemId: string;
+    itemName: string;
+    price: number;
+    quantity: number;
+    translations?: Record<string, { name: string }>;
+    selectedComplements?: Array<{ id: string; name: string; price: number }>;
+  }>) => void
   totalItems: number
   totalPrice: number
   isCartOpen: boolean
@@ -204,6 +212,39 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
     });
   }, [])
 
+  /** Replaces ALL deferred items in the cart with the given list from DB.
+   *  Keeps non-deferred items intact. Used to sync after external changes
+   *  (e.g. kitchen panel releasing individual deferred items). */
+  const syncDeferredItems = useCallback((deferredItems: Array<{
+    itemId: string;
+    itemName: string;
+    price: number;
+    quantity: number;
+    translations?: Record<string, { name: string }>;
+    selectedComplements?: Array<{ id: string; name: string; price: number }>;
+  }>) => {
+    setItems(prev => {
+      const nonDeferred = prev.filter(ci => !ci.deferred);
+      const newDeferred = deferredItems.map(d => ({
+        cartId: newCartId(),
+        item: {
+          id: d.itemId,
+          name: d.itemName,
+          price: d.price,
+          translations: d.translations,
+        } as MenuItemVM,
+        quantity: d.quantity,
+        selectedComplements: d.selectedComplements?.map(c => ({
+          id: c.id,
+          name: c.name,
+          price: c.price,
+        })),
+        deferred: true as const,
+      }));
+      return [...nonDeferred, ...newDeferred];
+    });
+  }, [])
+
   const totalItems = items.reduce((sum, ci) => sum + ci.quantity, 0)
   const totalPrice = items.reduce((sum, ci) => {
     const complementPrice = ci.selectedComplements?.reduce((s, c) => s + c.price, 0) || 0;
@@ -220,13 +261,14 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
     toggleDeferred,
     releaseAllDeferred,
     loadDeferredItems,
+    syncDeferredItems,
     totalItems,
     totalPrice,
     isCartOpen,
     openCart,
     closeCart,
     lastAddedItem,
-  }), [items, addItem, removeItem, updateQuantity, clearCart, clearNonDeferred, toggleDeferred, releaseAllDeferred, loadDeferredItems, totalItems, totalPrice, isCartOpen, openCart, closeCart, lastAddedItem]);
+  }), [items, addItem, removeItem, updateQuantity, clearCart, clearNonDeferred, toggleDeferred, releaseAllDeferred, loadDeferredItems, syncDeferredItems, totalItems, totalPrice, isCartOpen, openCart, closeCart, lastAddedItem]);
 
   return (
     <CartContext.Provider value={contextValue}>
