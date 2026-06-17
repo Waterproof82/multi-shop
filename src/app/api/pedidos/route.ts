@@ -120,8 +120,13 @@ async function handleMesaOrder(empresa: EmpresaOrderData, data: MesaData, reques
   const lockResponse = await checkMesaPaymentLock(data.mesa_id);
   if (lockResponse) return lockResponse;
 
-  // Only authenticated waiters may set initialEstado; customer requests always use 'pendiente'
-  const initialEstado = isWaiter && data.initialEstado === 'retenido' ? 'retenido' : 'pendiente';
+  // Waiter: may set retenido. Customer: pendiente_validacion when toggle is active, else pendiente.
+  let initialEstado: 'pendiente' | 'retenido' | 'pendiente_validacion' = 'pendiente';
+  if (isWaiter && data.initialEstado === 'retenido') {
+    initialEstado = 'retenido';
+  } else if (!isWaiter && empresa.validacion_pedidos_habilitada) {
+    initialEstado = 'pendiente_validacion';
+  }
 
   const pedidoResult = await pedidoUseCase.createMesaOrder(
     empresa.id,

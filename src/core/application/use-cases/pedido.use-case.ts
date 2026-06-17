@@ -463,7 +463,7 @@ export class PedidoUseCase {
     data: CreateMesaPedidoDTO,
     mesaNumero: number,
     mesaNombre: string | null,
-    initialEstado: 'pendiente' | 'retenido' = 'pendiente'
+    initialEstado: 'pendiente' | 'retenido' | 'pendiente_validacion' = 'pendiente'
   ): Promise<Result<{ id: string; numero_pedido: number; total: number; trackingToken: string }>> {
     try {
       // Step 1: Validate products and calculate server total
