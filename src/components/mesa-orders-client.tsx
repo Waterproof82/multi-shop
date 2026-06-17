@@ -862,23 +862,6 @@ function canDeleteItem(
   return paidUnits < item.cantidad;
 }
 
-function getOrderStatusLabel(estado: string, lang: Parameters<typeof t>[1]): string {
-  switch (estado) {
-    case 'pendiente_validacion': return t('pendientesValidacionLabel', lang);
-    case 'retenido': return t('kitchenItemRetenido', lang);
-    case 'preparado': return t('orderStatusPreparado', lang);
-    case 'servido': return t('orderStatusServido', lang);
-    default: return t('statusPendiente', lang);
-  }
-}
-
-function getOrderStatusStyle(estado: string): { background: string; color: string } {
-  const isWarning = estado === 'pendiente_validacion' || estado === 'retenido';
-  return {
-    background: isWarning ? 'oklch(21% 0.10 65)' : 'oklch(18% 0.05 148)',
-    color: isWarning ? 'oklch(72% 0.18 65)' : 'oklch(65% 0.18 148)',
-  };
-}
 
 function isItemInPreparadoOrder(
   orders: MesaOrder[],
@@ -1413,6 +1396,16 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
 
   const allItems = mergeOrderItems(sessionData?.orders.flatMap((o) => o.items) ?? []);
 
+  // Merge keys of items that belong to at least one retenido order
+  const retenidoItemKeys = new Set<string>(
+    (sessionData?.orders ?? [])
+      .filter(o => o.estado === 'retenido')
+      .flatMap(o => o.items.map(i => {
+        const ck = (i.complementos ?? []).map(c => c.nombre).sort((a, b) => a.localeCompare(b)).join(',');
+        return `${i.nombre}||${i.precio}||${ck}`;
+      }))
+  );
+
   // Paid-units per merge key — used in waiter mode to hide delete on fully-paid items
   const paidByMergeKey = buildPaidByMergeKey(sessionData);
 
@@ -1590,24 +1583,12 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
               {/* Items — waiter: merged with delete buttons; customer: grouped by order with status */}
               {isWaiterMode ? (
                 <>
-                  {(isWaiter || isWaiterMode) && sessionData && sessionData.orders.length > 0 && (
-                    <div className="flex flex-wrap gap-1 pt-2 pb-1">
-                      {sessionData.orders.map((order) => (
-                        <span
-                          key={order.id}
-                          className="text-[10px] rounded px-1.5 py-0.5 font-medium"
-                          style={getOrderStatusStyle(order.estado)}
-                        >
-                          #{order.numeroPedido}&nbsp;
-                          {getOrderStatusLabel(order.estado, lang)}
-                        </span>
-                      ))}
-                    </div>
-                  )}
                   <ul className="flex flex-col gap-1 pb-4">
                   {allItems.map((item) => {
                     const complementoTotal = item.complementos?.reduce((s, c) => s + c.precio, 0) ?? 0;
                     const lineTotal = (item.precio + complementoTotal) * item.cantidad;
+                    const ck = (item.complementos ?? []).map(c => c.nombre).sort((a, b) => a.localeCompare(b)).join(',');
+                    const isRetenido = retenidoItemKeys.has(`${item.nombre}||${item.precio}||${ck}`);
                     return (
                       <li
                         key={`${item.nombre}||${item.precio}`}
@@ -1633,7 +1614,7 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
                           {item.cantidad}
                         </span>
                         <span className="flex flex-col flex-1 min-w-0">
-                          <span>{(language !== "es" && item.translations?.[language]?.name) || item.nombre}</span>
+                          <span style={isRetenido ? { color: 'oklch(72% 0.18 62)' } : undefined}>{(language !== "es" && item.translations?.[language]?.name) || item.nombre}</span>
                           {item.complementos && item.complementos.length > 0 && (
                             <span className="text-xs" style={{ color: "#b0a090" }}>
                               + {item.complementos.map(c => c.nombre).join(", ")}

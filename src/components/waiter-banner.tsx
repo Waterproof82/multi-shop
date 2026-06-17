@@ -451,7 +451,7 @@ export function WaiterBanner() {
         <div className="flex items-center gap-1.5 shrink-0">
 
           {/* Cart — only when mesa selected and not on waiter/kitchen/bar pages */}
-          {hasMesa && pathname !== '/waiter' && pathname !== '/waiter/kitchen' && pathname !== '/waiter/bar' && (
+          {hasMesa && pathname !== '/waiter' && pathname !== '/waiter/pendientes' && pathname !== '/waiter/kitchen' && pathname !== '/waiter/bar' && (
             <button
               onClick={openCart}
               className="relative flex items-center justify-center rounded-md p-2 transition-colors duration-150 min-h-[32px] min-w-[32px]"
@@ -503,6 +503,7 @@ export function WaiterBanner() {
               <div className="flex items-center gap-0.5">
                 <BadgeCircle count={counts.cocina.total} color="neutral" />
                 <BadgeCircle count={counts.cocina.listos} color="green" />
+                <BadgeCircle count={counts.cocina.retenidos} color="orange" />
               </div>
             )}
           </button>
@@ -521,6 +522,7 @@ export function WaiterBanner() {
               <div className="flex items-center gap-0.5">
                 <BadgeCircle count={counts.bebidas.total} color="neutral" />
                 <BadgeCircle count={counts.bebidas.listos} color="green" />
+                <BadgeCircle count={counts.bebidas.retenidos} color="orange" />
               </div>
             )}
           </button>
