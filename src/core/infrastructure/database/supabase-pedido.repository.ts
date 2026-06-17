@@ -1,6 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Pedido, CartItem, PedidoItem, Result } from "@/core/domain/entities/types";
-import { IPedidoRepository, KitchenBarCounts, KitchenOrderItem, BarOrderItem, RetenidoItem, KitchenItemRecord, ItemEstado } from "@/core/domain/repositories/IPedidoRepository";
+import { IPedidoRepository, KitchenBarCounts, KitchenOrderItem, BarOrderItem, RetenidoItem, KitchenItemRecord, ItemEstado, PendienteValidacionMesa, PendienteValidacionItem } from "@/core/domain/repositories/IPedidoRepository";
 import { logger } from "../logging/logger";
 
 type DeliveryData = {
@@ -525,7 +525,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     total: number;
     trackingToken: string;
     sesionId: string | null;
-    initialEstado?: 'pendiente' | 'retenido';
+    initialEstado?: 'pendiente' | 'retenido' | 'pendiente_validacion';
   }): Promise<Result<{ id: string; numero_pedido: number; tracking_token: string }>> {
     try {
       const { data: nextNum, error: rpcError } = await this.supabase
@@ -1242,6 +1242,118 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       return { success: true, data: undefined };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.upsertItemEstado', { details: { pedidoId, itemIdx, estado } });
+      return { success: false, error: appError };
+    }
+  }
+
+  async findPendientesValidacion(empresaId: string): Promise<Result<PendienteValidacionMesa[]>> {
+    try {
+      const { data: pedidos, error } = await this.supabase
+        .from('pedidos')
+        .select(`id, created_at, detalle_pedido, mesa_id, mesas!inner(numero, nombre)`)
+        .eq('empresa_id', empresaId)
+        .eq('estado', 'pendiente_validacion')
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', error.message, 'repository', 'SupabasePedidoRepository.findPendientesValidacion', { details: { code: error.code, empresaId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pendientes de validación', module: 'repository', method: 'findPendientesValidacion' } };
+      }
+
+      const mesaMap = new Map<string, PendienteValidacionMesa>();
+
+      for (const row of pedidos ?? []) {
+        const r = row as Record<string, unknown>;
+        const mesaData = r['mesas'] as Record<string, unknown> ?? {};
+        const mesaId = r['mesa_id'] as string;
+        const detalle = (r['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
+
+        if (!mesaMap.has(mesaId)) {
+          mesaMap.set(mesaId, {
+            mesaId,
+            mesaNumero: (mesaData['numero'] as number) ?? null,
+            mesaNombre: (mesaData['nombre'] as string | null) ?? null,
+            pedidos: [],
+          });
+        }
+
+        const items: PendienteValidacionItem[] = detalle.map((item, idx) => ({
+          idx,
+          nombre: item['nombre'] as string,
+          cantidad: item['cantidad'] as number,
+          precio: item['precio'] as number,
+          tipo: ((item['tipo_producto'] as string | undefined) ?? 'comida') as 'comida' | 'bebida',
+          complementos: (item['complementos'] as Array<{ nombre?: string }> | undefined)
+            ?.map(c => c.nombre ?? '').filter(Boolean).join(', '),
+        }));
+
+        mesaMap.get(mesaId)!.pedidos.push({
+          id: r['id'] as string,
+          createdAt: r['created_at'] as string,
+          items,
+        });
+      }
+
+      return { success: true, data: Array.from(mesaMap.values()) };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findPendientesValidacion', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
+  async validatePedido(empresaId: string, pedidoId: string, retainIndices: number[]): Promise<Result<void>> {
+    try {
+      const { data: pedido, error: fetchError } = await this.supabase
+        .from('pedidos')
+        .select('id, estado, detalle_pedido')
+        .eq('id', pedidoId)
+        .eq('empresa_id', empresaId)
+        .single();
+
+      if (fetchError || !pedido) {
+        return { success: false, error: { code: 'NOT_FOUND', message: 'Pedido no encontrado', module: 'repository', method: 'validatePedido' } };
+      }
+
+      const p = pedido as Record<string, unknown>;
+      if (p['estado'] !== 'pendiente_validacion') {
+        return { success: false, error: { code: 'CONFLICT', message: 'El pedido no está pendiente de validación', module: 'repository', method: 'validatePedido' } };
+      }
+
+      const detalle = (p['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
+      const maxIdx = detalle.length - 1;
+      const validRetain = retainIndices.filter(i => i >= 0 && i <= maxIdx);
+
+      if (validRetain.length > 0) {
+        const upserts = validRetain.map(idx => ({
+          pedido_id: pedidoId,
+          item_idx: idx,
+          empresa_id: empresaId,
+          estado: 'retenido' as const,
+          updated_at: new Date().toISOString(),
+        }));
+        const { error: upsertError } = await this.supabase
+          .from('pedido_item_estados')
+          .upsert(upserts, { onConflict: 'pedido_id,item_idx' });
+        if (upsertError) {
+          await logger.logAndReturnError('DB_INSERT_ERROR', upsertError.message, 'repository', 'SupabasePedidoRepository.validatePedido', { details: { code: upsertError.code, pedidoId } });
+          return { success: false, error: { code: 'DB_ERROR', message: 'Error al retener ítems', module: 'repository', method: 'validatePedido' } };
+        }
+      }
+
+      const { error: updateError } = await this.supabase
+        .from('pedidos')
+        .update({ estado: 'pendiente' })
+        .eq('id', pedidoId)
+        .eq('empresa_id', empresaId);
+
+      if (updateError) {
+        await logger.logAndReturnError('DB_UPDATE_ERROR', updateError.message, 'repository', 'SupabasePedidoRepository.validatePedido', { details: { code: updateError.code, pedidoId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al validar pedido', module: 'repository', method: 'validatePedido' } };
+      }
+
+      return { success: true, data: undefined };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.validatePedido', { details: { pedidoId } });
       return { success: false, error: appError };
     }
   }
