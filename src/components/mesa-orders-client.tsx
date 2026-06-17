@@ -949,7 +949,7 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
   const [paying, setPaying] = useState(false);
   const [showDivisionModal, setShowDivisionModal] = useState(false);
   const [showDivisionTypeModal, setShowDivisionTypeModal] = useState(false);
-  const [_claimingTurn, setClaimingTurn] = useState(false);
+  const [claimingTurn, setClaimingTurn] = useState(false);
   const [hidingRemainingActions, setHidingRemainingActions] = useState(() => {
     try { return sessionStorage.getItem(`mesa-hide-rem-${mesaId}`) === '1'; } catch { return false; }
   });
@@ -1434,7 +1434,7 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
       <CustomSelectionView
         orders={sessionData.orders}
         itemsPagados={sessionData.itemsPagados ?? []}
-        turnoId={activeTurnoId}
+        turnoId={activeTurnoId!}
         mesaId={mesaId}
         lang={lang}
         onCancelled={() => {
@@ -1482,7 +1482,7 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
   }
 
   // Between turns: personalizado mode, no active lock, not fully paid
-  if (shouldShowRemainingActions(sessionData, hidingRemainingActions)) {
+  if (sessionData && shouldShowRemainingActions(sessionData, hidingRemainingActions)) {
     return (
       <RemainingItemsActions
         orders={sessionData.orders}
