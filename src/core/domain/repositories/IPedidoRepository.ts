@@ -25,6 +25,8 @@ export interface RetenidoItem {
   mesaNumero: number | null;
   mesaNombre: string | null;
   sesionCreatedAt: string;
+  /** Position of this item within its mesa_sesion.items_diferidos array */
+  sesionItemIdx: number;
 }
 
 /**
@@ -72,6 +74,8 @@ export interface KitchenItemRecord {
   createdAt: string;
   /** true = item from mesa_sesiones.items_diferidos (deferred cart item, read-only in waiter kitchen) */
   isDiferido?: boolean;
+  /** Index within the mesa_sesion.items_diferidos array — only set when isDiferido=true */
+  sesionItemIdx?: number;
 }
 
 export interface IPedidoRepository {

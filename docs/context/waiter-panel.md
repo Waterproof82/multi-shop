@@ -56,6 +56,7 @@ On mount, `WaiterLoginForm` pings `GET /api/waiter/me`. If the cookie is already
 | `POST` | `/api/waiter/mesas/{mesaId}/manual-payment` | Register a cash/external payment (full or one division share) |
 | `GET` | `/api/waiter/mesas/{mesaId}/deferred` | Get deferred items for the active session |
 | `PUT` | `/api/waiter/mesas/{mesaId}/deferred` | Save/clear deferred items for the active session |
+| `POST` | `/api/waiter/kitchen/mesas/{mesaId}/release-deferred-item` | Release one deferred cart item to the kitchen as a new pedido |
 
 ---
 
@@ -68,7 +69,7 @@ Single entry point. Two-step flow managed by `WaiterLoginForm`:
 
 ### `/waiter/kitchen`
 
-In-app kitchen view. Shows all in-flight `comida` items grouped by order (default) or by table (`Por mesa`). A third filter button **Listos** shows only items ready to serve.
+In-app kitchen view. Shows all in-flight `comida` items across four filter modes.
 
 **States per item (swiped via pointer gestures):**
 
@@ -76,11 +77,16 @@ In-app kitchen view. Shows all in-flight `comida` items grouped by order (defaul
 |--------|---------|
 | `pendiente` | Initial |
 | `en_preparacion` | Swipe right |
-| `preparado` | Swipe right again (listos) |
-| `servido` | Swipe right on listos item |
-| Restore | Swipe left |
+| `preparado` | Swipe right again |
+| `servido` | Swipe right on `preparado` item |
+| `retenido` | Swipe left on `pendiente` or `en_preparacion` |
+| Restore to `pendiente` | Swipe left on `retenido` |
 
-Items can also be **retenidos** (held/deferred by the kitchen). A retenidos section shows items the waiter set aside; they have an amber tint and can be released back to pending.
+Swiping left on an `en_preparacion` item shows a **confirmation dialog** (the item is already in preparation — waiter must confirm before retaining it).
+
+**Two types of retenido items — visually differentiated:**
+- **Retenido pedidos** (amber) — order item retained by the waiter; released via PATCH back to `pendiente`. Utensils icon.
+- **Retenido carrito** (amber-orange) — deferred cart item from `mesa_sesiones.items_diferidos`; released individually via `POST release-deferred-item`, which creates a new pedido. ShoppingCart icon.
 
 **Time-based card colors (oklch, hue progression):**
 - `< 10 min` → cool blue (hue 228)
@@ -93,13 +99,29 @@ Items can also be **retenidos** (held/deferred by the kitchen). A retenidos sect
 `anotado` orders (waiter-confirmed but not yet submitted) always show yellow regardless of time.
 
 **GroupBy modes:**
-- `Por pedido` (default) — one group per order, sorted by `numero_pedido`
-- `Por mesa` — grouped by table; within each group, listos items appear first
-- `Listos` — filters to show only `preparado` items awaiting service
+- `Por pedido` (default) — flat list, one group per order. No collapse.
+- `Por mesa` — grouped by table; listos items appear first within each group. Collapsible per mesa.
+- `Listos` — only `preparado` items, grouped by table. Collapsible per mesa.
+- `Retenidos` — only retenido items (both pedidos and carrito), grouped by table. Collapsible per mesa.
+
+**Collapse / expand:**
+- Each mesa card header (Table2 icon + ChevronDown) toggles that mesa's content.
+- A global ChevronsUpDown button in the header bar collapses/expands all mesas at once.
+- The collapse-all button is hidden in `Por pedido` mode (flat list, no collapsible groups).
+
+**Per-mesa release buttons (shown in `Por mesa` and `Retenidos`):**
+- **Utensils button** (blue) — releases all `retenido` order items for the mesa back to `pendiente` in parallel.
+- **ShoppingCart button** (amber) — releases the deferred cart item for the mesa to the kitchen as a new pedido.
 
 ### `/waiter/bar`
 
-Same UX as `/waiter/kitchen` but shows `bebida` items only. Same time-based color scheme and swipe mechanics. No groupBy toggle (single list).
+In-app bar view. Shows `bebida` items only. Same time-based color scheme and swipe mechanics.
+
+**Filter modes:**
+- `Por pedido` (default) — flat list, one group per order with table label. No collapse.
+- `Por mesa` — grouped by table. Collapsible per mesa (same Table2 / ChevronDown pattern as kitchen). A global ChevronsUpDown button is shown only in this mode.
+
+**Per-mesa "Todos servidos" button:** shown in the footer of each mesa card in `Por mesa` mode. Clicking opens a confirmation modal ("Se van a procesar como servidos todos los ítems de esta mesa"). On confirm, triggers individual 5-second countdown for every item in that mesa simultaneously.
 
 ---
 
@@ -299,9 +321,10 @@ Waiter confirms comanda
 Grid refresh
   → MesaCard shows deferred items list (clock icon + "ItemName x qty")
 
-Any waiter enters mesa
+Any waiter enters mesa / cart opens
   → GET /api/waiter/mesas/{mesaId}/deferred
-  → loadDeferredItems() → items appear in cart with fromPending flag
+  → syncDeferredItems() → replaces ALL deferred items in cart with DB state
+    (ensures kitchen-released items are removed even if cart was already open)
 
 Waiter confirms (releasing deferred)
   → all cart items → POST /api/pedidos

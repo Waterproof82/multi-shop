@@ -959,7 +959,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         const sesionCreatedAt = row['created_at'] as string ?? '';
         const deferred = (row['items_diferidos'] as Array<Record<string, unknown>>) ?? [];
 
-        for (const item of deferred) {
+        for (const [deferred_idx, item] of deferred.entries()) {
           const itemTipo = (item['tipo'] as string | undefined) ?? 'comida';
           if (itemTipo !== tipo) continue;
           const complements = (item['selectedComplements'] as Array<{ name: string }> | undefined);
@@ -972,6 +972,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
             mesaNumero: (mesaData['numero'] as number) ?? null,
             mesaNombre: (mesaData['nombre'] as string | null) ?? null,
             sesionCreatedAt,
+            sesionItemIdx: deferred_idx,
           });
         }
       }
@@ -1236,6 +1237,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         mesaNombre:   d.mesaNombre,
         createdAt:    d.sesionCreatedAt,
         isDiferido:   true,
+        sesionItemIdx: d.sesionItemIdx,
       }));
 
     return { success: true, data: [...orderItems, ...diferidoItems] };
