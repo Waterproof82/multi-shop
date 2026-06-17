@@ -525,6 +525,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     total: number;
     trackingToken: string;
     sesionId: string | null;
+    initialEstado?: 'pendiente' | 'retenido';
   }): Promise<Result<{ id: string; numero_pedido: number; tracking_token: string }>> {
     try {
       const { data: nextNum, error: rpcError } = await this.supabase
@@ -557,7 +558,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           complementos: item.complementos ?? [],
         })),
         total: params.total,
-        estado: 'pendiente',
+        estado: params.initialEstado ?? 'pendiente',
         tracking_token: params.trackingToken,
         sesion_id: params.sesionId,
       };
@@ -941,40 +942,45 @@ export class SupabasePedidoRepository implements IPedidoRepository {
 
   async findAllRetenidos(empresaId: string, tipo: 'comida' | 'bebida'): Promise<Result<RetenidoItem[]>> {
     try {
-      const { data: sessions, error: sessionsError } = await this.supabase
-        .from('mesa_sesiones')
-        .select(`id, created_at, items_diferidos, mesa_id, mesas!mesa_id(numero, nombre)`)
-        .eq('empresa_id', empresaId)
-        .is('cerrada_at', null);
+      const { data: estados, error } = await this.supabase
+        .from('pedido_item_estados')
+        .select(`
+          item_idx,
+          pedidos!inner(
+            id, created_at, sesion_id, detalle_pedido, empresa_id,
+            mesas!inner(id, numero, nombre)
+          )
+        `)
+        .eq('estado', 'retenido')
+        .eq('pedidos.empresa_id', empresaId);
 
-      if (sessionsError) {
-        await logger.logAndReturnError('DB_SELECT_ERROR', sessionsError.message, 'repository', 'SupabasePedidoRepository.findAllRetenidos', { details: { code: sessionsError.code, empresaId } });
-        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener sesiones', module: 'repository', method: 'findAllRetenidos' } };
+      if (error) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', error.message, 'repository', 'SupabasePedidoRepository.findAllRetenidos', { details: { code: error.code, empresaId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener retenidos', module: 'repository', method: 'findAllRetenidos' } };
       }
 
       const result: RetenidoItem[] = [];
-      for (const session of sessions ?? []) {
-        const row = session as Record<string, unknown>;
-        const mesaData = row['mesas'] as Record<string, unknown> ?? {};
-        const sesionCreatedAt = row['created_at'] as string ?? '';
-        const deferred = (row['items_diferidos'] as Array<Record<string, unknown>>) ?? [];
-
-        for (const [deferred_idx, item] of deferred.entries()) {
-          const itemTipo = (item['tipo'] as string | undefined) ?? 'comida';
-          if (itemTipo !== tipo) continue;
-          const complements = (item['selectedComplements'] as Array<{ name: string }> | undefined);
-          result.push({
-            itemId: item['itemId'] as string,
-            nombre: item['itemName'] as string,
-            cantidad: item['quantity'] as number,
-            complementos: complements?.map(c => c.name).join(', '),
-            mesaId: (row['mesa_id'] as string | null) ?? null,
-            mesaNumero: (mesaData['numero'] as number) ?? null,
-            mesaNombre: (mesaData['nombre'] as string | null) ?? null,
-            sesionCreatedAt,
-            sesionItemIdx: deferred_idx,
-          });
-        }
+      for (const row of estados ?? []) {
+        const r = row as Record<string, unknown>;
+        const pedido = r['pedidos'] as Record<string, unknown>;
+        const mesa = pedido['mesas'] as Record<string, unknown>;
+        const detalle = (pedido['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
+        const idx = r['item_idx'] as number;
+        const item = detalle[idx];
+        if (!item) continue;
+        const itemTipo = (item['tipo_producto'] as string | undefined) ?? 'comida';
+        if (itemTipo !== tipo) continue;
+        const complements = (item['complementos'] as Array<{ nombre?: string }> | undefined);
+        result.push({
+          itemId: pedido['id'] as string,
+          nombre: item['nombre'] as string,
+          cantidad: item['cantidad'] as number,
+          complementos: complements?.map(c => c.nombre ?? '').filter(Boolean).join(', '),
+          mesaId: (mesa['id'] as string | null) ?? null,
+          mesaNumero: (mesa['numero'] as number) ?? null,
+          mesaNombre: (mesa['nombre'] as string | null) ?? null,
+          sesionCreatedAt: pedido['created_at'] as string ?? '',
+        });
       }
 
       return { success: true, data: result };
@@ -1212,35 +1218,11 @@ export class SupabasePedidoRepository implements IPedidoRepository {
   }
 
   async findWaiterKitchenItems(empresaId: string): Promise<Result<KitchenItemRecord[]>> {
-    const [orderItemsResult, diferidosResult] = await Promise.all([
-      this.fetchAllComidaItems(empresaId),
-      this.findAllRetenidos(empresaId, 'comida'),
-    ]);
-
+    const orderItemsResult = await this.fetchAllComidaItems(empresaId);
     if (!orderItemsResult.success) return orderItemsResult;
 
     const visible: ItemEstado[] = ['pendiente', 'en_preparacion', 'listo', 'retenido'];
-    const orderItems = orderItemsResult.data.filter(i => visible.includes(i.estado));
-
-    // Include deferred cart items (items_diferidos) as read-only retenido entries
-    const diferidoItems: KitchenItemRecord[] = (diferidosResult.success ? diferidosResult.data : [])
-      .map((d, idx) => ({
-        pedidoId:     d.itemId,
-        numeroPedido: 0,
-        itemIdx:      idx,
-        nombre:       d.nombre,
-        cantidad:     d.cantidad,
-        complementos: d.complementos,
-        estado:       'retenido' as ItemEstado,
-        mesaId:       d.mesaId,
-        mesaNumero:   d.mesaNumero,
-        mesaNombre:   d.mesaNombre,
-        createdAt:    d.sesionCreatedAt,
-        isDiferido:   true,
-        sesionItemIdx: d.sesionItemIdx,
-      }));
-
-    return { success: true, data: [...orderItems, ...diferidoItems] };
+    return { success: true, data: orderItemsResult.data.filter(i => visible.includes(i.estado)) };
   }
 
   async upsertItemEstado(empresaId: string, pedidoId: string, itemIdx: number, estado: ItemEstado): Promise<Result<void>> {
