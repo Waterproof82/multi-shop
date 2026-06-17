@@ -773,7 +773,7 @@ function RemainingItemsActions({
   );
 }
 
-export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
+export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId: string; isWaiter?: boolean }>) {
   const { language } = useLanguage();
   const lang = language;
   const { gateState, handleTokenIssued } = useMesaToken(mesaId);
@@ -1510,7 +1510,31 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
 
               {/* Items — waiter: merged with delete buttons; customer: grouped by order with status */}
               {isWaiterMode ? (
-                <ul className="flex flex-col gap-1 pb-4">
+                <>
+                  {(isWaiter || isWaiterMode) && sessionData && sessionData.orders.length > 0 && (
+                    <div className="flex flex-wrap gap-1 pt-2 pb-1">
+                      {sessionData.orders.map((order) => (
+                        <span
+                          key={order.id}
+                          className="text-[10px] rounded px-1.5 py-0.5 font-medium"
+                          style={{
+                            background: ['pendiente_validacion', 'retenido'].includes(order.estado)
+                              ? 'oklch(21% 0.10 65)' : 'oklch(18% 0.05 148)',
+                            color: ['pendiente_validacion', 'retenido'].includes(order.estado)
+                              ? 'oklch(72% 0.18 65)' : 'oklch(65% 0.18 148)',
+                          }}
+                        >
+                          #{order.numeroPedido}&nbsp;
+                          {order.estado === 'pendiente_validacion' ? t('pendientesValidacionLabel', lang)
+                            : order.estado === 'retenido' ? t('kitchenItemRetenido', lang)
+                            : order.estado === 'preparado' ? t('orderStatusPreparado', lang)
+                            : order.estado === 'servido' ? t('orderStatusServido', lang)
+                            : t('statusPendiente', lang)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <ul className="flex flex-col gap-1 pb-4">
                   {allItems.map((item) => {
                     const complementoTotal = item.complementos?.reduce((s, c) => s + c.precio, 0) ?? 0;
                     const lineTotal = (item.precio + complementoTotal) * item.cantidad;
@@ -1560,6 +1584,7 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                     );
                   })}
                 </ul>
+                </>
               ) : (() => {
                 // Build paid-units map by merge key (only confirmed pagado turns)
                 const paidByKey = new Map<string, number>();
