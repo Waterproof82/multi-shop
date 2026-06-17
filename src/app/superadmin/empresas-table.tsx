@@ -29,6 +29,7 @@ interface EmpresaRow {
   pagosMesaHabilitados: boolean;
   pagosPickupHabilitados: boolean;
   mesasHabilitadas: boolean;
+  validacionPedidosHabilitada: boolean;
   stats: EmpresaStats;
   totalMesas: number;
   seoStatus: {
@@ -44,7 +45,7 @@ interface EmpresaRow {
 
 interface ModuloSwitchProps {
   readonly empresaId: string;
-  readonly field: 'mostrar_promociones' | 'mostrar_tgtg' | 'pagos_mesa_habilitados' | 'pagos_pickup_habilitados' | 'mesas_habilitadas';
+  readonly field: 'mostrar_promociones' | 'mostrar_tgtg' | 'pagos_mesa_habilitados' | 'pagos_pickup_habilitados' | 'mesas_habilitadas' | 'validacion_pedidos_habilitada';
   readonly checked: boolean;
   readonly label: string;
 }
@@ -184,6 +185,7 @@ export function EmpresasTable({ empresas }: EmpresasTableProps) {
               <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Tipo</th>
               <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Mesas</th>
               <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Pagos Mesa</th>
+              <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Validación</th>
               <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Pagos Pick-up</th>
               <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Hoy</th>
               <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">Mes</th>
@@ -271,6 +273,18 @@ export function EmpresasTable({ empresas }: EmpresasTableProps) {
                       field="pagos_mesa_habilitados"
                       checked={empresa.pagosMesaHabilitados}
                       label={`Activar pagos en mesa para ${empresa.nombre}`}
+                    />
+                  ) : (
+                    <span className="text-slate-600">—</span>
+                  )}
+                </td>
+                <td className="px-4 py-4 text-center">
+                  {empresa.tipo === 'restaurante' ? (
+                    <ModuloSwitch
+                      empresaId={empresa.id}
+                      field="validacion_pedidos_habilitada"
+                      checked={empresa.validacionPedidosHabilitada}
+                      label={`Activar validación de pedidos para ${empresa.nombre}`}
                     />
                   ) : (
                     <span className="text-slate-600">—</span>

@@ -82,6 +82,7 @@ export interface EmpresaWithStats {
   pagosMesaHabilitados: boolean;
   pagosPickupHabilitados: boolean;
   mesasHabilitadas: boolean;
+  validacionPedidosHabilitada: boolean;
   stats: EmpresaStats;
   totalMesas: number;
   createdAt: string;

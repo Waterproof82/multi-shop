@@ -89,6 +89,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
       if (data.descripcion_it !== undefined) updatePayload.descripcion_it = data.descripcion_it || null;
       if (data.descripcion_de !== undefined) updatePayload.descripcion_de = data.descripcion_de || null;
       // Boolean fields: must NOT use `|| null` — false is a valid value and must reach the DB.
+      if (data.validacion_pedidos_habilitada !== undefined) updatePayload.validacion_pedidos_habilitada = data.validacion_pedidos_habilitada;
       if (data.mostrar_promociones !== undefined) updatePayload.mostrar_promociones = data.mostrar_promociones;
       if (data.mostrar_tgtg !== undefined) updatePayload.mostrar_tgtg = data.mostrar_tgtg;
       if (data.descuento_bienvenida_activo !== undefined) updatePayload.descuento_bienvenida_activo = data.descuento_bienvenida_activo;
