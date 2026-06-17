@@ -31,6 +31,7 @@ const mesaPedidoSchema = z.object({
   mesa_id: z.string().uuid('El mesa_id debe ser un UUID válido'),
   items: itemsSchema,
   idioma: z.enum(['es', 'en', 'fr', 'it', 'de']).optional(),
+  initialEstado: z.enum(['pendiente', 'retenido']).optional(), // waiter-only field
 });
 
 const defaultPedidoSchema = z.object({
@@ -119,11 +120,15 @@ async function handleMesaOrder(empresa: EmpresaOrderData, data: MesaData, reques
   const lockResponse = await checkMesaPaymentLock(data.mesa_id);
   if (lockResponse) return lockResponse;
 
+  // Only authenticated waiters may set initialEstado; customer requests always use 'pendiente'
+  const initialEstado = isWaiter && data.initialEstado === 'retenido' ? 'retenido' : 'pendiente';
+
   const pedidoResult = await pedidoUseCase.createMesaOrder(
     empresa.id,
     { items: data.items, mesa_id: data.mesa_id, idioma: data.idioma },
     mesaResult.data.numero,
-    mesaResult.data.nombre
+    mesaResult.data.nombre,
+    initialEstado
   );
 
   if (!pedidoResult.success) {
