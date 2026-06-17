@@ -1,0 +1,71 @@
+<h2>¿Cómo selecciona el camarero qué retener?</h2>
+<p class="subtitle">Los pedidos esperan validación. El camarero puede lanzar todo o retener ítems individualmente. ¿Cómo funciona esa selección?</p>
+
+<div class="options">
+
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Todo lanzado por defecto — marcar para retener</h3>
+      <p>Por defecto todos los ítems están marcados para enviar. El camarero desactiva los que quiere retener. "Confirmar" envía los marcados a cocina/bar.</p>
+      <div class="mockup" style="margin-top:0.75rem">
+        <div class="mockup-header">Mesa 3 — Pendiente validación</div>
+        <div class="mockup-body" style="display:flex;flex-direction:column;gap:6px;padding:8px">
+          <div style="display:flex;align-items:center;gap:8px;background:#1e293b;padding:8px;border-radius:8px;border:1px solid #22c55e44">
+            <div style="width:18px;height:18px;border-radius:4px;background:#22c55e;border:2px solid #22c55e;flex-shrink:0"></div>
+            <span style="color:#e2e8f0;font-size:12px;flex:1">2× Spaghetti Carbonara</span>
+            <span style="color:#64748b;font-size:11px">comida</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;background:#1e293b;padding:8px;border-radius:8px;border:1px solid #22c55e44">
+            <div style="width:18px;height:18px;border-radius:4px;background:#22c55e;border:2px solid #22c55e;flex-shrink:0"></div>
+            <span style="color:#e2e8f0;font-size:12px;flex:1">1× Agua con gas</span>
+            <span style="color:#64748b;font-size:11px">bebida</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;background:#291a0a;padding:8px;border-radius:8px;border:1px solid #f59e0b44">
+            <div style="width:18px;height:18px;border-radius:4px;background:transparent;border:2px solid #64748b;flex-shrink:0"></div>
+            <span style="color:#94a3b8;font-size:12px;flex:1;text-decoration:line-through">1× Tiramisú</span>
+            <span style="color:#f59e0b;font-size:11px">retenido</span>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:4px">
+            <div class="mock-button" style="flex:1;background:#15803d;color:#dcfce7;border:none;font-size:12px;padding:8px;border-radius:8px;text-align:center">Confirmar (2 ítems)</div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:0.5rem">
+        <div class="pros"><h4>A favor</h4><ul><li>Flujo rápido: tap en excepciones solo</li><li>El caso común (lanzar todo) es un solo tap</li></ul></div>
+        <div class="cons"><h4>En contra</h4><ul><li>Fácil confirmar sin revisar</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Nada lanzado por defecto — aprobar ítem a ítem o "Lanzar todo"</h3>
+      <p>Los ítems llegan en estado neutro. El camarero aprueba cada uno individualmente, o pulsa "Lanzar todo" para confirmarlos todos de golpe. Sin acción = retenido.</p>
+      <div class="mockup" style="margin-top:0.75rem">
+        <div class="mockup-header">Mesa 3 — Pendiente validación</div>
+        <div class="mockup-body" style="display:flex;flex-direction:column;gap:6px;padding:8px">
+          <div style="display:flex;align-items:center;gap:8px;background:#1e293b;padding:8px;border-radius:8px;border:1px solid #33415566">
+            <span style="color:#e2e8f0;font-size:12px;flex:1">2× Spaghetti Carbonara</span>
+            <div class="mock-button" style="font-size:10px;padding:3px 8px;border-radius:6px;background:#15803d;color:#dcfce7;border:none">✓ Enviar</div>
+            <div class="mock-button" style="font-size:10px;padding:3px 8px;border-radius:6px;background:#292524;color:#f59e0b;border:1px solid #f59e0b44">Retener</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;background:#1e293b;padding:8px;border-radius:8px;border:1px solid #33415566">
+            <span style="color:#e2e8f0;font-size:12px;flex:1">1× Agua con gas</span>
+            <div class="mock-button" style="font-size:10px;padding:3px 8px;border-radius:6px;background:#15803d;color:#dcfce7;border:none">✓ Enviar</div>
+            <div class="mock-button" style="font-size:10px;padding:3px 8px;border-radius:6px;background:#292524;color:#f59e0b;border:1px solid #f59e0b44">Retener</div>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:4px">
+            <div class="mock-button" style="flex:1;background:#15803d;color:#dcfce7;border:none;font-size:12px;padding:8px;border-radius:8px;text-align:center">Lanzar todo</div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:0.5rem">
+        <div class="pros"><h4>A favor</h4><ul><li>Acción explícita — más control</li><li>El camarero no puede confirmar sin ver los ítems</li></ul></div>
+        <div class="cons"><h4>En contra</h4><ul><li>Más taps en el caso habitual</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+</div>

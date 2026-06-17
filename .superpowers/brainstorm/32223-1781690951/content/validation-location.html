@@ -1,0 +1,70 @@
+<h2>¿Dónde gestiona el camarero los pedidos pendientes de validación?</h2>
+<p class="subtitle">Cuando un cliente hace un pedido, el camarero tiene que validarlo antes de que llegue a cocina/bar. ¿Dónde vive esa pantalla?</p>
+
+<div class="options">
+
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Página propia <code>/waiter/pendientes</code></h3>
+      <p>Nueva sección dedicada, accesible desde el banner del camarero (igual que Kitchen y Bar). Muestra todos los pedidos de todas las mesas esperando validación. Botones: "Lanzar todo" o seleccionar ítem por ítem.</p>
+      <div class="mockup" style="margin-top:0.75rem">
+        <div class="mockup-header">WaiterBanner</div>
+        <div class="mockup-body" style="display:flex;gap:0.5rem;padding:0.5rem;flex-wrap:wrap">
+          <div class="mock-button" style="background:#1e293b;color:#94a3b8;border:1px solid #334155;font-size:11px;padding:4px 10px;border-radius:6px">← Salir</div>
+          <div class="mock-button" style="background:#1e293b;color:#f59e0b;border:1px solid #f59e0b55;font-size:11px;padding:4px 10px;border-radius:6px">Pendientes <span style="background:#ef4444;color:#fff;border-radius:9999px;padding:1px 6px;font-size:10px;margin-left:4px">3</span></div>
+          <div class="mock-button" style="background:#1e293b;color:#94a3b8;border:1px solid #33415555;font-size:11px;padding:4px 10px;border-radius:6px">Cocina</div>
+          <div class="mock-button" style="background:#1e293b;color:#94a3b8;border:1px solid #33415555;font-size:11px;padding:4px 10px;border-radius:6px">Bar</div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:0.5rem">
+        <div class="pros"><h4>A favor</h4><ul><li>Foco total en la validación</li><li>No contamina la vista de cocina</li></ul></div>
+        <div class="cons"><h4>En contra</h4><ul><li>Un botón más en el banner</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Tab en Kitchen y Bar</h3>
+      <p>Dentro de las páginas existentes, un nuevo filtro "Validar" aparece primero. Los ítems de comida esperan en Kitchen; los de bebida en Bar. El camarero valida desde cada página por separado.</p>
+      <div class="mockup" style="margin-top:0.75rem">
+        <div class="mockup-header">/waiter/kitchen</div>
+        <div class="mockup-body" style="display:flex;gap:0.5rem;padding:0.5rem;flex-wrap:wrap">
+          <div class="mock-button" style="background:#1e1f2e;color:#f59e0b;border:1px solid #f59e0b88;font-size:11px;padding:4px 10px;border-radius:6px">Validar <span style="background:#ef4444;color:#fff;border-radius:9999px;padding:1px 5px;font-size:10px;margin-left:3px">2</span></div>
+          <div class="mock-button" style="background:#1e293b;color:#94a3b8;border:1px solid #33415555;font-size:11px;padding:4px 10px;border-radius:6px">Por pedido</div>
+          <div class="mock-button" style="background:#1e293b;color:#94a3b8;border:1px solid #33415555;font-size:11px;padding:4px 10px;border-radius:6px">Por mesa</div>
+          <div class="mock-button" style="background:#1e293b;color:#94a3b8;border:1px solid #33415555;font-size:11px;padding:4px 10px;border-radius:6px">Listos</div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:0.5rem">
+        <div class="pros"><h4>A favor</h4><ul><li>Sin nueva página</li><li>Camarero ya está en Kitchen/Bar</li></ul></div>
+        <div class="cons"><h4>En contra</h4><ul><li>Ítems de comida y bebida separados</li><li>Hay que revisar dos páginas</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Panel flotante en el banner</h3>
+      <p>Un badge con contador en el banner abre un drawer/overlay con todos los pedidos pendientes de todas las mesas (comida + bebida mezclados). Sin nueva página.</p>
+      <div class="mockup" style="margin-top:0.75rem">
+        <div class="mockup-header">WaiterBanner</div>
+        <div class="mockup-body" style="display:flex;gap:0.5rem;padding:0.5rem;flex-wrap:wrap">
+          <div class="mock-button" style="background:#1e293b;color:#f59e0b;border:2px solid #f59e0b;font-size:11px;padding:4px 10px;border-radius:6px">
+            ⚡ <span style="background:#ef4444;color:#fff;border-radius:9999px;padding:1px 6px;font-size:10px;margin-left:2px">3</span>
+          </div>
+          <div class="mock-button" style="background:#1e293b;color:#94a3b8;border:1px solid #33415555;font-size:11px;padding:4px 10px;border-radius:6px">Cocina</div>
+          <div class="mock-button" style="background:#1e293b;color:#94a3b8;border:1px solid #33415555;font-size:11px;padding:4px 10px;border-radius:6px">Bar</div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:0.5rem">
+        <div class="pros"><h4>A favor</h4><ul><li>Siempre accesible sin cambiar de página</li><li>Comida + bebida juntos</li></ul></div>
+        <div class="cons"><h4>En contra</h4><ul><li>Espacio limitado en un drawer</li><li>Gestión individual de ítems más difícil</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+</div>
