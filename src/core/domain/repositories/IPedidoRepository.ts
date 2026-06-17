@@ -25,8 +25,6 @@ export interface RetenidoItem {
   mesaNumero: number | null;
   mesaNombre: string | null;
   sesionCreatedAt: string;
-  /** Position of this item within its mesa_sesion.items_diferidos array */
-  sesionItemIdx: number;
 }
 
 /**
@@ -72,10 +70,28 @@ export interface KitchenItemRecord {
   mesaNumero: number | null;
   mesaNombre: string | null;
   createdAt: string;
-  /** true = item from mesa_sesiones.items_diferidos (deferred cart item, read-only in waiter kitchen) */
-  isDiferido?: boolean;
-  /** Index within the mesa_sesion.items_diferidos array — only set when isDiferido=true */
-  sesionItemIdx?: number;
+}
+
+export interface PendienteValidacionItem {
+  idx: number;
+  nombre: string;
+  cantidad: number;
+  precio: number;
+  tipo: 'comida' | 'bebida';
+  complementos?: string;
+}
+
+export interface PendienteValidacionPedido {
+  id: string;
+  createdAt: string;
+  items: PendienteValidacionItem[];
+}
+
+export interface PendienteValidacionMesa {
+  mesaId: string;
+  mesaNumero: number | null;
+  mesaNombre: string | null;
+  pedidos: PendienteValidacionPedido[];
 }
 
 export interface IPedidoRepository {
@@ -92,6 +108,7 @@ export interface IPedidoRepository {
     total: number;
     trackingToken: string;
     sesionId: string | null;
+    initialEstado?: 'pendiente' | 'retenido' | 'pendiente_validacion';
   }): Promise<Result<{ id: string; numero_pedido: number; tracking_token: string }>>;
   findEstimatedReadyAtById(pedidoId: string): Promise<Result<string | null>>;
   findStatusById(pedidoId: string): Promise<Result<string | null>>;
@@ -128,6 +145,8 @@ export interface IPedidoRepository {
   findWaiterKitchenItems(empresaId: string): Promise<Result<KitchenItemRecord[]>>;
   /** Upsert a per-item kitchen estado */
   upsertItemEstado(empresaId: string, pedidoId: string, itemIdx: number, estado: ItemEstado): Promise<Result<void>>;
+  findPendientesValidacion(empresaId: string): Promise<Result<PendienteValidacionMesa[]>>;
+  validatePedido(empresaId: string, pedidoId: string, retainIndices: number[]): Promise<Result<void>>;
   getStats(empresaId: string, mes: number, año: number): Promise<Result<{
     pedidosHoy: number;
     pedidosMes: number;

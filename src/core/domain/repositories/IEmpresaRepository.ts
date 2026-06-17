@@ -22,6 +22,7 @@ export interface UpdateEmpresaData {
   descuento_bienvenida_porcentaje?: number;
   descuento_bienvenida_duracion?: number;
   tipo?: 'tienda' | 'restaurante';
+  validacion_pedidos_habilitada?: boolean;
 }
 
 export interface IEmpresaRepository {

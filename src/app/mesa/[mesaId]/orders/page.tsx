@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { MesaOrdersClient } from "@/components/mesa-orders-client";
 
 export const dynamic = "force-dynamic";
@@ -12,5 +13,7 @@ interface Props {
 
 export default async function MesaOrdersPage({ params }: Props) {
   const { mesaId } = await params;
-  return <MesaOrdersClient mesaId={mesaId} />;
+  const cookieStore = await cookies();
+  const isWaiter = !!(cookieStore.get("waiter_token")?.value);
+  return <MesaOrdersClient mesaId={mesaId} isWaiter={isWaiter} />;
 }

@@ -31,6 +31,7 @@ const mesaPedidoSchema = z.object({
   mesa_id: z.string().uuid('El mesa_id debe ser un UUID válido'),
   items: itemsSchema,
   idioma: z.enum(['es', 'en', 'fr', 'it', 'de']).optional(),
+  initialEstado: z.enum(['pendiente', 'retenido']).optional(), // waiter-only field
 });
 
 const defaultPedidoSchema = z.object({
@@ -119,11 +120,20 @@ async function handleMesaOrder(empresa: EmpresaOrderData, data: MesaData, reques
   const lockResponse = await checkMesaPaymentLock(data.mesa_id);
   if (lockResponse) return lockResponse;
 
+  // Waiter: may set retenido. Customer: pendiente_validacion when toggle is active, else pendiente.
+  let initialEstado: 'pendiente' | 'retenido' | 'pendiente_validacion' = 'pendiente';
+  if (isWaiter && data.initialEstado === 'retenido') {
+    initialEstado = 'retenido';
+  } else if (!isWaiter && empresa.validacion_pedidos_habilitada) {
+    initialEstado = 'pendiente_validacion';
+  }
+
   const pedidoResult = await pedidoUseCase.createMesaOrder(
     empresa.id,
     { items: data.items, mesa_id: data.mesa_id, idioma: data.idioma },
     mesaResult.data.numero,
-    mesaResult.data.nombre
+    mesaResult.data.nombre,
+    initialEstado
   );
 
   if (!pedidoResult.success) {
