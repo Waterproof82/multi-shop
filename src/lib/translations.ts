@@ -730,6 +730,11 @@ export const translations = {
     qrScannerRetry: "Intentar de nuevo",
     qrScannerSimulate: "Continuar sin QR",
     mesaOrderConfirmed: "¡Pedido confirmado!",
+    pendientesTitle: "Pendientes",
+    pendientesEmpty: "No hay pedidos pendientes de validación",
+    pendientesConfirmar: "Confirmar ({n} ítems → cocina)",
+    pendientesRetenerTodos: "Retener todos",
+    pendientesValidacionLabel: "Pendiente validación",
   },
   en: {
     // UI
@@ -1459,6 +1464,11 @@ export const translations = {
     qrScannerRetry: "Try again",
     qrScannerSimulate: "Continue without QR",
     mesaOrderConfirmed: "Order confirmed!",
+    pendientesTitle: "Pending",
+    pendientesEmpty: "No orders pending validation",
+    pendientesConfirmar: "Confirm ({n} items → kitchen)",
+    pendientesRetenerTodos: "Retain all",
+    pendientesValidacionLabel: "Pending validation",
   },
   fr: {
     // UI - Popup y carrito
@@ -1714,6 +1724,11 @@ export const translations = {
     qrScannerRetry: "Réessayer",
     qrScannerSimulate: "Continuer sans QR",
     mesaOrderConfirmed: "Commande confirmée !",
+    pendientesTitle: "En attente",
+    pendientesEmpty: "Aucune commande en attente de validation",
+    pendientesConfirmar: "Confirmer ({n} articles → cuisine)",
+    pendientesRetenerTodos: "Tout retenir",
+    pendientesValidacionLabel: "En attente de validation",
   },
   it: {
     // UI - Popup y carrito
@@ -1969,6 +1984,11 @@ export const translations = {
     qrScannerRetry: "Riprova",
     qrScannerSimulate: "Continua senza QR",
     mesaOrderConfirmed: "Ordine confermato!",
+    pendientesTitle: "In attesa",
+    pendientesEmpty: "Nessun ordine in attesa di validazione",
+    pendientesConfirmar: "Conferma ({n} articoli → cucina)",
+    pendientesRetenerTodos: "Trattieni tutti",
+    pendientesValidacionLabel: "In attesa di validazione",
   },
   de: {
     // UI - Popup y carrito
@@ -2224,6 +2244,11 @@ export const translations = {
     qrScannerRetry: "Erneut versuchen",
     qrScannerSimulate: "Ohne QR fortfahren",
     mesaOrderConfirmed: "Bestellung bestätigt!",
+    pendientesTitle: "Ausstehend",
+    pendientesEmpty: "Keine Bestellungen warten auf Validierung",
+    pendientesConfirmar: "Bestätigen ({n} Artikel → Küche)",
+    pendientesRetenerTodos: "Alle zurückstellen",
+    pendientesValidacionLabel: "Warte auf Validierung",
   },
 } as const;
 
