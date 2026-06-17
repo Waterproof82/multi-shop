@@ -41,6 +41,11 @@ const BTN_UNLOCK_BG    = "oklch(22% 0.07 40)";
 const BTN_UNLOCK_HOVER = "oklch(28% 0.11 40)";
 const BTN_UNLOCK_TEXT  = "oklch(75% 0.20 40)";
 
+// Pendientes — warm red/orange
+const BTN_PENDIENTES_BG    = "oklch(22% 0.12 35)";
+const BTN_PENDIENTES_HOVER = "oklch(28% 0.16 35)";
+const BTN_PENDIENTES_TEXT  = "oklch(75% 0.22 35)";
+
 // Kitchen — warm amber
 const BTN_KITCHEN_BG    = "oklch(22% 0.07 62)";
 const BTN_KITCHEN_HOVER = "oklch(28% 0.10 62)";
@@ -86,6 +91,7 @@ export function WaiterBanner() {
   const [counts, setCounts] = useState<{
     cocina: { total: number; listos: number; retenidos: number };
     bebidas: { total: number; listos: number; retenidos: number };
+    pendientes: number;
   } | null>(null);
   const prevCountsRef = useRef<typeof counts>(null);
 
@@ -164,12 +170,14 @@ export function WaiterBanner() {
           const json = await r.json() as {
             cocina: { total: number; listos: number; retenidos: number };
             bebidas: { total: number; listos: number; retenidos: number };
+            pendientes: number;
           };
           const prev = prevCountsRef.current;
           if (prev) {
             const totalUp = json.cocina.total > prev.cocina.total || json.bebidas.total > prev.bebidas.total;
             const listosUp = json.cocina.listos > prev.cocina.listos || json.bebidas.listos > prev.bebidas.listos;
-            if (totalUp || listosUp) {
+            const pendientesUp = json.pendientes > (prev.pendientes ?? 0);
+            if (totalUp || listosUp || pendientesUp) {
               try {
                 const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
                 const osc = ctx.createOscillator();
@@ -393,6 +401,26 @@ export function WaiterBanner() {
                   {totalItems}
                 </span>
               )}
+            </button>
+          )}
+
+          {/* Pendientes — visible only when there are items awaiting validation */}
+          {counts && counts.pendientes > 0 && (
+            <button
+              onClick={() => { window.location.href = '/waiter/pendientes'; }}
+              className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150 min-h-[32px]"
+              style={{ color: BTN_PENDIENTES_TEXT, backgroundColor: BTN_PENDIENTES_BG }}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_PENDIENTES_HOVER)}
+              onMouseLeave={e => (e.currentTarget.style.backgroundColor = BTN_PENDIENTES_BG)}
+              aria-label={t('pendientesTitle', lang)}
+            >
+              <span className="text-[10px] font-bold" style={{
+                background: 'oklch(55% 0.30 25)', color: '#fff',
+                borderRadius: '9999px', padding: '1px 6px', minWidth: 16, textAlign: 'center',
+              }}>
+                {counts.pendientes}
+              </span>
+              <span className="hidden sm:inline">{t('pendientesTitle', lang)}</span>
             </button>
           )}
 
