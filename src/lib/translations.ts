@@ -2262,7 +2262,7 @@ export const translations = {
     pendientesConfirmarBar: "Bar-Artikel bestätigen ({n})",
     pendientesRetenerTodos: "Alle zurückstellen",
     pendientesSeleccionarTodos: "Alle auswählen",
-    pendientesDeseleccionarTodos: "Auswahl aufheben",
+    pendientesDeseleccionarTodos: "Alle abwählen",
     pendientesValidacionLabel: "Warte auf Validierung",
   },
 } as const;

@@ -877,17 +877,20 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       .map(row => row['id'] as string);
 
     const estadoMap = new Map<string, Map<number, string>>();
+    const fromValidationSet = new Set<string>(); // "pedidoId:itemIdx" — back in pendientes queue
     if (pedidoIdsWithBebida.length > 0) {
       const { data: itemEstados } = await this.supabase
         .from('pedido_item_estados')
-        .select('pedido_id, item_idx, estado')
+        .select('pedido_id, item_idx, estado, from_validation')
         .in('pedido_id', pedidoIdsWithBebida);
 
       for (const row of itemEstados ?? []) {
         const r = row as Record<string, unknown>;
         const pid = r['pedido_id'] as string;
+        const idx = r['item_idx'] as number;
+        if (r['from_validation'] === true) { fromValidationSet.add(`${pid}:${idx}`); continue; }
         if (!estadoMap.has(pid)) estadoMap.set(pid, new Map());
-        estadoMap.get(pid)!.set(r['item_idx'] as number, r['estado'] as string);
+        estadoMap.get(pid)!.set(idx, r['estado'] as string);
       }
     }
 
@@ -897,7 +900,11 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       const pedidoId = pedido['id'] as string;
       const pedidoEstados = estadoMap.get(pedidoId) ?? new Map();
       items.forEach((item, idx) => {
-        if (item['tipo_producto'] === 'bebida' && pedidoEstados.get(idx) !== 'servido') total++;
+        if (
+          item['tipo_producto'] === 'bebida' &&
+          !fromValidationSet.has(`${pedidoId}:${idx}`) &&
+          pedidoEstados.get(idx) !== 'servido'
+        ) total++;
       });
     }
     return { success: true, data: total };
@@ -1079,17 +1086,20 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         .map(row => row['id'] as string);
 
       const estadoMap = new Map<string, Map<number, string>>();
+      const fromValidationSet = new Set<string>(); // "pedidoId:itemIdx" — back in pendientes queue
       if (pedidoIdsWithBebida.length > 0) {
         const { data: itemEstados } = await this.supabase
           .from('pedido_item_estados')
-          .select('pedido_id, item_idx, estado')
+          .select('pedido_id, item_idx, estado, from_validation')
           .in('pedido_id', pedidoIdsWithBebida);
 
         for (const row of itemEstados ?? []) {
           const r = row as Record<string, unknown>;
           const pid = r['pedido_id'] as string;
+          const idx = r['item_idx'] as number;
+          if (r['from_validation'] === true) { fromValidationSet.add(`${pid}:${idx}`); continue; }
           if (!estadoMap.has(pid)) estadoMap.set(pid, new Map());
-          estadoMap.get(pid)!.set(r['item_idx'] as number, r['estado'] as string);
+          estadoMap.get(pid)!.set(idx, r['estado'] as string);
         }
       }
 
@@ -1103,10 +1113,14 @@ export class SupabasePedidoRepository implements IPedidoRepository {
 
         const hasComida = items.some(i => i['tipo_producto'] === 'comida');
 
-        // Only include bebida items not yet marked servido in pedido_item_estados
+        // Only include bebida items not yet marked servido and not in the pendientes queue (from_validation=true)
         const bebidaItems: { nombre: string; cantidad: number; detallePedidoIdx: number }[] = [];
         items.forEach((item, fullIdx) => {
-          if (item['tipo_producto'] === 'bebida' && pedidoEstados.get(fullIdx) !== 'servido') {
+          if (
+            item['tipo_producto'] === 'bebida' &&
+            !fromValidationSet.has(`${pedidoId}:${fullIdx}`) &&
+            pedidoEstados.get(fullIdx) !== 'servido'
+          ) {
             bebidaItems.push({ nombre: item['nombre'] as string, cantidad: item['cantidad'] as number, detallePedidoIdx: fullIdx });
           }
         });
@@ -1164,7 +1178,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       if (pedidoIds.length > 0) {
         const { data: itemEstados, error: estadosError } = await this.supabase
           .from('pedido_item_estados')
-          .select('pedido_id, item_idx, estado')
+          .select('pedido_id, item_idx, estado, from_validation')
           .in('pedido_id', pedidoIds);
 
         if (estadosError) {
@@ -1174,6 +1188,9 @@ export class SupabasePedidoRepository implements IPedidoRepository {
 
         for (const row of itemEstados ?? []) {
           const r = row as Record<string, unknown>;
+          // Skip from_validation=true: item auto-retained during pendientes validation,
+          // already back in the pendientes queue — not a kitchen-retained item.
+          if (r['from_validation'] === true) continue;
           const pid = r['pedido_id'] as string;
           if (!estadoMap.has(pid)) estadoMap.set(pid, new Map());
           estadoMap.get(pid)!.set(r['item_idx'] as number, r['estado'] as ItemEstado);
@@ -1236,7 +1253,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       const { error } = await this.supabase
         .from('pedido_item_estados')
         .upsert(
-          { pedido_id: pedidoId, item_idx: itemIdx, empresa_id: empresaId, estado, updated_at: new Date().toISOString() },
+          { pedido_id: pedidoId, item_idx: itemIdx, empresa_id: empresaId, estado, updated_at: new Date().toISOString(), from_validation: false },
           { onConflict: 'pedido_id,item_idx' }
         );
 
@@ -1254,6 +1271,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
 
   async findPendientesValidacion(empresaId: string): Promise<Result<PendienteValidacionMesa[]>> {
     try {
+      // 1. Pedidos en cola de validación
       const { data: pedidos, error } = await this.supabase
         .from('pedidos')
         .select(`id, created_at, detalle_pedido, mesa_id, mesas!inner(numero, nombre)`)
@@ -1267,6 +1285,16 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       }
 
       const mesaMap = new Map<string, PendienteValidacionMesa>();
+
+      const mapItem = (item: Record<string, unknown>, idx: number): PendienteValidacionItem => ({
+        idx,
+        nombre: item['nombre'] as string,
+        cantidad: item['cantidad'] as number,
+        precio: item['precio'] as number,
+        tipo: ((item['tipo_producto'] as string | undefined) ?? 'comida') as 'comida' | 'bebida',
+        complementos: (item['complementos'] as Array<{ nombre?: string }> | undefined)
+          ?.map(c => c.nombre ?? '').filter(Boolean).join(', '),
+      });
 
       for (const row of pedidos ?? []) {
         const r = row as Record<string, unknown>;
@@ -1283,21 +1311,65 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           });
         }
 
-        const items: PendienteValidacionItem[] = detalle.map((item, idx) => ({
-          idx,
-          nombre: item['nombre'] as string,
-          cantidad: item['cantidad'] as number,
-          precio: item['precio'] as number,
-          tipo: ((item['tipo_producto'] as string | undefined) ?? 'comida') as 'comida' | 'bebida',
-          complementos: (item['complementos'] as Array<{ nombre?: string }> | undefined)
-            ?.map(c => c.nombre ?? '').filter(Boolean).join(', '),
-        }));
-
         mesaMap.get(mesaId)!.pedidos.push({
           id: r['id'] as string,
           createdAt: r['created_at'] as string,
-          items,
+          items: detalle.map(mapItem),
         });
+      }
+
+      // 2. Ítems retenidos durante validación — el camarero los libera desde pendientes
+      const { data: retenidos } = await this.supabase
+        .from('pedido_item_estados')
+        .select('pedido_id, item_idx')
+        .eq('empresa_id', empresaId)
+        .eq('estado', 'retenido')
+        .eq('from_validation', true);
+
+      const retenidoMap = new Map<string, Set<number>>();
+      for (const r of retenidos ?? []) {
+        const pid = r['pedido_id'] as string;
+        const idx = r['item_idx'] as number;
+        if (!retenidoMap.has(pid)) retenidoMap.set(pid, new Set());
+        retenidoMap.get(pid)!.add(idx);
+      }
+
+      if (retenidoMap.size > 0) {
+        const { data: validatedPedidos } = await this.supabase
+          .from('pedidos')
+          .select(`id, created_at, detalle_pedido, mesa_id, mesas!inner(numero, nombre)`)
+          .eq('empresa_id', empresaId)
+          .eq('estado', 'pendiente')
+          .in('id', [...retenidoMap.keys()])
+          .order('created_at', { ascending: true });
+
+        for (const row of validatedPedidos ?? []) {
+          const r = row as Record<string, unknown>;
+          const mesaData = r['mesas'] as Record<string, unknown> ?? {};
+          const mesaId = r['mesa_id'] as string;
+          const pedidoId = r['id'] as string;
+          const detalle = (r['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
+          const retenidoIndices = retenidoMap.get(pedidoId) ?? new Set<number>();
+
+          const items = detalle.map(mapItem).filter(item => retenidoIndices.has(item.idx));
+          if (items.length === 0) continue;
+
+          if (!mesaMap.has(mesaId)) {
+            mesaMap.set(mesaId, {
+              mesaId,
+              mesaNumero: (mesaData['numero'] as number) ?? null,
+              mesaNombre: (mesaData['nombre'] as string | null) ?? null,
+              pedidos: [],
+            });
+          }
+
+          mesaMap.get(mesaId)!.pedidos.push({
+            id: pedidoId,
+            createdAt: r['created_at'] as string,
+            items,
+            validated: true,
+          });
+        }
       }
 
       return { success: true, data: Array.from(mesaMap.values()) };
@@ -1307,7 +1379,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     }
   }
 
-  async validatePedido(empresaId: string, pedidoId: string, retainIndices: number[]): Promise<Result<void>> {
+  async validatePedido(empresaId: string, pedidoId: string, retainIndices: number[], pausedIndices: number[] = []): Promise<Result<void>> {
     try {
       const { data: pedido, error: fetchError } = await this.supabase
         .from('pedidos')
@@ -1329,6 +1401,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       const maxIdx = detalle.length - 1;
       const validRetain = retainIndices.filter(i => i >= 0 && i <= maxIdx);
 
+      // Auto-retained items (wrong tipo or not selected) → from_validation=true → reappear in pendientes
       if (validRetain.length > 0) {
         const upserts = validRetain.map(idx => ({
           pedido_id: pedidoId,
@@ -1336,6 +1409,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           empresa_id: empresaId,
           estado: 'retenido' as const,
           updated_at: new Date().toISOString(),
+          from_validation: true,
         }));
         const { error: upsertError } = await this.supabase
           .from('pedido_item_estados')
@@ -1343,6 +1417,26 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         if (upsertError) {
           await logger.logAndReturnError('DB_INSERT_ERROR', upsertError.message, 'repository', 'SupabasePedidoRepository.validatePedido', { details: { code: upsertError.code, pedidoId } });
           return { success: false, error: { code: 'DB_ERROR', message: 'Error al retener ítems', module: 'repository', method: 'validatePedido' } };
+        }
+      }
+
+      // Intentionally paused items → from_validation=false → go to kitchen/bar retenidos only
+      const validPaused = pausedIndices.filter(i => i >= 0 && i <= maxIdx);
+      if (validPaused.length > 0) {
+        const pausedUpserts = validPaused.map(idx => ({
+          pedido_id: pedidoId,
+          item_idx: idx,
+          empresa_id: empresaId,
+          estado: 'retenido' as const,
+          updated_at: new Date().toISOString(),
+          from_validation: false,
+        }));
+        const { error: pausedError } = await this.supabase
+          .from('pedido_item_estados')
+          .upsert(pausedUpserts, { onConflict: 'pedido_id,item_idx' });
+        if (pausedError) {
+          await logger.logAndReturnError('DB_INSERT_ERROR', pausedError.message, 'repository', 'SupabasePedidoRepository.validatePedido', { details: { code: pausedError.code, pedidoId } });
+          return { success: false, error: { code: 'DB_ERROR', message: 'Error al pausar ítems', module: 'repository', method: 'validatePedido' } };
         }
       }
 

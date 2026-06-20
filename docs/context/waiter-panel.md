@@ -54,9 +54,9 @@ On mount, `WaiterLoginForm` pings `GET /api/waiter/me`. If the cookie is already
 | `POST` | `/api/waiter/mesas/{mesaId}/open` | Open a table session |
 | `POST` | `/api/waiter/mesas/{mesaId}/close` | Close session (consolidate orders) + auto-reopen |
 | `POST` | `/api/waiter/mesas/{mesaId}/manual-payment` | Register a cash/external payment (full or one division share) |
-| `GET` | `/api/waiter/mesas/{mesaId}/deferred` | Get deferred items for the active session |
-| `PUT` | `/api/waiter/mesas/{mesaId}/deferred` | Save/clear deferred items for the active session |
-| `POST` | `/api/waiter/kitchen/mesas/{mesaId}/release-deferred-item` | Release one deferred cart item to the kitchen as a new pedido |
+| `POST` | `/api/waiter/pendientes/validate` | Validate a pending-validation order (move to pendiente, route items to kitchen/bar/queue) |
+| `GET` | `/api/waiter/pendientes/orders` | List orders pending validation + retained-in-queue items |
+| `POST` | `/api/waiter/kitchen/mesas/{mesaId}/release-retenidos` | Release all kitchen-retained items for a mesa back to `pendiente` |
 
 ---
 
@@ -84,9 +84,7 @@ In-app kitchen view. Shows all in-flight `comida` items across four filter modes
 
 Swiping left on an `en_preparacion` item shows a **confirmation dialog** (the item is already in preparation — waiter must confirm before retaining it).
 
-**Two types of retenido items — visually differentiated:**
-- **Retenido pedidos** (amber) — order item retained by the waiter; released via PATCH back to `pendiente`. Utensils icon.
-- **Retenido carrito** (amber-orange) — deferred cart item from `mesa_sesiones.items_diferidos`; released individually via `POST release-deferred-item`, which creates a new pedido. ShoppingCart icon.
+**Retenido items shown in the kitchen** are **only** those with `from_validation = false` (intentionally paused by a waiter in the kitchen panel). Items sent back to the pendientes queue (`from_validation = true`) are invisible here. See [waiter-validation-flow.md](./waiter-validation-flow.md) for details.
 
 **Time-based card colors (oklch, hue progression):**
 - `< 10 min` → cool blue (hue 228)
@@ -102,16 +100,17 @@ Swiping left on an `en_preparacion` item shows a **confirmation dialog** (the it
 - `Por pedido` (default) — flat list, one group per order. No collapse.
 - `Por mesa` — grouped by table; listos items appear first within each group. Collapsible per mesa.
 - `Listos` — only `preparado` items, grouped by table. Collapsible per mesa.
-- `Retenidos` — only retenido items (both pedidos and carrito), grouped by table. Collapsible per mesa.
+- `Retenidos` — only kitchen-retenido items (`from_validation = false`), grouped by table. Collapsible per mesa.
+
+**URL deep-link:** `/waiter/kitchen?groupBy=retenidos&mesa=<mesaName>` — opens directly on the Retenidos tab and auto-scrolls to the specified mesa's section. Used by the waiter grid popup.
 
 **Collapse / expand:**
 - Each mesa card header (Table2 icon + ChevronDown) toggles that mesa's content.
 - A global ChevronsUpDown button in the header bar collapses/expands all mesas at once.
 - The collapse-all button is hidden in `Por pedido` mode (flat list, no collapsible groups).
 
-**Per-mesa release buttons (shown in `Por mesa` and `Retenidos`):**
-- **Utensils button** (blue) — releases all `retenido` order items for the mesa back to `pendiente` in parallel.
-- **ShoppingCart button** (amber) — releases the deferred cart item for the mesa to the kitchen as a new pedido.
+**Per-mesa release button (shown in `Por mesa` and `Retenidos`):**
+- **Utensils button** (blue) — releases all kitchen-retenido (`from_validation = false`) items for the mesa back to `pendiente` in parallel.
 
 ### `/waiter/bar`
 
@@ -181,10 +180,12 @@ Response codes: `404` no active session, `403` wrong empresa, `409` session alre
 
 The `WaiterBanner` component is rendered globally in the root layout. It appears as a sticky top bar when a waiter session is active (detected via `waiter_token` cookie + `/api/waiter/me` check).
 
+**Session expiry redirect:** If a waiter navigates to any `/waiter/*` sub-page with an expired or missing session, they are automatically redirected to `/waiter` for PIN re-entry. The banner detects expiry via the `/api/waiter/me` check (401 response) and fires `globalThis.location.href = '/waiter'` when `pathname.startsWith('/waiter/')`.
+
 **Features:**
 - Pulsing live indicator dot
 - Shows active mesa name
-- **Kitchen & Bar buttons** — always visible for authenticated waiters. Navigate to `/waiter/kitchen` and `/waiter/bar`. Each shows three live badge counts (neutral = total in-flight, green = listos, orange = retenidos). Polled every 10 s; plays a short audio ping when counts increase.
+- **Kitchen & Bar buttons** — always visible for authenticated waiters. Navigate to `/waiter/kitchen` and `/waiter/bar`. Each shows three live badge counts (neutral = total in-flight, green = listos, orange = retenidos). The orange retenidos badge shows **only kitchen-retained items** (`from_validation = false`). Polled every 10 s; plays a short audio ping when counts increase.
 - **"Change table" dropdown** — fetches `GET /api/waiter/mesas` on open. First item is always **"Ver todas las mesas"** (navigates to `/waiter`). Remaining items list all mesas with open/libre status. Selecting a libre mesa calls `POST /api/waiter/mesas/{mesaId}/open` first.
 - **"Close table" button (X icon)** → shown when a session is active. Before closing, runs a guard chain (all via modal dialogs, no blocking `confirm`):
   1. `pagoEnCurso = true` → **payment dialog**: warns the waiter a Redsys payment is in progress; offers "Desbloquear y cerrar".

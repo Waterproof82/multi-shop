@@ -33,7 +33,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Wine, ChevronLeft, ChevronDown, ChevronsUpDown, Table2 } from 'lucide-react';
+import { Wine, ChevronLeft, ChevronDown, ChevronsUpDown, Table2, CheckCheck } from 'lucide-react';
 
 const STORAGE_KEY = 'bar_served_keys';
 
@@ -592,35 +592,33 @@ export default function BarPage() {
         {groupBy === 'mesa' && hasAnyContent && (
           <div className="flex flex-col gap-3">
             {Array.from(mesaGroups.entries()).map(([mesaKey, group]) => {
-              const elapsed     = getElapsedMinutes(group.firstCreatedAt);
-              const isCollapsed = collapsed.has(mesaKey);
+              const elapsed      = getElapsedMinutes(group.firstCreatedAt);
+              const isCollapsed  = collapsed.has(mesaKey);
+              const displayLabel = mesaKey.startsWith('Mesa ') ? mesaKey.slice(5) : mesaKey;
               return (
                 <div key={mesaKey} className="rounded-xl overflow-hidden"
                   style={{ border: '1px solid oklch(35% 0.08 252 / 0.5)' }}>
-                  <button
-                    className="w-full flex items-center gap-2 px-3 py-2 text-left"
+                  <div
+                    className="flex items-center gap-2 px-3 py-2.5 cursor-pointer"
                     style={{ background: 'oklch(18% 0.03 252)', borderBottom: isCollapsed ? 'none' : '1px solid oklch(35% 0.08 252 / 0.4)' }}
                     onClick={() => toggleCollapse(mesaKey)}>
-                    <Table2 className="w-3.5 h-3.5 shrink-0" style={{ color: 'oklch(62% 0.14 62)' }} />
-                    <span className="text-sm font-bold truncate" style={{ color: TEXT_MAIN }}>{mesaKey}</span>
-                    <span className="text-[10px] font-mono shrink-0" style={{ color: TEXT_DIM }}>{formatTimer(elapsed)}</span>
+                    <Table2 className="w-4 h-4 shrink-0" style={{ color: 'oklch(62% 0.14 62)' }} />
+                    <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{displayLabel}</span>
+                    <div className="flex items-center gap-2 ml-auto" onClick={e => e.stopPropagation()}>
+                      <button
+                        onClick={() => setPendingServeAll(mesaKey)}
+                        title={t('barServeAllConfirmYes', lang)}
+                        className="flex items-center justify-center rounded-lg"
+                        style={{ width: 44, height: 32, background: 'oklch(22% 0.10 148)', color: 'oklch(74% 0.20 148)', border: '1px solid oklch(46% 0.22 148 / 0.6)' }}>
+                        <CheckCheck className="w-4 h-4" />
+                      </button>
+                    </div>
                     <ChevronDown className="w-4 h-4 shrink-0" style={{ color: TEXT_DIM, transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }} />
-                  </button>
+                  </div>
                   {!isCollapsed && (
-                    <>
-                      <div className="flex flex-col gap-2 p-2">
-                        {group.items.map(renderDrinkCard)}
-                      </div>
-                      <div className="px-2 pb-2" style={{ borderTop: '1px solid oklch(35% 0.08 252 / 0.4)', paddingTop: '0.5rem' }}>
-                        <button
-                          className="w-full flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-semibold"
-                          style={{ background: 'oklch(22% 0.10 148)', color: 'oklch(74% 0.20 148)', border: '1px solid oklch(46% 0.22 148 / 0.6)' }}
-                          onClick={() => setPendingServeAll(mesaKey)}>
-                          <Wine className="w-3.5 h-3.5" />
-                          {t('barServeAllConfirmYes', lang)}
-                        </button>
-                      </div>
-                    </>
+                    <div className="flex flex-col gap-2 p-2">
+                      {group.items.map(renderDrinkCard)}
+                    </div>
                   )}
                 </div>
               );

@@ -99,7 +99,6 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     removeItem,
     clearCart,
     toggleDeferred,
-    releaseAllDeferred,
     totalPrice,
     isCartOpen,
     openCart,
@@ -118,12 +117,8 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
   const [isWaiterMode, setIsWaiterMode] = useState(false);
   const [qrGateState, setQrGateState] = useState<QRGateState | null>(null);
   const [showOrderToast, setShowOrderToast] = useState(false);
-  const [showLaunchDeferredConfirm, setShowLaunchDeferredConfirm] = useState(false);
   const [showClearWithDeferredWarning, setShowClearWithDeferredWarning] = useState(false);
-  const [pendingLaunchDeferred, setPendingLaunchDeferred] = useState(false);
 
-  // True when every item in cart is deferred
-  const allDeferred = items.length > 0 && items.every(ci => ci.deferred);
   const hasDeferredItems = items.some(ci => ci.deferred);
 
   // Detect ?mesa= param (client-side only, SSR safe)
@@ -212,10 +207,34 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
       const toOrder = items.filter(ci => !ci.deferred);
       const toDefer = items.filter(ci => ci.deferred);
 
-      if (toOrder.length === 0) return; // guard: button should already be disabled
+      if (toOrder.length === 0 && toDefer.length === 0) return;
 
       setSending(true);
       try {
+        // Deferred-only: send as retenido pedido and done
+        if (toOrder.length === 0) {
+          await fetch('/api/pedidos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tipo: 'mesa',
+              mesa_id: mesaId,
+              initialEstado: 'retenido',
+              items: toDefer.map((ci: CartItem) => ({
+                item: { id: ci.item.id, name: ci.item.name, price: ci.item.price, translations: ci.item.translations },
+                quantity: ci.quantity,
+                selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
+              })),
+              idioma: language,
+            }),
+          }).catch(() => null);
+          clearCart();
+          closeCart();
+          setShowOrderToast(true);
+          setTimeout(() => setShowOrderToast(false), 2000);
+          return;
+        }
+
         const res = await fetch('/api/pedidos', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...(clientToken ? { 'Authorization': `Bearer ${clientToken}` } : {}) },
@@ -432,16 +451,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     }
   }, [mesaToken, mesaInfo, isWaiterMode, nombre, telefono, countryCode, email, deliveryMethod, deliveryAddress, deliveryPostalCode, deliveryLatitude, deliveryLongitude, isRestaurant, pagosPickupHabilitados, items, language, discountCode, estimatedFeeCents, clearCart, closeCart, router]);
 
-  // After releaseAllDeferred updates items, fire the order
-  useEffect(() => {
-    if (pendingLaunchDeferred && !items.some(ci => ci.deferred)) {
-      setPendingLaunchDeferred(false);
-      void handleConfirmOrder();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, pendingLaunchDeferred]);
-
-  // Signal "Activa" state: when a real customer (non-waiter) adds their first item
+// Signal "Activa" state: when a real customer (non-waiter) adds their first item
   useEffect(() => {
     if (isWaiterMode || !mesaToken || items.length !== 1) return;
     const mesaId = mesaInfo?.id ?? mesaToken;
@@ -500,33 +510,6 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
           }}
         />
       )}
-      {/* Launch all deferred confirmation */}
-      <Dialog open={showLaunchDeferredConfirm} onOpenChange={setShowLaunchDeferredConfirm}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>¿Lanzar todos los retenidos?</DialogTitle>
-            <DialogDescription className="pt-2">
-              Se enviará un pedido con todos los ítems retenidos. Esta acción no se puede deshacer.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex gap-2 mt-2">
-            <Button variant="outline" className="flex-1" onClick={() => setShowLaunchDeferredConfirm(false)}>
-              Cancelar
-            </Button>
-            <Button
-              className="flex-1"
-              onClick={() => {
-                setShowLaunchDeferredConfirm(false);
-                releaseAllDeferred();
-                setPendingLaunchDeferred(true);
-              }}
-            >
-              Lanzar
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* Clear cart with deferred items warning */}
       <Dialog open={showClearWithDeferredWarning} onOpenChange={setShowClearWithDeferredWarning}>
         <DialogContent className="sm:max-w-sm">
@@ -722,7 +705,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                         >
                           <Trash2 className="size-4" />
                         </RippleButton>
-                        {mesaToken && isWaiterMode && (
+                        {mesaToken && isWaiterMode && ci.item.tipoProducto !== 'bebida' && (
                           <button
                             type="button"
                             onClick={() => {
@@ -995,17 +978,6 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                 </p>
               )}
               <div className="flex flex-col gap-2">
-                {isWaiterMode && hasDeferredItems && (
-                  <Button
-                    variant="outline"
-                    className="w-full rounded-full py-3 font-semibold min-h-[44px] border-amber-500/40 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/20"
-                    onClick={() => setShowLaunchDeferredConfirm(true)}
-                    disabled={sending}
-                  >
-                    <Pause className="w-4 h-4 mr-2 shrink-0" />
-                    Lanzar todos los retenidos
-                  </Button>
-                )}
                  <Button
                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full py-3 text-lg font-semibold shadow-elegant transition-colors duration-150 min-h-[44px]"
                    size="lg"
@@ -1016,9 +988,9 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                        handleConfirmOrder();
                      }
                    }}
-                   disabled={sending || (mesaToken !== null && mesaError) || isDeliveryIncomplete || allDeferred}
+                   disabled={sending || (mesaToken !== null && mesaError) || isDeliveryIncomplete}
                  >
-                   {sending ? t("sending", language) : allDeferred ? 'Todos los ítems están retenidos' : mesaToken ? t("mesaPlaceOrder", language) : t("sendOrder", language)}
+                   {sending ? t("sending", language) : mesaToken ? t("mesaPlaceOrder", language) : t("sendOrder", language)}
                  </Button>
                 <Button
                   variant="ghost"

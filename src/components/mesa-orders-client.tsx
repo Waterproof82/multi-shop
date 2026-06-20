@@ -1217,12 +1217,17 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
         void refresh();
         return;
       }
-      if (!res.ok) { setPaying(false); return; }
+      if (!res.ok) {
+        console.error('[initiateRedsys] API error', res.status, await res.text().catch(() => ''));
+        setPaying(false);
+        return;
+      }
       handleRedsysSuccess(
         await res.json() as { DS_MERCHANT_PARAMETERS: string; DS_SIGNATURE: string; DS_SIGNATURE_VERSION: string; paymentOrderRef?: string },
         esDivision,
       );
-    } catch {
+    } catch (e) {
+      console.error('[initiateRedsys] exception', e);
       setPaying(false);
     }
   };

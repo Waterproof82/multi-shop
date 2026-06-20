@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { validationErrorResponse, handleResult } from '@/core/infrastructure/api/helpers';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
-import { parseMainDomain, getDomainFromHeaders } from '@/lib/domain-utils';
-import { empresaPublicRepository } from '@/core/infrastructure/database';
+import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { initiateRedsysMesaPaymentUseCase } from '@/core/application/use-cases/payment/initiateRedsysMesaPaymentUseCase';
 
 const initiateMesaSchema = z.object({
@@ -16,13 +15,6 @@ const initiateMesaSchema = z.object({
 export async function POST(request: NextRequest) {
   const rateLimited = await rateLimitPublic(request);
   if (rateLimited) return rateLimited;
-
-  const domain = await getDomainFromHeaders();
-  const mainDomain = parseMainDomain(domain);
-  const empresaResult = await empresaPublicRepository.findByDomain(mainDomain);
-  if (!empresaResult.success || !empresaResult.data) {
-    return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 });
-  }
 
   let body: unknown;
   try {
@@ -37,9 +29,23 @@ export async function POST(request: NextRequest) {
   const origin = request.nextUrl.origin;
   const { mesaId, esDivision, expectedTotalCents } = parsed.data;
 
+  // Resolve empresaId from the active session — more reliable than domain lookup,
+  // works across all environments (dev, staging, production).
+  const supabase = getSupabaseClient();
+  const { data: sesionRow } = await supabase
+    .from('mesa_sesiones')
+    .select('empresa_id')
+    .eq('mesa_id', mesaId)
+    .is('cerrada_at', null)
+    .maybeSingle();
+  const empresaId = (sesionRow as { empresa_id: string } | null)?.empresa_id;
+  if (!empresaId) {
+    return NextResponse.json({ error: 'No hay sesión activa para esta mesa' }, { status: 404 });
+  }
+
   const result = await initiateRedsysMesaPaymentUseCase({
     mesaId,
-    empresaId: empresaResult.data.id,
+    empresaId,
     esDivision,
     expectedTotalCents,
     // urlOk → confirm-mesa processes the Redsys POST and then redirects to the ticket.

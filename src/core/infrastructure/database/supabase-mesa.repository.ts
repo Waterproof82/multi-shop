@@ -235,42 +235,63 @@ export class SupabaseMesaRepository implements IMesaRepository {
           .in('sesion_id', activeSesionIds)
           .neq('estado', 'cerrado');
 
-        const pedidoIdToSesion: Record<string, { sesionId: string; numeroPedido: number }> = {};
+        type DetalleItem = { nombre: string; precio: number; cantidad: number; complementos?: Array<{ nombre: string; precio: number }>; translations?: Record<string, { name?: string }> };
+        const pedidoIdToSesion: Record<string, { sesionId: string; numeroPedido: number; estado: string; detalle: DetalleItem[] }> = {};
         for (const p of (activeData ?? []) as PedidoRow[]) {
           const sid = p.sesion_id;
           countBySesion[sid] = (countBySesion[sid] ?? 0) + 1;
-          pedidoIdToSesion[p.id] = { sesionId: sid, numeroPedido: p.numero_pedido };
-
-          if (p.estado === 'retenido') {
-            const items = (p.detalle_pedido as Array<{ nombre: string; precio: number; cantidad: number; complementos?: Array<{ nombre: string; precio: number }>; translations?: Record<string, { name?: string }> }>) ?? [];
-            const mapped: DeferredItem[] = items.map(item => ({
-              itemId: `${item.nombre}-${item.precio}`,
-              itemName: item.nombre,
-              price: item.precio,
-              quantity: item.cantidad,
-              selectedComplements: item.complementos?.map(c => ({ id: c.nombre, name: c.nombre, price: c.precio })),
-              translations: item.translations as Record<string, { name: string }> | undefined,
-            }));
-            retenidoBySesion[sid] = [...(retenidoBySesion[sid] ?? []), ...mapped];
-          }
+          pedidoIdToSesion[p.id] = {
+            sesionId: sid,
+            numeroPedido: p.numero_pedido,
+            estado: p.estado,
+            detalle: (p.detalle_pedido as DetalleItem[]) ?? [],
+          };
         }
 
-        // Check pedido_item_estados for any item in 'listo' state
+        // Check pedido_item_estados for 'listo' and 'retenido' items
         const pedidoIds = Object.keys(pedidoIdToSesion);
         if (pedidoIds.length > 0) {
-          const { data: listoItems } = await this.supabase
+          const { data: itemEstados } = await this.supabase
             .from('pedido_item_estados')
-            .select('pedido_id')
-            .in('pedido_id', pedidoIds)
-            .eq('estado', 'listo');
+            .select('pedido_id, item_idx, estado, from_validation')
+            .in('pedido_id', pedidoIds);
 
-          const listoSet = new Set<string>((listoItems ?? []).map(i => i['pedido_id'] as string));
-          for (const [pid, { sesionId, numeroPedido }] of Object.entries(pedidoIdToSesion)) {
-            if (listoSet.has(pid)) {
+          // Build per-pedido estado override map
+          // Skip from_validation=true entries for the retenido check — those items are back in the
+          // pendientes queue, not kitchen-retained, and must not appear as retenidos in the grid.
+          const estadoMap = new Map<string, Map<number, string>>();
+          for (const row of (itemEstados ?? []) as { pedido_id: string; item_idx: number; estado: string; from_validation: boolean }[]) {
+            if (row.from_validation) continue;
+            if (!estadoMap.has(row.pedido_id)) estadoMap.set(row.pedido_id, new Map());
+            estadoMap.get(row.pedido_id)!.set(row.item_idx, row.estado);
+          }
+
+          for (const [pid, { sesionId, numeroPedido, estado: pedidoEstado, detalle }] of Object.entries(pedidoIdToSesion)) {
+            const overrides = estadoMap.get(pid) ?? new Map<number, string>();
+            const defaultEstado = pedidoEstado === 'retenido' ? 'retenido' : 'pendiente';
+
+            // Listo check
+            if ([...overrides.values()].some(e => e === 'listo')) {
               const nums = preparadoBySesion[sesionId] ?? [];
               if (!nums.includes(numeroPedido)) nums.push(numeroPedido);
               preparadoBySesion[sesionId] = nums;
             }
+
+            // Retenido items (per-item effective estado)
+            detalle.forEach((item, idx) => {
+              const efectiveEstado = overrides.get(idx) ?? defaultEstado;
+              if (efectiveEstado === 'retenido') {
+                const deferredItem: DeferredItem = {
+                  itemId: `${item.nombre}-${item.precio}`,
+                  itemName: item.nombre,
+                  price: item.precio,
+                  quantity: item.cantidad,
+                  selectedComplements: item.complementos?.map(c => ({ id: c.nombre, name: c.nombre, price: c.precio })),
+                  translations: item.translations as Record<string, { name: string }> | undefined,
+                };
+                retenidoBySesion[sesionId] = [...(retenidoBySesion[sesionId] ?? []), deferredItem];
+              }
+            });
           }
         }
       }
