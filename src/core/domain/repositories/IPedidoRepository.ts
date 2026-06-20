@@ -85,6 +85,8 @@ export interface PendienteValidacionPedido {
   id: string;
   createdAt: string;
   items: PendienteValidacionItem[];
+  /** true = pedido ya en 'pendiente', los items mostrados son retenidos a liberar */
+  validated?: boolean;
 }
 
 export interface PendienteValidacionMesa {
@@ -146,7 +148,7 @@ export interface IPedidoRepository {
   /** Upsert a per-item kitchen estado */
   upsertItemEstado(empresaId: string, pedidoId: string, itemIdx: number, estado: ItemEstado): Promise<Result<void>>;
   findPendientesValidacion(empresaId: string): Promise<Result<PendienteValidacionMesa[]>>;
-  validatePedido(empresaId: string, pedidoId: string, retainIndices: number[]): Promise<Result<void>>;
+  validatePedido(empresaId: string, pedidoId: string, retainIndices: number[], pausedIndices?: number[]): Promise<Result<void>>;
   getStats(empresaId: string, mes: number, año: number): Promise<Result<{
     pedidosHoy: number;
     pedidosMes: number;

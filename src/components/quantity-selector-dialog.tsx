@@ -194,7 +194,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
           </div>
         </div>
         
-        {isWaiterMode && (
+        {isWaiterMode && item.tipoProducto !== 'bebida' && (
           <button
             type="button"
             onClick={() => setIsDeferred(prev => !prev)}

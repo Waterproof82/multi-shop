@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic';
 const bodySchema = z.object({
   pedidoId: z.string().uuid(),
   retainIndices: z.array(z.number().int().min(0)).max(50).default([]),
+  pausedIndices: z.array(z.number().int().min(0)).max(50).default([]),
 });
 
 export async function POST(request: NextRequest) {
@@ -27,8 +28,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
   }
 
-  const { pedidoId, retainIndices } = parsed.data;
-  const result = await pedidoRepository.validatePedido(empresaId, pedidoId, retainIndices);
+  const { pedidoId, retainIndices, pausedIndices } = parsed.data;
+  const result = await pedidoRepository.validatePedido(empresaId, pedidoId, retainIndices, pausedIndices);
 
   if (!result.success) {
     if (result.error.code === 'NOT_FOUND') {

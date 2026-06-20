@@ -34,12 +34,48 @@ export async function GET(
     return NextResponse.json({ error: 'Error al obtener los pedidos' }, { status: 500 });
   }
 
+  // For pedidos with estado='retenido', check pedido_item_estados to see if all items
+  // have been explicitly released by kitchen. If so, treat the order as 'pendiente'
+  // so the ticket doesn't show stale retained state.
+  const retenidoIds = ordersResult.data
+    .filter(o => o.estado === 'retenido')
+    .map(o => o.id as string);
+
+  const stillRetenidoIds = new Set<string>(retenidoIds);
+
+  if (retenidoIds.length > 0) {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: itemEstados } = await supabase
+        .from('pedido_item_estados')
+        .select('pedido_id, item_idx, estado')
+        .in('pedido_id', retenidoIds);
+
+      const overridesByPedido = new Map<string, Map<number, string>>();
+      for (const row of (itemEstados ?? []) as { pedido_id: string; item_idx: number; estado: string }[]) {
+        if (!overridesByPedido.has(row.pedido_id)) overridesByPedido.set(row.pedido_id, new Map());
+        overridesByPedido.get(row.pedido_id)!.set(row.item_idx, row.estado);
+      }
+
+      for (const o of ordersResult.data.filter(p => p.estado === 'retenido')) {
+        const detalle = (o.detalle_pedido as unknown[]) ?? [];
+        const overrides = overridesByPedido.get(o.id as string) ?? new Map<number, string>();
+        // All items must have an explicit non-retenido override to consider the pedido released
+        const allReleased = detalle.length > 0 && detalle.every((_, idx) => {
+          const override = overrides.get(idx);
+          return override !== undefined && override !== 'retenido';
+        });
+        if (allReleased) stillRetenidoIds.delete(o.id as string);
+      }
+    } catch { /* best-effort */ }
+  }
+
   const orders = ordersResult.data.map(o => ({
     id: o.id,
     numeroPedido: o.numero_pedido,
     items: o.detalle_pedido,
     total: o.total,
-    estado: o.estado,
+    estado: o.estado === 'retenido' && !stillRetenidoIds.has(o.id as string) ? 'pendiente' : o.estado,
     createdAt: o.created_at,
   }));
 

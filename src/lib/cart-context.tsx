@@ -18,8 +18,7 @@ export interface CartItem {
   selectedComplements?: Complement[]
   justAdded?: boolean
   justRemoved?: boolean
-  deferred?: boolean      // waiter marked this item to send later
-  fromPending?: boolean   // kept for compat but no longer set; DB items load as deferred
+  deferred?: boolean      // waiter marked this item to send later (comida only)
 }
 
 function newCartId(): string {
@@ -40,9 +39,7 @@ interface CartContextType {
   removeItem: (cartId: string) => void
   updateQuantity: (cartId: string, quantity: number) => void
   clearCart: () => void
-  clearNonDeferred: () => void
   toggleDeferred: (cartId: string) => void
-  releaseAllDeferred: () => void
   totalItems: number
   totalPrice: number
   isCartOpen: boolean
@@ -150,18 +147,8 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
 
   const clearCart = useCallback(() => { setItems([]); setLastAddedItem(null); }, [])
 
-  const clearNonDeferred = useCallback(() => {
-    setLastAddedItem(null);
-    // Keep only items explicitly marked deferred.
-    setItems(prev => prev.filter(ci => ci.deferred));
-  }, [])
-
   const toggleDeferred = useCallback((cartId: string) => {
     setItems(prev => prev.map(ci => ci.cartId === cartId ? { ...ci, deferred: !ci.deferred } : ci));
-  }, [])
-
-  const releaseAllDeferred = useCallback(() => {
-    setItems(prev => prev.map(ci => ci.deferred ? { ...ci, deferred: false } : ci));
   }, [])
 
   const totalItems = items.reduce((sum, ci) => sum + ci.quantity, 0)
@@ -176,16 +163,14 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
     removeItem,
     updateQuantity,
     clearCart,
-    clearNonDeferred,
     toggleDeferred,
-    releaseAllDeferred,
     totalItems,
     totalPrice,
     isCartOpen,
     openCart,
     closeCart,
     lastAddedItem,
-  }), [items, addItem, removeItem, updateQuantity, clearCart, clearNonDeferred, toggleDeferred, releaseAllDeferred, totalItems, totalPrice, isCartOpen, openCart, closeCart, lastAddedItem]);
+  }), [items, addItem, removeItem, updateQuantity, clearCart, toggleDeferred, totalItems, totalPrice, isCartOpen, openCart, closeCart, lastAddedItem]);
 
   return (
     <CartContext.Provider value={contextValue}>

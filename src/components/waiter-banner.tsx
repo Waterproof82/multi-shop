@@ -141,6 +141,14 @@ export function WaiterBanner() {
       .finally(() => setAuthChecked(true));
   }, [pathname]);
 
+  // Session expired on a waiter sub-page → back to PIN
+  useEffect(() => {
+    if (!authChecked || isWaiter) return;
+    if (pathname.startsWith('/waiter/')) {
+      globalThis.location.href = '/waiter';
+    }
+  }, [authChecked, isWaiter, pathname]);
+
   useEffect(() => {
     const stored = getWaiterMesa();
     if (!stored) { setMesaLabel(null); setMesaId(null); return; }
@@ -197,6 +205,7 @@ export function WaiterBanner() {
     const fetchCounts = async () => {
       try {
         const r = await fetch('/api/waiter/orders/counts');
+        if (r.status === 401) { setIsWaiter(false); return; }
         if (!r.ok) return;
         const json = await r.json() as CountsPayload;
         const prev = prevCountsRef.current;

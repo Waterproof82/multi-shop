@@ -1,9 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
-import { UtensilsCrossed, ChevronLeft, ChevronDown, ChevronsUpDown, TimerOff, CheckCheck, PlayCircle, Pause, Utensils, Table2 } from 'lucide-react';
+import { UtensilsCrossed, ChevronLeft, ChevronDown, ChevronsUpDown, TimerOff, CheckCheck, PlayCircle, Pause, Table2 } from 'lucide-react';
 import type { ItemEstado } from '@/core/domain/repositories/IPedidoRepository';
 
 interface KitchenItem {
@@ -94,8 +95,13 @@ function makeKey(pedidoId: string, itemIdx: number) {
 export default function WaiterKitchenPage() {
   const { language } = useLanguage();
   const lang = language as Parameters<typeof t>[1];
+  const searchParams = useSearchParams();
+  const targetMesa = searchParams.get('mesa');
+  const initialGroupBy = searchParams.get('groupBy') as 'order' | 'mesa' | 'listos' | 'retenidos' | null;
   const [items, setItems] = useState<KitchenItem[]>([]);
-  const [groupBy, setGroupBy] = useState<'order' | 'mesa' | 'listos' | 'retenidos'>('order');
+  const [groupBy, setGroupBy] = useState<'order' | 'mesa' | 'listos' | 'retenidos'>(
+    initialGroupBy === 'retenidos' || initialGroupBy === 'listos' || initialGroupBy === 'mesa' ? initialGroupBy : 'order'
+  );
   const [servingMesas, setServingMesas] = useState<Set<string>>(new Set());
   const [liberatingMesas, setLiberatingMesas] = useState<Set<string>>(new Set());
   const [pendingRetain, setPendingRetain] = useState<KitchenItem | null>(null);
@@ -125,6 +131,16 @@ export default function WaiterKitchenPage() {
     const tick = setInterval(() => setItems(p => [...p]), 1000);
     return () => clearInterval(tick);
   }, []);
+
+  // Scroll to target mesa when arriving from grid with a mesa param
+  const scrolledRef = useRef(false);
+  useEffect(() => {
+    if (!targetMesa || scrolledRef.current || items.length === 0) return;
+    scrolledRef.current = true;
+    const id = `mesa-section-${targetMesa}`;
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [items, targetMesa]);
 
   // ── PATCH helper ───────────────────────────────────────────────────────────
 
@@ -590,67 +606,64 @@ export default function WaiterKitchenPage() {
           <div className="flex flex-col gap-5">
             {Array.from(groupByMesa(items).entries()).map(([mesaKey, group]) => {
               const elapsed = getElapsedMinutes(group.firstCreatedAt);
-              // Sort items within mesa: listos first, then nuevos (by createdAt), then retenidos
               const sorted = [...group.items].sort((a, b) => {
                 const order = (i: KitchenItem) => i.estado === 'listo' ? 0 : i.estado === 'retenido' ? 2 : 1;
                 const diff = order(a) - order(b);
                 return diff !== 0 ? diff : a.createdAt.localeCompare(b.createdAt);
               });
-              const listosInMesa       = group.items.filter(i => i.estado === 'listo');
-              const retenidosInMesa    = group.items.filter(i => i.estado === 'retenido');
-              const isServing          = servingMesas.has(mesaKey);
-              const isLiberating       = liberatingMesas.has(mesaKey);
-              const isCollapsed        = collapsedMesas.has(mesaKey);
+              const listosInMesa    = group.items.filter(i => i.estado === 'listo');
+              const retenidosInMesa = group.items.filter(i => i.estado === 'retenido');
+              const isServing       = servingMesas.has(mesaKey);
+              const isLiberating    = liberatingMesas.has(mesaKey);
+              const isCollapsed     = collapsedMesas.has(mesaKey);
+              const displayLabel    = mesaKey.startsWith('Mesa ') ? mesaKey.slice(5) : mesaKey;
               return (
                 <div
                   key={mesaKey}
                   className="rounded-xl overflow-hidden"
                   style={{ border: '1px solid oklch(35% 0.08 252 / 0.5)' }}
                 >
-                  <button
-                    className="w-full flex items-center gap-2 px-3 py-2 text-left"
+                  <div
+                    className="flex items-center gap-2 px-3 py-2.5 cursor-pointer"
                     style={{ background: 'oklch(18% 0.03 252)', borderBottom: isCollapsed ? 'none' : '1px solid oklch(35% 0.08 252 / 0.4)' }}
                     onClick={() => toggleMesaCollapse(mesaKey)}
                   >
-                    <Table2 className="w-3.5 h-3.5 shrink-0" style={{ color: 'oklch(62% 0.14 62)' }} />
-                    <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{mesaKey}</span>
-                    <ChevronDown
-                      className="w-4 h-4 ml-auto shrink-0"
-                      style={{ color: TEXT_DIM, transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}
-                    />
-                  </button>
-                  {!isCollapsed && (<>
-                  <div className="flex flex-col gap-2 p-2">
-                    {sorted.map(renderItemCard)}
-                  </div>
-                  {(listosInMesa.length > 0 || retenidosInMesa.length > 0) && (
-                    <div
-                      className="flex flex-col gap-1.5 px-2 pb-2"
-                      style={{ borderTop: '1px solid oklch(35% 0.08 252 / 0.4)', paddingTop: '0.5rem' }}
-                    >
+                    <Table2 className="w-4 h-4 shrink-0" style={{ color: 'oklch(62% 0.14 62)' }} />
+                    <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{displayLabel}</span>
+                    <div className="flex items-center gap-2 ml-auto" onClick={e => e.stopPropagation()}>
                       {listosInMesa.length > 0 && (
                         <button
                           onClick={() => void handleTodosServidos(mesaKey, listosInMesa)}
                           disabled={isServing}
-                          className="w-full rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:opacity-50"
-                          style={{ background: 'oklch(26% 0.16 148)', color: 'oklch(80% 0.22 148)', border: '1px solid oklch(45% 0.22 148 / 0.6)' }}
+                          title={t('kitchenTodosServidos', lang)}
+                          className="flex items-center justify-center rounded-lg disabled:opacity-50"
+                          style={{ width: 44, height: 32, background: 'oklch(26% 0.16 148)', color: 'oklch(80% 0.22 148)', border: '1px solid oklch(45% 0.22 148 / 0.6)' }}
                         >
-                          {isServing ? '…' : <span className="flex items-center justify-center gap-1.5"><CheckCheck className="w-3.5 h-3.5" />{t('kitchenTodosServidos', lang)}</span>}
+                          {isServing ? <span className="text-[10px]">…</span> : <CheckCheck className="w-4 h-4" />}
                         </button>
                       )}
                       {retenidosInMesa.length > 0 && (
                         <button
                           onClick={() => void handleLiberarRetenidosMesa(mesaKey, retenidosInMesa)}
                           disabled={isLiberating}
-                          className="w-full rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:opacity-50"
-                          style={{ background: 'oklch(22% 0.10 228)', color: 'oklch(74% 0.18 228)', border: '1px solid oklch(46% 0.20 228 / 0.6)' }}
+                          title={t('kitchenLiberarPedidos', lang)}
+                          className="flex items-center justify-center rounded-lg disabled:opacity-50"
+                          style={{ width: 44, height: 32, background: 'oklch(21% 0.10 65)', color: 'oklch(72% 0.18 65)', border: '1px solid oklch(50% 0.22 65 / 0.55)' }}
                         >
-                          {isLiberating ? '…' : <span className="flex items-center justify-center gap-1.5"><Utensils className="w-3.5 h-3.5" />{t('kitchenLiberarPedidos', lang)}</span>}
+                          {isLiberating ? <span className="text-[10px]">…</span> : <PlayCircle className="w-4 h-4" />}
                         </button>
                       )}
                     </div>
+                    <ChevronDown
+                      className="w-4 h-4 shrink-0"
+                      style={{ color: TEXT_DIM, transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}
+                    />
+                  </div>
+                  {!isCollapsed && (
+                    <div className="flex flex-col gap-2 p-2">
+                      {sorted.map(renderItemCard)}
+                    </div>
                   )}
-                  </>)}
                 </div>
               );
             })}
@@ -666,44 +679,43 @@ export default function WaiterKitchenPage() {
             ) : (
               <div className="flex flex-col gap-5">
                 {Array.from(groupByMesa(listosItems).entries()).map(([mesaKey, group]) => {
-                  const isServing   = servingMesas.has(mesaKey);
-                  const isCollapsed = collapsedMesas.has(mesaKey);
+                  const isServing      = servingMesas.has(mesaKey);
+                  const isCollapsed    = collapsedMesas.has(mesaKey);
+                  const displayLabel   = mesaKey.startsWith('Mesa ') ? mesaKey.slice(5) : mesaKey;
                   return (
                     <div
                       key={mesaKey}
                       className="rounded-xl overflow-hidden"
                       style={{ border: '1px solid oklch(35% 0.08 252 / 0.5)' }}
                     >
-                      <button
-                        className="w-full flex items-center gap-2 px-3 py-2 text-left"
+                      <div
+                        className="flex items-center gap-2 px-3 py-2.5 cursor-pointer"
                         style={{ background: 'oklch(18% 0.03 252)', borderBottom: isCollapsed ? 'none' : '1px solid oklch(35% 0.08 252 / 0.4)' }}
                         onClick={() => toggleMesaCollapse(mesaKey)}
                       >
-                        <Table2 className="w-3.5 h-3.5 shrink-0" style={{ color: 'oklch(65% 0.18 148)' }} />
-                        <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{mesaKey}</span>
-                        <ChevronDown
-                          className="w-4 h-4 ml-auto shrink-0"
-                          style={{ color: TEXT_DIM, transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}
-                        />
-                      </button>
-                      {!isCollapsed && (<>
-                        <div className="flex flex-col gap-2 p-2">
-                          {group.items.map(renderItemCard)}
-                        </div>
-                        <div
-                          className="px-2 pb-2"
-                          style={{ borderTop: '1px solid oklch(35% 0.08 252 / 0.4)', paddingTop: '0.5rem' }}
-                        >
+                        <Table2 className="w-4 h-4 shrink-0" style={{ color: 'oklch(65% 0.18 148)' }} />
+                        <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{displayLabel}</span>
+                        <div className="flex items-center gap-2 ml-auto" onClick={e => e.stopPropagation()}>
                           <button
                             onClick={() => void handleTodosServidos(mesaKey, group.items)}
                             disabled={isServing}
-                            className="w-full rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:opacity-50"
-                            style={{ background: 'oklch(26% 0.16 148)', color: 'oklch(80% 0.22 148)', border: '1px solid oklch(45% 0.22 148 / 0.6)' }}
+                            title={t('kitchenTodosServidos', lang)}
+                            className="flex items-center justify-center rounded-lg disabled:opacity-50"
+                            style={{ width: 44, height: 32, background: 'oklch(26% 0.16 148)', color: 'oklch(80% 0.22 148)', border: '1px solid oklch(45% 0.22 148 / 0.6)' }}
                           >
-                            {isServing ? '…' : <span className="flex items-center justify-center gap-1.5"><CheckCheck className="w-3.5 h-3.5" />{t('kitchenTodosServidos', lang)}</span>}
+                            {isServing ? <span className="text-[10px]">…</span> : <CheckCheck className="w-4 h-4" />}
                           </button>
                         </div>
-                      </>)}
+                        <ChevronDown
+                          className="w-4 h-4 shrink-0"
+                          style={{ color: TEXT_DIM, transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}
+                        />
+                      </div>
+                      {!isCollapsed && (
+                        <div className="flex flex-col gap-2 p-2">
+                          {group.items.map(renderItemCard)}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -721,47 +733,45 @@ export default function WaiterKitchenPage() {
             ) : (
               <div className="flex flex-col gap-5">
                 {Array.from(groupByMesa(retenidoItems).entries()).map(([mesaKey, group]) => {
-                  const elapsed      = getElapsedMinutes(group.firstCreatedAt);
                   const isLiberating = liberatingMesas.has(mesaKey);
                   const isCollapsed  = collapsedMesas.has(mesaKey);
                   return (
                     <div
                       key={mesaKey}
+                      id={`mesa-section-${mesaKey}`}
                       className="rounded-xl overflow-hidden"
                       style={{ border: '1px solid oklch(35% 0.08 252 / 0.5)' }}
                     >
-                      <button
-                        className="w-full flex items-center gap-2 px-3 py-2 text-left"
+                      <div
+                        className="flex items-center gap-2 px-3 py-2 cursor-pointer"
                         style={{ background: 'oklch(18% 0.03 252)', borderBottom: isCollapsed ? 'none' : '1px solid oklch(35% 0.08 252 / 0.4)' }}
                         onClick={() => toggleMesaCollapse(mesaKey)}
                       >
-                        <Table2 className="w-3.5 h-3.5 shrink-0" style={{ color: TEXT_DIM }} />
-                        <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{mesaKey}</span>
+                        <Table2 className="w-4 h-4 shrink-0" style={{ color: TEXT_DIM }} />
+                        <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>
+                          {mesaKey.startsWith('Mesa ') ? mesaKey.slice(5) : mesaKey}
+                        </span>
+                        <div className="flex items-center gap-2 ml-auto" onClick={e => e.stopPropagation()}>
+                          <button
+                            onClick={() => void handleLiberarRetenidosMesa(mesaKey, group.items)}
+                            disabled={isLiberating}
+                            title={t('kitchenLiberarPedidos', lang)}
+                            className="flex items-center justify-center rounded-lg disabled:opacity-50"
+                            style={{ width: 44, height: 32, background: 'oklch(21% 0.10 65)', color: 'oklch(72% 0.18 65)', border: '1px solid oklch(50% 0.22 65 / 0.55)' }}
+                          >
+                            {isLiberating ? <span className="text-[10px]">…</span> : <PlayCircle className="w-4 h-4" />}
+                          </button>
+                        </div>
                         <ChevronDown
-                          className="w-4 h-4 ml-auto shrink-0"
+                          className="w-4 h-4 shrink-0"
                           style={{ color: TEXT_DIM, transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}
                         />
-                      </button>
-                      {!isCollapsed && (<>
+                      </div>
+                      {!isCollapsed && (
                         <div className="flex flex-col gap-2 p-2">
                           {group.items.map(renderItemCard)}
                         </div>
-                        {group.items.length > 0 && (
-                          <div
-                            className="px-2 pb-2"
-                            style={{ borderTop: '1px solid oklch(35% 0.08 252 / 0.4)', paddingTop: '0.5rem' }}
-                          >
-                            <button
-                              onClick={() => void handleLiberarRetenidosMesa(mesaKey, group.items)}
-                              disabled={isLiberating}
-                              className="w-full rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:opacity-50"
-                              style={{ background: 'oklch(22% 0.10 228)', color: 'oklch(74% 0.18 228)', border: '1px solid oklch(46% 0.20 228 / 0.6)' }}
-                            >
-                              {isLiberating ? '…' : <span className="flex items-center justify-center gap-1.5"><Utensils className="w-3.5 h-3.5" />{t('kitchenLiberarPedidos', lang)}</span>}
-                            </button>
-                          </div>
-                        )}
-                      </>)}
+                      )}
                     </div>
                   );
                 })}

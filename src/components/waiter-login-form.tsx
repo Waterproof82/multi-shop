@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { UtensilsCrossed, KeyRound, Pause, ReceiptText, X, CheckSquare } from "lucide-react";
+import { UtensilsCrossed, KeyRound, Pause, ReceiptText, X, CheckSquare, ExternalLink, PlayCircle } from "lucide-react";
 import { formatPrice } from "@/lib/format-price";
 import type { MesaWithSession } from "@/core/domain/repositories/IMesaRepository";
 
@@ -333,6 +333,8 @@ export function WaiterLoginForm() {
   const [mesaLoading, setMesaLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [closeBlockedError, setCloseBlockedError] = useState<string | null>(null);
+  const [deferredMesa, setDeferredMesa] = useState<MesaWithSession | null>(null);
+  const [launching, setLaunching] = useState(false);
 
   const refresh = useCallback(async () => {
     const data = await fetchMesas();
@@ -428,6 +430,19 @@ export function WaiterLoginForm() {
       }
     } finally {
       setMesaLoading(null);
+    }
+  }
+
+  async function handleLaunchRetenidos(mesa: MesaWithSession) {
+    setLaunching(true);
+    try {
+      await fetch(`/api/waiter/kitchen/mesas/${encodeURIComponent(mesa.id)}/release-retenidos`, {
+        method: 'POST',
+      });
+      await refresh();
+    } finally {
+      setLaunching(false);
+      setDeferredMesa(null);
     }
   }
 
@@ -581,11 +596,71 @@ export function WaiterLoginForm() {
               mesa={mesa}
               isLoading={mesaLoading === mesa.id}
               onClick={() => void handleMesaNav(mesa)}
-              onClickDeferred={() => void handleMesaNav(mesa, true)}
+              onClickDeferred={() => setDeferredMesa(mesa)}
               onViewTicket={() => void handleViewTicket(mesa)}
               onCloseMesa={() => void handleCloseMesa(mesa)}
             />
           ))}
+        </div>
+      )}
+
+      {/* Deferred items dialog */}
+      {deferredMesa && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center px-6"
+          style={{ background: 'oklch(0% 0 0 / 0.65)' }}
+          onClick={() => !launching && setDeferredMesa(null)}
+        >
+          <div
+            className="w-full max-w-xs rounded-2xl p-5 flex flex-col gap-4"
+            style={{ background: 'oklch(18% 0.03 252)', border: '1px solid oklch(42% 0.10 252 / 0.5)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <Pause className="w-4 h-4 shrink-0" style={{ color: 'oklch(72% 0.16 62)' }} />
+                <span className="text-sm font-bold" style={{ color: 'oklch(92% 0.02 252)' }}>
+                  Retenidos — {deferredMesa.nombre ?? `Mesa ${deferredMesa.numero}`}
+                </span>
+              </div>
+              <span className="text-xs" style={{ color: 'oklch(55% 0.04 252)' }}>
+                {deferredMesa.itemsDiferidos.length} ítem{deferredMesa.itemsDiferidos.length !== 1 ? 's' : ''} retenido{deferredMesa.itemsDiferidos.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => {
+                  const mesaKey = deferredMesa.nombre ?? `Mesa ${deferredMesa.numero}`;
+                  router.push(`/waiter/kitchen?groupBy=retenidos&mesa=${encodeURIComponent(mesaKey)}`);
+                }}
+                className="flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm font-semibold transition-colors text-left"
+                style={{ background: 'oklch(22% 0.04 252)', color: 'oklch(80% 0.04 252)', border: '1px solid oklch(38% 0.06 252 / 0.5)' }}
+              >
+                <ExternalLink className="w-4 h-4 shrink-0" style={{ color: 'oklch(62% 0.08 252)' }} />
+                Abrir retenidos
+              </button>
+
+              <button
+                onClick={() => void handleLaunchRetenidos(deferredMesa)}
+                disabled={launching}
+                className="flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm font-semibold transition-colors text-left disabled:opacity-50"
+                style={{ background: 'oklch(21% 0.10 65)', color: 'oklch(80% 0.20 65)', border: '1px solid oklch(50% 0.22 65 / 0.55)' }}
+              >
+                <PlayCircle className="w-4 h-4 shrink-0" />
+                {launching ? 'Lanzando…' : 'Lanzar ítems retenidos de esta mesa'}
+              </button>
+            </div>
+
+            <button
+              onClick={() => setDeferredMesa(null)}
+              disabled={launching}
+              className="text-xs text-center disabled:opacity-40"
+              style={{ color: 'oklch(48% 0.04 252)' }}
+            >
+              Cancelar
+            </button>
+          </div>
         </div>
       )}
 
