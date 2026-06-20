@@ -1237,6 +1237,7 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
     setSettingDivision(true);
     try {
       // Re-verify total hasn't changed while the modal was open
+      let verifiedTotal = sessionData?.total ?? 0;
       const checkRes = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/orders`);
       if (checkRes.ok) {
         const fresh = await checkRes.json() as MesaSessionData;
@@ -1248,17 +1249,19 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
           try { sessionStorage.setItem(`mesa-mismatch-${mesaId}`, JSON.stringify(mismatch)); } catch { /* ignore */ }
           return;
         }
+        verifiedTotal = fresh.total;
         setSessionData(fresh);
       }
-      await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/division`, {
+      const divisionRes = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/division`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ numPersonas }),
       });
-      // Division is set — release the checkout lock.
-      // Other users are already on the ticket via divisionActiva redirect.
+      if (!divisionRes.ok) return;
+      // Division is set — release checkout lock and go straight to Redsys.
+      // The user already expressed intent to pay; no extra click needed.
       releaseCheckoutLock();
-      await refresh();
+      void initiateRedsys(true, Math.max(1, Math.round(verifiedTotal * 100)));
     } finally {
       setSettingDivision(false);
     }
