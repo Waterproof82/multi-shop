@@ -1252,15 +1252,17 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
         verifiedTotal = fresh.total;
         setSessionData(fresh);
       }
+      // Release the checkout lock BEFORE POSTing to /division.
+      // handlePrePaymentCheck sets pago_en_curso=true when acquiring the lock,
+      // and the division route rejects with 409 when pago_en_curso is active.
+      releaseCheckoutLock();
       const divisionRes = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/division`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ numPersonas }),
       });
       if (!divisionRes.ok) return;
-      // Division is set — release checkout lock and go straight to Redsys.
-      // The user already expressed intent to pay; no extra click needed.
-      releaseCheckoutLock();
+      // Division is set — go straight to Redsys; no extra click needed.
       void initiateRedsys(true, Math.max(1, Math.round(verifiedTotal * 100)));
     } finally {
       setSettingDivision(false);
