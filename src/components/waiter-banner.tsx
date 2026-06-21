@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { UtensilsCrossed, ArrowLeftRight, LogOut, X, ShoppingCart, ChevronDown, Circle, LockOpen, AlertTriangle, Wine } from "lucide-react";
+import { UtensilsCrossed, ArrowLeftRight, LogOut, X, ShoppingCart, ChevronDown, Circle, LockOpen, AlertTriangle, Wine, BellRing } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { getWaiterMesa, clearWaiterMesa, saveWaiterMesa } from "@/components/waiter-login-form";
@@ -41,6 +41,11 @@ const BTN_UNLOCK_BG    = "oklch(22% 0.07 40)";
 const BTN_UNLOCK_HOVER = "oklch(28% 0.11 40)";
 const BTN_UNLOCK_TEXT  = "oklch(75% 0.20 40)";
 
+// Llamadas — golden amber
+const BTN_LLAMADAS_BG    = "oklch(22% 0.12 55)";
+const BTN_LLAMADAS_HOVER = "oklch(28% 0.17 55)";
+const BTN_LLAMADAS_TEXT  = "oklch(82% 0.24 55)";
+
 // Pendientes — warm red/orange
 const BTN_PENDIENTES_BG    = "oklch(22% 0.12 35)";
 const BTN_PENDIENTES_HOVER = "oklch(28% 0.16 35)";
@@ -73,29 +78,22 @@ type CountsPayload = {
   cocina: { total: number; listos: number; retenidos: number };
   bebidas: { total: number; listos: number; retenidos: number };
   pendientes: number;
+  llamadas?: number;
 };
 
 function didCountsIncrease(prev: CountsPayload, next: CountsPayload): boolean {
   const totalUp = next.cocina.total > prev.cocina.total || next.bebidas.total > prev.bebidas.total;
   const listosUp = next.cocina.listos > prev.cocina.listos || next.bebidas.listos > prev.bebidas.listos;
   const pendientesUp = next.pendientes > (prev.pendientes ?? 0);
-  return totalUp || listosUp || pendientesUp;
+  const llamadasUp = (next.llamadas ?? 0) > (prev.llamadas ?? 0);
+  return totalUp || listosUp || pendientesUp || llamadasUp;
 }
 
 function playNotificationSound() {
   try {
-    const AudioCtx = globalThis.AudioContext ?? (globalThis as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    const ctx = new AudioCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(800, ctx.currentTime);
-    gain.gain.setValueAtTime(0.15, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.15);
+    const audio = new Audio('/bell.mp3');
+    audio.volume = 0.7;
+    void audio.play();
   } catch { /* audio not available */ }
 }
 
@@ -209,7 +207,7 @@ export function WaiterBanner() {
         if (!r.ok) return;
         const json = await r.json() as CountsPayload;
         const prev = prevCountsRef.current;
-        if (prev && didCountsIncrease(prev, json)) {
+        if (prev && pathname.startsWith('/waiter') && didCountsIncrease(prev, json)) {
           playNotificationSound();
         }
         prevCountsRef.current = json;
@@ -476,6 +474,30 @@ export function WaiterBanner() {
                 </span>
               )}
             </button>
+          )}
+
+          {/* Llamadas — visual indicator only, no action */}
+          {counts && (counts.llamadas ?? 0) > 0 && (
+            <div
+              className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium min-h-[32px] pointer-events-none select-none"
+              style={{ color: BTN_LLAMADAS_TEXT, backgroundColor: BTN_LLAMADAS_BG }}
+              aria-label="Llamadas de mesa"
+            >
+              <BellRing className="w-3.5 h-3.5 shrink-0 animate-pulse" />
+              <span
+                className="text-[10px] font-bold"
+                style={{
+                  background: BTN_LLAMADAS_TEXT,
+                  color: 'oklch(15% 0.05 55)',
+                  borderRadius: '9999px',
+                  padding: '1px 6px',
+                  minWidth: 16,
+                  textAlign: 'center',
+                }}
+              >
+                {counts.llamadas}
+              </span>
+            </div>
           )}
 
           {/* Pendientes — visible only when there are items awaiting validation */}

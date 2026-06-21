@@ -73,6 +73,15 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
     }
   }, [isWaiterMode]);
 
+  // Signal "Activa": mark session as customer-entered as soon as menu opens (not waiter)
+  useEffect(() => {
+    if (isWaiterMode) return;
+    const mesa = new URLSearchParams(window.location.search).get('mesa');
+    if (!mesa) return;
+    void fetch(`/api/mesas/${encodeURIComponent(mesa)}/activate`, { method: 'POST' });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Close search when cart opens in waiter mode
   useEffect(() => {
     if (isCartOpen) setWaiterSearch("");

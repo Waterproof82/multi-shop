@@ -100,19 +100,62 @@ Usar siempre en RLS policies para aislar datos por empresa.
 - Iconos `UtensilsCrossed` (amber) y `Wine` (azul) por ítem; naranja si retenido.
 - Claves i18n: `pendientesConfirmar`, `pendientesConfirmarBar`, `pendientesSeleccionarTodos`, `pendientesDeseleccionarTodos`.
 
-### `waiter-banner.tsx` — Badging
+### `waiter-banner.tsx` — Badging y conteos
 - Badge naranja de retenidos junto al botón de cocina (`counts.cocina.retenidos`).
 - Badge naranja de retenidos junto al botón de bar (`counts.bebidas.retenidos`).
 - El ícono del carrito se oculta en: `/waiter`, `/waiter/pendientes`, `/waiter/kitchen`, `/waiter/bar`.
+- **Indicador de llamadas:** `<div>` no interactivo con `BellRing` animado (animate-pulse) + badge dorado cuando `counts.llamadas > 0`. Solo visual, sin acción.
+- **Sonido:** `playNotificationSound()` usa `new Audio('/bell.mp3')`. Suena cuando aumenta `total`, `listos`, `pendientes` o `llamadas`. Guard: `pathname.startsWith('/waiter')`.
 
 ### `supabase-pedido.repository.ts` — Conteo cocina/bar
 - `fetchAllComidaItems`: excluye `pendiente_validacion` del filtro NOT IN (evita leak antes de validar).
 - `tallyCocinaItems`: cuenta `retenidos` solo desde `pedido_item_estados`; ya no llama a `findAllRetenidos` en paralelo (evitaba doble conteo).
 - `findAllRetenidos`: sigue en uso por `/api/waiter/kitchen/orders/route.ts` — NO es código huérfano.
 
+### `/api/waiter/orders/counts` — CountsPayload
+Devuelve `{ cocina: {total,listos,retenidos}, bebidas: {total,listos,retenidos}, pendientes, llamadas }`.
+`llamadas` = count de `mesa_sesiones` con `llamada_activa=true AND cerrada_at IS NULL`.
+
 ### `mesa-orders-client.tsx` — Ticket del camarero
 - Sin badges de estado de pedido (eliminados).
 - Ítem con `estado='retenido'` en algún pedido → nombre del ítem en color naranja.
+- **Botón de pago:** etiqueta dinámica — con división activa → `"Marcar pago de una parte · €X"`, sin división → `"Marcar pago completo"`. Incluye icono `<CreditCard>`.
+
+### 📞 Call Waiter — Avisar al camarero
+**Flujo completo:**
+1. Cliente pulsa `BellRing` en la cabecera (`site-header-client.tsx`) → aparece solo cuando `?mesa=` en URL y no es modo camarero.
+2. POST `→ /api/mesas/[mesaId]/call-waiter` — endpoint público, rate-limited. Actualiza `mesa_sesiones.llamada_activa = true`.
+3. Cliente ve popup "Camarero avisado" (30 s auto-dismiss, fixed centrado, no interactivo).
+4. Waiter grid (`waiter-login-form.tsx`) detecta `mesa.llamadaActiva = true` → botón pulsante dorado en esquina superior-izquierda de la tarjeta. Al pulsar → POST `/api/waiter/mesas/[mesaId]/dismiss-call` → `llamada_activa = false`.
+5. `WaiterBanner` muestra indicador dorado no interactivo mientras `counts.llamadas > 0`, con animación pulse. Suena `bell.mp3` cuando el contador sube.
+
+**DB:** `supabase/migrations/20260621000001_mesa_llamada_activa.sql` — añade columna `llamada_activa BOOLEAN DEFAULT false` a `mesa_sesiones` y reconstruye RPC `get_mesas_with_sessions` para incluirla.
+**Domain:** `MesaWithSession.llamadaActiva: boolean` (mapeado desde `row.llamada_activa`).
+
+### 🔔 Sistema de Sonido (bell.mp3)
+- Archivo: `public/bell.mp3`
+- Reemplaza el oscilador AudioContext que había en todos los puntos.
+- **`waiter-banner.tsx`:** Suena en `/waiter/*` cuando aumentan `cocina.total`, `cocina.listos`, `bebidas.total`, `bebidas.listos`, `pendientes` o `llamadas`.
+- **`/kitchen/page.tsx`:** Suena localmente cuando aumenta el conteo de ítems `pendiente | en_preparacion`. NO suena al marcar `en_preparacion`, solo al recibir ítems nuevos.
+- **`/waiter/kitchen/page.tsx`:** El sonido listo lo gestiona el banner, no esta página.
+- **IMPORTANTE:** El banner renderiza en todas las páginas (incluyendo la del cliente). El guard `pathname.startsWith('/waiter')` es CRÍTICO para no reproducir sonido en la carta del cliente.
+
+### 🍽️ Kitchen page — Swipe colors
+`/app/kitchen/page.tsx`:
+- Swipe de `pendiente` → `en_preparacion`: fondo reveal = `EN_PREP_COLOR.bg`.
+- Swipe de `en_preparacion` → `listo`: fondo reveal = `COUNTDOWN_COLOR.bg` (verde).
+- Swipe inverso (back): fondo reveal = `PENDIENTE_COLOR.bg` para en_preparacion, `transparent` si pendiente.
+- Atributos: `data-hint-fwd` y `data-hint-back` en el outer div con background dinámico.
+
+### 🧑‍🍳 Waiter Kitchen — Swipe retener
+`/app/waiter/kitchen/page.tsx`:
+- Swipe de ítem `nuevo` → `retenido`: fondo reveal = `RETENIDO_COLOR.bg` (naranja/ámbar).
+- Hint del swipe incluye icono `<Pause>` + texto "Retener".
+
+### 🟢 clienteActivo — Activación automática
+`client-menu-page.tsx`: Al montar (si no es modo camarero y hay `?mesa=` en URL), hace fire-and-forget POST a `/api/mesas/[mesa]/activate`. Así `clienteActivo = true` se registra en cuanto el cliente abre la carta, sin esperar al primer ítem del carrito.
+
+Impacto en el grid: "Cerrar mesa" aparece cuando `activeOrderCount > 0 OR clienteActivo` (no cuando el camarero suplanta sin cliente real).
 
 ## 🔍 SEO Multi-Tenant
 

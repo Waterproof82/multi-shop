@@ -92,6 +92,7 @@ function makeKey(pedidoId: string, itemIdx: number) {
   return `${pedidoId}:${itemIdx}`;
 }
 
+
 export default function WaiterKitchenPage() {
   const { language } = useLanguage();
   const lang = language as Parameters<typeof t>[1];
@@ -108,7 +109,6 @@ export default function WaiterKitchenPage() {
   const [collapsedMesas, setCollapsedMesas] = useState<Set<string>>(new Set());
   const pointerStartX = useRef<number | null>(null);
   const swipingKey    = useRef<string | null>(null);
-
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
   const fetchItems = useCallback(async () => {
@@ -346,7 +346,7 @@ export default function WaiterKitchenPage() {
       <div
         key={key}
         className="relative rounded-xl overflow-hidden select-none"
-        data-action-color={isRetenido ? 'oklch(28% 0.12 65)' : 'oklch(28% 0.16 148)'}
+        data-action-color={isRetenido ? 'oklch(28% 0.12 65)' : isListo ? 'oklch(28% 0.16 148)' : RETENIDO_COLOR.bg}
         style={{
           background:  cardColor.bg,
           border:      `1px solid ${cardColor.border}`,
@@ -363,9 +363,10 @@ export default function WaiterKitchenPage() {
           <div data-reveal-bg="" className="absolute inset-0 flex items-center justify-end px-3" style={{ background: 'transparent' }}>
             <span
               data-hint=""
-              className="pointer-events-none text-[10px] font-bold"
-              style={{ opacity: 0, color: isRetenido ? 'oklch(75% 0.20 65)' : isListo ? 'oklch(75% 0.18 148)' : 'oklch(68% 0.22 148)', transition: 'opacity 0.1s' }}
+              className="pointer-events-none flex items-center gap-1 text-[10px] font-bold"
+              style={{ opacity: 0, color: isRetenido ? 'oklch(75% 0.20 65)' : isListo ? 'oklch(75% 0.18 148)' : 'oklch(75% 0.20 65)', transition: 'opacity 0.1s' }}
             >
+              {!isRetenido && !isListo && <Pause className="w-3 h-3 shrink-0" />}
               {hintText}
             </span>
           </div>

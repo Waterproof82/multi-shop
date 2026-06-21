@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { UtensilsCrossed, KeyRound, Pause, ReceiptText, X, CheckSquare, ExternalLink, PlayCircle } from "lucide-react";
+import { UtensilsCrossed, KeyRound, Pause, ReceiptText, X, CheckSquare, ExternalLink, PlayCircle, BellRing } from "lucide-react";
 import { formatPrice } from "@/lib/format-price";
 import type { MesaWithSession } from "@/core/domain/repositories/IMesaRepository";
 
@@ -201,9 +201,10 @@ interface MesaCardProps {
   readonly onClickDeferred: () => void;
   readonly onViewTicket: () => void;
   readonly onCloseMesa?: () => void;
+  readonly onDismissCall?: () => void;
 }
 
-function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onViewTicket, onCloseMesa }: MesaCardProps) {
+function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onViewTicket, onCloseMesa, onDismissCall }: MesaCardProps) {
   const isPaid = mesa.sesionPagada;
   const isPaymentInProgress = (mesa.pagoEnCurso || mesa.divisionActiva) && !mesa.sesionPagada;
   const isOpen = !!mesa.sesionId && mesa.activeOrderCount > 0 && !isPaid && !isPaymentInProgress;
@@ -227,6 +228,19 @@ function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onViewTicket, onC
         <div className="absolute top-3 right-3">
           <MesaDot pulsing={pulsing} dotColor={colors.dot} />
         </div>
+
+        {/* Call-waiter indicator — top-left, dismiss on click */}
+        {mesa.llamadaActiva && (
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); onDismissCall?.(); }}
+            className="absolute top-2 left-2 flex items-center justify-center rounded-full w-7 h-7 animate-pulse"
+            style={{ background: 'oklch(25% 0.18 55)', border: '1px solid oklch(60% 0.28 55 / 0.7)' }}
+            aria-label="Llamada de cliente — pulsar para descartar"
+          >
+            <BellRing className="w-3.5 h-3.5" style={{ color: 'oklch(85% 0.22 55)' }} />
+          </button>
+        )}
 
         <div className="flex flex-col items-center gap-1 flex-1 justify-center">
           <UtensilsCrossed className="w-5 h-5 mb-1" style={{ color: colors.icon }} />
@@ -305,8 +319,8 @@ function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onViewTicket, onC
         </button>
       )}
 
-      {/* Cerrar mesa — visible siempre que haya sesión activa y no haya pago en curso */}
-      {!!mesa.sesionId && !isPaymentInProgress && onCloseMesa && (
+      {/* Cerrar mesa — visible si hay pedidos O si un cliente real entró al menú */}
+      {!!mesa.sesionId && (mesa.activeOrderCount > 0 || mesa.clienteActivo) && !isPaymentInProgress && onCloseMesa && (
         <button
           onClick={onCloseMesa}
           className="w-full rounded-lg px-2 py-1.5 flex items-center justify-center gap-1.5 hover:brightness-125 transition-all"
@@ -335,10 +349,20 @@ export function WaiterLoginForm() {
   const [closeBlockedError, setCloseBlockedError] = useState<string | null>(null);
   const [deferredMesa, setDeferredMesa] = useState<MesaWithSession | null>(null);
   const [launching, setLaunching] = useState(false);
+  const llamadasRef = useRef<Set<string>>(new Set());
 
   const refresh = useCallback(async () => {
     const data = await fetchMesas();
-    if (data.length > 0) setMesas(data);
+    if (data.length > 0) {
+      const newLlamadas = new Set(data.filter(m => m.llamadaActiva).map(m => m.id));
+      for (const id of newLlamadas) {
+        if (!llamadasRef.current.has(id)) {
+          try { const a = new Audio('/bell.mp3'); a.volume = 0.7; void a.play(); } catch { /* ignore */ }
+        }
+      }
+      llamadasRef.current = newLlamadas;
+      setMesas(data);
+    }
   }, []);
 
   useEffect(() => {
@@ -413,6 +437,11 @@ export function WaiterLoginForm() {
     } finally {
       setMesaLoading(null);
     }
+  }
+
+  async function handleDismissCall(mesa: MesaWithSession) {
+    await fetch(`/api/waiter/mesas/${encodeURIComponent(mesa.id)}/dismiss-call`, { method: 'POST' });
+    await refresh();
   }
 
   async function handleViewTicket(mesa: MesaWithSession) {
@@ -599,6 +628,7 @@ export function WaiterLoginForm() {
               onClickDeferred={() => setDeferredMesa(mesa)}
               onViewTicket={() => void handleViewTicket(mesa)}
               onCloseMesa={() => void handleCloseMesa(mesa)}
+              onDismissCall={() => void handleDismissCall(mesa)}
             />
           ))}
         </div>

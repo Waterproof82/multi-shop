@@ -840,8 +840,8 @@ function getManualPayLabel(
   lang: Parameters<typeof t>[1],
 ): string {
   if (manualPaying) return "Registrando...";
-  if (division) return `Pago manual · ${formatPrice(division.importePorPersona, "EUR", lang)}`;
-  return "Marcar pagada (efectivo)";
+  if (division) return `Marcar pago de una parte · ${formatPrice(division.importePorPersona, "EUR", lang)}`;
+  return "Marcar pago completo";
 }
 
 function getExpectedCents(sessionData: MesaSessionData | null): number | undefined {
@@ -2072,7 +2072,10 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
                   className="w-full py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ backgroundColor: "#1a1612", color: "#fffcf7", fontFamily: "monospace" }}
                 >
-                  {manualPayLabel}
+                  <span className="flex items-center justify-center gap-2">
+                    <CreditCard size={16} strokeWidth={2} />
+                    {manualPayLabel}
+                  </span>
                 </button>
               </div>
             )}

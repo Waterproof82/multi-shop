@@ -34,6 +34,14 @@ function makeKey(pedidoId: string, itemIdx: number) {
   return `${pedidoId}:${itemIdx}`;
 }
 
+function playNotificationSound() {
+  try {
+    const audio = new Audio('/bell.mp3');
+    audio.volume = 0.7;
+    void audio.play();
+  } catch { /* audio not available */ }
+}
+
 function getElapsedMinutes(createdAt: string): number {
   return Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000);
 }
@@ -68,6 +76,7 @@ export default function KitchenPage() {
 
   const pointerStartX = useRef<number | null>(null);
   const swipingKey    = useRef<string | null>(null);
+  const prevItemCountRef = useRef<number | null>(null);
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
@@ -77,7 +86,13 @@ export default function KitchenPage() {
       if (r.status === 401) { window.location.href = '/waiter'; return; }
       if (r.ok) {
         const json = await r.json() as { items: KitchenItem[] };
-        setItems(json.items ?? []);
+        const incoming = json.items ?? [];
+        const count = incoming.filter(i => i.estado === 'pendiente' || i.estado === 'en_preparacion').length;
+        if (prevItemCountRef.current !== null && count > prevItemCountRef.current) {
+          playNotificationSound();
+        }
+        prevItemCountRef.current = count;
+        setItems(incoming);
       }
     } catch { /* ignore */ }
   }, []);
@@ -337,13 +352,21 @@ export default function KitchenPage() {
                         >
                           {!isCountdown && (
                             <>
-                              <div className="absolute inset-0 flex items-center px-3">
-                                <span data-hint-back="" className="pointer-events-none text-[10px] font-bold" style={{ opacity: 0, color: 'oklch(68% 0.12 252)', transition: 'opacity 0.1s' }}>
+                              <div
+                                data-hint-back=""
+                                className="absolute inset-0 flex items-center px-3 rounded-xl"
+                                style={{ opacity: 0, background: isEnPrep ? PENDIENTE_COLOR.bg : 'transparent', transition: 'opacity 0.1s' }}
+                              >
+                                <span className="pointer-events-none text-[10px] font-bold" style={{ color: 'oklch(68% 0.18 240)' }}>
                                   {isEnPrep ? '← ' + t('orderStatusPending', lang) : ''}
                                 </span>
                               </div>
-                              <div className="absolute inset-0 flex items-center justify-end px-3">
-                                <span data-hint-fwd="" className="pointer-events-none text-[10px] font-bold" style={{ opacity: 0, color: 'oklch(75% 0.18 148)', transition: 'opacity 0.1s' }}>
+                              <div
+                                data-hint-fwd=""
+                                className="absolute inset-0 flex items-center justify-end px-3 rounded-xl"
+                                style={{ opacity: 0, background: isEnPrep ? COUNTDOWN_COLOR.bg : EN_PREP_COLOR.bg, transition: 'opacity 0.1s' }}
+                              >
+                                <span className="pointer-events-none text-[10px] font-bold" style={{ color: isEnPrep ? 'oklch(78% 0.22 148)' : 'oklch(82% 0.24 90)' }}>
                                   {isEnPrep ? '✓ ' + t('kitchenItemListo', lang) : '→ ' + t('orderStatusAnotado', lang)}
                                 </span>
                               </div>
