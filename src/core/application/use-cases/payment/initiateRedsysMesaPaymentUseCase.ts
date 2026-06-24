@@ -84,7 +84,7 @@ export async function initiateRedsysMesaPaymentUseCase(
     // Find active sesion for the mesa (including division state + payment lock)
     const { data: sesion, error: sesionError } = await supabase
       .from('mesa_sesiones')
-      .select('id, empresa_id, division_personas, division_pagos_realizados, sesion_pagada, pago_en_curso, pago_iniciado_en, division_base_cents, division_tipo')
+      .select('id, empresa_id, division_personas, division_pagos_realizados, sesion_pagada, pago_en_curso, pago_iniciado_en, division_base_cents, division_tipo, propina_cents')
       .eq('mesa_id', input.mesaId)
       .is('cerrada_at', null)
       .maybeSingle();
@@ -106,6 +106,7 @@ export async function initiateRedsysMesaPaymentUseCase(
     const divisionPersonas = (s['division_personas'] as number | null) ?? null;
     const divisionPagosRealizados = (s['division_pagos_realizados'] as number) ?? 0;
     const divisionBaseCents = (s['division_base_cents'] as number | null) ?? null;
+    const propinaCents = (s['propina_cents'] as number | null) ?? 0;
     const sesionPagada = (s['sesion_pagada'] as boolean) ?? false;
 
     // Reject if the session is already fully paid (covers both full and division payments,
@@ -240,7 +241,7 @@ export async function initiateRedsysMesaPaymentUseCase(
           p_sesion_id:           sesionId,
           p_empresa_id:          input.empresaId,
           p_payment_order_ref:   paymentOrderRef,
-          p_session_total_cents: divisionBaseCents ?? sessionTotalCents,
+          p_session_total_cents: (divisionBaseCents ?? sessionTotalCents) + propinaCents,
         });
 
       if (claimError) {
@@ -280,7 +281,7 @@ export async function initiateRedsysMesaPaymentUseCase(
       // Full (non-division) payment: mark all pedidos as pending and set payment_order_ref
       // on the anchor so the webhook can reconcile against pedidos as before.
       // For personalizado mode remainingCents already has confirmed payments subtracted.
-      amountCents = remainingCents;
+      amountCents = remainingCents + propinaCents;
       const pedidoIds = rows.map(p => p.id);
 
       const { error: updatePendingError } = await supabase

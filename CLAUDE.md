@@ -94,6 +94,16 @@ Usar siempre en RLS policies para aislar datos por empresa.
 - `CountsPayload` incluye `llamadas` (mesas con `llamada_activa=true`). Ver `docs/context/waiter-panel.md` para el flujo completo.
 - **`pedidos.estado` NUNCA se actualiza** por cocina/bar al marcar ítems. La source of truth real está en `pedido_item_estados`. La route `/api/mesas/[mesaId]/orders` sintetiza el estado efectivo de cada pedido comparando item-level estados (`listo`/`servido`/`cancelado`). NO leer `pedido.estado` directamente para saber si un pedido está servido.
 - **`hasPlatosPoServir`** en `mesa-orders-client.tsx` bloquea pago y cierre cuando algún pedido sintetizado tiene estado ∈ `{pendiente_validacion, pendiente, en_preparacion, preparado}`. Ver `docs/context/waiter-ticket-ux.md`.
+- **`propina_cents`** en `mesa_sesiones`: propina acordada por la mesa en céntimos. Se expone como `propinaCents` en `GET /api/mesas/[mesaId]/orders` y se suma al total cobrado en Redsys (full payment y división). Actualizable por cualquier participante vía `PATCH /api/mesas/[mesaId]/propina`. Ver `docs/context/propina.md`.
+
+## 🍽 Sistema Tipo Producto (Restaurante)
+
+- **`categorias.tipo_producto`** (`'comida'|'bebida'`, DEFAULT `'comida'`) es la fuente de verdad para el enrutado cocina/bar. NO leer `productos.tipo_producto` para determinar el tab del menú.
+- Cambiar el tipo de una categoría actualiza en cascada todos sus productos (`SupabaseCategoryRepository.update`).
+- Crear un producto con `categoria_id` → el repositorio hereda el tipo de la categoría automáticamente.
+- El toggle Comida/Bebidas del menú público (`getCategoryTab`) lee `cat.tipoProducto` directamente; ya no infiere desde los items.
+- Subcategorías sin productos no se renderizan (`menu-section.tsx`).
+- Ver `docs/tipo-producto-menu-toggle.md`.
 
 ## 🔍 SEO Multi-Tenant
 

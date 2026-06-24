@@ -156,6 +156,7 @@ export async function GET(
   let customTurno: { id: string; status: string; importeCents: number | null } | null = null;
   let itemsPagados: { pedido_id: string; item_idx: number; unidades_pagadas: number }[] = [];
   let pagadoCents = 0;
+  let propinaCents = 0;
   // items_diferidos column was dropped; retenido orders are included in the orders array above.
   const itemsDiferidos: unknown[] = [];
   try {
@@ -164,7 +165,7 @@ export async function GET(
     const [sesionRowResult, paymentRowsResult, itemsPagadosResult, pagadoTurnosResult] = await Promise.all([
       supabaseAdmin
         .from('mesa_sesiones')
-        .select('division_personas, division_pagos_realizados, pago_en_curso, pago_iniciado_en, division_tipo, custom_turno_id, division_base_cents')
+        .select('division_personas, division_pagos_realizados, pago_en_curso, pago_iniciado_en, division_tipo, custom_turno_id, division_base_cents, propina_cents')
         .eq('id', sesion.id)
         .single(),
       supabaseAdmin
@@ -190,10 +191,12 @@ export async function GET(
       division_tipo: string | null;
       custom_turno_id: string | null;
       division_base_cents: number | null;
+      propina_cents: number | null;
     } | null;
     divisionTipo = (row?.division_tipo as string | null) ?? null;
     const customTurnoId = (row?.custom_turno_id as string | null) ?? null;
     const divisionBaseCents = (row?.division_base_cents as number | null) ?? null;
+    propinaCents = (row?.propina_cents as number | null) ?? 0;
 
     if (customTurnoId) {
       const { data: turnoRow } = await supabaseAdmin
@@ -226,7 +229,7 @@ export async function GET(
       const personas = row.division_personas;
       const pagosRealizados = row.division_pagos_realizados;
       const baseTotal = divisionBaseCents != null ? divisionBaseCents / 100 : total;
-      const importePorPersona = Math.round((baseTotal / personas) * 100) / 100;
+      const importePorPersona = Math.round(((baseTotal + propinaCents / 100) / personas) * 100) / 100;
       division = { personas, pagosRealizados, importePorPersona };
     }
 
@@ -287,5 +290,5 @@ export async function GET(
     // best-effort
   }
 
-  return NextResponse.json({ orders, sesionId: sesion.id, total, pagosHabilitados, division, sesionPagada, pagoEnCurso, divisionTipo, customTurno, itemsPagados, pagadoCents, itemsDiferidos });
+  return NextResponse.json({ orders, sesionId: sesion.id, total, pagosHabilitados, division, sesionPagada, pagoEnCurso, divisionTipo, customTurno, itemsPagados, pagadoCents, itemsDiferidos, propinaCents });
 }

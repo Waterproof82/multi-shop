@@ -17,6 +17,7 @@ export const createCategorySchema = z.object({
   categoria_complemento_de: z.string().uuid().nullable().optional(),
   complemento_obligatorio: z.boolean().default(false),
   categoria_padre_id: z.string().uuid().nullable().optional(),
+  tipo_producto: z.enum(['comida', 'bebida']).default('comida').optional(),
 });
 
 export const updateCategorySchema = createCategorySchema.partial();

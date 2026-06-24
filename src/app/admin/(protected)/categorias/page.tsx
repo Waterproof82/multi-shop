@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Pencil, Trash2, Loader2, Search, ArrowUpDown, ArrowUp, ArrowDown, Languages, ChevronDown, ChevronRight, Tags, FolderTree } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Search, ArrowUpDown, ArrowUp, ArrowDown, Languages, ChevronDown, ChevronRight, Tags, FolderTree, UtensilsCrossed, GlassWater } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,7 @@ interface Category {
   categoria_complemento_de: string | null;
   complemento_obligatorio: boolean;
   categoria_padre_id: string | null;
+  tipo_producto: 'comida' | 'bebida';
   hasSubcategories?: boolean;
 }
 
@@ -51,6 +52,7 @@ interface CategoryFormData {
   categoria_complemento_de: string | null;
   complemento_obligatorio: boolean;
   categoria_padre_id: string | null;
+  tipo_producto: 'comida' | 'bebida';
 }
 
 const emptyForm: CategoryFormData = {
@@ -68,6 +70,7 @@ const emptyForm: CategoryFormData = {
   categoria_complemento_de: null,
   complemento_obligatorio: false,
   categoria_padre_id: null,
+  tipo_producto: 'comida',
 };
 
 export default function CategoriasPage() {
@@ -165,6 +168,7 @@ export default function CategoriasPage() {
       categoria_complemento_de: categoria.categoria_complemento_de,
       complemento_obligatorio: categoria.complemento_obligatorio || false,
       categoria_padre_id: categoria.categoria_padre_id,
+      tipo_producto: categoria.tipo_producto ?? 'comida',
     });
     setEditingId(categoria.id);
     setIsModalOpen(true);
@@ -339,22 +343,33 @@ export default function CategoriasPage() {
                     {cat.nombre_es}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm">
-                    {cat.categoria_padre_id ? (
-                      <div className="flex flex-col gap-1">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-500/20 border border-teal-400/30 text-teal-300 text-xs font-medium">
-                          {t("subcategory", language)}
-                        </span>
-                        {cat.parentName && (
-                          <span className="text-xs text-slate-400">
-                            → {cat.parentName}
+                    <div className="flex flex-col gap-1">
+                      {cat.categoria_padre_id ? (
+                        <>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-500/20 border border-teal-400/30 text-teal-300 text-xs font-medium">
+                            {t("subcategory", language)}
                           </span>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-700/50 border border-slate-600 text-slate-300 text-xs font-medium">
-                        {t("mainCategory", language)}
-                      </span>
-                    )}
+                          {cat.parentName && (
+                            <span className="text-xs text-slate-400">
+                              → {cat.parentName}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-700/50 border border-slate-600 text-slate-300 text-xs font-medium">
+                          {t("mainCategory", language)}
+                        </span>
+                      )}
+                      {cat.tipo_producto === 'bebida' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-medium">
+                          <GlassWater className="w-3 h-3" /> Bar
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500/20 border border-orange-400/30 text-orange-300 text-xs font-medium">
+                          <UtensilsCrossed className="w-3 h-3" /> Cocina
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm">
                     {cat.hasSubcategories ? (
@@ -666,6 +681,43 @@ export default function CategoriasPage() {
                 </label>
               </div>
             )}
+
+            <div>
+              <p className="block text-sm font-medium text-foreground mb-2">
+                Tipo
+              </p>
+              <div className="flex gap-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="tipo_producto"
+                    value="comida"
+                    checked={formData.tipo_producto !== 'bebida'}
+                    onChange={() => setFormData({ ...formData, tipo_producto: 'comida' })}
+                    className="accent-primary"
+                  />
+                  <span className="inline-flex items-center gap-1 text-sm px-2 py-0.5 rounded-full bg-orange-500/20 border border-orange-400/30 text-orange-400">
+                    <UtensilsCrossed className="w-3 h-3" /> Cocina
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="tipo_producto"
+                    value="bebida"
+                    checked={formData.tipo_producto === 'bebida'}
+                    onChange={() => setFormData({ ...formData, tipo_producto: 'bebida' })}
+                    className="accent-primary"
+                  />
+                  <span className="inline-flex items-center gap-1 text-sm px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-400">
+                    <GlassWater className="w-3 h-3" /> Bar
+                  </span>
+                </label>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Todos los productos de esta categoría se enrutarán a Cocina o Bar.
+              </p>
+            </div>
 
             <div className="col-span-2">
               <button

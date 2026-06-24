@@ -13,6 +13,7 @@ export class SupabaseCategoryRepository implements ICategoryRepository {
       nombre: row.nombre_es as string | null,
       descripcion: (row.descripcion_es as string | null) || null,
       orden: (row.orden as number) || 0,
+      tipoProducto: (row.tipo_producto as string) === 'bebida' ? 'bebida' : 'comida',
       categoriaComplementoDe: (row.categoria_complemento_de as string | null) || null,
       complementoObligatorio: (row.complemento_obligatorio as boolean) || false,
       categoriaPadreId: (row.categoria_padre_id as string | null) || null,
@@ -87,6 +88,7 @@ export class SupabaseCategoryRepository implements ICategoryRepository {
           categoria_complemento_de: data.categoria_complemento_de || null,
           complemento_obligatorio: data.complemento_obligatorio,
           categoria_padre_id: data.categoria_padre_id || null,
+          tipo_producto: data.tipo_producto ?? 'comida',
         })
         .select()
         .single();
@@ -137,6 +139,7 @@ export class SupabaseCategoryRepository implements ICategoryRepository {
       if (data.categoria_complemento_de !== undefined) updatePayload.categoria_complemento_de = data.categoria_complemento_de;
       if (data.complemento_obligatorio !== undefined) updatePayload.complemento_obligatorio = data.complemento_obligatorio;
       if (data.categoria_padre_id !== undefined) updatePayload.categoria_padre_id = data.categoria_padre_id;
+      if (data.tipo_producto !== undefined) updatePayload.tipo_producto = data.tipo_producto;
 
       const { data: updated, error } = await this.supabase
         .from("categorias")
@@ -165,7 +168,18 @@ export class SupabaseCategoryRepository implements ICategoryRepository {
         };
       }
 
-      return { success: true, data: this.mapToDomain(updated) };
+      const result = this.mapToDomain(updated);
+
+      // Cascade tipo_producto to all products in this category (best-effort)
+      if (data.tipo_producto !== undefined) {
+        await this.supabase
+          .from('productos')
+          .update({ tipo_producto: data.tipo_producto })
+          .eq('categoria_id', id)
+          .eq('empresa_id', empresaId);
+      }
+
+      return { success: true, data: result };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabaseCategoryRepository.update', {
         empresaId,
