@@ -90,6 +90,7 @@ export interface Empresa {
   descuentoBienvenidaActivo: boolean;
   descuentoBienvenidaPorcentaje: number;
   descuentoBienvenidaDuracion?: number | null;
+  deliveryHabilitado: boolean;
 }
 
 interface TranslatableText {

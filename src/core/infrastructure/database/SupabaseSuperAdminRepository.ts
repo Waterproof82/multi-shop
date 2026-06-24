@@ -57,6 +57,7 @@ interface EmpresaRow {
   pagos_pickup_habilitados: boolean;
   mesas_habilitadas: boolean;
   validacion_pedidos_habilitada: boolean;
+  delivery_habilitado: boolean;
   created_at: string;
 }
 
@@ -384,6 +385,7 @@ export class SupabaseSuperAdminRepository implements ISuperAdminRepository {
       pagosPickupHabilitados: row.pagos_pickup_habilitados ?? false,
       mesasHabilitadas: row.mesas_habilitadas ?? true,
       validacionPedidosHabilitada: row.validacion_pedidos_habilitada ?? false,
+      deliveryHabilitado: row.delivery_habilitado ?? false,
       moneda: row.moneda,
       emailNotification: row.email_notification,
       urlImage: row.url_image,

@@ -30,6 +30,7 @@ export const updateEmpresaSchema = z.object({
   pagos_pickup_habilitados: z.boolean().optional(),
   mesas_habilitadas: z.boolean().optional(),
   validacion_pedidos_habilitada: z.boolean().optional(),
+  delivery_habilitado: z.boolean().optional(),
 });
 
 export type UpdateEmpresaDTO = z.infer<typeof updateEmpresaSchema>;

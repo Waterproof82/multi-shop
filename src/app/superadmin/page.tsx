@@ -28,6 +28,7 @@ interface Empresa {
   pagosPickupHabilitados: boolean;
   mesasHabilitadas: boolean;
   validacionPedidosHabilitada: boolean;
+  deliveryHabilitado: boolean;
   createdAt: string;
   stats: EmpresaStats;
   totalMesas: number;
@@ -253,6 +254,7 @@ export default async function SuperAdminPage() {
               pagosPickupHabilitados: e.pagosPickupHabilitados,
               mesasHabilitadas: e.mesasHabilitadas,
               validacionPedidosHabilitada: e.validacionPedidosHabilitada,
+              deliveryHabilitado: e.deliveryHabilitado,
               stats: e.stats,
               totalMesas: e.totalMesas,
               seoStatus: e.seoStatus,
