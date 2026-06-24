@@ -199,12 +199,13 @@ interface MesaCardProps {
   readonly isLoading: boolean;
   readonly onClick: () => void;
   readonly onClickDeferred: () => void;
+  readonly onClickListos: () => void;
   readonly onViewTicket: () => void;
   readonly onCloseMesa?: () => void;
   readonly onDismissCall?: () => void;
 }
 
-function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onViewTicket, onCloseMesa, onDismissCall }: MesaCardProps) {
+function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onClickListos, onViewTicket, onCloseMesa, onDismissCall }: MesaCardProps) {
   const isPaid = mesa.sesionPagada;
   const isPaymentInProgress = (mesa.pagoEnCurso || mesa.divisionActiva) && !mesa.sesionPagada;
   const isOpen = !!mesa.sesionId && mesa.activeOrderCount > 0 && !isPaid && !isPaymentInProgress;
@@ -268,15 +269,16 @@ function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onViewTicket, onC
 
       {/* Preparado badge — shown when any pedido in session has been marked ready by kitchen */}
       {mesa.preparadoPedidoNumbers.length > 0 && (
-        <div
-          className="w-full rounded-lg px-2 py-1.5 flex items-center gap-1.5"
+        <button
+          onClick={onClickListos}
+          className="w-full rounded-lg px-2 py-1.5 flex items-center gap-1.5 active:brightness-125 transition-all text-left"
           style={{ background: 'oklch(18% 0.08 148 / 0.7)', border: '1px solid oklch(45% 0.15 148 / 0.5)' }}
         >
           <CheckSquare className="w-3 h-3 shrink-0" style={{ color: 'oklch(72% 0.20 148)' }} />
           <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'oklch(72% 0.20 148)' }}>
             Platos listos
           </span>
-        </div>
+        </button>
       )}
 
       {/* Deferred items */}
@@ -425,7 +427,13 @@ export function WaiterLoginForm() {
       // Guard: check if payment is required before allowing close
       const r = await fetch(`/api/mesas/${encodeURIComponent(mesa.id)}/orders`);
       if (r.ok) {
-        const data = await r.json() as { orders: unknown[]; pagosHabilitados: boolean; sesionPagada: boolean };
+        const data = await r.json() as { orders: { estado: string }[]; pagosHabilitados: boolean; sesionPagada: boolean };
+        const unservedStates = ['pendiente_validacion', 'pendiente', 'en_preparacion', 'preparado'];
+        if (!data.sesionPagada && data.orders.some(o => unservedStates.includes(o.estado))) {
+          setCloseBlockedError('Quedan platos por servir. Sirve todos los platos antes de cerrar la mesa.');
+          setTimeout(() => setCloseBlockedError(null), 5000);
+          return;
+        }
         if (data.orders.length > 0 && data.pagosHabilitados && !data.sesionPagada) {
           setCloseBlockedError('Hay pedidos sin pagar. Registra el pago antes de cerrar la mesa.');
           setTimeout(() => setCloseBlockedError(null), 5000);
@@ -626,6 +634,10 @@ export function WaiterLoginForm() {
               isLoading={mesaLoading === mesa.id}
               onClick={() => void handleMesaNav(mesa)}
               onClickDeferred={() => setDeferredMesa(mesa)}
+              onClickListos={() => {
+                const mesaKey = mesa.nombre ?? `Mesa ${mesa.numero}`;
+                router.push(`/waiter/kitchen?groupBy=listos&mesa=${encodeURIComponent(mesaKey)}`);
+              }}
               onViewTicket={() => void handleViewTicket(mesa)}
               onCloseMesa={() => void handleCloseMesa(mesa)}
               onDismissCall={() => void handleDismissCall(mesa)}

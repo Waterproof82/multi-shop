@@ -1116,10 +1116,12 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         // Only include bebida items not yet marked servido and not in the pendientes queue (from_validation=true)
         const bebidaItems: { nombre: string; cantidad: number; detallePedidoIdx: number }[] = [];
         items.forEach((item, fullIdx) => {
-          if (
+          const barItemEstado = pedidoEstados.get(fullIdx);
+        if (
             item['tipo_producto'] === 'bebida' &&
             !fromValidationSet.has(`${pedidoId}:${fullIdx}`) &&
-            pedidoEstados.get(fullIdx) !== 'servido'
+            barItemEstado !== 'servido' &&
+            barItemEstado !== 'cancelado'
           ) {
             bebidaItems.push({ nombre: item['nombre'] as string, cantidad: item['cantidad'] as number, detallePedidoIdx: fullIdx });
           }
@@ -1318,7 +1320,39 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         });
       }
 
-      // 2. Ítems retenidos durante validación — el camarero los libera desde pendientes
+      // 2a. Ítems cancelados — excluirlos de la cola de pendientes
+      const allPedidoIds = [...mesaMap.values()].flatMap(m => m.pedidos.map(p => p.id));
+      const canceladoMap = new Map<string, Set<number>>();
+      if (allPedidoIds.length > 0) {
+        const { data: cancelados } = await this.supabase
+          .from('pedido_item_estados')
+          .select('pedido_id, item_idx')
+          .eq('empresa_id', empresaId)
+          .eq('estado', 'cancelado')
+          .in('pedido_id', allPedidoIds);
+        for (const r of cancelados ?? []) {
+          const pid = r['pedido_id'] as string;
+          const idx = r['item_idx'] as number;
+          if (!canceladoMap.has(pid)) canceladoMap.set(pid, new Set());
+          canceladoMap.get(pid)!.add(idx);
+        }
+        if (canceladoMap.size > 0) {
+          for (const mesa of mesaMap.values()) {
+            mesa.pedidos = mesa.pedidos
+              .map(p => ({
+                ...p,
+                items: p.items.filter(i => !canceladoMap.get(p.id)?.has(i.idx)),
+              }))
+              .filter(p => p.items.length > 0);
+          }
+          // Remove empty mesas
+          for (const [key, mesa] of mesaMap.entries()) {
+            if (mesa.pedidos.length === 0) mesaMap.delete(key);
+          }
+        }
+      }
+
+      // 2b. Ítems retenidos durante validación — el camarero los libera desde pendientes
       const { data: retenidos } = await this.supabase
         .from('pedido_item_estados')
         .select('pedido_id, item_idx')

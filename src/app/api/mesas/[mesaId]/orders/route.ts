@@ -70,16 +70,69 @@ export async function GET(
     } catch { /* best-effort */ }
   }
 
-  const orders = ordersResult.data.map(o => ({
-    id: o.id,
-    numeroPedido: o.numero_pedido,
-    items: o.detalle_pedido,
-    total: o.total,
-    estado: o.estado === 'retenido' && !stillRetenidoIds.has(o.id as string) ? 'pendiente' : o.estado,
-    createdAt: o.created_at,
-  }));
+  // Fetch cancelled and servido item estados for all pedidos in this session
+  const allPedidoIds = ordersResult.data.map(o => o.id as string);
+  const cancelledByPedido = new Map<string, Set<number>>();
+  const servidoByPedido = new Map<string, Set<number>>();
+  if (allPedidoIds.length > 0) {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: itemRows } = await supabase
+        .from('pedido_item_estados')
+        .select('pedido_id, item_idx, estado')
+        .in('pedido_id', allPedidoIds)
+        .in('estado', ['cancelado', 'listo', 'servido']);
+      for (const row of (itemRows ?? []) as { pedido_id: string; item_idx: number; estado: string }[]) {
+        if (row.estado === 'cancelado') {
+          if (!cancelledByPedido.has(row.pedido_id)) cancelledByPedido.set(row.pedido_id, new Set());
+          cancelledByPedido.get(row.pedido_id)!.add(row.item_idx);
+        } else if (row.estado === 'listo' || row.estado === 'servido') {
+          // Both 'listo' (kitchen done) and 'servido' (waiter delivered) count as served
+          // for payment purposes — blocking only makes sense while food is still cooking.
+          if (!servidoByPedido.has(row.pedido_id)) servidoByPedido.set(row.pedido_id, new Set());
+          servidoByPedido.get(row.pedido_id)!.add(row.item_idx);
+        }
+      }
+    } catch { /* best-effort */ }
+  }
 
-  const total = ordersResult.data.reduce((sum, o) => sum + Number(o.total), 0);
+  const orders = ordersResult.data.map(o => {
+    const cancelledIndices = cancelledByPedido.get(o.id as string) ?? new Set<number>();
+    const servidoIndices = servidoByPedido.get(o.id as string) ?? new Set<number>();
+    const detalle = (o.detalle_pedido as { precio?: number; cantidad?: number }[]) ?? [];
+    const items = detalle.map((item, idx) =>
+      cancelledIndices.has(idx) ? { ...item, cancelled: true } : item
+    );
+
+    // Synthesize estado='servido' when all non-cancelled items are explicitly servido/listo
+    // in pedido_item_estados. This covers the case where kitchen/bar marks items at the
+    // item level but pedidos.estado is never updated.
+    // Also treat fully-cancelled orders (activeIndices empty) as done — nothing left to serve.
+    const activeIndices = detalle.map((_, idx) => idx).filter(idx => !cancelledIndices.has(idx));
+    const allItemsDone = activeIndices.length === 0 || activeIndices.every(idx => servidoIndices.has(idx));
+
+    let estado = o.estado === 'retenido' && !stillRetenidoIds.has(o.id as string) ? 'pendiente' : o.estado;
+    if (allItemsDone) estado = 'servido';
+
+    return {
+      id: o.id,
+      numeroPedido: o.numero_pedido,
+      items,
+      total: o.total,
+      estado,
+      createdAt: o.created_at,
+    };
+  });
+
+  const total = ordersResult.data.reduce((sum, o) => {
+    const cancelledIndices = cancelledByPedido.get(o.id as string) ?? new Set<number>();
+    const detalle = (o.detalle_pedido as { precio?: number; cantidad?: number }[]) ?? [];
+    const cancelledSubtotal = detalle.reduce((s, item, idx) => {
+      if (!cancelledIndices.has(idx)) return s;
+      return s + (Number(item.precio ?? 0) * Number(item.cantidad ?? 1));
+    }, 0);
+    return sum + Number(o.total) - cancelledSubtotal;
+  }, 0);
 
   // Check if mesa payments are enabled for this empresa
   let pagosHabilitados = false;

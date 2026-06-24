@@ -92,6 +92,8 @@ Usar siempre en RLS policies para aislar datos por empresa.
 - `clienteActivo` se activa al abrir la carta (mount en `client-menu-page.tsx`), no al añadir al carrito.
 - `llamada_activa` vive en `mesa_sesiones`, no en `mesas`. Se expone vía RPC `get_mesas_with_sessions`.
 - `CountsPayload` incluye `llamadas` (mesas con `llamada_activa=true`). Ver `docs/context/waiter-panel.md` para el flujo completo.
+- **`pedidos.estado` NUNCA se actualiza** por cocina/bar al marcar ítems. La source of truth real está en `pedido_item_estados`. La route `/api/mesas/[mesaId]/orders` sintetiza el estado efectivo de cada pedido comparando item-level estados (`listo`/`servido`/`cancelado`). NO leer `pedido.estado` directamente para saber si un pedido está servido.
+- **`hasPlatosPoServir`** en `mesa-orders-client.tsx` bloquea pago y cierre cuando algún pedido sintetizado tiene estado ∈ `{pendiente_validacion, pendiente, en_preparacion, preparado}`. Ver `docs/context/waiter-ticket-ux.md`.
 
 ## 🔍 SEO Multi-Tenant
 
