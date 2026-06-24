@@ -23,6 +23,7 @@ export interface UpdateEmpresaData {
   descuento_bienvenida_duracion?: number;
   tipo?: 'tienda' | 'restaurante';
   validacion_pedidos_habilitada?: boolean;
+  delivery_habilitado?: boolean;
 }
 
 export interface IEmpresaRepository {

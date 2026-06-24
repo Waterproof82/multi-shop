@@ -105,6 +105,12 @@ Usar siempre en RLS policies para aislar datos por empresa.
 - Subcategorías sin productos no se renderizan (`menu-section.tsx`).
 - Ver `docs/tipo-producto-menu-toggle.md`.
 
+## 🏢 Panel Superadmin — Trampas Críticas
+
+- **`delivery_habilitado`** en `empresas` (DEFAULT `false`): activa el ítem "Zona de entrega" en el sidebar del admin (`requiresDelivery` flag). Controlable desde la columna "Globo envíos" de la tabla de empresas en superadmin. Si está en `false`, la ruta `/admin/delivery` NO aparece aunque la empresa sea restaurante o tienda.
+- **`EmpresasTable`** extrae cada fila en `EmpresaTableRow` con su propio `useState(tipo)`. El `TipoSelector` llama `onTipoChange` solo cuando el PUT es OK — así Mesas/Pagos Mesa/Validación reaccionan al cambio de tipo SIN recargar la página.
+- Mesas / Pagos Mesa / Validación solo se muestran para `tipo === 'restaurante'`. Las tiendas dejan esas celdas vacías.
+
 ## 🔍 SEO Multi-Tenant
 
 ### Archivos Clave
