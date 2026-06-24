@@ -539,17 +539,20 @@ export default function ProductosPage() {
                   </td>
                   {empresaTipo === 'restaurante' && (
                     <td className="px-4 py-3 whitespace-nowrap text-sm">
-                      {getCategoriaTipo(prod.categoria_id) === 'bebida' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-400 text-xs font-medium">
-                          <GlassWater className="w-3 h-3" /> Bar
-                        </span>
-                      ) : getCategoriaTipo(prod.categoria_id) === 'comida' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500/20 border border-orange-400/30 text-orange-400 text-xs font-medium">
-                          <UtensilsCrossed className="w-3 h-3" /> Cocina
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
+                      {(() => {
+                        const tipo = getCategoriaTipo(prod.categoria_id);
+                        if (tipo === 'bebida') return (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-400 text-xs font-medium">
+                            <GlassWater className="w-3 h-3" /> Bar
+                          </span>
+                        );
+                        if (tipo === 'comida') return (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500/20 border border-orange-400/30 text-orange-400 text-xs font-medium">
+                            <UtensilsCrossed className="w-3 h-3" /> Cocina
+                          </span>
+                        );
+                        return <span className="text-muted-foreground">—</span>;
+                      })()}
                     </td>
                   )}
                   <td className="px-4 py-3 whitespace-nowrap">

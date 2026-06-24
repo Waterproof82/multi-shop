@@ -683,9 +683,9 @@ export default function CategoriasPage() {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
+              <p className="block text-sm font-medium text-foreground mb-2">
                 Tipo
-              </label>
+              </p>
               <div className="flex gap-3">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
