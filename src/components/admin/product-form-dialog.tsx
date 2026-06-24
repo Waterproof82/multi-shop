@@ -108,7 +108,6 @@ interface ProductFormDialogProps {
   saving: boolean;
   onSubmit: (e: React.SyntheticEvent) => void;
   empresaSlug: string;
-  isRestaurante?: boolean;
 }
 
 export function ProductFormDialog({
@@ -123,7 +122,6 @@ export function ProductFormDialog({
   saving,
   onSubmit,
   empresaSlug,
-  isRestaurante = false,
 }: Readonly<ProductFormDialogProps>) {
   const { language } = useLanguage();
   const handleClose = () => onOpenChange(false);
@@ -284,20 +282,6 @@ export function ProductFormDialog({
                 />
                 <span className="text-sm text-foreground">{t("active", language)}</span>
               </label>
-              {isRestaurante && (
-                <label htmlFor="tipo_producto" className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    id="tipo_producto"
-                    type="checkbox"
-                    checked={formData.tipo_producto === 'bebida'}
-                    onChange={(e) => onFormChange({ ...formData, tipo_producto: e.target.checked ? 'bebida' : 'comida' })}
-                    className="w-4 h-4 rounded border-border text-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background cursor-pointer accent-primary"
-                  />
-                  <span className="text-sm bg-blue-500/20 text-blue-400 border border-blue-400/30 px-2 py-0.5 rounded-full">
-                    🥤 Bebida
-                  </span>
-                </label>
-              )}
             </div>
           </div>
 

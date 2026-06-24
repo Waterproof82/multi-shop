@@ -2,7 +2,51 @@
 
 ## Resumen
 
-Para empresas de tipo `restaurante`, el menú público muestra un toggle que permite al cliente filtrar las categorías por tipo de producto: **Comida** o **Bebidas**. El toggle solo aparece si la empresa tiene al menos un producto con `tipo_producto = 'bebida'`.
+Para empresas de tipo `restaurante`, el menú público muestra un toggle que permite al cliente filtrar las categorías por tipo: **Comida** o **Bebidas**. El toggle solo aparece si la empresa tiene al menos una categoría con `tipo_producto = 'bebida'`.
+
+La clasificación es **a nivel de categoría** — la categoría es la fuente de verdad, no el producto individual.
+
+---
+
+## Base de datos
+
+### `categorias` (delta)
+```sql
+tipo_producto  TEXT NOT NULL DEFAULT 'comida'
+               CHECK (tipo_producto IN ('comida', 'bebida'))
+```
+
+### Migración
+`supabase/migrations/20260624000002_categorias_tipo_producto.sql`
+
+La migración auto-popula el valor de cada categoría existente mirando sus productos: si algún producto tiene `tipo_producto = 'bebida'`, la categoría queda como `'bebida'`.
+
+---
+
+## Cascade automático
+
+Cuando el admin cambia el `tipo_producto` de una categoría, el repositorio actualiza en cascada todos los productos de esa categoría:
+
+```sql
+UPDATE productos
+SET tipo_producto = <nuevo_tipo>
+WHERE categoria_id = <id>
+  AND empresa_id = <empresa_id>
+```
+
+Esto garantiza que `productos.tipo_producto` (que se almacena en `detalle_pedido` de cada orden) siempre coincide con la categoría — y el enrutado cocina/bar sigue funcionando correctamente.
+
+### Nuevo producto con categoría asignada
+
+Al crear un producto, el repositorio consulta la categoría y usa su `tipo_producto` como valor inicial, ignorando el default `'comida'`:
+
+```ts
+// SupabaseProductRepository.create()
+if (data.categoria_id) {
+  const { data: cat } = await supabase.from('categorias').select('tipo_producto').eq('id', data.categoria_id).single();
+  if (cat) tipoProducto = cat.tipo_producto;
+}
+```
 
 ---
 
@@ -10,73 +54,76 @@ Para empresas de tipo `restaurante`, el menú público muestra un toggle que per
 
 ### Clasificación de categorías
 
-Cada categoría se clasifica automáticamente según los `tipo_producto` de sus ítems:
+`getCategoryTab(cat: MenuCategoryVM)` lee directamente `cat.tipoProducto`:
 
-| Tipo de categoría | Criterio |
+| Resultado | Criterio |
 |---|---|
-| `comida` | Todos sus ítems son comida (o sin tipo asignado) |
-| `bebida` | Todos sus ítems son bebidas |
-| `both` | Mezcla de comida y bebidas |
-| `empty` | Sin ítems |
+| `'bebida'` | `cat.tipoProducto === 'bebida'` y tiene items |
+| `'comida'` | `cat.tipoProducto !== 'bebida'` y tiene items |
+| `'empty'` | Sin items (ni en la categoría ni en sus subcategorías) |
+
+Ya no existe el caso `'both'` — las categorías son explícitamente uno u otro.
 
 ### Comportamiento del toggle
 
-- **Tab Comida activo**: se muestran categorías `comida`, `both` y `empty`. El botón visible es "Bebidas" (para cambiar).
-- **Tab Bebidas activo**: se muestran categorías `bebida` y `both`. El botón visible es "Comida" (para volver).
+- **Tab Comida activo**: se muestran categorías `comida` y `empty`.
+- **Tab Bebidas activo**: se muestran categorías `bebida`.
 
-Cambiar de tab hace scroll al top de la página y resetea la categoría activa en la nav.
+Cambiar de tab hace scroll al top y resetea la categoría activa en la nav.
 
 ### Visibilidad del toggle
 
-El toggle **no aparece** en estos casos:
+El toggle **no aparece** si:
 - La empresa no es de tipo `restaurante`.
-- Ningún producto tiene `tipo_producto = 'bebida'` (todos son comida por defecto).
+- Ninguna categoría tiene `tipo_producto = 'bebida'`.
 
 ---
 
-## Configuración
+## Subcategorías vacías
 
-### Requisito: productos con categoría asignada
-
-Un producto con `tipo_producto = 'bebida'` pero **sin categoría asignada** no aparece en el menú ni activa el toggle. Todos los productos deben tener una categoría.
-
-### Flujo recomendado en el admin
-
-1. Crear una o más categorías para bebidas (ej: "Bebidas", "Cervezas", "Vinos").
-2. Asignar esas categorías a los productos de bebida.
-3. En el formulario de cada producto, seleccionar `tipo_producto = bebida`.
+Las subcategorías sin productos no se renderizan en el menú (`menu-section.tsx`):
+```tsx
+category.subcategories.filter(s => s.products.length > 0).map(...)
+```
 
 ---
 
-## Archivos modificados
+## Admin — Panel de Categorías
 
-| Archivo | Cambio |
+El formulario de categoría incluye un selector Cocina / Bar (radio buttons con íconos):
+- **Cocina** (`UtensilsCrossed`) → `tipo_producto = 'comida'`
+- **Bar** (`GlassWater`) → `tipo_producto = 'bebida'`
+
+La tabla de categorías muestra un badge coloreado con el tipo de cada categoría.
+
+## Admin — Panel de Productos
+
+Para empresas `restaurante`, la tabla de productos incluye una columna **Tipo** que muestra el tipo derivado de la categoría del producto (badge Cocina/Bar). El formulario de producto ya no incluye el checkbox "Bebida" — el tipo se controla desde la categoría.
+
+---
+
+## Flujo recomendado
+
+1. En `/admin/categorias`, crear categorías para bebidas (ej: "Cervezas", "Vinos", "Refrescos") y seleccionar **Bar**.
+2. Asignar productos a esas categorías — heredan el tipo automáticamente.
+3. El toggle Comida/Bebidas aparece en el menú público.
+
+---
+
+## Archivos clave
+
+| Archivo | Rol |
 |---|---|
-| `src/core/application/dtos/menu-view-model.ts` | Añadido campo `tipoProducto?: 'comida' \| 'bebida'` a `MenuItemVM` |
-| `src/core/application/mappers/menu.mapper.ts` | `mapProductToItem` ahora mapea `product.tipoProducto` |
-| `src/components/category-nav.tsx` | Props `showTabs`, `tab`, `onTabChange`; renderiza el botón del tab inactivo |
-| `src/components/client-menu-page.tsx` | Estado `menuTab`, `visibleCategories`, `handleTabChange`; función `getCategoryTab` |
-| `src/lib/translations.ts` | Claves `filterFood` / `filterDrinks` en `es` y `en` |
-
----
-
-## Cambios relacionados en esta rama
-
-### Modo camarero en el menú público
-
-Cuando hay un `waiter_token` activo (cookie) **y** una mesa seleccionada (sessionStorage), el menú público reemplaza el header + HeroBanner por un input de búsqueda de productos. Esto replica exactamente la condición del `WaiterBanner`.
-
-- `src/app/page.tsx`: detecta `waiter_token` y pasa `isWaiterMode` a `MenuPage`.
-- `src/components/client-menu-page.tsx`: hook `useEffect` lee `getWaiterMesa()` en el cliente para confirmar que hay mesa activa antes de mostrar el buscador.
-
-### WaiterBanner
-
-Se oculta automáticamente en rutas `/waiter/tables/*` porque el panel de mesas tiene su propia navegación.
-
-### WaiterTableDetail
-
-Rediseño completo del panel de detalle de mesa (`/waiter/tables/[mesaId]`):
-
-- **Mesa cerrada**: botón de abrir mesa.
-- **Mesa abierta**: buscador inline que carga los productos automáticamente, lista filtrada con controles de cantidad, resumen de carrito con botón de confirmar pedido, listado de pedidos de la sesión, y acciones de volver/cerrar mesa en el pie.
-- Eliminado: modal de selección de productos (reemplazado por búsqueda inline).
+| `supabase/migrations/20260624000002_categorias_tipo_producto.sql` | Añade `tipo_producto` a `categorias` |
+| `src/core/domain/entities/types.ts` | `Category.tipoProducto` |
+| `src/core/domain/repositories/ICategoryRepository.ts` | `tipo_producto` en CreateCategoryData |
+| `src/core/application/dtos/category.dto.ts` | Validación Zod |
+| `src/core/infrastructure/database/SupabaseCategoryRepository.ts` | Map, insert, cascade a productos |
+| `src/core/infrastructure/database/SupabaseProductRepository.ts` | Deriva tipo de categoría en create |
+| `src/core/application/dtos/menu-view-model.ts` | `MenuCategoryVM.tipoProducto` |
+| `src/core/application/mappers/menu.mapper.ts` | Pasa `tipoProducto` al VM |
+| `src/app/api/admin/categorias/route.ts` | Expone `tipo_producto` al admin |
+| `src/app/admin/(protected)/categorias/page.tsx` | Formulario + badge en tabla |
+| `src/app/admin/(protected)/productos/page.tsx` | Columna Tipo (solo restaurante) |
+| `src/components/client-menu-page.tsx` | `getCategoryTab`, `showTabs`, `visibleCategories` |
+| `src/components/menu-section.tsx` | Filtra subcategorías vacías |

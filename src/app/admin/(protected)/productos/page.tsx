@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Image from 'next/image';
-import { Plus, Pencil, Trash2, Image as ImageIcon, Search, ArrowUpDown, ArrowUp, ArrowDown, Package, Star, Video } from 'lucide-react';
+import { Plus, Pencil, Trash2, Image as ImageIcon, Search, ArrowUpDown, ArrowUp, ArrowDown, Package, Star, Video, UtensilsCrossed, GlassWater } from 'lucide-react';
 
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.avif'];
 
@@ -27,6 +27,7 @@ interface Categoria {
   id: string;
   nombre_es: string;
   categoria_padre_id: string | null;
+  tipo_producto: 'comida' | 'bebida';
 }
 
 interface Producto {
@@ -248,6 +249,12 @@ export default function ProductosPage() {
     return cat ? cat.nombre_es : '—';
   };
 
+  const getCategoriaTipo = (categoriaId: string | null): 'comida' | 'bebida' | null => {
+    if (!categoriaId) return null;
+    const cat = categorias.find(c => c.id === categoriaId);
+    return cat ? cat.tipo_producto : null;
+  };
+
   const getAriaSortValue = (field: keyof Producto | 'categoria'): 'ascending' | 'descending' | 'none' => {
     if (sortField !== field) return 'none';
     return sortDirection === 'asc' ? 'ascending' : 'descending';
@@ -451,7 +458,7 @@ export default function ProductosPage() {
                   </button>
                 </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase" aria-sort={getAriaSortValue('categoria')}>
-                  <button 
+                  <button
                     className="flex items-center gap-1 hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm px-1"
                     onClick={() => handleSort('categoria')}
                   >
@@ -459,6 +466,11 @@ export default function ProductosPage() {
                     <SortIndicator field="categoria" currentField={sortField} direction={sortDirection} />
                   </button>
                 </th>
+                {empresaTipo === 'restaurante' && (
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
+                    Tipo
+                  </th>
+                )}
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase" aria-sort={getAriaSortValue('activo')}>
                   <button 
                     className="flex items-center gap-1 hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm px-1"
@@ -525,6 +537,21 @@ export default function ProductosPage() {
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
                     {getCategoriaNombre(prod.categoria_id)}
                   </td>
+                  {empresaTipo === 'restaurante' && (
+                    <td className="px-4 py-3 whitespace-nowrap text-sm">
+                      {getCategoriaTipo(prod.categoria_id) === 'bebida' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-400 text-xs font-medium">
+                          <GlassWater className="w-3 h-3" /> Bar
+                        </span>
+                      ) : getCategoriaTipo(prod.categoria_id) === 'comida' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500/20 border border-orange-400/30 text-orange-400 text-xs font-medium">
+                          <UtensilsCrossed className="w-3 h-3" /> Cocina
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                  )}
                   <td className="px-4 py-3 whitespace-nowrap">
                     <button
                       onClick={() => toggleActivo(prod)}
@@ -670,7 +697,6 @@ export default function ProductosPage() {
         saving={saving}
         onSubmit={handleSubmit}
         empresaSlug={empresaSlug}
-        isRestaurante={empresaTipo === 'restaurante'}
       />
 
       <DeleteConfirmDialog

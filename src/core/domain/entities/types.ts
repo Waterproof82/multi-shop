@@ -29,6 +29,7 @@ export interface Category {
   nombre: string | null;
   descripcion: string | null;
   orden: number;
+  tipoProducto: 'comida' | 'bebida';
   categoriaComplementoDe: string | null;
   complementoObligatorio: boolean;
   categoriaPadreId: string | null;

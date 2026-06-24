@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
 import Image from "next/image";
-import { ArrowLeft, CreditCard, Receipt, Users, ShieldCheck, Plus, Minus } from "lucide-react";
+import { ArrowLeft, CreditCard, Receipt, Users, ShieldCheck, Plus, Minus, X } from "lucide-react";
 import Link from "next/link";
 import { useLanguage } from "@/lib/language-context";
+import type { Language } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { formatPrice } from "@/lib/format-price";
 import { getWaiterMesa } from "@/components/waiter-login-form";
@@ -60,6 +61,7 @@ interface MesaSessionData {
   itemsPagados?: ItemPagado[];
   pagadoCents?: number;
   itemsDiferidos?: unknown[];
+  propinaCents?: number;
 }
 
 interface MesaInfo {
@@ -456,6 +458,68 @@ function CustomItemRow({
   );
 }
 
+type GroupedSelectorItem = {
+  groupKey: string;
+  nombre: string;
+  precio: number;
+  tipo_producto: 'comida' | 'bebida';
+  complementos?: { nombre: string; precio: number }[];
+  totalDisponibles: number;
+  subitems: { orderId: string; idx: number; disponibles: number }[];
+};
+
+function buildGroupedItems(
+  orders: MesaOrder[],
+  getPaidUnits: (pedidoId: string, itemIdx: number) => number,
+): Map<string, GroupedSelectorItem> {
+  const map = new Map<string, GroupedSelectorItem>();
+  for (const order of orders) {
+    for (let idx = 0; idx < order.items.length; idx++) {
+      const item = order.items[idx];
+      if (item.cancelled) continue;
+      const paid = getPaidUnits(order.id, idx);
+      const disponibles = item.cantidad - paid;
+      if (disponibles <= 0) continue;
+      const ck = (item.complementos ?? []).map(c => c.nombre).sort((a, b) => a.localeCompare(b)).join(',');
+      const groupKey = `${item.nombre}||${item.precio}||${ck}`;
+      const existing = map.get(groupKey);
+      if (existing) {
+        existing.totalDisponibles += disponibles;
+        existing.subitems.push({ orderId: order.id, idx, disponibles });
+      } else {
+        map.set(groupKey, {
+          groupKey,
+          nombre: item.nombre,
+          precio: item.precio,
+          tipo_producto: item.tipo_producto ?? 'comida',
+          complementos: item.complementos,
+          totalDisponibles: disponibles,
+          subitems: [{ orderId: order.id, idx, disponibles }],
+        });
+      }
+    }
+  }
+  return map;
+}
+
+function buildSeleccion(
+  selection: Map<string, number>,
+  groupedMap: Map<string, GroupedSelectorItem>,
+): { pedido_id: string; item_idx: number; unidades: number }[] {
+  const seleccion: { pedido_id: string; item_idx: number; unidades: number }[] = [];
+  for (const [gk, totalSelected] of selection.entries()) {
+    const group = groupedMap.get(gk);
+    if (!group || totalSelected <= 0) continue;
+    let rem = totalSelected;
+    for (const sub of group.subitems) {
+      if (rem <= 0) break;
+      const u = Math.min(rem, sub.disponibles);
+      if (u > 0) { seleccion.push({ pedido_id: sub.orderId, item_idx: sub.idx, unidades: u }); rem -= u; }
+    }
+  }
+  return seleccion;
+}
+
 function CustomSelectionView({
   orders, itemsPagados, turnoId, mesaId, lang, onCancelled, onCommitted,
 }: Readonly<{
@@ -477,43 +541,7 @@ function CustomSelectionView({
       .filter(p => p.pedido_id === pedidoId && p.item_idx === itemIdx)
       .reduce((s, p) => s + p.unidades_pagadas, 0);
 
-  // Group unpaid items by nombre + precio + complementos for display
-  type GroupedSelectorItem = {
-    groupKey: string;
-    nombre: string;
-    precio: number;
-    tipo_producto: 'comida' | 'bebida';
-    complementos?: { nombre: string; precio: number }[];
-    totalDisponibles: number;
-    subitems: { orderId: string; idx: number; disponibles: number }[];
-  };
-  const groupedMap = new Map<string, GroupedSelectorItem>();
-  for (const order of orders) {
-    for (let idx = 0; idx < order.items.length; idx++) {
-      const item = order.items[idx];
-      if (item.cancelled) continue;
-      const paid = getPaidUnits(order.id, idx);
-      const disponibles = item.cantidad - paid;
-      if (disponibles <= 0) continue;
-      const ck = (item.complementos ?? []).map(c => c.nombre).sort((a, b) => a.localeCompare(b)).join(',');
-      const groupKey = `${item.nombre}||${item.precio}||${ck}`;
-      const existing = groupedMap.get(groupKey);
-      if (existing) {
-        existing.totalDisponibles += disponibles;
-        existing.subitems.push({ orderId: order.id, idx, disponibles });
-      } else {
-        groupedMap.set(groupKey, {
-          groupKey,
-          nombre: item.nombre,
-          precio: item.precio,
-          tipo_producto: item.tipo_producto ?? 'comida',
-          complementos: item.complementos,
-          totalDisponibles: disponibles,
-          subitems: [{ orderId: order.id, idx, disponibles }],
-        });
-      }
-    }
-  }
+  const groupedMap = buildGroupedItems(orders, getPaidUnits);
   const groupedItems = Array.from(groupedMap.values());
 
   const subtotalCents = Array.from(selection.entries()).reduce((sum, [groupKey, units]) => {
@@ -527,17 +555,7 @@ function CustomSelectionView({
     setSelection(next);
 
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    const seleccion: { pedido_id: string; item_idx: number; unidades: number }[] = [];
-    for (const [gk, totalSelected] of next.entries()) {
-      const group = groupedMap.get(gk);
-      if (!group || totalSelected <= 0) continue;
-      let rem = totalSelected;
-      for (const sub of group.subitems) {
-        if (rem <= 0) break;
-        const u = Math.min(rem, sub.disponibles);
-        if (u > 0) { seleccion.push({ pedido_id: sub.orderId, item_idx: sub.idx, unidades: u }); rem -= u; }
-      }
-    }
+    const seleccion = buildSeleccion(next, groupedMap);
     const totalCents = Array.from(next.entries()).reduce((sum, [gk, u]) => {
       const g = groupedMap.get(gk);
       return sum + Math.round((g?.precio ?? 0) * 100) * u;
@@ -561,17 +579,7 @@ function CustomSelectionView({
       clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
     }
-    const seleccion: { pedido_id: string; item_idx: number; unidades: number }[] = [];
-    for (const [gk, totalSelected] of selection.entries()) {
-      const group = groupedMap.get(gk);
-      if (!group || totalSelected <= 0) continue;
-      let rem = totalSelected;
-      for (const sub of group.subitems) {
-        if (rem <= 0) break;
-        const u = Math.min(rem, sub.disponibles);
-        if (u > 0) { seleccion.push({ pedido_id: sub.orderId, item_idx: sub.idx, unidades: u }); rem -= u; }
-      }
-    }
+    const seleccion = buildSeleccion(selection, groupedMap);
     const patchRes = await fetch(
       `/api/mesas/${encodeURIComponent(mesaId)}/custom-turn/${encodeURIComponent(turnoId)}/selection`,
       { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -1000,6 +1008,178 @@ function createMesaChannel(
   return () => { void supabase.removeChannel(channel); };
 }
 
+function TipSelector({
+  mesaId,
+  propinaCents,
+  lang,
+  disabled,
+}: Readonly<{ mesaId: string; propinaCents: number; lang: Language; disabled?: boolean }>) {
+  const [localCents, setLocalCents] = useState(propinaCents);
+  const [customInput, setCustomInput] = useState('');
+  const [showCustom, setShowCustom] = useState(false);
+  const savingRef = useRef(false);
+
+  // Sync from server (realtime / parent refresh) only when we're not mid-save,
+  // so the optimistic state doesn't get overwritten by the echo of our own write.
+  useEffect(() => {
+    if (!savingRef.current) setLocalCents(propinaCents);
+  }, [propinaCents]);
+
+  const presets = [50, 100, 200, 300, 400, 500];
+
+  const savePropina = async (cents: number) => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    try {
+      const res = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/propina`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ propinaCents: cents }),
+      });
+      if (!res.ok) setLocalCents(propinaCents); // revert on error
+    } catch {
+      setLocalCents(propinaCents); // revert on network error
+    } finally {
+      savingRef.current = false;
+    }
+  };
+
+  const handlePreset = (cents: number) => {
+    const next = localCents === cents ? 0 : cents;
+    setLocalCents(next);
+    void savePropina(next);
+  };
+
+  const handleCustomSubmit = () => {
+    const parsed = Number.parseFloat(customInput.replace(',', '.'));
+    if (Number.isNaN(parsed) || parsed < 0) return;
+    const cents = Math.round(parsed * 100);
+    if (cents > 5000) return;
+    setLocalCents(cents);
+    void savePropina(cents);
+    setShowCustom(false);
+    setCustomInput('');
+  };
+
+  const isCustomActive = localCents > 0 && !presets.includes(localCents);
+
+  return (
+    <div className="rounded-2xl p-4" style={{ backgroundColor: '#fffcf7', border: '1px solid #e8e0d8' }}>
+      <div className="flex items-center justify-between mb-3">
+        <p
+          className="text-[10px] uppercase tracking-[0.18em]"
+          style={{ color: '#8a7560', fontFamily: 'monospace' }}
+        >
+          {t('mesaPropinaTitulo', lang)}
+        </p>
+        {localCents > 0 && (
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => { setLocalCents(0); void savePropina(0); }}
+            className="flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] uppercase tracking-[0.1em] font-bold transition-all disabled:opacity-50 active:scale-[0.97]"
+            style={{ color: '#ef4444', border: '1px solid #fca5a5', backgroundColor: '#fff5f5', fontFamily: 'monospace' }}
+          >
+            <X size={10} strokeWidth={2.5} />
+            {t('mesaPropinaQuitar', lang)}
+          </button>
+        )}
+      </div>
+      <div className="grid grid-cols-3 gap-2 mb-2">
+        {presets.map((cents) => {
+          const active = localCents === cents;
+          return (
+            <button
+              key={cents}
+              type="button"
+              disabled={disabled}
+              onClick={() => handlePreset(cents)}
+              className="py-2.5 rounded-xl text-xs font-bold transition-all disabled:opacity-50 active:scale-[0.97]"
+              style={{
+                fontFamily: 'monospace',
+                backgroundColor: active ? '#1a1612' : 'transparent',
+                color: active ? '#fffcf7' : '#1a1612',
+                border: `1.5px solid ${active ? '#1a1612' : '#d4c9ba'}`,
+              }}
+            >
+              {formatPrice(cents / 100, 'EUR', lang)}
+            </button>
+          );
+        })}
+      </div>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setShowCustom(v => !v)}
+        className="w-full py-2.5 rounded-xl text-xs font-bold transition-all disabled:opacity-50 active:scale-[0.97]"
+        style={{
+          fontFamily: 'monospace',
+          backgroundColor: isCustomActive || showCustom ? '#1a1612' : 'transparent',
+          color: isCustomActive || showCustom ? '#fffcf7' : '#1a1612',
+          border: `1.5px solid ${isCustomActive || showCustom ? '#1a1612' : '#d4c9ba'}`,
+        }}
+      >
+        {isCustomActive ? `${t('mesaPropinaPersonalizado', lang)} ${formatPrice(localCents / 100, 'EUR', lang)}` : t('mesaPropinaOtro', lang)}
+      </button>
+      {showCustom && (
+        <div className="mt-2 flex gap-2 items-center">
+          <input
+            type="number"
+            value={customInput}
+            onChange={(e) => setCustomInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleCustomSubmit(); }}
+            placeholder="0.00"
+            min="0"
+            max="50"
+            step="0.01"
+            className="flex-1 px-3 py-2 rounded-xl text-sm text-right border outline-none"
+            style={{ fontFamily: 'monospace', borderColor: '#d4c9ba', backgroundColor: '#fff', color: '#1a1612' }}
+          />
+          <button
+            type="button"
+            onClick={handleCustomSubmit}
+            disabled={!customInput}
+            className="px-4 py-2 rounded-xl text-xs font-bold disabled:opacity-50"
+            style={{ backgroundColor: '#1a1612', color: '#fffcf7', fontFamily: 'monospace' }}
+          >
+            OK
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function isWaiterForMesa(mesaId: string): boolean {
+  try { return getWaiterMesa()?.mesaId === mesaId; }
+  catch { return false; }
+}
+
+function getStoredHidingActions(mesaId: string): boolean {
+  try { return sessionStorage.getItem(`mesa-hide-rem-${mesaId}`) === '1'; }
+  catch { return false; }
+}
+
+function getStoredActiveTurno(mesaId: string): string | null {
+  try { return sessionStorage.getItem(`mesa-custom-turno-${mesaId}`); }
+  catch { return null; }
+}
+
+function getStoredMismatch(mesaId: string): { oldTotal: number; newTotal: number; pendingAction: PendingAction } | null {
+  try {
+    if (sessionStorage.getItem(`mesa-lock-${mesaId}`) === 'true') {
+      const stored = sessionStorage.getItem(`mesa-mismatch-${mesaId}`);
+      if (stored) return JSON.parse(stored) as { oldTotal: number; newTotal: number; pendingAction: PendingAction };
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
+function getStoredPaymentLock(mesaId: string): boolean {
+  try { return sessionStorage.getItem(`mesa-lock-${mesaId}`) === 'true'; }
+  catch { return false; }
+}
+
 export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId: string; isWaiter?: boolean }>) {
   const { language } = useLanguage();
   const lang = language;
@@ -1010,19 +1190,15 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
   const [paying, setPaying] = useState(false);
   const [showDivisionModal, setShowDivisionModal] = useState(false);
   const [showDivisionTypeModal, setShowDivisionTypeModal] = useState(false);
-  const [claimingTurn, setClaimingTurn] = useState(false);
-  const [hidingRemainingActions, setHidingRemainingActions] = useState(() => {
-    try { return sessionStorage.getItem(`mesa-hide-rem-${mesaId}`) === '1'; } catch { return false; }
-  });
+
+  const [hidingRemainingActions, setHidingRemainingActions] = useState(() => getStoredHidingActions(mesaId));
   useEffect(() => {
     try {
       if (hidingRemainingActions) sessionStorage.setItem(`mesa-hide-rem-${mesaId}`, '1');
       else sessionStorage.removeItem(`mesa-hide-rem-${mesaId}`);
     } catch { /* ignore */ }
   }, [hidingRemainingActions, mesaId]);
-  const [activeTurnoId, setActiveTurnoId] = useState<string | null>(() => {
-    try { return sessionStorage.getItem(`mesa-custom-turno-${mesaId}`); } catch { return null; }
-  });
+  const [activeTurnoId, setActiveTurnoId] = useState<string | null>(() => getStoredActiveTurno(mesaId));
   // Tracks whether the current activeTurnoId has been confirmed by at least one server
   // poll — prevents auto-clearing it during the brief window between claim() and the
   // first refresh that returns the new customTurno.
@@ -1035,33 +1211,19 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
   const [deleteQty, setDeleteQty] = useState(1);
   const [deleting, setDeleting] = useState(false);
   const [verifyingTotal, setVerifyingTotal] = useState(false);
+  // Restore mismatch warning if the payer navigated away and came back (back button)
   const [totalMismatch, setTotalMismatch] = useState<{
     oldTotal: number;
     newTotal: number;
     pendingAction: PendingAction;
-  } | null>(() => {
-    // Restore mismatch warning if the payer navigated away and came back (back button)
-    try {
-      if (sessionStorage.getItem(`mesa-lock-${mesaId}`) === 'true') {
-        const stored = sessionStorage.getItem(`mesa-mismatch-${mesaId}`);
-        if (stored) return JSON.parse(stored) as { oldTotal: number; newTotal: number; pendingAction: PendingAction };
-      }
-    } catch { /* ignore */ }
-    return null;
-  });
+  } | null>(() => getStoredMismatch(mesaId));
   // true while THIS user owns the checkout lock (they clicked "Pagar" / "Dividir cuenta").
   // Persisted in sessionStorage so it survives in-app navigation (back button recovery).
-  const [isInitiatingPayment, setIsInitiatingPayment] = useState(() => {
-    try { return sessionStorage.getItem(`mesa-lock-${mesaId}`) === 'true'; }
-    catch { return false; }
-  });
+  const [isInitiatingPayment, setIsInitiatingPayment] = useState(() => getStoredPaymentLock(mesaId));
 
   // True when the current session belongs to a waiter impersonating this table.
   // Waiters should not see payment buttons — the customer pays, not the waiter.
-  const isWaiterMode = (() => {
-    try { return getWaiterMesa()?.mesaId === mesaId; }
-    catch { return false; }
-  })();
+  const isWaiterMode = isWaiterForMesa(mesaId);
 
   // Poll at 3s when: (a) a payment lock is active, (b) waiting for someone else's
   // custom turn, or (c) own turn is en_pago (waiting for Redsys webhook).
@@ -1420,7 +1582,6 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
   };
 
   const handleClaimCustomTurn = useCallback(async () => {
-    setClaimingTurn(true);
     try {
       const res = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/custom-turn`, { method: 'POST' });
       if (!res.ok) { void refresh(); return; } // 409 means lock held — refresh to show waiting view
@@ -1428,9 +1589,7 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
       setActiveTurnoId(body.turnoId);
       try { sessionStorage.setItem(`mesa-custom-turno-${mesaId}`, body.turnoId); } catch { /* ignore */ }
       void refresh();
-    } finally {
-      setClaimingTurn(false);
-    }
+    } catch { /* best-effort */ }
   }, [mesaId, refresh]);
 
   const handleDeleteItem = useCallback(async () => {
@@ -1676,7 +1835,6 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
 
               {/* Items — waiter: merged with delete buttons; customer: grouped by order with status */}
               {isWaiterMode ? (
-                <>
                   <ul className="flex flex-col gap-1 pb-4">
                   {[...allItems].sort(sortItemsByTypeAndName).map((item, waiterIdx, waiterArr) => {
                     const complementoTotal = item.complementos?.reduce((s, c) => s + c.precio, 0) ?? 0;
@@ -1726,7 +1884,6 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
                     );
                   })}
                 </ul>
-                </>
               ) : (() => {
                 // Build paid-units map by merge key (only confirmed pagado turns)
                 const paidByKey = new Map<string, number>();
@@ -1870,6 +2027,26 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
                 </div>
               )}
 
+              {(sessionData.propinaCents ?? 0) > 0 && (
+                <div
+                  className="flex justify-between items-baseline py-2"
+                  style={{ fontFamily: 'monospace' }}
+                >
+                  <span
+                    className="text-xs uppercase tracking-[0.2em]"
+                    style={{ color: '#6aaa7a' }}
+                  >
+                    {t('mesaPropinaAceptada', lang)}
+                  </span>
+                  <span
+                    className="text-sm font-semibold tabular-nums"
+                    style={{ color: '#6aaa7a' }}
+                  >
+                    + {formatPrice((sessionData.propinaCents ?? 0) / 100, 'EUR', lang)}
+                  </span>
+                </div>
+              )}
+
               <DottedRule />
 
               {/* Footer */}
@@ -1893,6 +2070,16 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
             style={{ border: "1px solid #e8e0d8" }}
           >
           <div className="flex flex-col gap-3 p-5">
+
+            {/* Tip selector — customer-facing only, not waiter */}
+            {sessionData?.pagosHabilitados && !isWaiterMode && !fullyPaid && (
+              <TipSelector
+                mesaId={mesaId}
+                propinaCents={sessionData.propinaCents ?? 0}
+                lang={lang}
+                disabled={paying || verifyingTotal || settingDivision}
+              />
+            )}
 
             {/* Secure payment header — customer-facing only, not waiter */}
             {sessionData?.pagosHabilitados && !isWaiterMode && !fullyPaid && (
@@ -2396,7 +2583,7 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
 
       {showDivisionModal && sessionData && (
         <DivisionModal
-          total={sessionData.total}
+          total={sessionData.total + (sessionData.propinaCents ?? 0) / 100}
           lang={lang}
           onConfirm={(n) => { void handleConfirmDivision(n); }}
           onClose={() => { releaseCheckoutLock(); setShowDivisionModal(false); }}

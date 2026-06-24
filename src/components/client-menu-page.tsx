@@ -45,13 +45,10 @@ interface MenuPageProps {
 }
 
 
-function getCategoryTab(cat: MenuCategoryVM): 'comida' | 'bebida' | 'both' | 'empty' {
-  const hasBebida = cat.items.some(i => i.tipoProducto === 'bebida');
-  const hasComida = cat.items.some(i => !i.tipoProducto || i.tipoProducto === 'comida');
-  if (hasBebida && hasComida) return 'both';
-  if (hasBebida) return 'bebida';
-  if (hasComida) return 'comida';
-  return 'empty';
+function getCategoryTab(cat: MenuCategoryVM): 'comida' | 'bebida' | 'empty' {
+  const hasItems = cat.items.length > 0 || (cat.subcategories?.some(s => s.products.length > 0) ?? false);
+  if (!hasItems) return 'empty';
+  return cat.tipoProducto ?? 'comida';
 }
 
 export function MenuPage({ menuData, header, showCart = false, empresa, isWaiterMode = false }: Readonly<MenuPageProps>) {
@@ -183,14 +180,14 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
   }, [waiterAllProducts, waiterSearch]);
 
   const isRestaurant = empresa?.tipo === 'restaurante';
-  const showTabs = isRestaurant && menuData.some(cat => cat.items.some(i => i.tipoProducto === 'bebida'));
+  const showTabs = isRestaurant && menuData.some(cat => cat.tipoProducto === 'bebida');
 
   const visibleCategories = useMemo(() => {
     if (!showTabs) return menuData;
     return menuData.filter(cat => {
       const type = getCategoryTab(cat);
-      if (menuTab === 'bebidas') return type === 'bebida' || type === 'both';
-      return type === 'comida' || type === 'both' || type === 'empty';
+      if (menuTab === 'bebidas') return type === 'bebida';
+      return type === 'comida' || type === 'empty';
     });
   }, [menuData, showTabs, menuTab]);
 
