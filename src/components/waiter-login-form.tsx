@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { UtensilsCrossed, KeyRound, Pause, ReceiptText, X, CheckSquare, ExternalLink, PlayCircle } from "lucide-react";
+import { UtensilsCrossed, KeyRound, Pause, ReceiptText, X, CheckSquare, ExternalLink, PlayCircle, BellRing } from "lucide-react";
 import { formatPrice } from "@/lib/format-price";
 import type { MesaWithSession } from "@/core/domain/repositories/IMesaRepository";
 
@@ -199,11 +199,13 @@ interface MesaCardProps {
   readonly isLoading: boolean;
   readonly onClick: () => void;
   readonly onClickDeferred: () => void;
+  readonly onClickListos: () => void;
   readonly onViewTicket: () => void;
   readonly onCloseMesa?: () => void;
+  readonly onDismissCall?: () => void;
 }
 
-function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onViewTicket, onCloseMesa }: MesaCardProps) {
+function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onClickListos, onViewTicket, onCloseMesa, onDismissCall }: MesaCardProps) {
   const isPaid = mesa.sesionPagada;
   const isPaymentInProgress = (mesa.pagoEnCurso || mesa.divisionActiva) && !mesa.sesionPagada;
   const isOpen = !!mesa.sesionId && mesa.activeOrderCount > 0 && !isPaid && !isPaymentInProgress;
@@ -227,6 +229,19 @@ function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onViewTicket, onC
         <div className="absolute top-3 right-3">
           <MesaDot pulsing={pulsing} dotColor={colors.dot} />
         </div>
+
+        {/* Call-waiter indicator — top-left, dismiss on click */}
+        {mesa.llamadaActiva && (
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); onDismissCall?.(); }}
+            className="absolute top-2 left-2 flex items-center justify-center rounded-full w-7 h-7 animate-pulse"
+            style={{ background: 'oklch(25% 0.18 55)', border: '1px solid oklch(60% 0.28 55 / 0.7)' }}
+            aria-label="Llamada de cliente — pulsar para descartar"
+          >
+            <BellRing className="w-3.5 h-3.5" style={{ color: 'oklch(85% 0.22 55)' }} />
+          </button>
+        )}
 
         <div className="flex flex-col items-center gap-1 flex-1 justify-center">
           <UtensilsCrossed className="w-5 h-5 mb-1" style={{ color: colors.icon }} />
@@ -254,15 +269,16 @@ function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onViewTicket, onC
 
       {/* Preparado badge — shown when any pedido in session has been marked ready by kitchen */}
       {mesa.preparadoPedidoNumbers.length > 0 && (
-        <div
-          className="w-full rounded-lg px-2 py-1.5 flex items-center gap-1.5"
+        <button
+          onClick={onClickListos}
+          className="w-full rounded-lg px-2 py-1.5 flex items-center gap-1.5 active:brightness-125 transition-all text-left"
           style={{ background: 'oklch(18% 0.08 148 / 0.7)', border: '1px solid oklch(45% 0.15 148 / 0.5)' }}
         >
           <CheckSquare className="w-3 h-3 shrink-0" style={{ color: 'oklch(72% 0.20 148)' }} />
           <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'oklch(72% 0.20 148)' }}>
             Platos listos
           </span>
-        </div>
+        </button>
       )}
 
       {/* Deferred items */}
@@ -305,8 +321,8 @@ function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onViewTicket, onC
         </button>
       )}
 
-      {/* Cerrar mesa — visible siempre que haya sesión activa y no haya pago en curso */}
-      {!!mesa.sesionId && !isPaymentInProgress && onCloseMesa && (
+      {/* Cerrar mesa — visible si hay pedidos O si un cliente real entró al menú */}
+      {!!mesa.sesionId && (mesa.activeOrderCount > 0 || mesa.clienteActivo) && !isPaymentInProgress && onCloseMesa && (
         <button
           onClick={onCloseMesa}
           className="w-full rounded-lg px-2 py-1.5 flex items-center justify-center gap-1.5 hover:brightness-125 transition-all"
@@ -335,10 +351,20 @@ export function WaiterLoginForm() {
   const [closeBlockedError, setCloseBlockedError] = useState<string | null>(null);
   const [deferredMesa, setDeferredMesa] = useState<MesaWithSession | null>(null);
   const [launching, setLaunching] = useState(false);
+  const llamadasRef = useRef<Set<string>>(new Set());
 
   const refresh = useCallback(async () => {
     const data = await fetchMesas();
-    if (data.length > 0) setMesas(data);
+    if (data.length > 0) {
+      const newLlamadas = new Set(data.filter(m => m.llamadaActiva).map(m => m.id));
+      for (const id of newLlamadas) {
+        if (!llamadasRef.current.has(id)) {
+          try { const a = new Audio('/bell.mp3'); a.volume = 0.7; void a.play(); } catch { /* ignore */ }
+        }
+      }
+      llamadasRef.current = newLlamadas;
+      setMesas(data);
+    }
   }, []);
 
   useEffect(() => {
@@ -401,7 +427,13 @@ export function WaiterLoginForm() {
       // Guard: check if payment is required before allowing close
       const r = await fetch(`/api/mesas/${encodeURIComponent(mesa.id)}/orders`);
       if (r.ok) {
-        const data = await r.json() as { orders: unknown[]; pagosHabilitados: boolean; sesionPagada: boolean };
+        const data = await r.json() as { orders: { estado: string }[]; pagosHabilitados: boolean; sesionPagada: boolean };
+        const unservedStates = ['pendiente_validacion', 'pendiente', 'en_preparacion', 'preparado'];
+        if (!data.sesionPagada && data.orders.some(o => unservedStates.includes(o.estado))) {
+          setCloseBlockedError('Quedan platos por servir. Sirve todos los platos antes de cerrar la mesa.');
+          setTimeout(() => setCloseBlockedError(null), 5000);
+          return;
+        }
         if (data.orders.length > 0 && data.pagosHabilitados && !data.sesionPagada) {
           setCloseBlockedError('Hay pedidos sin pagar. Registra el pago antes de cerrar la mesa.');
           setTimeout(() => setCloseBlockedError(null), 5000);
@@ -413,6 +445,11 @@ export function WaiterLoginForm() {
     } finally {
       setMesaLoading(null);
     }
+  }
+
+  async function handleDismissCall(mesa: MesaWithSession) {
+    await fetch(`/api/waiter/mesas/${encodeURIComponent(mesa.id)}/dismiss-call`, { method: 'POST' });
+    await refresh();
   }
 
   async function handleViewTicket(mesa: MesaWithSession) {
@@ -597,8 +634,13 @@ export function WaiterLoginForm() {
               isLoading={mesaLoading === mesa.id}
               onClick={() => void handleMesaNav(mesa)}
               onClickDeferred={() => setDeferredMesa(mesa)}
+              onClickListos={() => {
+                const mesaKey = mesa.nombre ?? `Mesa ${mesa.numero}`;
+                router.push(`/waiter/kitchen?groupBy=listos&mesa=${encodeURIComponent(mesaKey)}`);
+              }}
               onViewTicket={() => void handleViewTicket(mesa)}
               onCloseMesa={() => void handleCloseMesa(mesa)}
+              onDismissCall={() => void handleDismissCall(mesa)}
             />
           ))}
         </div>

@@ -15,8 +15,10 @@ interface OrderItem {
   nombre: string;
   cantidad: number;
   precio: number;
+  tipo_producto?: 'comida' | 'bebida';
   complementos?: { nombre: string; precio: number }[];
   translations?: Record<string, { name?: string } | undefined>;
+  cancelled?: boolean;
 }
 
 interface MesaOrder {
@@ -88,6 +90,13 @@ function mergeOrderItems(items: OrderItem[]): OrderItem[] {
     }
   }
   return [...map.values()];
+}
+
+function sortItemsByTypeAndName(a: OrderItem, b: OrderItem): number {
+  const aTipo = (a.tipo_producto ?? 'comida') === 'bebida' ? 0 : 1;
+  const bTipo = (b.tipo_producto ?? 'comida') === 'bebida' ? 0 : 1;
+  if (aTipo !== bTipo) return aTipo - bTipo;
+  return a.nombre.localeCompare(b.nombre);
 }
 
 function buildTotalMismatch(
@@ -402,10 +411,11 @@ function DivisionTypeModal({
 }
 
 function CustomItemRow({
-  nombre, precio, totalUnidades, unidadesPagadas, unidadesSeleccionadas, onChangeUnidades, lang,
+  nombre, precio, totalUnidades, unidadesPagadas, unidadesSeleccionadas, onChangeUnidades, lang, complementos,
 }: Readonly<{
   nombre: string; precio: number; totalUnidades: number; unidadesPagadas: number;
   unidadesSeleccionadas: number; onChangeUnidades: (n: number) => void; lang: Parameters<typeof t>[1];
+  complementos?: { nombre: string; precio: number }[];
 }>) {
   const disponibles = totalUnidades - unidadesPagadas;
 
@@ -413,6 +423,11 @@ function CustomItemRow({
     <div className="flex items-center justify-between py-3">
       <div className="flex-1">
         <p className="text-sm font-medium text-[#1a1612]">{nombre}</p>
+        {complementos && complementos.length > 0 && (
+          <p className="text-xs mt-0.5" style={{ color: "#b0a090" }}>
+            + {complementos.map(c => c.nombre).join(", ")}
+          </p>
+        )}
         <p className="text-xs text-[#8a7d6b]">
           {formatPrice(precio, "EUR", lang)} · {disponibles} disponible{disponibles === 1 ? "" : "s"}
         </p>
@@ -462,29 +477,70 @@ function CustomSelectionView({
       .filter(p => p.pedido_id === pedidoId && p.item_idx === itemIdx)
       .reduce((s, p) => s + p.unidades_pagadas, 0);
 
-  const subtotalCents = Array.from(selection.entries()).reduce((sum, [key, units]) => {
-    const [pedidoId, idxStr] = key.split(':');
-    const order = orders.find(o => o.id === pedidoId);
-    const item = order?.items[Number(idxStr)];
-    return sum + Math.round((item?.precio ?? 0) * 100) * units;
+  // Group unpaid items by nombre + precio + complementos for display
+  type GroupedSelectorItem = {
+    groupKey: string;
+    nombre: string;
+    precio: number;
+    tipo_producto: 'comida' | 'bebida';
+    complementos?: { nombre: string; precio: number }[];
+    totalDisponibles: number;
+    subitems: { orderId: string; idx: number; disponibles: number }[];
+  };
+  const groupedMap = new Map<string, GroupedSelectorItem>();
+  for (const order of orders) {
+    for (let idx = 0; idx < order.items.length; idx++) {
+      const item = order.items[idx];
+      if (item.cancelled) continue;
+      const paid = getPaidUnits(order.id, idx);
+      const disponibles = item.cantidad - paid;
+      if (disponibles <= 0) continue;
+      const ck = (item.complementos ?? []).map(c => c.nombre).sort((a, b) => a.localeCompare(b)).join(',');
+      const groupKey = `${item.nombre}||${item.precio}||${ck}`;
+      const existing = groupedMap.get(groupKey);
+      if (existing) {
+        existing.totalDisponibles += disponibles;
+        existing.subitems.push({ orderId: order.id, idx, disponibles });
+      } else {
+        groupedMap.set(groupKey, {
+          groupKey,
+          nombre: item.nombre,
+          precio: item.precio,
+          tipo_producto: item.tipo_producto ?? 'comida',
+          complementos: item.complementos,
+          totalDisponibles: disponibles,
+          subitems: [{ orderId: order.id, idx, disponibles }],
+        });
+      }
+    }
+  }
+  const groupedItems = Array.from(groupedMap.values());
+
+  const subtotalCents = Array.from(selection.entries()).reduce((sum, [groupKey, units]) => {
+    const group = groupedMap.get(groupKey);
+    return sum + Math.round((group?.precio ?? 0) * 100) * units;
   }, 0);
 
-  const handleChange = (pedidoId: string, itemIdx: number, units: number) => {
-    const key = `${pedidoId}:${itemIdx}`;
+  const handleChange = (groupKey: string, units: number) => {
     const next = new Map(selection);
-    if (units === 0) next.delete(key); else next.set(key, units);
+    if (units === 0) next.delete(groupKey); else next.set(groupKey, units);
     setSelection(next);
 
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    const seleccion = Array.from(next.entries()).map(([k, u]) => {
-      const [pid, idx] = k.split(':');
-      return { pedido_id: pid, item_idx: Number(idx), unidades: u };
-    });
-    const totalCents = Array.from(next.entries()).reduce((sum, [k, u]) => {
-      const [pid, idxStr] = k.split(':');
-      const order = orders.find(o => o.id === pid);
-      const item = order?.items[Number(idxStr)];
-      return sum + Math.round((item?.precio ?? 0) * 100) * u;
+    const seleccion: { pedido_id: string; item_idx: number; unidades: number }[] = [];
+    for (const [gk, totalSelected] of next.entries()) {
+      const group = groupedMap.get(gk);
+      if (!group || totalSelected <= 0) continue;
+      let rem = totalSelected;
+      for (const sub of group.subitems) {
+        if (rem <= 0) break;
+        const u = Math.min(rem, sub.disponibles);
+        if (u > 0) { seleccion.push({ pedido_id: sub.orderId, item_idx: sub.idx, unidades: u }); rem -= u; }
+      }
+    }
+    const totalCents = Array.from(next.entries()).reduce((sum, [gk, u]) => {
+      const g = groupedMap.get(gk);
+      return sum + Math.round((g?.precio ?? 0) * 100) * u;
     }, 0);
     saveTimerRef.current = setTimeout(() => {
       void fetch(
@@ -505,10 +561,17 @@ function CustomSelectionView({
       clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
     }
-    const seleccion = Array.from(selection.entries()).map(([k, u]) => {
-      const [pid, idx] = k.split(':');
-      return { pedido_id: pid, item_idx: Number(idx), unidades: u };
-    });
+    const seleccion: { pedido_id: string; item_idx: number; unidades: number }[] = [];
+    for (const [gk, totalSelected] of selection.entries()) {
+      const group = groupedMap.get(gk);
+      if (!group || totalSelected <= 0) continue;
+      let rem = totalSelected;
+      for (const sub of group.subitems) {
+        if (rem <= 0) break;
+        const u = Math.min(rem, sub.disponibles);
+        if (u > 0) { seleccion.push({ pedido_id: sub.orderId, item_idx: sub.idx, unidades: u }); rem -= u; }
+      }
+    }
     const patchRes = await fetch(
       `/api/mesas/${encodeURIComponent(mesaId)}/custom-turn/${encodeURIComponent(turnoId)}/selection`,
       { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -551,16 +614,12 @@ function CustomSelectionView({
     onCancelled();
   };
 
-  const selectorItems: { orderId: string; item: MesaOrder['items'][0]; idx: number; paid: number }[] = [];
   const paidMergeMap = new Map<string, { nombre: string; precio: number; cantidad: number; complementos?: { nombre: string; precio: number }[] }>();
   for (const order of orders) {
     for (let idx = 0; idx < order.items.length; idx++) {
       const item = order.items[idx];
+      if (item.cancelled) continue;
       const paid = getPaidUnits(order.id, idx);
-      const disponibles = item.cantidad - paid;
-      if (disponibles > 0) {
-        selectorItems.push({ orderId: order.id, item, idx, paid });
-      }
       if (paid > 0) {
         const ck = (item.complementos ?? []).map(c => c.nombre).sort((a, b) => a.localeCompare(b)).join(',');
         const k = `${item.nombre}||${item.precio}||${ck}`;
@@ -581,27 +640,44 @@ function CustomSelectionView({
         <h2 className="text-lg font-semibold text-[#1a1612]">{t("mesaCustomSelectTitle", lang)}</h2>
       </div>
       <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4">
-        {selectorItems.length > 0 && (
-          <div>
-            <p className="text-xs uppercase tracking-widest mb-3" style={{ color: "#b0a090", fontFamily: "monospace" }}>
-              Sin pagar
-            </p>
-            <div className="rounded-2xl overflow-hidden border border-[#e8e0d8] bg-white divide-y divide-[#f0ede8] px-4">
-              {selectorItems.map(({ orderId, item, idx, paid }) => (
-                <CustomItemRow
-                  key={`${orderId}:${idx}`}
-                  nombre={item.nombre}
-                  precio={item.precio}
-                  totalUnidades={item.cantidad}
-                  unidadesPagadas={paid}
-                  unidadesSeleccionadas={selection.get(`${orderId}:${idx}`) ?? 0}
-                  onChangeUnidades={units => handleChange(orderId, idx, units)}
-                  lang={lang}
-                />
-              ))}
+        {groupedItems.length > 0 && (() => {
+          const sorted = [...groupedItems].sort((a, b) => {
+            const aTipo = a.tipo_producto === 'bebida' ? 0 : 1;
+            const bTipo = b.tipo_producto === 'bebida' ? 0 : 1;
+            if (aTipo !== bTipo) return aTipo - bTipo;
+            return a.nombre.localeCompare(b.nombre);
+          });
+          const hasBebidas = sorted.some(g => g.tipo_producto === 'bebida');
+          const firstComidaIdx = sorted.findIndex(g => g.tipo_producto !== 'bebida');
+          return (
+            <div>
+              <p className="text-xs uppercase tracking-widest mb-3" style={{ color: "#b0a090", fontFamily: "monospace" }}>
+                Sin pagar
+              </p>
+              <div className="rounded-2xl overflow-hidden border border-[#e8e0d8] bg-white px-4">
+                {sorted.map((group, i) => (
+                  <div key={group.groupKey} className={i < sorted.length - 1 ? "border-b border-[#f0ede8]" : ""}>
+                    {hasBebidas && i === firstComidaIdx && firstComidaIdx > 0 && (
+                      <div className="pt-3 pb-1 text-xs uppercase tracking-widest" style={{ color: "#c0b0a0", fontFamily: "monospace" }}>
+                        — Comidas
+                      </div>
+                    )}
+                    <CustomItemRow
+                      nombre={group.nombre}
+                      precio={group.precio}
+                      totalUnidades={group.totalDisponibles}
+                      unidadesPagadas={0}
+                      unidadesSeleccionadas={selection.get(group.groupKey) ?? 0}
+                      onChangeUnidades={units => handleChange(group.groupKey, units)}
+                      lang={lang}
+                      complementos={group.complementos}
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
         {fullyPaidItems.length > 0 && (
           <div>
             <p className="text-xs uppercase tracking-widest mb-3" style={{ color: "#6aaa7a", fontFamily: "monospace" }}>
@@ -636,8 +712,8 @@ function CustomSelectionView({
           {t("mesaCustomPay", lang).replace("{amount}", formatPrice(subtotalCents / 100, "EUR", lang))}
         </button>
         <button onClick={() => { void handleCancel(); }} disabled={cancelling}
-          className="w-full py-2 text-sm text-[#8a7d6b]">
-          {t("mesaCustomCancel", lang)}
+          className="w-full rounded-xl border border-[#d0c8bc] py-3 text-sm font-medium text-[#5a4f45] bg-white active:bg-[#f0ede8] disabled:opacity-40">
+          {cancelling ? t("loading", lang) : t("mesaCustomCancel", lang)}
         </button>
       </div>
     </div>
@@ -688,6 +764,7 @@ function buildRemainingAndPaidMaps(
   const paidMap = new Map<string, { nombre: string; precio: number; paid: number }>();
   for (const order of orders) {
     for (let idx = 0; idx < order.items.length; idx++) {
+      if (order.items[idx].cancelled) continue;
       processOrderItem(order.items[idx], idx, order, itemsPagados, remainingMap, paidMap);
     }
   }
@@ -823,6 +900,7 @@ function buildPaidByMergeKey(sessionData: MesaSessionData | null): Map<string, n
   for (const order of sessionData.orders) {
     for (let idx = 0; idx < order.items.length; idx++) {
       const it = order.items[idx];
+      if (it.cancelled) continue;
       const ck = (it.complementos ?? []).map(c => c.nombre).sort((a, b) => a.localeCompare(b)).join(',');
       const k = `${it.nombre}||${it.precio}||${ck}`;
       const paid = (sessionData.itemsPagados ?? [])
@@ -840,8 +918,8 @@ function getManualPayLabel(
   lang: Parameters<typeof t>[1],
 ): string {
   if (manualPaying) return "Registrando...";
-  if (division) return `Pago manual · ${formatPrice(division.importePorPersona, "EUR", lang)}`;
-  return "Marcar pagada (efectivo)";
+  if (division) return `Marcar pago de una parte · ${formatPrice(division.importePorPersona, "EUR", lang)}`;
+  return "Marcar pago completo";
 }
 
 function getExpectedCents(sessionData: MesaSessionData | null): number | undefined {
@@ -1404,7 +1482,7 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
     return () => globalThis.removeEventListener('popstate', handlePopState);
   }, [shouldTrapBack]);
 
-  const allItems = mergeOrderItems(sessionData?.orders.flatMap((o) => o.items) ?? []);
+  const allItems = mergeOrderItems(sessionData?.orders.flatMap((o) => o.items.filter(i => !i.cancelled)) ?? []);
 
   // Merge keys of items that belong to at least one retenido order
   const retenidoItemKeys = new Set<string>(
@@ -1428,6 +1506,11 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
 
   const hasDeferred = (sessionData?.orders ?? []).some(o => o.estado === 'retenido');
 
+  // Block payment if any order is not yet served (kitchen/validation queue or ready but not delivered)
+  const hasPlatosPoServir = !fullyPaid && (sessionData?.orders ?? []).some(
+    o => ['pendiente_validacion', 'pendiente', 'en_preparacion', 'preparado'].includes(o.estado)
+  );
+
   const manualPayLabel = getManualPayLabel(manualPaying, division, lang);
 
   // Custom selection: this user holds the lock
@@ -1442,6 +1525,7 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
         lang={lang}
         onCancelled={() => {
           setActiveTurnoId(null);
+          setHidingRemainingActions(true);
           try { sessionStorage.removeItem(`mesa-custom-turno-${mesaId}`); } catch { /* ignore */ }
           void refresh();
         }}
@@ -1594,17 +1678,20 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
               {isWaiterMode ? (
                 <>
                   <ul className="flex flex-col gap-1 pb-4">
-                  {allItems.map((item) => {
+                  {[...allItems].sort(sortItemsByTypeAndName).map((item, waiterIdx, waiterArr) => {
                     const complementoTotal = item.complementos?.reduce((s, c) => s + c.precio, 0) ?? 0;
                     const lineTotal = (item.precio + complementoTotal) * item.cantidad;
                     const ck = (item.complementos ?? []).map(c => c.nombre).sort((a, b) => a.localeCompare(b)).join(',');
                     const isRetenido = retenidoItemKeys.has(`${item.nombre}||${item.precio}||${ck}`);
+                    const hasBebidaWaiter = waiterArr.some(i => (i.tipo_producto ?? 'comida') === 'bebida');
+                    const showWaiterSep = hasBebidaWaiter && waiterIdx > 0 && (item.tipo_producto ?? 'comida') !== 'bebida' && ((waiterArr[waiterIdx - 1].tipo_producto ?? 'comida') === 'bebida');
                     return (
                       <li
-                        key={`${item.nombre}||${item.precio}`}
-                        className="flex items-center gap-2 text-sm"
-                        style={{ color: "#1a1612", fontFamily: "monospace" }}
+                        key={`${item.nombre}||${item.precio}||${ck}`}
+                        style={{ fontFamily: "monospace" }}
                       >
+                        {showWaiterSep && <div className="mt-2 mb-1 border-t border-dashed border-[#e8e0d8]" />}
+                      <div className="flex items-center gap-2 text-sm" style={{ color: "#1a1612" }}>
                         {!fullyPaid && !externalPaymentInProgress && canDeleteItem(item, paidByMergeKey) && (
                           <button
                             type="button"
@@ -1634,6 +1721,7 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
                         <span className="tabular-nums shrink-0 text-right" style={{ color: "#1a1612" }}>
                           {formatPrice(lineTotal, "EUR", lang)}
                         </span>
+                      </div>
                       </li>
                     );
                   })}
@@ -1646,6 +1734,7 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
                   for (const order of sessionData.orders) {
                     for (let idx = 0; idx < order.items.length; idx++) {
                       const itm = order.items[idx];
+                      if (itm.cancelled) continue;
                       const ck = (itm.complementos ?? []).map(c => c.nombre).sort((a, b) => a.localeCompare(b)).join(',');
                       const k = `${itm.nombre}||${itm.precio}||${ck}`;
                       const paid = (sessionData.itemsPagados ?? [])
@@ -1661,22 +1750,29 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
                   const paidUnits = (!fullyPaid && sessionData?.divisionTipo === 'personalizado') ? (paidByKey.get(mergeKey) ?? 0) : 0;
                   return { item, mergeKey, paidUnits };
                 });
-                // Pending items first, fully-paid items at the bottom
+                // Bebidas first (alphabetical), then comidas (alphabetical); paid items at bottom within each group
                 enriched.sort((a, b) => {
-                  const aPending = a.item.cantidad - a.paidUnits > 0 ? 0 : 1;
-                  const bPending = b.item.cantidad - b.paidUnits > 0 ? 0 : 1;
-                  return aPending - bPending;
+                  const aTipo = (a.item.tipo_producto ?? 'comida') === 'bebida' ? 0 : 1;
+                  const bTipo = (b.item.tipo_producto ?? 'comida') === 'bebida' ? 0 : 1;
+                  if (aTipo !== bTipo) return aTipo - bTipo;
+                  return a.item.nombre.localeCompare(b.item.nombre);
                 });
+                const hasBebidaClient = enriched.some(e => (e.item.tipo_producto ?? 'comida') === 'bebida');
+                const firstComidaIdxClient = enriched.findIndex(e => (e.item.tipo_producto ?? 'comida') !== 'bebida');
                 return (
                   <ul className="flex flex-col gap-1 pb-4">
-                    {enriched.map(({ item, mergeKey, paidUnits }) => {
+                    {enriched.map(({ item, mergeKey, paidUnits }, enrichedIdx) => {
                       const complementoTotal = item.complementos?.reduce((s, c) => s + c.precio, 0) ?? 0;
                       const pendingUnits = item.cantidad - paidUnits;
                       const allPaid = pendingUnits <= 0;
                       const lineTotal = (item.precio + complementoTotal) * (allPaid ? item.cantidad : pendingUnits);
                       const itemName = (language !== "es" && item.translations?.[language]?.name) || item.nombre;
+                      const showTypeSeparator = hasBebidaClient && enrichedIdx === firstComidaIdxClient && firstComidaIdxClient > 0;
                       return (
                         <li key={mergeKey} style={{ fontFamily: "monospace" }}>
+                          {showTypeSeparator && (
+                            <div className="mt-2 mb-1 border-t border-dashed border-[#e8e0d8]" />
+                          )}
                           {/* Pending units row */}
                           {!allPaid && (
                             <div className="flex items-center gap-2 text-sm" style={{ color: "#1a1612" }}>
@@ -1966,13 +2062,23 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
               </div>
             )}
 
+            {/* Unserved orders warning — client-facing */}
+            {!isWaiterMode && hasPlatosPoServir && !fullyPaid && !externalPaymentInProgress && (
+              <div className="flex items-start gap-2 rounded-xl px-3 py-2.5" style={{ background: "oklch(28% 0.08 252 / 0.08)", border: "1px solid oklch(50% 0.08 252 / 0.3)" }}>
+                <span style={{ fontSize: "0.85rem" }}>🍽</span>
+                <p className="text-xs leading-snug" style={{ color: "#5a4f45", fontFamily: "monospace" }}>
+                  {t("mesaPlatosPoServir", lang)}
+                </p>
+              </div>
+            )}
+
             {/* Buttons */}
             {!division && !fullyPaid && !totalMismatch && !externalPaymentInProgress && !isWaiterMode && (
               <div className="flex gap-3">
                 <button
                   type="button"
                   onClick={() => { void handlePrePaymentCheck('full'); }}
-                  disabled={paying || settingDivision || verifyingTotal}
+                  disabled={paying || settingDivision || verifyingTotal || hasPlatosPoServir}
                   className="flex-1 py-5 rounded-2xl text-xs font-bold tracking-widest uppercase transition-all disabled:opacity-50 flex flex-col items-center gap-2 active:scale-[0.98]"
                   style={{ backgroundColor: "#1a1612", color: "#fffcf7", fontFamily: "monospace" }}
                 >
@@ -1983,7 +2089,7 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
                 <button
                   type="button"
                   onClick={() => setShowDivisionTypeModal(true)}
-                  disabled={paying || settingDivision || verifyingTotal}
+                  disabled={paying || settingDivision || verifyingTotal || hasPlatosPoServir}
                   className="flex-1 py-5 rounded-2xl text-xs font-bold tracking-widest uppercase transition-all disabled:opacity-50 flex flex-col items-center gap-2 active:scale-[0.98]"
                   style={{ backgroundColor: "transparent", color: "#1a1612", fontFamily: "monospace", border: "2px solid #1a1612" }}
                 >
@@ -1999,7 +2105,7 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
               <button
                 type="button"
                 onClick={() => { void handlePrePaymentCheck('division-pay'); }}
-                disabled={paying || verifyingTotal}
+                disabled={paying || verifyingTotal || hasPlatosPoServir}
                 className="w-full py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
                 style={{ backgroundColor: "#1a1612", color: "#fffcf7", fontFamily: "monospace" }}
               >
@@ -2014,49 +2120,84 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
               </button>
             )}
 
-            {/* Waiter: custom split breakdown */}
-            {isWaiterMode && sessionData?.divisionTipo === 'personalizado' && (
-              <div className="mx-4 mb-4 rounded-xl border border-[#e8e0d8] bg-white overflow-hidden">
-                <div className="border-b border-[#e8e0d8] bg-[#f8f4ef] px-4 py-3">
-                  <p className="text-sm font-semibold text-[#1a1612]">Pago personalizado</p>
-                </div>
-                <div className="divide-y divide-[#e8e0d8]">
-                  {sessionData.orders.flatMap(order =>
-                    order.items.map((item, idx) => {
-                      const paid = (sessionData.itemsPagados ?? [])
-                        .filter(p => p.pedido_id === order.id && p.item_idx === idx)
-                        .reduce((s, p) => s + p.unidades_pagadas, 0);
-                      const isPaid = paid >= item.cantidad;
-                      return (
-                        <div key={`${order.id}:${idx}`}
-                          className={`flex items-center justify-between px-4 py-2 text-sm ${isPaid ? 'opacity-50' : ''}`}>
-                          <span className={isPaid ? 'line-through' : ''} style={{ color: "#1a1612" }}>{item.cantidad}× {item.nombre}</span>
-                          <div className="flex items-center gap-2">
-                            <span style={{ color: "#1a1612" }}>{formatPrice(item.precio * item.cantidad, "EUR", lang)}</span>
-                            <span className={`rounded-full px-2 py-0.5 text-xs ${isPaid ? 'bg-green-100 text-green-700' : 'bg-[#f8f4ef] text-[#8a7d6b]'}`}>
-                              {isPaid ? 'pagado' : 'pendiente'}
-                            </span>
+            {/* Waiter: custom split breakdown — only paid items, grouped */}
+            {isWaiterMode && sessionData?.divisionTipo === 'personalizado' && (() => {
+              const paidGroupMap = new Map<string, { nombre: string; precio: number; cantidad: number; complementos?: { nombre: string; precio: number }[] }>();
+              for (const order of sessionData.orders) {
+                for (let idx = 0; idx < order.items.length; idx++) {
+                  const item = order.items[idx];
+                  if (item.cancelled) continue;
+                  const paid = (sessionData.itemsPagados ?? [])
+                    .filter(p => p.pedido_id === order.id && p.item_idx === idx)
+                    .reduce((s, p) => s + p.unidades_pagadas, 0);
+                  if (paid <= 0) continue;
+                  const ck = (item.complementos ?? []).map(c => c.nombre).sort((a, b) => a.localeCompare(b)).join(',');
+                  const k = `${item.nombre}||${item.precio}||${ck}`;
+                  const ex = paidGroupMap.get(k);
+                  if (ex) { ex.cantidad += paid; } else {
+                    paidGroupMap.set(k, { nombre: item.nombre, precio: item.precio, cantidad: paid, complementos: item.complementos });
+                  }
+                }
+              }
+              const paidGroups = Array.from(paidGroupMap.entries()).map(([key, val]) => ({ key, ...val }));
+              const pagadoCents = sessionData.pagadoCents ?? 0;
+              const pendienteCents = Math.max(0, Math.round(sessionData.total * 100) - pagadoCents);
+              return (
+                <div className="rounded-xl border border-[#e8e0d8] bg-white overflow-hidden">
+                  <div className="border-b border-[#e8e0d8] bg-[#f8f4ef] px-4 py-3 flex items-center justify-between">
+                    <p className="text-sm font-semibold text-[#1a1612]">Pago personalizado</p>
+                    <span className="text-xs text-[#8a7d6b]">✓ Pagado</span>
+                  </div>
+                  {paidGroups.length === 0 ? (
+                    <p className="px-4 py-3 text-sm text-[#b0a090]">Sin pagos registrados aún</p>
+                  ) : (
+                    <div className="divide-y divide-[#f0ede8]">
+                      {paidGroups.map(({ key, nombre, precio, cantidad, complementos }) => (
+                        <div key={key} className="flex items-start justify-between px-4 py-2.5 text-sm">
+                          <div className="flex flex-col gap-0.5">
+                            <span style={{ color: "#1a1612" }}>{cantidad}× {nombre}</span>
+                            {complementos && complementos.length > 0 && (
+                              <span className="text-xs" style={{ color: "#b0a090" }}>
+                                + {complementos.map(c => c.nombre).join(", ")}
+                              </span>
+                            )}
                           </div>
+                          <span className="tabular-nums shrink-0 ml-3" style={{ color: "#6aaa7a", fontFamily: "monospace" }}>
+                            {formatPrice(precio * cantidad, "EUR", lang)}
+                          </span>
                         </div>
-                      );
-                    })
+                      ))}
+                    </div>
                   )}
+                  <div className="border-t border-[#e8e0d8] bg-[#f8f4ef] px-4 py-3 flex flex-col gap-1 text-sm" style={{ fontFamily: "monospace" }}>
+                    <div className="flex justify-between">
+                      <span style={{ color: "#6aaa7a" }}>Pagado</span>
+                      <span className="tabular-nums font-semibold" style={{ color: "#6aaa7a" }}>
+                        {formatPrice(pagadoCents / 100, "EUR", lang)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span style={{ color: "#8a7d6b" }}>Pendiente</span>
+                      <span className="tabular-nums font-semibold" style={{ color: "#1a1612" }}>
+                        {formatPrice(pendienteCents / 100, "EUR", lang)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex justify-between border-t border-[#e8e0d8] bg-[#f8f4ef] px-4 py-3 text-sm">
-                  <span className="text-[#8a7d6b]">Pendiente</span>
-                  <span className="font-semibold text-[#1a1612]">
-                    {formatPrice(
-                      Math.max(0, sessionData.total - (sessionData.pagadoCents ?? 0) / 100),
-                      "EUR", lang
-                    )}
-                  </span>
-                </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Waiter: manual payment button */}
             {isWaiterMode && !fullyPaid && !externalPaymentInProgress && (
               <div className="flex flex-col gap-2">
+                {hasPlatosPoServir && (
+                  <div className="flex items-start gap-2 rounded-xl px-3 py-2.5" style={{ background: "oklch(28% 0.08 252 / 0.1)", border: "1px solid oklch(50% 0.08 252 / 0.35)" }}>
+                    <span style={{ fontSize: "0.85rem" }}>🍽</span>
+                    <p className="text-xs leading-snug" style={{ color: "oklch(40% 0.06 252)", fontFamily: "monospace" }}>
+                      Quedan pedidos sin servir. Sírvelos antes de cobrar.
+                    </p>
+                  </div>
+                )}
                 {hasDeferred && (
                   <div className="flex items-start gap-2 rounded-xl px-3 py-2.5" style={{ background: "oklch(28% 0.10 55 / 0.15)", border: "1px solid oklch(55% 0.18 55 / 0.4)" }}>
                     <span style={{ color: "oklch(55% 0.18 55)", fontSize: "0.85rem" }}>⚠</span>
@@ -2068,11 +2209,14 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
                 <button
                   type="button"
                   onClick={() => { void handleManualPayment(); }}
-                  disabled={manualPaying || hasDeferred}
+                  disabled={manualPaying || hasDeferred || hasPlatosPoServir}
                   className="w-full py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ backgroundColor: "#1a1612", color: "#fffcf7", fontFamily: "monospace" }}
                 >
-                  {manualPayLabel}
+                  <span className="flex items-center justify-center gap-2">
+                    <CreditCard size={16} strokeWidth={2} />
+                    {manualPayLabel}
+                  </span>
                 </button>
               </div>
             )}

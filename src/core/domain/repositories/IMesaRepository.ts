@@ -23,6 +23,7 @@ export interface MesaWithSession {
   itemsDiferidos: DeferredItem[];
   clienteActivo: boolean;
   preparadoPedidoNumbers: number[];
+  llamadaActiva: boolean;
 }
 
 export interface IMesaRepository {

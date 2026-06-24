@@ -55,7 +55,7 @@ export interface BarOrderItem {
 }
 
 /** Estado values for per-item kitchen tracking */
-export type ItemEstado = 'pendiente' | 'en_preparacion' | 'listo' | 'servido' | 'retenido';
+export type ItemEstado = 'pendiente' | 'en_preparacion' | 'listo' | 'servido' | 'retenido' | 'cancelado';
 
 /** A single food item from a mesa order, with its kitchen estado */
 export interface KitchenItemRecord {

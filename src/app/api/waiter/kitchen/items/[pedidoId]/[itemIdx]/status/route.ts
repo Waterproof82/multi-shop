@@ -6,7 +6,7 @@ import type { ItemEstado } from '@/core/domain/repositories/IPedidoRepository';
 export const dynamic = 'force-dynamic';
 
 const schema = z.object({
-  estado: z.enum(['pendiente', 'retenido', 'servido']),
+  estado: z.enum(['pendiente', 'retenido', 'servido', 'cancelado']),
 });
 
 export async function PATCH(

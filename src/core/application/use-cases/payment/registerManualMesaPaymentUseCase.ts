@@ -56,8 +56,9 @@ export async function registerManualMesaPaymentUseCase(
       // Custom turn payment: commit then complete
       const effectiveTurnoId = input.turnoId ?? (s['custom_turno_id'] as string | null);
       if (!effectiveTurnoId) {
-        return { success: false, error: { code: 'NOT_FOUND', message: 'No hay turno activo', module: 'use-case', method: 'registerManualMesaPaymentUseCase' } };
-      }
+        // No active turn — waiter is manually closing the whole bill (full override)
+        fullyPaid = true;
+      } else {
 
       const paymentOrderRef = `MANUAL-${effectiveTurnoId.slice(0, 8)}-${Date.now()}`;
 
@@ -86,6 +87,7 @@ export async function registerManualMesaPaymentUseCase(
       }
       const completeRow = (completeResult as { success: boolean; sesion_completa: boolean; out_sesion_id: string | null }[] | null)?.[0];
       fullyPaid = completeRow?.sesion_completa ?? false;
+      }
 
     } else if (divisionPersonas != null) {
       // Division active — increment counter atomically

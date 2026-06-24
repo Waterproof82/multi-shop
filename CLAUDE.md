@@ -83,36 +83,17 @@ Usar siempre en RLS policies para aislar datos por empresa.
 - Build: `pnpm build` (Ignorar "Skipping validation of types")
 - Lint: `pnpm lint`
 
-## 🧑‍🍳 Sistema de Camarero (Waiter Flow)
+## 🧑‍🍳 Sistema de Camarero — Trampas Críticas
 
-### Flujo de validación de pedidos (`validacion_pedidos_habilitada`)
-- Cuando está activo, pedidos de clientes → `estado='pendiente_validacion'` en espera del camarero.
-- Camarero valida en `/waiter/pendientes` → POST `/api/waiter/pendientes/validate`.
-- El endpoint mueve el pedido a `pendiente` y crea `pedido_item_estados` para cocina/bar.
-- Los pedidos en `pendiente_validacion` están EXCLUIDOS de cocina/bar hasta ser validados.
-- `isWaiterRequest()` detecta token de camarero → bypasea la cola de validación.
-
-### `/waiter/pendientes` — Cola de validación
-- Polling cada 3 s a `/api/waiter/pendientes/orders`.
-- Por pedido: dos botones separados — **Confirmar ítems cocina (N)** y **Confirmar ítems bar (N)**.
-- Al confirmar solo cocina, los ítems de bebida quedan retenidos automáticamente (y vice versa).
-- Botón select/deselect all en la barra del timer de cada pedido.
-- Iconos `UtensilsCrossed` (amber) y `Wine` (azul) por ítem; naranja si retenido.
-- Claves i18n: `pendientesConfirmar`, `pendientesConfirmarBar`, `pendientesSeleccionarTodos`, `pendientesDeseleccionarTodos`.
-
-### `waiter-banner.tsx` — Badging
-- Badge naranja de retenidos junto al botón de cocina (`counts.cocina.retenidos`).
-- Badge naranja de retenidos junto al botón de bar (`counts.bebidas.retenidos`).
-- El ícono del carrito se oculta en: `/waiter`, `/waiter/pendientes`, `/waiter/kitchen`, `/waiter/bar`.
-
-### `supabase-pedido.repository.ts` — Conteo cocina/bar
-- `fetchAllComidaItems`: excluye `pendiente_validacion` del filtro NOT IN (evita leak antes de validar).
-- `tallyCocinaItems`: cuenta `retenidos` solo desde `pedido_item_estados`; ya no llama a `findAllRetenidos` en paralelo (evitaba doble conteo).
-- `findAllRetenidos`: sigue en uso por `/api/waiter/kitchen/orders/route.ts` — NO es código huérfano.
-
-### `mesa-orders-client.tsx` — Ticket del camarero
-- Sin badges de estado de pedido (eliminados).
-- Ítem con `estado='retenido'` en algún pedido → nombre del ítem en color naranja.
+- Pedidos en `estado='pendiente_validacion'` EXCLUIDOS de cocina/bar hasta validar. `isWaiterRequest()` bypasea esta cola.
+- `from_validation` en `pedido_item_estados`: `false` = retenido en cocina; `true` = devuelto a pendientes. Nunca mezclar.
+- `findAllRetenidos` en `supabase-pedido.repository.ts` NO es código huérfano — lo usa `/api/waiter/kitchen/orders`.
+- `WaiterBanner` renderiza en TODAS las páginas. El sonido `bell.mp3` SOLO puede sonar con guard `pathname.startsWith('/waiter')`.
+- `clienteActivo` se activa al abrir la carta (mount en `client-menu-page.tsx`), no al añadir al carrito.
+- `llamada_activa` vive en `mesa_sesiones`, no en `mesas`. Se expone vía RPC `get_mesas_with_sessions`.
+- `CountsPayload` incluye `llamadas` (mesas con `llamada_activa=true`). Ver `docs/context/waiter-panel.md` para el flujo completo.
+- **`pedidos.estado` NUNCA se actualiza** por cocina/bar al marcar ítems. La source of truth real está en `pedido_item_estados`. La route `/api/mesas/[mesaId]/orders` sintetiza el estado efectivo de cada pedido comparando item-level estados (`listo`/`servido`/`cancelado`). NO leer `pedido.estado` directamente para saber si un pedido está servido.
+- **`hasPlatosPoServir`** en `mesa-orders-client.tsx` bloquea pago y cierre cuando algún pedido sintetizado tiene estado ∈ `{pendiente_validacion, pendiente, en_preparacion, preparado}`. Ver `docs/context/waiter-ticket-ux.md`.
 
 ## 🔍 SEO Multi-Tenant
 
