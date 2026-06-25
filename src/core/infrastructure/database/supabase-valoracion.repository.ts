@@ -25,7 +25,7 @@ export class SupabaseValoracionRepository implements IValoracionRepository {
         .single();
 
       if (error) {
-        await logger.logAndReturnError('DB_INSERT_ERROR', error.message, 'repository', 'SupabaseValoracionRepository.create', { details: data });
+        await logger.logAndReturnError('DB_INSERT_ERROR', error.message, 'repository', 'SupabaseValoracionRepository.create', { details: data as unknown as Record<string, unknown> });
         return { success: false, error: { code: 'DB_ERROR', message: 'Error al guardar la valoración', module: 'repository', method: 'create' } };
       }
 
@@ -43,7 +43,7 @@ export class SupabaseValoracionRepository implements IValoracionRepository {
         },
       };
     } catch (e) {
-      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseValoracionRepository.create', { details: data });
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseValoracionRepository.create', { details: data as unknown as Record<string, unknown> });
       return { success: false, error: appError };
     }
   }

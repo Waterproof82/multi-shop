@@ -22,7 +22,7 @@ export class ValoracionUseCase {
       }
       return this.repo.create(parsed.data);
     } catch (e) {
-      const appError = await logger.logFromCatch(e, 'use-case', 'ValoracionUseCase.create', { details: input });
+      const appError = await logger.logFromCatch(e, 'use-case', 'ValoracionUseCase.create', { details: input as Record<string, unknown> });
       return { success: false, error: appError };
     }
   }

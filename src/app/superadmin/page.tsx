@@ -29,6 +29,7 @@ interface Empresa {
   mesasHabilitadas: boolean;
   validacionPedidosHabilitada: boolean;
   deliveryHabilitado: boolean;
+  googleReviewsUrl: string | null;
   createdAt: string;
   stats: EmpresaStats;
   totalMesas: number;
@@ -255,6 +256,7 @@ export default async function SuperAdminPage() {
               mesasHabilitadas: e.mesasHabilitadas,
               validacionPedidosHabilitada: e.validacionPedidosHabilitada,
               deliveryHabilitado: e.deliveryHabilitado,
+              googleReviewsUrl: e.googleReviewsUrl ?? null,
               stats: e.stats,
               totalMesas: e.totalMesas,
               seoStatus: e.seoStatus,
