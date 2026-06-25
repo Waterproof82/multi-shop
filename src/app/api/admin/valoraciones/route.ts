@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { requireAuth, handleResult, errorResponse } from '@/core/infrastructure/api/helpers';
+import { requireAuth, handleResult } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import { valoracionUseCase } from '@/core/infrastructure/database';
 import { z } from 'zod';
