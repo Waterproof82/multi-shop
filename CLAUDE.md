@@ -83,6 +83,12 @@ Usar siempre en RLS policies para aislar datos por empresa.
 - Build: `pnpm build` (Ignorar "Skipping validation of types")
 - Lint: `pnpm lint`
 
+## 🔔 WaiterBanner — Re-autenticación sin recarga
+
+`WaiterBanner` verifica sesión al montar y en cada cambio de `pathname`. Si la sesión expira y el camarero mete el PIN en `WaiterLoginForm`, el `pathname` no cambia → el banner no se entera.
+
+Solución: `WaiterLoginForm.handlePinSubmit` dispara `window.dispatchEvent(new CustomEvent('waiter-auth-changed'))` al hacer login. `WaiterBanner` escucha ese evento y re-llama `/api/waiter/me`.
+
 ## 🧑‍🍳 Sistema de Camarero — Trampas Críticas
 
 - Pedidos en `estado='pendiente_validacion'` EXCLUIDOS de cocina/bar hasta validar. `isWaiterRequest()` bypasea esta cola.
@@ -92,6 +98,9 @@ Usar siempre en RLS policies para aislar datos por empresa.
 - `clienteActivo` se activa al abrir la carta (mount en `client-menu-page.tsx`), no al añadir al carrito.
 - `llamada_activa` vive en `mesa_sesiones`, no en `mesas`. Se expone vía RPC `get_mesas_with_sessions`.
 - `CountsPayload` incluye `llamadas` (mesas con `llamada_activa=true`). Ver `docs/context/waiter-panel.md` para el flujo completo.
+- **`validated_at`** en `pedidos` (nullable): se graba al validar en `/waiter/pendientes`. `findKitchenOrders` y `findBarOrders` usan `validated_at ?? created_at` como `createdAt` — así el timer de cocina/bar cuenta desde que el camarero lanzó el pedido, no desde que el cliente lo hizo.
+- **`countBebidasTotal`** excluye `estado='cancelado'` además de `'servido'` para que el badge de bebidas en WaiterBanner descuente cancelaciones correctamente.
+- **Pausa en pendientes**: en `handleConfirmBoth`, la pausa (⏸) prevalece sobre la selección (✓). Un ítem puede estar simultáneamente seleccionado Y pausado → va a `pausedIndices` → kitchen retenido. NO usar `&& !selected.has(...)` en ese filtro.
 - **`pedidos.estado` NUNCA se actualiza** por cocina/bar al marcar ítems. La source of truth real está en `pedido_item_estados`. La route `/api/mesas/[mesaId]/orders` sintetiza el estado efectivo de cada pedido comparando item-level estados (`listo`/`servido`/`cancelado`). NO leer `pedido.estado` directamente para saber si un pedido está servido.
 - **`hasPlatosPoServir`** en `mesa-orders-client.tsx` bloquea pago y cierre cuando algún pedido sintetizado tiene estado ∈ `{pendiente_validacion, pendiente, en_preparacion, preparado}`. Ver `docs/context/waiter-ticket-ux.md`.
 - **`propina_cents`** en `mesa_sesiones`: propina acordada por la mesa en céntimos. Se expone como `propinaCents` en `GET /api/mesas/[mesaId]/orders` y se suma al total cobrado en Redsys (full payment y división). Actualizable por cualquier participante vía `PATCH /api/mesas/[mesaId]/propina`. Ver `docs/context/propina.md`.

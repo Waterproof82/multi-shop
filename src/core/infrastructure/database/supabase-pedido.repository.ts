@@ -903,7 +903,8 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         if (
           item['tipo_producto'] === 'bebida' &&
           !fromValidationSet.has(`${pedidoId}:${idx}`) &&
-          pedidoEstados.get(idx) !== 'servido'
+          pedidoEstados.get(idx) !== 'servido' &&
+          pedidoEstados.get(idx) !== 'cancelado'
         ) total++;
       });
     }
@@ -1008,7 +1009,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       // are marked servido/cerrado/cancelado.
       const { data: orders, error: ordersError } = await this.supabase
         .from('pedidos')
-        .select(`id, numero_pedido, sesion_id, detalle_pedido, estado, created_at, mesas!inner(numero, nombre)`)
+        .select(`id, numero_pedido, sesion_id, detalle_pedido, estado, created_at, validated_at, mesas!inner(numero, nombre)`)
         .eq('empresa_id', empresaId)
         .in('estado', ['pendiente', 'anotado', 'preparado'])
         .order('created_at', { ascending: true });
@@ -1037,7 +1038,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
             complementos: i['complementos'] as { nombre?: string; name?: string }[] | undefined,
           })),
           estado: row['estado'] as string,
-          createdAt: row['created_at'] as string,
+          createdAt: (row['validated_at'] as string | null) ?? (row['created_at'] as string),
           sesionId: (row['sesion_id'] as string | null) ?? null,
         });
       }
@@ -1069,7 +1070,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       // Bar orders must remain visible after a mesa closes until served.
       const { data: orders, error: ordersError } = await this.supabase
         .from('pedidos')
-        .select(`id, numero_pedido, sesion_id, detalle_pedido, estado, created_at, mesas!inner(numero, nombre)`)
+        .select(`id, numero_pedido, sesion_id, detalle_pedido, estado, created_at, validated_at, mesas!inner(numero, nombre)`)
         .eq('empresa_id', empresaId)
         .eq('estado', 'pendiente')
         .order('created_at', { ascending: true });
@@ -1136,7 +1137,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           mesaNombre: (mesaData['nombre'] as string | null) ?? null,
           items: bebidaItems,
           estado: row['estado'] as string,
-          createdAt: row['created_at'] as string,
+          createdAt: (row['validated_at'] as string | null) ?? (row['created_at'] as string),
           sesionId: (row['sesion_id'] as string | null) ?? null,
           tipo: 'bebida',
           hasComida,
@@ -1476,7 +1477,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
 
       const { error: updateError } = await this.supabase
         .from('pedidos')
-        .update({ estado: 'pendiente' })
+        .update({ estado: 'pendiente', validated_at: new Date().toISOString() })
         .eq('id', pedidoId)
         .eq('empresa_id', empresaId);
 

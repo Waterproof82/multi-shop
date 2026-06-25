@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
 import Image from "next/image";
-import { ArrowLeft, CreditCard, Receipt, Users, ShieldCheck, Plus, Minus, X } from "lucide-react";
+import { ArrowLeft, CreditCard, Receipt, Users, ShieldCheck, Plus, Minus, X, SplitSquareVertical } from "lucide-react";
 import Link from "next/link";
 import { useLanguage } from "@/lib/language-context";
 import type { Language } from "@/lib/language-context";
@@ -521,15 +521,17 @@ function buildSeleccion(
 }
 
 function CustomSelectionView({
-  orders, itemsPagados, turnoId, mesaId, lang, onCancelled, onCommitted,
+  orders, itemsPagados, turnoId, mesaId, lang, isWaiterMode, onCancelled, onCommitted, onPaid,
 }: Readonly<{
   orders: MesaOrder[];
   itemsPagados: ItemPagado[];
   turnoId: string;
   mesaId: string;
   lang: Parameters<typeof t>[1];
+  isWaiterMode?: boolean;
   onCancelled: () => void;
-  onCommitted: (formData: { DS_MERCHANT_PARAMETERS: string; DS_SIGNATURE: string; DS_SIGNATURE_VERSION: string }) => void;
+  onCommitted?: (formData: { DS_MERCHANT_PARAMETERS: string; DS_SIGNATURE: string; DS_SIGNATURE_VERSION: string }) => void;
+  onPaid?: () => Promise<void>;
 }>) {
   const [selection, setSelection] = useState<Map<string, number>>(new Map());
   const [committing, setCommitting] = useState(false);
@@ -590,6 +592,13 @@ function CustomSelectionView({
       return;
     }
 
+    // Waiter mode: register as manual payment instead of redirecting to Redsys.
+    if (isWaiterMode && onPaid) {
+      setCommitting(true);
+      try { await onPaid(); } finally { setCommitting(false); }
+      return;
+    }
+
     setCommitting(true);
     try {
       const res = await fetch(
@@ -604,7 +613,7 @@ function CustomSelectionView({
       const body = await res.json() as { DS_MERCHANT_PARAMETERS?: string; DS_SIGNATURE?: string; DS_SIGNATURE_VERSION?: string; paymentOrderRef?: string };
       if (body.DS_MERCHANT_PARAMETERS && body.DS_SIGNATURE && body.DS_SIGNATURE_VERSION) {
         try { sessionStorage.setItem(`mesa-custom-turno-${mesaId}`, turnoId); } catch { /* ignore */ }
-        onCommitted({ DS_MERCHANT_PARAMETERS: body.DS_MERCHANT_PARAMETERS, DS_SIGNATURE: body.DS_SIGNATURE, DS_SIGNATURE_VERSION: body.DS_SIGNATURE_VERSION });
+        onCommitted?.({ DS_MERCHANT_PARAMETERS: body.DS_MERCHANT_PARAMETERS, DS_SIGNATURE: body.DS_SIGNATURE, DS_SIGNATURE_VERSION: body.DS_SIGNATURE_VERSION });
       } else {
         console.error('[commit] unexpected response shape', body);
         setCommitting(false);
@@ -717,7 +726,11 @@ function CustomSelectionView({
         <button onClick={() => { void handlePay(); }}
           disabled={subtotalCents === 0 || committing}
           className="w-full rounded-xl bg-[#1a1612] py-4 text-sm font-semibold text-white disabled:opacity-40">
-          {t("mesaCustomPay", lang).replace("{amount}", formatPrice(subtotalCents / 100, "EUR", lang))}
+          {committing
+            ? t("loading", lang)
+            : isWaiterMode
+              ? `Registrar como pagado · ${formatPrice(subtotalCents / 100, "EUR", lang)}`
+              : t("mesaCustomPay", lang).replace("{amount}", formatPrice(subtotalCents / 100, "EUR", lang))}
         </button>
         <button onClick={() => { void handleCancel(); }} disabled={cancelling}
           className="w-full rounded-xl border border-[#d0c8bc] py-3 text-sm font-medium text-[#5a4f45] bg-white active:bg-[#f0ede8] disabled:opacity-40">
@@ -923,11 +936,23 @@ function buildPaidByMergeKey(sessionData: MesaSessionData | null): Map<string, n
 function getManualPayLabel(
   manualPaying: boolean,
   division: DivisionState | null,
+  divisionTipo: string | null | undefined,
+  customTurno: CustomTurno | null | undefined,
   lang: Parameters<typeof t>[1],
 ): string {
   if (manualPaying) return "Registrando...";
   if (division) return `Marcar pago de una parte · ${formatPrice(division.importePorPersona, "EUR", lang)}`;
-  return "Marcar pago completo";
+  if (divisionTipo === 'personalizado') {
+    const ct = customTurno;
+    if (ct && (ct.status === 'en_seleccion' || ct.status === 'en_pago')) {
+      if (ct.importeCents && ct.importeCents > 0) {
+        return `Confirmar turno · ${formatPrice(ct.importeCents / 100, "EUR", lang)}`;
+      }
+      return "Confirmar turno activo";
+    }
+    return "Pago total";
+  }
+  return "Pago total";
 }
 
 function getExpectedCents(sessionData: MesaSessionData | null): number | undefined {
@@ -955,7 +980,7 @@ function isItemInPreparadoOrder(
   itemPrecio: number,
 ): boolean {
   return orders.some(
-    o => o.estado === 'preparado' && o.items.some(i => i.nombre === itemNombre && Math.abs(i.precio - itemPrecio) < 0.001)
+    o => (o.estado === 'preparado' || o.estado === 'listo') && o.items.some(i => i.nombre === itemNombre && Math.abs(i.precio - itemPrecio) < 0.001)
   );
 }
 
@@ -1623,6 +1648,7 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
     }
   };
 
+
   const division = sessionData?.division ?? null;
 
   const fullyPaid = isSessionFullyPaid(sessionData, division);
@@ -1667,12 +1693,13 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
 
   // Block payment if any order is not yet served (kitchen/validation queue or ready but not delivered)
   const hasPlatosPoServir = !fullyPaid && (sessionData?.orders ?? []).some(
-    o => ['pendiente_validacion', 'pendiente', 'en_preparacion', 'preparado'].includes(o.estado)
+    o => ['pendiente_validacion', 'pendiente', 'en_preparacion', 'preparado', 'listo'].includes(o.estado)
   );
 
-  const manualPayLabel = getManualPayLabel(manualPaying, division, lang);
+  const manualPayLabel = getManualPayLabel(manualPaying, division, sessionData?.divisionTipo, sessionData?.customTurno, lang);
 
-  // Custom selection: this user holds the lock
+  // Custom selection: this user holds the lock.
+  // Customer → Redsys payment. Waiter → manual registration.
   if (sessionData && isInSelectionTurn(activeTurnoId, sessionData.customTurno)) {
     const redsysUrl = process.env.NEXT_PUBLIC_REDSYS_URL ?? 'https://sis-t.redsys.es:25443/sis/realizarPago';
     return (
@@ -1682,15 +1709,21 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
         turnoId={activeTurnoId!}
         mesaId={mesaId}
         lang={lang}
+        isWaiterMode={isWaiterMode}
         onCancelled={() => {
           setActiveTurnoId(null);
-          setHidingRemainingActions(true);
+          if (!isWaiterMode) setHidingRemainingActions(true);
           try { sessionStorage.removeItem(`mesa-custom-turno-${mesaId}`); } catch { /* ignore */ }
           void refresh();
         }}
-        onCommitted={(formData) => {
+        onCommitted={isWaiterMode ? undefined : (formData) => {
           submitRedsysForm(formData, redsysUrl);
         }}
+        onPaid={isWaiterMode ? async () => {
+          await handleManualPayment();
+          setActiveTurnoId(null);
+          try { sessionStorage.removeItem(`mesa-custom-turno-${mesaId}`); } catch { /* ignore */ }
+        } : undefined}
       />
     );
   }
@@ -1700,7 +1733,7 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
   // and mount effects above will have already cleared this state. The cancel button
   // below is a last-resort escape for the rare full-reload case where those effects
   // run before the server poll reflects the cancellation.
-  if (sessionData && isInPaymentTurn(activeTurnoId, sessionData.customTurno)) {
+  if (!isWaiterMode && sessionData && isInPaymentTurn(activeTurnoId, sessionData.customTurno)) {
     return (
       <div className="min-h-screen bg-[#f0ede8] flex flex-col items-center justify-center gap-4 px-6 py-16 text-center">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#1a1612] border-t-transparent" />
@@ -1718,8 +1751,8 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
     );
   }
 
-  // Waiting: someone else holds the lock (selecting or paying)
-  if (isWaitingForOtherTurn(sessionData?.customTurno, activeTurnoId)) {
+  // Waiting: someone else holds the lock (selecting or paying) — skip for waiter
+  if (!isWaiterMode && isWaitingForOtherTurn(sessionData?.customTurno, activeTurnoId)) {
     return (
       <div className="min-h-screen bg-[#f0ede8]">
         <CustomWaitingView lang={lang} />
@@ -1727,8 +1760,8 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
     );
   }
 
-  // Between turns: personalizado mode, no active lock, not fully paid
-  if (sessionData && shouldShowRemainingActions(sessionData, hidingRemainingActions)) {
+  // Between turns: personalizado mode, no active lock, not fully paid — skip for waiter
+  if (!isWaiterMode && sessionData && shouldShowRemainingActions(sessionData, hidingRemainingActions)) {
     return (
       <RemainingItemsActions
         orders={sessionData.orders}
@@ -2307,8 +2340,8 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
               </button>
             )}
 
-            {/* Waiter: custom split breakdown — only paid items, grouped */}
-            {isWaiterMode && sessionData?.divisionTipo === 'personalizado' && (() => {
+            {/* Waiter: custom split breakdown — only when something has actually been paid */}
+            {isWaiterMode && sessionData?.divisionTipo === 'personalizado' && (sessionData.pagadoCents ?? 0) > 0 && (() => {
               const paidGroupMap = new Map<string, { nombre: string; precio: number; cantidad: number; complementos?: { nombre: string; precio: number }[] }>();
               for (const order of sessionData.orders) {
                 for (let idx = 0; idx < order.items.length; idx++) {
@@ -2377,6 +2410,36 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
             {/* Waiter: manual payment button */}
             {isWaiterMode && !fullyPaid && !externalPaymentInProgress && (
               <div className="flex flex-col gap-2">
+                {sessionData?.customTurno && (sessionData.customTurno.status === 'en_seleccion' || sessionData.customTurno.status === 'en_pago') && (
+                  <div className="flex items-start gap-2 rounded-xl px-3 py-2.5" style={{ background: "oklch(28% 0.14 145 / 0.1)", border: "1px solid oklch(50% 0.14 145 / 0.3)" }}>
+                    <span style={{ fontSize: "0.85rem" }}>💳</span>
+                    <div className="flex flex-col gap-0.5">
+                      <p className="text-xs leading-snug font-semibold" style={{ color: "oklch(35% 0.10 145)", fontFamily: "monospace" }}>
+                        Turno activo — {sessionData.customTurno.status === 'en_seleccion' ? 'seleccionando ítems' : 'pago en curso'}
+                      </p>
+                      {sessionData.customTurno.importeCents != null && sessionData.customTurno.importeCents > 0 && (
+                        <p className="text-xs" style={{ color: "oklch(40% 0.08 145)", fontFamily: "monospace" }}>
+                          Importe: {formatPrice(sessionData.customTurno.importeCents / 100, "EUR", lang)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {/* Waiter: simulate personalizado selection — hidden when equal-division is active or a custom turn is already running */}
+                {!division && !sessionData?.customTurno && (
+                  <button
+                    type="button"
+                    onClick={() => { void handleClaimCustomTurn(); }}
+                    disabled={hasDeferred || hasPlatosPoServir}
+                    className="w-full py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ backgroundColor: "oklch(22% 0.12 300)", color: "oklch(80% 0.18 300)", border: "1px solid oklch(50% 0.22 300 / 0.6)", fontFamily: "monospace" }}
+                  >
+                    <span className="flex items-center justify-center gap-2">
+                      <SplitSquareVertical size={16} strokeWidth={2} />
+                      Pago personalizado
+                    </span>
+                  </button>
+                )}
                 {hasPlatosPoServir && (
                   <div className="flex items-start gap-2 rounded-xl px-3 py-2.5" style={{ background: "oklch(28% 0.08 252 / 0.1)", border: "1px solid oklch(50% 0.08 252 / 0.35)" }}>
                     <span style={{ fontSize: "0.85rem" }}>🍽</span>
@@ -2401,7 +2464,10 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
                   style={{ backgroundColor: "#1a1612", color: "#fffcf7", fontFamily: "monospace" }}
                 >
                   <span className="flex items-center justify-center gap-2">
-                    <CreditCard size={16} strokeWidth={2} />
+                    {sessionData?.division
+                      ? <CreditCard size={16} strokeWidth={2} />
+                      : <Receipt size={16} strokeWidth={2} />
+                    }
                     {manualPayLabel}
                   </span>
                 </button>

@@ -70,9 +70,13 @@ export async function GET(
     } catch { /* best-effort */ }
   }
 
-  // Fetch cancelled and servido item estados for all pedidos in this session
+  // Fetch cancelled, listo and servido item estados for all pedidos in this session.
+  // 'listo' = kitchen done but not yet delivered to the table.
+  // 'servido' = physically delivered to the table.
+  // Payment must only be allowed when everything is 'servido', not just 'listo'.
   const allPedidoIds = ordersResult.data.map(o => o.id as string);
   const cancelledByPedido = new Map<string, Set<number>>();
+  const listoByPedido = new Map<string, Set<number>>();
   const servidoByPedido = new Map<string, Set<number>>();
   if (allPedidoIds.length > 0) {
     try {
@@ -86,9 +90,10 @@ export async function GET(
         if (row.estado === 'cancelado') {
           if (!cancelledByPedido.has(row.pedido_id)) cancelledByPedido.set(row.pedido_id, new Set());
           cancelledByPedido.get(row.pedido_id)!.add(row.item_idx);
-        } else if (row.estado === 'listo' || row.estado === 'servido') {
-          // Both 'listo' (kitchen done) and 'servido' (waiter delivered) count as served
-          // for payment purposes — blocking only makes sense while food is still cooking.
+        } else if (row.estado === 'listo') {
+          if (!listoByPedido.has(row.pedido_id)) listoByPedido.set(row.pedido_id, new Set());
+          listoByPedido.get(row.pedido_id)!.add(row.item_idx);
+        } else if (row.estado === 'servido') {
           if (!servidoByPedido.has(row.pedido_id)) servidoByPedido.set(row.pedido_id, new Set());
           servidoByPedido.get(row.pedido_id)!.add(row.item_idx);
         }
@@ -98,21 +103,23 @@ export async function GET(
 
   const orders = ordersResult.data.map(o => {
     const cancelledIndices = cancelledByPedido.get(o.id as string) ?? new Set<number>();
+    const listoIndices = listoByPedido.get(o.id as string) ?? new Set<number>();
     const servidoIndices = servidoByPedido.get(o.id as string) ?? new Set<number>();
     const detalle = (o.detalle_pedido as { precio?: number; cantidad?: number }[]) ?? [];
     const items = detalle.map((item, idx) =>
       cancelledIndices.has(idx) ? { ...item, cancelled: true } : item
     );
 
-    // Synthesize estado='servido' when all non-cancelled items are explicitly servido/listo
-    // in pedido_item_estados. This covers the case where kitchen/bar marks items at the
-    // item level but pedidos.estado is never updated.
-    // Also treat fully-cancelled orders (activeIndices empty) as done — nothing left to serve.
     const activeIndices = detalle.map((_, idx) => idx).filter(idx => !cancelledIndices.has(idx));
+    // allItemsDone: every active item must be 'servido' (delivered). 'listo' alone is not enough.
     const allItemsDone = activeIndices.length === 0 || activeIndices.every(idx => servidoIndices.has(idx));
+    // allItemsListo: all active items are at least 'listo' or 'servido' (ready in kitchen or delivered).
+    const allItemsListo = activeIndices.length > 0 && activeIndices.every(idx => listoIndices.has(idx) || servidoIndices.has(idx));
 
     let estado = o.estado === 'retenido' && !stillRetenidoIds.has(o.id as string) ? 'pendiente' : o.estado;
     if (allItemsDone) estado = 'servido';
+    // Synthesize 'listo' when all items are ready in kitchen but waiter hasn't served them yet.
+    else if (allItemsListo) estado = 'listo';
 
     return {
       id: o.id,

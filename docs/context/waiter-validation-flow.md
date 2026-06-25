@@ -81,6 +81,8 @@ Waiter clicks ⏸ on a comida item before confirming
   → Waiter releases it later from kitchen panel
 ```
 
+> **Pause prevalece sobre selección** (aplica a AMBOS botones — `handleConfirm` y `handleConfirmBoth`): un ítem puede estar a la vez seleccionado (✓) Y pausado (⏸). La pausa gana siempre: el ítem va a `pausedIndices` → kitchen retenido. La condición `&& !selected.has(...)` fue eliminada del filtro en ambas funciones.
+
 ---
 
 ## Pendientes Page (`/waiter/pendientes`)
@@ -121,6 +123,23 @@ The combined button appears **first** (leftmost) when all items are selected. In
 ### Deferred items (bebidas) in validation context
 
 Bebidas cannot be manually deferred/retained in the pendientes page (no pause button for bebidas). Only comida items have the pause button. Bebidas always go directly to bar when confirmed.
+
+---
+
+## Timer de Cocina y Bar
+
+El timer que aparece en `/waiter/kitchen` y `/waiter/bar` usa el campo `createdAt` de cada ítem.
+
+Desde la migración `pedidos_add_validated_at`, el repositorio expone:
+
+```
+createdAt = pedidos.validated_at ?? pedidos.created_at
+```
+
+- **Pedidos con validación** (`pendiente_validacion` → validado por camarero): el timer arranca desde `validated_at` (momento en que el camarero lanzó el pedido), NO desde cuando el cliente lo hizo.
+- **Pedidos directos** (sin cola de validación): `validated_at` es NULL, se usa `created_at` como antes.
+
+Esto evita que el timer cuente el tiempo en sala de espera de validación como tiempo de preparación en cocina.
 
 ---
 

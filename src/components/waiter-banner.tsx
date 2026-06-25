@@ -139,6 +139,18 @@ export function WaiterBanner() {
       .finally(() => setAuthChecked(true));
   }, [pathname]);
 
+  // Re-check auth when login form signals a successful PIN entry
+  useEffect(() => {
+    function handleAuthChanged() {
+      fetch('/api/waiter/me')
+        .then(r => { setIsWaiter(r.ok); })
+        .catch(() => setIsWaiter(false))
+        .finally(() => setAuthChecked(true));
+    }
+    window.addEventListener('waiter-auth-changed', handleAuthChanged);
+    return () => window.removeEventListener('waiter-auth-changed', handleAuthChanged);
+  }, []);
+
   // Session expired on a waiter sub-page → back to PIN
   useEffect(() => {
     if (!authChecked || isWaiter) return;
@@ -322,6 +334,9 @@ export function WaiterBanner() {
 
   // Not a waiter at all → hide everything
   if (!isWaiter) return null;
+
+  // Admin/superadmin panels are never waiter context
+  if (pathname.startsWith('/admin') || pathname.startsWith('/superadmin')) return null;
 
   // Kitchen page has its own header — don't render the waiter banner there
   if (pathname === '/kitchen') return null;
