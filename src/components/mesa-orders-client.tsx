@@ -2307,8 +2307,8 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
               </button>
             )}
 
-            {/* Waiter: custom split breakdown — only paid items, grouped */}
-            {isWaiterMode && sessionData?.divisionTipo === 'personalizado' && (() => {
+            {/* Waiter: custom split breakdown — only when something has actually been paid */}
+            {isWaiterMode && sessionData?.divisionTipo === 'personalizado' && (sessionData.pagadoCents ?? 0) > 0 && (() => {
               const paidGroupMap = new Map<string, { nombre: string; precio: number; cantidad: number; complementos?: { nombre: string; precio: number }[] }>();
               for (const order of sessionData.orders) {
                 for (let idx = 0; idx < order.items.length; idx++) {
