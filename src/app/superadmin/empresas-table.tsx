@@ -31,6 +31,7 @@ interface EmpresaRow {
   mesasHabilitadas: boolean;
   validacionPedidosHabilitada: boolean;
   deliveryHabilitado: boolean;
+  googleReviewsUrl: string | null;
   stats: EmpresaStats;
   totalMesas: number;
   seoStatus: {
@@ -163,6 +164,38 @@ function TipoSelector({ empresaId, tipo, totalMesas, onTipoChange }: TipoSelecto
           {totalMesas} {totalMesas === 1 ? 'mesa' : 'mesas'}
         </span>
       )}
+    </div>
+  );
+}
+
+function GoogleReviewsField({ empresaId, initialValue }: { readonly empresaId: string; readonly initialValue: string | null }) {
+  const [value, setValue] = useState(initialValue ?? '');
+  const [saving, setSaving] = useState(false);
+
+  const handleBlur = async () => {
+    setSaving(true);
+    try {
+      await fetchWithCsrf(`/api/superadmin/empresas/${empresaId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ google_reviews_url: value || null }),
+      });
+    } catch { /* ignore */ }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="url"
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        onBlur={handleBlur}
+        placeholder="https://g.page/r/..."
+        className="text-xs bg-slate-700 border border-white/10 rounded px-2 py-1 text-slate-200 w-48 focus:outline-none focus:border-cyan-400"
+        aria-label="Google Reviews URL"
+      />
+      {saving && <span className="text-xs text-slate-400">...</span>}
     </div>
   );
 }
@@ -357,6 +390,9 @@ function EmpresaTableRow({ empresa, seoExpanded }: { empresa: EmpresaRow; seoExp
           />
         </div>
       </td>
+      <td className="px-4 py-4">
+        <GoogleReviewsField empresaId={empresa.id} initialValue={empresa.googleReviewsUrl} />
+      </td>
       <td className="px-4 py-4 text-center">
         <SeoCell seoStatus={empresa.seoStatus} dominio={empresa.dominio} expanded={seoExpanded} />
       </td>
@@ -415,6 +451,7 @@ export function EmpresasTable({ empresas }: EmpresasTableProps) {
                   <span className="text-xs font-normal">validados</span>
                 </span>
               </th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-slate-300">Google Reviews</th>
               <th className="text-center px-4 py-3 text-sm font-medium text-slate-300">
                 <button
                   type="button"

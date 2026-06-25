@@ -91,6 +91,7 @@ export interface Empresa {
   descuentoBienvenidaPorcentaje: number;
   descuentoBienvenidaDuracion?: number | null;
   deliveryHabilitado: boolean;
+  googleReviewsUrl: string | null;
 }
 
 interface TranslatableText {
@@ -287,3 +288,19 @@ export type Result<T, E = AppError> =
 
 // Helper type for functions that may return error without details
 export type SimpleResult<T> = Result<T, { code: string; message: string; module: ErrorModule; method?: string }>;
+
+export interface Valoracion {
+  id: string;
+  empresaId: string;
+  mesaId: string | null;
+  mesaSesionId: string | null;
+  raterId: string;
+  estrellas: number;
+  createdAt: string;
+}
+
+export interface ValoracionStats {
+  media: number;
+  total: number;
+  distribucion: Record<string, number>;
+}

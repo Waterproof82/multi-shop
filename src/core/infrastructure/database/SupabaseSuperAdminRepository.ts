@@ -58,6 +58,7 @@ interface EmpresaRow {
   mesas_habilitadas: boolean;
   validacion_pedidos_habilitada: boolean;
   delivery_habilitado: boolean;
+  google_reviews_url: string | null;
   created_at: string;
 }
 
@@ -386,6 +387,7 @@ export class SupabaseSuperAdminRepository implements ISuperAdminRepository {
       mesasHabilitadas: row.mesas_habilitadas ?? true,
       validacionPedidosHabilitada: row.validacion_pedidos_habilitada ?? false,
       deliveryHabilitado: row.delivery_habilitado ?? false,
+      googleReviewsUrl: row.google_reviews_url ?? null,
       moneda: row.moneda,
       emailNotification: row.email_notification,
       urlImage: row.url_image,
