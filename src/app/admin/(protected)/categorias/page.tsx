@@ -75,7 +75,7 @@ const emptyForm: CategoryFormData = {
 
 export default function CategoriasPage() {
   const { language } = useLanguage();
-  const { empresaId, overrideEmpresaId } = useAdmin();
+  const { empresaId, overrideEmpresaId, empresaTipo } = useAdmin();
   const effectiveEmpresaId = overrideEmpresaId || empresaId;
   const [categorias, setCategorias] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -360,7 +360,7 @@ export default function CategoriasPage() {
                           {t("mainCategory", language)}
                         </span>
                       )}
-                      {cat.tipo_producto === 'bebida' ? (
+                      {empresaTipo === 'restaurante' && (cat.tipo_producto === 'bebida' ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-medium">
                           <GlassWater className="w-3 h-3" /> Bar
                         </span>
@@ -368,7 +368,7 @@ export default function CategoriasPage() {
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500/20 border border-orange-400/30 text-orange-300 text-xs font-medium">
                           <UtensilsCrossed className="w-3 h-3" /> Cocina
                         </span>
-                      )}
+                      ))}
                     </div>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm">
@@ -682,6 +682,7 @@ export default function CategoriasPage() {
               </div>
             )}
 
+            {empresaTipo === 'restaurante' && (
             <div>
               <p className="block text-sm font-medium text-foreground mb-2">
                 Tipo
@@ -718,6 +719,7 @@ export default function CategoriasPage() {
                 Todos los productos de esta categoría se enrutarán a Cocina o Bar.
               </p>
             </div>
+            )}
 
             <div className="col-span-2">
               <button
