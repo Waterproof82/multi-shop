@@ -143,16 +143,19 @@ export async function GET(
 
   // Check if mesa payments are enabled for this empresa
   let pagosHabilitados = false;
+  let googleReviewsUrl: string | null = null;
   try {
     const supabase = getSupabaseAnonClient();
     const { data: emp } = await supabase
       .from('empresas')
-      .select('pagos_mesa_habilitados')
+      .select('pagos_mesa_habilitados, google_reviews_url')
       .eq('id', sesion.empresaId)
       .single();
-    pagosHabilitados = (emp as { pagos_mesa_habilitados: boolean } | null)?.pagos_mesa_habilitados ?? false;
+    const empRow = emp as { pagos_mesa_habilitados: boolean; google_reviews_url: string | null } | null;
+    pagosHabilitados = empRow?.pagos_mesa_habilitados ?? false;
+    googleReviewsUrl = empRow?.google_reviews_url ?? null;
   } catch {
-    // best-effort — default false
+    // best-effort — default false/null
   }
 
   // Fetch division state + payment status from the session (service_role to bypass RLS)
@@ -297,5 +300,5 @@ export async function GET(
     // best-effort
   }
 
-  return NextResponse.json({ orders, sesionId: sesion.id, total, pagosHabilitados, division, sesionPagada, pagoEnCurso, divisionTipo, customTurno, itemsPagados, pagadoCents, itemsDiferidos, propinaCents });
+  return NextResponse.json({ orders, sesionId: sesion.id, total, pagosHabilitados, division, sesionPagada, pagoEnCurso, divisionTipo, customTurno, itemsPagados, pagadoCents, itemsDiferidos, propinaCents, googleReviewsUrl });
 }
