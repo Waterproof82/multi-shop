@@ -372,10 +372,10 @@ export default function WaiterPendientesPage() {
           const notSelected = pedido.items
             .filter(i => !selected.has(`${pedido.id}:${i.idx}`))
             .map(i => i.idx);
-          // pausedIndices: comida pausada y NO seleccionada → kitchen retenido (from_validation=false)
-          // Selección explícita anula la pausa.
+          // pausedIndices: comida pausada → kitchen retenido (from_validation=false).
+          // La selección NO anula la pausa: un ítem puede estar seleccionado Y retenido.
           const pausedIndices = pedido.items
-            .filter(i => i.tipo === 'comida' && paused.has(`${pedido.id}:${i.idx}`) && !selected.has(`${pedido.id}:${i.idx}`))
+            .filter(i => i.tipo === 'comida' && paused.has(`${pedido.id}:${i.idx}`))
             .map(i => i.idx);
 
           const r = await fetch('/api/waiter/pendientes/validate', {

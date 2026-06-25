@@ -139,6 +139,18 @@ export function WaiterBanner() {
       .finally(() => setAuthChecked(true));
   }, [pathname]);
 
+  // Re-check auth when login form signals a successful PIN entry
+  useEffect(() => {
+    function handleAuthChanged() {
+      fetch('/api/waiter/me')
+        .then(r => { setIsWaiter(r.ok); })
+        .catch(() => setIsWaiter(false))
+        .finally(() => setAuthChecked(true));
+    }
+    window.addEventListener('waiter-auth-changed', handleAuthChanged);
+    return () => window.removeEventListener('waiter-auth-changed', handleAuthChanged);
+  }, []);
+
   // Session expired on a waiter sub-page → back to PIN
   useEffect(() => {
     if (!authChecked || isWaiter) return;

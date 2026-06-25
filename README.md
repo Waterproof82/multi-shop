@@ -26,7 +26,8 @@ Plataforma **multi-tenant** de gestión de negocios de hostelería y retail. Cad
 - **Registro manual de pagos** por el camarero (efectivo / pago externo) para desbloquear la sesión en escenarios de división.
 - **Gestión de pedidos takeaway** desde un entorno de chat de Telegram: con un solo botón se indica el tiempo de recogida (10, 15, 20, 30 o 45 minutos). El cliente recibe la notificación automáticamente en su pantalla de seguimiento, sin necesidad de llamar por teléfono.
 - **Gestión de pedidos en mesa (cocina y bar)** íntegramente en la app:
-  - `/waiter/kitchen` — vista de cocina con todos los ítems de comida en curso, agrupados por pedido o por mesa. Colores por tiempo de espera (azul → teal → ámbar → rojo). Filtro "Listos" para servicio.
+  - `/waiter/pendientes` — cola de validación: pedidos en `pendiente_validacion` que el camarero revisa antes de mandar a cocina/bar. Selección individual o por tipo (comida/bebida), pausa por ítem (→ kitchen retenido), envío conjunto comida+bebida en un solo tap.
+  - `/waiter/kitchen` — vista de cocina con todos los ítems de comida en curso, agrupados por pedido o por mesa. Colores por tiempo de espera (azul → teal → ámbar → rojo). Filtro "Listos" para servicio. Timer arranca desde la validación, no desde el pedido original.
   - `/waiter/bar` — vista equivalente para bebidas.
   - Los camareros deslizan cada ítem para avanzar su estado (`pendiente → en preparación → listo → servido`) con gestos de puntero.
 
@@ -115,6 +116,7 @@ src/
 │   ├── mesa/[mesaId]/orders/        # Ticket de mesa (cliente)
 │   ├── waiter/                      # Panel de sala
 │   │   ├── page.tsx                 # Login PIN + grid de mesas
+│   │   ├── pendientes/page.tsx      # Cola de validación (pendiente_validacion)
 │   │   ├── kitchen/page.tsx         # Vista de cocina en tiempo real (comida)
 │   │   └── bar/page.tsx             # Vista de bar en tiempo real (bebidas)
 │   ├── admin/
@@ -537,7 +539,7 @@ const main = parseMainDomain(domain); // elimina subdominio pedidos
 | `categorias` | id (uuid) | empresa_id → empresas | categoria_padre_id, categoriaComplementoDe |
 | `productos` | id (uuid) | empresa_id, categoria_id | i18n: titulo_es/en/fr/it/de |
 | `clientes` | id (uuid) | empresa_id | telefono único por empresa |
-| `pedidos` | id (uuid) | empresa_id, cliente_id | numero_pedido (atómico por tenant), detalle_pedido: JSON (PedidoItem[]), **codigo_descuento_id, descuento_porcentaje, total_sin_descuento**, **mesa_id, sesion_id, estado** |
+| `pedidos` | id (uuid) | empresa_id, cliente_id | numero_pedido (atómico por tenant), detalle_pedido: JSON (PedidoItem[]), **codigo_descuento_id, descuento_porcentaje, total_sin_descuento**, **mesa_id, sesion_id, estado**, **validated_at** (timestamptz, NULL = sin validación) |
 | `promociones` | id (uuid) | empresa_id | imagen_url, numero_envios |
 | `codigos_descuento` | id (uuid) | empresa_id | codigo unik por empresa + email, usado boolean, pedido_id FK |
 | `tgtg_promociones` | id (uuid) | empresa_id | fechaActivacion, horaRecogidaInicio/Fin, emailEnviado, numeroEnvios |
@@ -752,8 +754,9 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 | **Mesa Ordering** | QR table ordering para restaurantes dine-in. mesas + mesa_sesiones en DB. Rate limiting per-UUID (120/min). Ticket view con complementos + i18n + hora 24h. Gestión in-app de ítems por cocina y bar (sin Telegram). |
 | **Mesa Payments** | Pago en mesa vía Redsys TPV. Pago total o división de cuenta (2–20 personas). `mesa_division_pagos` elimina race condition en pagos simultáneos. Sistema de lock atómico (`pago_en_curso`) bloquea todos los usuarios de la mesa durante el pago. Verificación de total antes de pagar (detecta nuevos productos). Overlay 💳 en ticket + back button trap + adaptive polling (3s/10s). |
 | **QR Session Enforcement** | Pedidos en mesa requieren presencia física validada por escaneo in-app del QR impreso. Token de 20min en `mesa_client_tokens` (sessionStorage). `validateMesaClientToken` middleware en `/api/pedidos` y `/api/mesas/{mesaId}/orders`. Rotación de sesión al cerrar mesa invalida todos los tokens anteriores. Rate limit: 10 tokens/hora/mesa. |
-| **Waiter Panel** | Panel PIN-auth en /waiter. Grid de mesas, ciclo de sesión open/close, ítems diferidos, pago manual. WaiterBanner sticky global con badges de cocina y bar en tiempo real. |
-| **Kitchen & Bar In-App** | `/waiter/kitchen` y `/waiter/bar`: vistas en tiempo real para gestión de ítems sin Telegram. Estados por ítem: pendiente → en_preparacion → preparado → servido (swipe gestual). Colores por tiempo de espera (oklch, 6 rangos). GroupBy por pedido o por mesa. Filtro "Listos". Retenidos con sección propia. Badges con counts en WaiterBanner (neutral/verde/naranja). |
+| **Waiter Panel** | Panel PIN-auth en /waiter. Grid de mesas, ciclo de sesión open/close, ítems diferidos, pago manual. WaiterBanner sticky global con badges de cocina y bar en tiempo real. Re-autenticación sin recarga: `WaiterLoginForm` dispara `CustomEvent('waiter-auth-changed')` → banner revalida sesión automáticamente. |
+| **Kitchen & Bar In-App** | `/waiter/kitchen` y `/waiter/bar`: vistas en tiempo real para gestión de ítems sin Telegram. Estados por ítem: pendiente → en_preparacion → preparado → servido (swipe gestual). Colores por tiempo de espera (oklch, 6 rangos). GroupBy por pedido o por mesa. Filtro "Listos". Retenidos con sección propia. Badges con counts en WaiterBanner (neutral/verde/naranja). Timer de espera arranca desde `validated_at` (momento de validación), no desde `created_at` del pedido original. |
+| **Waiter Pendientes** | `/waiter/pendientes`: cola de validación antes de cocina/bar. Selección individual o por tipo (comida/bebida). Pausa (⏸) por ítem de comida → llega a cocina como retenido. Botón conjunto comida+bebida (botón morado) valida ambos tipos en un solo POST. La pausa prevalece sobre la selección en envíos conjuntos. |
 | **Telegram Multi-modo** | tienda → quick-reply buttons. restaurante takeaway → time-selector + tracking en vivo. mesa → gestionado in-app (sin Telegram). |
 | **Delivery + Pago online** | Zona de cobertura por CP configurable. Cotización Glovo en tiempo real. Pago Redsys TPV Virtual obligatorio para delivery. Auto-despacho de rider al confirmar pago. Tracking page post-pago. |
 
@@ -771,6 +774,7 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 - [`docs/telegram-notifications.md`](docs/telegram-notifications.md) — Notificaciones Telegram (tienda, restaurante takeaway, mesa)
 - [`docs/context/delivery.md`](docs/context/delivery.md) — Delivery: zona de cobertura, Glovo Business LaaS, Redsys TPV, flujo completo end-to-end
 - [`docs/context/qr-session-enforcement.md`](docs/context/qr-session-enforcement.md) — QR session enforcement: presencia física, mesa_client_tokens, QRScannerGate, rotación de sesión
+- [`docs/context/waiter-validation-flow.md`](docs/context/waiter-validation-flow.md) — Cola de validación: flujo pendiente_validacion → cocina/bar, from_validation flag, pausa, timer validated_at
 
 ---
 

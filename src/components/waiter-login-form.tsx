@@ -405,6 +405,7 @@ export function WaiterLoginForm() {
         const data = await res.json() as { empresaId?: string };
         if (data.empresaId) setEmpresaId(data.empresaId);
         setStep("tables");
+        window.dispatchEvent(new CustomEvent('waiter-auth-changed'));
       } else {
         const data = await res.json() as { error?: string };
         setError(data.error ?? "PIN incorrecto");
