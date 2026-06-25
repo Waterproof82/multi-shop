@@ -44,14 +44,19 @@ export default function ValoracionesPage() {
   const { language } = useLanguage();
   const [data, setData] = useState<ValoracionData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
 
   useEffect(() => {
     setLoading(true);
+    setError(null);
     fetchWithCsrf(`/api/admin/valoraciones?page=${page}`)
-      .then(r => r.json())
-      .then((d: ValoracionData) => setData(d))
-      .catch(() => null)
+      .then(async r => {
+        const json = await r.json();
+        if (!r.ok) throw new Error(json?.error ?? `Error ${r.status}`);
+        setData(json as ValoracionData);
+      })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Error al cargar valoraciones'))
       .finally(() => setLoading(false));
   }, [page]);
 
@@ -63,6 +68,10 @@ export default function ValoracionesPage() {
 
       {loading && !data && (
         <p className="text-slate-400">Cargando...</p>
+      )}
+
+      {error && (
+        <p className="text-red-400 text-sm bg-red-500/10 border border-red-400/20 rounded-xl px-4 py-3">{error}</p>
       )}
 
       {data && (
