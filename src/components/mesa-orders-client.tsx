@@ -11,6 +11,7 @@ import { t } from "@/lib/translations";
 import { formatPrice } from "@/lib/format-price";
 import { getWaiterMesa } from "@/components/waiter-login-form";
 import { QRScannerGate, type QRGateState } from "@/components/qr-scanner-gate";
+import { GoogleReviewsWidget } from "@/components/google-reviews-widget";
 
 interface OrderItem {
   nombre: string;
@@ -62,6 +63,7 @@ interface MesaSessionData {
   pagadoCents?: number;
   itemsDiferidos?: unknown[];
   propinaCents?: number;
+  googleReviewsUrl?: string | null;
 }
 
 interface MesaInfo {
@@ -1854,6 +1856,15 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
                   {dateStr} · {timeStr}
                 </p>
               </div>
+
+              {!isWaiterMode && (
+                <GoogleReviewsWidget
+                  mesaId={mesaId}
+                  sesionId={sessionData.sesionId}
+                  googleReviewsUrl={sessionData.googleReviewsUrl ?? null}
+                  lang={lang}
+                />
+              )}
 
               <DottedRule />
 
