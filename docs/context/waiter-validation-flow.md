@@ -81,7 +81,7 @@ Waiter clicks ⏸ on a comida item before confirming
   → Waiter releases it later from kitchen panel
 ```
 
-> **Pause prevalece sobre selección**: en `handleConfirmBoth` (botón morado), un ítem puede estar a la vez seleccionado (✓) Y pausado (⏸). La pausa gana: el ítem va a `pausedIndices` → kitchen retenido. La condición `!selected.has(...)` fue eliminada del filtro porque el botón conjunto requiere todos los ítems seleccionados, lo que hacía imposible pausar con él.
+> **Pause prevalece sobre selección** (aplica a AMBOS botones — `handleConfirm` y `handleConfirmBoth`): un ítem puede estar a la vez seleccionado (✓) Y pausado (⏸). La pausa gana siempre: el ítem va a `pausedIndices` → kitchen retenido. La condición `&& !selected.has(...)` fue eliminada del filtro en ambas funciones.
 
 ---
 
