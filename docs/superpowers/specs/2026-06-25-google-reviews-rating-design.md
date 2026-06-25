@@ -20,18 +20,24 @@ No RLS changes needed — existing policies cover the column.
 
 ### 1.2 New table `valoraciones`
 
+Multiple people can share the same mesa session (one per device). The unique constraint is therefore on `(mesa_sesion_id, rater_id)` — one rating per device per session.
+
+`rater_id` is a UUID generated client-side on first render and persisted in `localStorage` under the key `rater_id`. It is device-scoped and never tied to a user account.
+
 ```sql
 CREATE TABLE public.valoraciones (
-  id            UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  empresa_id    UUID NOT NULL REFERENCES public.empresas(id) ON DELETE CASCADE,
-  mesa_id       TEXT,
+  id             UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  empresa_id     UUID NOT NULL REFERENCES public.empresas(id) ON DELETE CASCADE,
+  mesa_id        TEXT,
   mesa_sesion_id TEXT,
-  estrellas     NUMERIC(2,1) NOT NULL CHECK (estrellas >= 0.5 AND estrellas <= 5.0),
-  created_at    TIMESTAMPTZ DEFAULT now()
+  rater_id       UUID NOT NULL,
+  estrellas      NUMERIC(2,1) NOT NULL CHECK (estrellas >= 0.5 AND estrellas <= 5.0),
+  created_at     TIMESTAMPTZ DEFAULT now()
 );
 
--- Unique: one rating per session
-CREATE UNIQUE INDEX valoraciones_sesion_unique ON public.valoraciones (mesa_sesion_id)
+-- Unique: one rating per device per session
+CREATE UNIQUE INDEX valoraciones_device_sesion_unique
+  ON public.valoraciones (mesa_sesion_id, rater_id)
   WHERE mesa_sesion_id IS NOT NULL;
 ```
 
@@ -68,6 +74,7 @@ interface Valoracion {
   empresaId: string;
   mesaId: string | null;
   mesaSesionId: string | null;
+  raterId: string; // device-scoped UUID from localStorage
   estrellas: number; // 0.5–5.0
   createdAt: string;
 }
@@ -75,10 +82,10 @@ interface Valoracion {
 
 ### 2.3 CreateValoracionUseCase
 
-- Input DTO: `{ empresaId, mesaId, mesaSesionId, estrellas }`
-- Zod: `estrellas` is `z.number().min(0.5).max(5.0).multipleOf(0.5)`
+- Input DTO: `{ empresaId, mesaId, mesaSesionId, raterId, estrellas }`
+- Zod: `estrellas` is `z.number().min(0.5).max(5.0).multipleOf(0.5)`, `raterId` is `z.string().uuid()`
 - Calls `IValoracionRepository.create()`
-- On conflict on `mesa_sesion_id` → upsert (update estrellas, created_at) to handle re-rating edge case
+- On conflict on `(mesa_sesion_id, rater_id)` → upsert (update estrellas, created_at) so the same device can correct its rating before locking
 
 ### 2.4 GetValoracionesStatsUseCase
 
@@ -93,7 +100,7 @@ interface Valoracion {
 ### 3.1 SupabaseValoracionRepository
 
 Implements `IValoracionRepository`:
-- `create(data)` → upsert by `mesa_sesion_id`
+- `create(data)` → upsert by `(mesa_sesion_id, rater_id)`
 - `getStatsByEmpresa(empresaId)` → aggregation query for stats
 
 ### 3.2 EmpresaRepository update
@@ -107,13 +114,14 @@ Map to `googleReviewsUrl` in the mapper.
 
 ### 4.1 POST `/api/mesas/[mesaId]/valoracion`
 
-Public endpoint (no auth). Rate-limited by the DB unique index on `mesa_sesion_id`.
+Public endpoint (no auth). Rate-limited by the DB unique index on `(mesa_sesion_id, rater_id)`.
 
 Request body (Zod validated):
 ```ts
 {
   estrellas: number;      // 0.5–5.0, multiple of 0.5
   sesion_id: string;      // mesa_sesion_id
+  rater_id: string;       // UUID from client localStorage
 }
 ```
 
@@ -164,10 +172,12 @@ Props:
 
 Behavior:
 1. If `sesionId` is null or `googleReviewsUrl` is null → render nothing
-2. On mount: check `localStorage.getItem('valoracion_' + sesionId)` — if present, show "rated" state (stars locked, no action available)
+2. On mount:
+   - Read `rater_id` from `localStorage.getItem('rater_id')`. If missing, generate `crypto.randomUUID()` and persist it under `'rater_id'` (permanent, device-scoped)
+   - Check `localStorage.getItem('valoracion_' + sesionId)` — if present, show locked "rated" state with the previously submitted value
 3. User swipes stars → local `hoverValue` state, no submission yet
 4. On `touchend`/`mouseup` → submit value:
-   - POST `/api/mesas/${mesaId}/valoracion` with `{ estrellas, sesion_id }`
+   - POST `/api/mesas/${mesaId}/valoracion` with `{ estrellas, sesion_id, rater_id }`
    - Save `localStorage.setItem('valoracion_' + sesionId, estrellas.toString())`
    - If `estrellas >= 4` AND `googleReviewsUrl` is set → `window.open(googleReviewsUrl, '_blank')`
    - Show inline "Gracias por tu valoración" confirmation text (no external modal)
