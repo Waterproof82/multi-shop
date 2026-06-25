@@ -49,11 +49,12 @@ export async function initiateRedsysPaymentUseCase(
     const secretKey = e['redsys_secret_key'] as string | null;
     const merchantName = (e['nombre'] as string | null) ?? 'Tienda';
 
-    // In development, fall back to Redsys public test credentials if not configured
+    // In development, always use Redsys public test credentials (override DB values).
+    // This ensures production credentials stored in DB are never sent to the test URL.
     const isDev = process.env.NODE_ENV !== 'production';
-    const effectiveMerchantCode = merchantCode ?? (isDev ? '999008881' : null);
-    const effectiveSecretKey    = secretKey    ?? (isDev ? 'sq7HjrUOBfKmC576ILgskD5srU870gJ7' : null);
-    const effectiveTerminal     = terminal     ?? '001';
+    const effectiveMerchantCode = isDev ? '999008881' : (merchantCode ?? null);
+    const effectiveSecretKey    = isDev ? 'sq7HjrUOBfKmC576ILgskD5srU870gJ7' : (secretKey ?? null);
+    const effectiveTerminal     = isDev ? '001' : (terminal ?? '001');
 
     if (!effectiveMerchantCode || !effectiveSecretKey) {
       return {

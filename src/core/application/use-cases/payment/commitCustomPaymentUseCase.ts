@@ -52,10 +52,12 @@ export async function commitCustomPaymentUseCase(
       .single();
 
     const e = empresa as Record<string, unknown> | null;
+    // In development, always use Redsys public test credentials (override DB values).
+    // This ensures production credentials stored in DB are never sent to the test URL.
     const isDev = process.env.NODE_ENV !== 'production';
-    const merchantCode = (e?.['redsys_merchant_code'] as string | null) ?? (isDev ? '999008881' : null);
-    const secretKey    = (e?.['redsys_secret_key']    as string | null) ?? (isDev ? 'sq7HjrUOBfKmC576ILgskD5srU870gJ7' : null);
-    const terminal     = (e?.['redsys_terminal']      as string | null) ?? '001';
+    const merchantCode = isDev ? '999008881' : ((e?.['redsys_merchant_code'] as string | null) ?? null);
+    const secretKey    = isDev ? 'sq7HjrUOBfKmC576ILgskD5srU870gJ7' : ((e?.['redsys_secret_key'] as string | null) ?? null);
+    const terminal     = isDev ? '001' : ((e?.['redsys_terminal'] as string | null) ?? '001');
     const merchantName = (e?.['nombre']               as string | null) ?? 'Tienda';
 
     if (!merchantCode || !secretKey) {
