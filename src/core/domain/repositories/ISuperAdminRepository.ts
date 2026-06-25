@@ -84,6 +84,7 @@ export interface EmpresaWithStats {
   mesasHabilitadas: boolean;
   validacionPedidosHabilitada: boolean;
   deliveryHabilitado: boolean;
+  googleReviewsUrl: string | null;
   stats: EmpresaStats;
   totalMesas: number;
   createdAt: string;
