@@ -1672,8 +1672,8 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
 
   const manualPayLabel = getManualPayLabel(manualPaying, division, lang);
 
-  // Custom selection: this user holds the lock
-  if (sessionData && isInSelectionTurn(activeTurnoId, sessionData.customTurno)) {
+  // Custom selection: this user holds the lock (skip for waiter — waiter sees main ticket view)
+  if (!isWaiterMode && sessionData && isInSelectionTurn(activeTurnoId, sessionData.customTurno)) {
     const redsysUrl = process.env.NEXT_PUBLIC_REDSYS_URL ?? 'https://sis-t.redsys.es:25443/sis/realizarPago';
     return (
       <CustomSelectionView
@@ -1700,7 +1700,7 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
   // and mount effects above will have already cleared this state. The cancel button
   // below is a last-resort escape for the rare full-reload case where those effects
   // run before the server poll reflects the cancellation.
-  if (sessionData && isInPaymentTurn(activeTurnoId, sessionData.customTurno)) {
+  if (!isWaiterMode && sessionData && isInPaymentTurn(activeTurnoId, sessionData.customTurno)) {
     return (
       <div className="min-h-screen bg-[#f0ede8] flex flex-col items-center justify-center gap-4 px-6 py-16 text-center">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#1a1612] border-t-transparent" />
@@ -1718,8 +1718,8 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
     );
   }
 
-  // Waiting: someone else holds the lock (selecting or paying)
-  if (isWaitingForOtherTurn(sessionData?.customTurno, activeTurnoId)) {
+  // Waiting: someone else holds the lock (selecting or paying) — skip for waiter
+  if (!isWaiterMode && isWaitingForOtherTurn(sessionData?.customTurno, activeTurnoId)) {
     return (
       <div className="min-h-screen bg-[#f0ede8]">
         <CustomWaitingView lang={lang} />
@@ -1727,8 +1727,8 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
     );
   }
 
-  // Between turns: personalizado mode, no active lock, not fully paid
-  if (sessionData && shouldShowRemainingActions(sessionData, hidingRemainingActions)) {
+  // Between turns: personalizado mode, no active lock, not fully paid — skip for waiter
+  if (!isWaiterMode && sessionData && shouldShowRemainingActions(sessionData, hidingRemainingActions)) {
     return (
       <RemainingItemsActions
         orders={sessionData.orders}
