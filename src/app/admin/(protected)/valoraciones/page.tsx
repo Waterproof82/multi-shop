@@ -24,18 +24,22 @@ interface ValoracionData {
   list: ValoracionItem[];
 }
 
-function StarDisplay({ value, size = 16 }: { value: number; size?: number }) {
+function StarDisplay({ value, size = 16 }: Readonly<{ value: number; size?: number }>) {
   return (
     <span className="flex gap-0.5">
-      {[1, 2, 3, 4, 5].map(s => (
-        <Star
-          key={s}
-          size={size}
-          fill={value >= s ? '#f5a623' : value >= s - 0.5 ? '#f5a623' : 'none'}
-          stroke={value >= s - 0.5 ? '#f5a623' : '#d4c9b8'}
-          style={value >= s - 0.5 && value < s ? { clipPath: 'inset(0 50% 0 0)' } : undefined}
-        />
-      ))}
+      {[1, 2, 3, 4, 5].map(s => {
+        const filled = value >= s;
+        const half = !filled && value >= s - 0.5;
+        return (
+          <Star
+            key={s}
+            size={size}
+            fill={filled || half ? '#f5a623' : 'none'}
+            stroke={filled || half ? '#f5a623' : '#d4c9b8'}
+            style={half ? { clipPath: 'inset(0 50% 0 0)' } : undefined}
+          />
+        );
+      })}
     </span>
   );
 }
