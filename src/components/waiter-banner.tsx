@@ -335,6 +335,9 @@ export function WaiterBanner() {
   // Not a waiter at all → hide everything
   if (!isWaiter) return null;
 
+  // Admin/superadmin panels are never waiter context
+  if (pathname.startsWith('/admin') || pathname.startsWith('/superadmin')) return null;
+
   // Kitchen page has its own header — don't render the waiter banner there
   if (pathname === '/kitchen') return null;
 
