@@ -10,21 +10,22 @@ export class SupabaseValoracionRepository implements IValoracionRepository {
     try {
       const { data: row, error } = await this.supabase
         .from('valoraciones')
-        .upsert(
-          {
-            empresa_id: data.empresaId,
-            mesa_id: data.mesaId,
-            mesa_sesion_id: data.mesaSesionId,
-            rater_id: data.raterId,
-            estrellas: data.estrellas,
-            created_at: new Date().toISOString(),
-          },
-          { onConflict: 'mesa_sesion_id,rater_id', ignoreDuplicates: false }
-        )
+        .insert({
+          empresa_id: data.empresaId,
+          mesa_id: data.mesaId,
+          mesa_sesion_id: data.mesaSesionId,
+          rater_id: data.raterId,
+          estrellas: data.estrellas,
+          created_at: new Date().toISOString(),
+        })
         .select('id, empresa_id, mesa_id, mesa_sesion_id, rater_id, estrellas, created_at')
         .single();
 
       if (error) {
+        // 23505 = unique_violation: user already rated this session — treat as success
+        if (error.code === '23505') {
+          return { success: true, data: { id: '', empresaId: data.empresaId, mesaId: data.mesaId ?? null, mesaSesionId: data.mesaSesionId ?? null, raterId: data.raterId, estrellas: data.estrellas, createdAt: new Date().toISOString() } };
+        }
         await logger.logAndReturnError('DB_INSERT_ERROR', error.message, 'repository', 'SupabaseValoracionRepository.create', { details: data as unknown as Record<string, unknown> });
         return { success: false, error: { code: 'DB_ERROR', message: 'Error al guardar la valoración', module: 'repository', method: 'create' } };
       }
