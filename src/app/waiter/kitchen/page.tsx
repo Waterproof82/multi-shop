@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { useSearchParams } from 'next/navigation';
-import { useLanguage } from '@/lib/language-context';
+import { useLanguage, type Language } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import { UtensilsCrossed, ChevronLeft, ChevronDown, ChevronsUpDown, TimerOff, CheckCheck, PlayCircle, Pause, Table2, Trash2, Layers } from 'lucide-react';
 import type { ItemEstado } from '@/core/domain/repositories/IPedidoRepository';
@@ -42,7 +43,7 @@ const THRESHOLD = 80;
 
 function getTimeColor(minutes: number) {
   for (const c of TIME_COLORS) if (minutes < c.max) return c;
-  return TIME_COLORS[TIME_COLORS.length - 1];
+  return TIME_COLORS.at(-1)!;
 }
 
 function getElapsedMinutes(createdAt: string): number {
@@ -121,7 +122,7 @@ function groupKitchenMesaItems(items: KitchenItem[]): MergedKitchenItem[] {
   }
   return Array.from(map.values()).sort((a, b) => {
     const nameComp = a.nombre.localeCompare(b.nombre);
-    return nameComp !== 0 ? nameComp : a.representativeEstado.localeCompare(b.representativeEstado);
+    return nameComp === 0 ? a.representativeEstado.localeCompare(b.representativeEstado) : nameComp;
   });
 }
 
@@ -129,10 +130,97 @@ function makeKey(pedidoId: string, itemIdx: number) {
   return `${pedidoId}:${itemIdx}`;
 }
 
+function itemStateKey(item: KitchenItem) {
+  return `${item.pedidoId}:${item.itemIdx}`;
+}
+
+function getKitchenSortOrder(estado: string): number {
+  if (estado === 'listo') return 0;
+  if (estado === 'retenido') return 2;
+  return 1;
+}
+
+type SwipeEls = { bg: HTMLElement | null; hint: HTMLElement | null; cancelBg: HTMLElement | null; cancelHint: HTMLElement | null };
+
+function applyLeftSwipe(els: SwipeEls, delta: number, actionBg: string) {
+  if (els.bg) els.bg.style.background = delta < -20 ? actionBg : 'transparent';
+  if (els.hint) els.hint.style.opacity = String(Math.min(1, -delta / THRESHOLD));
+  if (els.cancelBg) els.cancelBg.style.background = 'transparent';
+  if (els.cancelHint) els.cancelHint.style.opacity = '0';
+}
+
+function applyRightSwipe(els: SwipeEls, delta: number) {
+  if (els.bg) els.bg.style.background = 'transparent';
+  if (els.hint) els.hint.style.opacity = '0';
+  if (els.cancelBg) els.cancelBg.style.background = delta > 20 ? 'oklch(28% 0.22 25)' : 'transparent';
+  if (els.cancelHint) els.cancelHint.style.opacity = delta > 20 ? String(Math.min(1, (delta - 20) / THRESHOLD)) : '0';
+}
+
+function applyKitchenSwipeVisuals(el: HTMLElement, delta: number) {
+  const content = el.querySelector<HTMLElement>('[data-card-content]');
+  if (content) { content.style.transform = `translateX(${delta}px)`; content.style.transition = 'none'; }
+  const els: SwipeEls = {
+    bg:         el.querySelector<HTMLElement>('[data-reveal-bg]'),
+    hint:       el.querySelector<HTMLElement>('[data-hint]'),
+    cancelBg:   el.querySelector<HTMLElement>('[data-cancel-bg]'),
+    cancelHint: el.querySelector<HTMLElement>('[data-cancel-hint]'),
+  };
+  if (delta < 0) {
+    applyLeftSwipe(els, delta, el.dataset.actionColor ?? 'oklch(28% 0.16 148)');
+  } else {
+    applyRightSwipe(els, delta);
+  }
+}
+
+function snapCardInstant(el: HTMLElement) {
+  const content    = el.querySelector<HTMLElement>('[data-card-content]');
+  const bg         = el.querySelector<HTMLElement>('[data-reveal-bg]');
+  const hint       = el.querySelector<HTMLElement>('[data-hint]');
+  const cancelBg   = el.querySelector<HTMLElement>('[data-cancel-bg]');
+  const cancelHint = el.querySelector<HTMLElement>('[data-cancel-hint]');
+  if (content)    { content.style.transition = 'none'; content.style.transform = 'translateX(0)'; }
+  if (bg)         bg.style.background = 'transparent';
+  if (hint)       hint.style.opacity  = '0';
+  if (cancelBg)   cancelBg.style.background = 'transparent';
+  if (cancelHint) cancelHint.style.opacity  = '0';
+}
+
+
+function getItemCardColor(estado: ItemEstado, elapsed: number): { bg: string; border: string } {
+  if (estado === 'listo') return LISTO_COLOR;
+  if (estado === 'retenido') return RETENIDO_COLOR;
+  return getTimeColor(elapsed);
+}
+
+function getItemHintText(estado: ItemEstado, lang: Language): string {
+  if (estado === 'listo') return t('kitchenSwipeToServe', lang);
+  if (estado === 'retenido') return t('kitchenSwipeRestore', lang);
+  return t('kitchenSwipeToRetenido', lang);
+}
+
+function getItemBadgeStyle(estado: ItemEstado): { background: string; color: string } {
+  if (estado === 'listo')          return { background: 'oklch(28% 0.16 148 / 0.5)', color: 'oklch(80% 0.22 148)' };
+  if (estado === 'en_preparacion') return { background: 'oklch(32% 0.16 90 / 0.5)',  color: 'oklch(82% 0.20 90)' };
+  if (estado === 'retenido')       return { background: 'oklch(28% 0.14 65 / 0.5)',  color: 'oklch(78% 0.20 65)' };
+  return { background: 'oklch(30% 0.10 252 / 0.4)', color: 'oklch(75% 0.12 252)' };
+}
+
+function getItemStatusText(estado: ItemEstado, lang: Language): string {
+  if (estado === 'listo')          return t('kitchenItemListo', lang);
+  if (estado === 'retenido')       return t('kitchenItemRetenido', lang);
+  if (estado === 'en_preparacion') return t('orderStatusAnotado', lang);
+  return t('orderStatusPending', lang);
+}
+
+function getItemActionColor(estado: ItemEstado): string {
+  if (estado === 'retenido') return 'oklch(28% 0.12 65)';
+  if (estado === 'listo')    return 'oklch(28% 0.16 148)';
+  return RETENIDO_COLOR.bg;
+}
 
 export default function WaiterKitchenPage() {
   const { language } = useLanguage();
-  const lang = language as Parameters<typeof t>[1];
+  const lang = language;
   const searchParams = useSearchParams();
   const targetMesa = searchParams.get('mesa');
   const initialGroupBy = searchParams.get('groupBy') as 'order' | 'mesa' | 'listos' | 'retenidos' | null;
@@ -163,8 +251,25 @@ export default function WaiterKitchenPage() {
 
   useEffect(() => {
     void fetchItems();
-    const poll = setInterval(fetchItems, 3000);
-    return () => clearInterval(poll);
+
+    const supabase = getSupabaseAnonClient();
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const channel = supabase
+      .channel('waiter-kitchen-items')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados' }, () => {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => { void fetchItems(); }, 100);
+      })
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('[Realtime] waiter-kitchen-items error:', status);
+        }
+      });
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      void supabase.removeChannel(channel);
+    };
   }, [fetchItems]);
 
   useEffect(() => {
@@ -179,9 +284,14 @@ export default function WaiterKitchenPage() {
     scrolledRef.current = true;
 
     // Collapse all mesas except the target one
-    const sourceItems = groupBy === 'listos' ? items.filter(i => i.estado === 'listo')
-      : groupBy === 'retenidos' ? items.filter(i => i.estado === 'retenido')
-      : items;
+    let sourceItems: KitchenItem[];
+    if (groupBy === 'listos') {
+      sourceItems = items.filter(i => i.estado === 'listo');
+    } else if (groupBy === 'retenidos') {
+      sourceItems = items.filter(i => i.estado === 'retenido');
+    } else {
+      sourceItems = items;
+    }
     const allKeys = Array.from(groupByMesa(sourceItems).keys());
     const toCollapse = new Set(allKeys.filter(k => k !== targetMesa));
     if (toCollapse.size > 0) setCollapsedMesas(toCollapse);
@@ -202,6 +312,16 @@ export default function WaiterKitchenPage() {
     if (r.ok) onSuccess();
   }, []);
 
+  const setItemEstado = useCallback((pedidoId: string, itemIdx: number, newEstado: ItemEstado) => {
+    setItems(prev => prev.map(i =>
+      i.pedidoId === pedidoId && i.itemIdx === itemIdx ? { ...i, estado: newEstado } : i
+    ));
+  }, []);
+
+  const removeItem = useCallback((pedidoId: string, itemIdx: number) => {
+    setItems(prev => prev.filter(i => !(i.pedidoId === pedidoId && i.itemIdx === itemIdx)));
+  }, []);
+
   // ── Swipe handlers ─────────────────────────────────────────────────────────
 
   const handlePointerDown = useCallback((e: React.PointerEvent, key: string) => {
@@ -212,31 +332,7 @@ export default function WaiterKitchenPage() {
 
   const handlePointerMove = useCallback((e: React.PointerEvent, key: string) => {
     if (swipingKey.current !== key || pointerStartX.current === null) return;
-    const delta   = e.clientX - pointerStartX.current;
-    const el      = e.currentTarget as HTMLElement;
-    const content = el.querySelector<HTMLElement>('[data-card-content]');
-    const bg      = el.querySelector<HTMLElement>('[data-reveal-bg]');
-    const hint    = el.querySelector<HTMLElement>('[data-hint]');
-    const cancelBg   = el.querySelector<HTMLElement>('[data-cancel-bg]');
-    const cancelHint = el.querySelector<HTMLElement>('[data-cancel-hint]');
-
-    // Only inner content translates — reveal-bg stays stationary, no badge overlap
-    if (content) { content.style.transform = `translateX(${delta}px)`; content.style.transition = 'none'; }
-
-    if (delta < 0) {
-      // Left drag: action (retain/restore/serve) on the right side
-      const actionBg = el.dataset.actionColor ?? 'oklch(28% 0.16 148)';
-      if (bg) bg.style.background = delta < -20 ? actionBg : 'transparent';
-      if (hint) hint.style.opacity = String(Math.min(1, -delta / THRESHOLD));
-      if (cancelBg) cancelBg.style.background = 'transparent';
-      if (cancelHint) cancelHint.style.opacity = '0';
-    } else {
-      // Right drag: cancel action on the left side (red)
-      if (bg) bg.style.background = 'transparent';
-      if (hint) hint.style.opacity = '0';
-      if (cancelBg) cancelBg.style.background = delta > 20 ? 'oklch(28% 0.22 25)' : 'transparent';
-      if (cancelHint) cancelHint.style.opacity = delta > 20 ? String(Math.min(1, (delta - 20) / THRESHOLD)) : '0';
-    }
+    applyKitchenSwipeVisuals(e.currentTarget as HTMLElement, e.clientX - pointerStartX.current);
   }, []);
 
   const snapBack = useCallback((el: HTMLElement) => {
@@ -273,62 +369,36 @@ export default function WaiterKitchenPage() {
     const isListo    = item.estado === 'listo';
     const isRetenido = item.estado === 'retenido';
 
-    const resetInner = () => {
-      const content    = el.querySelector<HTMLElement>('[data-card-content]');
-      const bg         = el.querySelector<HTMLElement>('[data-reveal-bg]');
-      const hint       = el.querySelector<HTMLElement>('[data-hint]');
-      const cancelBg   = el.querySelector<HTMLElement>('[data-cancel-bg]');
-      const cancelHint = el.querySelector<HTMLElement>('[data-cancel-hint]');
-      if (content)    { content.style.transition = 'none'; content.style.transform = 'translateX(0)'; }
-      if (bg)         bg.style.background = 'transparent';
-      if (hint)       hint.style.opacity  = '0';
-      if (cancelBg)   cancelBg.style.background = 'transparent';
-      if (cancelHint) cancelHint.style.opacity  = '0';
-    };
-
-    if (isNuevo && delta < 0) {
+    if (isNuevo) {
       if (item.estado === 'en_preparacion') {
         // Item already being prepared — ask for confirmation before retaining
         snapBack(el);
         setPendingRetain(item);
       } else {
         // Pendiente — retain immediately
-        // In mesa view: snap back so the card stays visible with retenido styling
-        // (same key = same DOM node; flying it off-screen would hide it until next poll)
-        // In order view: fly the card out (item moves to a different section = fresh DOM node)
         if (groupBy === 'mesa') {
           snapBack(el);
         } else {
-          resetInner();
+          snapCardInstant(el);
           el.style.transition = 'transform 0.18s ease';
           el.style.transform  = 'translateX(-110%)';
         }
-        void patchEstado(item.pedidoId, item.itemIdx, 'retenido', () => {
-          setItems(prev => prev.map(i =>
-            i.pedidoId === item.pedidoId && i.itemIdx === item.itemIdx ? { ...i, estado: 'retenido' } : i
-          ));
-        });
+        void patchEstado(item.pedidoId, item.itemIdx, 'retenido', () => setItemEstado(item.pedidoId, item.itemIdx, 'retenido'));
       }
-    } else if (isListo && delta < 0) {
+    } else if (isListo) {
       // Left swipe on listo → servido: snap inner content, fly outer card left
-      resetInner();
+      snapCardInstant(el);
       el.style.transition = 'transform 0.18s ease';
       el.style.transform  = 'translateX(-110%)';
-      void patchEstado(item.pedidoId, item.itemIdx, 'servido', () => {
-        setItems(prev => prev.filter(i => !(i.pedidoId === item.pedidoId && i.itemIdx === item.itemIdx)));
-      });
-    } else if (isRetenido && delta < 0) {
+      void patchEstado(item.pedidoId, item.itemIdx, 'servido', () => removeItem(item.pedidoId, item.itemIdx));
+    } else if (isRetenido) {
       // Left swipe on retenido → restore to pendiente
       snapBack(el);
-      void patchEstado(item.pedidoId, item.itemIdx, 'pendiente', () => {
-        setItems(prev => prev.map(i =>
-          i.pedidoId === item.pedidoId && i.itemIdx === item.itemIdx ? { ...i, estado: 'pendiente' } : i
-        ));
-      });
+      void patchEstado(item.pedidoId, item.itemIdx, 'pendiente', () => setItemEstado(item.pedidoId, item.itemIdx, 'pendiente'));
     } else {
       snapBack(el);
     }
-  }, [patchEstado, snapBack, groupBy, setPendingRetain]);
+  }, [patchEstado, snapBack, groupBy, setPendingRetain, setItemEstado, removeItem]);
 
   const handlePointerCancel = useCallback((e: React.PointerEvent) => {
     snapBack(e.currentTarget as HTMLElement);
@@ -357,7 +427,7 @@ export default function WaiterKitchenPage() {
     const isNuevo    = estado === 'pendiente' || estado === 'en_preparacion';
     const isListo    = estado === 'listo';
     const isRetenido = estado === 'retenido';
-    if (isNuevo)    setPendingMergedWaiterAction({ items: merged.items, action: 'retenido' });
+    if (isNuevo)         setPendingMergedWaiterAction({ items: merged.items, action: 'retenido' });
     else if (isListo)    setPendingMergedWaiterAction({ items: merged.items, action: 'servido' });
     else if (isRetenido) setPendingMergedWaiterAction({ items: merged.items, action: 'pendiente' });
   }, [snapBack]);
@@ -366,15 +436,13 @@ export default function WaiterKitchenPage() {
     if (!pendingMergedWaiterAction) return;
     const { items: toProcess, action } = pendingMergedWaiterAction;
     setPendingMergedWaiterAction(null);
-    await Promise.all(toProcess.map(item =>
-      patchEstado(item.pedidoId, item.itemIdx, action, () => {
-        setItems(prev => action === 'servido'
-          ? prev.filter(i => !(i.pedidoId === item.pedidoId && i.itemIdx === item.itemIdx))
-          : prev.map(i => i.pedidoId === item.pedidoId && i.itemIdx === item.itemIdx ? { ...i, estado: action } : i)
-        );
-      })
-    ));
-  }, [pendingMergedWaiterAction, patchEstado]);
+    await Promise.all(toProcess.map(item => {
+      const onSuccess = action === 'servido'
+        ? () => removeItem(item.pedidoId, item.itemIdx)
+        : () => setItemEstado(item.pedidoId, item.itemIdx, action);
+      return patchEstado(item.pedidoId, item.itemIdx, action, onSuccess);
+    }));
+  }, [pendingMergedWaiterAction, patchEstado, setItemEstado, removeItem]);
 
   // ── Sections ───────────────────────────────────────────────────────────────
 
@@ -394,7 +462,8 @@ export default function WaiterKitchenPage() {
           body: JSON.stringify({ estado: 'servido' }),
         })
       ));
-      setItems(prev => prev.filter(i => !listosInMesa.some(l => l.pedidoId === i.pedidoId && l.itemIdx === i.itemIdx)));
+      const doneKeys = new Set(listosInMesa.map(itemStateKey));
+      setItems(prev => prev.filter(i => !doneKeys.has(itemStateKey(i))));
     } finally {
       setServingMesas(prev => { const next = new Set(prev); next.delete(mesaKey); return next; });
     }
@@ -410,10 +479,9 @@ export default function WaiterKitchenPage() {
           body: JSON.stringify({ estado: 'pendiente' }),
         })
       ));
+      const retenidoKeys = new Set(retenidos.map(itemStateKey));
       setItems(prev => prev.map(i =>
-        retenidos.some(r => r.pedidoId === i.pedidoId && r.itemIdx === i.itemIdx)
-          ? { ...i, estado: 'pendiente' }
-          : i
+        retenidoKeys.has(itemStateKey(i)) ? { ...i, estado: 'pendiente' } : i
       ));
     } finally {
       setLiberatingMesas(prev => { const next = new Set(prev); next.delete(mesaKey); return next; });
@@ -432,48 +500,34 @@ export default function WaiterKitchenPage() {
     if (!pendingRetain) return;
     const item = pendingRetain;
     setPendingRetain(null);
-    await patchEstado(item.pedidoId, item.itemIdx, 'retenido', () => {
-      setItems(prev => prev.map(i =>
-        i.pedidoId === item.pedidoId && i.itemIdx === item.itemIdx ? { ...i, estado: 'retenido' } : i
-      ));
-    });
-  }, [pendingRetain, patchEstado]);
+    await patchEstado(item.pedidoId, item.itemIdx, 'retenido', () => setItemEstado(item.pedidoId, item.itemIdx, 'retenido'));
+  }, [pendingRetain, patchEstado, setItemEstado]);
 
   const confirmCancel = useCallback(async () => {
     if (!pendingCancel) return;
     const toCancel = pendingCancel;
     setPendingCancel(null);
     await Promise.all(toCancel.map(item =>
-      patchEstado(item.pedidoId, item.itemIdx, 'cancelado', () => {
-        setItems(prev => prev.filter(i => !(i.pedidoId === item.pedidoId && i.itemIdx === item.itemIdx)));
-      })
+      patchEstado(item.pedidoId, item.itemIdx, 'cancelado', () => removeItem(item.pedidoId, item.itemIdx))
     ));
-  }, [pendingCancel, patchEstado]);
+  }, [pendingCancel, patchEstado, removeItem]);
 
   function renderItemCard(item: KitchenItem) {
     const key        = makeKey(item.pedidoId, item.itemIdx);
-    const isEnPrep   = item.estado === 'en_preparacion';
     const isListo    = item.estado === 'listo';
     const isRetenido = item.estado === 'retenido';
-    const canSwipe   = true;
-    const elapsed = getElapsedMinutes(item.createdAt);
-
-    const baseTimeColor = getTimeColor(elapsed);
-    const cardColor: { bg: string; border: string } = isListo    ? LISTO_COLOR
-      : isRetenido ? RETENIDO_COLOR
-      : baseTimeColor;
-
-    const hintText = isListo
-      ? t('kitchenSwipeToServe', lang)
-      : isRetenido
-        ? t('kitchenSwipeRestore', lang)
-        : t('kitchenSwipeToRetenido', lang);
+    const elapsed    = getElapsedMinutes(item.createdAt);
+    const cardColor  = getItemCardColor(item.estado, elapsed);
+    const hintText   = getItemHintText(item.estado, lang);
+    const hintColor  = isListo ? 'oklch(75% 0.18 148)' : 'oklch(75% 0.20 65)';
+    const badgeStyle = getItemBadgeStyle(item.estado);
+    const statusText = getItemStatusText(item.estado, lang);
 
     return (
       <div
         key={key}
         className="relative rounded-xl overflow-hidden select-none"
-        data-action-color={isRetenido ? 'oklch(28% 0.12 65)' : isListo ? 'oklch(28% 0.16 148)' : RETENIDO_COLOR.bg}
+        data-action-color={getItemActionColor(item.estado)}
         style={{
           background:  cardColor.bg,
           border:      `1px solid ${cardColor.border}`,
@@ -485,30 +539,28 @@ export default function WaiterKitchenPage() {
         onPointerUp={e => handlePointerUp(e, item)}
         onPointerCancel={handlePointerCancel}
       >
-        {canSwipe && (<>
-          {/* Right side reveal (left drag) — action hint */}
-          <div data-reveal-bg="" className="absolute inset-0 flex items-center justify-end px-3" style={{ background: 'transparent' }}>
-            <span
-              data-hint=""
-              className="pointer-events-none flex items-center gap-1 text-[10px] font-bold"
-              style={{ opacity: 0, color: isRetenido ? 'oklch(75% 0.20 65)' : isListo ? 'oklch(75% 0.18 148)' : 'oklch(75% 0.20 65)', transition: 'opacity 0.1s' }}
-            >
-              {!isRetenido && !isListo && <Pause className="w-3 h-3 shrink-0" />}
-              {hintText}
-            </span>
-          </div>
-          {/* Left side reveal (right drag) — cancel/trash */}
-          <div data-cancel-bg="" className="absolute inset-0 flex items-center justify-start px-3" style={{ background: 'transparent' }}>
-            <span
-              data-cancel-hint=""
-              className="pointer-events-none flex items-center gap-1 text-[10px] font-bold"
-              style={{ opacity: 0, color: 'oklch(78% 0.24 25)', transition: 'opacity 0.1s' }}
-            >
-              <Trash2 className="w-3 h-3 shrink-0" />
-              {t('kitchenCancelSwipeHint', lang)}
-            </span>
-          </div>
-        </>)}
+        {/* Right side reveal (left drag) — action hint */}
+        <div data-reveal-bg="" className="absolute inset-0 flex items-center justify-end px-3" style={{ background: 'transparent' }}>
+          <span
+            data-hint=""
+            className="pointer-events-none flex items-center gap-1 text-[10px] font-bold"
+            style={{ opacity: 0, color: hintColor, transition: 'opacity 0.1s' }}
+          >
+            {!isRetenido && !isListo && <Pause className="w-3 h-3 shrink-0" />}
+            {hintText}
+          </span>
+        </div>
+        {/* Left side reveal (right drag) — cancel/trash */}
+        <div data-cancel-bg="" className="absolute inset-0 flex items-center justify-start px-3" style={{ background: 'transparent' }}>
+          <span
+            data-cancel-hint=""
+            className="pointer-events-none flex items-center gap-1 text-[10px] font-bold"
+            style={{ opacity: 0, color: 'oklch(78% 0.24 25)', transition: 'opacity 0.1s' }}
+          >
+            <Trash2 className="w-3 h-3 shrink-0" />
+            {t('kitchenCancelSwipeHint', lang)}
+          </span>
+        </div>
 
         {/* Card content — this div translates during drag */}
         <div data-card-content="" className="relative flex items-center gap-3 px-3 py-2.5" style={{ background: cardColor.bg }}>
@@ -527,28 +579,10 @@ export default function WaiterKitchenPage() {
           <div className="shrink-0 flex items-center gap-2">
             <span
               className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold"
-              style={isListo ? {
-                background: 'oklch(28% 0.16 148 / 0.5)',
-                color:      'oklch(80% 0.22 148)',
-              } : isEnPrep ? {
-                background: 'oklch(32% 0.16 90 / 0.5)',
-                color:      'oklch(82% 0.20 90)',
-              } : isRetenido ? {
-                background: 'oklch(28% 0.14 65 / 0.5)',
-                color:      'oklch(78% 0.20 65)',
-              } : {
-                background: 'oklch(30% 0.10 252 / 0.4)',
-                color:      'oklch(75% 0.12 252)',
-              }}
+              style={badgeStyle}
             >
               {isRetenido && <Pause className="w-2.5 h-2.5" />}
-              {isListo
-                ? t('kitchenItemListo', lang)
-                : isRetenido
-                  ? t('kitchenItemRetenido', lang)
-                  : isEnPrep
-                    ? t('orderStatusAnotado', lang)
-                    : t('orderStatusPending', lang)}
+              {statusText}
             </span>
           </div>
         </div>
@@ -562,7 +596,48 @@ export default function WaiterKitchenPage() {
     const isRetenido  = merged.representativeEstado === 'retenido';
     const isEnPrep    = merged.representativeEstado === 'en_preparacion';
     const elapsed     = getElapsedMinutes(merged.firstCreatedAt);
-    const cardColor   = isListo ? LISTO_COLOR : isRetenido ? RETENIDO_COLOR : getTimeColor(elapsed);
+
+    let cardColor: { bg: string; border: string };
+    if (isListo) {
+      cardColor = LISTO_COLOR;
+    } else if (isRetenido) {
+      cardColor = RETENIDO_COLOR;
+    } else {
+      cardColor = getTimeColor(elapsed);
+    }
+
+    let hintText: string;
+    if (isListo) {
+      hintText = t('kitchenSwipeToServe', lang);
+    } else if (isRetenido) {
+      hintText = t('kitchenSwipeRestore', lang);
+    } else {
+      hintText = t('kitchenSwipeToRetenido', lang);
+    }
+
+    const hintColor = isListo ? 'oklch(75% 0.18 148)' : 'oklch(75% 0.20 65)';
+
+    let badgeStyle: { background: string; color: string };
+    if (isListo) {
+      badgeStyle = { background: 'oklch(28% 0.16 148 / 0.5)', color: 'oklch(80% 0.22 148)' };
+    } else if (isEnPrep) {
+      badgeStyle = { background: 'oklch(32% 0.16 90 / 0.5)',  color: 'oklch(82% 0.20 90)' };
+    } else if (isRetenido) {
+      badgeStyle = { background: 'oklch(28% 0.14 65 / 0.5)',  color: 'oklch(78% 0.20 65)' };
+    } else {
+      badgeStyle = { background: 'oklch(30% 0.10 252 / 0.4)', color: 'oklch(75% 0.12 252)' };
+    }
+
+    let statusText: string;
+    if (isListo) {
+      statusText = t('kitchenItemListo', lang);
+    } else if (isRetenido) {
+      statusText = t('kitchenItemRetenido', lang);
+    } else if (isEnPrep) {
+      statusText = t('orderStatusAnotado', lang);
+    } else {
+      statusText = t('orderStatusPending', lang);
+    }
 
     return (
       <div
@@ -579,10 +654,10 @@ export default function WaiterKitchenPage() {
           <span
             data-hint=""
             className="pointer-events-none flex items-center gap-1 text-[10px] font-bold"
-            style={{ opacity: 0, color: isRetenido ? 'oklch(75% 0.20 65)' : isListo ? 'oklch(75% 0.18 148)' : 'oklch(75% 0.20 65)', transition: 'opacity 0.1s' }}
+            style={{ opacity: 0, color: hintColor, transition: 'opacity 0.1s' }}
           >
             {!isRetenido && !isListo && <Pause className="w-3 h-3 shrink-0" />}
-            {isListo ? t('kitchenSwipeToServe', lang) : isRetenido ? t('kitchenSwipeRestore', lang) : t('kitchenSwipeToRetenido', lang)}
+            {hintText}
           </span>
         </div>
         {/* Left side reveal (right drag) — cancel all */}
@@ -611,18 +686,10 @@ export default function WaiterKitchenPage() {
           <div className="shrink-0">
             <span
               className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold"
-              style={isListo ? {
-                background: 'oklch(28% 0.16 148 / 0.5)', color: 'oklch(80% 0.22 148)',
-              } : isEnPrep ? {
-                background: 'oklch(32% 0.16 90 / 0.5)', color: 'oklch(82% 0.20 90)',
-              } : isRetenido ? {
-                background: 'oklch(28% 0.14 65 / 0.5)', color: 'oklch(78% 0.20 65)',
-              } : {
-                background: 'oklch(30% 0.10 252 / 0.4)', color: 'oklch(75% 0.12 252)',
-              }}
+              style={badgeStyle}
             >
               {isRetenido && <Pause className="w-2.5 h-2.5" />}
-              {isListo ? t('kitchenItemListo', lang) : isRetenido ? t('kitchenItemRetenido', lang) : isEnPrep ? t('orderStatusAnotado', lang) : t('orderStatusPending', lang)}
+              {statusText}
             </span>
           </div>
         </div>
@@ -649,9 +716,9 @@ export default function WaiterKitchenPage() {
         </div>
         {/* Row 2: time legend */}
         <div className="flex flex-wrap gap-1 py-2 px-3">
-          {TIME_COLORS.map((c, idx) => (
+          {TIME_COLORS.map((c) => (
             <span
-              key={idx}
+              key={c.label}
               className="rounded px-1.5 py-0.5 text-[10px] font-medium"
               style={{ background: c.bg, color: c.text, border: `1px solid ${c.border}` }}
             >
@@ -662,26 +729,27 @@ export default function WaiterKitchenPage() {
         {/* Row 3: filter toggle */}
         <div className="flex items-center gap-1 px-3 pb-2 flex-wrap">
           {(['order', 'mesa', 'listos', 'retenidos'] as const).map(mode => {
-            const isActive = groupBy === mode;
+            const isActive    = groupBy === mode;
             const isListos    = mode === 'listos';
             const isRetenidos = mode === 'retenidos';
-            const label = mode === 'order'     ? t('kitchenGroupByOrder', lang)
-              : mode === 'mesa'      ? t('kitchenGroupByTable', lang)
-              : mode === 'listos'    ? t('kitchenListos', lang)
-              : t('waiterRetenidos', lang);
-            const activeStyle = isListos ? {
-              background: 'oklch(26% 0.16 148)',
-              color: 'oklch(80% 0.22 148)',
-              border: '1px solid oklch(52% 0.26 148 / 0.7)',
-            } : isRetenidos ? {
-              background: 'oklch(24% 0.06 252)',
-              color: TEXT_DIM,
-              border: '1px solid oklch(48% 0.08 252 / 0.6)',
-            } : {
-              background: 'oklch(32% 0.10 252)',
-              color: TEXT_MAIN,
-              border: '1px solid oklch(50% 0.10 252 / 0.6)',
-            };
+            let label: string;
+            if (mode === 'order') {
+              label = t('kitchenGroupByOrder', lang);
+            } else if (mode === 'mesa') {
+              label = t('kitchenGroupByTable', lang);
+            } else if (mode === 'listos') {
+              label = t('kitchenListos', lang);
+            } else {
+              label = t('waiterRetenidos', lang);
+            }
+            let activeStyle: { background: string; color: string; border: string };
+            if (isListos) {
+              activeStyle = { background: 'oklch(26% 0.16 148)', color: 'oklch(80% 0.22 148)', border: '1px solid oklch(52% 0.26 148 / 0.7)' };
+            } else if (isRetenidos) {
+              activeStyle = { background: 'oklch(24% 0.06 252)', color: TEXT_DIM, border: '1px solid oklch(48% 0.08 252 / 0.6)' };
+            } else {
+              activeStyle = { background: 'oklch(32% 0.10 252)', color: TEXT_MAIN, border: '1px solid oklch(50% 0.10 252 / 0.6)' };
+            }
             return (
               <button
                 key={mode}
@@ -698,9 +766,15 @@ export default function WaiterKitchenPage() {
             );
           })}
           {groupBy !== 'order' && (() => {
-            const mesaKeys = Array.from(groupByMesa(
-                  groupBy === 'listos' ? listosItems : groupBy === 'retenidos' ? retenidoItems : items
-                ).keys());
+            let sourceItems: KitchenItem[];
+            if (groupBy === 'listos') {
+              sourceItems = listosItems;
+            } else if (groupBy === 'retenidos') {
+              sourceItems = retenidoItems;
+            } else {
+              sourceItems = items;
+            }
+            const mesaKeys = Array.from(groupByMesa(sourceItems).keys());
             const allCollapsed = mesaKeys.length > 0 && mesaKeys.every(k => collapsedMesas.has(k));
             return (
               <button
@@ -818,13 +892,11 @@ export default function WaiterKitchenPage() {
         {groupBy === 'mesa' && hasAny && (
           <div className="flex flex-col gap-5">
             {Array.from(groupByMesa(items).entries()).map(([mesaKey, group]) => {
-              const elapsed = getElapsedMinutes(group.firstCreatedAt);
               const sorted = [...group.items].sort((a, b) => {
-                const order = (i: KitchenItem) => i.estado === 'listo' ? 0 : i.estado === 'retenido' ? 2 : 1;
-                const diff = order(a) - order(b);
+                const diff = getKitchenSortOrder(a.estado) - getKitchenSortOrder(b.estado);
                 if (diff !== 0) return diff;
                 const nameComp = a.nombre.localeCompare(b.nombre);
-                return nameComp !== 0 ? nameComp : a.createdAt.localeCompare(b.createdAt);
+                return nameComp === 0 ? a.createdAt.localeCompare(b.createdAt) : nameComp;
               });
               const listosInMesa    = group.items.filter(i => i.estado === 'listo');
               const retenidosInMesa = group.items.filter(i => i.estado === 'retenido');
@@ -841,13 +913,22 @@ export default function WaiterKitchenPage() {
                   style={{ border: '1px solid oklch(35% 0.08 252 / 0.5)' }}
                 >
                   <div
-                    className="flex items-center gap-2 px-3 py-2.5 cursor-pointer"
+                    className="flex items-center"
                     style={{ background: 'oklch(18% 0.03 252)', borderBottom: isCollapsed ? 'none' : '1px solid oklch(35% 0.08 252 / 0.4)' }}
-                    onClick={() => toggleMesaCollapse(mesaKey)}
                   >
-                    <Table2 className="w-4 h-4 shrink-0" style={{ color: 'oklch(62% 0.14 62)' }} />
-                    <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{displayLabel}</span>
-                    <div className="flex items-center gap-2 ml-auto" onClick={e => e.stopPropagation()}>
+                    <button
+                      className="flex flex-1 items-center gap-2 px-3 py-2.5 min-w-0"
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                      onClick={() => toggleMesaCollapse(mesaKey)}
+                    >
+                      <Table2 className="w-4 h-4 shrink-0" style={{ color: 'oklch(62% 0.14 62)' }} />
+                      <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{displayLabel}</span>
+                      <ChevronDown
+                        className="w-4 h-4 shrink-0 ml-auto"
+                        style={{ color: TEXT_DIM, transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}
+                      />
+                    </button>
+                    <div className="flex items-center gap-2 pr-3 shrink-0">
                       {listosInMesa.length > 0 && (
                         <button
                           onClick={() => void handleTodosServidos(mesaKey, listosInMesa)}
@@ -888,10 +969,6 @@ export default function WaiterKitchenPage() {
                         <Layers className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <ChevronDown
-                      className="w-4 h-4 shrink-0"
-                      style={{ color: TEXT_DIM, transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}
-                    />
                   </div>
                   {!isCollapsed && (
                     <div className="flex flex-col gap-2 p-2">
@@ -915,9 +992,9 @@ export default function WaiterKitchenPage() {
             ) : (
               <div className="flex flex-col gap-5">
                 {Array.from(groupByMesa(listosItems).entries()).map(([mesaKey, group]) => {
-                  const isServing      = servingMesas.has(mesaKey);
-                  const isCollapsed    = collapsedMesas.has(mesaKey);
-                  const displayLabel   = mesaKey.startsWith('Mesa ') ? mesaKey.slice(5) : mesaKey;
+                  const isServing    = servingMesas.has(mesaKey);
+                  const isCollapsed  = collapsedMesas.has(mesaKey);
+                  const displayLabel = mesaKey.startsWith('Mesa ') ? mesaKey.slice(5) : mesaKey;
                   return (
                     <div
                       key={mesaKey}
@@ -925,13 +1002,22 @@ export default function WaiterKitchenPage() {
                       style={{ border: '1px solid oklch(35% 0.08 252 / 0.5)' }}
                     >
                       <div
-                        className="flex items-center gap-2 px-3 py-2.5 cursor-pointer"
+                        className="flex items-center"
                         style={{ background: 'oklch(18% 0.03 252)', borderBottom: isCollapsed ? 'none' : '1px solid oklch(35% 0.08 252 / 0.4)' }}
-                        onClick={() => toggleMesaCollapse(mesaKey)}
                       >
-                        <Table2 className="w-4 h-4 shrink-0" style={{ color: 'oklch(65% 0.18 148)' }} />
-                        <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{displayLabel}</span>
-                        <div className="flex items-center gap-2 ml-auto" onClick={e => e.stopPropagation()}>
+                        <button
+                          className="flex flex-1 items-center gap-2 px-3 py-2.5 min-w-0"
+                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                          onClick={() => toggleMesaCollapse(mesaKey)}
+                        >
+                          <Table2 className="w-4 h-4 shrink-0" style={{ color: 'oklch(65% 0.18 148)' }} />
+                          <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{displayLabel}</span>
+                          <ChevronDown
+                            className="w-4 h-4 shrink-0 ml-auto"
+                            style={{ color: TEXT_DIM, transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}
+                          />
+                        </button>
+                        <div className="flex items-center gap-2 pr-3 shrink-0">
                           <button
                             onClick={() => void handleTodosServidos(mesaKey, group.items)}
                             disabled={isServing}
@@ -942,10 +1028,6 @@ export default function WaiterKitchenPage() {
                             {isServing ? <span className="text-[10px]">…</span> : <CheckCheck className="w-4 h-4" />}
                           </button>
                         </div>
-                        <ChevronDown
-                          className="w-4 h-4 shrink-0"
-                          style={{ color: TEXT_DIM, transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}
-                        />
                       </div>
                       {!isCollapsed && (
                         <div className="flex flex-col gap-2 p-2">
@@ -979,15 +1061,24 @@ export default function WaiterKitchenPage() {
                       style={{ border: '1px solid oklch(35% 0.08 252 / 0.5)' }}
                     >
                       <div
-                        className="flex items-center gap-2 px-3 py-2 cursor-pointer"
+                        className="flex items-center"
                         style={{ background: 'oklch(18% 0.03 252)', borderBottom: isCollapsed ? 'none' : '1px solid oklch(35% 0.08 252 / 0.4)' }}
-                        onClick={() => toggleMesaCollapse(mesaKey)}
                       >
-                        <Table2 className="w-4 h-4 shrink-0" style={{ color: TEXT_DIM }} />
-                        <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>
-                          {mesaKey.startsWith('Mesa ') ? mesaKey.slice(5) : mesaKey}
-                        </span>
-                        <div className="flex items-center gap-2 ml-auto" onClick={e => e.stopPropagation()}>
+                        <button
+                          className="flex flex-1 items-center gap-2 px-3 py-2 min-w-0"
+                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                          onClick={() => toggleMesaCollapse(mesaKey)}
+                        >
+                          <Table2 className="w-4 h-4 shrink-0" style={{ color: TEXT_DIM }} />
+                          <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>
+                            {mesaKey.startsWith('Mesa ') ? mesaKey.slice(5) : mesaKey}
+                          </span>
+                          <ChevronDown
+                            className="w-4 h-4 shrink-0 ml-auto"
+                            style={{ color: TEXT_DIM, transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}
+                          />
+                        </button>
+                        <div className="flex items-center gap-2 pr-3 shrink-0">
                           <button
                             onClick={() => void handleLiberarRetenidosMesa(mesaKey, group.items)}
                             disabled={isLiberating}
@@ -998,10 +1089,6 @@ export default function WaiterKitchenPage() {
                             {isLiberating ? <span className="text-[10px]">…</span> : <PlayCircle className="w-4 h-4" />}
                           </button>
                         </div>
-                        <ChevronDown
-                          className="w-4 h-4 shrink-0"
-                          style={{ color: TEXT_DIM, transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}
-                        />
                       </div>
                       {!isCollapsed && (
                         <div className="flex flex-col gap-2 p-2">
@@ -1021,12 +1108,19 @@ export default function WaiterKitchenPage() {
         <div
           className="fixed inset-0 z-50 flex items-center justify-center px-6"
           style={{ background: 'oklch(0% 0 0 / 0.65)' }}
-          onClick={() => setPendingRetain(null)}
         >
-          <div
-            className="w-full max-w-xs rounded-2xl p-5 flex flex-col gap-4"
-            style={{ background: 'oklch(18% 0.03 252)', border: '1px solid oklch(42% 0.10 252 / 0.5)' }}
-            onClick={e => e.stopPropagation()}
+          <button
+            type="button"
+            className="absolute inset-0"
+            style={{ cursor: 'default' }}
+            aria-label="Close"
+            onClick={() => setPendingRetain(null)}
+            onKeyDown={e => { if (e.key === 'Escape') { setPendingRetain(null); } }}
+          />
+          <dialog
+            open
+            className="w-full max-w-xs rounded-2xl flex flex-col gap-4"
+            style={{ background: 'oklch(18% 0.03 252)', border: '1px solid oklch(42% 0.10 252 / 0.5)', margin: 0, padding: '1.25rem' }}
           >
             <div className="flex flex-col gap-1.5">
               <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>
@@ -1052,7 +1146,7 @@ export default function WaiterKitchenPage() {
                 {t('kitchenRetainConfirmYes', lang)}
               </button>
             </div>
-          </div>
+          </dialog>
         </div>
       )}
       {/* Cancel confirmation dialog */}
@@ -1060,12 +1154,19 @@ export default function WaiterKitchenPage() {
         <div
           className="fixed inset-0 z-50 flex items-center justify-center px-6"
           style={{ background: 'oklch(0% 0 0 / 0.72)' }}
-          onClick={() => setPendingCancel(null)}
         >
-          <div
-            className="w-full max-w-xs rounded-2xl p-5 flex flex-col gap-4"
-            style={{ background: 'oklch(16% 0.04 25)', border: '1px solid oklch(45% 0.24 25 / 0.5)' }}
-            onClick={e => e.stopPropagation()}
+          <button
+            type="button"
+            className="absolute inset-0"
+            style={{ cursor: 'default' }}
+            aria-label="Close"
+            onClick={() => setPendingCancel(null)}
+            onKeyDown={e => { if (e.key === 'Escape') { setPendingCancel(null); } }}
+          />
+          <dialog
+            open
+            className="w-full max-w-xs rounded-2xl flex flex-col gap-4"
+            style={{ background: 'oklch(16% 0.04 25)', border: '1px solid oklch(45% 0.24 25 / 0.5)', margin: 0, padding: '1.25rem' }}
           >
             <div className="flex items-start gap-3">
               <div className="shrink-0 flex items-center justify-center w-9 h-9 rounded-full" style={{ background: 'oklch(22% 0.20 25)', border: '1px solid oklch(45% 0.28 25 / 0.6)' }}>
@@ -1100,53 +1201,66 @@ export default function WaiterKitchenPage() {
                 {t('kitchenCancelConfirmYes', lang)}
               </button>
             </div>
-          </div>
+          </dialog>
         </div>
       )}
 
       {/* Merged-group action confirmation dialog */}
-      {pendingMergedWaiterAction && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center px-6"
-          style={{ background: 'oklch(0% 0 0 / 0.72)' }}
-          onClick={() => setPendingMergedWaiterAction(null)}
-        >
+      {pendingMergedWaiterAction && (() => {
+        let dialogTitle: string;
+        if (pendingMergedWaiterAction.action === 'retenido') {
+          dialogTitle = t('kitchenItemRetenido', lang);
+        } else if (pendingMergedWaiterAction.action === 'servido') {
+          dialogTitle = t('kitchenSwipeToServe', lang);
+        } else {
+          dialogTitle = t('orderStatusPending', lang);
+        }
+        return (
           <div
-            className="w-full max-w-xs rounded-2xl p-5 flex flex-col gap-4"
-            style={{ background: 'oklch(16% 0.04 252)', border: '1px solid oklch(45% 0.12 252 / 0.5)' }}
-            onClick={e => e.stopPropagation()}
+            className="fixed inset-0 z-50 flex items-center justify-center px-6"
+            style={{ background: 'oklch(0% 0 0 / 0.72)' }}
           >
-            <div className="flex flex-col gap-1.5">
-              <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>
-                {pendingMergedWaiterAction.action === 'retenido'
-                  ? t('kitchenItemRetenido', lang)
-                  : pendingMergedWaiterAction.action === 'servido'
-                    ? t('kitchenSwipeToServe', lang)
-                    : t('orderStatusPending', lang)}
-              </span>
-              <span className="text-xs leading-relaxed" style={{ color: TEXT_DIM }}>
-                {pendingMergedWaiterAction.items.length} {pendingMergedWaiterAction.items.length === 1 ? 'pedido' : 'pedidos'} se procesarán a la vez.
-              </span>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setPendingMergedWaiterAction(null)}
-                className="flex-1 rounded-lg px-3 py-2 text-xs font-semibold"
-                style={{ background: 'oklch(20% 0.04 252)', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
-              >
-                {t('kitchenCountdownCancel', lang)}
-              </button>
-              <button
-                onClick={() => void confirmMergedWaiterAction()}
-                className="flex-1 rounded-lg px-3 py-2 text-xs font-semibold"
-                style={{ background: 'oklch(26% 0.14 252)', color: TEXT_MAIN, border: '1px solid oklch(50% 0.14 252 / 0.6)' }}
-              >
-                {t('kitchenConfirmProcess', lang)}
-              </button>
-            </div>
+            <button
+              type="button"
+              className="absolute inset-0"
+              style={{ cursor: 'default' }}
+              aria-label="Close"
+              onClick={() => setPendingMergedWaiterAction(null)}
+              onKeyDown={e => { if (e.key === 'Escape') { setPendingMergedWaiterAction(null); } }}
+            />
+            <dialog
+              open
+              className="w-full max-w-xs rounded-2xl flex flex-col gap-4"
+              style={{ background: 'oklch(16% 0.04 252)', border: '1px solid oklch(45% 0.12 252 / 0.5)', margin: 0, padding: '1.25rem' }}
+            >
+              <div className="flex flex-col gap-1.5">
+                <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>
+                  {dialogTitle}
+                </span>
+                <span className="text-xs leading-relaxed" style={{ color: TEXT_DIM }}>
+                  {pendingMergedWaiterAction.items.length} {pendingMergedWaiterAction.items.length === 1 ? 'pedido' : 'pedidos'} se procesarán a la vez.
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPendingMergedWaiterAction(null)}
+                  className="flex-1 rounded-lg px-3 py-2 text-xs font-semibold"
+                  style={{ background: 'oklch(20% 0.04 252)', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
+                >
+                  {t('kitchenCountdownCancel', lang)}
+                </button>
+                <button
+                  onClick={() => void confirmMergedWaiterAction()}
+                  className="flex-1 rounded-lg px-3 py-2 text-xs font-semibold"
+                  style={{ background: 'oklch(26% 0.14 252)', color: TEXT_MAIN, border: '1px solid oklch(50% 0.14 252 / 0.6)' }}
+                >
+                  {t('kitchenConfirmProcess', lang)}
+                </button>
+              </div>
+            </dialog>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

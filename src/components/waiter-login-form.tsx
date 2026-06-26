@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { UtensilsCrossed, KeyRound, Pause, ReceiptText, X, CheckSquare, ExternalLink, PlayCircle, BellRing } from "lucide-react";
 import { formatPrice } from "@/lib/format-price";
 import type { MesaWithSession } from "@/core/domain/repositories/IMesaRepository";
@@ -294,8 +295,8 @@ function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onClickListos, on
               Retenidos
             </span>
           </div>
-          {mesa.itemsDiferidos.map((d, i) => (
-            <div key={i} className="flex items-baseline justify-between gap-1.5">
+          {mesa.itemsDiferidos.map((d) => (
+            <div key={d.itemName} className="flex items-baseline justify-between gap-1.5">
               <span className="text-[11px] leading-snug break-words min-w-0" style={{ color: 'oklch(84% 0.05 62)', wordBreak: 'break-word' }}>
                 {d.itemName}
               </span>
@@ -371,10 +372,24 @@ export function WaiterLoginForm() {
     if (step !== "tables" || !empresaId) return;
 
     void refresh();
-    const interval = setInterval(() => { void refresh(); }, 2000);
+
+    const supabase = getSupabaseAnonClient();
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const channel = supabase
+      .channel('waiter-login-mesas')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mesa_sesiones' }, () => {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => { void refresh(); }, 100);
+      })
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('[Realtime] waiter-login-mesas error:', status);
+        }
+      });
 
     return () => {
-      clearInterval(interval);
+      if (debounceTimer) clearTimeout(debounceTimer);
+      void supabase.removeChannel(channel);
     };
   }, [step, empresaId, refresh]);
 
@@ -405,7 +420,7 @@ export function WaiterLoginForm() {
         const data = await res.json() as { empresaId?: string };
         if (data.empresaId) setEmpresaId(data.empresaId);
         setStep("tables");
-        window.dispatchEvent(new CustomEvent('waiter-auth-changed'));
+        globalThis.dispatchEvent(new CustomEvent('waiter-auth-changed'));
       } else {
         const data = await res.json() as { error?: string };
         setError(data.error ?? "PIN incorrecto");
@@ -429,8 +444,8 @@ export function WaiterLoginForm() {
       const r = await fetch(`/api/mesas/${encodeURIComponent(mesa.id)}/orders`);
       if (r.ok) {
         const data = await r.json() as { orders: { estado: string }[]; pagosHabilitados: boolean; sesionPagada: boolean };
-        const unservedStates = ['pendiente_validacion', 'pendiente', 'en_preparacion', 'preparado'];
-        if (!data.sesionPagada && data.orders.some(o => unservedStates.includes(o.estado))) {
+        const unservedStates = new Set(['pendiente_validacion', 'pendiente', 'en_preparacion', 'preparado']);
+        if (!data.sesionPagada && data.orders.some(o => unservedStates.has(o.estado))) {
           setCloseBlockedError('Quedan platos por servir. Sirve todos los platos antes de cerrar la mesa.');
           setTimeout(() => setCloseBlockedError(null), 5000);
           return;
@@ -652,12 +667,19 @@ export function WaiterLoginForm() {
         <div
           className="fixed inset-0 z-50 flex items-center justify-center px-6"
           style={{ background: 'oklch(0% 0 0 / 0.65)' }}
-          onClick={() => !launching && setDeferredMesa(null)}
         >
-          <div
+          <button
+            type="button"
+            className="absolute inset-0"
+            style={{ cursor: 'default' }}
+            aria-label="Close"
+            onClick={() => { if (!launching) { setDeferredMesa(null); } }}
+            onKeyDown={e => { if (e.key === 'Escape' && !launching) { setDeferredMesa(null); } }}
+          />
+          <dialog
+            open
             className="w-full max-w-xs rounded-2xl p-5 flex flex-col gap-4"
             style={{ background: 'oklch(18% 0.03 252)', border: '1px solid oklch(42% 0.10 252 / 0.5)' }}
-            onClick={e => e.stopPropagation()}
           >
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
@@ -667,7 +689,7 @@ export function WaiterLoginForm() {
                 </span>
               </div>
               <span className="text-xs" style={{ color: 'oklch(55% 0.04 252)' }}>
-                {deferredMesa.itemsDiferidos.length} ítem{deferredMesa.itemsDiferidos.length !== 1 ? 's' : ''} retenido{deferredMesa.itemsDiferidos.length !== 1 ? 's' : ''}
+                {deferredMesa.itemsDiferidos.length} ítem{deferredMesa.itemsDiferidos.length === 1 ? '' : 's'} retenido{deferredMesa.itemsDiferidos.length === 1 ? '' : 's'}
               </span>
             </div>
 
@@ -703,7 +725,7 @@ export function WaiterLoginForm() {
             >
               Cancelar
             </button>
-          </div>
+          </dialog>
         </div>
       )}
 

@@ -34,6 +34,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Wine, ChevronLeft, ChevronDown, ChevronsUpDown, Table2, CheckCheck, Trash2, Layers } from 'lucide-react';
+import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 
 const STORAGE_KEY = 'bar_served_keys';
 
@@ -63,7 +64,7 @@ function clearServedKeysForOrder(orderId: string) {
 
 const COUNTDOWN_SECONDS = 5;
 const COUNTDOWN_COLOR   = { bg: 'oklch(22% 0.16 148)', border: 'oklch(50% 0.26 148 / 0.6)' };
-import { useLanguage } from '@/lib/language-context';
+import { useLanguage, type Language } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 
 interface BarOrder {
@@ -138,6 +139,15 @@ interface MergedBarItem {
   createdAt: string;        // earliest createdAt in the group
 }
 
+function cancelBarItems(orders: BarOrder[], items: FlatBarItem[]): BarOrder[] {
+  return orders.map(o => {
+    const cancelledIdxs = items.filter(i => i.orderId === o.id).map(i => i.detallePedidoIdx);
+    if (cancelledIdxs.length === 0) return o;
+    const newItems = o.items.filter(i => !cancelledIdxs.includes(i.detallePedidoIdx));
+    return newItems.length === 0 ? null : { ...o, items: newItems };
+  }).filter((o): o is BarOrder => o !== null);
+}
+
 function groupMesaItems(items: FlatBarItem[]): MergedBarItem[] {
   const map = new Map<string, MergedBarItem>();
   for (const item of items) {
@@ -151,6 +161,47 @@ function groupMesaItems(items: FlatBarItem[]): MergedBarItem[] {
     if (item.createdAt < g.createdAt) g.createdAt = item.createdAt;
   }
   return Array.from(map.values()).sort((a, b) => a.nombre.localeCompare(b.nombre));
+}
+
+function getMergedGroupMinRemaining(items: FlatBarItem[], countdowns: Record<string, number>): number {
+  const active = items.filter(i => i.key in countdowns);
+  return Math.min(...active.map(i => countdowns[i.key] ?? 0));
+}
+
+function renderMergedCardInner(
+  anyCountdown: boolean,
+  minRemaining: number,
+  merged: MergedBarItem,
+  lang: Language,
+  cancelCountdown: (key: string) => void,
+) {
+  if (anyCountdown) {
+    return (
+      <>
+        <div className="shrink-0 flex items-center justify-center w-9 h-9 rounded-full text-base font-bold"
+          style={{ background: 'oklch(32% 0.20 148)', color: 'oklch(80% 0.22 148)', border: '2px solid oklch(55% 0.28 148 / 0.7)' }}>
+          {minRemaining}
+        </div>
+        <div className="flex-1 min-w-0">
+          <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{merged.totalCantidad}× {merged.nombre}</span>
+        </div>
+        <button className="rounded px-2 py-1 text-[10px] font-bold shrink-0"
+          style={{ background: 'oklch(26% 0.08 25)', color: 'oklch(75% 0.18 25)' }}
+          onClick={() => merged.items.forEach(i => cancelCountdown(i.key))}>
+          {t('kitchenCountdownCancel', lang)}
+        </button>
+      </>
+    );
+  }
+  return (
+    <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
+      <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{merged.totalCantidad}×</span>
+      <span className="text-xs truncate" style={{ color: TEXT_MAIN }}>{merged.nombre}</span>
+      <span className="text-[10px] ml-auto shrink-0 rounded px-1.5 py-0.5" style={{ background: 'oklch(22% 0.06 252 / 0.5)', color: TEXT_DIM }}>
+        {merged.items.length} pedido{merged.items.length === 1 ? '' : 's'}
+      </span>
+    </div>
+  );
 }
 
 function getTimeColor(minutes: number) {
@@ -170,6 +221,31 @@ function formatTimer(minutes: number): string {
 }
 
 const SWIPE_THRESHOLD = 80;
+
+type SwipeSideEls = { hint: HTMLElement | null; cancelBg: HTMLElement | null; cancelHint: HTMLElement | null };
+
+function applyLeftSwipeDrag({ hint, cancelBg, cancelHint }: SwipeSideEls, delta: number) {
+  if (hint) hint.style.opacity = delta < -20 ? String(Math.min(1, (-delta - 20) / 40)) : '0';
+  if (cancelBg) cancelBg.style.background = 'transparent';
+  if (cancelHint) cancelHint.style.opacity = '0';
+}
+
+function applyRightSwipeDrag({ hint, cancelBg, cancelHint }: SwipeSideEls, delta: number) {
+  if (hint) hint.style.opacity = '0';
+  if (cancelBg) cancelBg.style.background = delta > 20 ? 'oklch(32% 0.26 25)' : 'transparent';
+  if (cancelHint) cancelHint.style.opacity = delta > 20 ? String(Math.min(1, (delta - 20) / 60)) : '0';
+}
+
+function applySwipeDragVisuals(el: HTMLElement, delta: number) {
+  const content    = el.querySelector<HTMLElement>('[data-card-content]');
+  const hint       = el.querySelector<HTMLElement>('[data-hint]');
+  const cancelBg   = el.querySelector<HTMLElement>('[data-cancel-bg]');
+  const cancelHint = el.querySelector<HTMLElement>('[data-cancel-hint]');
+  if (content) { content.style.transform = `translateX(${delta}px)`; content.style.transition = 'none'; }
+  const els: SwipeSideEls = { hint, cancelBg, cancelHint };
+  if (delta < 0) { applyLeftSwipeDrag(els, delta); }
+  else { applyRightSwipeDrag(els, delta); }
+}
 
 export default function BarPage() {
   const { language } = useLanguage();
@@ -206,8 +282,25 @@ export default function BarPage() {
 
   useEffect(() => {
     void fetchOrders();
-    const poll = setInterval(fetchOrders, 3000);
-    return () => clearInterval(poll);
+
+    const supabase = getSupabaseAnonClient();
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const channel = supabase
+      .channel('waiter-bar-items')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados' }, () => {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => { void fetchOrders(); }, 100);
+      })
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('[Realtime] waiter-bar-items error:', status);
+        }
+      });
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      void supabase.removeChannel(channel);
+    };
   }, [fetchOrders]);
 
   // Trigger re-render every second so timers update without refetching
@@ -272,8 +365,8 @@ export default function BarPage() {
       }
     };
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    globalThis.addEventListener('beforeunload', handleBeforeUnload);
+    return () => globalThis.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
 
   // ── Countdown ─────────────────────────────────────────────────────────────
@@ -376,22 +469,7 @@ export default function BarPage() {
 
   const handlePointerMove = useCallback((e: React.PointerEvent, id: string) => {
     if (swipingId.current !== id || pointerStartX.current === null) return;
-    const delta   = e.clientX - pointerStartX.current;
-    const el      = e.currentTarget as HTMLElement;
-    const content = el.querySelector<HTMLElement>('[data-card-content]');
-    const hint    = el.querySelector<HTMLElement>('[data-hint]');
-    const cancelBg   = el.querySelector<HTMLElement>('[data-cancel-bg]');
-    const cancelHint = el.querySelector<HTMLElement>('[data-cancel-hint]');
-    if (content) { content.style.transform = `translateX(${delta}px)`; content.style.transition = 'none'; }
-    if (delta < 0) {
-      if (hint) hint.style.opacity = delta < -20 ? String(Math.min(1, (-delta - 20) / 40)) : '0';
-      if (cancelBg) cancelBg.style.background = 'transparent';
-      if (cancelHint) cancelHint.style.opacity = '0';
-    } else {
-      if (hint) hint.style.opacity = '0';
-      if (cancelBg) cancelBg.style.background = delta > 20 ? 'oklch(32% 0.26 25)' : 'transparent';
-      if (cancelHint) cancelHint.style.opacity = delta > 20 ? String(Math.min(1, (delta - 20) / 60)) : '0';
-    }
+    applySwipeDragVisuals(e.currentTarget as HTMLElement, e.clientX - pointerStartX.current);
   }, []);
 
   const handlePointerUp = useCallback((e: React.PointerEvent, flatItem: FlatBarItem) => {
@@ -437,13 +515,49 @@ export default function BarPage() {
   }, []);
 
   const toggleCollapse = useCallback((key: string) => {
-    setCollapsed(prev => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; });
+    setCollapsed(prev => { const n = new Set(prev); if (n.has(key)) { n.delete(key); } else { n.add(key); } return n; });
   }, []);
 
   const handleServeAllMesa = useCallback((mesaItems: FlatBarItem[]) => {
     mesaItems.forEach(item => startCountdown(item));
     setPendingServeAll(null);
   }, [startCountdown]);
+
+  const handleBarCancel = useCallback(async () => {
+    if (!pendingBarCancel) return;
+    const items = pendingBarCancel;
+    setPendingBarCancel(null);
+    await Promise.all(items.map(item =>
+      fetch(`/api/waiter/kitchen/items/${encodeURIComponent(item.orderId)}/${item.detallePedidoIdx}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: 'cancelado' }),
+      })
+    ));
+    setOrders(prev => cancelBarItems(prev, items));
+  }, [pendingBarCancel]);
+
+  const handleGroupPointerUp = useCallback((e: React.PointerEvent, groupKey: string, mergedItems: FlatBarItem[]) => {
+    if (swipingId.current !== groupKey || pointerStartX.current === null) return;
+    const delta = e.clientX - pointerStartX.current;
+    const el = e.currentTarget as HTMLElement;
+    pointerStartX.current = null;
+    swipingId.current = null;
+    const content    = el.querySelector<HTMLElement>('[data-card-content]');
+    const hint       = el.querySelector<HTMLElement>('[data-hint]');
+    const cancelBg   = el.querySelector<HTMLElement>('[data-cancel-bg]');
+    const cancelHint = el.querySelector<HTMLElement>('[data-cancel-hint]');
+    if (content)    { content.style.transition = 'transform 0.25s ease'; content.style.transform = 'translateX(0)'; }
+    if (hint)       hint.style.opacity = '0';
+    if (cancelBg)   cancelBg.style.background = 'transparent';
+    if (cancelHint) cancelHint.style.opacity = '0';
+    if (Math.abs(delta) < SWIPE_THRESHOLD) return;
+    if (delta > 0) {
+      setPendingBarCancel(mergedItems);
+    } else {
+      mergedItems.filter(i => !(i.key in countdowns) && !servedKeys.has(i.key)).forEach(i => startCountdown(i));
+    }
+  }, [countdowns, servedKeys, startCountdown]);
 
   // Flatten orders into one card per drink item, excluding locally served ones
   const flatItems: FlatBarItem[] = orders.flatMap(order =>
@@ -528,6 +642,44 @@ export default function BarPage() {
               </div>
             </div>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  function renderMergedDrinkCard(merged: MergedBarItem, mesaKey: string) {
+    const anyCountdown = merged.items.some(i => i.key in countdowns);
+    const allServed    = merged.items.every(i => servedKeys.has(i.key));
+    if (allServed) return null;
+    const minRemaining = anyCountdown ? getMergedGroupMinRemaining(merged.items, countdowns) : 0;
+    const elapsed   = getElapsedMinutes(merged.createdAt);
+    const cardColor = anyCountdown ? COUNTDOWN_COLOR : getTimeColor(elapsed);
+    const groupKey  = `group:${mesaKey}:${merged.nombre}`;
+    return (
+      <div
+        key={groupKey}
+        className="relative rounded-xl overflow-hidden select-none"
+        style={{ background: cardColor.bg, border: `1px solid ${cardColor.border}`, touchAction: 'pan-y', willChange: 'transform' }}
+        onPointerDown={anyCountdown ? undefined : e => handlePointerDown(e, groupKey)}
+        onPointerMove={anyCountdown ? undefined : e => handlePointerMove(e, groupKey)}
+        onPointerUp={anyCountdown ? undefined : e => handleGroupPointerUp(e, groupKey, merged.items)}
+        onPointerCancel={anyCountdown ? undefined : handlePointerCancel}
+      >
+        {!anyCountdown && (<>
+          <div className="absolute inset-0 flex items-center justify-end pr-3" style={{ background: 'oklch(28% 0.16 148)' }}>
+            <span data-hint="" className="text-xs font-bold" style={{ color: KITCHEN_ALERT_ACCENT, opacity: 0 }}>
+              {t('orderStatusServido', lang)} ✓
+            </span>
+          </div>
+          <div data-cancel-bg="" className="absolute inset-0 flex items-center justify-start pl-3" style={{ background: 'transparent' }}>
+            <span data-cancel-hint="" className="pointer-events-none flex items-center gap-1 text-[10px] font-bold" style={{ opacity: 0, color: 'oklch(80% 0.26 25)', transition: 'opacity 0.1s' }}>
+              <Trash2 className="w-3 h-3 shrink-0" />
+              {t('kitchenCancelSwipeHint', lang)}
+            </span>
+          </div>
+        </>)}
+        <div data-card-content="" className="relative flex items-center gap-3 px-3 py-2.5" style={{ background: cardColor.bg }}>
+          {renderMergedCardInner(anyCountdown, minRemaining, merged, lang, cancelCountdown)}
         </div>
       </div>
     );
@@ -620,15 +772,19 @@ export default function BarPage() {
           ? `${pendingBarCancel[0].cantidad}× ${pendingBarCancel[0].nombre}`
           : `${totalCant} ítem(s) — ${pendingBarCancel[0].nombre}`;
         return (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center px-6"
-            style={{ background: 'oklch(0% 0 0 / 0.75)' }}
-            onClick={() => setPendingBarCancel(null)}
-          >
-            <div
-              className="w-full max-w-xs rounded-2xl p-5 flex flex-col gap-4"
-              style={{ background: 'oklch(15% 0.06 25)', border: '2px solid oklch(50% 0.30 25 / 0.7)' }}
-              onClick={e => e.stopPropagation()}
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
+            <button
+              type="button"
+              className="absolute inset-0"
+              style={{ background: 'oklch(0% 0 0 / 0.75)' }}
+              onClick={() => setPendingBarCancel(null)}
+              onKeyDown={e => { if (e.key === 'Escape') { setPendingBarCancel(null); } }}
+              aria-label="Cerrar"
+            />
+            <dialog
+              open
+              className="relative w-full max-w-xs rounded-2xl flex flex-col gap-4"
+              style={{ background: 'oklch(15% 0.06 25)', border: '2px solid oklch(50% 0.30 25 / 0.7)', margin: 0, padding: '1.25rem' }}
             >
               <div className="flex items-start gap-3">
                 <div className="shrink-0 flex items-center justify-center w-10 h-10 rounded-full" style={{ background: 'oklch(24% 0.24 25)', border: '2px solid oklch(50% 0.32 25 / 0.7)' }}>
@@ -655,24 +811,7 @@ export default function BarPage() {
                   {t('kitchenCountdownCancel', lang)}
                 </button>
                 <button
-                  onClick={async () => {
-                    const items = pendingBarCancel;
-                    setPendingBarCancel(null);
-                    await Promise.all(items.map(item =>
-                      fetch(`/api/waiter/kitchen/items/${encodeURIComponent(item.orderId)}/${item.detallePedidoIdx}/status`, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ estado: 'cancelado' }),
-                      })
-                    ));
-                    setOrders(prev => prev.map(o => {
-                      const cancelledIdxs = items.filter(i => i.orderId === o.id).map(i => i.detallePedidoIdx);
-                      if (cancelledIdxs.length === 0) return o;
-                      const newItems = o.items.filter(i => !cancelledIdxs.includes(i.detallePedidoIdx));
-                      if (newItems.length === 0) return null;
-                      return { ...o, items: newItems };
-                    }).filter(Boolean) as typeof prev);
-                  }}
+                  onClick={handleBarCancel}
                   className="flex-1 rounded-lg px-3 py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5"
                   style={{ background: 'oklch(30% 0.28 25)', color: 'oklch(88% 0.26 25)', border: '2px solid oklch(52% 0.32 25 / 0.7)' }}
                 >
@@ -680,7 +819,7 @@ export default function BarPage() {
                   {t('kitchenCancelConfirmYes', lang)}
                 </button>
               </div>
-            </div>
+            </dialog>
           </div>
         );
       })()}
@@ -716,7 +855,6 @@ export default function BarPage() {
         {groupBy === 'mesa' && hasAnyContent && (
           <div className="flex flex-col gap-3">
             {Array.from(mesaGroups.entries()).map(([mesaKey, group]) => {
-              const elapsed      = getElapsedMinutes(group.firstCreatedAt);
               const isCollapsed  = collapsed.has(mesaKey);
               const isGrouped    = groupedMesas.has(mesaKey);
               const displayLabel = mesaKey.startsWith('Mesa ') ? mesaKey.slice(5) : mesaKey;
@@ -727,13 +865,17 @@ export default function BarPage() {
                 <div key={mesaKey} className="rounded-xl overflow-hidden"
                   style={{ border: '1px solid oklch(35% 0.08 252 / 0.5)' }}>
                   <div
-                    className="flex items-center gap-2 px-3 py-2.5 cursor-pointer"
-                    style={{ background: 'oklch(18% 0.03 252)', borderBottom: isCollapsed ? 'none' : '1px solid oklch(35% 0.08 252 / 0.4)' }}
-                    onClick={() => toggleCollapse(mesaKey)}>
-                    <Table2 className="w-4 h-4 shrink-0" style={{ color: 'oklch(62% 0.14 62)' }} />
-                    <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{displayLabel}</span>
-                    <div className="flex items-center gap-2 ml-auto" onClick={e => e.stopPropagation()}>
-                      {/* Group toggle button */}
+                    className="flex items-center"
+                    style={{ background: 'oklch(18% 0.03 252)', borderBottom: isCollapsed ? 'none' : '1px solid oklch(35% 0.08 252 / 0.4)' }}>
+                    <button
+                      className="flex flex-1 items-center gap-2 px-3 py-2.5 min-w-0"
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                      onClick={() => toggleCollapse(mesaKey)}>
+                      <Table2 className="w-4 h-4 shrink-0" style={{ color: 'oklch(62% 0.14 62)' }} />
+                      <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{displayLabel}</span>
+                      <ChevronDown className="w-4 h-4 shrink-0 ml-auto" style={{ color: TEXT_DIM, transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }} />
+                    </button>
+                    <div className="flex items-center gap-2 pr-3 shrink-0">
                       <button
                         onClick={() => setGroupedMesas(prev => {
                           const n = new Set(prev);
@@ -758,113 +900,10 @@ export default function BarPage() {
                         <CheckCheck className="w-4 h-4" />
                       </button>
                     </div>
-                    <ChevronDown className="w-4 h-4 shrink-0" style={{ color: TEXT_DIM, transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }} />
                   </div>
                   {!isCollapsed && (
                     <div className="flex flex-col gap-2 p-2">
-                      {isGrouped && mergedItems ? mergedItems.map(merged => {
-                        const anyCountdown  = merged.items.some(i => i.key in countdowns);
-                        const allServed     = merged.items.every(i => servedKeys.has(i.key));
-                        if (allServed) return null;
-                        const minRemaining  = anyCountdown
-                          ? Math.min(...merged.items.filter(i => i.key in countdowns).map(i => countdowns[i.key] ?? 0))
-                          : 0;
-                        const elapsed       = getElapsedMinutes(merged.createdAt);
-                        const cardColor     = anyCountdown ? COUNTDOWN_COLOR : getTimeColor(elapsed);
-                        const groupKey      = `group:${mesaKey}:${merged.nombre}`;
-                        return (
-                          <div
-                            key={groupKey}
-                            className="relative rounded-xl overflow-hidden select-none"
-                            style={{ background: cardColor.bg, border: `1px solid ${cardColor.border}`, touchAction: 'pan-y', willChange: 'transform' }}
-                            onPointerDown={anyCountdown ? undefined : e => handlePointerDown(e, groupKey)}
-                            onPointerMove={anyCountdown ? undefined : e => {
-                              if (swipingId.current !== groupKey || pointerStartX.current === null) return;
-                              const delta = e.clientX - pointerStartX.current;
-                              const el = e.currentTarget as HTMLElement;
-                              const content = el.querySelector<HTMLElement>('[data-card-content]');
-                              const hint    = el.querySelector<HTMLElement>('[data-hint]');
-                              const cancelBg   = el.querySelector<HTMLElement>('[data-cancel-bg]');
-                              const cancelHint = el.querySelector<HTMLElement>('[data-cancel-hint]');
-                              if (content) { content.style.transform = `translateX(${delta}px)`; content.style.transition = 'none'; }
-                              if (delta < 0) {
-                                if (hint) hint.style.opacity = delta < -20 ? String(Math.min(1, (-delta - 20) / 40)) : '0';
-                                if (cancelBg) cancelBg.style.background = 'transparent';
-                                if (cancelHint) cancelHint.style.opacity = '0';
-                              } else {
-                                if (hint) hint.style.opacity = '0';
-                                if (cancelBg) cancelBg.style.background = delta > 20 ? 'oklch(32% 0.26 25)' : 'transparent';
-                                if (cancelHint) cancelHint.style.opacity = delta > 20 ? String(Math.min(1, (delta - 20) / 60)) : '0';
-                              }
-                            }}
-                            onPointerUp={anyCountdown ? undefined : e => {
-                              if (swipingId.current !== groupKey || pointerStartX.current === null) return;
-                              const delta = e.clientX - pointerStartX.current;
-                              const el = e.currentTarget as HTMLElement;
-                              pointerStartX.current = null;
-                              swipingId.current = null;
-                              // snap back
-                              const content = el.querySelector<HTMLElement>('[data-card-content]');
-                              const hint    = el.querySelector<HTMLElement>('[data-hint]');
-                              const cancelBg   = el.querySelector<HTMLElement>('[data-cancel-bg]');
-                              const cancelHint = el.querySelector<HTMLElement>('[data-cancel-hint]');
-                              if (content) { content.style.transition = 'transform 0.25s ease'; content.style.transform = 'translateX(0)'; }
-                              if (hint) hint.style.opacity = '0';
-                              if (cancelBg) cancelBg.style.background = 'transparent';
-                              if (cancelHint) cancelHint.style.opacity = '0';
-                              if (Math.abs(delta) < SWIPE_THRESHOLD) return;
-                              if (delta > 0) {
-                                // Right swipe: cancel all items in group
-                                setPendingBarCancel(merged.items);
-                              } else {
-                                // Left swipe: serve all items in group
-                                merged.items.filter(i => !(i.key in countdowns) && !servedKeys.has(i.key)).forEach(i => startCountdown(i));
-                              }
-                            }}
-                            onPointerCancel={anyCountdown ? undefined : handlePointerCancel}
-                          >
-                            {!anyCountdown && (<>
-                              <div className="absolute inset-0 flex items-center justify-end pr-3" style={{ background: 'oklch(28% 0.16 148)' }}>
-                                <span data-hint="" className="text-xs font-bold" style={{ color: KITCHEN_ALERT_ACCENT, opacity: 0 }}>
-                                  {t('orderStatusServido', lang)} ✓
-                                </span>
-                              </div>
-                              <div data-cancel-bg="" className="absolute inset-0 flex items-center justify-start pl-3" style={{ background: 'transparent' }}>
-                                <span data-cancel-hint="" className="pointer-events-none flex items-center gap-1 text-[10px] font-bold" style={{ opacity: 0, color: 'oklch(80% 0.26 25)', transition: 'opacity 0.1s' }}>
-                                  <Trash2 className="w-3 h-3 shrink-0" />
-                                  {t('kitchenCancelSwipeHint', lang)}
-                                </span>
-                              </div>
-                            </>)}
-                            <div data-card-content="" className="relative flex items-center gap-3 px-3 py-2.5" style={{ background: cardColor.bg }}>
-                              {anyCountdown ? (
-                                <>
-                                  <div className="shrink-0 flex items-center justify-center w-9 h-9 rounded-full text-base font-bold"
-                                    style={{ background: 'oklch(32% 0.20 148)', color: 'oklch(80% 0.22 148)', border: '2px solid oklch(55% 0.28 148 / 0.7)' }}>
-                                    {minRemaining}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{merged.totalCantidad}× {merged.nombre}</span>
-                                  </div>
-                                  <button className="rounded px-2 py-1 text-[10px] font-bold shrink-0"
-                                    style={{ background: 'oklch(26% 0.08 25)', color: 'oklch(75% 0.18 25)' }}
-                                    onClick={() => merged.items.forEach(i => cancelCountdown(i.key))}>
-                                    {t('kitchenCountdownCancel', lang)}
-                                  </button>
-                                </>
-                              ) : (
-                                <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
-                                  <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{merged.totalCantidad}×</span>
-                                  <span className="text-xs truncate" style={{ color: TEXT_MAIN }}>{merged.nombre}</span>
-                                  <span className="text-[10px] ml-auto shrink-0 rounded px-1.5 py-0.5" style={{ background: 'oklch(22% 0.06 252 / 0.5)', color: TEXT_DIM }}>
-                                    {merged.items.length} pedido{merged.items.length !== 1 ? 's' : ''}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      }) : sortedItems.map(renderDrinkCard)}
+                      {isGrouped && mergedItems ? mergedItems.map(merged => renderMergedDrinkCard(merged, mesaKey)) : sortedItems.map(renderDrinkCard)}
                     </div>
                   )}
                 </div>
