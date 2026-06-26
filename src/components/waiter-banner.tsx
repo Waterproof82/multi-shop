@@ -105,6 +105,8 @@ async function handleLogout() {
 
 export function WaiterBanner() {
   const pathname = usePathname();
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
   const { language: lang } = useLanguage();
   const { openCart, totalItems, clearCart } = useCart();
   const [closeDialog, setCloseDialog] = useState<'confirm' | 'cart' | 'payment' | 'unpaid' | 'free' | null>(null);
@@ -219,7 +221,7 @@ export function WaiterBanner() {
         if (!r.ok) return;
         const json = await r.json() as CountsPayload;
         const prev = prevCountsRef.current;
-        if (prev && pathname.startsWith('/waiter') && didCountsIncrease(prev, json)) {
+        if (prev && pathnameRef.current.startsWith('/waiter') && didCountsIncrease(prev, json)) {
           playNotificationSound();
         }
         prevCountsRef.current = json;
@@ -339,7 +341,6 @@ export function WaiterBanner() {
   if (pathname.startsWith('/admin') || pathname.startsWith('/superadmin')) return null;
 
   // Kitchen page has its own header — don't render the waiter banner there
-  if (pathname === '/kitchen') return null;
 
   // Tracking page is customer-facing — never show the waiter banner there
   if (pathname.startsWith('/tracking/')) return null;

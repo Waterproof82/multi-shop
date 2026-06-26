@@ -1,4 +1,4 @@
-import { AppError, ErrorModule, Result } from '@/core/domain/entities/types';
+import { AppError, ErrorModule } from '@/core/domain/entities/types';
 
 /**
  * Client-safe error handler for React components
@@ -28,18 +28,6 @@ function safeLogError(error: AppError): void {
   }
 }
 
-export function handleClientError<T>(
-  error: unknown,
-  fallbackData: T,
-  method: string,
-  module: ClientErrorModule = 'use-case',
-): Result<T> {
-  const message = error instanceof Error ? error.message : 'Unknown error';
-  const appError = createClientError('CLIENT_ERROR', message, method, module);
-  safeLogError(appError);
-  return { success: false, error: appError };
-}
-
 export function logClientError(
   error: unknown,
   method: string,
@@ -51,6 +39,3 @@ export function logClientError(
   return appError;
 }
 
-export function isResultError<T>(result: Result<T>): boolean {
-  return !result.success;
-}
