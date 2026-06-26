@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { UtensilsCrossed, ArrowLeftRight, LogOut, X, ShoppingCart, ChevronDown, Circle, LockOpen, AlertTriangle, Wine, BellRing } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
@@ -207,11 +208,9 @@ export function WaiterBanner() {
   useEffect(() => {
     if (!mesaId) { setPagoEnCurso(false); return; }
     void fetchLock(mesaId);
-    const interval = setInterval(() => { void fetchLock(mesaId); }, 10_000);
-    return () => clearInterval(interval);
   }, [mesaId, fetchLock]);
 
-  // Poll kitchen/bar counts (works even without mesa selected)
+  // Realtime: kitchen/bar counts + lock status via single multiplexed channel
   useEffect(() => {
     if (!isWaiter) return;
     const fetchCounts = async () => {
@@ -229,9 +228,33 @@ export function WaiterBanner() {
       } catch { /* ignore */ }
     };
     void fetchCounts();
-    const interval = setInterval(fetchCounts, 10_000);
-    return () => clearInterval(interval);
-  }, [isWaiter]);
+
+    const supabase = getSupabaseAnonClient();
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const channel = supabase
+      .channel('waiter-banner')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados' }, () => {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => { void fetchCounts(); }, 100);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mesa_sesiones' }, () => {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          void fetchCounts();
+          if (mesaId) void fetchLock(mesaId);
+        }, 100);
+      })
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('[Realtime] waiter-banner error:', status);
+        }
+      });
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      void supabase.removeChannel(channel);
+    };
+  }, [isWaiter, mesaId, fetchLock]);
 
   // ── helper functions ──────────────────────────────────
 

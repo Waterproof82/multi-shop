@@ -350,9 +350,13 @@ export function TrackingPageClient({ token, initialStatus }: TrackingPageClientP
 
   useEffect(() => {
     if (orders.length === 0) return;
+    const allDone = orders.every(
+      o => o.error || o.status?.estado === 'entregado' || o.status?.glovo_status === 'COMPLETED'
+    );
+    if (allDone) return;
     const interval = setInterval(pollAll, 5000);
     return () => clearInterval(interval);
-  }, [pollAll, orders.length]);
+  }, [pollAll, orders]);
 
   if (orders.length === 0) {
     return (
