@@ -34,6 +34,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Wine, ChevronLeft, ChevronDown, ChevronsUpDown, Table2, CheckCheck, Trash2, Layers } from 'lucide-react';
+import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 
 const STORAGE_KEY = 'bar_served_keys';
 
@@ -206,8 +207,25 @@ export default function BarPage() {
 
   useEffect(() => {
     void fetchOrders();
-    const poll = setInterval(fetchOrders, 3000);
-    return () => clearInterval(poll);
+
+    const supabase = getSupabaseAnonClient();
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const channel = supabase
+      .channel('waiter-bar-items')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados' }, () => {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => { void fetchOrders(); }, 100);
+      })
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('[Realtime] waiter-bar-items error:', status);
+        }
+      });
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      void supabase.removeChannel(channel);
+    };
   }, [fetchOrders]);
 
   // Trigger re-render every second so timers update without refetching
