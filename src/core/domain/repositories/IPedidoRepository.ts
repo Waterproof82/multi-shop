@@ -141,8 +141,6 @@ export interface IPedidoRepository {
   findKitchenOrders(empresaId: string): Promise<Result<KitchenOrderItem[]>>;
   findAllRetenidos(empresaId: string, tipo: 'comida' | 'bebida'): Promise<Result<RetenidoItem[]>>;
   findBarOrders(empresaId: string): Promise<Result<BarOrderItem[]>>;
-  /** Returns food items in pendiente|en_preparacion (for /kitchen cook view) */
-  findKitchenItems(empresaId: string): Promise<Result<KitchenItemRecord[]>>;
   /** Returns food items in pendiente|en_preparacion|listo|retenido (for /waiter/kitchen view) */
   findWaiterKitchenItems(empresaId: string): Promise<Result<KitchenItemRecord[]>>;
   /** Upsert a per-item kitchen estado */

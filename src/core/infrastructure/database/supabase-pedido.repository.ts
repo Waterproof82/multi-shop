@@ -1236,13 +1236,6 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     }
   }
 
-  async findKitchenItems(empresaId: string): Promise<Result<KitchenItemRecord[]>> {
-    const result = await this.fetchAllComidaItems(empresaId);
-    if (!result.success) return result;
-    const active = new Set<ItemEstado>(['pendiente', 'en_preparacion']);
-    return { success: true, data: result.data.filter(i => active.has(i.estado)) };
-  }
-
   async findWaiterKitchenItems(empresaId: string): Promise<Result<KitchenItemRecord[]>> {
     const orderItemsResult = await this.fetchAllComidaItems(empresaId);
     if (!orderItemsResult.success) return orderItemsResult;
