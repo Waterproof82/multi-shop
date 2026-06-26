@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { ChevronLeft, ChevronDown, Table2, UtensilsCrossed, Wine, Pause, CheckCheck, Trash2, Layers } from 'lucide-react';
+import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 
@@ -174,8 +175,27 @@ export default function WaiterPendientesPage() {
 
   useEffect(() => {
     void fetchPendientes();
-    const poll = setInterval(fetchPendientes, 3000);
-    return () => clearInterval(poll);
+
+    const supabase = getSupabaseAnonClient();
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const trigger = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => { void fetchPendientes(); }, 100);
+    };
+    const channel = supabase
+      .channel('waiter-pendientes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, trigger)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados' }, trigger)
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('[Realtime] waiter-pendientes error:', status);
+        }
+      });
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      void supabase.removeChannel(channel);
+    };
   }, [fetchPendientes]);
 
   useEffect(() => {
