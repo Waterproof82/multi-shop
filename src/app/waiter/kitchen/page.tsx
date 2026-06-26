@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { useSearchParams } from 'next/navigation';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
@@ -163,8 +164,25 @@ export default function WaiterKitchenPage() {
 
   useEffect(() => {
     void fetchItems();
-    const poll = setInterval(fetchItems, 3000);
-    return () => clearInterval(poll);
+
+    const supabase = getSupabaseAnonClient();
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const channel = supabase
+      .channel('waiter-kitchen-items')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados' }, () => {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => { void fetchItems(); }, 100);
+      })
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('[Realtime] waiter-kitchen-items error:', status);
+        }
+      });
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      void supabase.removeChannel(channel);
+    };
   }, [fetchItems]);
 
   useEffect(() => {
