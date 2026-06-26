@@ -150,8 +150,8 @@ export function WaiterBanner() {
         .catch(() => setIsWaiter(false))
         .finally(() => setAuthChecked(true));
     }
-    window.addEventListener('waiter-auth-changed', handleAuthChanged);
-    return () => window.removeEventListener('waiter-auth-changed', handleAuthChanged);
+    globalThis.addEventListener('waiter-auth-changed', handleAuthChanged);
+    return () => globalThis.removeEventListener('waiter-auth-changed', handleAuthChanged);
   }, []);
 
   // Session expired on a waiter sub-page → back to PIN

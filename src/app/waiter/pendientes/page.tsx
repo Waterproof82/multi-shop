@@ -86,6 +86,139 @@ function getGroupedItems(mergedItems: MergedItem[], paused: Set<string>): Groupe
   return Array.from(map.values());
 }
 
+async function releaseRetainedPedidoItems(
+  pedidoId: string,
+  items: PendienteItem[],
+  sendTipo: 'comida' | 'bebida',
+  selected: Set<string>,
+  paused: Set<string>,
+  mode: 'all' | 'selected'
+): Promise<number[]> {
+  const toRelease = items.filter(i => {
+    if (i.tipo !== sendTipo) return false;
+    const isSelected = selected.has(`${pedidoId}:${i.idx}`);
+    if (mode === 'selected' && !isSelected) return false;
+    if (paused.has(`${pedidoId}:${i.idx}`) && !isSelected) return false;
+    return true;
+  });
+  const releasedIdx: number[] = [];
+  for (const item of toRelease) {
+    const r = await fetch(`/api/waiter/kitchen/items/${pedidoId}/${item.idx}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ estado: 'pendiente' }),
+    });
+    if (r.ok) releasedIdx.push(item.idx);
+  }
+  return releasedIdx;
+}
+
+async function validateNewPedido(
+  pedidoId: string,
+  items: PendienteItem[],
+  sendTipo: 'comida' | 'bebida',
+  selected: Set<string>,
+  paused: Set<string>,
+  mode: 'all' | 'selected'
+): Promise<boolean> {
+  const autoRetain = items.filter(i => i.tipo !== sendTipo).map(i => i.idx);
+  const notSelectedOfTipo = mode === 'selected'
+    ? items.filter(i => i.tipo === sendTipo && !selected.has(`${pedidoId}:${i.idx}`)).map(i => i.idx)
+    : [];
+  const retainIndices = [...new Set([...autoRetain, ...notSelectedOfTipo])];
+  const pausedIndices = items
+    .filter(i => i.tipo === sendTipo && paused.has(`${pedidoId}:${i.idx}`))
+    .map(i => i.idx);
+  const r = await fetch('/api/waiter/pendientes/validate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pedidoId, retainIndices, pausedIndices }),
+  });
+  return r.ok;
+}
+
+async function releaseSelectedPedidoItems(
+  pedidoId: string,
+  items: PendienteItem[],
+  selected: Set<string>
+): Promise<number[]> {
+  const toRelease = items.filter(i => selected.has(`${pedidoId}:${i.idx}`));
+  if (toRelease.length === 0) return [];
+  const releasedIdx: number[] = [];
+  for (const item of toRelease) {
+    const r = await fetch(`/api/waiter/kitchen/items/${pedidoId}/${item.idx}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ estado: 'pendiente' }),
+    });
+    if (r.ok) releasedIdx.push(item.idx);
+  }
+  return releasedIdx;
+}
+
+async function validateBothTypesPedido(
+  pedidoId: string,
+  items: PendienteItem[],
+  selected: Set<string>,
+  paused: Set<string>
+): Promise<boolean> {
+  const notSelected = items.filter(i => !selected.has(`${pedidoId}:${i.idx}`)).map(i => i.idx);
+  const pausedIndices = items
+    .filter(i => i.tipo === 'comida' && paused.has(`${pedidoId}:${i.idx}`))
+    .map(i => i.idx);
+  const r = await fetch('/api/waiter/pendientes/validate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pedidoId, retainIndices: notSelected, pausedIndices }),
+  });
+  return r.ok;
+}
+
+function removePedidoItems(
+  mesas: PendienteMesa[],
+  mesaId: string,
+  removedItemsMap: Map<string, number[]>
+): PendienteMesa[] {
+  return mesas
+    .map(m => {
+      if (m.mesaId !== mesaId) return m;
+      return {
+        ...m,
+        pedidos: m.pedidos
+          .map(p => {
+            const removed = removedItemsMap.get(p.id);
+            if (!removed) return p;
+            return { ...p, items: p.items.filter(i => !removed.includes(i.idx)) };
+          })
+          .filter(p => p.items.length > 0),
+      };
+    })
+    .filter(m => m.pedidos.length > 0);
+}
+
+function toggleSetItems(
+  prev: Record<string, Set<string>>,
+  mesaId: string,
+  keys: string[],
+  allActive: boolean
+): Record<string, Set<string>> {
+  const current = new Set(prev[mesaId] ?? []);
+  if (allActive) { keys.forEach(k => current.delete(k)); }
+  else { keys.forEach(k => current.add(k)); }
+  if (current.size === 0) { const n = { ...prev }; delete n[mesaId]; return n; }
+  return { ...prev, [mesaId]: current };
+}
+
+function makeCleanupMap(mesaId: string, removedItemsMap: Map<string, number[]>) {
+  return (prev: Record<string, Set<string>>) => {
+    if (!prev[mesaId]) return prev;
+    const processedIds = new Set(removedItemsMap.keys());
+    const remaining = new Set([...prev[mesaId]].filter(k => !processedIds.has(k.split(':')[0] ?? '')));
+    if (remaining.size === 0) { const n = { ...prev }; delete n[mesaId]; return n; }
+    return { ...prev, [mesaId]: remaining };
+  };
+}
+
 function getOldestCreatedAt(mesa: PendienteMesa): string {
   return mesa.pedidos.reduce((oldest, p) =>
     new Date(p.createdAt) < new Date(oldest) ? p.createdAt : oldest,
@@ -94,55 +227,57 @@ function getOldestCreatedAt(mesa: PendienteMesa): string {
 }
 
 interface PedidoItemButtonProps {
-  item: MergedItem;
-  isSelected: boolean;
-  isPaused: boolean;
-  onToggleSelect: () => void;
-  onTogglePause: () => void;
+  readonly item: MergedItem;
+  readonly isSelected: boolean;
+  readonly isPaused: boolean;
+  readonly onToggleSelect: () => void;
+  readonly onTogglePause: () => void;
 }
 
 function PedidoItemButton({ item, isSelected, isPaused, onToggleSelect, onTogglePause }: PedidoItemButtonProps) {
   return (
     <div
-      className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer"
-      style={{
-        background: 'oklch(15% 0.03 252)',
-        border: '1px solid oklch(35% 0.06 252 / 0.5)',
-      }}
-      onClick={onToggleSelect}
+      className="flex items-center rounded-lg overflow-hidden"
+      style={{ background: 'oklch(15% 0.03 252)', border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
     >
-      {/* Checkbox de selección */}
       <button
-        onClick={e => e.stopPropagation()}
-        className="shrink-0 flex items-center justify-center rounded"
-        style={{
-          width: 20, height: 20,
-          background: isSelected ? 'oklch(50% 0.22 148)' : 'transparent',
-          border: `2px solid ${isSelected ? 'oklch(50% 0.22 148)' : 'oklch(45% 0.06 252)'}`,
-        }}>
-        {isSelected && <span style={{ color: '#fff', fontSize: 9, fontWeight: 'bold', lineHeight: 1 }}>✓</span>}
-      </button>
-      <div className="flex-1 min-w-0">
-        <span className="text-xs" style={{ color: TEXT_MAIN }}>{item.cantidad}× {item.nombre}</span>
-        {item.complementos && (
-          <div className="text-[10px] truncate" style={{ color: TEXT_DIM }}>({item.complementos})</div>
-        )}
-      </div>
-      {item.tipo === 'comida'
-        ? <UtensilsCrossed className="w-3 h-3 shrink-0" style={{ color: 'oklch(62% 0.14 62)' }} />
-        : <Wine className="w-3 h-3 shrink-0" style={{ color: 'oklch(62% 0.14 252)' }} />
-      }
-      {/* Botón de pausa: solo para comida (cocina) */}
-      {item.tipo === 'comida' && (
-        <button
-          onClick={e => { e.stopPropagation(); onTogglePause(); }}
+        type="button"
+        className="flex flex-1 items-center gap-2 px-3 py-2 text-left"
+        onClick={onToggleSelect}
+      >
+        <span
           className="shrink-0 flex items-center justify-center rounded"
           style={{
-            width: 28, height: 28,
+            width: 20, height: 20,
+            background: isSelected ? 'oklch(50% 0.22 148)' : 'transparent',
+            border: `2px solid ${isSelected ? 'oklch(50% 0.22 148)' : 'oklch(45% 0.06 252)'}`,
+          }}
+        >
+          {isSelected && <span style={{ color: '#fff', fontSize: 9, fontWeight: 'bold', lineHeight: 1 }}>✓</span>}
+        </span>
+        <div className="flex-1 min-w-0">
+          <span className="text-xs" style={{ color: TEXT_MAIN }}>{item.cantidad}× {item.nombre}</span>
+          {item.complementos && (
+            <div className="text-[10px] truncate" style={{ color: TEXT_DIM }}>({item.complementos})</div>
+          )}
+        </div>
+        {item.tipo === 'comida'
+          ? <UtensilsCrossed className="w-3 h-3 shrink-0" style={{ color: 'oklch(62% 0.14 62)' }} />
+          : <Wine className="w-3 h-3 shrink-0" style={{ color: 'oklch(62% 0.14 252)' }} />
+        }
+      </button>
+      {item.tipo === 'comida' && (
+        <button
+          type="button"
+          onClick={onTogglePause}
+          className="shrink-0 flex items-center justify-center rounded"
+          style={{
+            width: 28, height: 28, margin: '0 4px',
             background: isPaused ? 'oklch(28% 0.14 65)' : 'oklch(20% 0.04 252)',
             color: isPaused ? 'oklch(78% 0.20 65)' : 'oklch(42% 0.06 252)',
             border: `1px solid ${isPaused ? 'oklch(50% 0.22 65 / 0.6)' : 'oklch(35% 0.06 252 / 0.4)'}`,
-          }}>
+          }}
+        >
           <Pause className="w-3 h-3" />
         </button>
       )}
@@ -270,83 +405,20 @@ export default function WaiterPendientesPage() {
 
       for (const pedido of mesa.pedidos) {
         if (!pedido.items.some(i => i.tipo === sendTipo)) continue;
-
         if (pedido.validated) {
-          // Liberar ítems del tipo solicitado. Selección explícita anula pausa.
-          const toRelease = pedido.items.filter(i => {
-            if (i.tipo !== sendTipo) return false;
-            const isSelected = selected.has(`${pedido.id}:${i.idx}`);
-            if (mode === 'selected' && !isSelected) return false;
-            // Pausa bloquea solo si el ítem NO está seleccionado explícitamente
-            if (paused.has(`${pedido.id}:${i.idx}`) && !isSelected) return false;
-            return true;
-          });
-          if (toRelease.length === 0) continue;
-
-          const releasedIdx: number[] = [];
-          for (const item of toRelease) {
-            const r = await fetch(`/api/waiter/kitchen/items/${pedido.id}/${item.idx}/status`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ estado: 'pendiente' }),
-            });
-            if (r.ok) releasedIdx.push(item.idx);
-          }
-          if (releasedIdx.length > 0) removedItemsMap.set(pedido.id, releasedIdx);
+          const released = await releaseRetainedPedidoItems(pedido.id, pedido.items, sendTipo, selected, paused, mode);
+          if (released.length > 0) removedItemsMap.set(pedido.id, released);
         } else {
-          // Calcular retainIndices:
-          // - ítems del otro tipo (auto-retain)
-          // - ítems pausados del tipo solicitado (van como retenido)
-          // - ítems NO seleccionados del tipo (cuando mode='selected', quedan retenidos para después)
-          // autoRetain: wrong tipo + not selected → from_validation=true (reappear in pendientes)
-          const autoRetain = pedido.items.filter(i => i.tipo !== sendTipo).map(i => i.idx);
-          const notSelectedOfTipo = mode === 'selected'
-            ? pedido.items.filter(i => i.tipo === sendTipo && !selected.has(`${pedido.id}:${i.idx}`)).map(i => i.idx)
-            : [];
-          const retainIndices = [...new Set([...autoRetain, ...notSelectedOfTipo])];
-          // pausedIndices: pausados del tipo solicitado → kitchen retenido (from_validation=false).
-          // La pausa prevalece sobre la selección: un ítem puede estar seleccionado Y pausado; la pausa gana.
-          const pausedIndices = pedido.items
-            .filter(i => i.tipo === sendTipo && paused.has(`${pedido.id}:${i.idx}`))
-            .map(i => i.idx);
-
-          const r = await fetch('/api/waiter/pendientes/validate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pedidoId: pedido.id, retainIndices, pausedIndices }),
-          });
-          if (r.ok) {
-            removedItemsMap.set(pedido.id, pedido.items.map(i => i.idx));
-          }
+          const ok = await validateNewPedido(pedido.id, pedido.items, sendTipo, selected, paused, mode);
+          if (ok) removedItemsMap.set(pedido.id, pedido.items.map(i => i.idx));
         }
       }
 
       if (removedItemsMap.size === 0) return;
 
-      setMesas(prev => prev
-        .map(m => {
-          if (m.mesaId !== mesaId) return m;
-          return {
-            ...m,
-            pedidos: m.pedidos
-              .map(p => {
-                const removed = removedItemsMap.get(p.id);
-                if (!removed) return p;
-                return { ...p, items: p.items.filter(i => !removed.includes(i.idx)) };
-              })
-              .filter(p => p.items.length > 0),
-          };
-        })
-        .filter(m => m.pedidos.length > 0)
-      );
+      setMesas(prev => removePedidoItems(prev, mesaId, removedItemsMap));
 
-      const cleanupMap = (prev: Record<string, Set<string>>) => {
-        if (!prev[mesaId]) return prev;
-        const processedIds = [...removedItemsMap.keys()];
-        const remaining = new Set([...prev[mesaId]].filter(k => !processedIds.includes(k.split(':')[0]!)));
-        if (remaining.size === 0) { const n = { ...prev }; delete n[mesaId]; return n; }
-        return { ...prev, [mesaId]: remaining };
-      };
+      const cleanupMap = makeCleanupMap(mesaId, removedItemsMap);
       setPausedMap(cleanupMap);
       setSelectedMap(cleanupMap);
     } finally {
@@ -370,71 +442,19 @@ export default function WaiterPendientesPage() {
 
       for (const pedido of mesa.pedidos) {
         if (pedido.validated) {
-          // Liberar todos los ítems seleccionados. Selección explícita anula pausa.
-          const toRelease = pedido.items.filter(i =>
-            selected.has(`${pedido.id}:${i.idx}`)
-          );
-          if (toRelease.length === 0) continue;
-
-          const releasedIdx: number[] = [];
-          for (const item of toRelease) {
-            const r = await fetch(`/api/waiter/kitchen/items/${pedido.id}/${item.idx}/status`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ estado: 'pendiente' }),
-            });
-            if (r.ok) releasedIdx.push(item.idx);
-          }
-          if (releasedIdx.length > 0) removedItemsMap.set(pedido.id, releasedIdx);
+          const released = await releaseSelectedPedidoItems(pedido.id, pedido.items, selected);
+          if (released.length > 0) removedItemsMap.set(pedido.id, released);
         } else {
-          // Sin autoRetain porque se confirman ambos tipos a la vez.
-          // Solo quedan retenidos los ítems no seleccionados (si los hubiera).
-          const notSelected = pedido.items
-            .filter(i => !selected.has(`${pedido.id}:${i.idx}`))
-            .map(i => i.idx);
-          // pausedIndices: comida pausada → kitchen retenido (from_validation=false).
-          // La selección NO anula la pausa: un ítem puede estar seleccionado Y retenido.
-          const pausedIndices = pedido.items
-            .filter(i => i.tipo === 'comida' && paused.has(`${pedido.id}:${i.idx}`))
-            .map(i => i.idx);
-
-          const r = await fetch('/api/waiter/pendientes/validate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pedidoId: pedido.id, retainIndices: notSelected, pausedIndices }),
-          });
-          if (r.ok) {
-            removedItemsMap.set(pedido.id, pedido.items.map(i => i.idx));
-          }
+          const ok = await validateBothTypesPedido(pedido.id, pedido.items, selected, paused);
+          if (ok) removedItemsMap.set(pedido.id, pedido.items.map(i => i.idx));
         }
       }
 
       if (removedItemsMap.size === 0) return;
 
-      setMesas(prev => prev
-        .map(m => {
-          if (m.mesaId !== mesaId) return m;
-          return {
-            ...m,
-            pedidos: m.pedidos
-              .map(p => {
-                const removed = removedItemsMap.get(p.id);
-                if (!removed) return p;
-                return { ...p, items: p.items.filter(i => !removed.includes(i.idx)) };
-              })
-              .filter(p => p.items.length > 0),
-          };
-        })
-        .filter(m => m.pedidos.length > 0)
-      );
+      setMesas(prev => removePedidoItems(prev, mesaId, removedItemsMap));
 
-      const cleanupMap = (prev: Record<string, Set<string>>) => {
-        if (!prev[mesaId]) return prev;
-        const processedIds = [...removedItemsMap.keys()];
-        const remaining = new Set([...prev[mesaId]].filter(k => !processedIds.includes(k.split(':')[0]!)));
-        if (remaining.size === 0) { const n = { ...prev }; delete n[mesaId]; return n; }
-        return { ...prev, [mesaId]: remaining };
-      };
+      const cleanupMap = makeCleanupMap(mesaId, removedItemsMap);
       setPausedMap(cleanupMap);
       setSelectedMap(cleanupMap);
     } finally {
@@ -471,22 +491,7 @@ export default function WaiterPendientesPage() {
 
       if (removedItemsMap.size === 0) return;
 
-      setMesas(prev => prev
-        .map(m => {
-          if (m.mesaId !== mesaId) return m;
-          return {
-            ...m,
-            pedidos: m.pedidos
-              .map(p => {
-                const removed = removedItemsMap.get(p.id);
-                if (!removed) return p;
-                return { ...p, items: p.items.filter(i => !removed.includes(i.idx)) };
-              })
-              .filter(p => p.items.length > 0),
-          };
-        })
-        .filter(m => m.pedidos.length > 0)
-      );
+      setMesas(prev => removePedidoItems(prev, mesaId, removedItemsMap));
 
       setSelectedMap(prev => {
         if (!prev[mesaId]) return prev;
@@ -604,7 +609,7 @@ export default function WaiterPendientesPage() {
                         </button>
                       )}
                       <button
-                        onClick={() => setGroupedMesas(prev => { const next = new Set(prev); if (next.has(mesa.mesaId)) next.delete(mesa.mesaId); else next.add(mesa.mesaId); return next; })}
+                        onClick={() => setGroupedMesas(prev => { const next = new Set(prev); if (next.has(mesa.mesaId)) { next.delete(mesa.mesaId); } else { next.add(mesa.mesaId); } return next; })}
                         title="Agrupar ítems"
                         className="flex items-center justify-center rounded-lg"
                         style={{ width: 34, height: 30, background: isGrouped ? 'oklch(28% 0.16 228)' : 'oklch(20% 0.04 252)', color: isGrouped ? 'oklch(78% 0.20 228)' : TEXT_DIM, border: isGrouped ? '1px solid oklch(50% 0.22 228 / 0.6)' : '1px solid oklch(35% 0.06 252 / 0.5)' }}
@@ -612,7 +617,7 @@ export default function WaiterPendientesPage() {
                         <Layers className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => setCollapsedMesas(prev => { const next = new Set(prev); if (next.has(mesa.mesaId)) next.delete(mesa.mesaId); else next.add(mesa.mesaId); return next; })}
+                        onClick={() => setCollapsedMesas(prev => { const next = new Set(prev); if (next.has(mesa.mesaId)) { next.delete(mesa.mesaId); } else { next.add(mesa.mesaId); } return next; })}
                         title={isCollapsed ? 'Expandir' : 'Contraer'}
                         className="flex items-center justify-center rounded-lg"
                         style={{ width: 34, height: 30, background: 'oklch(20% 0.04 252)', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
@@ -691,51 +696,49 @@ export default function WaiterPendientesPage() {
                       const anyGroupSelected = group.items.some(i => selected.has(i.globalKey));
                       const allGroupPaused   = group.tipo === 'comida' && group.items.every(i => paused.has(i.globalKey));
                       const anyGroupPaused   = group.tipo === 'comida' && group.items.some(i => paused.has(i.globalKey));
-                      const toggleGroupSelect = () => setSelectedMap(prev => {
-                        const current = new Set(prev[mesa.mesaId] ?? []);
-                        if (allGroupSelected) { group.items.forEach(i => current.delete(i.globalKey)); }
-                        else { group.items.forEach(i => current.add(i.globalKey)); }
-                        if (current.size === 0) { const n = { ...prev }; delete n[mesa.mesaId]; return n; }
-                        return { ...prev, [mesa.mesaId]: current };
-                      });
-                      const toggleGroupPause = () => setPausedMap(prev => {
-                        const current = new Set(prev[mesa.mesaId] ?? []);
-                        if (allGroupPaused) { group.items.forEach(i => current.delete(i.globalKey)); }
-                        else { group.items.forEach(i => current.add(i.globalKey)); }
-                        if (current.size === 0) { const n = { ...prev }; delete n[mesa.mesaId]; return n; }
-                        return { ...prev, [mesa.mesaId]: current };
-                      });
+                      const groupKeys = group.items.map(i => i.globalKey);
+                      const toggleGroupSelect = () => { setSelectedMap(toggleSetItems(selectedMap, mesa.mesaId, groupKeys, allGroupSelected)); };
+                      const toggleGroupPause = () => { setPausedMap(toggleSetItems(pausedMap, mesa.mesaId, groupKeys, allGroupPaused)); };
                       const isPartialSel = anyGroupSelected && !allGroupSelected;
+                      let checkboxBg: string;
+                      if (allGroupSelected) { checkboxBg = 'oklch(50% 0.22 148)'; }
+                      else if (isPartialSel) { checkboxBg = 'oklch(35% 0.16 148)'; }
+                      else { checkboxBg = 'transparent'; }
                       return (
                         <div
                           key={group.groupKey}
-                          className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer"
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg"
                           style={{ background: 'oklch(15% 0.03 252)', border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
-                          onClick={toggleGroupSelect}
                         >
                           <button
-                            onClick={e => e.stopPropagation()}
-                            className="shrink-0 flex items-center justify-center rounded"
-                            style={{ width: 20, height: 20, background: allGroupSelected ? 'oklch(50% 0.22 148)' : isPartialSel ? 'oklch(35% 0.16 148)' : 'transparent', border: `2px solid ${allGroupSelected || isPartialSel ? 'oklch(50% 0.22 148)' : 'oklch(45% 0.06 252)'}` }}
+                            type="button"
+                            onClick={toggleGroupSelect}
+                            className="flex-1 flex items-center gap-2 min-w-0 text-left"
                           >
-                            {allGroupSelected && <span style={{ color: '#fff', fontSize: 9, fontWeight: 'bold', lineHeight: 1 }}>✓</span>}
-                            {isPartialSel && <span style={{ color: '#fff', fontSize: 9, fontWeight: 'bold', lineHeight: 1 }}>–</span>}
-                          </button>
-                          <div className="flex-1 min-w-0">
-                            <span className="text-xs" style={{ color: TEXT_MAIN }}>
-                              {group.totalCantidad}× {group.nombre}
+                            <span
+                              className="shrink-0 flex items-center justify-center rounded"
+                              style={{ width: 20, height: 20, background: checkboxBg, border: `2px solid ${allGroupSelected || isPartialSel ? 'oklch(50% 0.22 148)' : 'oklch(45% 0.06 252)'}` }}
+                            >
+                              {allGroupSelected && <span style={{ color: '#fff', fontSize: 9, fontWeight: 'bold', lineHeight: 1 }}>✓</span>}
+                              {isPartialSel && <span style={{ color: '#fff', fontSize: 9, fontWeight: 'bold', lineHeight: 1 }}>–</span>}
                             </span>
-                            {group.complementos && (
-                              <div className="text-[10px] truncate" style={{ color: TEXT_DIM }}>({group.complementos})</div>
-                            )}
-                          </div>
-                          {group.tipo === 'comida'
-                            ? <UtensilsCrossed className="w-3 h-3 shrink-0" style={{ color: 'oklch(62% 0.14 62)' }} />
-                            : <Wine className="w-3 h-3 shrink-0" style={{ color: 'oklch(62% 0.14 252)' }} />
-                          }
+                            <span className="flex-1 min-w-0">
+                              <span className="text-xs" style={{ color: TEXT_MAIN }}>
+                                {group.totalCantidad}× {group.nombre}
+                              </span>
+                              {group.complementos && (
+                                <span className="block text-[10px] truncate" style={{ color: TEXT_DIM }}>({group.complementos})</span>
+                              )}
+                            </span>
+                            {group.tipo === 'comida'
+                              ? <UtensilsCrossed className="w-3 h-3 shrink-0" style={{ color: 'oklch(62% 0.14 62)' }} />
+                              : <Wine className="w-3 h-3 shrink-0" style={{ color: 'oklch(62% 0.14 252)' }} />
+                            }
+                          </button>
                           {group.tipo === 'comida' && (
                             <button
-                              onClick={e => { e.stopPropagation(); toggleGroupPause(); }}
+                              type="button"
+                              onClick={toggleGroupPause}
                               className="shrink-0 flex items-center justify-center rounded"
                               style={{ width: 28, height: 28, background: anyGroupPaused ? 'oklch(28% 0.14 65)' : 'oklch(20% 0.04 252)', color: anyGroupPaused ? 'oklch(78% 0.20 65)' : 'oklch(42% 0.06 252)', border: `1px solid ${anyGroupPaused ? 'oklch(50% 0.22 65 / 0.6)' : 'oklch(35% 0.06 252 / 0.4)'}` }}
                             >
@@ -770,15 +773,19 @@ export default function WaiterPendientesPage() {
         // Count only keys that actually exist in current data (avoids stale selections)
         const count = mesa ? getMergedItems(mesa).filter(i => selected.has(i.globalKey)).length : 0;
         return (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center px-6"
-            style={{ background: 'oklch(0% 0 0 / 0.75)' }}
-            onClick={() => setPendingDelete(null)}
-          >
-            <div
-              className="w-full max-w-xs rounded-2xl p-5 flex flex-col gap-4"
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
+            <button
+              type="button"
+              className="absolute inset-0"
+              style={{ background: 'oklch(0% 0 0 / 0.75)' }}
+              onClick={() => setPendingDelete(null)}
+              onKeyDown={e => { if (e.key === 'Escape') { setPendingDelete(null); } }}
+              aria-label="Cerrar"
+            />
+            <dialog
+              open
+              className="relative w-full max-w-xs rounded-2xl p-5 flex flex-col gap-4"
               style={{ background: 'oklch(15% 0.06 25)', border: '2px solid oklch(50% 0.30 25 / 0.7)' }}
-              onClick={e => e.stopPropagation()}
             >
               <div className="flex items-start gap-3">
                 <div className="shrink-0 flex items-center justify-center w-10 h-10 rounded-full" style={{ background: 'oklch(24% 0.24 25)', border: '2px solid oklch(50% 0.32 25 / 0.7)' }}>
@@ -813,7 +820,7 @@ export default function WaiterPendientesPage() {
                   {t('pendientesDeleteConfirmYes', lang)}
                 </button>
               </div>
-            </div>
+            </dialog>
           </div>
         );
       })()}

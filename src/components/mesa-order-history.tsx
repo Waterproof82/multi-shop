@@ -9,7 +9,7 @@ import { getWaiterMesa } from "@/components/waiter-login-form";
 
 export function MesaOrderHistory() {
   const { language } = useLanguage();
-  const lang = language as Parameters<typeof t>[1];
+  const lang = language;
   const [mesaId, setMesaId] = useState<string | null>(null);
   const [orderCount, setOrderCount] = useState(0);
   const [bouncing, setBouncing] = useState(false);
@@ -17,7 +17,7 @@ export function MesaOrderHistory() {
 
   useEffect(() => {
     // URL param takes priority (customer), fall back to sessionStorage (waiter navigation)
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(globalThis.location.search);
     const token = params.get("mesa");
     if (token) {
       setMesaId(token);
@@ -52,8 +52,8 @@ export function MesaOrderHistory() {
   useEffect(() => {
     if (!mesaId) return;
     const handler = () => { void fetchCount(mesaId); };
-    window.addEventListener("tracking-token-added", handler);
-    return () => window.removeEventListener("tracking-token-added", handler);
+    globalThis.addEventListener("tracking-token-added", handler);
+    return () => globalThis.removeEventListener("tracking-token-added", handler);
   }, [mesaId, fetchCount]);
 
   useEffect(() => {
@@ -61,8 +61,8 @@ export function MesaOrderHistory() {
       setBouncing(true);
       setTimeout(() => setBouncing(false), 700);
     };
-    window.addEventListener("mesa-order-placed", handler);
-    return () => window.removeEventListener("mesa-order-placed", handler);
+    globalThis.addEventListener("mesa-order-placed", handler);
+    return () => globalThis.removeEventListener("mesa-order-placed", handler);
   }, []);
 
   if (!mesaId || orderCount === 0) return null;

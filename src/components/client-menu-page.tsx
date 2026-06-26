@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, Suspense, useState, useMemo, useEffect, useCallback } from "react"
+import { ReactNode, useState, useMemo, useEffect, useCallback } from "react"
 import { createClient } from "@supabase/supabase-js"
 import dynamic from "next/dynamic"
 import { MenuCategoryVM, MenuItemVM } from "@/core/application/dtos/menu-view-model"
@@ -73,7 +73,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
   // Signal "Activa": mark session as customer-entered as soon as menu opens (not waiter)
   useEffect(() => {
     if (isWaiterMode) return;
-    const mesa = new URLSearchParams(window.location.search).get('mesa');
+    const mesa = new URLSearchParams(globalThis.location.search).get('mesa');
     if (!mesa) return;
     void fetch(`/api/mesas/${encodeURIComponent(mesa)}/activate`, { method: 'POST' });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -85,7 +85,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
   }, [isCartOpen]);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(globalThis.location.search);
     const mesa = params.get('mesa');
     if (!mesa) return;
 
@@ -101,7 +101,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
         if (isWaiterMode) {
           if (pagada || enCurso || divisionActiva) {
             setWaiterMesaLocked(true);
-            window.location.href = `/mesa/${encodeURIComponent(mesa)}/orders`;
+            globalThis.location.href = `/mesa/${encodeURIComponent(mesa)}/orders`;
           }
         } else {
           setMesaEsperandoActivacion(pagada);
@@ -112,7 +112,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
             setMesaPaymentLocked(true);
             clearCart();
             closeCart();
-            window.location.href = `/mesa/${encodeURIComponent(mesa)}/orders`;
+            globalThis.location.href = `/mesa/${encodeURIComponent(mesa)}/orders`;
           }
         }
       } catch { /* best-effort */ }
@@ -137,13 +137,13 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
         if (isWaiterMode) {
           if (pagoEnCurso || sesionPagada) {
             setWaiterMesaLocked(true);
-            window.location.href = `/mesa/${encodeURIComponent(mesa)}/orders`;
+            globalThis.location.href = `/mesa/${encodeURIComponent(mesa)}/orders`;
           }
         } else if (pagoEnCurso) {
           setMesaPaymentLocked(true);
           clearCart();
           closeCart();
-          window.location.href = `/mesa/${encodeURIComponent(mesa)}/orders`;
+          globalThis.location.href = `/mesa/${encodeURIComponent(mesa)}/orders`;
         }
       })
       .subscribe();
@@ -157,12 +157,12 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
   // so the user cannot navigate away from the waiting screen.
   useEffect(() => {
     if (!mesaEsperandoActivacion) return;
-    window.history.pushState({ mesaWaiting: true }, '', window.location.href);
+    globalThis.history.pushState({ mesaWaiting: true }, '', globalThis.location.href);
     const handlePopState = () => {
-      window.history.pushState({ mesaWaiting: true }, '', window.location.href);
+      globalThis.history.pushState({ mesaWaiting: true }, '', globalThis.location.href);
     };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    globalThis.addEventListener('popstate', handlePopState);
+    return () => globalThis.removeEventListener('popstate', handlePopState);
   }, [mesaEsperandoActivacion]);
 
   const showWaiterSearch = isWaiterMode && waiterHasMesa && !waiterMesaLocked;
@@ -191,7 +191,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
 
   const handleTabChange = useCallback((tab: 'comida' | 'bebidas') => {
     setMenuTab(tab);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    globalThis.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
   return (
@@ -214,13 +214,13 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
               className="text-lg font-bold tracking-widest uppercase"
               style={{ color: '#fffcf7', fontFamily: 'monospace' }}
             >
-              {t('mesaEsperandoActivacion', language as Parameters<typeof t>[1])}
+              {t('mesaEsperandoActivacion', language)}
             </p>
             <p
               className="text-sm leading-relaxed"
               style={{ color: '#8a7560', fontFamily: 'monospace' }}
             >
-              {t('mesaEsperandoActivacionDesc', language as Parameters<typeof t>[1])}
+              {t('mesaEsperandoActivacionDesc', language)}
             </p>
           </div>
           <div className="flex gap-1.5 mt-2">
@@ -280,7 +280,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">{product.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {formatPrice(product.price, empresa?.moneda ?? "EUR", language as Parameters<typeof t>[1])}
+                          {formatPrice(product.price, empresa?.moneda ?? "EUR", language)}
                         </p>
                       </div>
                       {showCart && (
