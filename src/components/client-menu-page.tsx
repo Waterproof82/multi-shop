@@ -118,7 +118,6 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
       } catch { /* best-effort */ }
     };
     void check();
-    const interval = setInterval(() => { void check(); }, 10000);
 
     // Realtime: detect pago_en_curso immediately — fires as soon as any user clicks "Pagar"
     const supabase = createClient(
@@ -150,7 +149,6 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
       .subscribe();
 
     return () => {
-      clearInterval(interval);
       void supabase.removeChannel(channel);
     };
   }, [clearCart, closeCart, isWaiterMode]);

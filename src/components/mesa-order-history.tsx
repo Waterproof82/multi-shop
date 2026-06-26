@@ -47,8 +47,6 @@ export function MesaOrderHistory() {
   useEffect(() => {
     if (!mesaId) return;
     void fetchCount(mesaId);
-    const interval = setInterval(() => { void fetchCount(mesaId); }, 10000);
-    return () => clearInterval(interval);
   }, [mesaId, fetchCount]);
 
   useEffect(() => {
