@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { UtensilsCrossed, KeyRound, Pause, ReceiptText, X, CheckSquare, ExternalLink, PlayCircle, BellRing } from "lucide-react";
 import { formatPrice } from "@/lib/format-price";
 import type { MesaWithSession } from "@/core/domain/repositories/IMesaRepository";
@@ -371,10 +372,24 @@ export function WaiterLoginForm() {
     if (step !== "tables" || !empresaId) return;
 
     void refresh();
-    const interval = setInterval(() => { void refresh(); }, 2000);
+
+    const supabase = getSupabaseAnonClient();
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const channel = supabase
+      .channel('waiter-login-mesas')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mesa_sesiones' }, () => {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => { void refresh(); }, 100);
+      })
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('[Realtime] waiter-login-mesas error:', status);
+        }
+      });
 
     return () => {
-      clearInterval(interval);
+      if (debounceTimer) clearTimeout(debounceTimer);
+      void supabase.removeChannel(channel);
     };
   }, [step, empresaId, refresh]);
 
