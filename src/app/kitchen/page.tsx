@@ -96,8 +96,12 @@ function mergeByName(items: KitchenItem[]): MergedItem[] {
   return Array.from(map.values()).sort((a, b) => a.nombre.localeCompare(b.nombre));
 }
 
-function groupByPedido(items: KitchenItem[]) {
-  return items.reduce<Map<string, { numeroPedido: number; mesaNumero: number | null; mesaNombre: string | null; createdAt: string; items: KitchenItem[] }>>(
+interface PedidoGroupValue { numeroPedido: number; mesaNumero: number | null; mesaNombre: string | null; createdAt: string; items: KitchenItem[] }
+interface MesaGroupValue   { mesaNumero: number | null; mesaNombre: string | null; firstCreatedAt: string; items: KitchenItem[] }
+type AnyGroupValue = PedidoGroupValue | MesaGroupValue;
+
+function groupByPedido(items: KitchenItem[]): Map<string, PedidoGroupValue> {
+  return items.reduce<Map<string, PedidoGroupValue>>(
     (acc, item) => {
       if (!acc.has(item.pedidoId)) {
         acc.set(item.pedidoId, { numeroPedido: item.numeroPedido, mesaNumero: item.mesaNumero, mesaNombre: item.mesaNombre, createdAt: item.createdAt, items: [] });
@@ -109,8 +113,8 @@ function groupByPedido(items: KitchenItem[]) {
   );
 }
 
-function groupByMesa(items: KitchenItem[]) {
-  const map = new Map<string, { mesaNumero: number | null; mesaNombre: string | null; firstCreatedAt: string; items: KitchenItem[] }>();
+function groupByMesa(items: KitchenItem[]): Map<string, MesaGroupValue> {
+  const map = new Map<string, MesaGroupValue>();
   for (const item of items) {
     const key = item.mesaNombre ?? `Mesa ${item.mesaNumero ?? '\u2014'}`;
     if (!map.has(key)) map.set(key, { mesaNumero: item.mesaNumero, mesaNombre: item.mesaNombre, firstCreatedAt: item.createdAt, items: [] });
@@ -121,59 +125,18 @@ function groupByMesa(items: KitchenItem[]) {
   return new Map([...map.entries()].sort((a, b) => a[1].firstCreatedAt.localeCompare(b[1].firstCreatedAt)));
 }
 
-interface ItemCardProps {
-  item: KitchenItem;
-  countdown: number | undefined;
-  lang: Parameters<typeof t>[1];
-  onPointerDown: (e: React.PointerEvent, key: string) => void;
-  onPointerMove: (e: React.PointerEvent, key: string) => void;
-  onPointerUp: (e: React.PointerEvent, item: KitchenItem) => void;
-  onPointerCancel: (e: React.PointerEvent) => void;
-  onCancelCountdown: (pedidoId: string, itemIdx: number) => void;
-}
+type Lang = Parameters<typeof t>[1];
 
-function ItemCard({ item, countdown, lang, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onCancelCountdown }: ItemCardProps) {
-  const key         = makeKey(item.pedidoId, item.itemIdx);
-  const isCountdown = countdown !== undefined;
-  const remaining   = countdown ?? 0;
-  const isEnPrep    = item.estado === 'en_preparacion';
-  const itemElapsed = getElapsedMinutes(item.createdAt);
-  const cardColor   = resolveCardColor(isCountdown, isEnPrep, itemElapsed);
-
+interface CountdownCardProps { item: KitchenItem; remaining: number; lang: Lang; onCancelCountdown: (pedidoId: string, itemIdx: number) => void; }
+function CountdownCard({ item, remaining, lang, onCancelCountdown }: Readonly<CountdownCardProps>) {
   return (
-    <div
-      className="relative rounded-xl overflow-hidden select-none"
-      style={{ background: cardColor.bg, border: `1px solid ${cardColor.border}`, touchAction: 'pan-y', willChange: 'transform' }}
-      onPointerDown={isCountdown ? undefined : e => onPointerDown(e, key)}
-      onPointerMove={isCountdown ? undefined : e => onPointerMove(e, key)}
-      onPointerUp={isCountdown ? undefined : e => onPointerUp(e, item)}
-      onPointerCancel={isCountdown ? undefined : onPointerCancel}
-    >
-      {!isCountdown && (
-        <>
-          <div data-hint-fwd="" className="absolute inset-0 flex items-center justify-end px-3 rounded-xl pointer-events-none"
-            style={{ opacity: 0, background: isEnPrep ? COUNTDOWN_COLOR.bg : EN_PREP_COLOR.bg, transition: 'opacity 0.1s' }}>
-            <span className="text-[10px] font-bold" style={{ color: isEnPrep ? 'oklch(78% 0.22 148)' : 'oklch(82% 0.24 90)' }}>
-              {isEnPrep ? `\u2713 ${t('kitchenItemListo', lang)}` : `\u2192 ${t('orderStatusAnotado', lang)}`}
-            </span>
-          </div>
-          {isEnPrep && (
-            <div data-hint-bck="" className="absolute inset-0 flex items-center px-3 rounded-xl pointer-events-none"
-              style={{ opacity: 0, transition: 'opacity 0.1s' }}>
-              <span className="text-[10px] font-bold" style={{ color: 'oklch(68% 0.18 240)' }}>
-                {`\u2190 ${t('orderStatusPending', lang)}`}
-              </span>
-            </div>
-          )}
-        </>
-      )}
-      <div data-card-content="" className="flex items-center gap-3 px-3 py-2.5" style={{ background: cardColor.bg }}>
-        {isCountdown && (
-          <div className="shrink-0 flex items-center justify-center w-9 h-9 rounded-full text-base font-bold"
-            style={{ background: 'oklch(32% 0.20 148)', color: 'oklch(80% 0.22 148)', border: '2px solid oklch(55% 0.28 148 / 0.7)' }}>
-            {remaining}
-          </div>
-        )}
+    <div className="relative rounded-xl overflow-hidden select-none"
+      style={{ background: COUNTDOWN_COLOR.bg, border: `1px solid ${COUNTDOWN_COLOR.border}`, touchAction: 'pan-y' }}>
+      <div data-card-content="" className="flex items-center gap-3 px-3 py-2.5" style={{ background: COUNTDOWN_COLOR.bg }}>
+        <div className="shrink-0 flex items-center justify-center w-9 h-9 rounded-full text-base font-bold"
+          style={{ background: 'oklch(32% 0.20 148)', color: 'oklch(80% 0.22 148)', border: '2px solid oklch(55% 0.28 148 / 0.7)' }}>
+          {remaining}
+        </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-1.5">
             <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{item.cantidad}&times;</span>
@@ -181,27 +144,69 @@ function ItemCard({ item, countdown, lang, onPointerDown, onPointerMove, onPoint
           </div>
           {item.complementos && <span className="text-[10px]" style={{ color: 'oklch(78% 0.03 252)' }}>({item.complementos})</span>}
         </div>
-        <div className="shrink-0">
-          {isCountdown ? (
-            <button
-              className="rounded px-2 py-1 text-[10px] font-bold"
-              style={{ background: 'oklch(26% 0.08 25)', color: 'oklch(75% 0.18 25)' }}
-              onClick={() => onCancelCountdown(item.pedidoId, item.itemIdx)}
-            >
-              {t('kitchenCountdownCancel', lang)}
-            </button>
-          ) : (
-            <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
-              style={isEnPrep
-                ? { background: 'oklch(32% 0.16 90 / 0.5)', color: 'oklch(82% 0.20 90)' }
-                : { background: 'oklch(30% 0.10 252 / 0.4)', color: 'oklch(75% 0.12 252)' }}>
-              {isEnPrep ? t('orderStatusAnotado', lang) : t('orderStatusPending', lang)}
-            </span>
-          )}
-        </div>
+        <button className="rounded px-2 py-1 text-[10px] font-bold shrink-0"
+          style={{ background: 'oklch(26% 0.08 25)', color: 'oklch(75% 0.18 25)' }}
+          onClick={() => onCancelCountdown(item.pedidoId, item.itemIdx)}>
+          {t('kitchenCountdownCancel', lang)}
+        </button>
       </div>
     </div>
   );
+}
+
+interface SwipeCardProps { item: KitchenItem; lang: Lang; onPointerDown: (e: React.PointerEvent, key: string) => void; onPointerMove: (e: React.PointerEvent, key: string) => void; onPointerUp: (e: React.PointerEvent, item: KitchenItem) => void; onPointerCancel: (e: React.PointerEvent) => void; }
+function SwipeCard({ item, lang, onPointerDown, onPointerMove, onPointerUp, onPointerCancel }: Readonly<SwipeCardProps>) {
+  const key      = makeKey(item.pedidoId, item.itemIdx);
+  const isEnPrep = item.estado === 'en_preparacion';
+  const elapsed  = getElapsedMinutes(item.createdAt);
+  const color    = isEnPrep ? EN_PREP_COLOR : getTimeColor(elapsed);
+  return (
+    <div className="relative rounded-xl overflow-hidden select-none"
+      style={{ background: color.bg, border: `1px solid ${color.border}`, touchAction: 'pan-y', willChange: 'transform' }}
+      onPointerDown={e => onPointerDown(e, key)}
+      onPointerMove={e => onPointerMove(e, key)}
+      onPointerUp={e => onPointerUp(e, item)}
+      onPointerCancel={onPointerCancel}
+    >
+      <div data-hint-fwd="" className="absolute inset-0 flex items-center justify-end px-3 rounded-xl pointer-events-none"
+        style={{ opacity: 0, background: isEnPrep ? COUNTDOWN_COLOR.bg : EN_PREP_COLOR.bg, transition: 'opacity 0.1s' }}>
+        <span className="text-[10px] font-bold" style={{ color: isEnPrep ? 'oklch(78% 0.22 148)' : 'oklch(82% 0.24 90)' }}>
+          {isEnPrep ? `\u2713 ${t('kitchenItemListo', lang)}` : `\u2192 ${t('orderStatusAnotado', lang)}`}
+        </span>
+      </div>
+      {isEnPrep && (
+        <div data-hint-bck="" className="absolute inset-0 flex items-center px-3 rounded-xl pointer-events-none"
+          style={{ opacity: 0, transition: 'opacity 0.1s' }}>
+          <span className="text-[10px] font-bold" style={{ color: 'oklch(68% 0.18 240)' }}>
+            {`\u2190 ${t('orderStatusPending', lang)}`}
+          </span>
+        </div>
+      )}
+      <div data-card-content="" className="flex items-center gap-3 px-3 py-2.5" style={{ background: color.bg }}>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{item.cantidad}&times;</span>
+            <span className="text-xs font-medium truncate" style={{ color: TEXT_MAIN }}>{item.nombre}</span>
+          </div>
+          {item.complementos && <span className="text-[10px]" style={{ color: 'oklch(78% 0.03 252)' }}>({item.complementos})</span>}
+        </div>
+        <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold shrink-0"
+          style={isEnPrep
+            ? { background: 'oklch(32% 0.16 90 / 0.5)', color: 'oklch(82% 0.20 90)' }
+            : { background: 'oklch(30% 0.10 252 / 0.4)', color: 'oklch(75% 0.12 252)' }}>
+          {isEnPrep ? t('orderStatusAnotado', lang) : t('orderStatusPending', lang)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+interface ItemCardProps { item: KitchenItem; countdown: number | undefined; lang: Lang; onPointerDown: (e: React.PointerEvent, key: string) => void; onPointerMove: (e: React.PointerEvent, key: string) => void; onPointerUp: (e: React.PointerEvent, item: KitchenItem) => void; onPointerCancel: (e: React.PointerEvent) => void; onCancelCountdown: (pedidoId: string, itemIdx: number) => void; }
+function ItemCard({ item, countdown, lang, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onCancelCountdown }: Readonly<ItemCardProps>) {
+  if (countdown !== undefined) {
+    return <CountdownCard item={item} remaining={countdown} lang={lang} onCancelCountdown={onCancelCountdown} />;
+  }
+  return <SwipeCard item={item} lang={lang} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerCancel} />;
 }
 
 export default function KitchenPage() {
@@ -272,6 +277,16 @@ export default function KitchenPage() {
 
   // ── Countdown ──────────────────────────────────────────────────────────────
 
+  const applyItemListo = useCallback((pedidoId: string, itemIdx: number) => {
+    void fetch(`/api/kitchen/items/${encodeURIComponent(pedidoId)}/${itemIdx}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ estado: 'listo' }),
+    }).then(r => {
+      if (r.ok) setItems(prev => prev.filter(i => !(i.pedidoId === pedidoId && i.itemIdx === itemIdx)));
+    });
+  }, []);
+
   const startCountdown = useCallback((pedidoId: string, itemIdx: number) => {
     const key = makeKey(pedidoId, itemIdx);
     if (timersRef.current.has(key)) return;
@@ -283,19 +298,13 @@ export default function KitchenPage() {
         clearInterval(interval);
         timersRef.current.delete(key);
         setCountdowns(prev => { const next = { ...prev }; delete next[key]; return next; });
-        void fetch(`/api/kitchen/items/${encodeURIComponent(pedidoId)}/${itemIdx}/status`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ estado: 'listo' }),
-        }).then(r => {
-          if (r.ok) setItems(p => p.filter(i => !(i.pedidoId === pedidoId && i.itemIdx === itemIdx)));
-        });
+        applyItemListo(pedidoId, itemIdx);
       } else {
         setCountdowns(prev => ({ ...prev, [key]: remaining }));
       }
     }, 1000);
     timersRef.current.set(key, interval);
-  }, []);
+  }, [applyItemListo]);
 
   const cancelCountdown = useCallback((pedidoId: string, itemIdx: number) => {
     const key = makeKey(pedidoId, itemIdx);
@@ -391,7 +400,7 @@ export default function KitchenPage() {
   // ── Derived data ───────────────────────────────────────────────────────────
 
   const activeItems = items.filter(i => i.estado === 'pendiente' || i.estado === 'en_preparacion');
-  const grouped     = groupBy === 'mesa' ? groupByMesa(activeItems) : groupByPedido(activeItems);
+  const grouped     = (groupBy === 'mesa' ? groupByMesa(activeItems) : groupByPedido(activeItems)) as Map<string, AnyGroupValue>;
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -511,8 +520,8 @@ export default function KitchenPage() {
         {/* Per-order / per-mesa view */}
         {!globalGrouped && Array.from(grouped.entries()).map(([groupKey, group]) => {
           const isOrderGroup = groupBy === 'order';
-          const numeroPedido = 'numeroPedido' in group ? group.numeroPedido : null;
-          const createdAt    = 'createdAt' in group ? group.createdAt : group.firstCreatedAt;
+          const numeroPedido: number | null = 'numeroPedido' in group ? (group as PedidoGroupValue).numeroPedido : null;
+          const createdAt: string = 'createdAt' in group ? (group as PedidoGroupValue).createdAt : (group as MesaGroupValue).firstCreatedAt;
           const label        = group.mesaNombre ?? (group.mesaNumero === null ? groupKey : `Mesa ${group.mesaNumero}`);
           const elapsed      = getElapsedMinutes(createdAt);
 
