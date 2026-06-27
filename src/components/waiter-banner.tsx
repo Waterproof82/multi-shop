@@ -108,6 +108,9 @@ export function WaiterBanner() {
   const pathname = usePathname();
   const pathnameRef = useRef(pathname);
   pathnameRef.current = pathname;
+  // Unique channel name per instance — avoids React StrictMode returning a stale
+  // closed channel on the second mount when using a fixed name.
+  const channelNameRef = useRef(`waiter-banner-${Math.random().toString(36).slice(2)}`);
   const { language: lang } = useLanguage();
   const { openCart, totalItems, clearCart } = useCart();
   const [closeDialog, setCloseDialog] = useState<'confirm' | 'cart' | 'payment' | 'unpaid' | 'free' | null>(null);
@@ -231,17 +234,24 @@ export function WaiterBanner() {
 
     const supabase = getSupabaseAnonClient();
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const triggerUpdate = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        void fetchCounts();
+        // Relay to other waiter components (pendientes, etc.) listening for updates
+        globalThis.dispatchEvent(new CustomEvent('waiter-realtime-update'));
+      }, 100);
+    };
     const channel = supabase
-      .channel('waiter-banner')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados' }, () => {
-        if (debounceTimer) clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => { void fetchCounts(); }, 100);
-      })
+      .channel(channelNameRef.current)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, triggerUpdate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados' }, triggerUpdate)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'mesa_sesiones' }, () => {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
           void fetchCounts();
           if (mesaId) void fetchLock(mesaId);
+          globalThis.dispatchEvent(new CustomEvent('waiter-realtime-update'));
         }, 100);
       })
       .subscribe((status) => {
@@ -250,9 +260,35 @@ export function WaiterBanner() {
         }
       });
 
+    // Broadcast: 'waiter-new-order' — new client order (pendiente_validacion INSERT)
+    // OR order validated (pendiente_validacion → pendiente UPDATE).
+    // Fired by DB triggers notify_waiter_new_order / notify_waiter_order_validated.
+    const broadcastNewOrder = supabase
+      .channel('waiter-new-order')
+      .on('broadcast', { event: 'new-order' }, triggerUpdate)
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('[Realtime] waiter-new-order broadcast error:', status);
+        }
+      });
+
+    // Broadcast: 'waiter-items-update' — pedido_item_estados changed (kitchen/bar
+    // marking items listo/servido/retenido). Fired by notify_waiter_items_update.
+    // Needed so WaiterBanner badge counts (listos, retenidos) stay accurate.
+    const broadcastItems = supabase
+      .channel('waiter-items-update')
+      .on('broadcast', { event: 'item-update' }, triggerUpdate)
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('[Realtime] waiter-items-update broadcast error (banner):', status);
+        }
+      });
+
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       void supabase.removeChannel(channel);
+      void supabase.removeChannel(broadcastNewOrder);
+      void supabase.removeChannel(broadcastItems);
     };
   }, [isWaiter, mesaId, fetchLock]);
 

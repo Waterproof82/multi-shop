@@ -57,13 +57,15 @@ export function MesaOrderHistory() {
   }, [mesaId, fetchCount]);
 
   useEffect(() => {
+    if (!mesaId) return;
     const handler = () => {
       setBouncing(true);
       setTimeout(() => setBouncing(false), 700);
+      void fetchCount(mesaId);
     };
     globalThis.addEventListener("mesa-order-placed", handler);
     return () => globalThis.removeEventListener("mesa-order-placed", handler);
-  }, []);
+  }, [mesaId, fetchCount]);
 
   if (!mesaId || orderCount === 0) return null;
 

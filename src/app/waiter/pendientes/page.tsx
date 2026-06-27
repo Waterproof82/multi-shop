@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronDown, Table2, UtensilsCrossed, Wine, Pause, CheckCheck, Trash2, Layers } from 'lucide-react';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { useLanguage } from '@/lib/language-context';
@@ -287,12 +287,18 @@ function PedidoItemButton({ item, isSelected, isPaused, onToggleSelect, onToggle
 
 export default function WaiterPendientesPage() {
   const { language: lang } = useLanguage();
+  // Unique channel name per instance — avoids React StrictMode double-mount
+  // returning a stale closed channel on the second mount.
+  const channelNameRef = useRef(`waiter-pendientes-${Math.random().toString(36).slice(2)}`);
   const [mesas, setMesas] = useState<PendienteMesa[]>([]);
   // selectedMap: ítems marcados con ✓ (se incluirán en la confirmación selectiva)
   const [selectedMap, setSelectedMap] = useState<Record<string, Set<string>>>({});
   // pausedMap: ítems con pausa activa (se confirmarán como retenidos)
   const [pausedMap, setPausedMap] = useState<Record<string, Set<string>>>({});
   const [confirming, setConfirming] = useState<Set<string>>(new Set());
+  // Ref mirror of confirming — used in bannerRelay to avoid premature fetches
+  // while the validate loop is still processing multiple pedidos.
+  const confirmingRef = useRef<Set<string>>(new Set());
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [groupedMesas, setGroupedMesas] = useState<Set<string>>(new Set());
   const [collapsedMesas, setCollapsedMesas] = useState<Set<string>>(new Set());
@@ -318,18 +324,34 @@ export default function WaiterPendientesPage() {
       debounceTimer = setTimeout(() => { void fetchPendientes(); }, 100);
     };
     const channel = supabase
-      .channel('waiter-pendientes')
+      .channel(channelNameRef.current)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, trigger)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados' }, trigger)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mesa_sesiones' }, trigger)
       .subscribe((status) => {
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           console.error('[Realtime] waiter-pendientes error:', status);
         }
       });
 
+    // Fallback: WaiterBanner relays Realtime events via DOM for cases where
+    // the direct postgres_changes subscription doesn't fire (known Supabase JS
+    // limitation with multiple channels on the same singleton client subscribing
+    // to the same table).
+    // Skip relay fires while a confirmation is in progress: the validate loop
+    // processes pedidos sequentially and the DB trigger fires after each one,
+    // so an intermediate fetch would show stale data mid-loop. The finally
+    // block in handleConfirm/handleConfirmBoth does the authoritative refresh.
+    const bannerRelay = () => {
+      if (confirmingRef.current.size > 0) return;
+      void fetchPendientes();
+    };
+    globalThis.addEventListener('waiter-realtime-update', bannerRelay);
+
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       void supabase.removeChannel(channel);
+      globalThis.removeEventListener('waiter-realtime-update', bannerRelay);
     };
   }, [fetchPendientes]);
 
@@ -394,6 +416,7 @@ export default function WaiterPendientesPage() {
   // mode='selected' → envía solo los ítems seleccionados (✓) del tipo
   // En ambos casos: paused → retenido, no-paused → pendiente/normal.
   const handleConfirm = useCallback(async (mesaId: string, sendTipo: 'comida' | 'bebida', mode: 'all' | 'selected' = 'all') => {
+    confirmingRef.current = new Set(confirmingRef.current).add(mesaId);
     setConfirming(prev => new Set(prev).add(mesaId));
     try {
       const mesa = mesas.find(m => m.mesaId === mesaId);
@@ -422,6 +445,7 @@ export default function WaiterPendientesPage() {
       setPausedMap(cleanupMap);
       setSelectedMap(cleanupMap);
     } finally {
+      confirmingRef.current = new Set([...confirmingRef.current].filter(id => id !== mesaId));
       setConfirming(prev => { const n = new Set(prev); n.delete(mesaId); return n; });
       // Force-sync with server to avoid stale local state showing duplicates
       void fetchPendientes();
@@ -431,6 +455,7 @@ export default function WaiterPendientesPage() {
   // Confirma TODOS los ítems (comida + bebida) de una sola vez.
   // Solo disponible cuando todos los ítems de la mesa están seleccionados.
   const handleConfirmBoth = useCallback(async (mesaId: string) => {
+    confirmingRef.current = new Set(confirmingRef.current).add(mesaId);
     setConfirming(prev => new Set(prev).add(mesaId));
     try {
       const mesa = mesas.find(m => m.mesaId === mesaId);
@@ -458,6 +483,7 @@ export default function WaiterPendientesPage() {
       setPausedMap(cleanupMap);
       setSelectedMap(cleanupMap);
     } finally {
+      confirmingRef.current = new Set([...confirmingRef.current].filter(id => id !== mesaId));
       setConfirming(prev => { const n = new Set(prev); n.delete(mesaId); return n; });
       void fetchPendientes();
     }

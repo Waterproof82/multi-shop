@@ -235,6 +235,7 @@ export default function WaiterKitchenPage() {
   const [collapsedMesas, setCollapsedMesas] = useState<Set<string>>(new Set());
   const [groupedMesas, setGroupedMesas] = useState<Set<string>>(new Set());
   const [pendingMergedWaiterAction, setPendingMergedWaiterAction] = useState<{ items: KitchenItem[]; action: ItemEstado } | null>(null);
+  const channelNameRef = useRef(`waiter-kitchen-${Math.random().toString(36).slice(2)}`);
   const pointerStartX = useRef<number | null>(null);
   const swipingKey    = useRef<string | null>(null);
   // ── Fetch ──────────────────────────────────────────────────────────────────
@@ -255,7 +256,11 @@ export default function WaiterKitchenPage() {
     const supabase = getSupabaseAnonClient();
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const channel = supabase
-      .channel('waiter-kitchen-items')
+      .channel(channelNameRef.current)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => { void fetchItems(); }, 100);
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados' }, () => {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => { void fetchItems(); }, 100);
@@ -266,9 +271,25 @@ export default function WaiterKitchenPage() {
         }
       });
 
+    // Broadcast channel — receives 'item-update' events from the DB trigger
+    // (notify_waiter_items_update) whenever pedido_item_estados rows change.
+    // Bypasses the postgres_changes routing issue on the shared singleton client.
+    const broadcastChannel = supabase
+      .channel('waiter-items-update')
+      .on('broadcast', { event: 'item-update' }, () => {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => { void fetchItems(); }, 100);
+      })
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('[Realtime] waiter-items-update broadcast error (kitchen):', status);
+        }
+      });
+
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       void supabase.removeChannel(channel);
+      void supabase.removeChannel(broadcastChannel);
     };
   }, [fetchItems]);
 
@@ -540,10 +561,10 @@ export default function WaiterKitchenPage() {
         onPointerCancel={handlePointerCancel}
       >
         {/* Right side reveal (left drag) — action hint */}
-        <div data-reveal-bg="" className="absolute inset-0 flex items-center justify-end px-3" style={{ background: 'transparent' }}>
+        <div data-reveal-bg="" className="pointer-events-none absolute inset-0 flex items-center justify-end px-3" style={{ background: 'transparent' }}>
           <span
             data-hint=""
-            className="pointer-events-none flex items-center gap-1 text-[10px] font-bold"
+            className="flex items-center gap-1 text-[10px] font-bold"
             style={{ opacity: 0, color: hintColor, transition: 'opacity 0.1s' }}
           >
             {!isRetenido && !isListo && <Pause className="w-3 h-3 shrink-0" />}
@@ -551,10 +572,10 @@ export default function WaiterKitchenPage() {
           </span>
         </div>
         {/* Left side reveal (right drag) — cancel/trash */}
-        <div data-cancel-bg="" className="absolute inset-0 flex items-center justify-start px-3" style={{ background: 'transparent' }}>
+        <div data-cancel-bg="" className="pointer-events-none absolute inset-0 flex items-center justify-start px-3" style={{ background: 'transparent' }}>
           <span
             data-cancel-hint=""
-            className="pointer-events-none flex items-center gap-1 text-[10px] font-bold"
+            className="flex items-center gap-1 text-[10px] font-bold"
             style={{ opacity: 0, color: 'oklch(78% 0.24 25)', transition: 'opacity 0.1s' }}
           >
             <Trash2 className="w-3 h-3 shrink-0" />
@@ -639,10 +660,17 @@ export default function WaiterKitchenPage() {
       statusText = t('orderStatusPending', lang);
     }
 
+    const mergedActionColor = isRetenido
+      ? 'oklch(28% 0.12 65)'
+      : isListo
+        ? 'oklch(28% 0.16 148)'
+        : RETENIDO_COLOR.bg;
+
     return (
       <div
         key={mKey}
         className="relative rounded-xl overflow-hidden select-none"
+        data-action-color={mergedActionColor}
         style={{ background: cardColor.bg, border: `1px solid ${cardColor.border}`, touchAction: 'pan-y', willChange: 'transform' }}
         onPointerDown={e => handlePointerDown(e, mKey)}
         onPointerMove={e => handlePointerMove(e, mKey)}
@@ -650,10 +678,10 @@ export default function WaiterKitchenPage() {
         onPointerCancel={handlePointerCancel}
       >
         {/* Right side reveal (left drag) — action hint */}
-        <div data-reveal-bg="" className="absolute inset-0 flex items-center justify-end px-3" style={{ background: 'transparent' }}>
+        <div data-reveal-bg="" className="pointer-events-none absolute inset-0 flex items-center justify-end px-3" style={{ background: 'transparent' }}>
           <span
             data-hint=""
-            className="pointer-events-none flex items-center gap-1 text-[10px] font-bold"
+            className="flex items-center gap-1 text-[10px] font-bold"
             style={{ opacity: 0, color: hintColor, transition: 'opacity 0.1s' }}
           >
             {!isRetenido && !isListo && <Pause className="w-3 h-3 shrink-0" />}
@@ -661,10 +689,10 @@ export default function WaiterKitchenPage() {
           </span>
         </div>
         {/* Left side reveal (right drag) — cancel all */}
-        <div data-cancel-bg="" className="absolute inset-0 flex items-center justify-start px-3" style={{ background: 'transparent' }}>
+        <div data-cancel-bg="" className="pointer-events-none absolute inset-0 flex items-center justify-start px-3" style={{ background: 'transparent' }}>
           <span
             data-cancel-hint=""
-            className="pointer-events-none flex items-center gap-1 text-[10px] font-bold"
+            className="flex items-center gap-1 text-[10px] font-bold"
             style={{ opacity: 0, color: 'oklch(78% 0.24 25)', transition: 'opacity 0.1s' }}
           >
             <Trash2 className="w-3 h-3 shrink-0" />
@@ -728,38 +756,42 @@ export default function WaiterKitchenPage() {
         </div>
         {/* Row 3: filter toggle */}
         <div className="flex items-center gap-1 px-3 pb-2 flex-wrap">
-          {(['order', 'mesa', 'listos', 'retenidos'] as const).map(mode => {
-            const isActive    = groupBy === mode;
-            const isListos    = mode === 'listos';
-            const isRetenidos = mode === 'retenidos';
-            let label: string;
-            if (mode === 'order') {
-              label = t('kitchenGroupByOrder', lang);
-            } else if (mode === 'mesa') {
-              label = t('kitchenGroupByTable', lang);
-            } else if (mode === 'listos') {
-              label = t('kitchenListos', lang);
-            } else {
-              label = t('waiterRetenidos', lang);
-            }
-            let activeStyle: { background: string; color: string; border: string };
-            if (isListos) {
-              activeStyle = { background: 'oklch(26% 0.16 148)', color: 'oklch(80% 0.22 148)', border: '1px solid oklch(52% 0.26 148 / 0.7)' };
-            } else if (isRetenidos) {
-              activeStyle = { background: 'oklch(24% 0.06 252)', color: TEXT_DIM, border: '1px solid oklch(48% 0.08 252 / 0.6)' };
-            } else {
-              activeStyle = { background: 'oklch(32% 0.10 252)', color: TEXT_MAIN, border: '1px solid oklch(50% 0.10 252 / 0.6)' };
-            }
+          {/* Group: Por pedido / Por mesa */}
+          {(['order', 'mesa'] as const).map(mode => {
+            const isActive = groupBy === mode;
+            const label = mode === 'order' ? t('kitchenGroupByOrder', lang) : t('kitchenGroupByTable', lang);
             return (
               <button
                 key={mode}
                 onClick={() => setGroupBy(mode)}
                 className="rounded px-3 py-1 text-[11px] font-semibold transition-colors"
-                style={isActive ? activeStyle : {
-                  background: 'transparent',
-                  color: TEXT_DIM,
-                  border: '1px solid oklch(35% 0.06 252 / 0.4)',
-                }}
+                style={isActive
+                  ? { background: 'oklch(32% 0.10 252)', color: TEXT_MAIN, border: '1px solid oklch(50% 0.10 252 / 0.6)' }
+                  : { background: 'transparent', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.4)' }
+                }
+              >
+                {label}
+              </button>
+            );
+          })}
+
+          {/* Separator */}
+          <span style={{ width: 1, height: 18, background: 'oklch(38% 0.06 252 / 0.5)', margin: '0 4px', display: 'inline-block', alignSelf: 'center' }} />
+
+          {/* Group: Listos / Retenidos */}
+          {(['listos', 'retenidos'] as const).map(mode => {
+            const isActive    = groupBy === mode;
+            const isListos    = mode === 'listos';
+            const label = isListos ? t('kitchenListos', lang) : t('waiterRetenidos', lang);
+            const activeStyle = isListos
+              ? { background: 'oklch(26% 0.16 148)', color: 'oklch(80% 0.22 148)', border: '1px solid oklch(52% 0.26 148 / 0.7)' }
+              : { background: 'oklch(24% 0.06 252)', color: TEXT_DIM, border: '1px solid oklch(48% 0.08 252 / 0.6)' };
+            return (
+              <button
+                key={mode}
+                onClick={() => setGroupBy(mode)}
+                className="rounded px-3 py-1 text-[11px] font-semibold transition-colors"
+                style={isActive ? activeStyle : { background: 'transparent', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.4)' }}
               >
                 {label}
               </button>
