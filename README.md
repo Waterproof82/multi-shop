@@ -48,6 +48,84 @@ JWT + HttpOnly cookies, revocación en Redis (fail-closed), RBAC por rol, CSRF H
 
 ---
 
+## ⚡ Arquitectura Realtime — Sistema Híbrido
+
+Todas las vistas de tiempo real del sistema han sido migradas de polling HTTP a **Supabase Realtime** con un enfoque híbrido deliberado.
+
+### El problema del polling
+
+Antes de la migración, el panel de sala tenía múltiples bucles de polling HTTP corriendo en paralelo:
+
+| Componente | Intervalo anterior | Approach actual |
+|------------|-------------------|-----------------|
+| `WaiterBanner` (badges counts) | 2 × 10 s | Único canal Realtime multiplexado |
+| `WaiterLoginForm` (detección de apertura de mesa) | 2 s | Realtime trigger en `mesa_sesiones` |
+| `kitchen/page.tsx` (ítems de cocina) | 3 s | Realtime en `pedido_item_estados` |
+| `bar/page.tsx` (ítems de bar) | 3 s | Realtime en `pedido_item_estados` |
+| `pendientes/page.tsx` (cola de validación) | 3 s | Realtime en `pedidos` + `pedido_item_estados` |
+| `client-menu-page.tsx` / `mesa-order-history.tsx` | (redundante) | Eliminado |
+
+### Qué significa "híbrido"
+
+El sistema distingue dos tipos de actualización con necesidades distintas:
+
+**1. Cambios de datos** → Supabase Realtime (PostgreSQL CDC)
+Cuando se inserta o modifica un registro en `pedidos` o `pedido_item_estados`, Supabase notifica al cliente al instante vía WebSocket. El cliente re-fetchea solo el endpoint afectado. Latencia: < 100 ms. Sin polling.
+
+**2. Progresión visual de timers** → `setInterval` de 1 segundo
+Los colores de urgencia (azul → teal → ámbar → rojo) y los contadores de tiempo de espera en cocina y bar necesitan actualizar la UI cada segundo aunque no haya cambios en DB. Este intervalo es puramente cosmético — no hace ninguna llamada de red.
+
+```
+              ┌──────────────────────────────────────┐
+              │          Supabase Realtime           │
+              │  pedidos INSERT/UPDATE               │
+              │  pedido_item_estados INSERT/UPDATE   │
+              └──────────────┬───────────────────────┘
+                             │ CDC via WebSocket
+                             ▼
+              ┌──────────────────────────────────────┐
+              │      Cliente React (kitchen/bar)     │
+              │                                      │
+              │  onPostgresChanges → fetchItems()    │  ← datos al instante
+              │  setInterval 1s   → setItems(p→p)   │  ← re-render visual (timers)
+              └──────────────────────────────────────┘
+```
+
+### Canal multiplexado en WaiterBanner
+
+`WaiterBanner` necesita sincronizar tres señales: conteos de cocina, conteos de bar y estado de pago en curso. La solución anterior usaba dos endpoints en polling a 10 s. La solución actual abre **un único canal Realtime** que escucha cambios en `pedido_item_estados` y en `mesa_sesiones`, y dispara un `fetchCounts()` consolidado:
+
+```typescript
+const channel = supabase
+  .channel('waiter-banner')
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados' }, fetchCounts)
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'mesa_sesiones' }, fetchCounts)
+  .subscribe();
+```
+
+### Impacto en costes de Supabase
+
+| Métrica | Antes | Después |
+|---------|-------|---------|
+| Requests HTTP / minuto (1 camarero activo) | ~30 | ~0 (solo al cambio) |
+| Conexiones WebSocket | 0 | 1 por tab |
+| Latencia percibida al cambio | hasta 3–10 s | < 100 ms |
+| Carga en DB durante inactividad | constante | cero |
+
+> Las conexiones Realtime de Supabase son significativamente más baratas en créditos de compute que el polling HTTP equivalente — y la latencia mejora drásticamente.
+
+### Activación en Supabase (migración `20260626000001`)
+
+```sql
+-- Habilita CDC para las tablas críticas de tiempo real
+ALTER PUBLICATION supabase_realtime ADD TABLE public.pedido_item_estados;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.pedidos;
+```
+
+Estas tablas deben estar publicadas en Supabase antes de que los canales Realtime funcionen. La migración las activa automáticamente.
+
+---
+
 ## Stack Tecnológico
 
 | Tecnología | Versión | Uso |
@@ -55,7 +133,7 @@ JWT + HttpOnly cookies, revocación en Redis (fail-closed), RBAC por rol, CSRF H
 | Next.js | 16.0.10 (Turbopack) | Framework full-stack |
 | React | 19.2.0 | UI Library |
 | TypeScript | 5.x | Tipado estático |
-| Supabase | ^2.95.3 | BBDD + Auth |
+| Supabase | ^2.95.3 | BBDD + Auth + Realtime CDC |
 | Cloudflare R2 | — | Storage imágenes |
 | Tailwind CSS | 4.x | Estilos |
 | AWS SDK v3 | ^3.994 | Cliente S3/R2 |
@@ -757,6 +835,7 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 | **Waiter Panel** | Panel PIN-auth en /waiter. Grid de mesas, ciclo de sesión open/close, ítems diferidos, pago manual. WaiterBanner sticky global con badges de cocina y bar en tiempo real. Re-autenticación sin recarga: `WaiterLoginForm` dispara `CustomEvent('waiter-auth-changed')` → banner revalida sesión automáticamente. |
 | **Kitchen & Bar In-App** | `/waiter/kitchen` y `/waiter/bar`: vistas en tiempo real para gestión de ítems sin Telegram. Estados por ítem: pendiente → en_preparacion → preparado → servido (swipe gestual). Colores por tiempo de espera (oklch, 6 rangos). GroupBy por pedido o por mesa. Filtro "Listos". Retenidos con sección propia. Badges con counts en WaiterBanner (neutral/verde/naranja). Timer de espera arranca desde `validated_at` (momento de validación), no desde `created_at` del pedido original. |
 | **Waiter Pendientes** | `/waiter/pendientes`: cola de validación antes de cocina/bar. Selección individual o por tipo (comida/bebida). Pausa (⏸) por ítem de comida → llega a cocina como retenido. Botón conjunto comida+bebida (botón morado) valida ambos tipos en un solo POST. La pausa prevalece sobre la selección en envíos conjuntos. |
+| **Realtime Híbrido** | Migración completa de polling a Supabase Realtime en todas las vistas del panel de sala (kitchen, bar, pendientes, waiter-banner, waiter-login). Sistema híbrido: Realtime CDC para cambios de datos (<100 ms latencia, sin carga en DB en reposo) + `setInterval` 1 s exclusivamente para actualización visual de timers. Un único canal multiplexado en WaiterBanner consolida conteos de cocina, bar y estado de pago. Eliminados ~30 requests HTTP/min por camarero activo. Ver sección [⚡ Arquitectura Realtime](#-arquitectura-realtime--sistema-híbrido). |
 | **Telegram Multi-modo** | tienda → quick-reply buttons. restaurante takeaway → time-selector + tracking en vivo. mesa → gestionado in-app (sin Telegram). |
 | **Delivery + Pago online** | Zona de cobertura por CP configurable. Cotización Glovo en tiempo real. Pago Redsys TPV Virtual obligatorio para delivery. Auto-despacho de rider al confirmar pago. Tracking page post-pago. |
 

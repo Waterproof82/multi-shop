@@ -353,6 +353,7 @@ export function WaiterLoginForm() {
   const [deferredMesa, setDeferredMesa] = useState<MesaWithSession | null>(null);
   const [launching, setLaunching] = useState(false);
   const llamadasRef = useRef<Set<string>>(new Set());
+  const channelNameRef = useRef(`waiter-login-mesas-${Math.random().toString(36).slice(2)}`);
 
   const refresh = useCallback(async () => {
     const data = await fetchMesas();
@@ -375,21 +376,30 @@ export function WaiterLoginForm() {
 
     const supabase = getSupabaseAnonClient();
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedRefresh = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => { void refresh(); }, 100);
+    };
     const channel = supabase
-      .channel('waiter-login-mesas')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'mesa_sesiones' }, () => {
-        if (debounceTimer) clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => { void refresh(); }, 100);
-      })
+      .channel(channelNameRef.current)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mesa_sesiones' }, debouncedRefresh)
       .subscribe((status) => {
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           console.error('[Realtime] waiter-login-mesas error:', status);
         }
       });
 
+    // Listen to item-update broadcast so "Platos listos" badge updates when kitchen
+    // marks items as preparado — pedido_item_estados changes don't touch mesa_sesiones.
+    const broadcastChannel = supabase
+      .channel('waiter-items-update')
+      .on('broadcast', { event: 'item-update' }, debouncedRefresh)
+      .subscribe();
+
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       void supabase.removeChannel(channel);
+      void supabase.removeChannel(broadcastChannel);
     };
   }, [step, empresaId, refresh]);
 

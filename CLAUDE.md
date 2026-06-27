@@ -83,6 +83,37 @@ Usar siempre en RLS policies para aislar datos por empresa.
 - Build: `pnpm build` (Ignorar "Skipping validation of types")
 - Lint: `pnpm lint`
 
+## ⚡ Realtime — Patrones Críticos (Waiter System)
+
+### Trampas conocidas
+
+1. **React StrictMode double-mount con canal de nombre fijo** → el cleanup del primer mount cierra el canal; el segundo mount recibe un canal ya cerrado y nunca escucha. **Fix:** usar `useRef` con sufijo aleatorio: `useRef(\`waiter-banner-\${Math.random().toString(36).slice(2)}\`)` y pasar ese ref como nombre de canal.
+
+2. **`postgres_changes` silenciado en cliente singleton** → Supabase JS comparte una única conexión WebSocket. Varios componentes suscribiendo al mismo tabla desde distintos canales pueden dejar de recibir eventos. **Fix híbrido:** el componente central (`WaiterBanner`) escucha `postgres_changes` y además dispara un `CustomEvent('waiter-realtime-update')` por DOM, que los demás componentes capturan como fallback.
+
+3. **Race condition en validate loop** → cuando pendientes valida múltiples pedidos secuencialmente, el trigger de DB lanza un broadcast después de cada PATCH. El relay DOM llama `fetchPendientes()` entre iteraciones y devuelve estado parcial (el segundo pedido sigue en `pendiente_validacion`). **Fix:** `confirmingRef` (mirror de `useRef` del estado `confirming`); el relay retorna temprano si `confirmingRef.current.size > 0`. El `finally` del loop hace el fetch autoritativo.
+
+4. **Mesa grid badge no se actualiza al marcar ítems en cocina** → la cocina modifica `pedido_item_estados`, que no toca `mesa_sesiones`. `WaiterLoginForm` sólo escuchaba `mesa_sesiones`. **Fix:** agregar suscripción al broadcast `waiter-items-update` (canal `'waiter-items-update'`, evento `'item-update'`).
+
+### Arquitectura de canales activa
+
+| Canal | Tipo | Tabla/evento | Quién escucha |
+|---|---|---|---|
+| `waiter-banner-{uid}` | postgres_changes | pedidos, pedido_item_estados, mesa_sesiones | WaiterBanner |
+| `waiter-new-order` | broadcast `new-order` | trigger notify_waiter_new_order | WaiterBanner |
+| `waiter-items-update` | broadcast `item-update` | trigger notify_waiter_items_update | WaiterBanner, BarPage, WaiterLoginForm |
+| `waiter-kitchen-{uid}` | postgres_changes | pedido_item_estados, pedidos | WaiterKitchenPage |
+| `waiter-bar-{uid}` | postgres_changes | pedido_item_estados, pedidos | BarPage |
+| `waiter-pendientes-{uid}` | postgres_changes | pedidos, pedido_item_estados, mesa_sesiones | WaiterPendientesPage |
+| `waiter-login-mesas-{uid}` | postgres_changes | mesa_sesiones | WaiterLoginForm |
+| `kitchen-standalone` | postgres_changes | pedido_item_estados, pedidos | /kitchen page |
+
+### DOM relay: `waiter-realtime-update`
+
+`WaiterBanner` dispara `globalThis.dispatchEvent(new CustomEvent('waiter-realtime-update'))` cuando recibe cualquier update de Realtime. Los componentes waiter lo escuchan como fallback. **Nunca** hacer fetch en el handler si `confirmingRef.current.size > 0`.
+
+---
+
 ## 🔔 WaiterBanner — Re-autenticación sin recarga
 
 `WaiterBanner` verifica sesión al montar y en cada cambio de `pathname`. Si la sesión expira y el camarero mete el PIN en `WaiterLoginForm`, el `pathname` no cambia → el banner no se entera.

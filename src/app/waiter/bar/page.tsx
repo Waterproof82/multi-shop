@@ -258,6 +258,7 @@ export default function BarPage() {
   const [pendingServeAll, setPendingServeAll] = useState<string | null>(null);
   const [pendingBarCancel, setPendingBarCancel] = useState<FlatBarItem[] | null>(null);
   const [groupedMesas, setGroupedMesas] = useState<Set<string>>(new Set());
+  const channelNameRef = useRef(`waiter-bar-${Math.random().toString(36).slice(2)}`);
   const timersRef     = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
   const pointerStartX = useRef<number | null>(null);
   const swipingId     = useRef<string | null>(null);
@@ -286,7 +287,11 @@ export default function BarPage() {
     const supabase = getSupabaseAnonClient();
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const channel = supabase
-      .channel('waiter-bar-items')
+      .channel(channelNameRef.current)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => { void fetchOrders(); }, 100);
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados' }, () => {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => { void fetchOrders(); }, 100);
@@ -297,9 +302,25 @@ export default function BarPage() {
         }
       });
 
+    // Broadcast channel — receives 'item-update' events from the DB trigger
+    // (notify_waiter_items_update) whenever pedido_item_estados rows change.
+    // Bypasses the postgres_changes routing issue on the shared singleton client.
+    const broadcastChannel = supabase
+      .channel('waiter-items-update')
+      .on('broadcast', { event: 'item-update' }, () => {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => { void fetchOrders(); }, 100);
+      })
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('[Realtime] waiter-items-update broadcast error (bar):', status);
+        }
+      });
+
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       void supabase.removeChannel(channel);
+      void supabase.removeChannel(broadcastChannel);
     };
   }, [fetchOrders]);
 
