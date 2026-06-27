@@ -5,7 +5,7 @@ import { ICodigoDescuentoRepository } from "@/core/domain/repositories/ICodigoDe
 import { IMesaSesionRepository } from "@/core/domain/repositories/IMesaSesionRepository";
 import { Pedido, Result } from "@/core/domain/entities/types";
 import { logger } from "@/core/infrastructure/logging/logger";
-import { sendTelegramWithInlineButtons, sendTelegramWithQuickReplies, sendTelegramForMesa, sendTelegramBebidasInfo } from '@/core/infrastructure/services/telegram.service';
+import { sendTelegramWithInlineButtons, sendTelegramWithQuickReplies } from '@/core/infrastructure/services/telegram.service';
 
 export interface CreatePedidoDTO {
   items: {
@@ -456,20 +456,14 @@ export class PedidoUseCase {
 
   /**
    * Create a mesa order — no cliente required, no PII collected.
-   *
-   * Telegram routing (when telegram_bebidas_chat_id is set):
-   *   - comida → telegram_mesa_chat_id (cocina) with Anotado/Preparado buttons
-   *   - bebidas → telegram_bebidas_chat_id (bar) with informational message only
-   * Fallback (single group): all items → telegram_mesa_chat_id ?? telegram_chat_id
+   * In-app kitchen/bar replaces Telegram notifications for mesa orders.
    */
   async createMesaOrder(
     empresaId: string,
     data: CreateMesaPedidoDTO,
     mesaNumero: number,
     mesaNombre: string | null,
-    telegramMesaChatId: string | null,
-    telegramChatId: string | null,
-    telegramBebidasChatId: string | null = null
+    initialEstado: 'pendiente' | 'retenido' | 'pendiente_validacion' = 'pendiente'
   ): Promise<Result<{ id: string; numero_pedido: number; total: number; trackingToken: string }>> {
     try {
       // Step 1: Validate products and calculate server total
@@ -509,44 +503,20 @@ export class PedidoUseCase {
         total: serverTotal,
         trackingToken,
         sesionId,
+        initialEstado,
       });
       if (!pedidoResult.success) {
         return { success: false, error: pedidoResult.error };
       }
 
-      const pedidoId = pedidoResult.data.id;
-      const numeroPedido = pedidoResult.data.numero_pedido;
-
-      // Step 5: Send Telegram notifications
-      const cocinaChatId = telegramMesaChatId ?? telegramChatId;
-      const hasSplitGroups = Boolean(telegramBebidasChatId && cocinaChatId);
-
-      if (hasSplitGroups) {
-        // Split: comida → cocina group, bebidas → bar group
-        const comidaItems = repoItems.filter(i => i.tipo_producto !== 'bebida');
-        const bebidasItems = repoItems.filter(i => i.tipo_producto === 'bebida');
-
-        if (comidaItems.length > 0) {
-          const telegramResult = await sendTelegramForMesa(pedidoId, numeroPedido, comidaItems, mesaNumero, mesaNombre, cocinaChatId!);
-          if (telegramResult.success) {
-            await this.pedidoRepo.saveTelegramMessageId(pedidoId, telegramResult.data.messageId);
-          }
-        }
-
-        if (bebidasItems.length > 0) {
-          await sendTelegramBebidasInfo(pedidoId, numeroPedido, bebidasItems, mesaNumero, mesaNombre, telegramBebidasChatId!);
-        }
-      } else if (cocinaChatId) {
-        // Single group fallback: all items together
-        const telegramResult = await sendTelegramForMesa(pedidoId, numeroPedido, repoItems, mesaNumero, mesaNombre, cocinaChatId);
-        if (telegramResult.success) {
-          await this.pedidoRepo.saveTelegramMessageId(pedidoId, telegramResult.data.messageId);
-        }
-      }
-
       return {
         success: true,
-        data: { id: pedidoId, numero_pedido: numeroPedido, total: serverTotal, trackingToken },
+        data: {
+          id: pedidoResult.data.id,
+          numero_pedido: pedidoResult.data.numero_pedido,
+          total: serverTotal,
+          trackingToken,
+        },
       };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'use-case', 'PedidoUseCase.createMesaOrder', { empresaId });

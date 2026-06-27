@@ -6,7 +6,7 @@ Sistema de notificaciones vía Telegram para pedidos. Soporta tres modos según 
 
 - **`tienda`**: notificación con quick-reply buttons ("Te contestaremos" / "Te llamamos"). El cliente ve una página de tracking con el estado del pedido.
 - **`restaurante` (pedidos subdomain)**: notificación con botones de tiempo, el cliente es redirigido a una página de seguimiento en vivo con cuenta regresiva.
-- **`restaurante` (mesa / dine-in)**: notificación para pedidos de mesa, con botones de estado Anotado/Preparado/Servido para el equipo de sala. Soporta dos grupos Telegram: cocina (comida) y bar (bebidas).
+- **`restaurante` (mesa / dine-in)**: los pedidos de mesa ya **no usan Telegram**. Se gestionan íntegramente en la app a través de las páginas `/waiter/kitchen` y `/waiter/bar`. Ver [waiter-panel.md](./context/waiter-panel.md).
 
 ---
 
@@ -56,47 +56,6 @@ Cuando la empresa tiene `pagos_pickup_habilitados = true`, los pedidos de tipo `
 8. La página de tracking del cliente muestra el tiempo en vivo (polling cada 5 s)
 9. Cuando `estimated_ready_at` llega, la página muestra "¡Tu pedido está listo!"
 
-## Flujo — Modo Mesa (dine-in)
-
-1. Cliente en mesa escanea QR → pide desde `/?mesa={token}`
-2. `POST /api/pedidos` incluye `mesa_id` + `sesion_id`
-3. El use case enruta los ítems según `tipo_producto` y la configuración de grupos:
-   - **Con dos grupos**: ítems de comida → `telegram_mesa_chat_id` (cocina), ítems de bebida → `telegram_bebidas_chat_id` (bar)
-   - **Sin grupo bar**: todos los ítems → `telegram_mesa_chat_id` (comportamiento anterior)
-4. El mensaje muestra el número de pedido, la mesa y los ítems (sin precios)
-5. **El equipo de sala interactúa con los botones (flujo 3 estados):**
-
-**Estado inicial:**
-```
-[ ✅ Anotado ]  [ 🍳 Preparado ]
-```
-
-**Al pulsar Anotado:**
-```
-[ ✅ Anotado ✓ ]  [ 🍳 Preparado ]
-[ 🔄 Modificar ]
-```
-→ Estado del pedido en DB: `anotado`
-
-**Al pulsar Preparado:**
-```
-[ 🍳 Preparado ✓ ]  [ 🍽️ Servido ]
-[ 🔄 Modificar ]
-```
-→ Estado del pedido en DB: `preparado`
-→ Si `telegram_bebidas_chat_id` está configurado: se envía alerta al grupo bar — *"🍳 Comida lista — Mesa 3 · Pedido #42"*
-
-**Al pulsar Servido:**
-```
-[ 🍽️ Servido ✓ ]  [ 🗑️ Eliminar ]
-[ 🔄 Modificar ]
-```
-→ Estado del pedido en DB: `servido`
-
-**Al pulsar Eliminar:** borra el mensaje del chat de Telegram.
-
-**Al pulsar Modificar:** restaura los botones originales `Anotado / Preparado` y resetea el estado a `pendiente`.
-
 ---
 
 ## Configuración
@@ -117,9 +76,7 @@ TELEGRAM_WEBHOOK_SECRET=mi_secreto_seguro_123
 | Campo | Descripción |
 |-------|-------------|
 | `tipo` | `'tienda'` (defecto) o `'restaurante'` |
-| `telegram_chat_id` | ID del chat para pedidos takeaway/tienda |
-| `telegram_mesa_chat_id` | ID del chat para pedidos de mesa — cocina (comida) |
-| `telegram_bebidas_chat_id` | ID del chat para el bar (bebidas + alerta de comida lista). Opcional. |
+| `telegram_chat_id` | ID del chat para pedidos takeaway/tienda/recogida |
 
 ### Obtener el `telegram_chat_id`
 
@@ -154,11 +111,6 @@ Recibe callbacks de Telegram. Valida `X-Telegram-Bot-Api-Secret-Token` y despach
 | `quick_reply:{id}:soon` | Marca estado `soon`, muestra respuesta seleccionada |
 | `quick_reply:{id}:call` | Marca estado `call`, muestra respuesta seleccionada |
 | `modify_reply:{id}` | Restaura botones quick-reply (tienda) |
-| `anotado:{id}` | Marca como anotado, muestra estado + Preparado + Modificar |
-| `preparado:{id}` | Marca como preparado, notifica bar si está configurado, muestra Servido + Modificar |
-| `servido:{id}` | Marca como servido, muestra Eliminar + Modificar |
-| `eliminar:{id}` | Borra el mensaje del chat de Telegram |
-| `modify_mesa:{id}` | Restaura botones Anotado/Preparado (mesa), resetea a pendiente |
 | `noop` | Dismiss spinner sin acción |
 
 Siempre devuelve `200` (requisito de Telegram).
@@ -188,8 +140,6 @@ Si la notificación a Telegram falla, el error se registra en logs pero **no imp
 ```sql
 tipo                         text     DEFAULT 'tienda'   -- 'tienda' | 'restaurante'
 telegram_chat_id             text     NULL               -- pedidos takeaway/tienda/recogida
-telegram_mesa_chat_id        text     NULL               -- pedidos de mesa — cocina
-telegram_bebidas_chat_id     text     NULL               -- pedidos de mesa — bar (opcional)
 waiter_pin_hash              text     NULL               -- bcrypt hash del PIN de sala
 pagos_pickup_habilitados     boolean  DEFAULT false      -- requiere pago online para recogida/tienda; Telegram se envía post-pago
 ```

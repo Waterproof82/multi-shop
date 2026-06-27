@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Plus, Minus, Check } from "lucide-react"
+import { Plus, Minus, Check, Pause } from "lucide-react"
+import { getWaiterMesa } from "@/components/waiter-login-form"
 import {
   Dialog,
   DialogContent,
@@ -30,8 +31,11 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
   const [quantity, setQuantity] = useState(1)
   const [selectedComplement, setSelectedComplement] = useState<ComplementVM | null>(null)
   const [addedAnimation, setAddedAnimation] = useState(false)
+  const [isDeferred, setIsDeferred] = useState(false)
   const { language } = useLanguage()
   const { addItem } = useCart()
+
+  const isWaiterMode = !!getWaiterMesa()
 
   const complements = item?.complements || [];
 
@@ -56,12 +60,13 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
       if (item.requiresComplement && !selectedComplement) {
         return;
       }
-      addItem(item, quantity, selectedComplement ? [selectedComplement] : undefined);
+      addItem(item, quantity, selectedComplement ? [selectedComplement] : undefined, isDeferred || undefined);
       setAddedAnimation(true);
       setTimeout(() => {
         onOpenChange(false);
         setQuantity(1);
         setSelectedComplement(null);
+        setIsDeferred(false);
         setAddedAnimation(false);
       }, 300);
     }
@@ -75,6 +80,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
     if (open && item && (!previousOpenRef.current || previousItemIdRef.current !== item.id)) {
       setQuantity(1);
       setSelectedComplement(null);
+      setIsDeferred(false);
     }
     
     previousOpenRef.current = open;
@@ -188,10 +194,32 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
           </div>
         </div>
         
+        {isWaiterMode && item.tipoProducto !== 'bebida' && (
+          <button
+            type="button"
+            onClick={() => setIsDeferred(prev => !prev)}
+            className={`w-full flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm transition-all ${
+              isDeferred
+                ? 'border-orange-400/60 bg-orange-50 dark:bg-orange-950/30'
+                : 'border-border bg-muted/40 hover:bg-muted/70'
+            }`}
+          >
+            <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors ${
+              isDeferred ? 'border-orange-500 bg-orange-500' : 'border-muted-foreground/40'
+            }`}>
+              {isDeferred && <Check className="w-3 h-3 text-white" />}
+            </div>
+            <Pause className={`w-4 h-4 shrink-0 ${isDeferred ? 'text-orange-500' : 'text-muted-foreground'}`} />
+            <span className={isDeferred ? 'font-semibold text-orange-700 dark:text-orange-300' : 'text-muted-foreground'}>
+              Añadir como retenido
+            </span>
+          </button>
+        )}
+
         <DialogFooter className="shrink-0">
-          <RippleButton 
-            type="button" 
-            onClick={handleConfirmAddToCart} 
+          <RippleButton
+            type="button"
+            onClick={handleConfirmAddToCart}
             disabled={quantity < 1 || (item.requiresComplement && !selectedComplement)}
             className={addedAnimation ? 'animate-complement-select' : ''}
           >

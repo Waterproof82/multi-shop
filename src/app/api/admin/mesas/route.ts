@@ -1,7 +1,6 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { mesaRepository, mesaSesionUseCase, pedidoRepository } from '@/core/infrastructure/database';
-import { deleteMessage } from '@/core/infrastructure/services/telegram.service';
 import { requireAuth, requireRole, successResponse, validationErrorResponse, handleResult, type AuthResult } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 
@@ -88,14 +87,6 @@ export async function PATCH(request: NextRequest) {
   if (!parsed.success) return validationErrorResponse('sesionId inválido');
 
   const { sesionId } = parsed.data;
-
-  // Delete Telegram notifications (best-effort)
-  const telegramMessages = await pedidoRepository.findSesionTelegramMessages(sesionId);
-  if (telegramMessages.success) {
-    await Promise.all(
-      telegramMessages.data.map(({ messageId, chatId }) => deleteMessage(chatId, messageId))
-    );
-  }
 
   // Consolidate individual orders into a single closed ticket
   await pedidoRepository.consolidateSesionOrders(sesionId);

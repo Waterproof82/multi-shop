@@ -93,6 +93,7 @@ export class MenuMapper {
       id: `category-${parentCat.id}`,
       label: parentCat.nombre ?? "Unnamed Category",
       descripcion: parentCat.descripcion || undefined,
+      tipoProducto: parentCat.tipoProducto,
       translations: mapCategoryTranslations(parentCat),
       descripcionTranslations: mapDescriptionTranslations(parentCat),
       complementCategoryName: complementCategoryName || undefined,

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
-import { UtensilsCrossed, KeyRound, Pause, ReceiptText, X } from "lucide-react";
+import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
+import { UtensilsCrossed, KeyRound, Pause, ReceiptText, X, CheckSquare, ExternalLink, PlayCircle, BellRing } from "lucide-react";
 import { formatPrice } from "@/lib/format-price";
 import type { MesaWithSession } from "@/core/domain/repositories/IMesaRepository";
 
@@ -30,36 +30,6 @@ export function getWaiterMesa(): WaiterMesaSession | null {
   } catch {
     return null;
   }
-}
-
-interface OrderItem {
-  nombre: string;
-  cantidad: number;
-  precio: number;
-  complementos?: { nombre: string; precio: number }[];
-}
-
-interface MesaOrder {
-  id: string;
-  items: OrderItem[];
-  createdAt: string;
-}
-
-function mergeOrderItems(items: OrderItem[]): OrderItem[] {
-  const map = new Map<string, OrderItem>();
-  for (const item of items) {
-    const key = `${item.nombre}||${item.precio}`;
-    const existing = map.get(key);
-    if (existing) {
-      existing.cantidad += item.cantidad;
-      if (item.complementos?.length) {
-        existing.complementos = [...(existing.complementos ?? []), ...item.complementos];
-      }
-    } else {
-      map.set(key, { ...item, complementos: item.complementos ? [...item.complementos] : undefined });
-    }
-  }
-  return [...map.values()];
 }
 
 type Step = "pin" | "tables";
@@ -230,13 +200,15 @@ interface MesaCardProps {
   readonly isLoading: boolean;
   readonly onClick: () => void;
   readonly onClickDeferred: () => void;
+  readonly onClickListos: () => void;
   readonly onViewTicket: () => void;
   readonly onCloseMesa?: () => void;
+  readonly onDismissCall?: () => void;
 }
 
-function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onViewTicket, onCloseMesa }: MesaCardProps) {
+function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onClickListos, onViewTicket, onCloseMesa, onDismissCall }: MesaCardProps) {
   const isPaid = mesa.sesionPagada;
-  const isPaymentInProgress = mesa.pagoEnCurso && !mesa.sesionPagada;
+  const isPaymentInProgress = (mesa.pagoEnCurso || mesa.divisionActiva) && !mesa.sesionPagada;
   const isOpen = !!mesa.sesionId && mesa.activeOrderCount > 0 && !isPaid && !isPaymentInProgress;
   const isActive = !!mesa.sesionId && mesa.clienteActivo && mesa.activeOrderCount === 0 && !isPaid && !isPaymentInProgress;
   const colors = getMesaColors(isPaid, isPaymentInProgress, isOpen, isActive);
@@ -258,6 +230,19 @@ function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onViewTicket, onC
         <div className="absolute top-3 right-3">
           <MesaDot pulsing={pulsing} dotColor={colors.dot} />
         </div>
+
+        {/* Call-waiter indicator — top-left, dismiss on click */}
+        {mesa.llamadaActiva && (
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); onDismissCall?.(); }}
+            className="absolute top-2 left-2 flex items-center justify-center rounded-full w-7 h-7 animate-pulse"
+            style={{ background: 'oklch(25% 0.18 55)', border: '1px solid oklch(60% 0.28 55 / 0.7)' }}
+            aria-label="Llamada de cliente — pulsar para descartar"
+          >
+            <BellRing className="w-3.5 h-3.5" style={{ color: 'oklch(85% 0.22 55)' }} />
+          </button>
+        )}
 
         <div className="flex flex-col items-center gap-1 flex-1 justify-center">
           <UtensilsCrossed className="w-5 h-5 mb-1" style={{ color: colors.icon }} />
@@ -283,6 +268,20 @@ function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onViewTicket, onC
         </div>
       </button>
 
+      {/* Preparado badge — shown when any pedido in session has been marked ready by kitchen */}
+      {mesa.preparadoPedidoNumbers.length > 0 && (
+        <button
+          onClick={onClickListos}
+          className="w-full rounded-lg px-2 py-1.5 flex items-center gap-1.5 active:brightness-125 transition-all text-left"
+          style={{ background: 'oklch(18% 0.08 148 / 0.7)', border: '1px solid oklch(45% 0.15 148 / 0.5)' }}
+        >
+          <CheckSquare className="w-3 h-3 shrink-0" style={{ color: 'oklch(72% 0.20 148)' }} />
+          <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'oklch(72% 0.20 148)' }}>
+            Platos listos
+          </span>
+        </button>
+      )}
+
       {/* Deferred items */}
       {mesa.itemsDiferidos.length > 0 && (
         <button
@@ -296,8 +295,8 @@ function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onViewTicket, onC
               Retenidos
             </span>
           </div>
-          {mesa.itemsDiferidos.map((d, i) => (
-            <div key={i} className="flex items-baseline justify-between gap-1.5">
+          {mesa.itemsDiferidos.map((d) => (
+            <div key={d.itemName} className="flex items-baseline justify-between gap-1.5">
               <span className="text-[11px] leading-snug break-words min-w-0" style={{ color: 'oklch(84% 0.05 62)', wordBreak: 'break-word' }}>
                 {d.itemName}
               </span>
@@ -323,8 +322,8 @@ function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onViewTicket, onC
         </button>
       )}
 
-      {/* Cerrar mesa — solo cuando está pagada */}
-      {isPaid && onCloseMesa && (
+      {/* Cerrar mesa — visible si hay pedidos O si un cliente real entró al menú */}
+      {!!mesa.sesionId && (mesa.activeOrderCount > 0 || mesa.clienteActivo) && !isPaymentInProgress && onCloseMesa && (
         <button
           onClick={onCloseMesa}
           className="w-full rounded-lg px-2 py-1.5 flex items-center justify-center gap-1.5 hover:brightness-125 transition-all"
@@ -350,41 +349,57 @@ export function WaiterLoginForm() {
   const [loading, setLoading] = useState(false);
   const [mesaLoading, setMesaLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [ticketMesa, setTicketMesa] = useState<MesaWithSession | null>(null);
-  const [ticketOrders, setTicketOrders] = useState<MesaOrder[]>([]);
-  const [ticketLoading, setTicketLoading] = useState(false);
-  const [ticketPendingDelete, setTicketPendingDelete] = useState<{ mesaId: string; nombre: string; precio: number; maxCantidad: number } | null>(null);
-  const [ticketDeleteQty, setTicketDeleteQty] = useState(1);
-  const [ticketDeleting, setTicketDeleting] = useState(false);
+  const [closeBlockedError, setCloseBlockedError] = useState<string | null>(null);
+  const [deferredMesa, setDeferredMesa] = useState<MesaWithSession | null>(null);
+  const [launching, setLaunching] = useState(false);
+  const llamadasRef = useRef<Set<string>>(new Set());
+  const channelNameRef = useRef(`waiter-login-mesas-${Math.random().toString(36).slice(2)}`);
 
   const refresh = useCallback(async () => {
     const data = await fetchMesas();
-    if (data.length > 0) setMesas(data);
+    if (data.length > 0) {
+      const newLlamadas = new Set(data.filter(m => m.llamadaActiva).map(m => m.id));
+      for (const id of newLlamadas) {
+        if (!llamadasRef.current.has(id)) {
+          try { const a = new Audio('/bell.mp3'); a.volume = 0.7; void a.play(); } catch { /* ignore */ }
+        }
+      }
+      llamadasRef.current = newLlamadas;
+      setMesas(data);
+    }
   }, []);
 
   useEffect(() => {
     if (step !== "tables" || !empresaId) return;
 
     void refresh();
-    const interval = setInterval(() => { void refresh(); }, 2000);
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+    const supabase = getSupabaseAnonClient();
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedRefresh = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => { void refresh(); }, 100);
+    };
     const channel = supabase
-      .channel(`waiter-grid:${empresaId}`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'mesa_sesiones',
-        filter: `empresa_id=eq.${empresaId}`,
-      }, () => { void refresh(); })
+      .channel(channelNameRef.current)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mesa_sesiones' }, debouncedRefresh)
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('[Realtime] waiter-login-mesas error:', status);
+        }
+      });
+
+    // Listen to item-update broadcast so "Platos listos" badge updates when kitchen
+    // marks items as preparado — pedido_item_estados changes don't touch mesa_sesiones.
+    const broadcastChannel = supabase
+      .channel('waiter-items-update')
+      .on('broadcast', { event: 'item-update' }, debouncedRefresh)
       .subscribe();
 
     return () => {
-      clearInterval(interval);
+      if (debounceTimer) clearTimeout(debounceTimer);
       void supabase.removeChannel(channel);
+      void supabase.removeChannel(broadcastChannel);
     };
   }, [step, empresaId, refresh]);
 
@@ -415,6 +430,7 @@ export function WaiterLoginForm() {
         const data = await res.json() as { empresaId?: string };
         if (data.empresaId) setEmpresaId(data.empresaId);
         setStep("tables");
+        globalThis.dispatchEvent(new CustomEvent('waiter-auth-changed'));
       } else {
         const data = await res.json() as { error?: string };
         setError(data.error ?? "PIN incorrecto");
@@ -427,8 +443,29 @@ export function WaiterLoginForm() {
   }
 
   async function handleCloseMesa(mesa: MesaWithSession) {
+    if (mesa.itemsDiferidos.length > 0) {
+      setCloseBlockedError('Hay ítems retenidos. Libéralos o elimínalos antes de cerrar la mesa.');
+      setTimeout(() => setCloseBlockedError(null), 5000);
+      return;
+    }
     setMesaLoading(mesa.id);
     try {
+      // Guard: check if payment is required before allowing close
+      const r = await fetch(`/api/mesas/${encodeURIComponent(mesa.id)}/orders`);
+      if (r.ok) {
+        const data = await r.json() as { orders: { estado: string }[]; pagosHabilitados: boolean; sesionPagada: boolean };
+        const unservedStates = new Set(['pendiente_validacion', 'pendiente', 'en_preparacion', 'preparado']);
+        if (!data.sesionPagada && data.orders.some(o => unservedStates.has(o.estado))) {
+          setCloseBlockedError('Quedan platos por servir. Sirve todos los platos antes de cerrar la mesa.');
+          setTimeout(() => setCloseBlockedError(null), 5000);
+          return;
+        }
+        if (data.orders.length > 0 && data.pagosHabilitados && !data.sesionPagada) {
+          setCloseBlockedError('Hay pedidos sin pagar. Registra el pago antes de cerrar la mesa.');
+          setTimeout(() => setCloseBlockedError(null), 5000);
+          return;
+        }
+      }
       await fetch(`/api/waiter/mesas/${encodeURIComponent(mesa.id)}/close`, { method: 'POST' });
       await refresh();
     } finally {
@@ -436,53 +473,41 @@ export function WaiterLoginForm() {
     }
   }
 
+  async function handleDismissCall(mesa: MesaWithSession) {
+    await fetch(`/api/waiter/mesas/${encodeURIComponent(mesa.id)}/dismiss-call`, { method: 'POST' });
+    await refresh();
+  }
+
   async function handleViewTicket(mesa: MesaWithSession) {
-    setTicketMesa(mesa);
-    setTicketOrders([]);
-    setTicketLoading(true);
+    setMesaLoading(mesa.id);
     try {
-      const res = await fetch(`/api/mesas/${encodeURIComponent(mesa.id)}/orders`);
+      const res = await fetch("/api/waiter/mesa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mesaNumero: mesa.numero }),
+      });
       if (res.ok) {
-        const data = await res.json() as { orders: MesaOrder[] };
-        setTicketOrders(data.orders ?? []);
+        const data = await res.json() as { mesaId: string; mesaNumero: number; mesaNombre: string | null };
+        saveWaiterMesa({ mesaId: data.mesaId, mesaNumero: data.mesaNumero, mesaNombre: data.mesaNombre });
+        router.push(`/mesa/${data.mesaId}/orders`);
       }
-    } catch {
-      // best-effort
     } finally {
-      setTicketLoading(false);
+      setMesaLoading(null);
     }
   }
 
-  const handleTicketDeleteItem = useCallback(async () => {
-    if (!ticketPendingDelete || ticketDeleting) return;
-    setTicketDeleting(true);
+  async function handleLaunchRetenidos(mesa: MesaWithSession) {
+    setLaunching(true);
     try {
-      await fetch(`/api/waiter/mesas/${encodeURIComponent(ticketPendingDelete.mesaId)}/orders/items`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nombre: ticketPendingDelete.nombre,
-          precio: ticketPendingDelete.precio,
-          cantidadAEliminar: ticketDeleteQty,
-        }),
+      await fetch(`/api/waiter/kitchen/mesas/${encodeURIComponent(mesa.id)}/release-retenidos`, {
+        method: 'POST',
       });
-      setTicketPendingDelete(null);
-      if (ticketMesa) {
-        setTicketLoading(true);
-        try {
-          const res = await fetch(`/api/waiter/mesas/${encodeURIComponent(ticketPendingDelete.mesaId)}/orders`);
-          if (res.ok) {
-            const data = await res.json() as { orders: MesaOrder[] };
-            setTicketOrders(data.orders ?? []);
-          }
-        } finally {
-          setTicketLoading(false);
-        }
-      }
+      await refresh();
     } finally {
-      setTicketDeleting(false);
+      setLaunching(false);
+      setDeferredMesa(null);
     }
-  }, [ticketPendingDelete, ticketDeleteQty, ticketDeleting, ticketMesa]);
+  }
 
   async function handleMesaNav(mesa: MesaWithSession, openCart = false) {
     setMesaLoading(mesa.id);
@@ -609,6 +634,16 @@ export function WaiterLoginForm() {
         ))}
       </div>
 
+      {closeBlockedError && (
+        <div
+          role="alert"
+          className="mb-2 rounded-lg px-3 py-2 text-xs font-medium text-center"
+          style={{ background: 'oklch(22% 0.08 25)', color: 'oklch(88% 0.14 25)', border: '1px solid oklch(45% 0.18 25 / 0.5)' }}
+        >
+          {closeBlockedError}
+        </div>
+      )}
+
       {mesas.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-12">
           <UtensilsCrossed className="w-10 h-10 opacity-20" style={{ color: "oklch(60% 0.05 252)" }} />
@@ -624,172 +659,86 @@ export function WaiterLoginForm() {
               mesa={mesa}
               isLoading={mesaLoading === mesa.id}
               onClick={() => void handleMesaNav(mesa)}
-              onClickDeferred={() => void handleMesaNav(mesa, true)}
+              onClickDeferred={() => setDeferredMesa(mesa)}
+              onClickListos={() => {
+                const mesaKey = mesa.nombre ?? `Mesa ${mesa.numero}`;
+                router.push(`/waiter/kitchen?groupBy=listos&mesa=${encodeURIComponent(mesaKey)}`);
+              }}
               onViewTicket={() => void handleViewTicket(mesa)}
               onCloseMesa={() => void handleCloseMesa(mesa)}
+              onDismissCall={() => void handleDismissCall(mesa)}
             />
           ))}
         </div>
       )}
 
-      {/* Ticket modal */}
-      {ticketMesa && (
+      {/* Deferred items dialog */}
+      {deferredMesa && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "oklch(0% 0 0 / 0.75)" }}
-          onClick={() => setTicketMesa(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center px-6"
+          style={{ background: 'oklch(0% 0 0 / 0.65)' }}
         >
-          <div
-            className="relative w-full max-w-sm rounded-2xl overflow-hidden flex flex-col"
-            style={{ background: "oklch(14% 0.02 252)", border: "1px solid oklch(28% 0.04 252 / 0.8)", maxHeight: "85dvh" }}
-            onClick={(e) => e.stopPropagation()}
+          <button
+            type="button"
+            className="absolute inset-0"
+            style={{ cursor: 'default' }}
+            aria-label="Close"
+            onClick={() => { if (!launching) { setDeferredMesa(null); } }}
+            onKeyDown={e => { if (e.key === 'Escape' && !launching) { setDeferredMesa(null); } }}
+          />
+          <dialog
+            open
+            className="w-full max-w-xs rounded-2xl p-5 flex flex-col gap-4"
+            style={{ background: 'oklch(18% 0.03 252)', border: '1px solid oklch(42% 0.10 252 / 0.5)' }}
           >
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 pt-5 pb-3" style={{ borderBottom: "1px solid oklch(28% 0.04 252 / 0.6)" }}>
+            <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
-                <ReceiptText className="w-4 h-4" style={{ color: "oklch(62% 0.08 252)" }} />
-                <span className="text-sm font-bold tracking-wide" style={{ color: "oklch(85% 0.04 252)" }}>
-                  Mesa {ticketMesa.numero}{ticketMesa.nombre ? ` — ${ticketMesa.nombre}` : ""}
+                <Pause className="w-4 h-4 shrink-0" style={{ color: 'oklch(72% 0.16 62)' }} />
+                <span className="text-sm font-bold" style={{ color: 'oklch(92% 0.02 252)' }}>
+                  Retenidos — {deferredMesa.nombre ?? `Mesa ${deferredMesa.numero}`}
                 </span>
               </div>
-              <button
-                onClick={() => setTicketMesa(null)}
-                className="flex items-center justify-center w-7 h-7 rounded-full transition-all hover:brightness-125"
-                style={{ background: "oklch(22% 0.03 252 / 0.8)" }}
-                aria-label="Cerrar"
-              >
-                <X className="w-3.5 h-3.5" style={{ color: "oklch(60% 0.06 252)" }} />
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="overflow-y-auto flex-1 px-5 py-4">
-              {ticketLoading && (
-                <p className="text-center py-8 text-sm" style={{ color: "oklch(50% 0.05 252)" }}>Cargando…</p>
-              )}
-              {!ticketLoading && ticketOrders.length === 0 && (
-                <p className="text-center py-8 text-sm" style={{ color: "oklch(50% 0.05 252)" }}>Sin pedidos</p>
-              )}
-              {!ticketLoading && ticketOrders.length > 0 && (() => {
-                const allItems = mergeOrderItems(ticketOrders.flatMap((o) => o.items));
-                const total = allItems.reduce((sum, item) => {
-                  const compTotal = item.complementos?.reduce((s, c) => s + c.precio, 0) ?? 0;
-                  return sum + (item.precio + compTotal) * item.cantidad;
-                }, 0);
-                return (
-                  <div className="flex flex-col gap-0">
-                    {allItems.map((item) => {
-                      const compTotal = item.complementos?.reduce((s, c) => s + c.precio, 0) ?? 0;
-                      const lineTotal = (item.precio + compTotal) * item.cantidad;
-                      return (
-                        <div key={`${item.nombre}||${item.precio}`} className="flex items-center gap-2 py-2" style={{ borderBottom: "1px solid oklch(22% 0.03 252 / 0.6)" }}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setTicketPendingDelete({ mesaId: ticketMesa!.id, nombre: item.nombre, precio: item.precio, maxCantidad: item.cantidad });
-                              setTicketDeleteQty(1);
-                            }}
-                            className="flex items-center justify-center shrink-0 w-5 h-5 rounded-full text-xs font-bold"
-                            style={{ background: "oklch(35% 0.14 25 / 0.8)", color: "oklch(80% 0.10 25)" }}
-                            aria-label={`Eliminar ${item.nombre}`}
-                          >
-                            −
-                          </button>
-                          <div className="flex flex-col min-w-0 flex-1">
-                            <span className="text-sm font-medium leading-snug" style={{ color: "oklch(82% 0.04 252)" }}>
-                              <span className="font-bold mr-1" style={{ color: "oklch(65% 0.08 252)" }}>×{item.cantidad}</span>
-                              {item.nombre}
-                            </span>
-                            {item.complementos && item.complementos.length > 0 && (
-                              <span className="text-[10px] mt-0.5" style={{ color: "oklch(48% 0.05 252)" }}>
-                                {item.complementos.map((c) => c.nombre).join(", ")}
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-sm font-bold shrink-0 tabular-nums ml-auto" style={{ color: "oklch(72% 0.08 252)" }}>
-                            {formatPrice(lineTotal)}
-                          </span>
-                        </div>
-                      );
-                    })}
-                    <div className="flex items-center justify-between pt-3 mt-1">
-                      <span className="text-sm font-bold uppercase tracking-wide" style={{ color: "oklch(60% 0.06 252)" }}>Total</span>
-                      <span className="text-lg font-black tabular-nums" style={{ color: "oklch(88% 0.04 252)" }}>
-                        {formatPrice(total)}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete item confirmation modal — grid ticket */}
-      {ticketPendingDelete && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-6"
-          style={{ background: "oklch(0% 0 0 / 0.75)" }}
-          onClick={() => { if (!ticketDeleting) setTicketPendingDelete(null); }}
-        >
-          <div
-            className="w-full max-w-xs rounded-2xl p-5 flex flex-col gap-4"
-            style={{ background: "oklch(14% 0.02 252)", border: "1px solid oklch(28% 0.04 252 / 0.8)" }}
-            onClick={e => e.stopPropagation()}
-          >
-            <p className="text-sm font-bold text-center" style={{ color: "oklch(85% 0.04 252)" }}>
-              Eliminar: {ticketPendingDelete.nombre}
-            </p>
-            <div className="flex items-center justify-center gap-4">
-              <button
-                type="button"
-                onClick={() => setTicketDeleteQty(q => Math.max(1, q - 1))}
-                disabled={ticketDeleteQty <= 1}
-                className="w-9 h-9 rounded-full text-lg font-bold flex items-center justify-center disabled:opacity-30"
-                style={{ background: "oklch(22% 0.04 252 / 0.6)", color: "oklch(82% 0.04 252)" }}
-              >
-                −
-              </button>
-              <span className="text-2xl font-black w-8 text-center tabular-nums" style={{ color: "oklch(88% 0.04 252)" }}>
-                {ticketDeleteQty}
+              <span className="text-xs" style={{ color: 'oklch(55% 0.04 252)' }}>
+                {deferredMesa.itemsDiferidos.length} ítem{deferredMesa.itemsDiferidos.length === 1 ? '' : 's'} retenido{deferredMesa.itemsDiferidos.length === 1 ? '' : 's'}
               </span>
+            </div>
+
+            <div className="flex flex-col gap-2">
               <button
-                type="button"
-                onClick={() => setTicketDeleteQty(q => Math.min(ticketPendingDelete.maxCantidad, q + 1))}
-                disabled={ticketDeleteQty >= ticketPendingDelete.maxCantidad}
-                className="w-9 h-9 rounded-full text-lg font-bold flex items-center justify-center disabled:opacity-30"
-                style={{ background: "oklch(22% 0.04 252 / 0.6)", color: "oklch(82% 0.04 252)" }}
+                onClick={() => {
+                  const mesaKey = deferredMesa.nombre ?? `Mesa ${deferredMesa.numero}`;
+                  router.push(`/waiter/kitchen?groupBy=retenidos&mesa=${encodeURIComponent(mesaKey)}`);
+                }}
+                className="flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm font-semibold transition-colors text-left"
+                style={{ background: 'oklch(22% 0.04 252)', color: 'oklch(80% 0.04 252)', border: '1px solid oklch(38% 0.06 252 / 0.5)' }}
               >
-                +
+                <ExternalLink className="w-4 h-4 shrink-0" style={{ color: 'oklch(62% 0.08 252)' }} />
+                Abrir retenidos
+              </button>
+
+              <button
+                onClick={() => void handleLaunchRetenidos(deferredMesa)}
+                disabled={launching}
+                className="flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm font-semibold transition-colors text-left disabled:opacity-50"
+                style={{ background: 'oklch(21% 0.10 65)', color: 'oklch(80% 0.20 65)', border: '1px solid oklch(50% 0.22 65 / 0.55)' }}
+              >
+                <PlayCircle className="w-4 h-4 shrink-0" />
+                {launching ? 'Lanzando…' : 'Lanzar ítems retenidos de esta mesa'}
               </button>
             </div>
-            <p className="text-xs text-center" style={{ color: "oklch(50% 0.05 252)" }}>
-              de {ticketPendingDelete.maxCantidad} unidades
-            </p>
-            <div className="flex gap-2 mt-1">
-              <button
-                type="button"
-                onClick={() => setTicketPendingDelete(null)}
-                disabled={ticketDeleting}
-                className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
-                style={{ background: "oklch(22% 0.04 252 / 0.5)", color: "oklch(60% 0.06 252)" }}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={() => { void handleTicketDeleteItem(); }}
-                disabled={ticketDeleting}
-                className="flex-1 py-2.5 rounded-xl text-sm font-bold"
-                style={{ background: "oklch(35% 0.14 25 / 0.9)", color: "oklch(85% 0.08 25)" }}
-              >
-                {ticketDeleting ? "…" : "Confirmar"}
-              </button>
-            </div>
-          </div>
+
+            <button
+              onClick={() => setDeferredMesa(null)}
+              disabled={launching}
+              className="text-xs text-center disabled:opacity-40"
+              style={{ color: 'oklch(48% 0.04 252)' }}
+            >
+              Cancelar
+            </button>
+          </dialog>
         </div>
       )}
+
     </div>
   );
 }

@@ -38,6 +38,7 @@ export default async function AdminProtectedLayout({
   let mostrarPromociones = empresa?.mostrarPromociones ?? true;
   let mostrarTgtg = empresa?.mostrarTgtg ?? true;
   let mesasHabilitadas = empresa?.mesasHabilitadas ?? true;
+  let deliveryHabilitado = empresa?.deliveryHabilitado ?? false;
   let empresaTipo: 'tienda' | 'restaurante' = (empresa?.tipo === 'restaurante') ? 'restaurante' : 'tienda';
 
   if (admin.rol === SUPERADMIN_ROLE) {
@@ -55,6 +56,7 @@ export default async function AdminProtectedLayout({
       mostrarPromociones = empresaResult.data.mostrarPromociones ?? true;
       mostrarTgtg = empresaResult.data.mostrarTgtg ?? true;
       mesasHabilitadas = empresaResult.data.mesasHabilitadas ?? true;
+      deliveryHabilitado = empresaResult.data.deliveryHabilitado ?? false;
       empresaTipo = (empresaResult.data.tipo === 'restaurante') ? 'restaurante' : 'tienda';
     }
   } else {
@@ -71,6 +73,7 @@ export default async function AdminProtectedLayout({
         mostrarPromociones={mostrarPromociones}
         mostrarTgtg={mostrarTgtg}
         mesasHabilitadas={mesasHabilitadas}
+        deliveryHabilitado={deliveryHabilitado}
         overrideEmpresaId={isSuperAdminView ? empresaId : undefined}
         isSuperAdmin={isSuperAdminView}
       >

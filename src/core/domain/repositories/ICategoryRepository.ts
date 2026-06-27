@@ -16,6 +16,7 @@ export interface CreateCategoryData {
   categoria_complemento_de?: string | null;
   complemento_obligatorio?: boolean;
   categoria_padre_id?: string | null;
+  tipo_producto?: 'comida' | 'bebida';
 }
 
 export interface UpdateCategoryData extends Partial<CreateCategoryData> {}

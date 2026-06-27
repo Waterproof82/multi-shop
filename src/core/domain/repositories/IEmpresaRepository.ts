@@ -22,6 +22,8 @@ export interface UpdateEmpresaData {
   descuento_bienvenida_porcentaje?: number;
   descuento_bienvenida_duracion?: number;
   tipo?: 'tienda' | 'restaurante';
+  validacion_pedidos_habilitada?: boolean;
+  delivery_habilitado?: boolean;
 }
 
 export interface IEmpresaRepository {
@@ -33,8 +35,6 @@ export interface IEmpresaRepository {
     telefono_whatsapp: string | null;
     tipo: string;
     telegram_chat_id: string | null;
-    telegram_mesa_chat_id: string | null;
-    telegram_bebidas_chat_id: string | null;
     mesas_habilitadas: boolean;
   } | null>>;
   findByDomainPublic(domain: string): Promise<Result<EmpresaPublic | null>>;

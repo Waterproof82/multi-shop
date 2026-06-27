@@ -22,17 +22,19 @@ Plataforma **multi-tenant** de gestión de negocios de hostelería y retail. Cad
 - **Pedidos desde la mesa** mediante QR: el cliente escanea el código QR de la mesa con la cámara del móvil, sin instalar nada, y hace su pedido directamente.
 - **Validación de presencia física**: los pedidos en mesa requieren escaneo in-app del QR impreso (token de sesión de 20 min, rotación automática al cerrar la sesión).
 - **Panel de sala para camareros** con login por PIN: grid de mesas con estado en tiempo real, apertura y cierre de sesión, búsqueda rápida de productos para tomar pedidos.
-- **Pago en mesa** vía Redsys TPV: pago total o división de cuenta entre 2 y 20 personas. Sistema de lock atómico para evitar pagos simultáneos. Verificación de total antes de pagar (detecta productos nuevos añadidos en el último momento).
+- **Pago en mesa** vía Redsys TPV: pago total o división de cuenta entre 2 y 20 personas. Lock atómico (PostgreSQL `FOR UPDATE`) para pago total; división permite pagos simultáneos independientes mediante RPC transaccional. Verificación de total antes de pagar (detecta productos añadidos en el último momento). Idempotencia de webhook garantizada con update atómico `WHERE status='pending'`. Actualización en tiempo real vía Supabase Realtime.
 - **Registro manual de pagos** por el camarero (efectivo / pago externo) para desbloquear la sesión en escenarios de división.
 - **Gestión de pedidos takeaway** desde un entorno de chat de Telegram: con un solo botón se indica el tiempo de recogida (10, 15, 20, 30 o 45 minutos). El cliente recibe la notificación automáticamente en su pantalla de seguimiento, sin necesidad de llamar por teléfono.
+- **Gestión de pedidos en mesa (cocina y bar)** íntegramente en la app:
+  - `/waiter/pendientes` — cola de validación: pedidos en `pendiente_validacion` que el camarero revisa antes de mandar a cocina/bar. Selección individual o por tipo (comida/bebida), pausa por ítem (→ kitchen retenido), envío conjunto comida+bebida en un solo tap.
+  - `/waiter/kitchen` — vista de cocina con todos los ítems de comida en curso, agrupados por pedido o por mesa. Colores por tiempo de espera (azul → teal → ámbar → rojo). Filtro "Listos" para servicio. Timer arranca desde la validación, no desde el pedido original.
+  - `/waiter/bar` — vista equivalente para bebidas.
+  - Los camareros deslizan cada ítem para avanzar su estado (`pendiente → en preparación → listo → servido`) con gestos de puntero.
 
-### 🤖 Notificaciones Telegram — tres modos de operación
+### 🤖 Notificaciones Telegram — dos modos de operación
 
 - **Tienda**: botones de acción rápida (Aceptar, Rechazar) directamente en el mensaje.
 - **Restaurante takeaway**: selector de tiempo de preparación con botones; el admin confirma el tiempo y el cliente lo ve al instante.
-- **Mesa — dos grupos de trabajo independientes**:
-  - **Grupo de cocina / barra**: recibe cada pedido con botones por línea (Anotado / Servido). Cuando cocina marca un plato como servido, el camarero recibe la notificación en tiempo real para saber que el pedido está listo para llevar a la mesa.
-  - **Grupo de gestión general**: coordina el sistema completo de pedidos (apertura y cierre de mesas, pagos, incidencias). Permite que sala y cocina operen en canales separados sin interferencias.
 
 ### 🌐 Multi-idioma y multi-tenant
 
@@ -46,6 +48,84 @@ JWT + HttpOnly cookies, revocación en Redis (fail-closed), RBAC por rol, CSRF H
 
 ---
 
+## ⚡ Arquitectura Realtime — Sistema Híbrido
+
+Todas las vistas de tiempo real del sistema han sido migradas de polling HTTP a **Supabase Realtime** con un enfoque híbrido deliberado.
+
+### El problema del polling
+
+Antes de la migración, el panel de sala tenía múltiples bucles de polling HTTP corriendo en paralelo:
+
+| Componente | Intervalo anterior | Approach actual |
+|------------|-------------------|-----------------|
+| `WaiterBanner` (badges counts) | 2 × 10 s | Único canal Realtime multiplexado |
+| `WaiterLoginForm` (detección de apertura de mesa) | 2 s | Realtime trigger en `mesa_sesiones` |
+| `kitchen/page.tsx` (ítems de cocina) | 3 s | Realtime en `pedido_item_estados` |
+| `bar/page.tsx` (ítems de bar) | 3 s | Realtime en `pedido_item_estados` |
+| `pendientes/page.tsx` (cola de validación) | 3 s | Realtime en `pedidos` + `pedido_item_estados` |
+| `client-menu-page.tsx` / `mesa-order-history.tsx` | (redundante) | Eliminado |
+
+### Qué significa "híbrido"
+
+El sistema distingue dos tipos de actualización con necesidades distintas:
+
+**1. Cambios de datos** → Supabase Realtime (PostgreSQL CDC)
+Cuando se inserta o modifica un registro en `pedidos` o `pedido_item_estados`, Supabase notifica al cliente al instante vía WebSocket. El cliente re-fetchea solo el endpoint afectado. Latencia: < 100 ms. Sin polling.
+
+**2. Progresión visual de timers** → `setInterval` de 1 segundo
+Los colores de urgencia (azul → teal → ámbar → rojo) y los contadores de tiempo de espera en cocina y bar necesitan actualizar la UI cada segundo aunque no haya cambios en DB. Este intervalo es puramente cosmético — no hace ninguna llamada de red.
+
+```
+              ┌──────────────────────────────────────┐
+              │          Supabase Realtime           │
+              │  pedidos INSERT/UPDATE               │
+              │  pedido_item_estados INSERT/UPDATE   │
+              └──────────────┬───────────────────────┘
+                             │ CDC via WebSocket
+                             ▼
+              ┌──────────────────────────────────────┐
+              │      Cliente React (kitchen/bar)     │
+              │                                      │
+              │  onPostgresChanges → fetchItems()    │  ← datos al instante
+              │  setInterval 1s   → setItems(p→p)   │  ← re-render visual (timers)
+              └──────────────────────────────────────┘
+```
+
+### Canal multiplexado en WaiterBanner
+
+`WaiterBanner` necesita sincronizar tres señales: conteos de cocina, conteos de bar y estado de pago en curso. La solución anterior usaba dos endpoints en polling a 10 s. La solución actual abre **un único canal Realtime** que escucha cambios en `pedido_item_estados` y en `mesa_sesiones`, y dispara un `fetchCounts()` consolidado:
+
+```typescript
+const channel = supabase
+  .channel('waiter-banner')
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados' }, fetchCounts)
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'mesa_sesiones' }, fetchCounts)
+  .subscribe();
+```
+
+### Impacto en costes de Supabase
+
+| Métrica | Antes | Después |
+|---------|-------|---------|
+| Requests HTTP / minuto (1 camarero activo) | ~30 | ~0 (solo al cambio) |
+| Conexiones WebSocket | 0 | 1 por tab |
+| Latencia percibida al cambio | hasta 3–10 s | < 100 ms |
+| Carga en DB durante inactividad | constante | cero |
+
+> Las conexiones Realtime de Supabase son significativamente más baratas en créditos de compute que el polling HTTP equivalente — y la latencia mejora drásticamente.
+
+### Activación en Supabase (migración `20260626000001`)
+
+```sql
+-- Habilita CDC para las tablas críticas de tiempo real
+ALTER PUBLICATION supabase_realtime ADD TABLE public.pedido_item_estados;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.pedidos;
+```
+
+Estas tablas deben estar publicadas en Supabase antes de que los canales Realtime funcionen. La migración las activa automáticamente.
+
+---
+
 ## Stack Tecnológico
 
 | Tecnología | Versión | Uso |
@@ -53,7 +133,7 @@ JWT + HttpOnly cookies, revocación en Redis (fail-closed), RBAC por rol, CSRF H
 | Next.js | 16.0.10 (Turbopack) | Framework full-stack |
 | React | 19.2.0 | UI Library |
 | TypeScript | 5.x | Tipado estático |
-| Supabase | ^2.95.3 | BBDD + Auth |
+| Supabase | ^2.95.3 | BBDD + Auth + Realtime CDC |
 | Cloudflare R2 | — | Storage imágenes |
 | Tailwind CSS | 4.x | Estilos |
 | AWS SDK v3 | ^3.994 | Cliente S3/R2 |
@@ -113,9 +193,10 @@ src/
 │   │   └── pago-ko/                 # Error de pago Redsys
 │   ├── mesa/[mesaId]/orders/        # Ticket de mesa (cliente)
 │   ├── waiter/                      # Panel de sala
-│   │   ├── page.tsx                 # Login PIN
-│   │   ├── tables/page.tsx          # Grid de mesas
-│   │   └── tables/[mesaId]/page.tsx # Detalle de mesa
+│   │   ├── page.tsx                 # Login PIN + grid de mesas
+│   │   ├── pendientes/page.tsx      # Cola de validación (pendiente_validacion)
+│   │   ├── kitchen/page.tsx         # Vista de cocina en tiempo real (comida)
+│   │   └── bar/page.tsx             # Vista de bar en tiempo real (bebidas)
 │   ├── admin/
 │   │   ├── login/                   # Login admin
 │   │   └── (protected)/             # Rutas protegidas (SSR)
@@ -171,7 +252,15 @@ src/
 │       │   │   └── [mesaId]/
 │       │   │       ├── open/        # POST — abrir sesión de mesa
 │       │   │       ├── close/       # POST — cerrar sesión de mesa
-│       │   │       └── orders/      # GET — pedidos de una mesa
+│       │   │       ├── orders/      # GET — pedidos de una mesa
+│       │   │       │   └── items/[itemId]/ # DELETE — eliminar ítem de pedido
+│       │   │       ├── deferred/    # GET/PUT — ítems diferidos de la sesión
+│       │   │       └── manual-payment/ # POST — pago manual (efectivo/externo)
+│       │   ├── orders/
+│       │   │   ├── counts/          # GET — contadores cocina + bar (WaiterBanner badges)
+│       │   │   ├── kitchen/         # GET — ítems de cocina en curso (comida)
+│       │   │   ├── bar/             # GET — ítems de bar en curso (bebidas)
+│       │   │   └── items/[itemId]/state/ # PUT — avanzar estado de ítem (swipe)
 │       │   └── productos/           # GET — productos para tomar pedidos
 │       ├── telegram/
 │       │   └── webhook/             # POST — callbacks de Telegram (todos los modos)
@@ -523,12 +612,12 @@ const main = parseMainDomain(domain); // elimina subdominio pedidos
 
 | Tabla | PK | FK | Notas |
 |-------|----|----|-------|
-| `empresas` | id (uuid) | — | dominio, subdomain_pedidos, colores, fb, instagram, url_mapa, telefono_whatsapp, **descuento_bienvenida_activo/porcentaje**, telegram_chat_id, **telegram_mesa_chat_id**, **waiter_pin_hash** |
+| `empresas` | id (uuid) | — | dominio, subdomain_pedidos, colores, fb, instagram, url_mapa, telefono_whatsapp, **descuento_bienvenida_activo/porcentaje**, telegram_chat_id, **waiter_pin_hash** |
 | `perfiles_admin` | id (uuid) | empresa_id → empresas (nullable) | → auth.users, `rol` = 'admin' o 'superadmin' |
 | `categorias` | id (uuid) | empresa_id → empresas | categoria_padre_id, categoriaComplementoDe |
 | `productos` | id (uuid) | empresa_id, categoria_id | i18n: titulo_es/en/fr/it/de |
 | `clientes` | id (uuid) | empresa_id | telefono único por empresa |
-| `pedidos` | id (uuid) | empresa_id, cliente_id | numero_pedido (atómico por tenant), detalle_pedido: JSON (PedidoItem[]), **codigo_descuento_id, descuento_porcentaje, total_sin_descuento**, **mesa_id, sesion_id, estado** |
+| `pedidos` | id (uuid) | empresa_id, cliente_id | numero_pedido (atómico por tenant), detalle_pedido: JSON (PedidoItem[]), **codigo_descuento_id, descuento_porcentaje, total_sin_descuento**, **mesa_id, sesion_id, estado**, **validated_at** (timestamptz, NULL = sin validación) |
 | `promociones` | id (uuid) | empresa_id | imagen_url, numero_envios |
 | `codigos_descuento` | id (uuid) | empresa_id | codigo unik por empresa + email, usado boolean, pedido_id FK |
 | `tgtg_promociones` | id (uuid) | empresa_id | fechaActivacion, horaRecogidaInicio/Fin, emailEnviado, numeroEnvios |
@@ -740,11 +829,14 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 | **Welcome Discount** | Popup 30s en subdomain pedidos, código único BIENVENIDO-XXXXXX, email con idioma del cliente, porcentaje configurable (1-50%), duración configurable (7/14/30/60/90 días), validación server-side (existencia, usado, expirado, email match), aplicación en checkout, persists en pedido |
 | **Admin Panel Design** | Glassmorphic dark theme (backdrop-blur + white/10 opacity), estadoPendiente=Aceptado colores consistentes con badges de tabla (ámbar/azul), diseño unificado sin colores por empresa |
 | **SEO Multi-Tenant** | Metadata dinámica por empresa, hreflang (5 idiomas), sitemap/robots dinámicos, Schema.org Restaurant+FAQ+Menu, geo coordinates desde urlMapa, 404 con meta tags |
-| **Mesa Ordering** | QR table ordering para restaurantes dine-in. mesas + mesa_sesiones en DB. Rate limiting per-UUID (120/min). Ticket view con complementos + i18n + hora 24h. Notificación Telegram con botones Anotado/Servido. |
+| **Mesa Ordering** | QR table ordering para restaurantes dine-in. mesas + mesa_sesiones en DB. Rate limiting per-UUID (120/min). Ticket view con complementos + i18n + hora 24h. Gestión in-app de ítems por cocina y bar (sin Telegram). |
 | **Mesa Payments** | Pago en mesa vía Redsys TPV. Pago total o división de cuenta (2–20 personas). `mesa_division_pagos` elimina race condition en pagos simultáneos. Sistema de lock atómico (`pago_en_curso`) bloquea todos los usuarios de la mesa durante el pago. Verificación de total antes de pagar (detecta nuevos productos). Overlay 💳 en ticket + back button trap + adaptive polling (3s/10s). |
 | **QR Session Enforcement** | Pedidos en mesa requieren presencia física validada por escaneo in-app del QR impreso. Token de 20min en `mesa_client_tokens` (sessionStorage). `validateMesaClientToken` middleware en `/api/pedidos` y `/api/mesas/{mesaId}/orders`. Rotación de sesión al cerrar mesa invalida todos los tokens anteriores. Rate limit: 10 tokens/hora/mesa. |
-| **Waiter Panel** | Panel PIN-auth en /waiter. Grid de mesas, detalle por mesa, ciclo de sesión open/close. WaiterBanner sticky global. Integración con mesa_sesiones |
-| **Telegram Multi-modo** | tienda → quick-reply buttons. restaurante takeaway → time-selector + tracking. mesa → Anotado/Servido con estado seleccionado + Modificar |
+| **Waiter Panel** | Panel PIN-auth en /waiter. Grid de mesas, ciclo de sesión open/close, ítems diferidos, pago manual. WaiterBanner sticky global con badges de cocina y bar en tiempo real. Re-autenticación sin recarga: `WaiterLoginForm` dispara `CustomEvent('waiter-auth-changed')` → banner revalida sesión automáticamente. |
+| **Kitchen & Bar In-App** | `/waiter/kitchen` y `/waiter/bar`: vistas en tiempo real para gestión de ítems sin Telegram. Estados por ítem: pendiente → en_preparacion → preparado → servido (swipe gestual). Colores por tiempo de espera (oklch, 6 rangos). GroupBy por pedido o por mesa. Filtro "Listos". Retenidos con sección propia. Badges con counts en WaiterBanner (neutral/verde/naranja). Timer de espera arranca desde `validated_at` (momento de validación), no desde `created_at` del pedido original. |
+| **Waiter Pendientes** | `/waiter/pendientes`: cola de validación antes de cocina/bar. Selección individual o por tipo (comida/bebida). Pausa (⏸) por ítem de comida → llega a cocina como retenido. Botón conjunto comida+bebida (botón morado) valida ambos tipos en un solo POST. La pausa prevalece sobre la selección en envíos conjuntos. |
+| **Realtime Híbrido** | Migración completa de polling a Supabase Realtime en todas las vistas del panel de sala (kitchen, bar, pendientes, waiter-banner, waiter-login). Sistema híbrido: Realtime CDC para cambios de datos (<100 ms latencia, sin carga en DB en reposo) + `setInterval` 1 s exclusivamente para actualización visual de timers. Un único canal multiplexado en WaiterBanner consolida conteos de cocina, bar y estado de pago. Eliminados ~30 requests HTTP/min por camarero activo. Ver sección [⚡ Arquitectura Realtime](#-arquitectura-realtime--sistema-híbrido). |
+| **Telegram Multi-modo** | tienda → quick-reply buttons. restaurante takeaway → time-selector + tracking en vivo. mesa → gestionado in-app (sin Telegram). |
 | **Delivery + Pago online** | Zona de cobertura por CP configurable. Cotización Glovo en tiempo real. Pago Redsys TPV Virtual obligatorio para delivery. Auto-despacho de rider al confirmar pago. Tracking page post-pago. |
 
 ## Documentación
@@ -761,6 +853,7 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 - [`docs/telegram-notifications.md`](docs/telegram-notifications.md) — Notificaciones Telegram (tienda, restaurante takeaway, mesa)
 - [`docs/context/delivery.md`](docs/context/delivery.md) — Delivery: zona de cobertura, Glovo Business LaaS, Redsys TPV, flujo completo end-to-end
 - [`docs/context/qr-session-enforcement.md`](docs/context/qr-session-enforcement.md) — QR session enforcement: presencia física, mesa_client_tokens, QRScannerGate, rotación de sesión
+- [`docs/context/waiter-validation-flow.md`](docs/context/waiter-validation-flow.md) — Cola de validación: flujo pendiente_validacion → cocina/bar, from_validation flag, pausa, timer validated_at
 
 ---
 

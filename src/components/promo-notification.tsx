@@ -46,19 +46,19 @@ function PromoNotificationInner() {
 
   if (!notification) return null;
 
-  const isSuccess = notification.type === "success";
-  const colorClasses = isSuccess
-    ? "bg-primary text-primary-foreground"
-    : "bg-destructive text-destructive-foreground";
+  const baseClass = `fixed top-20 left-1/2 z-[100] -translate-x-1/2 px-6 py-3 rounded-lg shadow-elegant-lg text-sm font-medium max-w-md text-center`;
 
+  if (notification.type === "error") {
+    return (
+      <div role="alert" aria-live="assertive" className={`${baseClass} bg-destructive text-destructive-foreground`}>
+        {notification.text}
+      </div>
+    );
+  }
   return (
-    <div
-      role={notification.type === "error" ? "alert" : "status"}
-      aria-live={notification.type === "error" ? "assertive" : "polite"}
-      className={`fixed top-20 left-1/2 z-[100] -translate-x-1/2 ${colorClasses} px-6 py-3 rounded-lg shadow-elegant-lg text-sm font-medium max-w-md text-center`}
-    >
+    <output aria-live="polite" className={`${baseClass} bg-primary text-primary-foreground`}>
       {notification.text}
-    </div>
+    </output>
   );
 }
 

@@ -29,6 +29,9 @@ export const updateEmpresaSchema = z.object({
   pagos_mesa_habilitados: z.boolean().optional(),
   pagos_pickup_habilitados: z.boolean().optional(),
   mesas_habilitadas: z.boolean().optional(),
+  validacion_pedidos_habilitada: z.boolean().optional(),
+  delivery_habilitado: z.boolean().optional(),
+  google_reviews_url: z.string().url().nullable().optional(),
 });
 
 export type UpdateEmpresaDTO = z.infer<typeof updateEmpresaSchema>;

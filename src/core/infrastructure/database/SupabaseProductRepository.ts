@@ -33,6 +33,17 @@ export class SupabaseProductRepository implements IProductRepository {
 
   async create(data: CreateProductData): Promise<Result<Product>> {
     try {
+      // Derive tipo_producto from the category when one is assigned
+      let tipoProducto = data.tipo_producto ?? 'comida';
+      if (data.categoria_id) {
+        const { data: cat } = await this.supabase
+          .from('categorias')
+          .select('tipo_producto')
+          .eq('id', data.categoria_id)
+          .single();
+        if (cat) tipoProducto = (cat as { tipo_producto: string }).tipo_producto === 'bebida' ? 'bebida' : 'comida';
+      }
+
       const { data: created, error } = await this.supabase
         .from("productos")
         .insert({
@@ -53,7 +64,7 @@ export class SupabaseProductRepository implements IProductRepository {
           foto_object_fit: data.foto_object_fit || 'contain',
           es_especial: data.es_especial,
           activo: data.activo,
-          tipo_producto: data.tipo_producto ?? 'comida',
+          tipo_producto: tipoProducto,
         })
         .select()
         .single();

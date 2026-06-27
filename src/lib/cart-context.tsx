@@ -18,8 +18,7 @@ export interface CartItem {
   selectedComplements?: Complement[]
   justAdded?: boolean
   justRemoved?: boolean
-  deferred?: boolean      // waiter marked this item to send later
-  fromPending?: boolean   // kept for compat but no longer set; DB items load as deferred
+  deferred?: boolean      // waiter marked this item to send later (comida only)
 }
 
 function newCartId(): string {
@@ -36,21 +35,11 @@ export interface AddedItemInfo {
 
 interface CartContextType {
   items: CartItem[]
-  addItem: (item: MenuItemVM, quantity?: number, selectedComplements?: Complement[]) => void
+  addItem: (item: MenuItemVM, quantity?: number, selectedComplements?: Complement[], deferred?: boolean) => void
   removeItem: (cartId: string) => void
   updateQuantity: (cartId: string, quantity: number) => void
   clearCart: () => void
-  clearNonDeferred: () => void
   toggleDeferred: (cartId: string) => void
-  releaseAllDeferred: () => void
-  loadDeferredItems: (items: Array<{
-    itemId: string;
-    itemName: string;
-    price: number;
-    quantity: number;
-    translations?: Record<string, { name: string }>;
-    selectedComplements?: Array<{ id: string; name: string; price: number }>;
-  }>) => void
   totalItems: number
   totalPrice: number
   isCartOpen: boolean
@@ -102,7 +91,7 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
     }
   }, [])
 
-  const addItem = useCallback((item: MenuItemVM, quantity = 1, selectedComplements?: Complement[]) => {
+  const addItem = useCallback((item: MenuItemVM, quantity = 1, selectedComplements?: Complement[], deferred?: boolean) => {
     const itemKey = getItemKey(item, selectedComplements);
     const complementPrice = selectedComplements?.reduce((s, c) => s + c.price, 0) || 0;
     const totalItemPrice = (item.price + complementPrice) * quantity;
@@ -126,7 +115,7 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
           index === existingIndex ? { ...ci, quantity: ci.quantity + quantity } : ci
         )
       }
-      return [...prev, { cartId: newCartId(), item, quantity, selectedComplements, justAdded: true }]
+      return [...prev, { cartId: newCartId(), item, quantity, selectedComplements, justAdded: true, deferred: deferred ?? undefined }]
     })
   }, [])
 
@@ -158,50 +147,8 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
 
   const clearCart = useCallback(() => { setItems([]); setLastAddedItem(null); }, [])
 
-  const clearNonDeferred = useCallback(() => {
-    setLastAddedItem(null);
-    // Keep only items explicitly marked deferred.
-    setItems(prev => prev.filter(ci => ci.deferred));
-  }, [])
-
   const toggleDeferred = useCallback((cartId: string) => {
     setItems(prev => prev.map(ci => ci.cartId === cartId ? { ...ci, deferred: !ci.deferred } : ci));
-  }, [])
-
-  const releaseAllDeferred = useCallback(() => {
-    setItems(prev => prev.map(ci => ci.deferred ? { ...ci, deferred: false } : ci));
-  }, [])
-
-  const loadDeferredItems = useCallback((deferredItems: Array<{
-    itemId: string;
-    itemName: string;
-    price: number;
-    quantity: number;
-    translations?: Record<string, { name: string }>;
-    selectedComplements?: Array<{ id: string; name: string; price: number }>;
-  }>) => {
-    if (deferredItems.length === 0) return;
-    setItems(prev => {
-      const toAdd = deferredItems
-        .filter(d => !prev.some(ci => ci.item.id === d.itemId && ci.deferred))
-        .map(d => ({
-          cartId: newCartId(),
-          item: {
-            id: d.itemId,
-            name: d.itemName,
-            price: d.price,
-            translations: d.translations,
-          } as MenuItemVM,
-          quantity: d.quantity,
-          selectedComplements: d.selectedComplements?.map(c => ({
-            id: c.id,
-            name: c.name,
-            price: c.price,
-          })),
-          deferred: true as const,
-        }));
-      return [...prev, ...toAdd];
-    });
   }, [])
 
   const totalItems = items.reduce((sum, ci) => sum + ci.quantity, 0)
@@ -216,17 +163,14 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
     removeItem,
     updateQuantity,
     clearCart,
-    clearNonDeferred,
     toggleDeferred,
-    releaseAllDeferred,
-    loadDeferredItems,
     totalItems,
     totalPrice,
     isCartOpen,
     openCart,
     closeCart,
     lastAddedItem,
-  }), [items, addItem, removeItem, updateQuantity, clearCart, clearNonDeferred, toggleDeferred, releaseAllDeferred, loadDeferredItems, totalItems, totalPrice, isCartOpen, openCart, closeCart, lastAddedItem]);
+  }), [items, addItem, removeItem, updateQuantity, clearCart, toggleDeferred, totalItems, totalPrice, isCartOpen, openCart, closeCart, lastAddedItem]);
 
   return (
     <CartContext.Provider value={contextValue}>

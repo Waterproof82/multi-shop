@@ -117,7 +117,7 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
 
       {category.subcategories && category.subcategories.length > 0 ? (
         <div className="space-y-8">
-          {category.subcategories.map((subcat) => (
+          {category.subcategories.filter(s => s.products.length > 0).map((subcat) => (
             <SubcategorySection
               key={subcat.id}
               subcategory={subcat}

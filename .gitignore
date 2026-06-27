@@ -67,4 +67,5 @@ next-env.d.ts
 
 # Public images (except main header)
 public/*.webp
-!public/MERMELADA-TOMATE-web-transp-sombra-1920w.webp
+!public/MERMELADA-TOMATE-web-transp-sombra-1920w.webp.superpowers/
+.worktrees/

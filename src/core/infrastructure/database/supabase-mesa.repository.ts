@@ -200,7 +200,7 @@ export class SupabaseMesaRepository implements IMesaRepository {
       type RpcRow = {
         id: string; empresa_id: string; numero: number; nombre: string | null;
         sesion_id: string | null; sesion_pagada: boolean; pago_en_curso: boolean;
-        session_total: number; items_diferidos: unknown[] | null; cliente_activo: boolean;
+        session_total: number; cliente_activo: boolean; division_activa: boolean; llamada_activa: boolean;
       };
       const { data: rpcData, error: rpcError } = await this.supabase
         .rpc('get_mesas_with_sessions', { p_empresa_id: empresaId });
@@ -222,16 +222,77 @@ export class SupabaseMesaRepository implements IMesaRepository {
         .filter((id): id is string => id !== null);
 
       // Step 2: count active (non-cerrado) pedidos per session
+      // + collect pedido numbers that have at least one item in 'listo' state (per-item kitchen state)
+      // + collect retenido pedido items (replaces the dropped items_diferidos JSONB column)
       const countBySesion: Record<string, number> = {};
+      const preparadoBySesion: Record<string, number[]> = {};
+      const retenidoBySesion: Record<string, DeferredItem[]> = {};
       if (activeSesionIds.length > 0) {
+        type PedidoRow = { id: string; sesion_id: string; estado: string; numero_pedido: number; detalle_pedido: unknown };
         const { data: activeData } = await this.supabase
           .from('pedidos')
-          .select('sesion_id')
+          .select('id, sesion_id, estado, numero_pedido, detalle_pedido')
           .in('sesion_id', activeSesionIds)
           .neq('estado', 'cerrado');
-        for (const p of activeData ?? []) {
-          const sid = p['sesion_id'] as string;
+
+        type DetalleItem = { nombre: string; precio: number; cantidad: number; complementos?: Array<{ nombre: string; precio: number }>; translations?: Record<string, { name?: string }> };
+        const pedidoIdToSesion: Record<string, { sesionId: string; numeroPedido: number; estado: string; detalle: DetalleItem[] }> = {};
+        for (const p of (activeData ?? []) as PedidoRow[]) {
+          const sid = p.sesion_id;
           countBySesion[sid] = (countBySesion[sid] ?? 0) + 1;
+          pedidoIdToSesion[p.id] = {
+            sesionId: sid,
+            numeroPedido: p.numero_pedido,
+            estado: p.estado,
+            detalle: (p.detalle_pedido as DetalleItem[]) ?? [],
+          };
+        }
+
+        // Check pedido_item_estados for 'listo' and 'retenido' items
+        const pedidoIds = Object.keys(pedidoIdToSesion);
+        if (pedidoIds.length > 0) {
+          const { data: itemEstados } = await this.supabase
+            .from('pedido_item_estados')
+            .select('pedido_id, item_idx, estado, from_validation')
+            .in('pedido_id', pedidoIds);
+
+          // Build per-pedido estado override map
+          // Skip from_validation=true entries for the retenido check — those items are back in the
+          // pendientes queue, not kitchen-retained, and must not appear as retenidos in the grid.
+          const estadoMap = new Map<string, Map<number, string>>();
+          for (const row of (itemEstados ?? []) as { pedido_id: string; item_idx: number; estado: string; from_validation: boolean }[]) {
+            if (row.from_validation) continue;
+            if (!estadoMap.has(row.pedido_id)) estadoMap.set(row.pedido_id, new Map());
+            estadoMap.get(row.pedido_id)!.set(row.item_idx, row.estado);
+          }
+
+          for (const [pid, { sesionId, numeroPedido, estado: pedidoEstado, detalle }] of Object.entries(pedidoIdToSesion)) {
+            const overrides = estadoMap.get(pid) ?? new Map<number, string>();
+            const defaultEstado = pedidoEstado === 'retenido' ? 'retenido' : 'pendiente';
+
+            // Listo check
+            if ([...overrides.values()].some(e => e === 'listo')) {
+              const nums = preparadoBySesion[sesionId] ?? [];
+              if (!nums.includes(numeroPedido)) nums.push(numeroPedido);
+              preparadoBySesion[sesionId] = nums;
+            }
+
+            // Retenido items (per-item effective estado)
+            detalle.forEach((item, idx) => {
+              const efectiveEstado = overrides.get(idx) ?? defaultEstado;
+              if (efectiveEstado === 'retenido') {
+                const deferredItem: DeferredItem = {
+                  itemId: `${item.nombre}-${item.precio}`,
+                  itemName: item.nombre,
+                  price: item.precio,
+                  quantity: item.cantidad,
+                  selectedComplements: item.complementos?.map(c => ({ id: c.nombre, name: c.nombre, price: c.precio })),
+                  translations: item.translations as Record<string, { name: string }> | undefined,
+                };
+                retenidoBySesion[sesionId] = [...(retenidoBySesion[sesionId] ?? []), deferredItem];
+              }
+            });
+          }
         }
       }
 
@@ -247,8 +308,11 @@ export class SupabaseMesaRepository implements IMesaRepository {
           sessionTotal: Number(row.session_total),
           sesionPagada: row.sesion_pagada ?? false,
           pagoEnCurso: row.pago_en_curso ?? false,
-          itemsDiferidos: (row.items_diferidos ?? []) as DeferredItem[],
+          divisionActiva: row.division_activa ?? false,
+          itemsDiferidos: row.sesion_id ? (retenidoBySesion[row.sesion_id] ?? []) : [],
           clienteActivo: row.cliente_activo ?? false,
+          preparadoPedidoNumbers: row.sesion_id ? (preparadoBySesion[row.sesion_id] ?? []) : [],
+          llamadaActiva: row.llamada_activa ?? false,
         })),
       };
     } catch (e) {

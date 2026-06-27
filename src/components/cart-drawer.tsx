@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect, useRef } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, Check, Gift, UtensilsCrossed, Pause } from "lucide-react"
 import { useReducedMotion } from "framer-motion"
@@ -98,10 +98,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     updateQuantity,
     removeItem,
     clearCart,
-    clearNonDeferred,
     toggleDeferred,
-    releaseAllDeferred,
-    loadDeferredItems,
     totalPrice,
     isCartOpen,
     openCart,
@@ -110,8 +107,6 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
   const { language } = useLanguage()
   const router = useRouter();
   const shouldReduceMotion = useReducedMotion() ?? false;
-  // Keyed to mesaId so a mesa-switch also triggers a reload
-  const deferredLoadedRef = useRef<string | null>(null);
   const [sending, setSending] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState<{ numeroPedido: number } | null>(null);
   const [activeOrderTokens, setActiveOrderTokens] = useState<string[]>([]);
@@ -122,12 +117,8 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
   const [isWaiterMode, setIsWaiterMode] = useState(false);
   const [qrGateState, setQrGateState] = useState<QRGateState | null>(null);
   const [showOrderToast, setShowOrderToast] = useState(false);
-  const [showLaunchDeferredConfirm, setShowLaunchDeferredConfirm] = useState(false);
   const [showClearWithDeferredWarning, setShowClearWithDeferredWarning] = useState(false);
-  const [pendingLaunchDeferred, setPendingLaunchDeferred] = useState(false);
 
-  // True when every item in cart is deferred
-  const allDeferred = items.length > 0 && items.every(ci => ci.deferred);
   const hasDeferredItems = items.some(ci => ci.deferred);
 
   // Detect ?mesa= param (client-side only, SSR safe)
@@ -177,43 +168,6 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     setActiveOrderTokens(getTrackingTokens());
   }, [isCartOpen]);
 
-  // Pre-load deferred items from DB when a mesa is identified
-  useEffect(() => {
-    const mesaId = mesaInfo?.id ?? mesaToken;
-    if (!mesaId || deferredLoadedRef.current === mesaId) return;
-    deferredLoadedRef.current = mesaId;
-
-    fetch(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/deferred`)
-      .then(async r => {
-        if (!r.ok) return;
-        const data = await r.json() as { items: Array<{ itemId: string; itemName: string; price: number; quantity: number; translations?: Record<string, { name: string }>; selectedComplements?: Array<{ id: string; name: string; price: number }> }> };
-        if (data.items?.length > 0) {
-          loadDeferredItems(data.items);
-        }
-      })
-      .catch(() => null);
-  }, [mesaInfo, mesaToken, loadDeferredItems]);
-
-  // Explicitly persist a computed deferred list to DB. Called immediately at each action
-  // (toggle, remove, quantity change) so there are no timing or race-condition issues.
-  const saveDeferredToDb = useCallback((deferredItems: CartItem[]) => {
-    if (!isWaiterMode || !mesaToken) return;
-    const mesaId = mesaInfo?.id ?? mesaToken;
-    void fetch(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/deferred`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        items: deferredItems.map(ci => ({
-          itemId: ci.item.id,
-          itemName: ci.item.name,
-          price: ci.item.price,
-          quantity: ci.quantity,
-          translations: ci.item.translations,
-          selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
-        })),
-      }),
-    });
-  }, [isWaiterMode, mesaToken, mesaInfo]);
 
   const [discountCode, setDiscountCode] = useState('');
   const [discountValid, setDiscountValid] = useState<{ valid: boolean; porcentaje: number } | null>(null);
@@ -253,10 +207,34 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
       const toOrder = items.filter(ci => !ci.deferred);
       const toDefer = items.filter(ci => ci.deferred);
 
-      if (toOrder.length === 0) return; // guard: button should already be disabled
+      if (toOrder.length === 0 && toDefer.length === 0) return;
 
       setSending(true);
       try {
+        // Deferred-only: send as retenido pedido and done
+        if (toOrder.length === 0) {
+          await fetch('/api/pedidos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tipo: 'mesa',
+              mesa_id: mesaId,
+              initialEstado: 'retenido',
+              items: toDefer.map((ci: CartItem) => ({
+                item: { id: ci.item.id, name: ci.item.name, price: ci.item.price, translations: ci.item.translations },
+                quantity: ci.quantity,
+                selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
+              })),
+              idioma: language,
+            }),
+          }).catch(() => null);
+          clearCart();
+          closeCart();
+          setShowOrderToast(true);
+          setTimeout(() => setShowOrderToast(false), 2000);
+          return;
+        }
+
         const res = await fetch('/api/pedidos', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...(clientToken ? { 'Authorization': `Bearer ${clientToken}` } : {}) },
@@ -306,23 +284,25 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
             // localStorage may be unavailable
           }
 
-          // Save deferred items to DB (empty array clears if none remain)
-          await fetch(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/deferred`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              items: toDefer.map(ci => ({
-                itemId: ci.item.id,
-                itemName: ci.item.name,
-                price: ci.item.price,
-                quantity: ci.quantity,
-                translations: ci.item.translations,
-                selectedComplements: ci.selectedComplements,
-              })),
-            }),
-          }).catch(() => null);
+          if (toDefer.length > 0) {
+            await fetch('/api/pedidos', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                tipo: 'mesa',
+                mesa_id: mesaId,
+                initialEstado: 'retenido',
+                items: toDefer.map((ci: CartItem) => ({
+                  item: { id: ci.item.id, name: ci.item.name, price: ci.item.price, translations: ci.item.translations },
+                  quantity: ci.quantity,
+                  selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
+                })),
+                idioma: language,
+              }),
+            }).catch(() => null); // fire-and-forget — failure is non-critical
+          }
 
-          clearNonDeferred();
+          clearCart();
           closeCart();
           setShowOrderToast(true);
           setTimeout(() => setShowOrderToast(false), 2000);
@@ -469,18 +449,9 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     } finally {
       setSending(false);
     }
-  }, [mesaToken, mesaInfo, isWaiterMode, nombre, telefono, countryCode, email, deliveryMethod, deliveryAddress, deliveryPostalCode, deliveryLatitude, deliveryLongitude, isRestaurant, pagosPickupHabilitados, items, language, discountCode, estimatedFeeCents, clearCart, clearNonDeferred, closeCart, router]);
+  }, [mesaToken, mesaInfo, isWaiterMode, nombre, telefono, countryCode, email, deliveryMethod, deliveryAddress, deliveryPostalCode, deliveryLatitude, deliveryLongitude, isRestaurant, pagosPickupHabilitados, items, language, discountCode, estimatedFeeCents, clearCart, closeCart, router]);
 
-  // After releaseAllDeferred updates items, fire the order
-  useEffect(() => {
-    if (pendingLaunchDeferred && !items.some(ci => ci.deferred)) {
-      setPendingLaunchDeferred(false);
-      void handleConfirmOrder();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, pendingLaunchDeferred]);
-
-  // Signal "Activa" state: when a real customer (non-waiter) adds their first item
+// Signal "Activa" state: when a real customer (non-waiter) adds their first item
   useEffect(() => {
     if (isWaiterMode || !mesaToken || items.length !== 1) return;
     const mesaId = mesaInfo?.id ?? mesaToken;
@@ -539,33 +510,6 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
           }}
         />
       )}
-      {/* Launch all deferred confirmation */}
-      <Dialog open={showLaunchDeferredConfirm} onOpenChange={setShowLaunchDeferredConfirm}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>¿Lanzar todos los retenidos?</DialogTitle>
-            <DialogDescription className="pt-2">
-              Se enviará un pedido con todos los ítems retenidos. Esta acción no se puede deshacer.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex gap-2 mt-2">
-            <Button variant="outline" className="flex-1" onClick={() => setShowLaunchDeferredConfirm(false)}>
-              Cancelar
-            </Button>
-            <Button
-              className="flex-1"
-              onClick={() => {
-                setShowLaunchDeferredConfirm(false);
-                releaseAllDeferred();
-                setPendingLaunchDeferred(true);
-              }}
-            >
-              Lanzar
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* Clear cart with deferred items warning */}
       <Dialog open={showClearWithDeferredWarning} onOpenChange={setShowClearWithDeferredWarning}>
         <DialogContent className="sm:max-w-sm">
@@ -730,13 +674,6 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                           onClick={() => {
                             const newQty = ci.quantity - 1;
                             updateQuantity(ci.cartId, newQty);
-                            if (ci.deferred) {
-                              saveDeferredToDb(
-                                newQty <= 0
-                                  ? items.filter(c => c.deferred && c.cartId !== ci.cartId)
-                                  : items.filter(c => c.deferred).map(c => c.cartId === ci.cartId ? { ...c, quantity: newQty } : c)
-                              );
-                            }
                           }}
                           aria-label={t("reduceQuantity", language)}
                         >
@@ -752,11 +689,6 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                           onClick={() => {
                             const newQty = ci.quantity + 1;
                             updateQuantity(ci.cartId, newQty);
-                            if (ci.deferred) {
-                              saveDeferredToDb(
-                                items.filter(c => c.deferred).map(c => c.cartId === ci.cartId ? { ...c, quantity: newQty } : c)
-                              );
-                            }
                           }}
                           aria-label={t("increaseQuantity", language)}
                         >
@@ -767,26 +699,17 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                           size="icon"
                           className="min-h-11 min-w-11 h-11 w-11 text-destructive hover:text-destructive hover:bg-destructive/10 transition-all duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={() => {
-                            if (ci.deferred) {
-                              saveDeferredToDb(items.filter(c => c.deferred && c.cartId !== ci.cartId));
-                            }
                             removeItem(ci.cartId);
                           }}
                           aria-label={`${t("remove", language)} ${(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}`}
                         >
                           <Trash2 className="size-4" />
                         </RippleButton>
-                        {mesaToken && (
+                        {mesaToken && isWaiterMode && ci.item.tipoProducto !== 'bebida' && (
                           <button
                             type="button"
                             onClick={() => {
-                              const willBeDeferred = !ci.deferred;
                               toggleDeferred(ci.cartId);
-                              saveDeferredToDb(
-                                willBeDeferred
-                                  ? [...items.filter(c => c.deferred), ci]
-                                  : items.filter(c => c.deferred && c.cartId !== ci.cartId)
-                              );
                             }}
                             className="flex items-center justify-center rounded-md p-1.5 transition-colors duration-150 min-h-[44px] min-w-[44px]"
                             style={{
@@ -1055,17 +978,6 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                 </p>
               )}
               <div className="flex flex-col gap-2">
-                {isWaiterMode && hasDeferredItems && (
-                  <Button
-                    variant="outline"
-                    className="w-full rounded-full py-3 font-semibold min-h-[44px] border-amber-500/40 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/20"
-                    onClick={() => setShowLaunchDeferredConfirm(true)}
-                    disabled={sending}
-                  >
-                    <Pause className="w-4 h-4 mr-2 shrink-0" />
-                    Lanzar todos los retenidos
-                  </Button>
-                )}
                  <Button
                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full py-3 text-lg font-semibold shadow-elegant transition-colors duration-150 min-h-[44px]"
                    size="lg"
@@ -1076,9 +988,9 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                        handleConfirmOrder();
                      }
                    }}
-                   disabled={sending || (mesaToken !== null && mesaError) || isDeliveryIncomplete || allDeferred}
+                   disabled={sending || (mesaToken !== null && mesaError) || isDeliveryIncomplete}
                  >
-                   {sending ? t("sending", language) : allDeferred ? 'Todos los ítems están retenidos' : mesaToken ? t("mesaPlaceOrder", language) : t("sendOrder", language)}
+                   {sending ? t("sending", language) : mesaToken ? t("mesaPlaceOrder", language) : t("sendOrder", language)}
                  </Button>
                 <Button
                   variant="ghost"

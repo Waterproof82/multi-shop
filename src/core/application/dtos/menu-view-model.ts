@@ -58,6 +58,7 @@ export interface MenuCategoryVM {
   id: string;
   label: string;
   descripcion?: string;
+  tipoProducto?: 'comida' | 'bebida';
   items: MenuItemVM[];
   translations?: {
     en?: TranslationEntry;

@@ -21,11 +21,29 @@ export async function GET(request: NextRequest) {
   if (parsed.success) {
     try {
       const supabase = getSupabaseClient();
-      await supabase
+
+      // Fetch the session to check for an active custom turn
+      const { data: sesionRow } = await supabase
         .from('mesa_sesiones')
-        .update({ pago_en_curso: false, pago_iniciado_en: null })
+        .select('id, custom_turno_id')
         .eq('mesa_id', parsed.data.mesaId)
-        .is('cerrada_at', null);
+        .is('cerrada_at', null)
+        .maybeSingle();
+
+      const row = sesionRow as { id: string; custom_turno_id: string | null } | null;
+
+      if (row?.custom_turno_id) {
+        // Custom turn payment cancelled — release the lock atomically via RPC
+        // (sets pago_en_curso=false, custom_turno_id=null, status=cancelado)
+        await supabase.rpc('cancel_custom_turn', { p_turno_id: row.custom_turno_id });
+      } else {
+        // Regular full/division payment cancelled — just clear the lock flag
+        await supabase
+          .from('mesa_sesiones')
+          .update({ pago_en_curso: false, pago_iniciado_en: null })
+          .eq('mesa_id', parsed.data.mesaId)
+          .is('cerrada_at', null);
+      }
     } catch {
       // Never block the redirect
     }

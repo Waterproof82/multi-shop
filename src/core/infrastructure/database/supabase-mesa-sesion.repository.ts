@@ -177,53 +177,73 @@ export class SupabaseMesaSesionRepository implements IMesaSesionRepository {
     }
   }
 
+  // items_diferidos column was dropped in migration 20260617000001.
+  // Deferred items are now stored as pedidos with estado = 'retenido'.
+  // These methods now operate on retenido pedidos via the pedidos table.
   async getDeferredItems(mesaId: string): Promise<Result<DeferredItem[]>> {
     try {
-      const { data, error } = await this.supabase
+      const { data: sesion } = await this.supabase
         .from('mesa_sesiones')
-        .select('items_diferidos')
+        .select('id')
         .eq('mesa_id', mesaId)
         .is('cerrada_at', null)
         .maybeSingle();
 
+      if (!sesion) return { success: true, data: [] };
+
+      const { data, error } = await this.supabase
+        .from('pedidos')
+        .select('detalle_pedido')
+        .eq('sesion_id', (sesion as { id: string }).id)
+        .eq('estado', 'retenido');
+
       if (error) {
-        await logger.logAndReturnError(
-          'DB_SELECT_ERROR',
-          error.message,
-          'repository',
-          'SupabaseMesaSesionRepository.getDeferredItems',
-          { details: { code: error.code, mesaId } }
-        );
-        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener ítems diferidos', module: 'repository', method: 'getDeferredItems' } };
+        await logger.logAndReturnError('DB_SELECT_ERROR', error.message, 'repository', 'SupabaseMesaSesionRepository.getDeferredItems', { details: { code: error.code, mesaId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener ítems retenidos', module: 'repository', method: 'getDeferredItems' } };
       }
 
-      if (!data) return { success: true, data: [] };
+      const items: DeferredItem[] = (data ?? []).flatMap(p => {
+        const pedidoItems = (p['detalle_pedido'] as Array<{ nombre: string; precio: number; cantidad: number; complementos?: Array<{ nombre: string; precio: number }>; translations?: Record<string, { name?: string }> }>) ?? [];
+        return pedidoItems.map(item => ({
+          itemId: `${item.nombre}-${item.precio}`,
+          itemName: item.nombre,
+          price: item.precio,
+          quantity: item.cantidad,
+          selectedComplements: item.complementos?.map(c => ({ id: c.nombre, name: c.nombre, price: c.precio })),
+          translations: item.translations as Record<string, { name: string }> | undefined,
+        }));
+      });
 
-      const row = data as Record<string, unknown>;
-      return { success: true, data: (row['items_diferidos'] as DeferredItem[]) ?? [] };
+      return { success: true, data: items };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabaseMesaSesionRepository.getDeferredItems', { details: { mesaId } });
       return { success: false, error: appError };
     }
   }
 
+  // Calling setDeferredItems([]) releases all retenido pedidos by setting estado = 'pendiente'.
+  // Writing new deferred items is no longer supported — use createMesaOrder with estado='retenido'.
   async setDeferredItems(mesaId: string, items: DeferredItem[]): Promise<Result<void>> {
+    if (items.length > 0) return { success: true, data: undefined }; // write path obsolete
     try {
-      const { error } = await this.supabase
+      const { data: sesion } = await this.supabase
         .from('mesa_sesiones')
-        .update({ items_diferidos: items })
+        .select('id')
         .eq('mesa_id', mesaId)
-        .is('cerrada_at', null);
+        .is('cerrada_at', null)
+        .maybeSingle();
+
+      if (!sesion) return { success: true, data: undefined };
+
+      const { error } = await this.supabase
+        .from('pedidos')
+        .update({ estado: 'pendiente' })
+        .eq('sesion_id', (sesion as { id: string }).id)
+        .eq('estado', 'retenido');
 
       if (error) {
-        await logger.logAndReturnError(
-          'DB_UPDATE_ERROR',
-          error.message,
-          'repository',
-          'SupabaseMesaSesionRepository.setDeferredItems',
-          { details: { code: error.code, mesaId } }
-        );
-        return { success: false, error: { code: 'DB_ERROR', message: 'Error al guardar ítems diferidos', module: 'repository', method: 'setDeferredItems' } };
+        await logger.logAndReturnError('DB_UPDATE_ERROR', error.message, 'repository', 'SupabaseMesaSesionRepository.setDeferredItems', { details: { code: error.code, mesaId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al liberar ítems retenidos', module: 'repository', method: 'setDeferredItems' } };
       }
 
       return { success: true, data: undefined };

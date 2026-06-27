@@ -11,7 +11,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
     try {
       const { data: empresa } = await this.supabase
         .from('empresas')
-        .select('email_notification, telefono_whatsapp, nombre, logo_url, mostrar_logo, fb, instagram, url_mapa, direccion, dominio, slug, url_image, banner_fit, descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de, mostrar_carrito, mostrar_promociones, mostrar_tgtg, mesas_habilitadas, moneda, subdomain_pedidos, tipo, color_primary, color_primary_foreground, color_secondary, color_secondary_foreground, color_accent, color_accent_foreground, color_background, color_foreground, descuento_bienvenida_activo, descuento_bienvenida_porcentaje, descuento_bienvenida_duracion')
+        .select('email_notification, telefono_whatsapp, nombre, logo_url, mostrar_logo, fb, instagram, url_mapa, direccion, dominio, slug, url_image, banner_fit, descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de, mostrar_carrito, mostrar_promociones, mostrar_tgtg, mesas_habilitadas, moneda, subdomain_pedidos, tipo, color_primary, color_primary_foreground, color_secondary, color_secondary_foreground, color_accent, color_accent_foreground, color_background, color_foreground, descuento_bienvenida_activo, descuento_bienvenida_porcentaje, descuento_bienvenida_duracion, delivery_habilitado')
         .eq('id', empresaId)
         .single();
 
@@ -42,6 +42,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
           mostrarPromociones: empresa.mostrar_promociones ?? true,
           mostrarTgtg: empresa.mostrar_tgtg ?? true,
           mesasHabilitadas: empresa.mesas_habilitadas ?? true,
+          deliveryHabilitado: empresa.delivery_habilitado ?? false,
           moneda: empresa.moneda ?? 'EUR',
           emailNotification: empresa.email_notification,
           colores,
@@ -89,6 +90,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
       if (data.descripcion_it !== undefined) updatePayload.descripcion_it = data.descripcion_it || null;
       if (data.descripcion_de !== undefined) updatePayload.descripcion_de = data.descripcion_de || null;
       // Boolean fields: must NOT use `|| null` — false is a valid value and must reach the DB.
+      if (data.validacion_pedidos_habilitada !== undefined) updatePayload.validacion_pedidos_habilitada = data.validacion_pedidos_habilitada;
       if (data.mostrar_promociones !== undefined) updatePayload.mostrar_promociones = data.mostrar_promociones;
       if (data.mostrar_tgtg !== undefined) updatePayload.mostrar_tgtg = data.mostrar_tgtg;
       if (data.descuento_bienvenida_activo !== undefined) updatePayload.descuento_bienvenida_activo = data.descuento_bienvenida_activo;
@@ -118,11 +120,11 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
     }
   }
 
-  async findByDomain(dominio: string): Promise<Result<{ id: string; nombre: string; email_notification: string | null; telefono_whatsapp: string | null; tipo: string; telegram_chat_id: string | null; telegram_mesa_chat_id: string | null; telegram_bebidas_chat_id: string | null; mesas_habilitadas: boolean; pagos_pickup_habilitados: boolean } | null>> {
+  async findByDomain(dominio: string): Promise<Result<{ id: string; nombre: string; email_notification: string | null; telefono_whatsapp: string | null; tipo: string; telegram_chat_id: string | null; mesas_habilitadas: boolean; pagos_pickup_habilitados: boolean; validacion_pedidos_habilitada: boolean } | null>> {
     try {
       const { data: empresa } = await this.supabase
         .from('empresas')
-        .select('id, nombre, email_notification, telefono_whatsapp, tipo, telegram_chat_id, telegram_mesa_chat_id, telegram_bebidas_chat_id, mesas_habilitadas, pagos_pickup_habilitados')
+        .select('id, nombre, email_notification, telefono_whatsapp, tipo, telegram_chat_id, mesas_habilitadas, pagos_pickup_habilitados, validacion_pedidos_habilitada')
         .eq('dominio', dominio)
         .single();
 
@@ -133,10 +135,9 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
         telefono_whatsapp: empresa.telefono_whatsapp as string | null,
         tipo: (empresa.tipo as string) ?? 'tienda',
         telegram_chat_id: empresa.telegram_chat_id as string | null,
-        telegram_mesa_chat_id: (empresa.telegram_mesa_chat_id as string | null) ?? null,
-        telegram_bebidas_chat_id: (empresa.telegram_bebidas_chat_id as string | null) ?? null,
         mesas_habilitadas: (empresa.mesas_habilitadas as boolean) ?? true,
         pagos_pickup_habilitados: (empresa.pagos_pickup_habilitados as boolean) ?? false,
+        validacion_pedidos_habilitada: (empresa.validacion_pedidos_habilitada as boolean) ?? false,
       }};
 
       const isPedidos = dominio.startsWith(`${DEFAULT_PEDIDOS_SUBDOMAIN}.`) || dominio.endsWith('-pedidos');
@@ -145,7 +146,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
         const mainDomainFromSubdomain = dominio.split('.').slice(1).join('.');
         const { data: empresaSubdomain } = await this.supabase
           .from('empresas')
-          .select('id, nombre, email_notification, telefono_whatsapp, tipo, telegram_chat_id, telegram_mesa_chat_id, telegram_bebidas_chat_id, mesas_habilitadas, pagos_pickup_habilitados')
+          .select('id, nombre, email_notification, telefono_whatsapp, tipo, telegram_chat_id, mesas_habilitadas, pagos_pickup_habilitados, validacion_pedidos_habilitada')
           .eq('dominio', mainDomainFromSubdomain)
           .single();
 
@@ -156,10 +157,9 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
           telefono_whatsapp: empresaSubdomain.telefono_whatsapp as string | null,
           tipo: (empresaSubdomain.tipo as string) ?? 'tienda',
           telegram_chat_id: empresaSubdomain.telegram_chat_id as string | null,
-          telegram_mesa_chat_id: (empresaSubdomain.telegram_mesa_chat_id as string | null) ?? null,
-          telegram_bebidas_chat_id: (empresaSubdomain.telegram_bebidas_chat_id as string | null) ?? null,
           mesas_habilitadas: (empresaSubdomain.mesas_habilitadas as boolean) ?? true,
           pagos_pickup_habilitados: (empresaSubdomain.pagos_pickup_habilitados as boolean) ?? false,
+          validacion_pedidos_habilitada: (empresaSubdomain.validacion_pedidos_habilitada as boolean) ?? false,
         } : null };
       }
 

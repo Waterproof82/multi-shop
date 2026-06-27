@@ -3,8 +3,9 @@ import { getSupabaseClient } from '@/core/infrastructure/database/supabase-clien
 import { logger } from '@/core/infrastructure/logging/logger';
 
 export interface RegisterManualMesaPaymentInput {
-  mesaId: string;
+  mesaId:    string;
   empresaId: string;
+  turnoId?:  string; // required when division_tipo === 'personalizado'
 }
 
 export interface RegisterManualMesaPaymentResult {
@@ -21,7 +22,7 @@ export async function registerManualMesaPaymentUseCase(
 
     const { data: sesion, error: sesionError } = await supabase
       .from('mesa_sesiones')
-      .select('id, empresa_id, division_personas, division_pagos_realizados, sesion_pagada')
+      .select('id, empresa_id, division_personas, division_pagos_realizados, sesion_pagada, division_tipo, custom_turno_id')
       .eq('mesa_id', input.mesaId)
       .is('cerrada_at', null)
       .maybeSingle();
@@ -38,6 +39,7 @@ export async function registerManualMesaPaymentUseCase(
     const sesionId = s['id'] as string;
     const sesionEmpresaId = s['empresa_id'] as string;
     const divisionPersonas = s['division_personas'] as number | null;
+    const divisionTipo = s['division_tipo'] as string | null;
 
     if (sesionEmpresaId !== input.empresaId) {
       return { success: false, error: { code: 'FORBIDDEN', message: 'Acceso denegado', module: 'use-case', method: 'registerManualMesaPaymentUseCase' } };
@@ -50,7 +52,44 @@ export async function registerManualMesaPaymentUseCase(
     let pagosRealizados = 0;
     let fullyPaid = false;
 
-    if (divisionPersonas != null) {
+    if (divisionTipo === 'personalizado') {
+      // Custom turn payment: commit then complete
+      const effectiveTurnoId = input.turnoId ?? (s['custom_turno_id'] as string | null);
+      if (!effectiveTurnoId) {
+        // No active turn — waiter is manually closing the whole bill (full override)
+        fullyPaid = true;
+      } else {
+
+      const paymentOrderRef = `MANUAL-${effectiveTurnoId.slice(0, 8)}-${Date.now()}`;
+
+      // commit_custom_payment transitions en_seleccion → en_pago and inserts mesa_item_pagos rows
+      const { data: commitResult, error: commitError } = await supabase.rpc('commit_custom_payment', {
+        p_turno_id:          effectiveTurnoId,
+        p_payment_order_ref: paymentOrderRef,
+        p_importe_cents:     0, // manual payment — amount not tracked in RPC
+      });
+      if (commitError) {
+        const appError = await logger.logAndReturnError('DB_ERROR', commitError.message, 'use-case', 'registerManualMesaPaymentUseCase', { details: { turnoId: effectiveTurnoId } });
+        return { success: false, error: appError };
+      }
+      const commitRow = (commitResult as { success: boolean; error_code: string | null }[] | null)?.[0];
+      if (!commitRow?.success) {
+        return { success: false, error: { code: commitRow?.error_code ?? 'CONFLICT', message: commitRow?.error_code ?? 'Error al confirmar selección', module: 'use-case', method: 'registerManualMesaPaymentUseCase' } };
+      }
+
+      // complete_custom_payment transitions en_pago → pagado, clears lock, checks sesion_pagada
+      const { data: completeResult, error: completeError } = await supabase.rpc('complete_custom_payment', {
+        p_turno_id: effectiveTurnoId,
+      });
+      if (completeError) {
+        const appError = await logger.logAndReturnError('DB_ERROR', completeError.message, 'use-case', 'registerManualMesaPaymentUseCase', { details: { turnoId: effectiveTurnoId } });
+        return { success: false, error: appError };
+      }
+      const completeRow = (completeResult as { success: boolean; sesion_completa: boolean; out_sesion_id: string | null }[] | null)?.[0];
+      fullyPaid = completeRow?.sesion_completa ?? false;
+      }
+
+    } else if (divisionPersonas != null) {
       // Division active — increment counter atomically
       const { data: rpcResult } = await supabase
         .rpc('increment_division_pagos', { p_sesion_id: sesionId });

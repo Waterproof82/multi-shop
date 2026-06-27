@@ -1,5 +1,101 @@
 import { Pedido, CartItem, Result } from "../entities/types";
 
+export interface KitchenBarCounts {
+  cocina: { total: number; listos: number; retenidos: number };
+  bebidas: { total: number; listos: number; retenidos: number };
+}
+
+export interface KitchenOrderItem {
+  id: string;
+  numeroPedido: number;
+  mesaNumero: number | null;
+  mesaNombre: string | null;
+  items: { nombre: string; cantidad: number; complementos?: { nombre?: string; name?: string }[] }[];
+  estado: string;
+  createdAt: string;
+  sesionId: string | null;
+}
+
+export interface RetenidoItem {
+  itemId: string;
+  nombre: string;
+  cantidad: number;
+  complementos?: string;
+  mesaId: string | null;
+  mesaNumero: number | null;
+  mesaNombre: string | null;
+  sesionCreatedAt: string;
+}
+
+/**
+ * A pending bar order as seen by the bar page.
+ *
+ * `items` contains only bebida items not yet served (filtered server-side
+ * by pedido_item_estados so all bar screens share the same view).
+ *
+ * `detallePedidoIdx` — real position of each item inside detalle_pedido.
+ * Used as a stable swipe key and as the PATCH path param for per-item status.
+ *
+ * `hasComida` — true when the parent pedido also contains comida items.
+ * The bar page uses this to choose the correct order-level estado transition:
+ *   - false → PATCH pedido to `servido` (all done)
+ *   - true  → PATCH pedido to `anotado` (kitchen items must remain visible)
+ */
+export interface BarOrderItem {
+  id: string;
+  numeroPedido: number;
+  mesaNumero: number | null;
+  mesaNombre: string | null;
+  items: { nombre: string; cantidad: number; detallePedidoIdx: number }[];
+  estado: string;
+  createdAt: string;
+  sesionId: string | null;
+  tipo: 'bebida';
+  hasComida: boolean;
+}
+
+/** Estado values for per-item kitchen tracking */
+export type ItemEstado = 'pendiente' | 'en_preparacion' | 'listo' | 'servido' | 'retenido' | 'cancelado';
+
+/** A single food item from a mesa order, with its kitchen estado */
+export interface KitchenItemRecord {
+  pedidoId: string;
+  numeroPedido: number;
+  itemIdx: number;
+  nombre: string;
+  cantidad: number;
+  complementos?: string;
+  estado: ItemEstado;
+  mesaId?: string | null;
+  mesaNumero: number | null;
+  mesaNombre: string | null;
+  createdAt: string;
+}
+
+export interface PendienteValidacionItem {
+  idx: number;
+  nombre: string;
+  cantidad: number;
+  precio: number;
+  tipo: 'comida' | 'bebida';
+  complementos?: string;
+}
+
+export interface PendienteValidacionPedido {
+  id: string;
+  createdAt: string;
+  items: PendienteValidacionItem[];
+  /** true = pedido ya en 'pendiente', los items mostrados son retenidos a liberar */
+  validated?: boolean;
+}
+
+export interface PendienteValidacionMesa {
+  mesaId: string;
+  mesaNumero: number | null;
+  mesaNombre: string | null;
+  pedidos: PendienteValidacionPedido[];
+}
+
 export interface IPedidoRepository {
   findAllByTenant(empresaId: string): Promise<Result<Pedido[]>>;
   findAllByTenantAndMonth(empresaId: string, mes: number, año: number): Promise<Result<Pedido[]>>;
@@ -14,30 +110,17 @@ export interface IPedidoRepository {
     total: number;
     trackingToken: string;
     sesionId: string | null;
+    initialEstado?: 'pendiente' | 'retenido' | 'pendiente_validacion';
   }): Promise<Result<{ id: string; numero_pedido: number; tracking_token: string }>>;
   findEstimatedReadyAtById(pedidoId: string): Promise<Result<string | null>>;
   findStatusById(pedidoId: string): Promise<Result<string | null>>;
   updateEstimatedTime(pedidoId: string, minutes: number): Promise<Result<void>>;
   updateStatusById(pedidoId: string, estado: string): Promise<Result<void>>;
   saveTelegramMessageId(pedidoId: string, messageId: number): Promise<Result<void>>;
-  findReadyPedidosWithTelegramMessage(): Promise<Result<{ id: string; telegram_message_id: string; telegram_chat_id: string }[]>>;
-  clearTelegramMessageId(pedidoId: string): Promise<Result<void>>;
   deleteAllByTenant(empresaId: string): Promise<Result<number>>;
   findBySesionId(sesionId: string): Promise<Result<{ id: string; numero_pedido: number; total: number; estado: string; detalle_pedido: unknown[]; created_at: string }[]>>;
-  findBySesionIdWithTelegram(sesionId: string): Promise<Result<{
-    id: string;
-    numero_pedido: number;
-    total: number;
-    detalle_pedido: { nombre: string; cantidad: number; precio: number; complementos?: { nombre?: string; name?: string }[] }[];
-    telegram_message_id: string | null;
-    telegram_chat_id: string | null;
-    mesa_numero: number | null;
-    mesa_nombre: string | null;
-  }[]>>;
   updateOrderItems(pedidoId: string, items: { nombre: string; cantidad: number; precio: number; complementos?: { nombre?: string; name?: string }[] }[], newTotal: number): Promise<Result<void>>;
   consolidateSesionOrders(sesionId: string): Promise<Result<void>>;
-  findSesionTelegramMessages(sesionId: string): Promise<Result<{ messageId: number; chatId: string }[]>>;
-  findMesaContextForWebhook(pedidoId: string): Promise<Result<{ empresa_id: string; numero_pedido: number; mesa_numero: number; mesa_nombre: string | null; telegram_bebidas_chat_id: string | null; comidaItems: { nombre: string; cantidad: number }[] } | null>>;
   create(
     empresaId: string,
     clienteId: string | null,
@@ -54,6 +137,16 @@ export interface IPedidoRepository {
       estimated_delivery_fee_cents?: number;
     }
   ): Promise<Result<{ id: string; numero_pedido: number; total: number; trackingToken?: string }>>;
+  countKitchenBarOrders(empresaId: string): Promise<Result<KitchenBarCounts>>;
+  findKitchenOrders(empresaId: string): Promise<Result<KitchenOrderItem[]>>;
+  findAllRetenidos(empresaId: string, tipo: 'comida' | 'bebida'): Promise<Result<RetenidoItem[]>>;
+  findBarOrders(empresaId: string): Promise<Result<BarOrderItem[]>>;
+  /** Returns food items in pendiente|en_preparacion|listo|retenido (for /waiter/kitchen view) */
+  findWaiterKitchenItems(empresaId: string): Promise<Result<KitchenItemRecord[]>>;
+  /** Upsert a per-item kitchen estado */
+  upsertItemEstado(empresaId: string, pedidoId: string, itemIdx: number, estado: ItemEstado): Promise<Result<void>>;
+  findPendientesValidacion(empresaId: string): Promise<Result<PendienteValidacionMesa[]>>;
+  validatePedido(empresaId: string, pedidoId: string, retainIndices: number[], pausedIndices?: number[]): Promise<Result<void>>;
   getStats(empresaId: string, mes: number, año: number): Promise<Result<{
     pedidosHoy: number;
     pedidosMes: number;

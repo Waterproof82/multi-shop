@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Clock, CheckCircle, AlertCircle, ArrowLeft, Hourglass, ChefHat, Truck } from "lucide-react";
 import { getTrackingTokens, removeTrackingToken, isOrderExpired } from "@/lib/order-tracking";
@@ -106,7 +106,7 @@ function resolveItemName(item: OrderItem, language: string): string {
   return item.nombre;
 }
 
-function ItemsList({ items, language, deliveryFeeCents }: { items: OrderItem[]; language: string; deliveryFeeCents?: number | null }) {
+function ItemsList({ items, language, deliveryFeeCents }: Readonly<{ items: OrderItem[]; language: string; deliveryFeeCents?: number | null }>) {
   if (!items || items.length === 0) return null;
   const lang = language as Parameters<typeof t>[1];
   const subtotal = items.reduce((sum, item) => sum + item.precio * item.cantidad, 0);
@@ -119,7 +119,7 @@ function ItemsList({ items, language, deliveryFeeCents }: { items: OrderItem[]; 
       </p>
       <ul className="flex flex-col gap-1.5">
         {items.map((item, i) => (
-          <li key={i} className="flex items-center justify-between gap-2 text-sm">
+          <li key={`${item.nombre}-${i}`} className="flex items-center justify-between gap-2 text-sm">
             <span className="flex items-center gap-1.5">
               <span className="font-medium text-foreground">{item.cantidad}×</span>
               <span className="text-foreground">{resolveItemName(item, language)}</span>
@@ -146,7 +146,7 @@ function ItemsList({ items, language, deliveryFeeCents }: { items: OrderItem[]; 
   );
 }
 
-function DeliveryStatusBanner({ glovoStatus, estado, lang }: { glovoStatus: string | null; estado: string; lang: Parameters<typeof t>[1] }) {
+function DeliveryStatusBanner({ glovoStatus, estado, lang }: Readonly<{ glovoStatus: string | null; estado: string; lang: Parameters<typeof t>[1] }>) {
   const isDelivered = glovoStatus === 'COMPLETED' || estado === 'entregado';
   const isEnRoute = estado === 'en_camino' && !isDelivered;
   const isAccepted = glovoStatus === 'ACCEPTED' && !isDelivered && !isEnRoute;
@@ -183,7 +183,74 @@ function DeliveryStatusBanner({ glovoStatus, estado, lang }: { glovoStatus: stri
   return null;
 }
 
-function OrderCard({ order, language }: { order: OrderState; language: string }) {
+type Lang = Parameters<typeof t>[1];
+
+function getTiendaAcceptedMsg(estado: string, lang: Lang): string {
+  if (estado === 'soon') return t('tiendaQuickReplySoon', lang);
+  if (estado === 'call') return t('tiendaQuickReplyCall', lang);
+  return t('tiendaTrackingAcceptedMessage', lang);
+}
+
+function getMesaCardIcon(estado: string): ReactNode {
+  if (estado === 'servido') return <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />;
+  if (estado === 'anotado') return <Clock className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />;
+  return <Hourglass className="w-5 h-5 text-primary shrink-0 mt-0.5" />;
+}
+
+function getMesaCardStatusText(estado: string, lang: Lang): string {
+  if (estado === 'servido') return t('mesaStatusServido', lang);
+  if (estado === 'anotado') return t('mesaStatusAnotado', lang);
+  return t('mesaStatusPending', lang);
+}
+
+function DeliveryTimeDisplay({ estimatedMinutes, estimatedReadyAt, remaining, lang }: Readonly<{
+  estimatedMinutes: number | null;
+  estimatedReadyAt: string | null;
+  remaining: number | null;
+  lang: Lang;
+}>) {
+  if (estimatedMinutes === null) {
+    return <p className="text-xs text-muted-foreground mt-0.5">{t('trackingPendingTime', lang)}</p>;
+  }
+  return (
+    <div className="flex items-center gap-1 mt-0.5">
+      <Clock className="w-3.5 h-3.5 text-primary shrink-0" />
+      <p className="text-xs text-muted-foreground">
+        {remaining !== null && remaining > 0
+          ? <>{remaining} min</>
+          : <>{t('trackingPickupAt', lang)} <span className="font-medium text-foreground">{formatTime(estimatedReadyAt!)}</span></>
+        }
+      </p>
+    </div>
+  );
+}
+
+function getTiendaPrimaryMsg(estado: string, lang: Lang): string {
+  if (estado === 'pendiente') return t('tiendaTrackingMessage', lang);
+  if (estado === 'soon') return t('tiendaQuickReplySoon', lang);
+  if (estado === 'call') return t('tiendaQuickReplyCall', lang);
+  return t('tiendaTrackingAcceptedMessage', lang);
+}
+
+function getMesaPrimaryIcon(estado: string): ReactNode {
+  if (estado === 'servido') return <CheckCircle className="w-16 h-16 text-green-500" />;
+  if (estado === 'anotado') return <Clock className="w-16 h-16 text-blue-500" />;
+  return <Hourglass className="w-16 h-16 text-primary animate-pulse" style={{ animationDuration: '1.5s' }} />;
+}
+
+function getMesaTableLabel(mesaNumero: number | null, mesaNombre: string | null, lang: Lang): string {
+  if (mesaNumero === null) return t('mesaLabel', lang);
+  const suffix = mesaNombre ? ` — ${mesaNombre}` : '';
+  return `${t('mesaLabel', lang)} ${mesaNumero}${suffix}`;
+}
+
+function getMesaNumberSuffix(mesaNumero: number | null, mesaNombre: string | null, lang: Lang): ReactNode {
+  if (mesaNumero === null) return null;
+  const nameSuffix = mesaNombre ? ` (${mesaNombre})` : '';
+  return <> — {t('mesaLabel', lang)} {mesaNumero}{nameSuffix}</>;
+}
+
+function OrderCard({ order, language }: Readonly<{ order: OrderState; language: string }>) {
   const lang = language as Parameters<typeof t>[1];
   const { status } = order;
   const ready = isReady(status?.estimated_ready_at ?? null);
@@ -209,11 +276,6 @@ function OrderCard({ order, language }: { order: OrderState; language: string })
 
   if (status.tipo === 'tienda') {
     const accepted = status.estado !== 'pendiente';
-    const acceptedMsg = status.estado === 'soon'
-      ? t('tiendaQuickReplySoon', lang)
-      : status.estado === 'call'
-        ? t('tiendaQuickReplyCall', lang)
-        : t('tiendaTrackingAcceptedMessage', lang);
     return (
       <div className="rounded-xl border border-border bg-muted/30 p-4 flex flex-col gap-3">
         <div className="flex items-start gap-3">
@@ -226,7 +288,7 @@ function OrderCard({ order, language }: { order: OrderState; language: string })
               {t('trackingOrderPrefix', lang)} #{status.numero_pedido} — {accepted ? t('tiendaTrackingAcceptedTitle', lang) : t('tiendaTrackingTitle', lang)}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {accepted ? acceptedMsg : t('tiendaTrackingMessage', lang)}
+              {accepted ? getTiendaAcceptedMsg(status.estado, lang) : t('tiendaTrackingMessage', lang)}
             </p>
           </div>
         </div>
@@ -236,31 +298,16 @@ function OrderCard({ order, language }: { order: OrderState; language: string })
   }
 
   if (status.tipo === 'mesa') {
-    const tableLabel = status.mesa_numero !== null
-      ? `${t('mesaLabel', lang)} ${status.mesa_numero}${status.mesa_nombre ? ` — ${status.mesa_nombre}` : ''}`
-      : t('mesaLabel', lang);
-    const isServido = status.estado === 'servido';
-    const isAnotado = status.estado === 'anotado';
+    const tableLabel = getMesaTableLabel(status.mesa_numero, status.mesa_nombre, lang);
     return (
       <div className="rounded-xl border border-border bg-muted/30 p-4 flex flex-col gap-3">
         <div className="flex items-start gap-3">
-          {isServido
-            ? <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
-            : isAnotado
-              ? <Clock className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
-              : <Hourglass className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-          }
+          {getMesaCardIcon(status.estado)}
           <div className="flex-1">
             <p className="text-sm font-semibold text-foreground">
               {t('trackingOrderPrefix', lang)} #{status.numero_pedido} — {tableLabel}
             </p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {isServido
-                ? t('mesaStatusServido', lang)
-                : isAnotado
-                  ? t('mesaStatusAnotado', lang)
-                  : t('mesaStatusPending', lang)}
-            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">{getMesaCardStatusText(status.estado, lang)}</p>
           </div>
         </div>
         <ItemsList items={status.items} language={language} deliveryFeeCents={status.delivery_fee_cents} />
@@ -294,19 +341,12 @@ function OrderCard({ order, language }: { order: OrderState; language: string })
           <p className="text-sm font-semibold text-foreground">
             {t('trackingOrderPrefix', lang)} #{status.numero_pedido} — {status.estimated_minutes === null ? t('trackingWaiting', lang) : t('trackingPrep', lang)}
           </p>
-          {status.estimated_minutes === null ? (
-            <p className="text-xs text-muted-foreground mt-0.5">{t('trackingPendingTime', lang)}</p>
-          ) : (
-            <div className="flex items-center gap-1 mt-0.5">
-              <Clock className="w-3.5 h-3.5 text-primary shrink-0" />
-              <p className="text-xs text-muted-foreground">
-                {remaining !== null && remaining > 0
-                  ? <>{remaining} min</>
-                  : <>{t('trackingPickupAt', lang)} <span className="font-medium text-foreground">{formatTime(status.estimated_ready_at!)}</span></>
-                }
-              </p>
-            </div>
-          )}
+          <DeliveryTimeDisplay
+            estimatedMinutes={status.estimated_minutes}
+            estimatedReadyAt={status.estimated_ready_at}
+            remaining={remaining}
+            lang={lang}
+          />
         </div>
       </div>
       <ItemsList items={status.items} language={language} deliveryFeeCents={status.delivery_fee_cents} />
@@ -314,10 +354,141 @@ function OrderCard({ order, language }: { order: OrderState; language: string })
   );
 }
 
-export function TrackingPageClient({ token, initialStatus }: TrackingPageClientProps) {
+function PrimaryOrderView({ order, language, lang, primaryReady, primaryRemaining }: Readonly<{
+  order: OrderState;
+  language: string;
+  lang: Parameters<typeof t>[1];
+  primaryReady: boolean;
+  primaryRemaining: number | null;
+}>) {
+  if (order.error) {
+    return (
+      <>
+        <AlertCircle className="w-16 h-16 text-destructive" />
+        <p className="text-lg text-muted-foreground">{t('trackingNotFound', lang)}</p>
+      </>
+    );
+  }
+
+  if (order.status === null) {
+    return (
+      <>
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <p className="text-muted-foreground">{t('trackingLoading', lang)}</p>
+      </>
+    );
+  }
+
+  const { status } = order;
+
+  if (status.tipo === 'tienda') {
+    return (
+      <>
+        {status.estado === 'pendiente' ? (
+          <Hourglass className="w-16 h-16 text-primary animate-pulse" style={{ animationDuration: '1.5s' }} />
+        ) : (
+          <CheckCircle className="w-16 h-16 text-green-500" />
+        )}
+        <div>
+          <p className="text-2xl font-bold text-foreground">
+            {status.estado === 'pendiente' ? t('tiendaTrackingTitle', lang) : t('tiendaTrackingAcceptedTitle', lang)}
+          </p>
+          <p className="text-muted-foreground mt-1">{t('trackingOrderPrefix', lang)} #{status.numero_pedido}</p>
+        </div>
+        <div className="rounded-xl bg-secondary px-6 py-4 max-w-sm w-full">
+          <p className="text-secondary-foreground">{getTiendaPrimaryMsg(status.estado, lang)}</p>
+        </div>
+        <ItemsList items={status.items} language={language} deliveryFeeCents={status.delivery_fee_cents} />
+      </>
+    );
+  }
+
+  if (status.tipo === 'mesa') {
+    return (
+      <>
+        {getMesaPrimaryIcon(status.estado)}
+        <div>
+          <p className="text-2xl font-bold text-foreground">{getMesaCardStatusText(status.estado, lang)}</p>
+          <p className="text-muted-foreground mt-1">
+            {t('trackingOrderPrefix', lang)} #{status.numero_pedido}
+            {getMesaNumberSuffix(status.mesa_numero, status.mesa_nombre, lang)}
+          </p>
+        </div>
+        <ItemsList items={status.items} language={language} deliveryFeeCents={status.delivery_fee_cents} />
+      </>
+    );
+  }
+
+  if (primaryReady) {
+    return (
+      <>
+        <CheckCircle className="w-16 h-16 text-green-500" />
+        <div>
+          <p className="text-2xl font-bold text-foreground">{t('trackingReady', lang)}</p>
+          <p className="text-muted-foreground mt-1">{t('trackingOrderPrefix', lang)} #{status.numero_pedido}</p>
+        </div>
+        <div className="rounded-xl bg-secondary px-6 py-4 max-w-sm w-full">
+          <p className="text-secondary-foreground">{t('trackingPickup', lang)}</p>
+        </div>
+        <ItemsList items={status.items} language={language} deliveryFeeCents={status.delivery_fee_cents} />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <DeliveryStatusBanner glovoStatus={status.glovo_status ?? null} estado={status.estado} lang={lang} />
+      <div className="relative inline-flex items-center justify-center w-16 h-16">
+        {status.estimated_minutes === null ? (
+          <Hourglass className="w-16 h-16 text-primary animate-pulse" style={{ animationDuration: '1.5s' }} />
+        ) : (
+          <>
+            <span className="absolute w-16 h-16 rounded-full bg-primary animate-ping" style={{ opacity: 0.2, animationDuration: '2s' }} />
+            <span className="absolute w-20 h-20 rounded-full bg-primary animate-ping" style={{ opacity: 0.1, animationDuration: '2s', animationDelay: '0.7s' }} />
+            <ChefHat className="relative w-16 h-16 text-primary z-10" />
+          </>
+        )}
+      </div>
+      <div>
+        <p className="text-2xl font-bold text-foreground">
+          {status.estimated_minutes === null ? t('trackingWaiting', lang) : t('trackingPrep', lang)}
+        </p>
+        <p className="text-muted-foreground mt-1">{t('trackingOrderPrefix', lang)} #{status.numero_pedido}</p>
+      </div>
+      {status.estimated_minutes === null ? (
+        <div className="rounded-xl bg-secondary px-6 py-4 max-w-sm w-full">
+          <p className="text-secondary-foreground">{t('trackingReceived', lang)}</p>
+        </div>
+      ) : (
+        <div className="rounded-xl bg-secondary px-6 py-5 max-w-sm w-full space-y-3">
+          <div className="flex items-center justify-center gap-2">
+            <Clock className="w-5 h-5 text-primary animate-pulse" />
+            <span className="text-lg font-semibold text-foreground">
+              {primaryRemaining !== null && primaryRemaining > 0
+                ? <>~{primaryRemaining} min</>
+                : <>{t('trackingReadyAny', lang)}</>
+              }
+            </span>
+          </div>
+          {status.estimated_ready_at && (
+            <p className="text-muted-foreground">
+              {t('trackingPickupAt', lang)}{' '}
+              <span className="font-semibold text-foreground">
+                {formatTime(status.estimated_ready_at)}
+              </span>
+            </p>
+          )}
+        </div>
+      )}
+      <ItemsList items={status.items} language={language} deliveryFeeCents={status.delivery_fee_cents} />
+    </>
+  );
+}
+
+export function TrackingPageClient({ token, initialStatus }: Readonly<TrackingPageClientProps>) {
   const [orders, setOrders] = useState<OrderState[]>([]);
   const { language } = useLanguage();
-  const lang = language as Parameters<typeof t>[1];
+  const lang = language;
   const router = useRouter();
 
   useEffect(() => {
@@ -350,9 +521,13 @@ export function TrackingPageClient({ token, initialStatus }: TrackingPageClientP
 
   useEffect(() => {
     if (orders.length === 0) return;
+    const allDone = orders.every(
+      o => o.error || o.status?.estado === 'entregado' || o.status?.glovo_status === 'COMPLETED'
+    );
+    if (allDone) return;
     const interval = setInterval(pollAll, 5000);
     return () => clearInterval(interval);
-  }, [pollAll, orders.length]);
+  }, [pollAll, orders]);
 
   if (orders.length === 0) {
     return (
@@ -365,7 +540,7 @@ export function TrackingPageClient({ token, initialStatus }: TrackingPageClientP
 
   const sorted = sortOrders(orders);
   const primaryOrder = sorted[0];
-  const otherOrders = sorted.slice(1);
+  const otherOrders = sorted.slice(1).filter(o => o.status?.tipo !== 'mesa');
   const primaryReady = isReady(primaryOrder.status?.estimated_ready_at ?? null);
   const primaryRemaining = primaryOrder.status?.estimated_ready_at
     ? getRemainingMinutes(primaryOrder.status.estimated_ready_at)
@@ -384,128 +559,13 @@ export function TrackingPageClient({ token, initialStatus }: TrackingPageClientP
 
       {/* Pedido principal — vista grande */}
       <div className="flex flex-col items-center gap-6 text-center">
-        {primaryOrder.error ? (
-          <>
-            <AlertCircle className="w-16 h-16 text-destructive" />
-            <p className="text-lg text-muted-foreground">{t('trackingNotFound', lang)}</p>
-          </>
-        ) : !primaryOrder.status ? (
-          <>
-            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            <p className="text-muted-foreground">{t('trackingLoading', lang)}</p>
-          </>
-        ) : primaryOrder.status.tipo === 'tienda' ? (
-          <>
-            {primaryOrder.status.estado === 'pendiente' ? (
-              <Hourglass className="w-16 h-16 text-primary animate-pulse" style={{ animationDuration: '1.5s' }} />
-            ) : (
-              <CheckCircle className="w-16 h-16 text-green-500" />
-            )}
-            <div>
-              <p className="text-2xl font-bold text-foreground">
-                {primaryOrder.status.estado === 'pendiente'
-                  ? t('tiendaTrackingTitle', lang)
-                  : t('tiendaTrackingAcceptedTitle', lang)}
-              </p>
-              <p className="text-muted-foreground mt-1">{t('trackingOrderPrefix', lang)} #{primaryOrder.status.numero_pedido}</p>
-            </div>
-            <div className="rounded-xl bg-secondary px-6 py-4 max-w-sm w-full">
-              <p className="text-secondary-foreground">
-                {primaryOrder.status.estado === 'pendiente'
-                  ? t('tiendaTrackingMessage', lang)
-                  : primaryOrder.status.estado === 'soon'
-                    ? t('tiendaQuickReplySoon', lang)
-                    : primaryOrder.status.estado === 'call'
-                      ? t('tiendaQuickReplyCall', lang)
-                      : t('tiendaTrackingAcceptedMessage', lang)}
-              </p>
-            </div>
-            <ItemsList items={primaryOrder.status.items} language={language} deliveryFeeCents={primaryOrder.status.delivery_fee_cents} />
-          </>
-        ) : primaryOrder.status.tipo === 'mesa' ? (
-          <>
-            {primaryOrder.status.estado === 'servido' ? (
-              <CheckCircle className="w-16 h-16 text-green-500" />
-            ) : primaryOrder.status.estado === 'anotado' ? (
-              <Clock className="w-16 h-16 text-blue-500" />
-            ) : (
-              <Hourglass className="w-16 h-16 text-primary animate-pulse" style={{ animationDuration: '1.5s' }} />
-            )}
-            <div>
-              <p className="text-2xl font-bold text-foreground">
-                {primaryOrder.status.estado === 'servido'
-                  ? t('mesaStatusServido', lang)
-                  : primaryOrder.status.estado === 'anotado'
-                    ? t('mesaStatusAnotado', lang)
-                    : t('mesaStatusPending', lang)}
-              </p>
-              <p className="text-muted-foreground mt-1">
-                {t('trackingOrderPrefix', lang)} #{primaryOrder.status.numero_pedido}
-                {primaryOrder.status.mesa_numero !== null && (
-                  <> — {t('mesaLabel', lang)} {primaryOrder.status.mesa_numero}{primaryOrder.status.mesa_nombre ? ` (${primaryOrder.status.mesa_nombre})` : ''}</>
-                )}
-              </p>
-            </div>
-            <ItemsList items={primaryOrder.status.items} language={language} deliveryFeeCents={primaryOrder.status.delivery_fee_cents} />
-          </>
-        ) : primaryReady ? (
-          <>
-            <CheckCircle className="w-16 h-16 text-green-500" />
-            <div>
-              <p className="text-2xl font-bold text-foreground">{t('trackingReady', lang)}</p>
-              <p className="text-muted-foreground mt-1">{t('trackingOrderPrefix', lang)} #{primaryOrder.status.numero_pedido}</p>
-            </div>
-            <div className="rounded-xl bg-secondary px-6 py-4 max-w-sm w-full">
-              <p className="text-secondary-foreground">{t('trackingPickup', lang)}</p>
-            </div>
-            <ItemsList items={primaryOrder.status.items} language={language} deliveryFeeCents={primaryOrder.status.delivery_fee_cents} />
-          </>
-        ) : (
-          <>
-            <DeliveryStatusBanner glovoStatus={primaryOrder.status.glovo_status ?? null} estado={primaryOrder.status.estado} lang={lang} />
-            <div className="relative inline-flex items-center justify-center w-16 h-16">
-              {primaryOrder.status.estimated_minutes === null ? (
-                <Hourglass className="w-16 h-16 text-primary animate-pulse" style={{ animationDuration: '1.5s' }} />
-              ) : (
-                <>
-                  <span className="absolute w-16 h-16 rounded-full bg-primary animate-ping" style={{ opacity: 0.2, animationDuration: '2s' }} />
-                  <span className="absolute w-20 h-20 rounded-full bg-primary animate-ping" style={{ opacity: 0.1, animationDuration: '2s', animationDelay: '0.7s' }} />
-                  <ChefHat className="relative w-16 h-16 text-primary z-10" />
-                </>
-              )}
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-foreground">{primaryOrder.status.estimated_minutes === null ? t('trackingWaiting', lang) : t('trackingPrep', lang)}</p>
-              <p className="text-muted-foreground mt-1">{t('trackingOrderPrefix', lang)} #{primaryOrder.status.numero_pedido}</p>
-            </div>
-            {primaryOrder.status.estimated_minutes === null ? (
-              <div className="rounded-xl bg-secondary px-6 py-4 max-w-sm w-full">
-                <p className="text-secondary-foreground">{t('trackingReceived', lang)}</p>
-              </div>
-            ) : (
-              <div className="rounded-xl bg-secondary px-6 py-5 max-w-sm w-full space-y-3">
-                <div className="flex items-center justify-center gap-2">
-                  <Clock className="w-5 h-5 text-primary animate-pulse" />
-                  <span className="text-lg font-semibold text-foreground">
-                    {primaryRemaining !== null && primaryRemaining > 0
-                      ? <>~{primaryRemaining} min</>
-                      : <>{t('trackingReadyAny', lang)}</>
-                    }
-                  </span>
-                </div>
-                {primaryOrder.status.estimated_ready_at && (
-                  <p className="text-muted-foreground">
-                    {t('trackingPickupAt', lang)}{' '}
-                    <span className="font-semibold text-foreground">
-                      {formatTime(primaryOrder.status.estimated_ready_at)}
-                    </span>
-                  </p>
-                )}
-              </div>
-            )}
-            <ItemsList items={primaryOrder.status.items} language={language} deliveryFeeCents={primaryOrder.status.delivery_fee_cents} />
-          </>
-        )}
+        <PrimaryOrderView
+          order={primaryOrder}
+          language={language}
+          lang={lang}
+          primaryReady={primaryReady}
+          primaryRemaining={primaryRemaining}
+        />
       </div>
 
       {/* Otros pedidos */}

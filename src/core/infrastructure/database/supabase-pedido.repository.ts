@@ -1,6 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Pedido, CartItem, PedidoItem, Result } from "@/core/domain/entities/types";
-import { IPedidoRepository } from "@/core/domain/repositories/IPedidoRepository";
+import { IPedidoRepository, KitchenBarCounts, KitchenOrderItem, BarOrderItem, RetenidoItem, KitchenItemRecord, ItemEstado, PendienteValidacionMesa, PendienteValidacionItem } from "@/core/domain/repositories/IPedidoRepository";
 import { logger } from "../logging/logger";
 
 type DeliveryData = {
@@ -525,6 +525,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     total: number;
     trackingToken: string;
     sesionId: string | null;
+    initialEstado?: 'pendiente' | 'retenido' | 'pendiente_validacion';
   }): Promise<Result<{ id: string; numero_pedido: number; tracking_token: string }>> {
     try {
       const { data: nextNum, error: rpcError } = await this.supabase
@@ -557,7 +558,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           complementos: item.complementos ?? [],
         })),
         total: params.total,
-        estado: 'pendiente',
+        estado: params.initialEstado ?? 'pendiente',
         tracking_token: params.trackingToken,
         sesion_id: params.sesionId,
       };
@@ -609,35 +610,6 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       return { success: true, data: undefined };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.saveTelegramMessageId', { details: { pedidoId } });
-      return { success: false, error: appError };
-    }
-  }
-
-  async findReadyPedidosWithTelegramMessage(): Promise<Result<{ id: string; telegram_message_id: string; telegram_chat_id: string }[]>> {
-    try {
-      const { data, error } = await this.supabase
-        .from('pedidos')
-        .select('id, telegram_message_id, empresas!inner(telegram_chat_id)')
-        .not('telegram_message_id', 'is', null)
-        .lte('estimated_ready_at', new Date().toISOString());
-
-      if (error) {
-        await logger.logAndReturnError('DB_SELECT_ERROR', error.message, 'repository', 'SupabasePedidoRepository.findReadyPedidosWithTelegramMessage', { details: { code: error.code } });
-        return { success: false, error: { code: 'DB_ERROR', message: 'Error al buscar pedidos listos', module: 'repository', method: 'findReadyPedidosWithTelegramMessage' } };
-      }
-
-      const rows = (data ?? []).map((row: Record<string, unknown>) => {
-        const empresa = row['empresas'] as Record<string, unknown> | null;
-        return {
-          id: row['id'] as string,
-          telegram_message_id: row['telegram_message_id'] as string,
-          telegram_chat_id: (empresa?.['telegram_chat_id'] ?? '') as string,
-        };
-      }).filter(r => r.telegram_chat_id);
-
-      return { success: true, data: rows };
-    } catch (e) {
-      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findReadyPedidosWithTelegramMessage');
       return { success: false, error: appError };
     }
   }
@@ -779,65 +751,6 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     }
   }
 
-  async findBySesionIdWithTelegram(sesionId: string): Promise<Result<{
-    id: string;
-    numero_pedido: number;
-    total: number;
-    detalle_pedido: { nombre: string; cantidad: number; precio: number; complementos?: { nombre?: string; name?: string }[] }[];
-    telegram_message_id: string | null;
-    telegram_chat_id: string | null;
-    mesa_numero: number | null;
-    mesa_nombre: string | null;
-  }[]>> {
-    try {
-      const { data, error } = await this.supabase
-        .from('pedidos')
-        .select('id, numero_pedido, total, detalle_pedido, telegram_message_id, mesas(numero, nombre), empresas(telegram_mesa_chat_id, telegram_chat_id)')
-        .eq('sesion_id', sesionId)
-        .order('created_at', { ascending: true });
-
-      if (error) {
-        await logger.logAndReturnError(
-          'DB_SELECT_ERROR',
-          error.message,
-          'repository',
-          'SupabasePedidoRepository.findBySesionIdWithTelegram',
-          { details: { code: error.code, sesionId } }
-        );
-        return { success: false, error: { code: 'DB_ERROR', message: error.message, module: 'repository', method: 'findBySesionIdWithTelegram' } };
-      }
-
-      const rows = (data ?? []) as Record<string, unknown>[];
-      return {
-        success: true,
-        data: rows.map(row => {
-          const mesaRaw = Array.isArray(row['mesas'])
-            ? (row['mesas'][0] as Record<string, unknown> | undefined) ?? null
-            : (row['mesas'] as Record<string, unknown> | null);
-          const empRaw = Array.isArray(row['empresas'])
-            ? (row['empresas'][0] as Record<string, unknown> | undefined) ?? null
-            : (row['empresas'] as Record<string, unknown> | null);
-          const chatId = (empRaw?.['telegram_mesa_chat_id'] as string | null)
-            ?? (empRaw?.['telegram_chat_id'] as string | null)
-            ?? null;
-          return {
-            id: row['id'] as string,
-            numero_pedido: row['numero_pedido'] as number,
-            total: row['total'] as number,
-            detalle_pedido: (row['detalle_pedido'] as { nombre: string; cantidad: number; precio: number; complementos?: { nombre?: string; name?: string }[] }[]) ?? [],
-            telegram_message_id: (row['telegram_message_id'] as string | null) ?? null,
-            telegram_chat_id: chatId,
-            mesa_numero: (mesaRaw?.['numero'] as number | null) ?? null,
-            mesa_nombre: (mesaRaw?.['nombre'] as string | null) ?? null,
-          };
-        }),
-      };
-    } catch (e) {
-      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findBySesionIdWithTelegram', { details: { sesionId } });
-      return { success: false, error: appError };
-    }
-  }
-
   async updateOrderItems(
     pedidoId: string,
     items: { nombre: string; cantidad: number; precio: number; complementos?: { nombre?: string; name?: string }[] }[],
@@ -923,75 +836,652 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     }
   }
 
-  async findSesionTelegramMessages(sesionId: string): Promise<Result<{ messageId: number; chatId: string }[]>> {
-    try {
-      const { data, error } = await this.supabase
-        .from('pedidos')
-        .select('telegram_message_id, empresas(telegram_mesa_chat_id, telegram_chat_id)')
-        .eq('sesion_id', sesionId)
-        .not('telegram_message_id', 'is', null);
-
-      if (error) {
-        return { success: false, error: { code: 'DB_ERROR', message: error.message, module: 'repository', method: 'findSesionTelegramMessages' } };
-      }
-
-      const messages = (data ?? []).flatMap((row) => {
-        const empRaw = Array.isArray(row['empresas'])
-          ? (row['empresas'][0] as Record<string, unknown> | undefined) ?? null
-          : (row['empresas'] as Record<string, unknown> | null);
-        const chatId = (empRaw?.['telegram_mesa_chat_id'] as string | null)
-          ?? (empRaw?.['telegram_chat_id'] as string | null)
-          ?? null;
-        const messageId = Number(row['telegram_message_id']);
-        return chatId && messageId ? [{ messageId, chatId }] : [];
-      });
-
-      return { success: true, data: messages };
-    } catch (e) {
-      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findSesionTelegramMessages', { details: { sesionId } });
-      return { success: false, error: appError };
+  /**
+   * Returns live badge counts for the waiter banner (cocina + bebidas).
+   *
+   * Bebidas total = bebida items in pendiente orders that have NOT yet been
+   * marked `servido` in pedido_item_estados. This query is per-item (not per-order)
+   * so partial serving (e.g. 1 of 2 drinks) is reflected correctly.
+   *
+   * Mixed orders (comida + bebida) are counted here for bebidas even though
+   * the parent pedido.estado remains `pendiente`; the bar page is responsible
+   * for PATCHing it to `anotado` once all bebidas are served.
+   */
+  private tallyCocinaItems(items: KitchenItemRecord[]): { total: number; listos: number; retenidos: number } {
+    let total = 0;
+    let listos = 0;
+    let retenidos = 0;
+    for (const item of items) {
+      if (item.estado === 'pendiente' || item.estado === 'en_preparacion') total++;
+      else if (item.estado === 'listo')    listos++;
+      else if (item.estado === 'retenido') retenidos++;
     }
+    return { total, listos, retenidos };
   }
-  async findMesaContextForWebhook(pedidoId: string): Promise<Result<{ empresa_id: string; numero_pedido: number; mesa_numero: number; mesa_nombre: string | null; telegram_bebidas_chat_id: string | null; comidaItems: { nombre: string; cantidad: number }[] } | null>> {
-    try {
-      const { data, error } = await this.supabase
-        .from('pedidos')
-        .select('empresa_id, numero_pedido, detalle_pedido, mesas(numero, nombre), empresas(telegram_bebidas_chat_id)')
-        .eq('id', pedidoId)
-        .maybeSingle();
 
-      if (error) {
-        return { success: false, error: { code: 'DB_ERROR', message: error.message, module: 'repository', method: 'findMesaContextForWebhook' } };
+  private async countBebidasTotal(sessionIds: string[]): Promise<Result<number>> {
+    const { data: pedidos, error: pedidosError } = await this.supabase
+      .from('pedidos')
+      .select('id, detalle_pedido, estado')
+      .in('sesion_id', sessionIds)
+      .eq('estado', 'pendiente');
+
+    if (pedidosError) {
+      await logger.logAndReturnError('DB_SELECT_ERROR', pedidosError.message, 'repository', 'SupabasePedidoRepository.countBebidasTotal', { details: { code: pedidosError.code } });
+      return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pedidos', module: 'repository', method: 'countBebidasTotal' } };
+    }
+
+    const pedidoRows = (pedidos ?? []) as Record<string, unknown>[];
+    const pedidoIdsWithBebida = pedidoRows
+      .filter(row => (row['detalle_pedido'] as Array<Record<string, unknown>>).some(i => i['tipo_producto'] === 'bebida'))
+      .map(row => row['id'] as string);
+
+    const estadoMap = new Map<string, Map<number, string>>();
+    const fromValidationSet = new Set<string>(); // "pedidoId:itemIdx" — back in pendientes queue
+    if (pedidoIdsWithBebida.length > 0) {
+      const { data: itemEstados } = await this.supabase
+        .from('pedido_item_estados')
+        .select('pedido_id, item_idx, estado, from_validation')
+        .in('pedido_id', pedidoIdsWithBebida);
+
+      for (const row of itemEstados ?? []) {
+        const r = row as Record<string, unknown>;
+        const pid = r['pedido_id'] as string;
+        const idx = r['item_idx'] as number;
+        if (r['from_validation'] === true) { fromValidationSet.add(`${pid}:${idx}`); continue; }
+        if (!estadoMap.has(pid)) estadoMap.set(pid, new Map());
+        estadoMap.get(pid)!.set(idx, r['estado'] as string);
+      }
+    }
+
+    let total = 0;
+    for (const pedido of pedidoRows) {
+      const items = (pedido['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
+      const pedidoId = pedido['id'] as string;
+      const pedidoEstados = estadoMap.get(pedidoId) ?? new Map();
+      items.forEach((item, idx) => {
+        if (
+          item['tipo_producto'] === 'bebida' &&
+          !fromValidationSet.has(`${pedidoId}:${idx}`) &&
+          pedidoEstados.get(idx) !== 'servido' &&
+          pedidoEstados.get(idx) !== 'cancelado'
+        ) total++;
+      });
+    }
+    return { success: true, data: total };
+  }
+
+  async countKitchenBarOrders(empresaId: string): Promise<Result<KitchenBarCounts>> {
+    try {
+      // Cocina counts: per-item estado from pedido_item_estados
+      const itemsResult = await this.fetchAllComidaItems(empresaId);
+      if (!itemsResult.success) return { success: false, error: itemsResult.error };
+
+      const cocina = this.tallyCocinaItems(itemsResult.data);
+
+      // Bar counts: pure bebida orders in pendiente state (unchanged)
+      const { data: activeSessions, error: sessionsError } = await this.supabase
+        .from('mesa_sesiones')
+        .select('id')
+        .eq('empresa_id', empresaId)
+        .is('cerrada_at', null);
+
+      if (sessionsError) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', sessionsError.message, 'repository', 'SupabasePedidoRepository.countKitchenBarOrders', { details: { code: sessionsError.code, empresaId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener sesiones activas', module: 'repository', method: 'countKitchenBarOrders' } };
       }
 
-      if (!data) return { success: true, data: null };
-
-      const mesaRaw = Array.isArray(data['mesas'])
-        ? (data['mesas'][0] ?? null)
-        : (data['mesas'] ?? null);
-
-      const empRaw = Array.isArray(data['empresas'])
-        ? (data['empresas'][0] ?? null)
-        : (data['empresas'] ?? null);
-
-      const allItems = (data['detalle_pedido'] as { nombre: string; cantidad: number; tipo_producto?: string }[] | null) ?? [];
-      const comidaItems = allItems
-        .filter(i => i.tipo_producto !== 'bebida')
-        .map(i => ({ nombre: i.nombre, cantidad: i.cantidad }));
+      const sessionIds = (activeSessions ?? []).map(s => (s as Record<string, unknown>).id as string);
+      let bebidasTotal = 0;
+      if (sessionIds.length > 0) {
+        const bebidasResult = await this.countBebidasTotal(sessionIds);
+        if (!bebidasResult.success) return { success: false, error: bebidasResult.error };
+        bebidasTotal = bebidasResult.data;
+      }
 
       return {
         success: true,
         data: {
-          empresa_id: data['empresa_id'] as string,
-          numero_pedido: data['numero_pedido'] as number,
-          mesa_numero: ((mesaRaw as Record<string, unknown> | null)?.['numero'] as number) ?? 0,
-          mesa_nombre: ((mesaRaw as Record<string, unknown> | null)?.['nombre'] as string | null) ?? null,
-          telegram_bebidas_chat_id: ((empRaw as Record<string, unknown> | null)?.['telegram_bebidas_chat_id'] as string | null) ?? null,
-          comidaItems,
+          cocina: { total: cocina.total, listos: cocina.listos, retenidos: cocina.retenidos },
+          bebidas: { total: bebidasTotal, listos: 0, retenidos: 0 },
         },
       };
     } catch (e) {
-      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findMesaContextForWebhook', { details: { pedidoId } });
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.countKitchenBarOrders', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
+  async findAllRetenidos(empresaId: string, tipo: 'comida' | 'bebida'): Promise<Result<RetenidoItem[]>> {
+    try {
+      const { data: estados, error } = await this.supabase
+        .from('pedido_item_estados')
+        .select(`
+          item_idx,
+          pedidos!inner(
+            id, created_at, sesion_id, detalle_pedido, empresa_id,
+            mesas!inner(id, numero, nombre)
+          )
+        `)
+        .eq('estado', 'retenido')
+        .eq('pedidos.empresa_id', empresaId);
+
+      if (error) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', error.message, 'repository', 'SupabasePedidoRepository.findAllRetenidos', { details: { code: error.code, empresaId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener retenidos', module: 'repository', method: 'findAllRetenidos' } };
+      }
+
+      const result: RetenidoItem[] = [];
+      for (const row of estados ?? []) {
+        const r = row as Record<string, unknown>;
+        const pedido = r['pedidos'] as Record<string, unknown>;
+        const mesa = pedido['mesas'] as Record<string, unknown>;
+        const detalle = (pedido['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
+        const idx = r['item_idx'] as number;
+        const item = detalle[idx];
+        if (!item) continue;
+        const itemTipo = (item['tipo_producto'] as string | undefined) ?? 'comida';
+        if (itemTipo !== tipo) continue;
+        const complements = (item['complementos'] as Array<{ nombre?: string }> | undefined);
+        result.push({
+          itemId: pedido['id'] as string,
+          nombre: item['nombre'] as string,
+          cantidad: item['cantidad'] as number,
+          complementos: complements?.map(c => c.nombre ?? '').filter(Boolean).join(', '),
+          mesaId: (mesa['id'] as string | null) ?? null,
+          mesaNumero: (mesa['numero'] as number) ?? null,
+          mesaNombre: (mesa['nombre'] as string | null) ?? null,
+          sesionCreatedAt: pedido['created_at'] as string ?? '',
+        });
+      }
+
+      return { success: true, data: result };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findAllRetenidos', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
+  async findKitchenOrders(empresaId: string): Promise<Result<KitchenOrderItem[]>> {
+    try {
+      // Filter by empresa_id + estado directly — do NOT filter by active session.
+      // Orders must remain visible in the kitchen after a mesa closes until they
+      // are marked servido/cerrado/cancelado.
+      const { data: orders, error: ordersError } = await this.supabase
+        .from('pedidos')
+        .select(`id, numero_pedido, sesion_id, detalle_pedido, estado, created_at, validated_at, mesas!inner(numero, nombre)`)
+        .eq('empresa_id', empresaId)
+        .in('estado', ['pendiente', 'anotado', 'preparado'])
+        .order('created_at', { ascending: true });
+
+      if (ordersError) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', ordersError.message, 'repository', 'SupabasePedidoRepository.findKitchenOrders', { details: { code: ordersError.code, empresaId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pedidos de cocina', module: 'repository', method: 'findKitchenOrders' } };
+      }
+
+      const result: KitchenOrderItem[] = [];
+      for (const order of orders ?? []) {
+        const row = order as Record<string, unknown>;
+        const items = (row['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
+        const comidaItems = items.filter(i => i['tipo_producto'] === 'comida');
+        if (comidaItems.length === 0) continue;
+
+        const mesaData = row['mesas'] as Record<string, unknown> ?? {};
+        result.push({
+          id: row['id'] as string,
+          numeroPedido: row['numero_pedido'] as number,
+          mesaNumero: (mesaData['numero'] as number) ?? null,
+          mesaNombre: (mesaData['nombre'] as string | null) ?? null,
+          items: comidaItems.map(i => ({
+            nombre: i['nombre'] as string,
+            cantidad: i['cantidad'] as number,
+            complementos: i['complementos'] as { nombre?: string; name?: string }[] | undefined,
+          })),
+          estado: row['estado'] as string,
+          createdAt: (row['validated_at'] as string | null) ?? (row['created_at'] as string),
+          sesionId: (row['sesion_id'] as string | null) ?? null,
+        });
+      }
+
+      return { success: true, data: result };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findKitchenOrders', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
+  /**
+   * Returns bebida items still pending for the bar page.
+   *
+   * Architecture notes:
+   * - Mixed orders (comida + bebida) ARE included. `hasComida` flag lets the bar
+   *   page PATCH the parent pedido to `anotado` (not `servido`) so kitchen items
+   *   remain visible. Pure-bebida orders get PATCHed to `servido`.
+   * - Per-item estado is the source of truth for multi-device sync:
+   *   items already marked `servido` in pedido_item_estados are excluded here
+   *   so every bar screen shows the same remaining work regardless of localStorage.
+   * - `detallePedidoIdx` is the item's real position in detalle_pedido (not the
+   *   filtered-array index). The bar page uses it as the stable swipe key and
+   *   as the path param for per-item PATCH `/waiter/kitchen/items/:id/:idx/status`.
+   */
+  async findBarOrders(empresaId: string): Promise<Result<BarOrderItem[]>> {
+    try {
+      // Filter by empresa_id + estado directly — do NOT filter by active session.
+      // Bar orders must remain visible after a mesa closes until served.
+      const { data: orders, error: ordersError } = await this.supabase
+        .from('pedidos')
+        .select(`id, numero_pedido, sesion_id, detalle_pedido, estado, created_at, validated_at, mesas!inner(numero, nombre)`)
+        .eq('empresa_id', empresaId)
+        .eq('estado', 'pendiente')
+        .order('created_at', { ascending: true });
+
+      if (ordersError) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', ordersError.message, 'repository', 'SupabasePedidoRepository.findBarOrders', { details: { code: ordersError.code, empresaId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pedidos de bar', module: 'repository', method: 'findBarOrders' } };
+      }
+
+      // Fetch per-item estados for all orders that have bebida items
+      const orderRows = (orders ?? []) as Record<string, unknown>[];
+      const pedidoIdsWithBebida = orderRows
+        .filter(row => (row['detalle_pedido'] as Array<Record<string, unknown>>).some(i => i['tipo_producto'] === 'bebida'))
+        .map(row => row['id'] as string);
+
+      const estadoMap = new Map<string, Map<number, string>>();
+      const fromValidationSet = new Set<string>(); // "pedidoId:itemIdx" — back in pendientes queue
+      if (pedidoIdsWithBebida.length > 0) {
+        const { data: itemEstados } = await this.supabase
+          .from('pedido_item_estados')
+          .select('pedido_id, item_idx, estado, from_validation')
+          .in('pedido_id', pedidoIdsWithBebida);
+
+        for (const row of itemEstados ?? []) {
+          const r = row as Record<string, unknown>;
+          const pid = r['pedido_id'] as string;
+          const idx = r['item_idx'] as number;
+          if (r['from_validation'] === true) { fromValidationSet.add(`${pid}:${idx}`); continue; }
+          if (!estadoMap.has(pid)) estadoMap.set(pid, new Map());
+          estadoMap.get(pid)!.set(idx, r['estado'] as string);
+        }
+      }
+
+      const result: BarOrderItem[] = [];
+      for (const order of orderRows) {
+        const row = order as Record<string, unknown>;
+        const items = (row['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
+        const mesaData = row['mesas'] as Record<string, unknown> ?? {};
+        const pedidoId = row['id'] as string;
+        const pedidoEstados = estadoMap.get(pedidoId) ?? new Map();
+
+        const hasComida = items.some(i => i['tipo_producto'] === 'comida');
+
+        // Only include bebida items not yet marked servido and not in the pendientes queue (from_validation=true)
+        const bebidaItems: { nombre: string; cantidad: number; detallePedidoIdx: number }[] = [];
+        items.forEach((item, fullIdx) => {
+          const barItemEstado = pedidoEstados.get(fullIdx);
+        if (
+            item['tipo_producto'] === 'bebida' &&
+            !fromValidationSet.has(`${pedidoId}:${fullIdx}`) &&
+            barItemEstado !== 'servido' &&
+            barItemEstado !== 'cancelado'
+          ) {
+            bebidaItems.push({ nombre: item['nombre'] as string, cantidad: item['cantidad'] as number, detallePedidoIdx: fullIdx });
+          }
+        });
+
+        if (bebidaItems.length === 0) continue;
+
+        result.push({
+          id: row['id'] as string,
+          numeroPedido: row['numero_pedido'] as number,
+          mesaNumero: (mesaData['numero'] as number) ?? null,
+          mesaNombre: (mesaData['nombre'] as string | null) ?? null,
+          items: bebidaItems,
+          estado: row['estado'] as string,
+          createdAt: (row['validated_at'] as string | null) ?? (row['created_at'] as string),
+          sesionId: (row['sesion_id'] as string | null) ?? null,
+          tipo: 'bebida',
+          hasComida,
+        });
+      }
+
+      return { success: true, data: result };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findBarOrders', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
+  // ── Per-item kitchen state ─────────────────────────────────────────────────
+
+  /** Shared helper: fetch all comida items with their effective estado.
+   * Does NOT filter by active session — orders must remain visible after mesa closes. */
+  private async fetchAllComidaItems(empresaId: string): Promise<Result<KitchenItemRecord[]>> {
+    try {
+      const { data: orders, error: ordersError } = await this.supabase
+        .from('pedidos')
+        .select('id, estado, numero_pedido, sesion_id, detalle_pedido, created_at, mesas!inner(numero, nombre)')
+        .eq('empresa_id', empresaId)
+        .not('estado', 'in', '("servido","cerrado","cancelado","pendiente_validacion")')
+        .order('created_at', { ascending: true });
+
+      if (ordersError) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', ordersError.message, 'repository', 'SupabasePedidoRepository.fetchAllComidaItems', { details: { code: ordersError.code, empresaId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pedidos', module: 'repository', method: 'fetchAllComidaItems' } };
+      }
+
+      const pedidoIds = (orders ?? [])
+        .filter(o => {
+          const items = (o as Record<string, unknown>)['detalle_pedido'] as Array<Record<string, unknown>>;
+          return items.some(i => i['tipo_producto'] === 'comida');
+        })
+        .map(o => (o as Record<string, unknown>)['id'] as string);
+
+      // Fetch item estados (empty Map if no pedidos)
+      const estadoMap = new Map<string, Map<number, ItemEstado>>();
+      if (pedidoIds.length > 0) {
+        const { data: itemEstados, error: estadosError } = await this.supabase
+          .from('pedido_item_estados')
+          .select('pedido_id, item_idx, estado, from_validation')
+          .in('pedido_id', pedidoIds);
+
+        if (estadosError) {
+          await logger.logAndReturnError('DB_SELECT_ERROR', estadosError.message, 'repository', 'SupabasePedidoRepository.fetchAllComidaItems', { details: { code: estadosError.code, empresaId } });
+          return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener estados de ítems', module: 'repository', method: 'fetchAllComidaItems' } };
+        }
+
+        for (const row of itemEstados ?? []) {
+          const r = row as Record<string, unknown>;
+          // Skip from_validation=true: item auto-retained during pendientes validation,
+          // already back in the pendientes queue — not a kitchen-retained item.
+          if (r['from_validation'] === true) continue;
+          const pid = r['pedido_id'] as string;
+          if (!estadoMap.has(pid)) estadoMap.set(pid, new Map());
+          estadoMap.get(pid)!.set(r['item_idx'] as number, r['estado'] as ItemEstado);
+        }
+      }
+
+      const result: KitchenItemRecord[] = [];
+      for (const order of orders ?? []) {
+        const row = order as Record<string, unknown>;
+        const items = (row['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
+        const mesaData = row['mesas'] as Record<string, unknown> ?? {};
+        const pedidoId = row['id'] as string;
+        const pedidoEstados = estadoMap.get(pedidoId) ?? new Map<number, ItemEstado>();
+        const pedidoNivelEstado = row['estado'] as string;
+
+        items.forEach((item, idx) => {
+          if (item['tipo_producto'] !== 'comida') return;
+          const defaultEstado: ItemEstado = pedidoNivelEstado === 'retenido' ? 'retenido' : 'pendiente';
+          const estado: ItemEstado = pedidoEstados.get(idx) ?? defaultEstado;
+          const complements = item['complementos'] as Array<{ nombre?: string; name?: string }> | undefined;
+          result.push({
+            pedidoId,
+            numeroPedido: row['numero_pedido'] as number,
+            itemIdx: idx,
+            nombre: (item['nombre'] as string) ?? '',
+            cantidad: item['cantidad'] as number,
+            complementos: complements?.map(c => c.nombre ?? c.name).filter(Boolean).join(', '),
+            estado,
+            mesaNumero: (mesaData['numero'] as number) ?? null,
+            mesaNombre: (mesaData['nombre'] as string | null) ?? null,
+            createdAt: row['created_at'] as string,
+          });
+        });
+      }
+
+      return { success: true, data: result };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.fetchAllComidaItems', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
+  async findWaiterKitchenItems(empresaId: string): Promise<Result<KitchenItemRecord[]>> {
+    const orderItemsResult = await this.fetchAllComidaItems(empresaId);
+    if (!orderItemsResult.success) return orderItemsResult;
+
+    const visible = new Set<ItemEstado>(['pendiente', 'en_preparacion', 'listo', 'retenido']);
+    return { success: true, data: orderItemsResult.data.filter(i => visible.has(i.estado)) };
+  }
+
+  async upsertItemEstado(empresaId: string, pedidoId: string, itemIdx: number, estado: ItemEstado): Promise<Result<void>> {
+    try {
+      const { error } = await this.supabase
+        .from('pedido_item_estados')
+        .upsert(
+          { pedido_id: pedidoId, item_idx: itemIdx, empresa_id: empresaId, estado, updated_at: new Date().toISOString(), from_validation: false },
+          { onConflict: 'pedido_id,item_idx' }
+        );
+
+      if (error) {
+        await logger.logAndReturnError('DB_UPDATE_ERROR', error.message, 'repository', 'SupabasePedidoRepository.upsertItemEstado', { details: { code: error.code, pedidoId, itemIdx, estado } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al actualizar estado del ítem', module: 'repository', method: 'upsertItemEstado' } };
+      }
+
+      return { success: true, data: undefined };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.upsertItemEstado', { details: { pedidoId, itemIdx, estado } });
+      return { success: false, error: appError };
+    }
+  }
+
+  async findPendientesValidacion(empresaId: string): Promise<Result<PendienteValidacionMesa[]>> {
+    try {
+      // 1. Pedidos en cola de validación
+      const { data: pedidos, error } = await this.supabase
+        .from('pedidos')
+        .select(`id, created_at, detalle_pedido, mesa_id, mesas!inner(numero, nombre)`)
+        .eq('empresa_id', empresaId)
+        .eq('estado', 'pendiente_validacion')
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', error.message, 'repository', 'SupabasePedidoRepository.findPendientesValidacion', { details: { code: error.code, empresaId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pendientes de validación', module: 'repository', method: 'findPendientesValidacion' } };
+      }
+
+      const mesaMap = new Map<string, PendienteValidacionMesa>();
+
+      const mapItem = (item: Record<string, unknown>, idx: number): PendienteValidacionItem => ({
+        idx,
+        nombre: item['nombre'] as string,
+        cantidad: item['cantidad'] as number,
+        precio: item['precio'] as number,
+        tipo: ((item['tipo_producto'] as string | undefined) ?? 'comida') as 'comida' | 'bebida',
+        complementos: (item['complementos'] as Array<{ nombre?: string }> | undefined)
+          ?.map(c => c.nombre ?? '').filter(Boolean).join(', '),
+      });
+
+      for (const row of pedidos ?? []) {
+        const r = row as Record<string, unknown>;
+        const mesaData = r['mesas'] as Record<string, unknown> ?? {};
+        const mesaId = r['mesa_id'] as string;
+        const detalle = (r['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
+
+        if (!mesaMap.has(mesaId)) {
+          mesaMap.set(mesaId, {
+            mesaId,
+            mesaNumero: (mesaData['numero'] as number) ?? null,
+            mesaNombre: (mesaData['nombre'] as string | null) ?? null,
+            pedidos: [],
+          });
+        }
+
+        mesaMap.get(mesaId)!.pedidos.push({
+          id: r['id'] as string,
+          createdAt: r['created_at'] as string,
+          items: detalle.map(mapItem),
+        });
+      }
+
+      // 2a. Ítems cancelados — excluirlos de la cola de pendientes
+      const allPedidoIds = [...mesaMap.values()].flatMap(m => m.pedidos.map(p => p.id));
+      const canceladoMap = new Map<string, Set<number>>();
+      if (allPedidoIds.length > 0) {
+        const { data: cancelados } = await this.supabase
+          .from('pedido_item_estados')
+          .select('pedido_id, item_idx')
+          .eq('empresa_id', empresaId)
+          .eq('estado', 'cancelado')
+          .in('pedido_id', allPedidoIds);
+        for (const r of cancelados ?? []) {
+          const pid = r['pedido_id'] as string;
+          const idx = r['item_idx'] as number;
+          if (!canceladoMap.has(pid)) canceladoMap.set(pid, new Set());
+          canceladoMap.get(pid)!.add(idx);
+        }
+        if (canceladoMap.size > 0) {
+          for (const mesa of mesaMap.values()) {
+            mesa.pedidos = mesa.pedidos
+              .map(p => ({
+                ...p,
+                items: p.items.filter(i => !canceladoMap.get(p.id)?.has(i.idx)),
+              }))
+              .filter(p => p.items.length > 0);
+          }
+          // Remove empty mesas
+          for (const [key, mesa] of mesaMap.entries()) {
+            if (mesa.pedidos.length === 0) mesaMap.delete(key);
+          }
+        }
+      }
+
+      // 2b. Ítems retenidos durante validación — el camarero los libera desde pendientes
+      const { data: retenidos } = await this.supabase
+        .from('pedido_item_estados')
+        .select('pedido_id, item_idx')
+        .eq('empresa_id', empresaId)
+        .eq('estado', 'retenido')
+        .eq('from_validation', true);
+
+      const retenidoMap = new Map<string, Set<number>>();
+      for (const r of retenidos ?? []) {
+        const pid = r['pedido_id'] as string;
+        const idx = r['item_idx'] as number;
+        if (!retenidoMap.has(pid)) retenidoMap.set(pid, new Set());
+        retenidoMap.get(pid)!.add(idx);
+      }
+
+      if (retenidoMap.size > 0) {
+        const { data: validatedPedidos } = await this.supabase
+          .from('pedidos')
+          .select(`id, created_at, detalle_pedido, mesa_id, mesas!inner(numero, nombre)`)
+          .eq('empresa_id', empresaId)
+          .eq('estado', 'pendiente')
+          .in('id', [...retenidoMap.keys()])
+          .order('created_at', { ascending: true });
+
+        for (const row of validatedPedidos ?? []) {
+          const r = row as Record<string, unknown>;
+          const mesaData = r['mesas'] as Record<string, unknown> ?? {};
+          const mesaId = r['mesa_id'] as string;
+          const pedidoId = r['id'] as string;
+          const detalle = (r['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
+          const retenidoIndices = retenidoMap.get(pedidoId) ?? new Set<number>();
+
+          const items = detalle.map(mapItem).filter(item => retenidoIndices.has(item.idx));
+          if (items.length === 0) continue;
+
+          if (!mesaMap.has(mesaId)) {
+            mesaMap.set(mesaId, {
+              mesaId,
+              mesaNumero: (mesaData['numero'] as number) ?? null,
+              mesaNombre: (mesaData['nombre'] as string | null) ?? null,
+              pedidos: [],
+            });
+          }
+
+          mesaMap.get(mesaId)!.pedidos.push({
+            id: pedidoId,
+            createdAt: r['created_at'] as string,
+            items,
+            validated: true,
+          });
+        }
+      }
+
+      return { success: true, data: Array.from(mesaMap.values()) };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findPendientesValidacion', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
+  async validatePedido(empresaId: string, pedidoId: string, retainIndices: number[], pausedIndices: number[] = []): Promise<Result<void>> {
+    try {
+      const { data: pedido, error: fetchError } = await this.supabase
+        .from('pedidos')
+        .select('id, estado, detalle_pedido')
+        .eq('id', pedidoId)
+        .eq('empresa_id', empresaId)
+        .single();
+
+      if (fetchError || !pedido) {
+        return { success: false, error: { code: 'NOT_FOUND', message: 'Pedido no encontrado', module: 'repository', method: 'validatePedido' } };
+      }
+
+      const p = pedido as Record<string, unknown>;
+      if (p['estado'] !== 'pendiente_validacion') {
+        return { success: false, error: { code: 'CONFLICT', message: 'El pedido no está pendiente de validación', module: 'repository', method: 'validatePedido' } };
+      }
+
+      const detalle = (p['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
+      const maxIdx = detalle.length - 1;
+      const validRetain = retainIndices.filter(i => i >= 0 && i <= maxIdx);
+
+      // Auto-retained items (wrong tipo or not selected) → from_validation=true → reappear in pendientes
+      if (validRetain.length > 0) {
+        const upserts = validRetain.map(idx => ({
+          pedido_id: pedidoId,
+          item_idx: idx,
+          empresa_id: empresaId,
+          estado: 'retenido' as const,
+          updated_at: new Date().toISOString(),
+          from_validation: true,
+        }));
+        const { error: upsertError } = await this.supabase
+          .from('pedido_item_estados')
+          .upsert(upserts, { onConflict: 'pedido_id,item_idx' });
+        if (upsertError) {
+          await logger.logAndReturnError('DB_INSERT_ERROR', upsertError.message, 'repository', 'SupabasePedidoRepository.validatePedido', { details: { code: upsertError.code, pedidoId } });
+          return { success: false, error: { code: 'DB_ERROR', message: 'Error al retener ítems', module: 'repository', method: 'validatePedido' } };
+        }
+      }
+
+      // Intentionally paused items → from_validation=false → go to kitchen/bar retenidos only
+      const validPaused = pausedIndices.filter(i => i >= 0 && i <= maxIdx);
+      if (validPaused.length > 0) {
+        const pausedUpserts = validPaused.map(idx => ({
+          pedido_id: pedidoId,
+          item_idx: idx,
+          empresa_id: empresaId,
+          estado: 'retenido' as const,
+          updated_at: new Date().toISOString(),
+          from_validation: false,
+        }));
+        const { error: pausedError } = await this.supabase
+          .from('pedido_item_estados')
+          .upsert(pausedUpserts, { onConflict: 'pedido_id,item_idx' });
+        if (pausedError) {
+          await logger.logAndReturnError('DB_INSERT_ERROR', pausedError.message, 'repository', 'SupabasePedidoRepository.validatePedido', { details: { code: pausedError.code, pedidoId } });
+          return { success: false, error: { code: 'DB_ERROR', message: 'Error al pausar ítems', module: 'repository', method: 'validatePedido' } };
+        }
+      }
+
+      const { error: updateError } = await this.supabase
+        .from('pedidos')
+        .update({ estado: 'pendiente', validated_at: new Date().toISOString() })
+        .eq('id', pedidoId)
+        .eq('empresa_id', empresaId);
+
+      if (updateError) {
+        await logger.logAndReturnError('DB_UPDATE_ERROR', updateError.message, 'repository', 'SupabasePedidoRepository.validatePedido', { details: { code: updateError.code, pedidoId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al validar pedido', module: 'repository', method: 'validatePedido' } };
+      }
+
+      return { success: true, data: undefined };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.validatePedido', { details: { pedidoId } });
       return { success: false, error: appError };
     }
   }

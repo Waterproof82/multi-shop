@@ -19,8 +19,11 @@ export interface MesaWithSession {
   sessionTotal: number;
   sesionPagada: boolean;
   pagoEnCurso: boolean;
+  divisionActiva: boolean;
   itemsDiferidos: DeferredItem[];
   clienteActivo: boolean;
+  preparadoPedidoNumbers: number[];
+  llamadaActiva: boolean;
 }
 
 export interface IMesaRepository {

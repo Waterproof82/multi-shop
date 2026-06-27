@@ -24,6 +24,7 @@ function toAdminCategory(cat: Category) {
     categoria_complemento_de: cat.categoriaComplementoDe,
     complemento_obligatorio: cat.complementoObligatorio || false,
     categoria_padre_id: cat.categoriaPadreId,
+    tipo_producto: cat.tipoProducto,
   };
 }
 

@@ -12,6 +12,7 @@ export interface DeferredItem {
   itemName: string;
   price: number;
   quantity: number;
+  tipo?: 'comida' | 'bebida';
   translations?: Record<string, { name: string }>;
   selectedComplements?: Array<{ id: string; name: string; price: number }>;
 }

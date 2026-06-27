@@ -54,8 +54,12 @@ On mount, `WaiterLoginForm` pings `GET /api/waiter/me`. If the cookie is already
 | `POST` | `/api/waiter/mesas/{mesaId}/open` | Open a table session |
 | `POST` | `/api/waiter/mesas/{mesaId}/close` | Close session (consolidate orders) + auto-reopen |
 | `POST` | `/api/waiter/mesas/{mesaId}/manual-payment` | Register a cash/external payment (full or one division share) |
-| `GET` | `/api/waiter/mesas/{mesaId}/deferred` | Get deferred items for the active session |
-| `PUT` | `/api/waiter/mesas/{mesaId}/deferred` | Save/clear deferred items for the active session |
+| `POST` | `/api/waiter/pendientes/validate` | Validate a pending-validation order (move to pendiente, route items to kitchen/bar/queue) |
+| `GET` | `/api/waiter/pendientes/orders` | List orders pending validation + retained-in-queue items |
+| `POST` | `/api/waiter/kitchen/mesas/{mesaId}/release-retenidos` | Release all kitchen-retained items for a mesa back to `pendiente` |
+| `GET` | `/api/waiter/orders/counts` | Poll kitchen/bar/pendientes/llamadas counts for banner badges |
+| `POST` | `/api/waiter/mesas/{mesaId}/dismiss-call` | Set `llamada_activa = false` on the active session (waiter acknowledges call) |
+| `POST` | `/api/mesas/{mesaId}/call-waiter` | Set `llamada_activa = true` — public, rate-limited, called by the customer |
 
 ---
 
@@ -65,6 +69,61 @@ On mount, `WaiterLoginForm` pings `GET /api/waiter/me`. If the cookie is already
 Single entry point. Two-step flow managed by `WaiterLoginForm`:
 1. **PIN step** — dark centered card, large password input, `autoComplete="off"` (prevents Chrome password-manager breach warnings). Submit calls `POST /api/waiter/auth`.
 2. **Table step** — live grid of all mesas with payment state. Each card shows table number, status dot, pill badge, and session total. Clicking a card calls `POST /api/waiter/mesa` and redirects to `/?mesa={mesaId}`.
+
+### `/waiter/kitchen`
+
+In-app kitchen view. Shows all in-flight `comida` items across four filter modes.
+
+**States per item (swiped via pointer gestures):**
+
+| Estado | Trigger |
+|--------|---------|
+| `pendiente` | Initial |
+| `en_preparacion` | Swipe right |
+| `preparado` | Swipe right again |
+| `servido` | Swipe right on `preparado` item |
+| `retenido` | Swipe left on `pendiente` or `en_preparacion` |
+| Restore to `pendiente` | Swipe left on `retenido` |
+
+Swiping left on an `en_preparacion` item shows a **confirmation dialog** (the item is already in preparation — waiter must confirm before retaining it).
+
+**Retenido items shown in the kitchen** are **only** those with `from_validation = false` (intentionally paused by a waiter in the kitchen panel). Items sent back to the pendientes queue (`from_validation = true`) are invisible here. See [waiter-validation-flow.md](./waiter-validation-flow.md) for details.
+
+**Time-based card colors (oklch, hue progression):**
+- `< 10 min` → cool blue (hue 228)
+- `10 – 20 m` → teal (hue 168)
+- `20 – 30 m` → yellow-green (hue 100)
+- `30 – 45 m` → amber (hue 68)
+- `45 – 60 m` → orange (hue 35)
+- `60+ min` → red (hue 16)
+
+`anotado` orders (waiter-confirmed but not yet submitted) always show yellow regardless of time.
+
+**GroupBy modes:**
+- `Por pedido` (default) — flat list, one group per order. No collapse.
+- `Por mesa` — grouped by table; listos items appear first within each group. Collapsible per mesa.
+- `Listos` — only `preparado` items, grouped by table. Collapsible per mesa.
+- `Retenidos` — only kitchen-retenido items (`from_validation = false`), grouped by table. Collapsible per mesa.
+
+**URL deep-link:** `/waiter/kitchen?groupBy=retenidos&mesa=<mesaName>` — opens directly on the Retenidos tab and auto-scrolls to the specified mesa's section. Used by the waiter grid popup.
+
+**Collapse / expand:**
+- Each mesa card header (Table2 icon + ChevronDown) toggles that mesa's content.
+- A global ChevronsUpDown button in the header bar collapses/expands all mesas at once.
+- The collapse-all button is hidden in `Por pedido` mode (flat list, no collapsible groups).
+
+**Per-mesa release button (shown in `Por mesa` and `Retenidos`):**
+- **Utensils button** (blue) — releases all kitchen-retenido (`from_validation = false`) items for the mesa back to `pendiente` in parallel.
+
+### `/waiter/bar`
+
+In-app bar view. Shows `bebida` items only. Same time-based color scheme and swipe mechanics.
+
+**Filter modes:**
+- `Por pedido` (default) — flat list, one group per order with table label. No collapse.
+- `Por mesa` — grouped by table. Collapsible per mesa (same Table2 / ChevronDown pattern as kitchen). A global ChevronsUpDown button is shown only in this mode.
+
+**Per-mesa "Todos servidos" button:** shown in the footer of each mesa card in `Por mesa` mode. Clicking opens a confirmation modal ("Se van a procesar como servidos todos los ítems de esta mesa"). On confirm, triggers individual 5-second countdown for every item in that mesa simultaneously.
 
 ---
 
@@ -116,6 +175,8 @@ Waiter registers manual payment → POST /api/waiter/mesas/{mesaId}/manual-payme
 
 After a successful manual payment, the client clears `sessionStorage` (waiter mesa key) and redirects to `/waiter` — no mesa is left selected in the banner.
 
+**Payment button label** (in `mesa-orders-client.tsx`): dynamic based on division state — `"Marcar pago de una parte · €X"` when a division is active, `"Marcar pago completo"` otherwise. Includes a `CreditCard` icon.
+
 Response codes: `404` no active session, `403` wrong empresa, `409` session already paid, `500` DB error.
 
 ---
@@ -124,9 +185,14 @@ Response codes: `404` no active session, `403` wrong empresa, `409` session alre
 
 The `WaiterBanner` component is rendered globally in the root layout. It appears as a sticky top bar when a waiter session is active (detected via `waiter_token` cookie + `/api/waiter/me` check).
 
+**Session expiry redirect:** If a waiter navigates to any `/waiter/*` sub-page with an expired or missing session, they are automatically redirected to `/waiter` for PIN re-entry. The banner detects expiry via the `/api/waiter/me` check (401 response) and fires `globalThis.location.href = '/waiter'` when `pathname.startsWith('/waiter/')`.
+
 **Features:**
 - Pulsing live indicator dot
 - Shows active mesa name
+- **Kitchen & Bar buttons** — always visible for authenticated waiters. Navigate to `/waiter/kitchen` and `/waiter/bar`. Each shows three live badge counts (neutral = total in-flight, green = listos, orange = retenidos). The orange retenidos badge shows **only kitchen-retained items** (`from_validation = false`). Polled every 10 s via `GET /api/waiter/orders/counts`.
+- **Llamadas indicator** — non-interactive `<div>` (pointer-events-none) with pulsing `BellRing` icon + golden badge. Shown when `counts.llamadas > 0`. No navigation action — waiter sees the per-mesa indicator in the grid instead.
+- **Sound** — plays `public/bell.mp3` when `cocina.total`, `cocina.listos`, `bebidas.total`, `bebidas.listos`, `pendientes`, or `llamadas` increases. Guard: `pathname.startsWith('/waiter')` — the banner renders on all pages including the client menu, so this guard is critical.
 - **"Change table" dropdown** — fetches `GET /api/waiter/mesas` on open. First item is always **"Ver todas las mesas"** (navigates to `/waiter`). Remaining items list all mesas with open/libre status. Selecting a libre mesa calls `POST /api/waiter/mesas/{mesaId}/open` first.
 - **"Close table" button (X icon)** → shown when a session is active. Before closing, runs a guard chain (all via modal dialogs, no blocking `confirm`):
   1. `pagoEnCurso = true` → **payment dialog**: warns the waiter a Redsys payment is in progress; offers "Desbloquear y cerrar".
@@ -165,11 +231,12 @@ Mesa cards in `/waiter` (step 2) reflect four payment states with distinct color
 | Payment in progress | Pulsing amber dot | Amber | "En pago" | Session total |
 | Paid | Static violet dot | Violet | "Pagada" | Session total |
 
-Each mesa card exposes two secondary actions:
+Each mesa card exposes secondary actions:
 - **"Ver ticket" button** — visible only when `activeOrderCount > 0`. Opens a receipt-style modal overlay. Fetches `GET /api/mesas/{mesaId}/orders`, merges items with the same name+price, and displays a line-item list with individual and session totals.
 - **Deferred items chip** — click navigates to `/?mesa={mesaId}` with the cart pre-opened, so the waiter can release or adjust deferred items directly.
+- **Call-waiter indicator** — pulsing golden `BellRing` button in the top-left corner of the card when `mesa.llamadaActiva = true`. Clicking it calls `POST /api/waiter/mesas/{mesaId}/dismiss-call` to set `llamada_activa = false`.
 
-A mesa is considered **occupied** only if it has an active session AND `activeOrderCount > 0`. After a waiter closes a table, the auto-reopen creates a new empty session (`activeOrderCount = 0`), so the card immediately shows as **libre** on the next grid refresh.
+A mesa is considered **occupied** only if it has an active session AND `activeOrderCount > 0 OR clienteActivo = true`. `clienteActivo` is set to `true` as soon as the customer opens the digital menu (mount in `client-menu-page.tsx`, via `POST /api/mesas/{mesaId}/activate`). This prevents the "Cerrar mesa" button from appearing when a waiter impersonates a table without any real customer. After a waiter closes a table, the auto-reopen creates a new empty session, so the card immediately shows as **libre** on the next grid refresh.
 
 The `activeOrderCount` is computed per-session (not all-time) by querying `pedidos` filtered by `sesion_id IN (activeSesionIds)` and `estado != 'cerrado'`. The session IDs come from `get_mesas_with_sessions` RPC which reads `mesas.sesion_id` (the currently linked session).
 
@@ -195,8 +262,7 @@ Implemented in `autoCloseMesaAfterPayment.ts` (fire-and-forget), called from:
 
 **Steps** (mirror the manual close route):
 1. Resolve `mesa_id` from `mesa_sesiones`
-2. Delete all Telegram order notifications for the session
-3. Consolidate individual pedidos into a single ticket
+2. Consolidate individual pedidos into a single ticket
 4. Set `cerrada_at = now()` on the session
 5. Open a new empty session — invalidates all client QR tokens
 
@@ -209,6 +275,61 @@ The cart drawer has additional waiter-specific controls:
 - **Payment banner hidden** — the "no payment required" info strip is hidden in waiter mode.
 - **"Lanzar todos los retenidos" button** — shown when `hasDeferredItems`. Opens a confirm dialog; on confirm calls `releaseAllDeferred()` (sets all `deferred = false`) then fires the order once the state update resolves (flag + `useEffect` pattern).
 - **Clear cart guard** — if the cart contains deferred items, clearing shows a warning dialog first instead of deleting silently.
+
+---
+
+## Call Waiter
+
+Customers can call the waiter from the client header without placing an order.
+
+**DB column:** `mesa_sesiones.llamada_activa BOOLEAN NOT NULL DEFAULT false`
+(`supabase/migrations/20260621000001_mesa_llamada_activa.sql` — also rebuilds `get_mesas_with_sessions` RPC)
+
+**Client flow:**
+1. `BellRing` button appears in `site-header-client.tsx` when `?mesa=` is in the URL and the session is NOT in waiter mode.
+2. Customer taps it → `POST /api/mesas/{mesaId}/call-waiter` (public, rate-limited) → `llamada_activa = true`.
+3. A "Camarero avisado" popup appears (fixed, centered, non-interactive) and auto-dismisses after 30 s.
+4. While `called = true`, the button is disabled to prevent spam.
+
+**Waiter flow:**
+1. `get_mesas_with_sessions` RPC returns `llamada_activa` → mapped to `MesaWithSession.llamadaActiva`.
+2. Grid card shows a pulsing golden `BellRing` button (top-left corner) when `llamadaActiva = true`.
+3. Waiter taps it → `POST /api/waiter/mesas/{mesaId}/dismiss-call` → `llamada_activa = false` → indicator disappears on next refresh.
+4. Banner shows a non-interactive pulsing badge while `counts.llamadas > 0`; plays `bell.mp3` when the count rises.
+
+---
+
+## Sound Notifications
+
+All notification sounds use `public/bell.mp3` (replaces the old AudioContext oscillator).
+
+| Location | Trigger |
+|---|---|
+| `waiter-banner.tsx` | `cocina.total`, `cocina.listos`, `bebidas.total`, `bebidas.listos`, `pendientes`, or `llamadas` increases |
+| `/kitchen` page | New items arrive (pendiente + en_preparacion count increases). Does NOT fire when marking en_preparacion. |
+
+**Critical:** `WaiterBanner` renders on all pages including the client menu. The sound must ONLY play when `pathname.startsWith('/waiter')`.
+
+---
+
+## Kitchen Page — Swipe Colors (`/kitchen`)
+
+Swipe reveal backgrounds are color-coded by the transition direction:
+
+| Swipe | Background color |
+|---|---|
+| `pendiente` → `en_preparacion` (forward) | `EN_PREP_COLOR.bg` (blue) |
+| `en_preparacion` → `listo` (forward) | `COUNTDOWN_COLOR.bg` (green) |
+| `en_preparacion` → `pendiente` (back) | `PENDIENTE_COLOR.bg` |
+| Back on `pendiente` | transparent |
+
+Implemented via `data-hint-fwd` / `data-hint-back` attributes on the outer card div with dynamic `background` style.
+
+## Waiter Kitchen — Swipe Retain (`/waiter/kitchen`)
+
+Swiping left on a `nuevo` item to retain it shows:
+- Background: `RETENIDO_COLOR.bg` (amber/orange)
+- Hint: `<Pause>` icon + "Retener" label
 
 ---
 
@@ -264,9 +385,10 @@ Waiter confirms comanda
 Grid refresh
   → MesaCard shows deferred items list (clock icon + "ItemName x qty")
 
-Any waiter enters mesa
+Any waiter enters mesa / cart opens
   → GET /api/waiter/mesas/{mesaId}/deferred
-  → loadDeferredItems() → items appear in cart with fromPending flag
+  → syncDeferredItems() → replaces ALL deferred items in cart with DB state
+    (ensures kitchen-released items are removed even if cart was already open)
 
 Waiter confirms (releasing deferred)
   → all cart items → POST /api/pedidos
