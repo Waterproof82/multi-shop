@@ -75,6 +75,10 @@ function resolveCardColor(isCountdown: boolean, isEnPrep: boolean, elapsed: numb
   return getTimeColor(elapsed);
 }
 
+function notMatchingItem(pedidoId: string, itemIdx: number): (i: KitchenItem) => boolean {
+  return i => !(i.pedidoId === pedidoId && i.itemIdx === itemIdx);
+}
+
 function getMergedActionLabel(action: ItemEstado): string {
   if (action === 'listo') return 'listo';
   if (action === 'en_preparacion') return 'en preparaci\u00f3n';
@@ -283,7 +287,7 @@ export default function KitchenPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ estado: 'listo' }),
     }).then(r => {
-      if (r.ok) setItems(prev => prev.filter(i => !(i.pedidoId === pedidoId && i.itemIdx === itemIdx)));
+      if (r.ok) setItems(prev => prev.filter(notMatchingItem(pedidoId, itemIdx)));
     });
   }, []);
 
@@ -520,8 +524,8 @@ export default function KitchenPage() {
         {/* Per-order / per-mesa view */}
         {!globalGrouped && Array.from(grouped.entries()).map(([groupKey, group]) => {
           const isOrderGroup = groupBy === 'order';
-          const numeroPedido: number | null = 'numeroPedido' in group ? (group as PedidoGroupValue).numeroPedido : null;
-          const createdAt: string = 'createdAt' in group ? (group as PedidoGroupValue).createdAt : (group as MesaGroupValue).firstCreatedAt;
+          const numeroPedido: number | null = 'numeroPedido' in group ? group.numeroPedido : null;
+          const createdAt: string = 'createdAt' in group ? group.createdAt : group.firstCreatedAt;
           const label        = group.mesaNombre ?? (group.mesaNumero === null ? groupKey : `Mesa ${group.mesaNumero}`);
           const elapsed      = getElapsedMinutes(createdAt);
 
