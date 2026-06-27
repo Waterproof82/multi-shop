@@ -3,6 +3,51 @@
 ## 🛠 REGLA DE ORO (Post-cambio obligatorio)
 Tras CADA modificación: `pnpm lint && pnpm build`. No marcar tarea como completada si fallan.
 
+## 🔬 SonarLint — Checklist pre-código (aplicar desde el primer momento)
+
+### S3776 — Complejidad cognitiva ≤ 15
+- Extraer cualquier bloque `if/else` complejo o cadena de ternarios a funciones puras de módulo.
+- Si un componente tiene dos rutas de render muy distintas (ej: countdown vs normal), dividirlo en `ComponenteA` + `ComponenteB` + dispatcher delgado.
+
+### S2004 — Máximo 4 niveles de funciones anidadas
+Contar desde el componente: `Componente → useCallback → setInterval → .then → setItems(prev => ...)` ya son 5.
+- **Predicados de `.filter()`**: siempre extraer a función de módulo: `function notMatchingItem(...) { return i => ...; }`
+- **Lógica con efectos secundarios** (fetch + setState): extraer a `useCallback` propio para que los callbacks internos no estén 4 niveles abajo del componente.
+- Regla: si ves `setItems(prev => prev.filter(i => ...))` dentro de un `.then()` dentro de un `useCallback` → extrae el predicado.
+
+### S3358 — Prohibido ternario anidado
+```typescript
+// MAL
+const x = a ? 'r' : b ? 'o' : 'g';
+// BIEN — función de módulo con if/return, o if/else
+function resolveX(a, b) { if (a) return 'r'; if (b) return 'o'; return 'g'; }
+```
+
+### S4325 — No casts redundantes
+- `language as Parameters<typeof t>[1]` → usar `const { language: lang } = useLanguage()`
+- Tras `'prop' in unionValue`, TypeScript ya estrecha el tipo. No hace falta `(value as Tipo).prop`.
+
+### S6759 — Props siempre `Readonly<Props>`
+```typescript
+function MiComponente({ ... }: Readonly<MiComponenteProps>) { ... }
+```
+
+### S7735 — Condiciones en positivo
+```typescript
+// MAL: x !== null ? A : B  →  BIEN: x === null ? B : A
+```
+
+### S6819 / S6848 — HTML semántico
+- `<div role="button">` → `<button type="button">`
+- `<div role="dialog">` → `<dialog open>`
+- Backdrop de modal: `<button type="button" className="absolute inset-0" aria-label="Cerrar" />`
+
+### Tipo `Lang` en helpers que usan `t()`
+```typescript
+type Lang = Parameters<typeof t>[1];
+// Usar como tipo de prop en sub-componentes o helpers de módulo
+```
+
 ## 🏗 Arquitectura y Capas
 Clean Architecture: `API Route (Zod) → Use Case (Logic) → Repository (Infra)`.
 - **Domain (`core/domain/`):** Entidades (types.ts), interfaces y constantes.
