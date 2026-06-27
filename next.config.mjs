@@ -30,6 +30,7 @@ const cspFallback = [
   `img-src ${imgSrc}`,
   `media-src ${mediaSrc}`,
   "font-src 'self'",
+  "worker-src 'self'",
   "connect-src 'self' https://*.supabase.co https://api.brevo.com https://*.upstash.io",
   "frame-src 'self' https://www.google.com https://maps.google.com",
   "object-src 'none'",
