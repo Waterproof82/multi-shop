@@ -158,8 +158,10 @@ export function WaiterBanner() {
   }, []);
 
   // Session expired on a waiter sub-page → back to PIN
+  // Skip redirect when offline — network errors are not auth failures (SW serves cached pages)
   useEffect(() => {
     if (!authChecked || isWaiter) return;
+    if (!navigator.onLine) return;
     if (pathname.startsWith('/waiter/')) {
       globalThis.location.href = '/waiter';
     }

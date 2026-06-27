@@ -11,6 +11,7 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import { LazyPromoToast, LazyTgtgReservaPopup } from "@/components/lazy-client-components";
 import { WaiterBanner } from "@/components/waiter-banner";
 import { ExitConfirmation } from "@/components/exit-confirmation";
+import { SwRegistrar } from "@/components/sw-registrar";
 import { getEmpresaByDomain } from "@/lib/server-services";
 import { getDomainFromHeaders } from "@/lib/domain-utils";
 import type { EmpresaPublic } from "@/core/domain/entities/types";
@@ -189,6 +190,7 @@ export default async function RootLayout({
             </LanguageProvider>
           </ErrorBoundary>
         </ThemeProvider>
+        <SwRegistrar />
       </body>
     </html>
   );

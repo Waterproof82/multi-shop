@@ -258,7 +258,8 @@ export default function BarPage() {
   const [pendingServeAll, setPendingServeAll] = useState<string | null>(null);
   const [pendingBarCancel, setPendingBarCancel] = useState<FlatBarItem[] | null>(null);
   const [groupedMesas, setGroupedMesas] = useState<Set<string>>(new Set());
-  const channelNameRef = useRef(`waiter-bar-${Math.random().toString(36).slice(2)}`);
+  const [channelName] = useState(() => `waiter-bar-${Math.random().toString(36).slice(2)}`);
+  const channelNameRef = useRef(channelName);
   const timersRef     = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
   const pointerStartX = useRef<number | null>(null);
   const swipingId     = useRef<string | null>(null);
