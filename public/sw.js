@@ -23,7 +23,7 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.add('/waiter/offline'))
   );
-  self.skipWaiting();
+  globalThis.skipWaiting();
 });
 
 // --- Activate ---
@@ -40,7 +40,7 @@ self.addEventListener('activate', (event) => {
             .map((key) => caches.delete(key))
         )
       )
-      .then(() => self.clients.claim())
+      .then(() => globalThis.clients.claim())
   );
 });
 

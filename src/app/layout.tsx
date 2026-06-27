@@ -94,7 +94,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const alternateLocales = availableLangs
     .filter(l => l !== primaryLang)
     .map(l => LOCALE_MAP[l])
-    .filter(Boolean) as string[];
+    .filter(Boolean);
 
   const hreflangMap: Record<string, string> = { [primaryLang]: "/" };
   for (const lang of availableLangs) {
