@@ -126,6 +126,39 @@ Estas tablas deben estar publicadas en Supabase antes de que los canales Realtim
 
 ---
 
+## PWA & Funcionamiento Offline — Panel Camarero
+
+El panel `/waiter` funciona como **Progressive Web App** con soporte offline mediante un Service Worker vanilla (sin Workbox/Serwist).
+
+### Service Worker (activo)
+
+| Estrategia | Ruta | Motivo |
+|------------|------|--------|
+| CacheFirst | `/_next/static/*` | Chunks con hash de contenido — nunca cambian sin nueva URL |
+| NetworkFirst + fallback | `/waiter/*`, `bell.mp3` | Shell disponible en cortes breves de Wi-Fi |
+| NetworkOnly | `/api/*` | Auth y datos de pedidos siempre frescos — nunca cachear |
+
+- GET-only guard: mutaciones (POST/PATCH/DELETE) siempre van a red.
+- `skipWaiting()` + `clients.claim()`: el nuevo SW toma control sin necesidad de recargar.
+- Página offline estática en `/waiter/offline` pre-cacheada en el install event.
+- El SW solo actúa en scope `/waiter` — sin impacto en la carta pública ni en el panel admin.
+
+**El SW solo se registra en producción.** En dev (`pnpm dev`) no hay Service Worker para no interferir con HMR. Probar con `pnpm build && pnpm start`.
+
+### Capacitor Android (planificado — siguiente fase)
+
+El objetivo es distribuir el panel `/waiter` como **APK nativo para Android**, tanto en PDAs de camarero como en TPVs Android. Capacitor envuelve la misma webapp en un WebView nativo sin reescribir el código.
+
+Lo que añade Capacitor sobre la capa SW:
+- APK instalable vía MDM o directo (sin Play Store)
+- Acceso nativo a cámara (escaneo QR)
+- Push notifications sin prompt de browser
+- Splash screen, icono de app, modo kiosko para TPV
+
+**La app Next.js, las rutas API y la auth (PIN + JWT cookie) no cambian.** Solo se añade el wrapper nativo.
+
+---
+
 ## Stack Tecnológico
 
 | Tecnología | Versión | Uso |
@@ -145,6 +178,7 @@ Estas tablas deben estar publicadas en Supabase antes de que los canales Realtim
 | Redsys TPV Virtual | — | Pago online (HMAC_SHA256_V1) |
 | Glovo Business LaaS | — | Despacho de riders (DH On Demand Rider API) |
 | @zxing/browser | — | Decodificación QR in-app (iOS Safari + Android Chrome) |
+| Service Worker (vanilla) | — | Caching offline para `/waiter` — sin Workbox/Serwist |
 
 ---
 

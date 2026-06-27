@@ -196,6 +196,18 @@ Solución: `WaiterLoginForm.handlePinSubmit` dispara `window.dispatchEvent(new C
 - **`EmpresasTable`** extrae cada fila en `EmpresaTableRow` con su propio `useState(tipo)`. El `TipoSelector` llama `onTipoChange` solo cuando el PUT es OK — así Mesas/Pagos Mesa/Validación reaccionan al cambio de tipo SIN recargar la página.
 - Mesas / Pagos Mesa / Validación solo se muestran para `tipo === 'restaurante'`. Las tiendas dejan esas celdas vacías.
 
+## 📱 Service Worker PWA — Trampas Críticas
+
+- `public/sw.js` es **plain JS**, no TypeScript. Vive en `/public`, no pasa por la compilación de Next.js.
+- El SW solo se registra en **producción** (`SwRegistrar` verifica `process.env.NODE_ENV !== 'production'`). En dev no hay SW.
+- **Scope** del SW: `{ scope: '/waiter' }` — solo intercepta requests de páginas bajo `/waiter/*`. Sin impacto en carta pública ni admin.
+- **`/api/*` es NetworkOnly siempre** — nunca cachear auth ni datos de pedidos.
+- **`navigator.onLine` guard obligatorio en `WaiterBanner`**: cuando el dispositivo está offline, `GET /api/waiter/me` lanza `TypeError: Failed to fetch`. Sin el guard, `.catch(() => setIsWaiter(false))` dispara el efecto de redirección a login, expulsando al camarero. El guard `if (!navigator.onLine) return` en el effect de redirect evita esto.
+- **DevTools 0 bytes**: Chrome DevTools Cache Storage muestra `0 B` para respuestas gzip cacheadas. Es un bug de visualización — el contenido real está ahí (verificado con `arrayBuffer()`).
+- **RSC prefetch**: Next.js App Router envía payloads `text/x-component` para navegación client-side. El guard `isWaiterHtml` (verifica `content-type` incluye `text/html`) los excluye correctamente del caché NetworkFirst.
+- **SonarLint S7764 en sw.js**: usar `globalThis.skipWaiting()` y `globalThis.clients.claim()` en lugar de `self.*`.
+- Para testear el SW: `pnpm build && pnpm start` (modo producción). Ver `docs/context/pwa-offline-system.md`.
+
 ## 🔍 SEO Multi-Tenant
 
 ### Archivos Clave
