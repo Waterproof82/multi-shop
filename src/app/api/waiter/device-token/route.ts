@@ -9,7 +9,8 @@ const tokenSchema = z.object({
 
 export async function POST(request: NextRequest) {
   const empresaId = request.headers.get('x-empresa-id');
-  if (!empresaId) {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!empresaId || !uuidRegex.test(empresaId)) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 
