@@ -91,8 +91,8 @@
 
     <label>Rol de este dispositivo</label>
     <div class="role-row">
-      <button class="role-btn selected" id="btn-waiter" onclick="selectRole('waiter')">Camarero</button>
-      <button class="role-btn" id="btn-kitchen" onclick="selectRole('kitchen')">Cocina</button>
+      <button type="button" class="role-btn selected" id="btn-waiter" onclick="selectRole('waiter')">Camarero</button>
+      <button type="button" class="role-btn" id="btn-kitchen" onclick="selectRole('kitchen')">Cocina</button>
     </div>
 
     <button class="btn-primary" id="submit-btn" onclick="submitSetup()">Configurar y entrar</button>
@@ -140,7 +140,7 @@
 
   async function submitSetup() {
     hideError();
-    const domain = document.getElementById('domain').value.trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const domain = document.getElementById('domain').value.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
     const email = document.getElementById('email').value.trim();
     const password = document.getElementById('password').value;
 
@@ -166,10 +166,12 @@
         return;
       }
 
-      const { Preferences } = window.Capacitor.Plugins;
-      await Preferences.set({ key: 'domain', value: domain });
-      await Preferences.set({ key: 'role', value: selectedRole });
-      await Preferences.set({ key: 'empresa_id', value: data.empresaId });
+      if (window.Capacitor?.Plugins?.Preferences) {
+        const { Preferences } = window.Capacitor.Plugins;
+        await Preferences.set({ key: 'domain', value: domain });
+        await Preferences.set({ key: 'role', value: selectedRole });
+        await Preferences.set({ key: 'empresa_id', value: data.empresaId ?? '' });
+      }
 
       await navigateToPanel(domain, selectedRole);
     } catch (e) {

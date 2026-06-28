@@ -71,9 +71,16 @@ public/*.webp
 .worktrees/
 
 # Capacitor Android — commit only config files
+# Note: git won't descend into ignored dirs, so intermediate paths must be un-ignored explicitly
 android/
+!android/app/
+android/app/*
 !android/app/build.gradle
 !android/app/google-services.json
+!android/app/src/
+android/app/src/*
+!android/app/src/main/
+android/app/src/main/*
 !android/app/src/main/AndroidManifest.xml
 !android/app/src/main/java/
 !android/app/src/main/res/
