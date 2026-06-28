@@ -69,3 +69,11 @@ next-env.d.ts
 public/*.webp
 !public/MERMELADA-TOMATE-web-transp-sombra-1920w.webp.superpowers/
 .worktrees/
+
+# Capacitor Android — commit only config files
+android/
+!android/app/build.gradle
+!android/app/google-services.json
+!android/app/src/main/AndroidManifest.xml
+!android/app/src/main/java/
+!android/app/src/main/res/
