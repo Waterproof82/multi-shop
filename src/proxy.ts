@@ -16,6 +16,9 @@ function getAdminTokenSecret(): string | undefined {
 function isAllowedOrigin(origin: string | null): boolean {
   if (!origin) return false;
 
+  // Capacitor native WebView origin — our own APK, always allowed
+  if (origin === 'capacitor://localhost' || origin === 'ionic://localhost') return true;
+
   if (process.env.NODE_ENV !== 'production') {
     if (origin.startsWith('http://localhost:')) return true;
   }
