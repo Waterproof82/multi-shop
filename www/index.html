@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Waiter Setup</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: #1e293b;
+      border-radius: 16px;
+      padding: 32px 24px;
+      width: 100%;
+      max-width: 380px;
+    }
+    h1 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+    p.subtitle { color: #94a3b8; font-size: 14px; margin-bottom: 28px; }
+    label { display: block; font-size: 13px; color: #94a3b8; margin-bottom: 6px; }
+    input {
+      display: block;
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid #334155;
+      background: #0f172a;
+      color: #f8fafc;
+      font-size: 16px;
+      margin-bottom: 16px;
+      outline: none;
+    }
+    input:focus { border-color: #6366f1; }
+    .role-row { display: flex; gap: 12px; margin-bottom: 24px; }
+    .role-btn {
+      flex: 1;
+      padding: 14px;
+      border-radius: 10px;
+      border: 2px solid #334155;
+      background: transparent;
+      color: #94a3b8;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .role-btn.selected {
+      border-color: #6366f1;
+      background: #312e81;
+      color: #e0e7ff;
+    }
+    .btn-primary {
+      display: block;
+      width: 100%;
+      padding: 14px;
+      border-radius: 10px;
+      border: none;
+      background: #6366f1;
+      color: white;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .error { color: #f87171; font-size: 13px; margin-top: 12px; display: none; }
+    .loading { display: none; color: #94a3b8; font-size: 14px; text-align: center; margin-top: 12px; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>Configurar dispositivo</h1>
+  <p class="subtitle">Este setup solo se hace una vez. Los camareros usarán el PIN habitual.</p>
+
+  <div id="setup-form">
+    <label>Dominio del restaurante</label>
+    <input id="domain" type="text" placeholder="mi-restaurante.com" autocomplete="off" autocapitalize="none" />
+
+    <label>Email del administrador</label>
+    <input id="email" type="email" placeholder="admin@mi-restaurante.com" />
+
+    <label>Contraseña</label>
+    <input id="password" type="password" placeholder="••••••••" />
+
+    <label>Rol de este dispositivo</label>
+    <div class="role-row">
+      <button class="role-btn selected" id="btn-waiter" onclick="selectRole('waiter')">Camarero</button>
+      <button class="role-btn" id="btn-kitchen" onclick="selectRole('kitchen')">Cocina</button>
+    </div>
+
+    <button class="btn-primary" id="submit-btn" onclick="submitSetup()">Configurar y entrar</button>
+    <div class="error" id="error-msg"></div>
+    <div class="loading" id="loading-msg">Verificando credenciales...</div>
+  </div>
+</div>
+
+<script>
+  let selectedRole = 'waiter';
+
+  function selectRole(role) {
+    selectedRole = role;
+    document.getElementById('btn-waiter').classList.toggle('selected', role === 'waiter');
+    document.getElementById('btn-kitchen').classList.toggle('selected', role === 'kitchen');
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('error-msg');
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  function hideError() {
+    document.getElementById('error-msg').style.display = 'none';
+  }
+
+  async function navigateToPanel(domain, role) {
+    const path = role === 'kitchen' ? '/kitchen' : '/waiter';
+    window.location.href = 'https://' + domain + path;
+  }
+
+  async function checkSavedConfig() {
+    try {
+      const { Preferences } = window.Capacitor.Plugins;
+      const { value: domain } = await Preferences.get({ key: 'domain' });
+      const { value: role } = await Preferences.get({ key: 'role' });
+      if (domain && role) {
+        await navigateToPanel(domain, role);
+      }
+    } catch (e) {
+      // Capacitor not available (e.g. browser dev) — show setup form
+    }
+  }
+
+  async function submitSetup() {
+    hideError();
+    const domain = document.getElementById('domain').value.trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+
+    if (!domain || !email || !password) {
+      showError('Completá todos los campos');
+      return;
+    }
+
+    document.getElementById('submit-btn').disabled = true;
+    document.getElementById('loading-msg').style.display = 'block';
+
+    try {
+      const res = await fetch('https://' + domain + '/api/app/setup/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        showError(data.error ?? 'Error al verificar credenciales');
+        return;
+      }
+
+      const { Preferences } = window.Capacitor.Plugins;
+      await Preferences.set({ key: 'domain', value: domain });
+      await Preferences.set({ key: 'role', value: selectedRole });
+      await Preferences.set({ key: 'empresa_id', value: data.empresaId });
+
+      await navigateToPanel(domain, selectedRole);
+    } catch (e) {
+      showError('No se pudo conectar con el servidor. Verificá el dominio e intentá de nuevo.');
+    } finally {
+      document.getElementById('submit-btn').disabled = false;
+      document.getElementById('loading-msg').style.display = 'none';
+    }
+  }
+
+  // On load: check if already configured
+  document.addEventListener('DOMContentLoaded', checkSavedConfig);
+</script>
+</body>
+</html>
