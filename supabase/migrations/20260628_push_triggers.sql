@@ -14,17 +14,17 @@ SET search_path = public
 AS $$
 BEGIN
   -- Call Edge Function asynchronously via pg_net
-  PERFORM extensions.net_http_post(
+  PERFORM net.http_post(
     url := current_setting('app.supabase_url') || '/functions/v1/notify-push',
     body := jsonb_build_object(
       'empresa_id', empresa_id::text,
       'event_type', event_type
-    )::text,
+    ),
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'Authorization', 'Bearer ' || current_setting('app.anon_key')
     ),
-    timeout_ms := 5000
+    timeout_milliseconds := 5000
   );
 EXCEPTION WHEN OTHERS THEN
   -- Never fail the main transaction due to push failure
