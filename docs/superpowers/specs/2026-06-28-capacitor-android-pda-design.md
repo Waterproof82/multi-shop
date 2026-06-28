@@ -167,6 +167,28 @@ export default config;
 Capacitor cuando el WebView navega a un dominio externo, dejando FCM y Preferences
 inoperativos de forma silenciosa.
 
+**`useLegacyBridge: false`** (default en Capacitor 4+): hace que todos los `fetch()`
+dentro del WebView de Capacitor se rutean por la capa HTTP nativa de Android, que
+**no está sujeta a CORS**. Esto permite que `www/setup.html` llame a
+`https://{dominio}/api/auth/admin` sin que el `proxy.ts` necesite aceptar el origen
+`capacitor://localhost`. Sin esta configuración, el origen `capacitor://localhost` del
+setup screen sería bloqueado por el CORS estricto de `proxy.ts`.
+
+```typescript
+const config: CapacitorConfig = {
+  appId: 'com.multishop.waiter',
+  appName: 'Waiter',
+  server: {
+    allowNavigation: ['*.tusaas.com', '*.dominiocliente.com'],
+    cleartext: false,
+  },
+  android: {
+    allowMixedContent: false,
+    useLegacyBridge: false,  // native HTTP → sin restricción CORS en setup screen
+  },
+};
+```
+
 ---
 
 ## Android Configuration
@@ -345,6 +367,22 @@ en `build.gradle` — son la fuente de verdad para el comparador de versiones.
 El usuario siempre confirma con un tap (limitación de Android fuera de Play Store).
 La URI `content://` via FileProvider es obligatoria desde Android 7 — una ruta
 `file://` directa crashea la app en Android 11+.
+
+---
+
+## Prerequisitos de Despliegue
+
+### SSL obligatorio para dominios de tenant
+
+`cleartext: false` en `capacitor.config.ts` bloquea HTTP en texto plano — correcto
+para seguridad en redes Wi-Fi de restaurante. Consecuencia: si un tenant con dominio
+propio tiene un certificado SSL expirado o mal configurado, el WebView Android muestra
+**pantalla blanca sin mensaje de error**. No hay fallback ni aviso al usuario.
+
+Antes de distribuir el APK a un tenant con dominio personalizado, verificar:
+- Certificado SSL válido y no expirado (`openssl s_client -connect dominio:443`)
+- Renovación automática configurada (Let's Encrypt / Certbot o equivalente)
+- Sin mixed content (todos los recursos del panel servidos por HTTPS)
 
 ---
 
