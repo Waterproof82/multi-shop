@@ -1431,16 +1431,19 @@ cd android && ./gradlew assembleRelease
 
 Output: `android/app/build/outputs/apk/release/app-release.apk`
 
-- [ ] **Step 2: Upload to Supabase Storage**
+- [ ] **Step 2: Upload to Supabase Storage with correct Content-Type**
 
-In Supabase dashboard: Storage → `app-releases` → Upload file.
-- Select `app-release.apk`
-- Rename to `waiter-1.apk` (matching `APP_VERSION_CODE=1`)
+**IMPORTANT:** The Content-Type MUST be `application/vnd.android.package-archive`. If uploaded as `application/octet-stream` (Supabase's default for unknown binaries), Android's download manager may strip or rename the extension, causing the install Intent in `MainActivity.kt` to fail silently.
 
-OR via CLI:
+Via Supabase CLI (sets Content-Type explicitly):
 ```bash
-supabase storage cp android/app/build/outputs/apk/release/app-release.apk ss://app-releases/waiter-1.apk
+supabase storage cp \
+  --content-type "application/vnd.android.package-archive" \
+  android/app/build/outputs/apk/release/app-release.apk \
+  ss://app-releases/waiter-1.apk
 ```
+
+Via dashboard: Storage → `app-releases` → Upload → after upload, click the file → Edit metadata → set `Content-Type` to `application/vnd.android.package-archive`.
 
 - [ ] **Step 3: Verify /api/app/version returns a URL**
 
