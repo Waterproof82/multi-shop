@@ -21,11 +21,10 @@ declare global {
 }
 
 interface PushRegistrarProps {
-  empresaId: string;
   role: 'waiter' | 'kitchen';
 }
 
-export function PushRegistrar({ empresaId, role }: Readonly<PushRegistrarProps>) {
+export function PushRegistrar({ role }: Readonly<PushRegistrarProps>) {
   useEffect(() => {
     if (!window.Capacitor?.isNativePlatform()) return;
 
@@ -38,10 +37,11 @@ export function PushRegistrar({ empresaId, role }: Readonly<PushRegistrarProps>)
 
       push!.addListener('registration', async (token) => {
         try {
+          // empresa_id comes from x-empresa-id header (injected by proxy from JWT)
           await fetch('/api/waiter/device-token', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fcm_token: token.value, role, empresa_id: empresaId }),
+            body: JSON.stringify({ fcm_token: token.value, role }),
           });
         } catch {
           // Non-critical — push registration failure doesn't break the app
@@ -54,7 +54,7 @@ export function PushRegistrar({ empresaId, role }: Readonly<PushRegistrarProps>)
     register().catch(() => {
       // Silently ignore — native push setup failure is non-critical
     });
-  }, [empresaId, role]);
+  }, [role]);
 
   return null;
 }
