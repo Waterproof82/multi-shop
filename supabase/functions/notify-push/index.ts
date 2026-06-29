@@ -21,6 +21,12 @@ function getNotificationContent(eventType: string): { title: string; body: strin
   return content[eventType] ?? { title: 'Actualización', body: 'Hay novedades en el sistema' };
 }
 
+function getNotificationRoute(eventType: string): string {
+  if (eventType === 'new_order') return '/waiter/pendientes';
+  if (eventType === 'item_ready') return '/waiter/kitchen?groupBy=listos';
+  return '/waiter';
+}
+
 function getTargetRole(eventType: string): 'waiter' | 'kitchen' {
   return eventType === 'new_order' || eventType === 'item_ready' ? 'waiter' : 'kitchen';
 }
@@ -42,7 +48,8 @@ async function sendFcmMessage(
   projectId: string,
   token: string,
   title: string,
-  body: string
+  body: string,
+  route: string
 ): Promise<{ success: boolean; invalidToken: boolean }> {
   const res = await fetch(
     `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
@@ -57,6 +64,7 @@ async function sendFcmMessage(
           token,
           notification: { title, body },
           android: { priority: 'HIGH' },
+          data: { route },
         },
       }),
     }
@@ -109,12 +117,13 @@ Deno.serve(async (req) => {
   const projectId: string = serviceAccount.project_id;
   const accessToken = await getFcmAccessToken();
   const { title, body } = getNotificationContent(payload.event_type);
+  const route = getNotificationRoute(payload.event_type);
 
   const invalidIds: string[] = [];
   let sent = 0;
 
   for (const { id, fcm_token } of tokens) {
-    const result = await sendFcmMessage(accessToken, projectId, fcm_token, title, body);
+    const result = await sendFcmMessage(accessToken, projectId, fcm_token, title, body, route);
     if (result.success) {
       sent++;
     } else if (result.invalidToken) {

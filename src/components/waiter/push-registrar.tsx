@@ -52,6 +52,10 @@ async function registerPush(): Promise<void> {
 
     await PushNotifications.addListener('pushNotificationReceived', () => { /* no-op: Realtime handles foreground */ });
     await PushNotifications.addListener('registration', ({ value: fcmToken }) => sendToken(fcmToken, Preferences));
+    await PushNotifications.addListener('pushNotificationActionPerformed', (action: { notification: { data?: Record<string, string> } }) => {
+      const route = action.notification.data?.route;
+      if (route) globalThis.location.href = route;
+    });
     await PushNotifications.register();
   } catch {
     // Capacitor not available in this environment — no-op
