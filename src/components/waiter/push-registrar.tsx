@@ -38,9 +38,7 @@ async function registerPush(): Promise<void> {
 
   try {
     const [{ PushNotifications }, { Preferences }] = await Promise.all([
-      // @ts-expect-error — module only available in Capacitor Android environment
       import('@capacitor/push-notifications') as Promise<{ PushNotifications: PushPlugin }>,
-      // @ts-expect-error — module only available in Capacitor Android environment
       import('@capacitor/preferences') as Promise<{ Preferences: PrefsPlugin }>,
     ]);
 
