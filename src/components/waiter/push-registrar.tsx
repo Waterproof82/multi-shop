@@ -2,45 +2,47 @@
 
 import { useEffect } from 'react';
 
-// Registers FCM token for push notifications when running inside Capacitor.
-// Foreground suppression: notification-type FCM messages are NOT shown by
-// Android automatically in foreground — they arrive here via pushNotificationReceived.
-// We deliberately do nothing with them because Realtime already handles the sound/UI.
-// Background / screen-off: Android system shows the notification automatically.
+// Registers FCM push token AFTER waiter PIN login (waiter-auth-changed event).
+//
+// Foreground suppression: notification-type FCM messages in foreground are
+// delivered to pushNotificationReceived — we do nothing (no-op) because
+// Realtime WebSocket already plays the sound/UI update.
+// Background / screen-off: Android FCM system shows the notification automatically.
 export function PushRegistrar() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    // Only run inside the Capacitor native shell
-    if (!window.Capacitor?.isNativePlatform()) return;
 
-    let cleanupFns: Array<() => void> = [];
+    async function registerPush() {
+      // Give the Capacitor bridge time to inject into the remote WebView
+      await new Promise(resolve => setTimeout(resolve, 300));
 
-    async function init() {
-      const [{ PushNotifications }, { Preferences }] = await Promise.all([
-        import('@capacitor/push-notifications'),
-        import('@capacitor/preferences'),
-      ]);
+      const cap = (window as Window & { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
+      if (!cap?.isNativePlatform?.()) return;
 
-      const { receive: permStatus } = await PushNotifications.checkPermissions();
-      const granted =
-        permStatus === 'granted'
-          ? 'granted'
-          : (await PushNotifications.requestPermissions()).receive;
+      try {
+        const [{ PushNotifications }, { Preferences }] = await Promise.all([
+          import('@capacitor/push-notifications'),
+          import('@capacitor/preferences'),
+        ]);
 
-      if (granted !== 'granted') return;
+        // Request permission (dialog shows here, right after login)
+        const { receive: permStatus } = await PushNotifications.checkPermissions();
+        const granted =
+          permStatus === 'granted'
+            ? 'granted'
+            : (await PushNotifications.requestPermissions()).receive;
 
-      // Foreground suppression — do nothing when the app is open
-      const fgListener = await PushNotifications.addListener(
-        'pushNotificationReceived',
-        () => { /* intentional no-op: Realtime WebSocket already notified */ }
-      );
-      cleanupFns.push(() => fgListener.remove());
+        if (granted !== 'granted') return;
 
-      const regListener = await PushNotifications.addListener(
-        'registration',
-        async ({ value: fcmToken }) => {
+        // Foreground suppression: when app is open, Realtime already handles sound/UI
+        await PushNotifications.addListener('pushNotificationReceived', () => {
+          /* intentional no-op */
+        });
+
+        // On FCM token received, register with backend
+        await PushNotifications.addListener('registration', async ({ value: fcmToken }) => {
           const { value: role } = await Preferences.get({ key: 'role' });
-          if (!role || (role !== 'waiter' && role !== 'kitchen')) return;
+          if (role !== 'waiter' && role !== 'kitchen') return;
 
           await fetch('/api/waiter/device-token', {
             method: 'POST',
@@ -48,18 +50,21 @@ export function PushRegistrar() {
             credentials: 'include',
             body: JSON.stringify({ fcm_token: fcmToken, role }),
           }).catch(() => { /* non-fatal */ });
-        }
-      );
-      cleanupFns.push(() => regListener.remove());
+        });
 
-      await PushNotifications.register();
+        await PushNotifications.register();
+      } catch {
+        // Capacitor not available in this environment — no-op
+      }
     }
 
-    init().catch(() => { /* non-fatal: push not available in this environment */ });
+    // Trigger on login (PIN entered successfully)
+    function onAuthChanged() {
+      void registerPush();
+    }
 
-    return () => {
-      cleanupFns.forEach(fn => fn());
-    };
+    window.addEventListener('waiter-auth-changed', onAuthChanged);
+    return () => window.removeEventListener('waiter-auth-changed', onAuthChanged);
   }, []);
 
   return null;
