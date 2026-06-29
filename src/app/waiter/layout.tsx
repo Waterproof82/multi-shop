@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { OfflineBanner } from '@/components/waiter/offline-banner';
 import { PushRegistrar } from '@/components/waiter/push-registrar';
 
 export const metadata: Metadata = {
@@ -13,6 +14,7 @@ export default function WaiterLayout({ children }: Readonly<{ children: React.Re
   return (
     <>
       <PushRegistrar />
+      <OfflineBanner />
       {children}
     </>
   );
