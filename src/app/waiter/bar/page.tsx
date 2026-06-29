@@ -318,10 +318,26 @@ export default function BarPage() {
         }
       });
 
+    // Broadcast channel — receives 'new-order' events from notify_waiter_new_order
+    // trigger for ALL pedido inserts (including waiter-placed estado='pendiente'/'retenido').
+    // Needed because postgres_changes on pedidos is unreliable on the singleton client.
+    const newOrderChannel = supabase
+      .channel('waiter-new-order-bar')
+      .on('broadcast', { event: 'new-order' }, () => {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => { void fetchOrders(); }, 100);
+      })
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('[Realtime] waiter-new-order broadcast error (bar):', status);
+        }
+      });
+
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       void supabase.removeChannel(channel);
       void supabase.removeChannel(broadcastChannel);
+      void supabase.removeChannel(newOrderChannel);
     };
   }, [fetchOrders]);
 

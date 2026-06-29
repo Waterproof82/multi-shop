@@ -145,7 +145,9 @@ Usar siempre en RLS policies para aislar datos por empresa.
 | Canal | Tipo | Tabla/evento | Quién escucha |
 |---|---|---|---|
 | `waiter-banner-{uid}` | postgres_changes | pedidos, pedido_item_estados, mesa_sesiones | WaiterBanner |
-| `waiter-new-order` | broadcast `new-order` | trigger notify_waiter_new_order | WaiterBanner |
+| `waiter-new-order` | broadcast `new-order` | trigger notify_waiter_new_order (todos los INSERTs) | WaiterBanner |
+| `waiter-new-order-kitchen` | broadcast `new-order` | trigger notify_waiter_new_order | WaiterKitchenPage |
+| `waiter-new-order-bar` | broadcast `new-order` | trigger notify_waiter_new_order | BarPage |
 | `waiter-items-update` | broadcast `item-update` | trigger notify_waiter_items_update | WaiterBanner, BarPage, WaiterLoginForm |
 | `waiter-kitchen-{uid}` | postgres_changes | pedido_item_estados, pedidos | WaiterKitchenPage |
 | `waiter-bar-{uid}` | postgres_changes | pedido_item_estados, pedidos | BarPage |
