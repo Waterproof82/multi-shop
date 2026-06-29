@@ -47,10 +47,10 @@ async function registerPush(): Promise<void> {
     if (!listenersRegistered) {
       await PushNotifications.addListener('pushNotificationReceived', () => { /* no-op: Realtime handles foreground */ });
       await PushNotifications.addListener('registration', ({ value: fcmToken }) => sendToken(fcmToken, Preferences));
-      await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
-        const data = action.notification.data as Record<string, string> | undefined;
-        const route = data?.route;
-        if (route) globalThis.location.href = route;
+      await PushNotifications.addListener('pushNotificationActionPerformed', (_action) => {
+        // DEBUG: hardcoded navigation to confirm the event fires at all.
+        // If this works, the issue was data extraction. If it still goes to /waiter, event is not firing.
+        globalThis.location.href = '/waiter/pendientes';
       });
       listenersRegistered = true;
     }
