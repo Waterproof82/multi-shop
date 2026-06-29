@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
+import type { PushNotificationsPlugin } from '@capacitor/push-notifications';
+import type { PreferencesPlugin } from '@capacitor/preferences';
 
 // Registers FCM push token AFTER waiter PIN login (waiter-auth-changed event).
 //
@@ -9,17 +11,7 @@ import { useEffect } from 'react';
 // Realtime WebSocket already plays the sound/UI update.
 // Background / screen-off: Android FCM system shows the notification automatically.
 
-type PushPlugin = {
-  checkPermissions(): Promise<{ receive: string }>;
-  requestPermissions(): Promise<{ receive: string }>;
-  addListener(event: string, callback: (data: { value: string }) => void | Promise<void>): Promise<unknown>;
-  register(): Promise<void>;
-};
-type PrefsPlugin = {
-  get(opts: { key: string }): Promise<{ value: string | null }>;
-};
-
-async function sendToken(fcmToken: string, Preferences: PrefsPlugin): Promise<void> {
+async function sendToken(fcmToken: string, Preferences: PreferencesPlugin): Promise<void> {
   const { value: role } = await Preferences.get({ key: 'role' });
   if (role !== 'waiter' && role !== 'kitchen') return;
   await fetch('/api/waiter/device-token', {
@@ -38,8 +30,8 @@ async function registerPush(): Promise<void> {
 
   try {
     const [{ PushNotifications }, { Preferences }] = await Promise.all([
-      import('@capacitor/push-notifications') as Promise<{ PushNotifications: PushPlugin }>,
-      import('@capacitor/preferences') as Promise<{ Preferences: PrefsPlugin }>,
+      import('@capacitor/push-notifications') as Promise<{ PushNotifications: PushNotificationsPlugin }>,
+      import('@capacitor/preferences') as Promise<{ Preferences: PreferencesPlugin }>,
     ]);
 
     const { receive: permStatus } = await PushNotifications.checkPermissions();
