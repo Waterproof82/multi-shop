@@ -8,7 +8,7 @@ export function OfflineBanner() {
   useEffect(() => {
     setIsOffline(!navigator.onLine);
     const onOffline = () => setIsOffline(true);
-    const onOnline = () => setIsOffline(false);
+    const onOnline = () => { setIsOffline(false); globalThis.location.reload(); };
     window.addEventListener('offline', onOffline);
     window.addEventListener('online', onOnline);
     return () => {
