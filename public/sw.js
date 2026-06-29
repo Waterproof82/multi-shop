@@ -2,7 +2,7 @@
 // Estrategia: CacheFirst para /_next/static/, NetworkFirst para /waiter/*
 // Scope: /waiter (registrado desde sw-registrar.tsx)
 
-const CACHE_NAME = 'waiter-v1';
+const CACHE_NAME = 'waiter-v2';
 
 // --- Install ---
 // Pre-cacheamos /waiter/offline de forma proactiva durante la instalación.
@@ -94,9 +94,14 @@ self.addEventListener('fetch', (event) => {
           // Nota: NO previene "zombie HTML" de error boundaries (retornan 200
           // text/html igualmente), pero NetworkFirst lo mitiga: la caché
           // se sobreescribe en el siguiente request exitoso con red disponible.
+          const contentType = response.headers.get('content-type') ?? '';
+          // Cache both the initial HTML page load AND the RSC payloads that
+          // Next.js App Router fetches during client-side navigation (text/x-component).
+          // Without caching RSC payloads, offline navigation between /waiter/* pages
+          // fails with a blank screen even though the HTML shell is cached.
           const isWaiterHtml =
             url.pathname.startsWith('/waiter') &&
-            (response.headers.get('content-type') ?? '').includes('text/html');
+            (contentType.includes('text/html') || contentType.includes('text/x-component'));
           const isNonWaiterAsset = !url.pathname.startsWith('/waiter'); // bell.mp3
 
           if (response.status === 200 && (isWaiterHtml || isNonWaiterAsset)) {
