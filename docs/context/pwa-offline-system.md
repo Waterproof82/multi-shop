@@ -129,31 +129,23 @@ To bump the cache version: change `const CACHE_NAME = 'waiter-v1'` to `'waiter-v
 
 ---
 
-## Planned: Capacitor Android (next phase)
+## Capacitor Android — IMPLEMENTADO
 
-The Service Worker layer is the foundation. The next phase wraps the `/waiter` panel in a Capacitor WebView for deployment as a native Android APK.
+El Service Worker es la base de la capa offline. La capa nativa (Capacitor) ya está implementada y en producción.
 
-**Target devices:**
-- PDA camareros (Android handheld)
-- TPV Android (tablet at the counter)
+**Documentación completa:** `docs/context/capacitor-android-pda.md`
 
-**What Capacitor adds over the SW layer:**
-- Native APK distributable via MDM or direct install (no Play Store needed)
-- Access to native camera (for QR scanning)
-- System-level push notifications (no browser permission prompt)
-- Splash screen and app icon
-- Full-screen kiosk mode for TPV
+**Qué aporta Capacitor sobre el SW:**
+- APK distribuible via MDM o instalación directa (sin Play Store)
+- Push notifications nativas por FCM (sin prompt de permisos del browser)
+- Wake lock de pantalla
+- Auto-update con descarga e instalación silenciosa del APK
 
-**What does NOT change:**
-- The Next.js app and all API routes remain unchanged
-- The SW continues to handle caching inside the WebView
-- Auth (PIN + JWT cookie) works identically
-- No Ionic/React Native rewrite — the existing web codebase ships as-is
-
-**Planned files for that phase:**
-- `capacitor.config.ts` — server URL pointing to production domain
-- `android/` — generated Android project (gitignored except config)
-- `src/app/waiter/layout.tsx` — viewport meta tweaks for native WebView
+**Qué NO cambia:**
+- La app Next.js y todas las rutas API son idénticas
+- El SW sigue funcionando dentro del WebView
+- La auth (PIN + JWT cookie) es idéntica — con `SameSite=lax` (no strict)
+- Sin reescritura en Ionic/React Native — el codebase web existente se usa tal cual
 
 ---
 

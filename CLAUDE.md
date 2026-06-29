@@ -231,3 +231,26 @@ Solución: `WaiterLoginForm.handlePinSubmit` dispara `window.dispatchEvent(new C
 - `empresa.descripcion` - Descripciones i18n (es/en/fr/it/de)
 - `empresa.url_mapa` - Google Maps (parsea coordenadas)
 - `empresa.updated_at` / `actualizado_en` - Para sitemap
+
+## 📱 Capacitor Android PDA — Trampas Críticas
+
+> Ver doc completo: `docs/context/capacitor-android-pda.md`
+
+### Proceso de build — orden OBLIGATORIO
+1. Editar `www/index.html` (fuente en el worktree, NUNCA editar `assets/public/` directamente)
+2. `npx cap copy android` — copia `www/` a `android/app/src/main/assets/public/`. **Sin este paso, cualquier cambio en `www/index.html` se ignora silenciosamente.**
+3. Bumping de `versionCode` en `android/app/build.gradle`
+4. `KEYSTORE_PASSWORD=... KEY_PASSWORD=... ./gradlew assembleRelease`
+5. Subir `waiter-{N}.apk` a Supabase Storage bucket `app-releases`
+6. Actualizar defaults en `src/app/api/app/version/route.ts`
+
+### Trampas de alto impacto
+- **`SameSite=lax` obligatorio** en `waiter_token` cookie. Con `strict`, la WebView navegando de `capacitor://localhost` → `https://domain.com` nunca recibe el cookie → siempre muestra PIN.
+- **`CookieManager.getInstance().flush()` en `onPause()`** — sin esto, el cookie se pierde si el proceso es killed → PIN en cada apertura.
+- **`style.display = ''` NO muestra elementos** si hay un CSS rule `display:none`. Usar siempre `style.display = 'block'`.
+- **`window.load` no `DOMContentLoaded`** — el bridge de Capacitor no está disponible en DOMContentLoaded.
+- **`isNativePlatform()` no `isNative`** — API correcta en Capacitor 5+.
+- **`/waiter/mesas` no existe** — la grilla de mesas vive en `/waiter`. No redirigir a rutas inexistentes.
+- **`WaiterLoginForm` flash de PIN** — inicializa en `step="pin"`. Mostrar spinner mientras `isCheckingAuth=true` (hasta que `/api/waiter/me` resuelve).
+- **`BuildConfig.DEFAULT_DOMAIN`** — fallback para el update check cuando el usuario borra datos. Requiere `buildFeatures { buildConfig = true }` en `build.gradle`.
+- **Vercel env vars** `APP_VERSION` / `APP_VERSION_CODE` sobreescriben los defaults del código. Actualizar en Vercel al hacer release si están seteadas.
