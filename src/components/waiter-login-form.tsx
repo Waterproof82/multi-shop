@@ -343,6 +343,7 @@ export function WaiterLoginForm() {
   const router = useRouter();
 
   const [step, setStep] = useState<Step>("pin");
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [pin, setPin] = useState("");
   const [mesas, setMesas] = useState<MesaWithSession[]>([]);
   const [empresaId, setEmpresaId] = useState<string | null>(null);
@@ -412,7 +413,8 @@ export function WaiterLoginForm() {
           setStep("tables");
         }
       })
-      .catch(() => null);
+      .catch(() => null)
+      .finally(() => setIsCheckingAuth(false));
   }, []);
 
   async function handlePinSubmit() {
@@ -532,6 +534,14 @@ export function WaiterLoginForm() {
     } finally {
       setMesaLoading(null);
     }
+  }
+
+  if (isCheckingAuth) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "oklch(42% 0.06 252)", borderTopColor: "transparent" }} />
+      </div>
+    );
   }
 
   if (step === "pin") {
