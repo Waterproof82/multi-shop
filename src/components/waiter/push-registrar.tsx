@@ -57,6 +57,18 @@ async function registerPush(): Promise<void> {
 
     // Always call register() — re-fires 'registration' event → sendToken() with the current role
     await PushNotifications.register();
+
+    // If native code saved a pending route (cold-start), read and consume it
+    try {
+      const { value: pendingRoute } = await Preferences.get({ key: 'push_route' });
+      if (pendingRoute) {
+        try { await Preferences.remove({ key: 'push_route' }); } catch {}
+        // Navigate to the saved route (it may be an absolute URL or app path)
+        globalThis.location.href = pendingRoute;
+      }
+    } catch {
+      // ignore if Preferences isn't available or remove fails
+    }
   } catch {
     // Capacitor not available in this environment — no-op
   }

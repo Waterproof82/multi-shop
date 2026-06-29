@@ -26,6 +26,67 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         checkForUpdate();
+
+        // Handle intent that launched the activity (cold start)
+        handleIntent(getIntent());
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        // Handle intents when app is already running (background -> foreground)
+        handleIntent(intent);
+    }
+
+    private void handleIntent(Intent intent) {
+        if (intent == null) return;
+
+        // Try common places where push/tap data may be stored
+        String route = null;
+        if (intent.getExtras() != null) {
+            // explicit 'route' key used by our payloads
+            route = intent.getExtras().getString("route");
+            if (route == null) route = intent.getExtras().getString("click_action");
+            if (route == null) route = intent.getExtras().getString("gcm.notification.click_action");
+            if (route == null) {
+                // some providers pack a JSON string under "data"
+                String data = intent.getExtras().getString("data");
+                if (data != null) {
+                    try {
+                        JSONObject j = new JSONObject(data);
+                        route = j.optString("route", null);
+                    } catch (Exception ignored) { }
+                }
+            }
+        }
+
+        // Fallback: intent data URI
+        if (route == null && intent.getData() != null) {
+            route = intent.getData().toString();
+        }
+
+        if (route == null) return;
+
+        // Save route to Capacitor Preferences storage so web side can pick it up on cold start
+        try {
+            SharedPreferences prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
+            prefs.edit().putString("push_route", route).apply();
+        } catch (Exception ignored) { }
+
+        // If the WebView is available, evaluate JS to navigate immediately (background -> foreground)
+        try {
+            if (getBridge() != null && getBridge().getWebView() != null) {
+                final String quoted = JSONObject.quote(route);
+                final String js = "window.dispatchEvent(new CustomEvent('push-navigate',{ detail: " + quoted + " }));";
+                runOnUiThread(() -> {
+                    try {
+                        getBridge().getWebView().evaluateJavascript(js, null);
+                    } catch (Exception e) {
+                        // ignore — webview might not accept evaluateJavascript yet
+                    }
+                });
+            }
+        } catch (Exception ignored) { }
     }
 
     private String getSavedDomain() {
