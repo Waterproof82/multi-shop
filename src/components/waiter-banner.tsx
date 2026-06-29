@@ -262,6 +262,16 @@ export function WaiterBanner() {
         globalThis.dispatchEvent(new CustomEvent('waiter-realtime-update'));
       }, 100);
     };
+
+    // On app resume from background (visibilitychange fires on Capacitor WebView).
+    // Re-fetch counts and relay so all waiter screens refresh stale data.
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void fetchCounts();
+        globalThis.dispatchEvent(new CustomEvent('waiter-realtime-update'));
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
     const channel = supabase
       .channel(channelNameRef.current)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, triggerUpdate)
@@ -306,6 +316,7 @@ export function WaiterBanner() {
 
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       void supabase.removeChannel(channel);
       void supabase.removeChannel(broadcastNewOrder);
       void supabase.removeChannel(broadcastItems);

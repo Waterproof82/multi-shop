@@ -301,8 +301,13 @@ export default function WaiterKitchenPage() {
         }
       });
 
+    // Re-fetch on app resume from background (visibilitychange relay from WaiterBanner).
+    const onResumeRelay = () => { void fetchItems(); };
+    globalThis.addEventListener('waiter-realtime-update', onResumeRelay);
+
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
+      globalThis.removeEventListener('waiter-realtime-update', onResumeRelay);
       void supabase.removeChannel(channel);
       void supabase.removeChannel(broadcastChannel);
       void supabase.removeChannel(newOrderChannel);
