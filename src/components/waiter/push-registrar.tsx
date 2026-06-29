@@ -22,10 +22,9 @@ async function sendToken(fcmToken: string, Preferences: PreferencesPlugin): Prom
   }).catch(() => { /* non-fatal */ });
 }
 
-let pushRegistered = false;
+let listenersRegistered = false;
 
 async function registerPush(): Promise<void> {
-  if (pushRegistered) return;
   await new Promise<void>(resolve => setTimeout(resolve, 300));
 
   const cap = (globalThis as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
@@ -45,14 +44,19 @@ async function registerPush(): Promise<void> {
 
     if (granted !== 'granted') return;
 
-    await PushNotifications.addListener('pushNotificationReceived', () => { /* no-op: Realtime handles foreground */ });
-    await PushNotifications.addListener('registration', ({ value: fcmToken }) => sendToken(fcmToken, Preferences));
-    await PushNotifications.addListener('pushNotificationActionPerformed', (action: { notification: { data?: Record<string, string> } }) => {
-      const route = action.notification.data?.route;
-      if (route) globalThis.location.href = route;
-    });
+    if (!listenersRegistered) {
+      await PushNotifications.addListener('pushNotificationReceived', () => { /* no-op: Realtime handles foreground */ });
+      await PushNotifications.addListener('registration', ({ value: fcmToken }) => sendToken(fcmToken, Preferences));
+      await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+        const data = action.notification.data as Record<string, string> | undefined;
+        const route = data?.route;
+        if (route) globalThis.location.href = route;
+      });
+      listenersRegistered = true;
+    }
+
+    // Always call register() — re-fires 'registration' event → sendToken() with the current role
     await PushNotifications.register();
-    pushRegistered = true;
   } catch {
     // Capacitor not available in this environment — no-op
   }
