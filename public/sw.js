@@ -2,7 +2,7 @@
 // Estrategia: CacheFirst para /_next/static/, NetworkFirst para /waiter/*
 // Scope: /waiter (registrado desde sw-registrar.tsx)
 
-const CACHE_NAME = 'waiter-v2';
+const CACHE_NAME = 'waiter-v3';
 
 // --- Install ---
 // Pre-cacheamos /waiter/offline de forma proactiva durante la instalación.
