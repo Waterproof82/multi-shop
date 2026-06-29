@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { PushRegistrar } from '@/components/waiter/push-registrar';
 
 export const metadata: Metadata = {
   other: {
@@ -9,5 +10,10 @@ export const metadata: Metadata = {
 };
 
 export default function WaiterLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <>{children}</>;
+  return (
+    <>
+      <PushRegistrar />
+      {children}
+    </>
+  );
 }
