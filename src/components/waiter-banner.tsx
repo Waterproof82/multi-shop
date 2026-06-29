@@ -138,7 +138,10 @@ export function WaiterBanner() {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Check waiter auth on mount and path change
+  // Skip fetch when offline — network errors are not auth failures.
+  // Keep existing isWaiter state so the banner stays visible.
   useEffect(() => {
+    if (!navigator.onLine) { setAuthChecked(true); return; }
     fetch('/api/waiter/me')
       .then(r => { setIsWaiter(r.ok); })
       .catch(() => setIsWaiter(false))
@@ -171,6 +174,11 @@ export function WaiterBanner() {
     const stored = getWaiterMesa();
     if (!stored) { setMesaLabel(null); setMesaId(null); return; }
 
+    if (!navigator.onLine) {
+      setMesaLabel(stored.mesaNombre ?? `Mesa ${stored.mesaNumero}`);
+      setMesaId(stored.mesaId);
+      return;
+    }
     fetch("/api/waiter/me")
       .then((r) => {
         if (r.ok) {
