@@ -22,7 +22,10 @@ async function sendToken(fcmToken: string, Preferences: PreferencesPlugin): Prom
   }).catch(() => { /* non-fatal */ });
 }
 
+let pushRegistered = false;
+
 async function registerPush(): Promise<void> {
+  if (pushRegistered) return;
   await new Promise<void>(resolve => setTimeout(resolve, 300));
 
   const cap = (globalThis as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
@@ -49,6 +52,7 @@ async function registerPush(): Promise<void> {
       if (route) globalThis.location.href = route;
     });
     await PushNotifications.register();
+    pushRegistered = true;
   } catch {
     // Capacitor not available in this environment — no-op
   }
@@ -56,6 +60,7 @@ async function registerPush(): Promise<void> {
 
 export function PushRegistrar() {
   useEffect(() => {
+    void registerPush(); // register immediately — handles already-authenticated users and cold-start notification taps
     function onAuthChanged() { void registerPush(); }
     globalThis.window?.addEventListener('waiter-auth-changed', onAuthChanged);
     return () => globalThis.window?.removeEventListener('waiter-auth-changed', onAuthChanged);
