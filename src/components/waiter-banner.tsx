@@ -123,8 +123,9 @@ export function WaiterBanner() {
   const [unlocking, setUnlocking]     = useState(false);
 
   // Waiter auth — independent of mesa selection
-  const [isWaiter, setIsWaiter]       = useState(false);
-  const [authChecked, setAuthChecked] = useState(false);
+  // Seed from sessionStorage so full-page SW cache loads don't flash-hide the banner.
+  const [isWaiter, setIsWaiter]       = useState(() => sessionStorage.getItem('waiter-authed') === '1');
+  const [authChecked, setAuthChecked] = useState(() => sessionStorage.getItem('waiter-authed') === '1');
 
   // Kitchen/bar badge counts
   const [counts, setCounts] = useState<CountsPayload | null>(null);
@@ -136,6 +137,15 @@ export function WaiterBanner() {
   const [loadingMesas, setLoadingMesas]   = useState(false);
   const [switchingId, setSwitchingId]     = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Sync isWaiter to sessionStorage so remounts (SW full-page cache loads) start correctly.
+  useEffect(() => {
+    if (isWaiter) {
+      sessionStorage.setItem('waiter-authed', '1');
+    } else {
+      sessionStorage.removeItem('waiter-authed');
+    }
+  }, [isWaiter]);
 
   // Check waiter auth on mount and path change
   // Skip fetch when offline — network errors are not auth failures.
