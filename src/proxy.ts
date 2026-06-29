@@ -16,8 +16,15 @@ function getAdminTokenSecret(): string | undefined {
 function isAllowedOrigin(origin: string | null): boolean {
   if (!origin) return false;
 
-  // Capacitor native WebView origin — our own APK, always allowed
-  if (origin === 'capacitor://localhost' || origin === 'ionic://localhost') return true;
+  // Capacitor native WebView origin — our own APK, always allowed.
+  // Capacitor v5+ Android uses androidScheme: 'https' by default → Origin: https://localhost
+  // Older versions or explicit config may send capacitor://localhost or ionic://localhost
+  if (
+    origin === 'https://localhost' ||
+    origin === 'http://localhost' ||
+    origin === 'capacitor://localhost' ||
+    origin === 'ionic://localhost'
+  ) return true;
 
   if (process.env.NODE_ENV !== 'production') {
     if (origin.startsWith('http://localhost:')) return true;
