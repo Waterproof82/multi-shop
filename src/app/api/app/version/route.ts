@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 
-const VERSION = process.env.APP_VERSION ?? '1.0.8';
-const parsed = parseInt(process.env.APP_VERSION_CODE ?? '9', 10);
+const VERSION = process.env.APP_VERSION ?? '1.0.9';
+const parsed = parseInt(process.env.APP_VERSION_CODE ?? '10', 10);
 const VERSION_CODE = Number.isNaN(parsed) ? 1 : parsed;
 const APK_PATH = `waiter-${VERSION_CODE}.apk`;
 

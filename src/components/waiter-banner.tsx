@@ -416,9 +416,6 @@ export function WaiterBanner() {
   // Not a waiter at all → hide everything
   if (!isWaiter) return null;
 
-  // PIN login page — banner not needed here, waiter hasn't entered yet
-  if (pathname === '/waiter') return null;
-
   // Admin/superadmin panels are never waiter context
   if (pathname.startsWith('/admin') || pathname.startsWith('/superadmin')) return null;
 
