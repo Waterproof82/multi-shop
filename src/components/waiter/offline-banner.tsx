@@ -2,13 +2,21 @@
 
 import { useEffect, useState } from 'react';
 
+// Ping the server until it responds, then reload to get fresh data.
+// Retries every 2s — handles Android firing 'online' before network is stable.
+function reloadWhenReady() {
+  fetch('/api/waiter/me', { cache: 'no-store' })
+    .then(() => { globalThis.location.reload(); })
+    .catch(() => { setTimeout(reloadWhenReady, 2000); });
+}
+
 export function OfflineBanner() {
   const [isOffline, setIsOffline] = useState(false);
 
   useEffect(() => {
     setIsOffline(!navigator.onLine);
     const onOffline = () => setIsOffline(true);
-    const onOnline = () => { setIsOffline(false); globalThis.location.reload(); };
+    const onOnline = () => { setIsOffline(false); reloadWhenReady(); };
     window.addEventListener('offline', onOffline);
     window.addEventListener('online', onOnline);
     return () => {
