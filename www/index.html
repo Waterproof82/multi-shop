@@ -146,6 +146,32 @@
     window.location.href = target;
   }
 
+  async function registerFcmToken(domain, role, empresaId) {
+    if (!window.Capacitor || !window.Capacitor.Plugins) return;
+    var Push = window.Capacitor.Plugins.PushNotifications;
+    if (!Push) return;
+    try {
+      var perm = await Push.checkPermissions();
+      if (perm.receive !== 'granted') await Push.requestPermissions();
+      await new Promise(function(resolve) {
+        var timeout = setTimeout(resolve, 5000); // max 5s wait
+        Push.addListener('registration', function(event) {
+          clearTimeout(timeout);
+          fetch('https://' + domain + '/api/app/device-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fcm_token: event.value, role: role, empresa_id: empresaId }),
+          }).catch(function() {}).finally(resolve);
+        });
+        Push.addListener('registrationError', function() {
+          clearTimeout(timeout);
+          resolve();
+        });
+        Push.register();
+      });
+    } catch (e) { /* non-fatal */ }
+  }
+
   async function checkSavedConfig() {
     if (!window.Capacitor) { showSetupForm(); return; }
 
@@ -161,16 +187,20 @@
       var domainRes    = await Preferences.get({ key: 'domain' });
       var roleRes      = await Preferences.get({ key: 'role' });
       var pushRouteRes = await Preferences.get({ key: 'push_route' });
+      var empresaIdRes = await Preferences.get({ key: 'empresa_id' });
 
       var domain    = domainRes.value;
       var role      = roleRes.value;
       var pushRoute = pushRouteRes.value;
+      var empresaId = empresaIdRes.value;
 
       if (domain && role) {
         if (pushRoute) {
           // Cold-start notification tap: consume and navigate directly to target screen
           await Preferences.remove({ key: 'push_route' });
         }
+        // Register FCM token while bridge is available (non-blocking for navigation)
+        if (empresaId) registerFcmToken(domain, role, empresaId);
         await navigateToPanel(domain, role, pushRoute || null);
         return;
       }

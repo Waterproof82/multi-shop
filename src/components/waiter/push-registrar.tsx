@@ -11,33 +11,26 @@ import type { PreferencesPlugin } from '@capacitor/preferences';
 // Realtime WebSocket already plays the sound/UI update.
 // Background / screen-off: Android FCM system shows the notification automatically.
 
+// Token registration happens in www/index.html (where the Capacitor bridge is available).
+// This function is kept as fallback for waiter-session re-registration.
 async function sendToken(fcmToken: string, Preferences: PreferencesPlugin): Promise<void> {
   const { value: role } = await Preferences.get({ key: 'role' });
   if (role !== 'waiter' && role !== 'kitchen') return;
-  try {
-    const res = await fetch('/api/waiter/device-token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ fcm_token: fcmToken, role }),
-    });
-    if (!res.ok) console.error('[push] device-token POST failed:', res.status, role);
-    else console.log('[push] device-token registered OK, role:', role);
-  } catch (err) {
-    console.error('[push] device-token fetch error:', err);
-  }
+  await fetch('/api/waiter/device-token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ fcm_token: fcmToken, role }),
+  }).catch(() => { /* non-fatal */ });
 }
 
 let listenersRegistered = false;
 
 async function registerPush(): Promise<void> {
-  globalThis.alert?.('[push] registerPush START');
   await new Promise<void>(resolve => setTimeout(resolve, 300));
 
   const cap = (globalThis as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
-  const isNative = cap?.isNativePlatform?.();
-  globalThis.alert?.('[push] isNativePlatform: ' + String(isNative));
-  if (!isNative) return;
+  if (!cap?.isNativePlatform?.()) return;
 
   try {
     const [{ PushNotifications }, { Preferences }] = await Promise.all([
@@ -63,15 +56,8 @@ async function registerPush(): Promise<void> {
           }
         }).catch(() => { /* ignore */ });
       });
-      await PushNotifications.addListener('registration', ({ value: fcmToken }) => {
-        console.log('[push] registration event received, token:', fcmToken.slice(0, 20));
-        globalThis.alert?.('[push] FCM token recibido: ' + fcmToken.slice(0, 30) + '...');
-        return sendToken(fcmToken, Preferences);
-      });
-      await PushNotifications.addListener('registrationError', (err) => {
-        console.error('[push] registrationError:', JSON.stringify(err));
-        globalThis.alert?.('[push] registrationError: ' + JSON.stringify(err));
-      });
+      await PushNotifications.addListener('registration', ({ value: fcmToken }) => sendToken(fcmToken, Preferences));
+      await PushNotifications.addListener('registrationError', () => { /* non-fatal */ });
       // Fallback: if Capacitor ever fires this event, use it. Primary mechanism is the
       // native MainActivity.handleIntent path (onNewIntent → evaluateJavascript → push-navigate).
       await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
