@@ -7,6 +7,7 @@ import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.WindowManager;
+import android.webkit.CookieManager;
 import android.widget.Toast;
 
 import androidx.core.content.FileProvider;
@@ -36,6 +37,14 @@ public class MainActivity extends BridgeActivity {
         super.onNewIntent(intent);
         // Handle intents when app is already running (background -> foreground)
         handleIntent(intent);
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        // Flush WebView cookies to disk so they survive process kill.
+        // Without this, waiter_token cookie is lost → PIN prompt on every cold open.
+        CookieManager.getInstance().flush();
     }
 
     private void handleIntent(Intent intent) {
@@ -96,8 +105,10 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void checkForUpdate() {
-        final String domain = getSavedDomain();
-        if (domain == null) return; // not configured yet — skip update check
+        String saved = getSavedDomain();
+        // Fall back to build-time default (useful after data wipe before first setup)
+        final String domain = (saved != null) ? saved : BuildConfig.DEFAULT_DOMAIN;
+        if (domain == null || domain.isEmpty()) return;
 
         new Thread(() -> {
             try {

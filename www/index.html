@@ -128,10 +128,20 @@
   async function checkSavedConfig() {
     try {
       const { Preferences } = window.Capacitor.Plugins;
-      const { value: domain } = await Preferences.get({ key: 'domain' });
-      const { value: role } = await Preferences.get({ key: 'role' });
+      const [{ value: domain }, { value: role }, { value: pushRoute }] = await Promise.all([
+        Preferences.get({ key: 'domain' }),
+        Preferences.get({ key: 'role' }),
+        Preferences.get({ key: 'push_route' }),
+      ]);
       if (domain && role) {
-        await navigateToPanel(domain, role);
+        if (pushRoute) {
+          // Cold-start notification tap: consume the pending route and navigate directly
+          await Preferences.remove({ key: 'push_route' });
+          const path = pushRoute.startsWith('http') ? pushRoute : 'https://' + domain + pushRoute;
+          window.location.href = path;
+        } else {
+          await navigateToPanel(domain, role);
+        }
       }
     } catch (e) {
       // Capacitor not available (e.g. browser dev) — show setup form

@@ -47,10 +47,12 @@ async function registerPush(): Promise<void> {
     if (!listenersRegistered) {
       await PushNotifications.addListener('pushNotificationReceived', () => { /* no-op: Realtime handles foreground */ });
       await PushNotifications.addListener('registration', ({ value: fcmToken }) => sendToken(fcmToken, Preferences));
-      await PushNotifications.addListener('pushNotificationActionPerformed', (_action) => {
-        // DEBUG: hardcoded navigation to confirm the event fires at all.
-        // If this works, the issue was data extraction. If it still goes to /waiter, event is not firing.
-        globalThis.location.href = '/waiter/pendientes';
+      // Fallback: if Capacitor ever fires this event, use it. Primary mechanism is the
+      // native MainActivity.handleIntent path (onNewIntent → evaluateJavascript → push-navigate).
+      await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+        const data = action.notification?.data as Record<string, unknown> | undefined;
+        const route = (data?.route as string | undefined) ?? (data?.click_action as string | undefined);
+        if (route) { globalThis.location.href = route; }
       });
       listenersRegistered = true;
     }
@@ -77,9 +79,20 @@ async function registerPush(): Promise<void> {
 export function PushRegistrar() {
   useEffect(() => {
     void registerPush(); // register immediately — handles already-authenticated users and cold-start notification taps
+
     function onAuthChanged() { void registerPush(); }
+    // Background→foreground: MainActivity.handleIntent fires push-navigate CustomEvent via evaluateJavascript
+    function onPushNavigate(e: Event) {
+      const route = (e as CustomEvent<string>).detail;
+      if (route) { globalThis.location.href = route; }
+    }
+
     globalThis.window?.addEventListener('waiter-auth-changed', onAuthChanged);
-    return () => globalThis.window?.removeEventListener('waiter-auth-changed', onAuthChanged);
+    globalThis.window?.addEventListener('push-navigate', onPushNavigate);
+    return () => {
+      globalThis.window?.removeEventListener('waiter-auth-changed', onAuthChanged);
+      globalThis.window?.removeEventListener('push-navigate', onPushNavigate);
+    };
   }, []);
 
   return null;
