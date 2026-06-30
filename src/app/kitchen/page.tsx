@@ -25,12 +25,12 @@ const TEXT_MAIN = 'oklch(92% 0.02 252)';
 const TEXT_DIM  = 'oklch(55% 0.04 252)';
 
 const TIME_COLORS = [
-  { max: 10,       bg: 'oklch(18% 0.06 228)', border: 'oklch(50% 0.22 228 / 0.55)' },
-  { max: 20,       bg: 'oklch(19% 0.09 168)', border: 'oklch(52% 0.26 168 / 0.55)' },
-  { max: 30,       bg: 'oklch(22% 0.14 100)', border: 'oklch(56% 0.28 100 / 0.55)' },
-  { max: 45,       bg: 'oklch(24% 0.18 68)',  border: 'oklch(58% 0.30 68  / 0.60)' },
-  { max: 60,       bg: 'oklch(24% 0.20 35)',  border: 'oklch(58% 0.33 35  / 0.65)' },
-  { max: Infinity, bg: 'oklch(22% 0.22 16)',  border: 'oklch(56% 0.36 16  / 0.70)' },
+  { max: 10,       label: '< 10 min',  bg: 'oklch(18% 0.06 228)', border: 'oklch(50% 0.22 228 / 0.55)', text: 'oklch(72% 0.20 228)' },
+  { max: 20,       label: '10 – 20 m', bg: 'oklch(19% 0.09 168)', border: 'oklch(52% 0.26 168 / 0.55)', text: 'oklch(74% 0.24 168)' },
+  { max: 30,       label: '20 – 30 m', bg: 'oklch(22% 0.14 100)', border: 'oklch(56% 0.28 100 / 0.55)', text: 'oklch(78% 0.26 100)' },
+  { max: 45,       label: '30 – 45 m', bg: 'oklch(24% 0.18 68)',  border: 'oklch(58% 0.30 68  / 0.60)', text: 'oklch(80% 0.28 68)'  },
+  { max: 60,       label: '45 – 60 m', bg: 'oklch(24% 0.20 35)',  border: 'oklch(58% 0.33 35  / 0.65)', text: 'oklch(80% 0.30 35)'  },
+  { max: Infinity, label: '60+ min',   bg: 'oklch(22% 0.22 16)',  border: 'oklch(56% 0.36 16  / 0.70)', text: 'oklch(78% 0.34 16)'  },
 ];
 const COUNTDOWN_COLOR = { bg: 'oklch(24% 0.18 148)', border: 'oklch(55% 0.28 148 / 0.65)' };
 const EN_PREP_BORDER  = 'oklch(80% 0.32 142)'; // bright lime — overrides time border when en_preparacion
@@ -436,7 +436,8 @@ export default function KitchenPage() {
     <div className="min-h-screen flex flex-col" style={{ background: BG, color: TEXT_MAIN }}>
 
       {/* Header */}
-      <div className="sticky top-0 z-20 px-4 pt-4 pb-3 flex items-center gap-3" style={{ background: BG, borderBottom: '1px solid oklch(28% 0.06 252 / 0.5)' }}>
+      <div className="sticky top-0 z-20 flex flex-col" style={{ background: BG, borderBottom: '1px solid oklch(28% 0.06 252 / 0.5)' }}>
+      <div className="px-4 pt-4 pb-2 flex items-center gap-3">
         <div className="flex items-center justify-center w-9 h-9 rounded-xl" style={{ background: 'oklch(26% 0.12 252)' }}>
           <UtensilsCrossed className="w-5 h-5" style={{ color: 'oklch(72% 0.18 252)' }} />
         </div>
@@ -489,6 +490,20 @@ export default function KitchenPage() {
             Salir
           </button>
         </div>
+      </div>
+      {/* Time legend */}
+      <div className="flex flex-wrap gap-1 px-4 pb-2">
+        {TIME_COLORS.map(c => (
+          <span key={c.label} className="rounded px-1.5 py-0.5 text-[10px] font-medium"
+            style={{ background: c.bg, color: c.text, border: `1px solid ${c.border}` }}>
+            {c.label}
+          </span>
+        ))}
+        <span className="rounded px-1.5 py-0.5 text-[10px] font-medium"
+          style={{ background: 'oklch(16% 0.04 142)', color: EN_PREP_BORDER, border: `1px solid ${EN_PREP_BORDER}66` }}>
+          En prep.
+        </span>
+      </div>
       </div>
 
       {/* Body */}
