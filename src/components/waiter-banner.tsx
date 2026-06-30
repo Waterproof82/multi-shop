@@ -431,6 +431,7 @@ export function WaiterBanner() {
   if (pathname.startsWith('/admin') || pathname.startsWith('/superadmin')) return null;
 
   // Kitchen page has its own header — don't render the waiter banner there
+  if (pathname.startsWith('/kitchen')) return null;
 
   // Tracking page is customer-facing — never show the waiter banner there
   if (pathname.startsWith('/tracking/')) return null;
