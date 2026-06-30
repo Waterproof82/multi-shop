@@ -465,59 +465,8 @@ export default function KitchenPage() {
           </div>
         )}
 
-        {/* Global grouped view */}
-        {globalGrouped && activeItems.length > 0 && (
-          <div className="flex flex-col gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: TEXT_DIM }}>Todos los ítems</span>
-            {mergeByName(activeItems).map(merged => {
-              const isEnPrep  = merged.estado === 'en_preparacion';
-              const elapsed   = getElapsedMinutes(merged.firstCreatedAt);
-              const cardColor = isEnPrep ? EN_PREP_COLOR : getTimeColor(elapsed);
-              return (
-                <div
-                  key={merged.mergeKey}
-                  className="relative w-full rounded-xl overflow-hidden select-none"
-                  style={{ background: cardColor.bg, border: `1px solid ${cardColor.border}`, touchAction: 'pan-y', willChange: 'transform' }}
-                  onPointerDown={e => handlePointerDown(e, merged.mergeKey)}
-                  onPointerMove={e => handlePointerMove(e, merged.mergeKey)}
-                  onPointerUp={e => handlePointerUpMerged(e, merged)}
-                  onPointerCancel={handlePointerCancel}
-                >
-                  <div data-hint-fwd="" className="absolute inset-0 flex items-center justify-end px-3 rounded-xl pointer-events-none"
-                    style={{ opacity: 0, background: isEnPrep ? COUNTDOWN_COLOR.bg : EN_PREP_COLOR.bg, transition: 'opacity 0.1s' }}>
-                    <span className="text-[10px] font-bold" style={{ color: isEnPrep ? 'oklch(78% 0.22 148)' : 'oklch(82% 0.24 90)' }}>
-                      {isEnPrep ? `\u2713 ${t('kitchenItemListo', lang)}` : `\u2192 ${t('orderStatusAnotado', lang)}`}
-                    </span>
-                  </div>
-                  {isEnPrep && (
-                    <div data-hint-bck="" className="absolute inset-0 flex items-center px-3 rounded-xl pointer-events-none"
-                      style={{ opacity: 0, transition: 'opacity 0.1s' }}>
-                      <span className="text-[10px] font-bold" style={{ color: 'oklch(68% 0.18 240)' }}>
-                        {`\u2190 ${t('orderStatusPending', lang)}`}
-                      </span>
-                    </div>
-                  )}
-                  <div data-card-content="" className="flex items-center gap-3 px-4 py-4" style={{ background: cardColor.bg }}>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-1.5">
-                        <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{merged.totalCantidad}&times;</span>
-                        <span className="text-sm font-medium truncate" style={{ color: TEXT_MAIN }}>{merged.nombre}</span>
-                      </div>
-                      {merged.complementos && <span className="text-[10px]" style={{ color: 'oklch(78% 0.03 252)' }}>({merged.complementos})</span>}
-                    </div>
-                    <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold"
-                      style={isEnPrep ? { background: 'oklch(32% 0.16 90 / 0.5)', color: 'oklch(82% 0.20 90)' } : { background: 'oklch(30% 0.10 252 / 0.4)', color: 'oklch(75% 0.12 252)' }}>
-                      {isEnPrep ? t('orderStatusAnotado', lang) : t('orderStatusPending', lang)}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Per-order / per-mesa view */}
-        {!globalGrouped && Array.from(grouped.entries()).map(([groupKey, group]) => {
+        {/* Per-order view */}
+        {Array.from(grouped.entries()).map(([groupKey, group]) => {
           const isOrderGroup = groupBy === 'order';
           const numeroPedido: number | null = 'numeroPedido' in group ? group.numeroPedido : null;
           const createdAt: string = 'createdAt' in group ? group.createdAt : group.firstCreatedAt;
