@@ -4,7 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
-import { UtensilsCrossed, Layers } from 'lucide-react';
+import { UtensilsCrossed, LogOut } from 'lucide-react';
 import type { ItemEstado } from '@/core/domain/repositories/IPedidoRepository';
 
 interface KitchenItem {
@@ -136,15 +136,15 @@ function CountdownCard({ item, remaining, lang, onCancelCountdown }: Readonly<Co
   return (
     <div className="relative rounded-xl overflow-hidden select-none"
       style={{ background: COUNTDOWN_COLOR.bg, border: `1px solid ${COUNTDOWN_COLOR.border}`, touchAction: 'pan-y' }}>
-      <div data-card-content="" className="flex items-center gap-3 px-3 py-2.5" style={{ background: COUNTDOWN_COLOR.bg }}>
+      <div data-card-content="" className="flex items-center gap-3 px-4 py-4" style={{ background: COUNTDOWN_COLOR.bg }}>
         <div className="shrink-0 flex items-center justify-center w-9 h-9 rounded-full text-base font-bold"
           style={{ background: 'oklch(32% 0.20 148)', color: 'oklch(80% 0.22 148)', border: '2px solid oklch(55% 0.28 148 / 0.7)' }}>
           {remaining}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-1.5">
-            <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{item.cantidad}&times;</span>
-            <span className="text-xs font-medium truncate" style={{ color: TEXT_MAIN }}>{item.nombre}</span>
+            <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{item.cantidad}&times;</span>
+            <span className="text-sm font-medium truncate" style={{ color: TEXT_MAIN }}>{item.nombre}</span>
           </div>
           {item.complementos && <span className="text-[10px]" style={{ color: 'oklch(78% 0.03 252)' }}>({item.complementos})</span>}
         </div>
@@ -186,11 +186,11 @@ function SwipeCard({ item, lang, onPointerDown, onPointerMove, onPointerUp, onPo
           </span>
         </div>
       )}
-      <div data-card-content="" className="flex items-center gap-3 px-3 py-2.5" style={{ background: color.bg }}>
+      <div data-card-content="" className="flex items-center gap-3 px-4 py-4" style={{ background: color.bg }}>
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-1.5">
-            <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{item.cantidad}&times;</span>
-            <span className="text-xs font-medium truncate" style={{ color: TEXT_MAIN }}>{item.nombre}</span>
+            <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{item.cantidad}&times;</span>
+            <span className="text-sm font-medium truncate" style={{ color: TEXT_MAIN }}>{item.nombre}</span>
           </div>
           {item.complementos && <span className="text-[10px]" style={{ color: 'oklch(78% 0.03 252)' }}>({item.complementos})</span>}
         </div>
@@ -218,8 +218,7 @@ export default function KitchenPage() {
 
   const [items, setItems]                             = useState<KitchenItem[]>([]);
   const [countdowns, setCountdowns]                   = useState<Record<string, number>>({});
-  const [groupBy, setGroupBy]                         = useState<'order' | 'mesa'>('order');
-  const [globalGrouped, setGlobalGrouped]             = useState(false);
+  const [groupBy]                                     = useState<'order' | 'mesa'>('order');
   const [pendingMergedAction, setPendingMergedAction] = useState<{ items: KitchenItem[]; action: ItemEstado } | null>(null);
 
   const timersRef      = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
@@ -434,51 +433,25 @@ export default function KitchenPage() {
     <div className="min-h-screen flex flex-col" style={{ background: BG, color: TEXT_MAIN }}>
 
       {/* Header */}
-      <div className="sticky top-0 z-20 px-4 pt-4 pb-3" style={{ background: BG, borderBottom: '1px solid oklch(28% 0.06 252 / 0.5)' }}>
-        <div className="flex items-center gap-3 mb-3">
-          <div className="flex items-center justify-center w-8 h-8 rounded-xl" style={{ background: 'oklch(26% 0.12 252)' }}>
-            <UtensilsCrossed className="w-4 h-4" style={{ color: 'oklch(72% 0.18 252)' }} />
-          </div>
-          <span className="text-base font-bold" style={{ color: TEXT_MAIN }}>Cocina</span>
-          {activeItems.length > 0 && (
-            <span className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: 'oklch(26% 0.14 35)', color: 'oklch(78% 0.22 35)' }}>
-              {activeItems.length}
-            </span>
-          )}
+      <div className="sticky top-0 z-20 px-4 pt-4 pb-3 flex items-center gap-3" style={{ background: BG, borderBottom: '1px solid oklch(28% 0.06 252 / 0.5)' }}>
+        <div className="flex items-center justify-center w-9 h-9 rounded-xl" style={{ background: 'oklch(26% 0.12 252)' }}>
+          <UtensilsCrossed className="w-5 h-5" style={{ color: 'oklch(72% 0.18 252)' }} />
         </div>
-
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {/* Grouping buttons: Por pedido / Por mesa */}
-          {(['order', 'mesa'] as const).map(mode => (
-            <button
-              key={mode}
-              onClick={() => setGroupBy(mode)}
-              className="rounded-lg px-3 py-1.5 text-xs font-semibold"
-              style={groupBy === mode && !globalGrouped
-                ? { background: 'oklch(28% 0.10 252)', color: TEXT_MAIN, border: '1px solid oklch(50% 0.10 252 / 0.6)' }
-                : { background: 'oklch(20% 0.06 252)', color: TEXT_DIM, border: '1px solid oklch(32% 0.08 252 / 0.5)' }
-              }
-            >
-              {mode === 'order' ? 'Por pedido' : 'Por mesa'}
-            </button>
-          ))}
-
-          {/* Separator */}
-          <span style={{ width: 1, height: 18, background: 'oklch(38% 0.06 252 / 0.5)', margin: '0 2px', display: 'inline-block', alignSelf: 'center' }} />
-
-          <button
-            onClick={() => setGlobalGrouped(g => !g)}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold"
-            style={{
-              background: globalGrouped ? 'oklch(26% 0.14 252)' : 'oklch(20% 0.06 252)',
-              color:      globalGrouped ? 'oklch(75% 0.20 252)' : TEXT_DIM,
-              border: `1px solid ${globalGrouped ? 'oklch(52% 0.18 252 / 0.5)' : 'oklch(32% 0.08 252 / 0.5)'}`,
-            }}
-          >
-            <Layers className="w-3 h-3" />
-            Agrupar
-          </button>
-        </div>
+        <span className="text-lg font-bold" style={{ color: TEXT_MAIN }}>Cocina</span>
+        {activeItems.length > 0 && (
+          <span className="text-sm font-bold px-2.5 py-0.5 rounded-full" style={{ background: 'oklch(26% 0.14 35)', color: 'oklch(78% 0.22 35)' }}>
+            {activeItems.length}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => { void fetch('/api/waiter/logout', { method: 'POST' }).then(() => { globalThis.location.reload(); }); }}
+          className="ml-auto flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold"
+          style={{ background: 'oklch(20% 0.06 252)', color: TEXT_DIM, border: '1px solid oklch(32% 0.08 252 / 0.5)' }}
+        >
+          <LogOut className="w-4 h-4" />
+          Salir
+        </button>
       </div>
 
       {/* Body */}
@@ -524,11 +497,11 @@ export default function KitchenPage() {
                       </span>
                     </div>
                   )}
-                  <div data-card-content="" className="flex items-center gap-3 px-3 py-2.5" style={{ background: cardColor.bg }}>
+                  <div data-card-content="" className="flex items-center gap-3 px-4 py-4" style={{ background: cardColor.bg }}>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline gap-1.5">
-                        <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{merged.totalCantidad}&times;</span>
-                        <span className="text-xs font-medium truncate" style={{ color: TEXT_MAIN }}>{merged.nombre}</span>
+                        <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{merged.totalCantidad}&times;</span>
+                        <span className="text-sm font-medium truncate" style={{ color: TEXT_MAIN }}>{merged.nombre}</span>
                       </div>
                       {merged.complementos && <span className="text-[10px]" style={{ color: 'oklch(78% 0.03 252)' }}>({merged.complementos})</span>}
                     </div>
