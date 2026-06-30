@@ -14,12 +14,18 @@ import type { PreferencesPlugin } from '@capacitor/preferences';
 async function sendToken(fcmToken: string, Preferences: PreferencesPlugin): Promise<void> {
   const { value: role } = await Preferences.get({ key: 'role' });
   if (role !== 'waiter' && role !== 'kitchen') return;
-  await fetch('/api/waiter/device-token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ fcm_token: fcmToken, role }),
-  }).catch(() => { /* non-fatal */ });
+  try {
+    const res = await fetch('/api/waiter/device-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ fcm_token: fcmToken, role }),
+    });
+    if (!res.ok) console.error('[push] device-token POST failed:', res.status, role);
+    else console.log('[push] device-token registered OK, role:', role);
+  } catch (err) {
+    console.error('[push] device-token fetch error:', err);
+  }
 }
 
 let listenersRegistered = false;
@@ -37,12 +43,12 @@ async function registerPush(): Promise<void> {
     ]);
 
     const { receive: permStatus } = await PushNotifications.checkPermissions();
-    const granted =
-      permStatus === 'granted'
-        ? 'granted'
-        : (await PushNotifications.requestPermissions()).receive;
-
-    if (granted !== 'granted') return;
+    if (permStatus !== 'granted') {
+      // Best-effort request — on Android < 13, POST_NOTIFICATIONS is not a runtime
+      // permission and requestPermissions() may return a non-'granted' value even
+      // though the system grants notifications automatically. We proceed regardless.
+      await PushNotifications.requestPermissions();
+    }
 
     if (!listenersRegistered) {
       await PushNotifications.addListener('pushNotificationReceived', () => {
@@ -55,7 +61,10 @@ async function registerPush(): Promise<void> {
           }
         }).catch(() => { /* ignore */ });
       });
-      await PushNotifications.addListener('registration', ({ value: fcmToken }) => sendToken(fcmToken, Preferences));
+      await PushNotifications.addListener('registration', ({ value: fcmToken }) => {
+        console.log('[push] registration event received, token:', fcmToken.slice(0, 20));
+        return sendToken(fcmToken, Preferences);
+      });
       // Fallback: if Capacitor ever fires this event, use it. Primary mechanism is the
       // native MainActivity.handleIntent path (onNewIntent → evaluateJavascript → push-navigate).
       await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
