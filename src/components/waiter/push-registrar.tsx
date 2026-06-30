@@ -65,6 +65,9 @@ async function registerPush(): Promise<void> {
         console.log('[push] registration event received, token:', fcmToken.slice(0, 20));
         return sendToken(fcmToken, Preferences);
       });
+      await PushNotifications.addListener('registrationError', (err) => {
+        console.error('[push] registrationError:', JSON.stringify(err));
+      });
       // Fallback: if Capacitor ever fires this event, use it. Primary mechanism is the
       // native MainActivity.handleIntent path (onNewIntent → evaluateJavascript → push-navigate).
       await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
