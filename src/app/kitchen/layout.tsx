@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import { PushRegistrar } from '@/components/waiter/push-registrar';
+import { KitchenSwRegistrar } from '@/components/kitchen/sw-registrar';
+import { KitchenOfflineBanner } from '@/components/kitchen/offline-banner';
 
 export const metadata: Metadata = {
   other: {
@@ -13,6 +15,8 @@ export default function KitchenLayout({ children }: Readonly<{ children: React.R
   return (
     <>
       <PushRegistrar />
+      <KitchenSwRegistrar />
+      <KitchenOfflineBanner />
       {children}
     </>
   );
