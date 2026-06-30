@@ -24,6 +24,7 @@ function getNotificationContent(eventType: string): { title: string; body: strin
 function getNotificationRoute(eventType: string): string {
   if (eventType === 'new_order') return '/waiter/pendientes';
   if (eventType === 'item_ready') return '/waiter/kitchen?groupBy=listos';
+  if (eventType === 'order_validated' || eventType === 'item_released') return '/kitchen';
   return '/waiter';
 }
 

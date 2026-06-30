@@ -45,7 +45,16 @@ async function registerPush(): Promise<void> {
     if (granted !== 'granted') return;
 
     if (!listenersRegistered) {
-      await PushNotifications.addListener('pushNotificationReceived', () => { /* no-op: Realtime handles foreground */ });
+      await PushNotifications.addListener('pushNotificationReceived', () => {
+        // Waiter: no-op — Realtime WebSocket handles foreground updates.
+        // Kitchen: play bell + signal the kitchen page to refresh.
+        Preferences.get({ key: 'role' }).then(({ value: role }) => {
+          if (role === 'kitchen') {
+            try { const a = new Audio('/bell.mp3'); a.volume = 0.7; void a.play(); } catch { /* ignore */ }
+            globalThis.window?.dispatchEvent(new CustomEvent('kitchen-push-received'));
+          }
+        }).catch(() => { /* ignore */ });
+      });
       await PushNotifications.addListener('registration', ({ value: fcmToken }) => sendToken(fcmToken, Preferences));
       // Fallback: if Capacitor ever fires this event, use it. Primary mechanism is the
       // native MainActivity.handleIntent path (onNewIntent → evaluateJavascript → push-navigate).

@@ -244,6 +244,13 @@ export default function KitchenPage() {
     } catch { /* ignore */ }
   }, []);
 
+  // Push notification foreground: play bell + refresh (dispatched by PushRegistrar when role=kitchen)
+  useEffect(() => {
+    function onPushReceived() { void fetchItems(); }
+    globalThis.window?.addEventListener('kitchen-push-received', onPushReceived);
+    return () => globalThis.window?.removeEventListener('kitchen-push-received', onPushReceived);
+  }, [fetchItems]);
+
   // Realtime: react to changes in pedido_item_estados + new pedidos
   useEffect(() => {
     void fetchItems();
