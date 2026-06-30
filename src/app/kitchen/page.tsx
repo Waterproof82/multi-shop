@@ -33,7 +33,7 @@ const TIME_COLORS = [
   { max: Infinity, bg: 'oklch(22% 0.22 16)',  border: 'oklch(56% 0.36 16  / 0.70)' },
 ];
 const COUNTDOWN_COLOR = { bg: 'oklch(24% 0.18 148)', border: 'oklch(55% 0.28 148 / 0.65)' };
-const EN_PREP_COLOR   = { bg: 'oklch(28% 0.22 90)',  border: 'oklch(62% 0.30 90  / 0.65)' };
+const EN_PREP_BORDER  = 'oklch(80% 0.32 142)'; // bright lime — overrides time border when en_preparacion
 
 const THRESHOLD         = 80;
 const COUNTDOWN_SECONDS = 5;
@@ -71,8 +71,8 @@ interface MergedItem {
 
 function resolveCardColor(isCountdown: boolean, isEnPrep: boolean, elapsed: number) {
   if (isCountdown) return COUNTDOWN_COLOR;
-  if (isEnPrep) return EN_PREP_COLOR;
-  return getTimeColor(elapsed);
+  const timeColor = getTimeColor(elapsed);
+  return { bg: timeColor.bg, border: isEnPrep ? EN_PREP_BORDER : timeColor.border };
 }
 
 function notMatchingItem(pedidoId: string, itemIdx: number): (i: KitchenItem) => boolean {
@@ -163,17 +163,18 @@ function SwipeCard({ item, lang, onPointerDown, onPointerMove, onPointerUp, onPo
   const key      = makeKey(item.pedidoId, item.itemIdx);
   const isEnPrep = item.estado === 'en_preparacion';
   const elapsed  = getElapsedMinutes(item.createdAt);
-  const color    = isEnPrep ? EN_PREP_COLOR : getTimeColor(elapsed);
+  const timeColor = getTimeColor(elapsed);
+  const color    = { bg: timeColor.bg, border: isEnPrep ? EN_PREP_BORDER : timeColor.border };
   return (
     <div className="relative rounded-xl overflow-hidden select-none"
-      style={{ background: color.bg, border: `1px solid ${color.border}`, touchAction: 'pan-y', willChange: 'transform' }}
+      style={{ background: color.bg, border: `${isEnPrep ? 2 : 1}px solid ${color.border}`, boxShadow: isEnPrep ? `0 0 10px ${EN_PREP_BORDER}33` : undefined, touchAction: 'pan-y', willChange: 'transform' }}
       onPointerDown={e => onPointerDown(e, key)}
       onPointerMove={e => onPointerMove(e, key)}
       onPointerUp={e => onPointerUp(e, item)}
       onPointerCancel={onPointerCancel}
     >
       <div data-hint-fwd="" className="absolute inset-0 flex items-center justify-end px-3 rounded-xl pointer-events-none"
-        style={{ opacity: 0, background: isEnPrep ? COUNTDOWN_COLOR.bg : EN_PREP_COLOR.bg, transition: 'opacity 0.1s' }}>
+        style={{ opacity: 0, background: isEnPrep ? COUNTDOWN_COLOR.bg : 'oklch(28% 0.22 90)', transition: 'opacity 0.1s' }}>
         <span className="text-[10px] font-bold" style={{ color: isEnPrep ? 'oklch(78% 0.22 148)' : 'oklch(82% 0.24 90)' }}>
           {isEnPrep ? `\u2713 ${t('kitchenItemListo', lang)}` : `\u2192 ${t('orderStatusAnotado', lang)}`}
         </span>
@@ -508,14 +509,14 @@ export default function KitchenPage() {
           const color = resolveCardColor(false, isEnPrep, elapsed);
           return (
             <div key={merged.mergeKey} className="relative rounded-xl overflow-hidden select-none"
-              style={{ background: color.bg, border: `1px solid ${color.border}`, touchAction: 'pan-y', willChange: 'transform' }}
+              style={{ background: color.bg, border: `${isEnPrep ? 2 : 1}px solid ${color.border}`, boxShadow: isEnPrep ? `0 0 10px ${EN_PREP_BORDER}33` : undefined, touchAction: 'pan-y', willChange: 'transform' }}
               onPointerDown={e => handlePointerDown(e, merged.mergeKey)}
               onPointerMove={e => handlePointerMove(e, merged.mergeKey)}
               onPointerUp={e => handlePointerUpMerged(e, merged)}
               onPointerCancel={handlePointerCancel}
             >
               <div data-hint-fwd="" className="absolute inset-0 flex items-center justify-end px-3 rounded-xl pointer-events-none"
-                style={{ opacity: 0, background: isEnPrep ? COUNTDOWN_COLOR.bg : EN_PREP_COLOR.bg, transition: 'opacity 0.1s' }}>
+                style={{ opacity: 0, background: isEnPrep ? COUNTDOWN_COLOR.bg : 'oklch(28% 0.22 90)', transition: 'opacity 0.1s' }}>
                 <span className="text-[10px] font-bold" style={{ color: isEnPrep ? 'oklch(78% 0.22 148)' : 'oklch(82% 0.24 90)' }}>
                   {isEnPrep ? `✓ ${t('kitchenItemListo', lang)}` : `→ ${t('orderStatusAnotado', lang)}`}
                 </span>
