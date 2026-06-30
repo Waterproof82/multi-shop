@@ -605,7 +605,7 @@ export default function WaiterKitchenPage() {
         </div>
 
         {/* Card content — this div translates during drag */}
-        <div data-card-content="" className="relative flex items-center gap-3 px-3 py-2.5" style={{ background: cardColor.bg }}>
+        <div data-card-content="" className="relative flex items-center gap-3 px-3 py-3.5" style={{ background: cardColor.bg }}>
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline gap-1.5">
               <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{item.cantidad}×</span>
@@ -720,7 +720,7 @@ export default function WaiterKitchenPage() {
             {t('kitchenCancelSwipeHint', lang)}
           </span>
         </div>
-        <div data-card-content="" className="relative flex items-center gap-3 px-3 py-2.5" style={{ background: cardColor.bg }}>
+        <div data-card-content="" className="relative flex items-center gap-3 px-3 py-3.5" style={{ background: cardColor.bg }}>
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline gap-1.5">
               <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{merged.totalCantidad}×</span>
@@ -785,7 +785,7 @@ export default function WaiterKitchenPage() {
               <button
                 key={mode}
                 onClick={() => setGroupBy(mode)}
-                className="rounded px-3 py-1 text-[11px] font-semibold transition-colors"
+                className="rounded-lg px-4 py-2 text-xs font-semibold transition-colors"
                 style={isActive
                   ? { background: 'oklch(32% 0.10 252)', color: TEXT_MAIN, border: '1px solid oklch(50% 0.10 252 / 0.6)' }
                   : { background: 'transparent', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.4)' }
@@ -811,7 +811,7 @@ export default function WaiterKitchenPage() {
               <button
                 key={mode}
                 onClick={() => setGroupBy(mode)}
-                className="rounded px-3 py-1 text-[11px] font-semibold transition-colors"
+                className="rounded-lg px-4 py-2 text-xs font-semibold transition-colors"
                 style={isActive ? activeStyle : { background: 'transparent', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.4)' }}
               >
                 {label}
@@ -853,7 +853,7 @@ export default function WaiterKitchenPage() {
         </div>
       </div>
 
-      <div className="pt-[112px] px-3 pb-6">
+      <div className="pt-[120px] px-3 pb-6">
         {!hasAny && (
           <div className="text-center py-10 text-sm" style={{ color: TEXT_DIM }}>
             {t('kitchenEmpty', lang)}
@@ -988,7 +988,7 @@ export default function WaiterKitchenPage() {
                           disabled={isServing}
                           title={t('kitchenTodosServidos', lang)}
                           className="flex items-center justify-center rounded-lg disabled:opacity-50"
-                          style={{ width: 44, height: 32, background: 'oklch(26% 0.16 148)', color: 'oklch(80% 0.22 148)', border: '1px solid oklch(45% 0.22 148 / 0.6)' }}
+                          style={{ width: 44, height: 40, background: 'oklch(26% 0.16 148)', color: 'oklch(80% 0.22 148)', border: '1px solid oklch(45% 0.22 148 / 0.6)' }}
                         >
                           {isServing ? <span className="text-[10px]">…</span> : <CheckCheck className="w-4 h-4" />}
                         </button>
@@ -999,7 +999,7 @@ export default function WaiterKitchenPage() {
                           disabled={isLiberating}
                           title={t('kitchenLiberarPedidos', lang)}
                           className="flex items-center justify-center rounded-lg disabled:opacity-50"
-                          style={{ width: 44, height: 32, background: 'oklch(21% 0.10 65)', color: 'oklch(72% 0.18 65)', border: '1px solid oklch(50% 0.22 65 / 0.55)' }}
+                          style={{ width: 44, height: 40, background: 'oklch(21% 0.10 65)', color: 'oklch(72% 0.18 65)', border: '1px solid oklch(50% 0.22 65 / 0.55)' }}
                         >
                           {isLiberating ? <span className="text-[10px]">…</span> : <PlayCircle className="w-4 h-4" />}
                         </button>
@@ -1013,7 +1013,7 @@ export default function WaiterKitchenPage() {
                         title="Agrupar ítems"
                         className="flex items-center justify-center rounded-lg"
                         style={{
-                          width: 44, height: 32,
+                          width: 44, height: 40,
                           background: isGrouped ? 'oklch(28% 0.16 228)' : 'oklch(20% 0.04 252)',
                           color: isGrouped ? 'oklch(78% 0.20 228)' : TEXT_DIM,
                           border: isGrouped ? '1px solid oklch(50% 0.22 228 / 0.6)' : '1px solid oklch(35% 0.06 252 / 0.5)',
@@ -1076,7 +1076,7 @@ export default function WaiterKitchenPage() {
                             disabled={isServing}
                             title={t('kitchenTodosServidos', lang)}
                             className="flex items-center justify-center rounded-lg disabled:opacity-50"
-                            style={{ width: 44, height: 32, background: 'oklch(26% 0.16 148)', color: 'oklch(80% 0.22 148)', border: '1px solid oklch(45% 0.22 148 / 0.6)' }}
+                            style={{ width: 44, height: 40, background: 'oklch(26% 0.16 148)', color: 'oklch(80% 0.22 148)', border: '1px solid oklch(45% 0.22 148 / 0.6)' }}
                           >
                             {isServing ? <span className="text-[10px]">…</span> : <CheckCheck className="w-4 h-4" />}
                           </button>
@@ -1137,7 +1137,7 @@ export default function WaiterKitchenPage() {
                             disabled={isLiberating}
                             title={t('kitchenLiberarPedidos', lang)}
                             className="flex items-center justify-center rounded-lg disabled:opacity-50"
-                            style={{ width: 44, height: 32, background: 'oklch(21% 0.10 65)', color: 'oklch(72% 0.18 65)', border: '1px solid oklch(50% 0.22 65 / 0.55)' }}
+                            style={{ width: 44, height: 40, background: 'oklch(21% 0.10 65)', color: 'oklch(72% 0.18 65)', border: '1px solid oklch(50% 0.22 65 / 0.55)' }}
                           >
                             {isLiberating ? <span className="text-[10px]">…</span> : <PlayCircle className="w-4 h-4" />}
                           </button>

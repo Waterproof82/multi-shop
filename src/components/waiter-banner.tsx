@@ -514,7 +514,7 @@ export function WaiterBanner() {
 
   return (
     <>
-      <div aria-hidden className="h-12" />
+      <div aria-hidden className="h-14" />
       {closeError && (
         <div
           role="alert"
@@ -527,7 +527,7 @@ export function WaiterBanner() {
       <div
         role="status"
         aria-live="polite"
-        className="fixed top-0 left-0 right-0 z-[200] flex h-12 items-center justify-between px-4 shadow-lg"
+        className="fixed top-0 left-0 right-0 z-[200] flex h-14 items-center justify-between px-4 shadow-lg"
         style={{ background: BG, borderBottom: `1px solid ${BORDER}`, pointerEvents: 'all' }}
         onPointerDown={(e) => e.stopPropagation()}
       >
@@ -568,7 +568,7 @@ export function WaiterBanner() {
           {hasMesa && pathname !== '/waiter' && pathname !== '/waiter/pendientes' && pathname !== '/waiter/kitchen' && pathname !== '/waiter/bar' && (
             <button
               onClick={openCart}
-              className="relative flex items-center justify-center rounded-md p-2 transition-colors duration-150 min-h-[32px] min-w-[32px]"
+              className="relative flex items-center justify-center rounded-md p-2.5 transition-colors duration-150 min-h-[40px] min-w-[40px]"
               style={{ color: BTN_CART_TEXT, backgroundColor: BTN_CART_BG }}
               onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_CART_HOVER)}
               onMouseLeave={e => (e.currentTarget.style.backgroundColor = BTN_CART_BG)}
@@ -586,7 +586,7 @@ export function WaiterBanner() {
           {/* Llamadas — visual indicator only, no action */}
           {counts && (counts.llamadas ?? 0) > 0 && (
             <div
-              className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium min-h-[32px] pointer-events-none select-none"
+              className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium min-h-[40px] pointer-events-none select-none"
               style={{ color: BTN_LLAMADAS_TEXT, backgroundColor: BTN_LLAMADAS_BG }}
               aria-label="Llamadas de mesa"
             >
@@ -611,7 +611,7 @@ export function WaiterBanner() {
           {counts && counts.pendientes > 0 && (
             <button
               onClick={() => { globalThis.location.href = '/waiter/pendientes'; }}
-              className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150 min-h-[32px]"
+              className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px]"
               style={{ color: BTN_PENDIENTES_TEXT, backgroundColor: BTN_PENDIENTES_BG }}
               onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_PENDIENTES_HOVER)}
               onMouseLeave={e => (e.currentTarget.style.backgroundColor = BTN_PENDIENTES_BG)}
@@ -630,7 +630,7 @@ export function WaiterBanner() {
           {/* Kitchen — always visible for authenticated waiters */}
           <button
             onClick={() => { globalThis.location.href = '/waiter/kitchen'; }}
-            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150 min-h-[32px]"
+            className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px]"
             style={{ color: BTN_KITCHEN_TEXT, backgroundColor: BTN_KITCHEN_BG }}
             onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_KITCHEN_HOVER)}
             onMouseLeave={e => (e.currentTarget.style.backgroundColor = BTN_KITCHEN_BG)}
@@ -649,7 +649,7 @@ export function WaiterBanner() {
           {/* Bar — always visible for authenticated waiters */}
           <button
             onClick={() => { globalThis.location.href = '/waiter/bar'; }}
-            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150 min-h-[32px]"
+            className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px]"
             style={{ color: BTN_BAR_TEXT, backgroundColor: BTN_BAR_BG }}
             onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_BAR_HOVER)}
             onMouseLeave={e => (e.currentTarget.style.backgroundColor = BTN_BAR_BG)}
@@ -669,7 +669,7 @@ export function WaiterBanner() {
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={handleToggleDropdown}
-              className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150 min-h-[32px]"
+              className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px]"
               style={{ color: BTN_TABLE_TEXT, backgroundColor: BTN_TABLE_BG }}
               onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_TABLE_HOVER)}
               onMouseLeave={e => (e.currentTarget.style.backgroundColor = BTN_TABLE_BG)}
@@ -699,7 +699,7 @@ export function WaiterBanner() {
             <button
               onClick={handleUnlockPayment}
               disabled={unlocking}
-              className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150 min-h-[32px] disabled:opacity-40"
+              className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px] disabled:opacity-40"
               style={{ color: BTN_UNLOCK_TEXT, backgroundColor: BTN_UNLOCK_BG }}
               onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_UNLOCK_HOVER)}
               onMouseLeave={e => (e.currentTarget.style.backgroundColor = BTN_UNLOCK_BG)}
@@ -715,7 +715,7 @@ export function WaiterBanner() {
             <button
               onClick={handleCloseTable}
               disabled={closing}
-              className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150 min-h-[32px] disabled:opacity-40"
+              className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px] disabled:opacity-40"
               style={{ color: BTN_CLOSE_TEXT, backgroundColor: BTN_CLOSE_BG }}
               onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_CLOSE_HOVER)}
               onMouseLeave={e => (e.currentTarget.style.backgroundColor = BTN_CLOSE_BG)}
@@ -729,7 +729,7 @@ export function WaiterBanner() {
           {/* Logout */}
           <button
             onClick={handleLogout}
-            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150 min-h-[32px]"
+            className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px]"
             style={{ color: BTN_EXIT_TEXT, backgroundColor: BTN_EXIT_BG }}
             onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_EXIT_HOVER)}
             onMouseLeave={e => (e.currentTarget.style.backgroundColor = BTN_EXIT_BG)}

@@ -661,7 +661,7 @@ export default function BarPage() {
             </span>
           </div>
         </>)}
-        <div data-card-content="" className="relative flex items-center gap-3 px-3 py-2.5" style={{ background: cardColor.bg }}>
+        <div data-card-content="" className="relative flex items-center gap-3 px-3 py-3.5" style={{ background: cardColor.bg }}>
           {isCountdown ? (
             <>
               <div className="shrink-0 flex items-center justify-center w-9 h-9 rounded-full text-base font-bold"
@@ -721,7 +721,7 @@ export default function BarPage() {
             </span>
           </div>
         </>)}
-        <div data-card-content="" className="relative flex items-center gap-3 px-3 py-2.5" style={{ background: cardColor.bg }}>
+        <div data-card-content="" className="relative flex items-center gap-3 px-3 py-3.5" style={{ background: cardColor.bg }}>
           {renderMergedCardInner(anyCountdown, minRemaining, merged, lang, cancelCountdown)}
         </div>
       </div>
@@ -759,7 +759,7 @@ export default function BarPage() {
             const label = mode === 'order' ? t('kitchenGroupByOrder', lang) : t('kitchenGroupByTable', lang);
             return (
               <button key={mode} onClick={() => setGroupBy(mode)}
-                className="rounded px-3 py-1 text-[11px] font-semibold transition-colors"
+                className="rounded-lg px-4 py-2 text-xs font-semibold transition-colors"
                 style={isActive ? { background: 'oklch(32% 0.10 252)', color: TEXT_MAIN, border: '1px solid oklch(50% 0.10 252 / 0.6)' }
                   : { background: 'transparent', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.4)' }}>
                 {label}
@@ -867,7 +867,7 @@ export default function BarPage() {
         );
       })()}
 
-      <div className="pt-[112px] px-3 pb-6">
+      <div className="pt-[120px] px-3 pb-6">
         {!hasAnyContent && (
           <div className="text-center py-10 text-sm" style={{ color: TEXT_DIM }}>
             {t('barEmpty', lang)}

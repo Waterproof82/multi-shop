@@ -312,7 +312,7 @@ function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onClickListos, on
       {hasSession && (
         <button
           onClick={onViewTicket}
-          className="w-full rounded-lg px-2 py-1.5 flex items-center justify-center gap-1.5 hover:brightness-125 transition-all"
+          className="w-full rounded-lg px-3 py-2.5 flex items-center justify-center gap-1.5 hover:brightness-125 transition-all"
           style={{ background: 'oklch(18% 0.04 252 / 0.7)', border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
         >
           <ReceiptText className="w-3 h-3 shrink-0" style={{ color: 'oklch(62% 0.08 252)' }} />
@@ -326,7 +326,7 @@ function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onClickListos, on
       {!!mesa.sesionId && (mesa.activeOrderCount > 0 || mesa.clienteActivo) && !isPaymentInProgress && onCloseMesa && (
         <button
           onClick={onCloseMesa}
-          className="w-full rounded-lg px-2 py-1.5 flex items-center justify-center gap-1.5 hover:brightness-125 transition-all"
+          className="w-full rounded-lg px-3 py-2.5 flex items-center justify-center gap-1.5 hover:brightness-125 transition-all"
           style={{ background: 'oklch(18% 0.06 290 / 0.7)', border: '1px solid oklch(42% 0.14 290 / 0.5)' }}
         >
           <X className="w-3 h-3 shrink-0" style={{ color: 'oklch(68% 0.16 290)' }} />
@@ -662,7 +662,7 @@ export function WaiterLoginForm() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
           {mesas.map((mesa) => (
             <MesaCard
               key={mesa.id}
