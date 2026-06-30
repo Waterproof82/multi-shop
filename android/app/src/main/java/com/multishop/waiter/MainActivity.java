@@ -1,10 +1,13 @@
 package com.multishop.waiter;
 
 import android.app.AlertDialog;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.WindowManager;
 import android.webkit.CookieManager;
@@ -26,6 +29,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        createNotificationChannels();
         checkForUpdate();
 
         // Handle intent that launched the activity (cold start)
@@ -96,6 +100,23 @@ public class MainActivity extends BridgeActivity {
                 });
             }
         } catch (Exception ignored) { }
+    }
+
+    private void createNotificationChannels() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
+        NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (nm == null) return;
+
+        // High-priority channel for kitchen order alerts — shows heads-up popup + sound
+        NotificationChannel kitchen = new NotificationChannel(
+                "kitchen_alerts",
+                "Alertas de cocina",
+                NotificationManager.IMPORTANCE_HIGH
+        );
+        kitchen.setDescription("Notificaciones de pedidos entrantes en cocina");
+        kitchen.enableVibration(true);
+        kitchen.enableLights(true);
+        nm.createNotificationChannel(kitchen);
     }
 
     private String getSavedDomain() {

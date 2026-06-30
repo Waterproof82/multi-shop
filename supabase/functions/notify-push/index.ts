@@ -64,7 +64,16 @@ async function sendFcmMessage(
         message: {
           token,
           notification: { title, body },
-          android: { priority: 'HIGH' },
+          android: {
+            priority: 'HIGH',
+            notification: {
+              channel_id: 'kitchen_alerts',
+              notification_priority: 'PRIORITY_MAX',
+              default_sound: true,
+              default_vibrate_timings: true,
+              visibility: 'PUBLIC',
+            },
+          },
           data: { route },
         },
       }),
