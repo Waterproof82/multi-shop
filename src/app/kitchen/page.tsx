@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
@@ -222,10 +222,12 @@ export default function KitchenPage() {
   const [globalGrouped, setGlobalGrouped]             = useState(false);
   const [pendingMergedAction, setPendingMergedAction] = useState<{ items: KitchenItem[]; action: ItemEstado } | null>(null);
 
-  const timersRef     = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
-  const pointerStartX = useRef<number | null>(null);
-  const swipingKey    = useRef<string | null>(null);
-  const prevCountRef  = useRef<number | null>(null);
+  const timersRef      = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
+  const pointerStartX  = useRef<number | null>(null);
+  const swipingKey     = useRef<string | null>(null);
+  const prevCountRef   = useRef<number | null>(null);
+  const instanceId     = useId();
+  const channelNameRef = useRef(`kitchen-standalone-${instanceId}`);
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
@@ -249,21 +251,34 @@ export default function KitchenPage() {
     const supabase = getSupabaseAnonClient();
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
+    function scheduleRefresh() {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => { void fetchItems(); }, 100);
+    }
+
+    // postgres_changes — catches direct DB mutations (unique name avoids StrictMode stale-channel bug)
     const channel = supabase
-      .channel('kitchen-standalone')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados' }, () => {
-        if (debounceTimer) clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => { void fetchItems(); }, 100);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => {
-        if (debounceTimer) clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => { void fetchItems(); }, 100);
-      })
+      .channel(channelNameRef.current)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, scheduleRefresh)
+      .subscribe();
+
+    // Broadcast channels — fired by DB triggers; catches validation events that postgres_changes may miss
+    const broadcastItems = supabase
+      .channel('waiter-items-update')
+      .on('broadcast', { event: 'item-update' }, scheduleRefresh)
+      .subscribe();
+
+    const broadcastOrders = supabase
+      .channel('waiter-new-order-kitchen')
+      .on('broadcast', { event: 'new-order' }, scheduleRefresh)
       .subscribe();
 
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       void supabase.removeChannel(channel);
+      void supabase.removeChannel(broadcastItems);
+      void supabase.removeChannel(broadcastOrders);
     };
   }, [fetchItems]);
 
