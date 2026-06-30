@@ -43,11 +43,10 @@ async function registerPush(): Promise<void> {
     ]);
 
     const { receive: permStatus } = await PushNotifications.checkPermissions();
+    globalThis.alert?.('[push] checkPermissions: ' + permStatus);
     if (permStatus !== 'granted') {
-      // Best-effort request — on Android < 13, POST_NOTIFICATIONS is not a runtime
-      // permission and requestPermissions() may return a non-'granted' value even
-      // though the system grants notifications automatically. We proceed regardless.
-      await PushNotifications.requestPermissions();
+      const req = await PushNotifications.requestPermissions();
+      globalThis.alert?.('[push] requestPermissions result: ' + req.receive);
     }
 
     if (!listenersRegistered) {
@@ -63,10 +62,12 @@ async function registerPush(): Promise<void> {
       });
       await PushNotifications.addListener('registration', ({ value: fcmToken }) => {
         console.log('[push] registration event received, token:', fcmToken.slice(0, 20));
+        globalThis.alert?.('[push] FCM token recibido: ' + fcmToken.slice(0, 30) + '...');
         return sendToken(fcmToken, Preferences);
       });
       await PushNotifications.addListener('registrationError', (err) => {
         console.error('[push] registrationError:', JSON.stringify(err));
+        globalThis.alert?.('[push] registrationError: ' + JSON.stringify(err));
       });
       // Fallback: if Capacitor ever fires this event, use it. Primary mechanism is the
       // native MainActivity.handleIntent path (onNewIntent → evaluateJavascript → push-navigate).
