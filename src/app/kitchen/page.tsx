@@ -187,19 +187,20 @@ function SwipeCard({ item, lang, onPointerDown, onPointerMove, onPointerUp, onPo
         </div>
       )}
       <div data-card-content="" className="flex items-center gap-3 px-4 py-4" style={{ background: color.bg }}>
+        <div className="shrink-0 flex items-center justify-center w-9 h-9 rounded-full text-sm font-bold"
+          style={{ background: 'oklch(24% 0.08 252)', color: TEXT_MAIN, border: `1px solid ${color.border}` }}>
+          {item.cantidad}
+        </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{item.cantidad}&times;</span>
-            <span className="text-sm font-medium truncate" style={{ color: TEXT_MAIN }}>{item.nombre}</span>
-          </div>
+          <span className="text-sm font-medium truncate block" style={{ color: TEXT_MAIN }}>{item.nombre}</span>
           {item.complementos && <span className="text-[10px]" style={{ color: 'oklch(78% 0.03 252)' }}>({item.complementos})</span>}
         </div>
-        <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold shrink-0"
-          style={isEnPrep
-            ? { background: 'oklch(32% 0.16 90 / 0.5)', color: 'oklch(82% 0.20 90)' }
-            : { background: 'oklch(30% 0.10 252 / 0.4)', color: 'oklch(75% 0.12 252)' }}>
-          {isEnPrep ? t('orderStatusAnotado', lang) : t('orderStatusPending', lang)}
-        </span>
+        {isEnPrep && (
+          <span className="rounded px-1.5 py-0.5 text-[10px] font-bold shrink-0"
+            style={{ background: 'oklch(34% 0.20 90)', color: 'oklch(90% 0.22 90)', border: '1px solid oklch(55% 0.28 90 / 0.6)' }}>
+            En prep.
+          </span>
+        )}
       </div>
     </div>
   );
@@ -533,17 +534,21 @@ export default function KitchenPage() {
                   {merged.totalCantidad}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-sm font-medium truncate" style={{ color: TEXT_MAIN }}>{merged.nombre}</span>
-                  </div>
+                  <span className="text-sm font-medium truncate block" style={{ color: TEXT_MAIN }}>{merged.nombre}</span>
                   {merged.complementos && <span className="text-[10px]" style={{ color: 'oklch(78% 0.03 252)' }}>({merged.complementos})</span>}
                 </div>
-                <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold shrink-0"
-                  style={isEnPrep
-                    ? { background: 'oklch(32% 0.16 90 / 0.5)', color: 'oklch(82% 0.20 90)' }
-                    : { background: 'oklch(30% 0.10 252 / 0.4)', color: 'oklch(75% 0.12 252)' }}>
-                  {merged.items.length} {merged.items.length === 1 ? 'ítem' : 'ítems'}
-                </span>
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  {isEnPrep && (
+                    <span className="rounded px-1.5 py-0.5 text-[10px] font-bold"
+                      style={{ background: 'oklch(34% 0.20 90)', color: 'oklch(90% 0.22 90)', border: '1px solid oklch(55% 0.28 90 / 0.6)' }}>
+                      En preparación
+                    </span>
+                  )}
+                  <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                    style={{ background: 'oklch(30% 0.10 252 / 0.4)', color: 'oklch(75% 0.12 252)' }}>
+                    {merged.items.length} {merged.items.length === 1 ? 'ítem' : 'ítems'}
+                  </span>
+                </div>
               </div>
             </div>
           );
