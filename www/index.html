@@ -22,6 +22,7 @@
       padding: 32px 24px;
       width: 100%;
       max-width: 380px;
+      display: none;
     }
     h1 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
     p.subtitle { color: #94a3b8; font-size: 14px; margin-bottom: 28px; }
@@ -72,12 +73,16 @@
     .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
     .error { color: #f87171; font-size: 13px; margin-top: 12px; display: none; }
     .loading { display: none; color: #94a3b8; font-size: 14px; text-align: center; margin-top: 12px; }
+    #setup-form { display: none; }
+    #checking { color: #94a3b8; font-size: 14px; text-align: center; padding: 8px 0; }
   </style>
 </head>
 <body>
 <div class="card">
-  <h1>Configurar dispositivo</h1>
-  <p class="subtitle">Este setup solo se hace una vez. Los camareros usarán el PIN habitual.</p>
+  <div id="checking">Iniciando...</div>
+
+  <h1 style="display:none" id="setup-title">Configurar dispositivo</h1>
+  <p class="subtitle" style="display:none" id="setup-subtitle">Este setup solo se hace una vez. Los camareros usarán el PIN habitual.</p>
 
   <div id="setup-form">
     <label>Dominio del restaurante</label>
@@ -102,7 +107,7 @@
 </div>
 
 <script>
-  let selectedRole = 'waiter';
+  var selectedRole = 'waiter';
 
   function selectRole(role) {
     selectedRole = role;
@@ -111,7 +116,7 @@
   }
 
   function showError(msg) {
-    const el = document.getElementById('error-msg');
+    var el = document.getElementById('error-msg');
     el.textContent = msg;
     el.style.display = 'block';
   }
@@ -120,39 +125,65 @@
     document.getElementById('error-msg').style.display = 'none';
   }
 
-  async function navigateToPanel(domain, role) {
-    const path = role === 'kitchen' ? '/kitchen' : '/waiter';
-    window.location.href = 'https://' + domain + path;
+  function showCard() {
+    document.querySelector('.card').style.display = 'block';
+  }
+
+  function showSetupForm() {
+    showCard();
+    document.getElementById('checking').style.display = 'none';
+    document.getElementById('setup-title').style.display = 'block';
+    document.getElementById('setup-subtitle').style.display = 'block';
+    document.getElementById('setup-form').style.display = 'block';
+  }
+
+  async function navigateToPanel(domain, role, path) {
+    document.getElementById('checking').textContent = 'Cargando\u2026';
+    showCard();
+    var target = path
+      ? (path.startsWith('http') ? path : 'https://' + domain + path)
+      : 'https://' + domain + (role === 'kitchen' ? '/kitchen' : '/waiter');
+    window.location.href = target;
   }
 
   async function checkSavedConfig() {
+    if (!window.Capacitor) { showSetupForm(); return; }
+
+    // Poll up to 3s for Preferences plugin — bridge may not be ready immediately
+    var Preferences = null;
+    for (var i = 0; i < 30 && !Preferences; i++) {
+      Preferences = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Preferences;
+      if (!Preferences) await new Promise(function(r) { setTimeout(r, 100); });
+    }
+    if (!Preferences) { showSetupForm(); return; }
+
     try {
-      const { Preferences } = window.Capacitor.Plugins;
-      const [{ value: domain }, { value: role }, { value: pushRoute }] = await Promise.all([
-        Preferences.get({ key: 'domain' }),
-        Preferences.get({ key: 'role' }),
-        Preferences.get({ key: 'push_route' }),
-      ]);
+      var domainRes    = await Preferences.get({ key: 'domain' });
+      var roleRes      = await Preferences.get({ key: 'role' });
+      var pushRouteRes = await Preferences.get({ key: 'push_route' });
+
+      var domain    = domainRes.value;
+      var role      = roleRes.value;
+      var pushRoute = pushRouteRes.value;
+
       if (domain && role) {
         if (pushRoute) {
-          // Cold-start notification tap: consume the pending route and navigate directly
+          // Cold-start notification tap: consume and navigate directly to target screen
           await Preferences.remove({ key: 'push_route' });
-          const path = pushRoute.startsWith('http') ? pushRoute : 'https://' + domain + pushRoute;
-          window.location.href = path;
-        } else {
-          await navigateToPanel(domain, role);
         }
+        await navigateToPanel(domain, role, pushRoute || null);
+        return;
       }
-    } catch (e) {
-      // Capacitor not available (e.g. browser dev) — show setup form
-    }
+    } catch (e) { /* unexpected — fall through to setup form */ }
+
+    showSetupForm();
   }
 
   async function submitSetup() {
     hideError();
-    const domain = document.getElementById('domain').value.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
-    const email = document.getElementById('email').value.trim();
-    const password = document.getElementById('password').value;
+    var domain = document.getElementById('domain').value.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    var email = document.getElementById('email').value.trim();
+    var password = document.getElementById('password').value;
 
     if (!domain || !email || !password) {
       showError('Completá todos los campos');
@@ -163,37 +194,39 @@
     document.getElementById('loading-msg').style.display = 'block';
 
     try {
-      const res = await fetch('https://' + domain + '/api/app/setup/validate', {
+      var res = await fetch('https://' + domain + '/api/app/setup/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email, password: password }),
       });
 
-      const data = await res.json();
+      var data = await res.json();
 
       if (!res.ok) {
-        showError(data.error ?? 'Error al verificar credenciales');
+        showError(data.error || 'Error al verificar credenciales');
         return;
       }
 
-      if (window.Capacitor?.Plugins?.Preferences) {
-        const { Preferences } = window.Capacitor.Plugins;
-        await Preferences.set({ key: 'domain', value: domain });
-        await Preferences.set({ key: 'role', value: selectedRole });
-        await Preferences.set({ key: 'empresa_id', value: data.empresaId ?? '' });
+      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Preferences) {
+        var Prefs = window.Capacitor.Plugins.Preferences;
+        await Prefs.set({ key: 'domain', value: domain });
+        await Prefs.set({ key: 'role', value: selectedRole });
+        await Prefs.set({ key: 'empresa_id', value: data.empresaId || '' });
       }
 
-      await navigateToPanel(domain, selectedRole);
+      await navigateToPanel(domain, selectedRole, null);
     } catch (e) {
-      showError('No se pudo conectar con el servidor. Verificá el dominio e intentá de nuevo.');
+      var detail = (e instanceof Error) ? e.message : String(e);
+      showError('No se pudo conectar. Verificá el dominio e intentá de nuevo. (' + detail + ')');
     } finally {
       document.getElementById('submit-btn').disabled = false;
       document.getElementById('loading-msg').style.display = 'none';
     }
   }
 
-  // On load: check if already configured
-  document.addEventListener('DOMContentLoaded', checkSavedConfig);
+  // Use 'load' (not 'DOMContentLoaded') — Capacitor bridge and plugins
+  // are guaranteed to be available only after the full load event fires.
+  window.addEventListener('load', checkSavedConfig);
 </script>
 </body>
 </html>
