@@ -31,10 +31,13 @@ async function sendToken(fcmToken: string, Preferences: PreferencesPlugin): Prom
 let listenersRegistered = false;
 
 async function registerPush(): Promise<void> {
+  globalThis.alert?.('[push] registerPush START');
   await new Promise<void>(resolve => setTimeout(resolve, 300));
 
   const cap = (globalThis as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
-  if (!cap?.isNativePlatform?.()) return;
+  const isNative = cap?.isNativePlatform?.();
+  globalThis.alert?.('[push] isNativePlatform: ' + String(isNative));
+  if (!isNative) return;
 
   try {
     const [{ PushNotifications }, { Preferences }] = await Promise.all([
