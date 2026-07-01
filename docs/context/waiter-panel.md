@@ -72,7 +72,9 @@ Single entry point. Two-step flow managed by `WaiterLoginForm`:
 
 ### `/waiter/kitchen`
 
-In-app kitchen view. Shows all in-flight `comida` items across four filter modes.
+In-app kitchen view for the waiter. Shows all in-flight `comida` items across four filter modes.
+
+> **Important:** Different from `/kitchen` (standalone cook tablet). See [kitchen-screens.md](./kitchen-screens.md) for the full comparison.
 
 **States per item (swiped via pointer gestures):**
 
@@ -115,15 +117,33 @@ Swiping left on an `en_preparacion` item shows a **confirmation dialog** (the it
 **Per-mesa release button (shown in `Por mesa` and `Retenidos`):**
 - **Utensils button** (blue) — releases all kitchen-retenido (`from_validation = false`) items for the mesa back to `pendiente` in parallel.
 
+**Header:** Fixed (`position: fixed`) with `ResizeObserver` measuring actual height dynamically. Content gets `paddingTop: headerHeight` (state variable, updated by ResizeObserver). This prevents items being cut under the header when the time legend or filter row wrap unpredictably. Time legend uses `flex-nowrap overflow-x-auto` to avoid wrapping.
+
+**Item notes:** Each item shows a `nota` field as an amber pill below the item name. Items with the same name but different notes are kept as separate groups in the merge (key includes `nota`).
+
 ### `/waiter/bar`
 
-In-app bar view. Shows `bebida` items only. Same time-based color scheme and swipe mechanics.
+In-app bar view. Shows `bebida` items only. Same time-based color scheme, but **swipe semantics are different** — there are no intermediate states.
+
+> See [kitchen-screens.md](./kitchen-screens.md) for the full kitchen/bar screen comparison.
+
+**Swipe mechanics:**
+- Swipe **left** → 5-second countdown → marks item as `servido`
+- Swipe **right** → cancel/delete item (with confirmation dialog)
+
+There is no `en_preparacion` or `preparado` state in bar. Items are either pending or served.
 
 **Filter modes:**
 - `Por pedido` (default) — flat list, one group per order with table label. No collapse.
 - `Por mesa` — grouped by table. Collapsible per mesa (same Table2 / ChevronDown pattern as kitchen). A global ChevronsUpDown button is shown only in this mode.
 
-**Per-mesa "Todos servidos" button:** shown in the footer of each mesa card in `Por mesa` mode. Clicking opens a confirmation modal ("Se van a procesar como servidos todos los ítems de esta mesa"). On confirm, triggers individual 5-second countdown for every item in that mesa simultaneously.
+**Per-mesa "Todos servidos" button:** shown in the footer of each mesa card in `Por mesa` mode. Clicking opens a confirmation modal. On confirm, triggers individual 5-second countdown for every item in that mesa simultaneously.
+
+**Header:** Fixed with `ResizeObserver` → same dynamic `paddingTop` pattern as `/waiter/kitchen`.
+
+**Mixed orders (comida + bebida):** After all bebidas in a mixed order are served, the order estado becomes `anotado` (not `servido`) so the cook still sees the comida items.
+
+**Item notes:** Same amber pill display as `/waiter/kitchen`. Items with the same name but different notes are separate groups in the mesa merge.
 
 ---
 
@@ -312,7 +332,45 @@ All notification sounds use `public/bell.mp3` (replaces the old AudioContext osc
 
 ---
 
+## Item Notes (`nota`)
+
+Customers and waiters can attach a free-text note to each cart item (e.g. "sin cebolla", "poco hecho"). The note flows through the entire pipeline:
+
+```
+QuantitySelectorDialog (collapsible Textarea, max 500 chars)
+  → CartItem.note
+  → POST /api/pedidos (Zod: note: z.string().max(500).optional())
+  → PedidoUseCase → detalle_pedido.nota
+  → findWaiterKitchenItems / findBarOrders → KitchenItemRecord.nota / BarOrderItem.items[].nota
+  → displayed in /kitchen, /waiter/kitchen, /waiter/bar, /waiter/pendientes
+```
+
+### UI in the cart dialog
+
+A collapsible "Nota" button appears in `QuantitySelectorDialog` above the quantity selector. Collapsed by default. When expanded, shows a 2-row `Textarea`. When collapsed again with text, shows a truncated preview of the note on the button label.
+
+### Display in kitchen/bar
+
+Shown as an amber pill below the item name in `/kitchen`, `/waiter/kitchen`, and `/waiter/bar`:
+
+```tsx
+<span className="text-xs font-medium italic block mt-0.5 px-1.5 py-0.5 rounded"
+  style={{ color: 'oklch(88% 0.18 85)', background: 'oklch(28% 0.12 85 / 0.45)' }}>
+  ✎ {nota}
+</span>
+```
+
+In `/waiter/pendientes` notes appear in compact `text-[10px] italic` style (no pill background) to keep validation screen density.
+
+### Merge key includes nota
+
+Items with the same name but different notes stay as separate groups. Merge key: `nombre|complementos|nota|estado`.
+
+---
+
 ## Kitchen Page — Swipe Colors (`/kitchen`)
+
+> For a full comparison of `/kitchen` vs `/waiter/kitchen` vs `/waiter/bar`, see [kitchen-screens.md](./kitchen-screens.md).
 
 Swipe reveal backgrounds are color-coded by the transition direction:
 

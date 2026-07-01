@@ -266,6 +266,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           precio: ci.item?.price,
           cantidad: ci.quantity,
           complementos: ci.selectedComplements || [],
+          ...(ci.note ? { nota: ci.note } : {}),
         })),
         total: total,
         estado: 'pendiente',
@@ -521,7 +522,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
   async createMesaOrder(params: {
     empresaId: string;
     mesaId: string;
-    items: { nombre: string; cantidad: number; precio: number; tipo_producto?: string; translations?: unknown; complementos?: { nombre: string; precio: number }[] }[];
+    items: { nombre: string; cantidad: number; precio: number; tipo_producto?: string; translations?: unknown; complementos?: { nombre: string; precio: number }[]; nota?: string }[];
     total: number;
     trackingToken: string;
     sesionId: string | null;
@@ -556,6 +557,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           tipo_producto: item.tipo_producto ?? 'comida',
           translations: item.translations ?? null,
           complementos: item.complementos ?? [],
+          ...(item.nota ? { nota: item.nota } : {}),
         })),
         total: params.total,
         estado: params.initialEstado ?? 'pendiente',
@@ -1115,7 +1117,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         const hasComida = items.some(i => i['tipo_producto'] === 'comida');
 
         // Only include bebida items not yet marked servido and not in the pendientes queue (from_validation=true)
-        const bebidaItems: { nombre: string; cantidad: number; detallePedidoIdx: number }[] = [];
+        const bebidaItems: { nombre: string; cantidad: number; detallePedidoIdx: number; nota?: string }[] = [];
         items.forEach((item, fullIdx) => {
           const barItemEstado = pedidoEstados.get(fullIdx);
         if (
@@ -1124,7 +1126,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
             barItemEstado !== 'servido' &&
             barItemEstado !== 'cancelado'
           ) {
-            bebidaItems.push({ nombre: item['nombre'] as string, cantidad: item['cantidad'] as number, detallePedidoIdx: fullIdx });
+            bebidaItems.push({ nombre: item['nombre'] as string, cantidad: item['cantidad'] as number, detallePedidoIdx: fullIdx, nota: (item['nota'] as string | undefined) || undefined });
           }
         });
 
@@ -1221,6 +1223,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
             nombre: (item['nombre'] as string) ?? '',
             cantidad: item['cantidad'] as number,
             complementos: complements?.map(c => c.nombre ?? c.name).filter(Boolean).join(', '),
+            nota: (item['nota'] as string | undefined) || undefined,
             estado,
             mesaNumero: (mesaData['numero'] as number) ?? null,
             mesaNombre: (mesaData['nombre'] as string | null) ?? null,
@@ -1290,6 +1293,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         tipo: ((item['tipo_producto'] as string | undefined) ?? 'comida') as 'comida' | 'bebida',
         complementos: (item['complementos'] as Array<{ nombre?: string }> | undefined)
           ?.map(c => c.nombre ?? '').filter(Boolean).join(', '),
+        nota: (item['nota'] as string | undefined) || undefined,
       });
 
       for (const row of pedidos ?? []) {

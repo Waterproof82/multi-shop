@@ -15,6 +15,7 @@ interface KitchenItem {
   nombre: string;
   cantidad: number;
   complementos?: string;
+  nota?: string;
   estado: ItemEstado;
   mesaId?: string | null;
   mesaNumero: number | null;
@@ -93,6 +94,7 @@ interface MergedKitchenItem {
   mergeKey: string;
   nombre: string;
   complementos?: string;
+  nota?: string;
   totalCantidad: number;
   representativeEstado: ItemEstado;
   firstCreatedAt: string;
@@ -102,13 +104,14 @@ interface MergedKitchenItem {
 function groupKitchenMesaItems(items: KitchenItem[]): MergedKitchenItem[] {
   const map = new Map<string, MergedKitchenItem>();
   for (const item of items) {
-    // Include estado in key: same name but different estado stays separate
-    const key = `${item.nombre}|${item.complementos ?? ''}|${item.estado}`;
+    // Include estado and nota in key: same name but different estado/nota stays separate
+    const key = `${item.nombre}|${item.complementos ?? ''}|${item.nota ?? ''}|${item.estado}`;
     if (!map.has(key)) {
       map.set(key, {
         mergeKey: key,
         nombre: item.nombre,
         complementos: item.complementos,
+        nota: item.nota,
         totalCantidad: 0,
         representativeEstado: item.estado,
         firstCreatedAt: item.createdAt,
@@ -238,6 +241,8 @@ export default function WaiterKitchenPage() {
   const channelNameRef = useRef(`waiter-kitchen-${Math.random().toString(36).slice(2)}`);
   const pointerStartX = useRef<number | null>(null);
   const swipingKey    = useRef<string | null>(null);
+  const headerRef     = useRef<HTMLDivElement>(null);
+  const [headerHeight, setHeaderHeight] = useState(120);
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
   const fetchItems = useCallback(async () => {
@@ -317,6 +322,16 @@ export default function WaiterKitchenPage() {
   useEffect(() => {
     const tick = setInterval(() => setItems(p => [...p]), 1000);
     return () => clearInterval(tick);
+  }, []);
+
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => {
+      setHeaderHeight(entry.contentRect.height);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
   }, []);
 
   // Scroll to target mesa and collapse all others when arriving from grid with a mesa param
@@ -616,6 +631,9 @@ export default function WaiterKitchenPage() {
                 <span className="text-[10px]" style={{ color: 'oklch(78% 0.03 252)' }}>({item.complementos})</span>
               </div>
             )}
+            {item.nota && (
+              <span className="text-xs font-medium italic block mt-0.5 px-1.5 py-0.5 rounded" style={{ color: 'oklch(88% 0.18 85)', background: 'oklch(28% 0.12 85 / 0.45)' }}>✎ {item.nota}</span>
+            )}
           </div>
 
           <div className="shrink-0 flex items-center gap-2">
@@ -731,6 +749,9 @@ export default function WaiterKitchenPage() {
                 <span className="text-[10px]" style={{ color: 'oklch(78% 0.03 252)' }}>({merged.complementos})</span>
               </div>
             )}
+            {merged.nota && (
+              <span className="text-xs font-medium italic block mt-0.5 px-1.5 py-0.5 rounded" style={{ color: 'oklch(88% 0.18 85)', background: 'oklch(28% 0.12 85 / 0.45)' }}>✎ {merged.nota}</span>
+            )}
           </div>
           <div className="shrink-0">
             <span
@@ -750,6 +771,7 @@ export default function WaiterKitchenPage() {
     <div className="min-h-screen" style={{ background: BG }}>
       {/* Header */}
       <div
+        ref={headerRef}
         className="fixed top-0 left-0 right-0 z-10 shadow-lg"
         style={{ background: 'oklch(17% 0.025 252)', borderBottom: '1px solid oklch(42% 0.14 62 / 0.35)' }}
       >
@@ -764,7 +786,7 @@ export default function WaiterKitchenPage() {
           <span className="text-[10px]" style={{ color: TEXT_DIM }}>({nuevosItems.length + listosItems.length})</span>
         </div>
         {/* Row 2: time legend */}
-        <div className="flex flex-wrap gap-1 py-2 px-3">
+        <div className="flex flex-nowrap overflow-x-auto gap-1 py-2 px-3 scrollbar-none" style={{ scrollbarWidth: 'none' }}>
           {TIME_COLORS.map((c) => (
             <span
               key={c.label}
@@ -776,7 +798,7 @@ export default function WaiterKitchenPage() {
           ))}
         </div>
         {/* Row 3: filter toggle */}
-        <div className="flex items-center gap-1 px-3 pb-2 flex-wrap">
+        <div className="flex items-center gap-1 px-3 pb-2 overflow-x-auto scrollbar-none" style={{ scrollbarWidth: 'none' }}>
           {/* Group: Por pedido / Por mesa */}
           {(['order', 'mesa'] as const).map(mode => {
             const isActive = groupBy === mode;
@@ -853,7 +875,7 @@ export default function WaiterKitchenPage() {
         </div>
       </div>
 
-      <div className="pt-[120px] px-3 pb-6">
+      <div className="px-3 pb-6" style={{ paddingTop: headerHeight }}>
         {!hasAny && (
           <div className="text-center py-10 text-sm" style={{ color: TEXT_DIM }}>
             {t('kitchenEmpty', lang)}

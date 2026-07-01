@@ -25,11 +25,13 @@ Plataforma **multi-tenant** de gestión de negocios de hostelería y retail. Cad
 - **Pago en mesa** vía Redsys TPV: pago total o división de cuenta entre 2 y 20 personas. Lock atómico (PostgreSQL `FOR UPDATE`) para pago total; división permite pagos simultáneos independientes mediante RPC transaccional. Verificación de total antes de pagar (detecta productos añadidos en el último momento). Idempotencia de webhook garantizada con update atómico `WHERE status='pending'`. Actualización en tiempo real vía Supabase Realtime.
 - **Registro manual de pagos** por el camarero (efectivo / pago externo) para desbloquear la sesión en escenarios de división.
 - **Gestión de pedidos takeaway** desde un entorno de chat de Telegram: con un solo botón se indica el tiempo de recogida (10, 15, 20, 30 o 45 minutos). El cliente recibe la notificación automáticamente en su pantalla de seguimiento, sin necesidad de llamar por teléfono.
-- **Gestión de pedidos en mesa (cocina y bar)** íntegramente en la app:
+- **Notas por ítem:** clientes y camareros pueden añadir una nota libre a cada producto del carrito ("sin cebolla", "punto medio", etc.). La nota viaja por todo el pipeline hasta las pantallas de cocina y bar, donde aparece como pill ámbar debajo del nombre.
+- **Gestión de pedidos en mesa (cocina y bar)** íntegramente en la app — tres pantallas especializadas:
+  - `/kitchen` — pantalla standalone para tablet en cocina. Sin login. Muestra ítems de comida con avance de estado por swipe (pendiente → en preparación → listo). Colores por tiempo de espera (azul → teal → ámbar → rojo).
+  - `/waiter/kitchen` — vista de cocina dentro del panel de camarero (PIN requerido). Añade filtros por Listos y Retenidos, retención de ítems por mesa, y release masivo. Timer arranca desde la validación, no desde el pedido original.
   - `/waiter/pendientes` — cola de validación: pedidos en `pendiente_validacion` que el camarero revisa antes de mandar a cocina/bar. Selección individual o por tipo (comida/bebida), pausa por ítem (→ kitchen retenido), envío conjunto comida+bebida en un solo tap.
-  - `/waiter/kitchen` — vista de cocina con todos los ítems de comida en curso, agrupados por pedido o por mesa. Colores por tiempo de espera (azul → teal → ámbar → rojo). Filtro "Listos" para servicio. Timer arranca desde la validación, no desde el pedido original.
-  - `/waiter/bar` — vista equivalente para bebidas.
-  - Los camareros deslizan cada ítem para avanzar su estado (`pendiente → en preparación → listo → servido`) con gestos de puntero.
+  - `/waiter/bar` — vista de bebidas para el camarero. Swipe directo a servido con countdown de 5 s. Botón "Todos servidos" por mesa.
+  - Los camareros deslizan cada ítem para avanzar su estado con gestos de puntero.
 
 ### 🤖 Notificaciones Telegram — dos modos de operación
 

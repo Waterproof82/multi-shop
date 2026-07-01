@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Plus, Minus, Check, Pause } from "lucide-react"
+import { Plus, Minus, Check, Pause, MessageSquarePlus, ChevronUp } from "lucide-react"
 import { getWaiterMesa } from "@/components/waiter-login-form"
 import {
   Dialog,
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { RippleButton } from "@/components/ui/ripple-button"
 import { useLanguage } from "@/lib/language-context"
 import { useCart } from "@/lib/cart-context"
@@ -32,6 +33,8 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
   const [selectedComplement, setSelectedComplement] = useState<ComplementVM | null>(null)
   const [addedAnimation, setAddedAnimation] = useState(false)
   const [isDeferred, setIsDeferred] = useState(false)
+  const [note, setNote] = useState('')
+  const [showNote, setShowNote] = useState(false)
   const { language } = useLanguage()
   const { addItem } = useCart()
 
@@ -60,13 +63,15 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
       if (item.requiresComplement && !selectedComplement) {
         return;
       }
-      addItem(item, quantity, selectedComplement ? [selectedComplement] : undefined, isDeferred || undefined);
+      addItem(item, quantity, selectedComplement ? [selectedComplement] : undefined, isDeferred || undefined, note.trim() || undefined);
       setAddedAnimation(true);
       setTimeout(() => {
         onOpenChange(false);
         setQuantity(1);
         setSelectedComplement(null);
         setIsDeferred(false);
+        setNote('');
+        setShowNote(false);
         setAddedAnimation(false);
       }, 300);
     }
@@ -81,8 +86,10 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
       setQuantity(1);
       setSelectedComplement(null);
       setIsDeferred(false);
+      setNote('');
+      setShowNote(false);
     }
-    
+
     previousOpenRef.current = open;
     previousItemIdRef.current = item?.id;
   }, [open, item]);
@@ -158,6 +165,33 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
         </div>
 
         <div className="border-t pt-4 space-y-3 shrink-0">
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => setShowNote(v => !v)}
+              className={`w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-all ${
+                showNote
+                  ? 'border-primary/40 bg-primary/5 text-primary'
+                  : 'border-border bg-muted/30 text-muted-foreground hover:text-foreground hover:bg-muted/60'
+              }`}
+            >
+              <MessageSquarePlus className={`w-3.5 h-3.5 shrink-0 transition-colors ${showNote ? 'text-primary' : ''}`} />
+              <span className="flex-1 text-left">{t("itemNote", language)}{note && !showNote ? ` · ${note.length > 30 ? note.slice(0, 30) + '…' : note}` : ''}</span>
+              <ChevronUp className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${showNote ? 'rotate-0' : 'rotate-180'}`} />
+            </button>
+            {showNote && (
+              <Textarea
+                id="item-note"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder={t("itemNotePlaceholder", language)}
+                className="resize-none text-sm"
+                rows={2}
+                maxLength={500}
+                autoFocus
+              />
+            )}
+          </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="quantity" className="text-right">
               {t("quantity", language)}

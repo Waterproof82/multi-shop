@@ -159,6 +159,7 @@ export interface PedidoItem {
   precio: number;
   cantidad: number;
   complementos?: PedidoComplemento[];
+  nota?: string;
 }
 
 export interface CartItem {
@@ -170,6 +171,7 @@ export interface CartItem {
   };
   quantity: number;
   selectedComplements?: { name: string; price: number }[];
+  note?: string;
 }
 
 export interface Pedido {

@@ -12,6 +12,7 @@ export interface CreatePedidoDTO {
     item: { id: string; name: string; price: number; translations?: { en?: { name: string }; fr?: { name: string }; it?: { name: string }; de?: { name: string } } };
     quantity: number;
     selectedComplements?: { id: string; name: string; price: number }[];
+    note?: string;
   }[];
   /** Client-supplied total is ignored — the server recalculates it from DB prices */
   total?: number;
@@ -483,6 +484,7 @@ export class PedidoUseCase {
         tipo_producto: tipoProductoMap.get(ci.item?.id ?? '') ?? 'comida',
         translations: ci.item?.translations,
         complementos: ci.selectedComplements?.map(c => ({ nombre: c.name, precio: c.price })) ?? [],
+        nota: ci.note || undefined,
       }));
 
       // Step 3: Ensure an active session exists (idempotent), then attach it to the order.
