@@ -1,4 +1,4 @@
-CREATE TABLE public.tpv_turnos (
+CREATE TABLE IF NOT EXISTS public.tpv_turnos (
   id                       UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   empresa_id               UUID        NOT NULL REFERENCES public.empresas(id) ON DELETE CASCADE,
   user_id                  UUID        NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id),
@@ -15,8 +15,8 @@ CREATE TABLE public.tpv_turnos (
 );
 
 -- Índices
-CREATE INDEX idx_tpv_turnos_empresa    ON public.tpv_turnos (empresa_id);
-CREATE INDEX idx_tpv_turnos_activo     ON public.tpv_turnos (empresa_id) WHERE cierre_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_tpv_turnos_empresa    ON public.tpv_turnos (empresa_id);
+CREATE INDEX IF NOT EXISTS idx_tpv_turnos_activo     ON public.tpv_turnos (empresa_id) WHERE cierre_at IS NULL;
 
 -- RLS
 ALTER TABLE public.tpv_turnos ENABLE ROW LEVEL SECURITY;
