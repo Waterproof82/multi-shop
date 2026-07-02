@@ -128,36 +128,36 @@ Estas tablas deben estar publicadas en Supabase antes de que los canales Realtim
 
 ---
 
-## PWA & Funcionamiento Offline — Panel Camarero
+## PWA & Resiliencia — Panel Camarero
 
-El panel `/waiter` funciona como **Progressive Web App** con soporte offline mediante un Service Worker vanilla (sin Workbox/Serwist).
+El panel `/waiter` incluye un Service Worker vanilla (sin Workbox/Serwist) cuyo objetivo es **rendimiento y resiliencia ante micro-cortes de red**, no funcionamiento offline real.
 
-### Service Worker (activo)
+> **Importante:** el camarero no puede operar sin conexión. Todos los datos (pedidos, mesas, estados) vienen de `/api/*`, que es siempre NetworkOnly. Lo que el SW previene es que un corte breve de Wi-Fi expulse al camarero al PIN o rompa la UI con una pantalla de error del browser.
 
-| Estrategia | Ruta | Motivo |
+### Service Worker (activo, scope `/waiter`)
+
+| Estrategia | Ruta | Qué resuelve |
 |------------|------|--------|
-| CacheFirst | `/_next/static/*` | Chunks con hash de contenido — nunca cambian sin nueva URL |
-| NetworkFirst + fallback | `/waiter/*`, `bell.mp3` | Shell disponible en cortes breves de Wi-Fi |
+| CacheFirst | `/_next/static/*` | Chunks con hash — carga instantánea en visitas repetidas |
+| NetworkFirst + fallback | `/waiter/*`, `bell.mp3` | Corte breve → shell cacheado visible + overlay "sin conexión" |
 | NetworkOnly | `/api/*` | Auth y datos de pedidos siempre frescos — nunca cachear |
 
 - GET-only guard: mutaciones (POST/PATCH/DELETE) siempre van a red.
-- `skipWaiting()` + `clients.claim()`: el nuevo SW toma control sin necesidad de recargar.
+- `skipWaiting()` + `clients.claim()`: el nuevo SW toma control sin recargar.
 - Página offline estática en `/waiter/offline` pre-cacheada en el install event.
-- El SW solo actúa en scope `/waiter` — sin impacto en la carta pública ni en el panel admin.
+- `navigator.onLine` guard en `WaiterBanner`: evita redirigir al PIN cuando la red cae brevemente.
+- **Solo se registra en producción.** En dev (`pnpm dev`) no hay SW para no interferir con HMR.
 
-**El SW solo se registra en producción.** En dev (`pnpm dev`) no hay Service Worker para no interferir con HMR. Probar con `pnpm build && pnpm start`.
+### Capacitor Android (activo — en producción)
 
-### Capacitor Android (planificado — siguiente fase)
+El panel `/waiter` se distribuye como **APK nativo para Android** en PDAs de camarero. Capacitor envuelve la webapp en un WebView nativo sin reescribir el código.
 
-El objetivo es distribuir el panel `/waiter` como **APK nativo para Android**, tanto en PDAs de camarero como en TPVs Android. Capacitor envuelve la misma webapp en un WebView nativo sin reescribir el código.
+- APK firmado, distribuido vía Supabase Storage (sin Play Store)
+- Auto-update: al abrir la app compara `versionCode` con `/api/app/version` y redirige a la descarga si hay nueva versión
+- `SameSite=lax` obligatorio en la cookie `waiter_token` para que el WebView la reciba
+- `CookieManager.flush()` en `onPause()` para persistir la sesión si el proceso es killed
 
-Lo que añade Capacitor sobre la capa SW:
-- APK instalable vía MDM o directo (sin Play Store)
-- Acceso nativo a cámara (escaneo QR)
-- Push notifications sin prompt de browser
-- Splash screen, icono de app, modo kiosko para TPV
-
-**La app Next.js, las rutas API y la auth (PIN + JWT cookie) no cambian.** Solo se añade el wrapper nativo.
+Ver `docs/context/capacitor-android-pda.md` para el proceso de build y release.
 
 ---
 
