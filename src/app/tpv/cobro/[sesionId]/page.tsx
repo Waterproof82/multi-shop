@@ -9,7 +9,7 @@ interface Props {
   searchParams: Promise<{ turnoId?: string }>;
 }
 
-export default async function CobroPage({ params, searchParams }: Props) {
+export default async function CobroPage({ params, searchParams }: Readonly<Props>) {
   const cookieStore = await cookies();
   const token = cookieStore.get('admin_token')?.value;
 
@@ -32,7 +32,7 @@ export default async function CobroPage({ params, searchParams }: Props) {
 
   if (!sesion) redirect('/tpv/mostrador');
 
-  const sesionData = sesion as {
+  const sesionData = sesion as unknown as {
     id: string;
     total: number;
     propina_cents: number;
@@ -45,7 +45,7 @@ export default async function CobroPage({ params, searchParams }: Props) {
       turnoId={turnoId}
       totalCents={Math.round(sesionData.total * 100)}
       mesaNumero={sesionData.mesas?.numero ?? 0}
-      operadorNombre={admin.nombre ?? 'Operador'}
+      operadorNombre={admin.nombreCompleto ?? 'Operador'}
     />
   );
 }
