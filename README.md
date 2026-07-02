@@ -25,11 +25,13 @@ Plataforma **multi-tenant** de gestión de negocios de hostelería y retail. Cad
 - **Pago en mesa** vía Redsys TPV: pago total o división de cuenta entre 2 y 20 personas. Lock atómico (PostgreSQL `FOR UPDATE`) para pago total; división permite pagos simultáneos independientes mediante RPC transaccional. Verificación de total antes de pagar (detecta productos añadidos en el último momento). Idempotencia de webhook garantizada con update atómico `WHERE status='pending'`. Actualización en tiempo real vía Supabase Realtime.
 - **Registro manual de pagos** por el camarero (efectivo / pago externo) para desbloquear la sesión en escenarios de división.
 - **Gestión de pedidos takeaway** desde un entorno de chat de Telegram: con un solo botón se indica el tiempo de recogida (10, 15, 20, 30 o 45 minutos). El cliente recibe la notificación automáticamente en su pantalla de seguimiento, sin necesidad de llamar por teléfono.
-- **Gestión de pedidos en mesa (cocina y bar)** íntegramente en la app:
+- **Notas por ítem:** clientes y camareros pueden añadir una nota libre a cada producto del carrito ("sin cebolla", "punto medio", etc.). La nota viaja por todo el pipeline hasta las pantallas de cocina y bar, donde aparece como pill ámbar debajo del nombre.
+- **Gestión de pedidos en mesa (cocina y bar)** íntegramente en la app — tres pantallas especializadas:
+  - `/kitchen` — pantalla standalone para tablet en cocina. Sin login. Muestra ítems de comida con avance de estado por swipe (pendiente → en preparación → listo). Colores por tiempo de espera (azul → teal → ámbar → rojo).
+  - `/waiter/kitchen` — vista de cocina dentro del panel de camarero (PIN requerido). Añade filtros por Listos y Retenidos, retención de ítems por mesa, y release masivo. Timer arranca desde la validación, no desde el pedido original.
   - `/waiter/pendientes` — cola de validación: pedidos en `pendiente_validacion` que el camarero revisa antes de mandar a cocina/bar. Selección individual o por tipo (comida/bebida), pausa por ítem (→ kitchen retenido), envío conjunto comida+bebida en un solo tap.
-  - `/waiter/kitchen` — vista de cocina con todos los ítems de comida en curso, agrupados por pedido o por mesa. Colores por tiempo de espera (azul → teal → ámbar → rojo). Filtro "Listos" para servicio. Timer arranca desde la validación, no desde el pedido original.
-  - `/waiter/bar` — vista equivalente para bebidas.
-  - Los camareros deslizan cada ítem para avanzar su estado (`pendiente → en preparación → listo → servido`) con gestos de puntero.
+  - `/waiter/bar` — vista de bebidas para el camarero. Swipe directo a servido con countdown de 5 s. Botón "Todos servidos" por mesa.
+  - Los camareros deslizan cada ítem para avanzar su estado con gestos de puntero.
 
 ### 🤖 Notificaciones Telegram — dos modos de operación
 
@@ -126,36 +128,36 @@ Estas tablas deben estar publicadas en Supabase antes de que los canales Realtim
 
 ---
 
-## PWA & Funcionamiento Offline — Panel Camarero
+## PWA & Resiliencia — Panel Camarero
 
-El panel `/waiter` funciona como **Progressive Web App** con soporte offline mediante un Service Worker vanilla (sin Workbox/Serwist).
+El panel `/waiter` incluye un Service Worker vanilla (sin Workbox/Serwist) cuyo objetivo es **rendimiento y resiliencia ante micro-cortes de red**, no funcionamiento offline real.
 
-### Service Worker (activo)
+> **Importante:** el camarero no puede operar sin conexión. Todos los datos (pedidos, mesas, estados) vienen de `/api/*`, que es siempre NetworkOnly. Lo que el SW previene es que un corte breve de Wi-Fi expulse al camarero al PIN o rompa la UI con una pantalla de error del browser.
 
-| Estrategia | Ruta | Motivo |
+### Service Worker (activo, scope `/waiter`)
+
+| Estrategia | Ruta | Qué resuelve |
 |------------|------|--------|
-| CacheFirst | `/_next/static/*` | Chunks con hash de contenido — nunca cambian sin nueva URL |
-| NetworkFirst + fallback | `/waiter/*`, `bell.mp3` | Shell disponible en cortes breves de Wi-Fi |
+| CacheFirst | `/_next/static/*` | Chunks con hash — carga instantánea en visitas repetidas |
+| NetworkFirst + fallback | `/waiter/*`, `bell.mp3` | Corte breve → shell cacheado visible + overlay "sin conexión" |
 | NetworkOnly | `/api/*` | Auth y datos de pedidos siempre frescos — nunca cachear |
 
 - GET-only guard: mutaciones (POST/PATCH/DELETE) siempre van a red.
-- `skipWaiting()` + `clients.claim()`: el nuevo SW toma control sin necesidad de recargar.
+- `skipWaiting()` + `clients.claim()`: el nuevo SW toma control sin recargar.
 - Página offline estática en `/waiter/offline` pre-cacheada en el install event.
-- El SW solo actúa en scope `/waiter` — sin impacto en la carta pública ni en el panel admin.
+- `navigator.onLine` guard en `WaiterBanner`: evita redirigir al PIN cuando la red cae brevemente.
+- **Solo se registra en producción.** En dev (`pnpm dev`) no hay SW para no interferir con HMR.
 
-**El SW solo se registra en producción.** En dev (`pnpm dev`) no hay Service Worker para no interferir con HMR. Probar con `pnpm build && pnpm start`.
+### Capacitor Android (activo — en producción)
 
-### Capacitor Android (planificado — siguiente fase)
+El panel `/waiter` se distribuye como **APK nativo para Android** en PDAs de camarero. Capacitor envuelve la webapp en un WebView nativo sin reescribir el código.
 
-El objetivo es distribuir el panel `/waiter` como **APK nativo para Android**, tanto en PDAs de camarero como en TPVs Android. Capacitor envuelve la misma webapp en un WebView nativo sin reescribir el código.
+- APK firmado, distribuido vía Supabase Storage (sin Play Store)
+- Auto-update: al abrir la app compara `versionCode` con `/api/app/version` y redirige a la descarga si hay nueva versión
+- `SameSite=lax` obligatorio en la cookie `waiter_token` para que el WebView la reciba
+- `CookieManager.flush()` en `onPause()` para persistir la sesión si el proceso es killed
 
-Lo que añade Capacitor sobre la capa SW:
-- APK instalable vía MDM o directo (sin Play Store)
-- Acceso nativo a cámara (escaneo QR)
-- Push notifications sin prompt de browser
-- Splash screen, icono de app, modo kiosko para TPV
-
-**La app Next.js, las rutas API y la auth (PIN + JWT cookie) no cambian.** Solo se añade el wrapper nativo.
+Ver `docs/context/capacitor-android-pda.md` para el proceso de build y release.
 
 ---
 

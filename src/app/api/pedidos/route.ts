@@ -24,6 +24,7 @@ const itemsSchema = z.array(z.object({
     name: z.string().max(200),
     price: z.number().min(0).max(100_000),
   })).max(20).optional(),
+  note: z.string().max(500).optional(),
 })).min(1).max(50);
 
 const mesaPedidoSchema = z.object({

@@ -46,7 +46,7 @@ export interface BarOrderItem {
   numeroPedido: number;
   mesaNumero: number | null;
   mesaNombre: string | null;
-  items: { nombre: string; cantidad: number; detallePedidoIdx: number }[];
+  items: { nombre: string; cantidad: number; detallePedidoIdx: number; nota?: string }[];
   estado: string;
   createdAt: string;
   sesionId: string | null;
@@ -65,6 +65,7 @@ export interface KitchenItemRecord {
   nombre: string;
   cantidad: number;
   complementos?: string;
+  nota?: string;
   estado: ItemEstado;
   mesaId?: string | null;
   mesaNumero: number | null;
@@ -79,6 +80,7 @@ export interface PendienteValidacionItem {
   precio: number;
   tipo: 'comida' | 'bebida';
   complementos?: string;
+  nota?: string;
 }
 
 export interface PendienteValidacionPedido {
@@ -106,7 +108,7 @@ export interface IPedidoRepository {
   createMesaOrder(params: {
     empresaId: string;
     mesaId: string;
-    items: { nombre: string; cantidad: number; precio: number; tipo_producto?: string; translations?: unknown }[];
+    items: { nombre: string; cantidad: number; precio: number; tipo_producto?: string; translations?: unknown; nota?: string; complementos?: { nombre: string; precio: number }[] }[];
     total: number;
     trackingToken: string;
     sesionId: string | null;
@@ -155,12 +157,18 @@ export interface IPedidoRepository {
     totalAno: number;
     topPlatos: { nombre: string; cantidad: number; total: number }[];
     topPlatosAno: { nombre: string; cantidad: number; total: number }[];
-    pedidosPorDia: { dia: number; pedidos: number; ingresos: number }[];
+    pedidosPorDia: { dia: number; mesa: number; recogida: number; delivery: number; web: number }[];
     clientesNuevos: number;
     clientesRecurrentes: number;
     ticketMedio: number;
     ticketMedioAnterior: number;
     pedidosAnterior: number;
     ingresosAnterior: number;
+    byOrigen: {
+      mesa:     { pedidos: number; total: number };
+      recogida: { pedidos: number; total: number };
+      delivery: { pedidos: number; total: number };
+      web:      { pedidos: number; total: number };
+    };
   }>>;
 }

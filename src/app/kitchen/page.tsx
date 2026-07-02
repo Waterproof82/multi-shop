@@ -14,6 +14,7 @@ interface KitchenItem {
   nombre: string;
   cantidad: number;
   complementos?: string;
+  nota?: string;
   estado: ItemEstado;
   mesaNumero: number | null;
   mesaNombre: string | null;
@@ -63,6 +64,7 @@ interface MergedItem {
   mergeKey: string;
   nombre: string;
   complementos?: string;
+  nota?: string;
   totalCantidad: number;
   estado: ItemEstado;
   firstCreatedAt: string;
@@ -88,9 +90,9 @@ function getMergedActionLabel(action: ItemEstado): string {
 function mergeByName(items: KitchenItem[]): MergedItem[] {
   const map = new Map<string, MergedItem>();
   for (const item of items) {
-    const key = `${item.nombre}|${item.complementos ?? ''}|${item.estado}`;
+    const key = `${item.nombre}|${item.complementos ?? ''}|${item.nota ?? ''}|${item.estado}`;
     if (!map.has(key)) {
-      map.set(key, { mergeKey: key, nombre: item.nombre, complementos: item.complementos, totalCantidad: 0, estado: item.estado, firstCreatedAt: item.createdAt, items: [] });
+      map.set(key, { mergeKey: key, nombre: item.nombre, complementos: item.complementos, nota: item.nota, totalCantidad: 0, estado: item.estado, firstCreatedAt: item.createdAt, items: [] });
     }
     const g = map.get(key)!;
     g.totalCantidad += item.cantidad;
@@ -147,6 +149,7 @@ function CountdownCard({ item, remaining, lang, onCancelCountdown }: Readonly<Co
             <span className="text-sm font-medium truncate" style={{ color: TEXT_MAIN }}>{item.nombre}</span>
           </div>
           {item.complementos && <span className="text-[10px]" style={{ color: 'oklch(78% 0.03 252)' }}>({item.complementos})</span>}
+          {item.nota && <span className="text-xs font-medium italic block mt-0.5 px-1.5 py-0.5 rounded" style={{ color: 'oklch(88% 0.18 85)', background: 'oklch(28% 0.12 85 / 0.45)' }}>✎ {item.nota}</span>}
         </div>
         <button className="rounded px-2 py-1 text-[10px] font-bold shrink-0"
           style={{ background: 'oklch(26% 0.08 25)', color: 'oklch(75% 0.18 25)' }}
@@ -195,6 +198,7 @@ function SwipeCard({ item, lang, onPointerDown, onPointerMove, onPointerUp, onPo
         <div className="flex-1 min-w-0">
           <span className="text-sm font-medium truncate block" style={{ color: TEXT_MAIN }}>{item.nombre}</span>
           {item.complementos && <span className="text-[10px]" style={{ color: 'oklch(78% 0.03 252)' }}>({item.complementos})</span>}
+          {item.nota && <span className="text-xs font-medium italic block mt-0.5 px-1.5 py-0.5 rounded" style={{ color: 'oklch(88% 0.18 85)', background: 'oklch(28% 0.12 85 / 0.45)' }}>✎ {item.nota}</span>}
         </div>
         {isEnPrep && (
           <span className="rounded px-1.5 py-0.5 text-[10px] font-bold shrink-0"
@@ -437,7 +441,7 @@ export default function KitchenPage() {
 
       {/* Header */}
       <div className="sticky top-0 z-20 flex flex-col" style={{ background: BG, borderBottom: '1px solid oklch(28% 0.06 252 / 0.5)' }}>
-      <div className="px-4 pt-4 pb-2 flex items-center gap-3">
+      <div className="px-4 pt-4 pb-2 flex items-center gap-3 overflow-x-auto scrollbar-none" style={{ scrollbarWidth: 'none' }}>
         <div className="flex items-center justify-center w-9 h-9 rounded-xl" style={{ background: 'oklch(26% 0.12 252)' }}>
           <UtensilsCrossed className="w-5 h-5" style={{ color: 'oklch(72% 0.18 252)' }} />
         </div>
@@ -492,7 +496,7 @@ export default function KitchenPage() {
         </div>
       </div>
       {/* Time legend */}
-      <div className="flex flex-wrap gap-1 px-4 pb-2">
+      <div className="flex flex-nowrap overflow-x-auto gap-1 px-4 pb-2 scrollbar-none" style={{ scrollbarWidth: 'none' }}>
         {TIME_COLORS.map(c => (
           <span key={c.label} className="rounded px-1.5 py-0.5 text-[10px] font-medium"
             style={{ background: c.bg, color: c.text, border: `1px solid ${c.border}` }}>
@@ -552,6 +556,7 @@ export default function KitchenPage() {
                 <div className="flex-1 min-w-0">
                   <span className="text-sm font-medium truncate block" style={{ color: TEXT_MAIN }}>{merged.nombre}</span>
                   {merged.complementos && <span className="text-[10px]" style={{ color: 'oklch(78% 0.03 252)' }}>({merged.complementos})</span>}
+                  {merged.nota && <span className="text-[10px] italic block" style={{ color: 'oklch(72% 0.12 85)' }}>✎ {merged.nota}</span>}
                 </div>
                 <div className="flex flex-col items-end gap-1 shrink-0">
                   {isEnPrep && (

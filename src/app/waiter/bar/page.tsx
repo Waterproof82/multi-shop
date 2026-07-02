@@ -72,7 +72,7 @@ interface BarOrder {
   numeroPedido: number;
   mesaNumero: number | null;
   mesaNombre: string | null;
-  items: { nombre: string; cantidad: number; detallePedidoIdx: number }[];
+  items: { nombre: string; cantidad: number; detallePedidoIdx: number; nota?: string }[];
   estado: string;
   createdAt: string;
   sesionId: string | null;
@@ -92,6 +92,7 @@ interface FlatBarItem {
   createdAt: string;
   nombre: string;
   cantidad: number;
+  nota?: string;
   hasComida: boolean;
 }
 
@@ -134,6 +135,7 @@ function groupByOrder(items: FlatBarItem[]) {
 
 interface MergedBarItem {
   nombre: string;
+  nota?: string;
   totalCantidad: number;
   items: FlatBarItem[];     // underlying flat items
   createdAt: string;        // earliest createdAt in the group
@@ -151,9 +153,9 @@ function cancelBarItems(orders: BarOrder[], items: FlatBarItem[]): BarOrder[] {
 function groupMesaItems(items: FlatBarItem[]): MergedBarItem[] {
   const map = new Map<string, MergedBarItem>();
   for (const item of items) {
-    const key = item.nombre;
+    const key = `${item.nombre}|${item.nota ?? ''}`;
     if (!map.has(key)) {
-      map.set(key, { nombre: item.nombre, totalCantidad: 0, items: [], createdAt: item.createdAt });
+      map.set(key, { nombre: item.nombre, nota: item.nota, totalCantidad: 0, items: [], createdAt: item.createdAt });
     }
     const g = map.get(key)!;
     g.totalCantidad += item.cantidad;
@@ -194,12 +196,17 @@ function renderMergedCardInner(
     );
   }
   return (
-    <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
-      <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{merged.totalCantidad}×</span>
-      <span className="text-xs truncate" style={{ color: TEXT_MAIN }}>{merged.nombre}</span>
-      <span className="text-[10px] ml-auto shrink-0 rounded px-1.5 py-0.5" style={{ background: 'oklch(22% 0.06 252 / 0.5)', color: TEXT_DIM }}>
-        {merged.items.length} pedido{merged.items.length === 1 ? '' : 's'}
-      </span>
+    <div className="flex-1 min-w-0">
+      <div className="flex items-baseline gap-1.5">
+        <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{merged.totalCantidad}×</span>
+        <span className="text-xs truncate" style={{ color: TEXT_MAIN }}>{merged.nombre}</span>
+        <span className="text-[10px] ml-auto shrink-0 rounded px-1.5 py-0.5" style={{ background: 'oklch(22% 0.06 252 / 0.5)', color: TEXT_DIM }}>
+          {merged.items.length} pedido{merged.items.length === 1 ? '' : 's'}
+        </span>
+      </div>
+      {merged.nota && (
+        <span className="text-xs font-medium italic block mt-0.5 px-1.5 py-0.5 rounded" style={{ color: 'oklch(88% 0.18 85)', background: 'oklch(28% 0.12 85 / 0.45)' }}>✎ {merged.nota}</span>
+      )}
     </div>
   );
 }
@@ -263,6 +270,8 @@ export default function BarPage() {
   const timersRef     = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
   const pointerStartX = useRef<number | null>(null);
   const swipingId     = useRef<string | null>(null);
+  const headerRef     = useRef<HTMLDivElement>(null);
+  const [headerHeight, setHeaderHeight] = useState(120);
 
   // Refs for beforeunload — must be updated synchronously (useEffect is too late if user navigates immediately)
   const ordersRef              = useRef<BarOrder[]>([]);
@@ -271,6 +280,14 @@ export default function BarPage() {
   const pendingCountdownsRef   = useRef<Map<string, FlatBarItem>>(new Map());
   useEffect(() => { ordersRef.current     = orders;     }, [orders]);
   useEffect(() => { servedKeysRef.current = servedKeys; }, [servedKeys]);
+
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => { setHeaderHeight(entry.contentRect.height); });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -616,6 +633,7 @@ export default function BarPage() {
       createdAt:         order.createdAt,
       nombre:            item.nombre,
       cantidad:          item.cantidad,
+      nota:              item.nota,
       hasComida:         order.hasComida,
     }))
   ).filter(item => !servedKeys.has(item.key));
@@ -683,6 +701,9 @@ export default function BarPage() {
                 <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{flatItem.cantidad}×</span>
                 <span className="text-xs truncate" style={{ color: TEXT_MAIN }}>{flatItem.nombre}</span>
               </div>
+              {flatItem.nota && (
+                <span className="text-xs font-medium italic block mt-0.5 px-1.5 py-0.5 rounded" style={{ color: 'oklch(88% 0.18 85)', background: 'oklch(28% 0.12 85 / 0.45)' }}>✎ {flatItem.nota}</span>
+              )}
             </div>
           )}
         </div>
@@ -731,7 +752,7 @@ export default function BarPage() {
   return (
     <div className="min-h-screen" style={{ background: BG }}>
       {/* Header */}
-      <div className="fixed top-0 left-0 right-0 z-10 shadow-lg"
+      <div ref={headerRef} className="fixed top-0 left-0 right-0 z-10 shadow-lg"
         style={{ background: 'oklch(17% 0.025 252)', borderBottom: '1px solid oklch(42% 0.10 252 / 0.35)' }}>
         {/* Row 1: back + title */}
         <div className="flex h-11 items-center gap-3 px-4">
@@ -744,7 +765,7 @@ export default function BarPage() {
           <span className="text-[10px]" style={{ color: TEXT_DIM }}>({flatItems.length})</span>
         </div>
         {/* Row 2: time legend */}
-        <div className="flex flex-wrap gap-1 py-2 px-3">
+        <div className="flex flex-nowrap overflow-x-auto gap-1 py-2 px-3 scrollbar-none" style={{ scrollbarWidth: 'none' }}>
           {TIME_COLORS.map(c => (
             <span key={c.label} className="rounded px-1.5 py-0.5 text-[10px] font-medium"
               style={{ background: c.bg, color: c.text, border: `1px solid ${c.border}` }}>
@@ -867,7 +888,7 @@ export default function BarPage() {
         );
       })()}
 
-      <div className="pt-[120px] px-3 pb-6">
+      <div className="px-3 pb-6" style={{ paddingTop: headerHeight }}>
         {!hasAnyContent && (
           <div className="text-center py-10 text-sm" style={{ color: TEXT_DIM }}>
             {t('barEmpty', lang)}

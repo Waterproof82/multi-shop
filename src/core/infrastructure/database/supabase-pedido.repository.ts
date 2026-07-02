@@ -21,6 +21,179 @@ function applyDeliveryFields(payload: Record<string, unknown>, d: DeliveryData):
   if (d.estimated_delivery_fee_cents !== undefined) payload.delivery_fee_cents = d.estimated_delivery_fee_cents;
 }
 
+// ── findPendientesValidacion helpers ──────────────────────────────────────────
+
+function mapPendienteItem(item: Record<string, unknown>, idx: number): PendienteValidacionItem {
+  return {
+    idx,
+    nombre: item['nombre'] as string,
+    cantidad: item['cantidad'] as number,
+    precio: item['precio'] as number,
+    tipo: ((item['tipo_producto'] as string | undefined) ?? 'comida') as 'comida' | 'bebida',
+    complementos: (item['complementos'] as Array<{ nombre?: string }> | undefined)
+      ?.map(c => c.nombre ?? '').filter(Boolean).join(', '),
+    nota: (item['nota'] as string | undefined) || undefined,
+  };
+}
+
+function buildIndexSetMap(rows: Array<Record<string, unknown>>): Map<string, Set<number>> {
+  const map = new Map<string, Set<number>>();
+  for (const r of rows) {
+    const pid = r['pedido_id'] as string;
+    const idx = r['item_idx'] as number;
+    if (!map.has(pid)) map.set(pid, new Set());
+    map.get(pid)!.add(idx);
+  }
+  return map;
+}
+
+function buildPendientesMesaMap(pedidos: Array<Record<string, unknown>>): Map<string, PendienteValidacionMesa> {
+  const mesaMap = new Map<string, PendienteValidacionMesa>();
+  for (const row of pedidos) {
+    const mesaData = row['mesas'] as Record<string, unknown> ?? {};
+    const mesaId = row['mesa_id'] as string;
+    const detalle = (row['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
+    if (!mesaMap.has(mesaId)) {
+      mesaMap.set(mesaId, {
+        mesaId,
+        mesaNumero: (mesaData['numero'] as number) ?? null,
+        mesaNombre: (mesaData['nombre'] as string | null) ?? null,
+        pedidos: [],
+      });
+    }
+    mesaMap.get(mesaId)!.pedidos.push({
+      id: row['id'] as string,
+      createdAt: row['created_at'] as string,
+      items: detalle.map((item, idx) => mapPendienteItem(item, idx)),
+    });
+  }
+  return mesaMap;
+}
+
+function applyCancelados(
+  mesaMap: Map<string, PendienteValidacionMesa>,
+  canceladoMap: Map<string, Set<number>>
+): void {
+  for (const mesa of mesaMap.values()) {
+    mesa.pedidos = mesa.pedidos
+      .map(p => ({ ...p, items: p.items.filter(i => !canceladoMap.get(p.id)?.has(i.idx)) }))
+      .filter(p => p.items.length > 0);
+  }
+  for (const [key, mesa] of mesaMap.entries()) {
+    if (mesa.pedidos.length === 0) mesaMap.delete(key);
+  }
+}
+
+function addValidatedRetenidos(
+  mesaMap: Map<string, PendienteValidacionMesa>,
+  validatedPedidos: Array<Record<string, unknown>>,
+  retenidoMap: Map<string, Set<number>>
+): void {
+  for (const row of validatedPedidos) {
+    const mesaData = row['mesas'] as Record<string, unknown> ?? {};
+    const mesaId = row['mesa_id'] as string;
+    const pedidoId = row['id'] as string;
+    const detalle = (row['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
+    const retenidoIndices = retenidoMap.get(pedidoId) ?? new Set<number>();
+    const items = detalle
+      .map((item, idx) => mapPendienteItem(item, idx))
+      .filter(item => retenidoIndices.has(item.idx));
+    if (items.length === 0) continue;
+    if (!mesaMap.has(mesaId)) {
+      mesaMap.set(mesaId, {
+        mesaId,
+        mesaNumero: (mesaData['numero'] as number) ?? null,
+        mesaNombre: (mesaData['nombre'] as string | null) ?? null,
+        pedidos: [],
+      });
+    }
+    mesaMap.get(mesaId)!.pedidos.push({
+      id: pedidoId,
+      createdAt: row['created_at'] as string,
+      items,
+      validated: true,
+    });
+  }
+}
+
+const PEDIDO_ADMIN_SELECT = '*, clientes:cliente_id (nombre, email, telefono), mesas:mesa_id (numero, nombre), sesion:sesion_id (cerrada_at)';
+
+function pedidoEffectiveDateMs(p: Record<string, unknown>): number {
+  const sesion = p['sesion'] as Record<string, unknown> | null;
+  const d = (sesion?.['cerrada_at'] as string | null) ?? (p['created_at'] as string);
+  return new Date(d).getTime();
+}
+
+// ─── Stats helpers (module-level to keep getStats under complexity budget) ────
+
+function buildSesionDateMap(sesiones: unknown[]): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const s of sesiones) {
+    const row = s as Record<string, unknown>;
+    map[row['id'] as string] = row['cerrada_at'] as string;
+  }
+  return map;
+}
+
+type NonMesaOrigen = 'recogida' | 'delivery' | 'web';
+
+function classifyNonMesaOrigen(p: { origen?: unknown; tracking_token?: unknown }): NonMesaOrigen {
+  if (p.origen === 'delivery') return 'delivery';
+  if (p.tracking_token) return 'recogida';
+  return 'web';
+}
+
+type PorDiaEntry = { dia: number; mesa: number; recogida: number; delivery: number; web: number };
+
+function buildPedidosPorDia(
+  mesaPedidos: Array<{ sesion_id?: string | null }>,
+  nonMesaPedidos: Array<{ created_at: string; origen?: unknown; tracking_token?: unknown }>,
+  sesionDateMap: Record<string, string>,
+  daysInMonth: number
+): PorDiaEntry[] {
+  type DaySlot = Omit<PorDiaEntry, 'dia'>;
+  const map: Record<number, DaySlot> = {};
+  for (let d = 1; d <= daysInMonth; d++) {
+    map[d] = { mesa: 0, recogida: 0, delivery: 0, web: 0 };
+  }
+  for (const p of mesaPedidos) {
+    const cerradaAt = sesionDateMap[p.sesion_id ?? ''];
+    if (cerradaAt) {
+      const dia = new Date(cerradaAt).getDate();
+      if (map[dia]) map[dia].mesa++;
+    }
+  }
+  for (const p of nonMesaPedidos) {
+    const dia = new Date(p.created_at).getDate();
+    if (map[dia]) map[dia][classifyNonMesaOrigen(p)]++;
+  }
+  return Object.entries(map).map(([dia, data]) => ({ dia: Number.parseInt(dia), ...data }));
+}
+
+function buildTopPlatosFromList(pedidosList: Array<{ detalle_pedido?: unknown }>) {
+  const dishCount: Record<string, { nombre: string; cantidad: number; total: number }> = {};
+  for (const pedido of pedidosList) {
+    if (!Array.isArray(pedido.detalle_pedido)) continue;
+    for (const item of pedido.detalle_pedido as PedidoItem[]) {
+      const key = String(item.nombre);
+      if (!dishCount[key]) dishCount[key] = { nombre: key, cantidad: 0, total: 0 };
+      dishCount[key].cantidad += Number(item.cantidad) || 1;
+      dishCount[key].total += (Number(item.precio) * (Number(item.cantidad) || 1));
+    }
+  }
+  return Object.values(dishCount).sort((a, b) => b.cantidad - a.cantidad).slice(0, 10);
+}
+
+function sumTotal(list: Array<{ total?: number | null }>): number {
+  return list.reduce((s, p) => s + (p.total || 0), 0);
+}
+
+function inDateRange(start: string, end: string) {
+  const s = new Date(start);
+  const e = new Date(end);
+  return (p: { created_at: string }) => new Date(p.created_at) >= s && new Date(p.created_at) <= e;
+}
+
 export class SupabasePedidoRepository implements IPedidoRepository {
   constructor(private readonly supabase: SupabaseClient) {}
 
@@ -46,7 +219,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       const [{ data, error }, openSesionIds] = await Promise.all([
         this.supabase
           .from('pedidos')
-          .select(`*, clientes:cliente_id (nombre, email, telefono), mesas:mesa_id (numero, nombre)`)
+          .select(PEDIDO_ADMIN_SELECT)
           .eq('empresa_id', empresaId)
           .order('created_at', { ascending: false }),
         this.getOpenSesionIds(empresaId),
@@ -68,22 +241,58 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       const startDate = new Date(año, mes, 1).toISOString();
       const endDate = new Date(año, mes + 1, 0, 23, 59, 59).toISOString();
 
-      const [{ data, error }, openSesionIds] = await Promise.all([
-        this.supabase
-          .from('pedidos')
-          .select(`*, clientes:cliente_id (nombre, email, telefono), mesas:mesa_id (numero, nombre)`)
-          .eq('empresa_id', empresaId)
-          .gte('created_at', startDate)
-          .lte('created_at', endDate)
-          .order('created_at', { ascending: false }),
-        this.getOpenSesionIds(empresaId),
-      ]);
+      // For mesa orders, effective date = session cerrada_at. Fetch closed sessions in range first.
+      const { data: sesiones, error: sesionesErr } = await this.supabase
+        .from('mesa_sesiones')
+        .select('id')
+        .eq('empresa_id', empresaId)
+        .gte('cerrada_at', startDate)
+        .lte('cerrada_at', endDate);
 
-      if (error) {
-        await logger.logAndReturnError('DB_SELECT_ERROR', error.message, 'repository', 'SupabasePedidoRepository.findAllByTenantAndMonth', { empresaId, details: { code: error.code, mes, año } });
+      if (sesionesErr) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', sesionesErr.message, 'repository', 'SupabasePedidoRepository.findAllByTenantAndMonth', { empresaId, details: { code: sesionesErr.code, mes, año } });
         return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pedidos', module: 'repository', method: 'findAllByTenantAndMonth' } };
       }
-      return { success: true, data: this.excludeOpenSesionPedidos(data || [], openSesionIds) };
+
+      const sesionIds = (sesiones ?? []).map(s => (s as Record<string, unknown>)['id'] as string);
+
+      // Non-mesa orders: filter by created_at
+      const { data: nonMesa, error: nonMesaErr } = await this.supabase
+        .from('pedidos')
+        .select(PEDIDO_ADMIN_SELECT)
+        .eq('empresa_id', empresaId)
+        .is('sesion_id', null)
+        .gte('created_at', startDate)
+        .lte('created_at', endDate)
+        .order('created_at', { ascending: false });
+
+      if (nonMesaErr) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', nonMesaErr.message, 'repository', 'SupabasePedidoRepository.findAllByTenantAndMonth', { empresaId, details: { code: nonMesaErr.code } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pedidos', module: 'repository', method: 'findAllByTenantAndMonth' } };
+      }
+
+      // Mesa orders: filter by their session's cerrada_at
+      let mesa: Pedido[] = [];
+      if (sesionIds.length > 0) {
+        const { data: mesaData, error: mesaErr } = await this.supabase
+          .from('pedidos')
+          .select(PEDIDO_ADMIN_SELECT)
+          .eq('empresa_id', empresaId)
+          .in('sesion_id', sesionIds)
+          .order('created_at', { ascending: false });
+
+        if (mesaErr) {
+          await logger.logAndReturnError('DB_SELECT_ERROR', mesaErr.message, 'repository', 'SupabasePedidoRepository.findAllByTenantAndMonth', { empresaId, details: { code: mesaErr.code } });
+          return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pedidos', module: 'repository', method: 'findAllByTenantAndMonth' } };
+        }
+
+        mesa = (mesaData ?? []) as Pedido[];
+      }
+
+      const rows = [...(nonMesa ?? []) as Pedido[], ...mesa] as unknown as Record<string, unknown>[];
+      rows.sort((a, b) => pedidoEffectiveDateMs(b) - pedidoEffectiveDateMs(a));
+
+      return { success: true, data: rows as unknown as Pedido[] };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findAllByTenantAndMonth', { empresaId, details: { mes, año } });
       return { success: false, error: appError };
@@ -266,6 +475,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           precio: ci.item?.price,
           cantidad: ci.quantity,
           complementos: ci.selectedComplements || [],
+          ...(ci.note ? { nota: ci.note } : {}),
         })),
         total: total,
         estado: 'pendiente',
@@ -314,7 +524,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     totalAno: number;
     topPlatos: { nombre: string; cantidad: number; total: number }[];
     topPlatosAno: { nombre: string; cantidad: number; total: number }[];
-    pedidosPorDia: { dia: number; pedidos: number; ingresos: number }[];
+    pedidosPorDia: { dia: number; mesa: number; recogida: number; delivery: number; web: number }[];
     clientesNuevos: number;
     clientesRecurrentes: number;
     ticketMedio: number;
@@ -324,130 +534,99 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     byOrigen: {
       mesa:     { pedidos: number; total: number };
       recogida: { pedidos: number; total: number };
+      delivery: { pedidos: number; total: number };
       web:      { pedidos: number; total: number };
     };
   }>> {
     try {
       const now = new Date();
-      const todayStart = new Date(año, mes, now.getDate()).toISOString();
       const monthStart = new Date(año, mes, 1).toISOString();
-      const monthEnd = new Date(año, mes + 1, 0, 23, 59, 59).toISOString();
-      const yearStart = new Date(año, 0, 1).toISOString();
-
-      // Previous month calculations
+      const monthEnd   = new Date(año, mes + 1, 0, 23, 59, 59).toISOString();
+      const todayStart = new Date(año, mes, now.getDate()).toISOString();
+      const yearStart  = new Date(año, 0, 1).toISOString();
+      const daysInMonth = new Date(año, mes + 1, 0).getDate();
       const mesAnterior = mes === 0 ? 11 : mes - 1;
       const añoAnterior = mes === 0 ? año - 1 : año;
       const mesAnteriorStart = new Date(añoAnterior, mesAnterior, 1).toISOString();
-      const mesAnteriorEnd = new Date(añoAnterior, mesAnterior + 1, 0, 23, 59, 59).toISOString();
+      const mesAnteriorEnd   = new Date(añoAnterior, mesAnterior + 1, 0, 23, 59, 59).toISOString();
 
-      const { data: pedidos, error } = await this.supabase
-        .from('pedidos')
-        .select('*, clientes!inner(*)')
-        .eq('empresa_id', empresaId)
-        .gte('created_at', yearStart);
+      const [yearRes, sesionesRes, nonMesaRes] = await Promise.all([
+        this.supabase.from('pedidos').select('*, clientes!inner(*)').eq('empresa_id', empresaId).gte('created_at', yearStart),
+        this.supabase.from('mesa_sesiones').select('id, cerrada_at').eq('empresa_id', empresaId).gte('cerrada_at', monthStart).lte('cerrada_at', monthEnd),
+        this.supabase.from('pedidos').select('id, total, tracking_token, origen, created_at, sesion_id, cliente_id, detalle_pedido').eq('empresa_id', empresaId).is('sesion_id', null).gte('created_at', monthStart).lte('created_at', monthEnd),
+      ]);
 
-      if (error) {
-        await logger.logAndReturnError(
-          'DB_SELECT_ERROR',
-          error.message,
-          'repository',
-          'SupabasePedidoRepository.getStats',
-          { empresaId, details: { code: error.code } }
-        );
+      if (yearRes.error) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', yearRes.error.message, 'repository', 'SupabasePedidoRepository.getStats', { empresaId, details: { code: yearRes.error.code } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener estadísticas', module: 'repository', method: 'getStats' } };
+      }
+      if (sesionesRes.error) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', sesionesRes.error.message, 'repository', 'SupabasePedidoRepository.getStats', { empresaId, details: { code: sesionesRes.error.code } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener estadísticas', module: 'repository', method: 'getStats' } };
+      }
+      if (nonMesaRes.error) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', nonMesaRes.error.message, 'repository', 'SupabasePedidoRepository.getStats', { empresaId, details: { code: nonMesaRes.error.code } });
         return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener estadísticas', module: 'repository', method: 'getStats' } };
       }
 
-      const pedidosFiltrados = pedidos || [];
+      const pedidosFiltrados = yearRes.data || [];
+      const nonMesaMes = nonMesaRes.data ?? [];
+      const sesionIds = (sesionesRes.data ?? []).map(s => (s as Record<string, unknown>)['id'] as string);
+      const sesionDateMap = buildSesionDateMap(sesionesRes.data ?? []);
 
-      const pedidosHoy = pedidosFiltrados.filter(p => {
-        const fecha = new Date(p.created_at);
-        return fecha >= new Date(todayStart) && fecha <= new Date(monthEnd);
-      });
-      const pedidosMes = pedidosFiltrados.filter(p => new Date(p.created_at) >= new Date(monthStart) && new Date(p.created_at) <= new Date(monthEnd));
-      const pedidosAnterior = pedidosFiltrados.filter(p => {
-        const fecha = new Date(p.created_at);
-        return fecha >= new Date(mesAnteriorStart) && fecha <= new Date(mesAnteriorEnd);
-      });
-
-      const totalHoy = pedidosHoy.reduce((sum, p) => sum + (p.total || 0), 0);
-      const totalMes = pedidosMes.reduce((sum, p) => sum + (p.total || 0), 0);
-      const totalAno = pedidosFiltrados.reduce((sum, p) => sum + (p.total || 0), 0);
-      const ingresosAnterior = pedidosAnterior.reduce((sum, p) => sum + (p.total || 0), 0);
-
-      // Build orders by day
-      const pedidosPorDiaMap: Record<number, { pedidos: number; ingresos: number }> = {};
-      const daysInMonth = new Date(año, mes + 1, 0).getDate();
-      for (let d = 1; d <= daysInMonth; d++) {
-        pedidosPorDiaMap[d] = { pedidos: 0, ingresos: 0 };
-      }
-      pedidosMes.forEach(p => {
-        const dia = new Date(p.created_at).getDate();
-        if (pedidosPorDiaMap[dia]) {
-          pedidosPorDiaMap[dia].pedidos++;
-          pedidosPorDiaMap[dia].ingresos += p.total || 0;
+      let mesaMesPedidos: Array<{ id: string; total: number | null; sesion_id: string | null; cliente_id: string | null; detalle_pedido: PedidoItem[] | null }> = [];
+      if (sesionIds.length > 0) {
+        const { data: mesaData, error: mesaErr } = await this.supabase.from('pedidos').select('id, total, sesion_id, cliente_id, detalle_pedido').eq('empresa_id', empresaId).in('sesion_id', sesionIds);
+        if (mesaErr) {
+          await logger.logAndReturnError('DB_SELECT_ERROR', mesaErr.message, 'repository', 'SupabasePedidoRepository.getStats', { empresaId, details: { code: mesaErr.code } });
+          return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener estadísticas', module: 'repository', method: 'getStats' } };
         }
-      });
-      const pedidosPorDia = Object.entries(pedidosPorDiaMap).map(([dia, data]) => ({
-        dia: Number.parseInt(dia),
-        pedidos: data.pedidos,
-        ingresos: data.ingresos
-      }));
+        mesaMesPedidos = mesaData ?? [];
+      }
 
-      // Client stats - track unique clients
+      const pedidosHoyArr     = pedidosFiltrados.filter(inDateRange(todayStart, monthEnd));
+      const pedidosAnteriorArr = pedidosFiltrados.filter(inDateRange(mesAnteriorStart, mesAnteriorEnd));
+      const totalHoy  = sumTotal(pedidosHoyArr);
+      const totalAno  = sumTotal(pedidosFiltrados);
+      const ingresosAnterior = sumTotal(pedidosAnteriorArr);
+
+      const allPedidosMes = [...mesaMesPedidos, ...nonMesaMes];
+      const recogidaMes   = nonMesaMes.filter(p => classifyNonMesaOrigen(p) === 'recogida');
+      const deliveryMes   = nonMesaMes.filter(p => classifyNonMesaOrigen(p) === 'delivery');
+      const webMes        = nonMesaMes.filter(p => classifyNonMesaOrigen(p) === 'web');
+      const totalMes = sumTotal(allPedidosMes);
+      const ticketMedio = allPedidosMes.length > 0 ? totalMes / allPedidosMes.length : 0;
+      const ticketMedioAnterior = pedidosAnteriorArr.length > 0 ? ingresosAnterior / pedidosAnteriorArr.length : 0;
+
+      const pedidosPorDia = buildPedidosPorDia(mesaMesPedidos, nonMesaMes, sesionDateMap, daysInMonth);
+
       const clientesSet = new Set<string>();
-      pedidosMes.forEach(p => {
+      for (const p of allPedidosMes) {
         if (p.cliente_id) clientesSet.add(p.cliente_id);
-      });
-      const clientesNuevos = clientesSet.size;
-      const clientesRecurrentes = 0; // Would need historical data to calculate
-
-      // Ticket medio
-      const ticketMedio = pedidosMes.length > 0 ? totalMes / pedidosMes.length : 0;
-      const ticketMedioAnterior = pedidosAnterior.length > 0 ? ingresosAnterior / pedidosAnterior.length : 0;
-
-      const buildTopPlatos = (pedidosList: typeof pedidosFiltrados) => {
-        const dishCount: Record<string, { nombre: string; cantidad: number; total: number }> = {};
-        pedidosList.forEach(pedido => {
-          if (pedido.detalle_pedido) {
-            pedido.detalle_pedido.forEach((item: PedidoItem) => {
-              const key = String(item.nombre);
-              if (!dishCount[key]) {
-                dishCount[key] = { nombre: key, cantidad: 0, total: 0 };
-              }
-              dishCount[key].cantidad += Number(item.cantidad) || 1;
-              dishCount[key].total += (Number(item.precio) * (Number(item.cantidad) || 1));
-            });
-          }
-        });
-        return Object.values(dishCount).sort((a, b) => b.cantidad - a.cantidad).slice(0, 10);
-      };
-
-      // Origin breakdown for the selected month
-      const mesaPedidos    = pedidosMes.filter(p => p.mesa_id);
-      const recogidaPedidos = pedidosMes.filter(p => !p.mesa_id && p.tracking_token);
-      const webPedidos     = pedidosMes.filter(p => !p.mesa_id && !p.tracking_token);
+      }
 
       return {
         success: true,
         data: {
-          pedidosHoy: pedidosHoy.length,
-          pedidosMes: pedidosMes.length,
+          pedidosHoy: pedidosHoyArr.length,
+          pedidosMes: allPedidosMes.length,
           totalHoy,
           totalMes,
           totalAno,
-          topPlatos: buildTopPlatos(pedidosMes),
-          topPlatosAno: buildTopPlatos(pedidosFiltrados),
+          topPlatos: buildTopPlatosFromList(allPedidosMes),
+          topPlatosAno: buildTopPlatosFromList(pedidosFiltrados),
           pedidosPorDia,
-          clientesNuevos,
-          clientesRecurrentes,
+          clientesNuevos: clientesSet.size,
+          clientesRecurrentes: 0,
           ticketMedio,
           ticketMedioAnterior,
-          pedidosAnterior: pedidosAnterior.length,
+          pedidosAnterior: pedidosAnteriorArr.length,
           ingresosAnterior,
           byOrigen: {
-            mesa:     { pedidos: mesaPedidos.length,    total: mesaPedidos.reduce((s, p) => s + (p.total || 0), 0) },
-            recogida: { pedidos: recogidaPedidos.length, total: recogidaPedidos.reduce((s, p) => s + (p.total || 0), 0) },
-            web:      { pedidos: webPedidos.length,      total: webPedidos.reduce((s, p) => s + (p.total || 0), 0) },
+            mesa:     { pedidos: mesaMesPedidos.length, total: sumTotal(mesaMesPedidos) },
+            recogida: { pedidos: recogidaMes.length,    total: sumTotal(recogidaMes) },
+            delivery: { pedidos: deliveryMes.length,    total: sumTotal(deliveryMes) },
+            web:      { pedidos: webMes.length,         total: sumTotal(webMes) },
           },
         }
       };
@@ -521,7 +700,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
   async createMesaOrder(params: {
     empresaId: string;
     mesaId: string;
-    items: { nombre: string; cantidad: number; precio: number; tipo_producto?: string; translations?: unknown; complementos?: { nombre: string; precio: number }[] }[];
+    items: { nombre: string; cantidad: number; precio: number; tipo_producto?: string; translations?: unknown; complementos?: { nombre: string; precio: number }[]; nota?: string }[];
     total: number;
     trackingToken: string;
     sesionId: string | null;
@@ -556,6 +735,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           tipo_producto: item.tipo_producto ?? 'comida',
           translations: item.translations ?? null,
           complementos: item.complementos ?? [],
+          ...(item.nota ? { nota: item.nota } : {}),
         })),
         total: params.total,
         estado: params.initialEstado ?? 'pendiente',
@@ -1106,16 +1286,15 @@ export class SupabasePedidoRepository implements IPedidoRepository {
 
       const result: BarOrderItem[] = [];
       for (const order of orderRows) {
-        const row = order as Record<string, unknown>;
-        const items = (row['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
-        const mesaData = row['mesas'] as Record<string, unknown> ?? {};
-        const pedidoId = row['id'] as string;
+        const items = (order['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
+        const mesaData = order['mesas'] as Record<string, unknown> ?? {};
+        const pedidoId = order['id'] as string;
         const pedidoEstados = estadoMap.get(pedidoId) ?? new Map();
 
         const hasComida = items.some(i => i['tipo_producto'] === 'comida');
 
         // Only include bebida items not yet marked servido and not in the pendientes queue (from_validation=true)
-        const bebidaItems: { nombre: string; cantidad: number; detallePedidoIdx: number }[] = [];
+        const bebidaItems: { nombre: string; cantidad: number; detallePedidoIdx: number; nota?: string }[] = [];
         items.forEach((item, fullIdx) => {
           const barItemEstado = pedidoEstados.get(fullIdx);
         if (
@@ -1124,21 +1303,21 @@ export class SupabasePedidoRepository implements IPedidoRepository {
             barItemEstado !== 'servido' &&
             barItemEstado !== 'cancelado'
           ) {
-            bebidaItems.push({ nombre: item['nombre'] as string, cantidad: item['cantidad'] as number, detallePedidoIdx: fullIdx });
+            bebidaItems.push({ nombre: item['nombre'] as string, cantidad: item['cantidad'] as number, detallePedidoIdx: fullIdx, nota: (item['nota'] as string | undefined) || undefined });
           }
         });
 
         if (bebidaItems.length === 0) continue;
 
         result.push({
-          id: row['id'] as string,
-          numeroPedido: row['numero_pedido'] as number,
+          id: order['id'] as string,
+          numeroPedido: order['numero_pedido'] as number,
           mesaNumero: (mesaData['numero'] as number) ?? null,
           mesaNombre: (mesaData['nombre'] as string | null) ?? null,
           items: bebidaItems,
-          estado: row['estado'] as string,
-          createdAt: (row['validated_at'] as string | null) ?? (row['created_at'] as string),
-          sesionId: (row['sesion_id'] as string | null) ?? null,
+          estado: order['estado'] as string,
+          createdAt: (order['validated_at'] as string | null) ?? (order['created_at'] as string),
+          sesionId: (order['sesion_id'] as string | null) ?? null,
           tipo: 'bebida',
           hasComida,
         });
@@ -1221,6 +1400,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
             nombre: (item['nombre'] as string) ?? '',
             cantidad: item['cantidad'] as number,
             complementos: complements?.map(c => c.nombre ?? c.name).filter(Boolean).join(', '),
+            nota: (item['nota'] as string | undefined) || undefined,
             estado,
             mesaNumero: (mesaData['numero'] as number) ?? null,
             mesaNombre: (mesaData['nombre'] as string | null) ?? null,
@@ -1280,43 +1460,10 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pendientes de validación', module: 'repository', method: 'findPendientesValidacion' } };
       }
 
-      const mesaMap = new Map<string, PendienteValidacionMesa>();
-
-      const mapItem = (item: Record<string, unknown>, idx: number): PendienteValidacionItem => ({
-        idx,
-        nombre: item['nombre'] as string,
-        cantidad: item['cantidad'] as number,
-        precio: item['precio'] as number,
-        tipo: ((item['tipo_producto'] as string | undefined) ?? 'comida') as 'comida' | 'bebida',
-        complementos: (item['complementos'] as Array<{ nombre?: string }> | undefined)
-          ?.map(c => c.nombre ?? '').filter(Boolean).join(', '),
-      });
-
-      for (const row of pedidos ?? []) {
-        const r = row as Record<string, unknown>;
-        const mesaData = r['mesas'] as Record<string, unknown> ?? {};
-        const mesaId = r['mesa_id'] as string;
-        const detalle = (r['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
-
-        if (!mesaMap.has(mesaId)) {
-          mesaMap.set(mesaId, {
-            mesaId,
-            mesaNumero: (mesaData['numero'] as number) ?? null,
-            mesaNombre: (mesaData['nombre'] as string | null) ?? null,
-            pedidos: [],
-          });
-        }
-
-        mesaMap.get(mesaId)!.pedidos.push({
-          id: r['id'] as string,
-          createdAt: r['created_at'] as string,
-          items: detalle.map(mapItem),
-        });
-      }
+      const mesaMap = buildPendientesMesaMap((pedidos ?? []) as Array<Record<string, unknown>>);
 
       // 2a. Ítems cancelados — excluirlos de la cola de pendientes
       const allPedidoIds = [...mesaMap.values()].flatMap(m => m.pedidos.map(p => p.id));
-      const canceladoMap = new Map<string, Set<number>>();
       if (allPedidoIds.length > 0) {
         const { data: cancelados } = await this.supabase
           .from('pedido_item_estados')
@@ -1324,26 +1471,8 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           .eq('empresa_id', empresaId)
           .eq('estado', 'cancelado')
           .in('pedido_id', allPedidoIds);
-        for (const r of cancelados ?? []) {
-          const pid = r['pedido_id'] as string;
-          const idx = r['item_idx'] as number;
-          if (!canceladoMap.has(pid)) canceladoMap.set(pid, new Set());
-          canceladoMap.get(pid)!.add(idx);
-        }
-        if (canceladoMap.size > 0) {
-          for (const mesa of mesaMap.values()) {
-            mesa.pedidos = mesa.pedidos
-              .map(p => ({
-                ...p,
-                items: p.items.filter(i => !canceladoMap.get(p.id)?.has(i.idx)),
-              }))
-              .filter(p => p.items.length > 0);
-          }
-          // Remove empty mesas
-          for (const [key, mesa] of mesaMap.entries()) {
-            if (mesa.pedidos.length === 0) mesaMap.delete(key);
-          }
-        }
+        const canceladoMap = buildIndexSetMap((cancelados ?? []) as Array<Record<string, unknown>>);
+        if (canceladoMap.size > 0) applyCancelados(mesaMap, canceladoMap);
       }
 
       // 2b. Ítems retenidos durante validación — el camarero los libera desde pendientes
@@ -1354,14 +1483,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         .eq('estado', 'retenido')
         .eq('from_validation', true);
 
-      const retenidoMap = new Map<string, Set<number>>();
-      for (const r of retenidos ?? []) {
-        const pid = r['pedido_id'] as string;
-        const idx = r['item_idx'] as number;
-        if (!retenidoMap.has(pid)) retenidoMap.set(pid, new Set());
-        retenidoMap.get(pid)!.add(idx);
-      }
-
+      const retenidoMap = buildIndexSetMap((retenidos ?? []) as Array<Record<string, unknown>>);
       if (retenidoMap.size > 0) {
         const { data: validatedPedidos } = await this.supabase
           .from('pedidos')
@@ -1370,34 +1492,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           .eq('estado', 'pendiente')
           .in('id', [...retenidoMap.keys()])
           .order('created_at', { ascending: true });
-
-        for (const row of validatedPedidos ?? []) {
-          const r = row as Record<string, unknown>;
-          const mesaData = r['mesas'] as Record<string, unknown> ?? {};
-          const mesaId = r['mesa_id'] as string;
-          const pedidoId = r['id'] as string;
-          const detalle = (r['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
-          const retenidoIndices = retenidoMap.get(pedidoId) ?? new Set<number>();
-
-          const items = detalle.map(mapItem).filter(item => retenidoIndices.has(item.idx));
-          if (items.length === 0) continue;
-
-          if (!mesaMap.has(mesaId)) {
-            mesaMap.set(mesaId, {
-              mesaId,
-              mesaNumero: (mesaData['numero'] as number) ?? null,
-              mesaNombre: (mesaData['nombre'] as string | null) ?? null,
-              pedidos: [],
-            });
-          }
-
-          mesaMap.get(mesaId)!.pedidos.push({
-            id: pedidoId,
-            createdAt: r['created_at'] as string,
-            items,
-            validated: true,
-          });
-        }
+        addValidatedRetenidos(mesaMap, (validatedPedidos ?? []) as Array<Record<string, unknown>>, retenidoMap);
       }
 
       return { success: true, data: Array.from(mesaMap.values()) };

@@ -1,10 +1,18 @@
-# PWA & Offline System
+# PWA & Service Worker — Waiter Panel
 
-## Overview
+## What this system does (and what it doesn't)
 
-The `/waiter` panel is being evolved into a **hybrid PWA** designed to survive micro-outages (brief Wi-Fi drops in the restaurant) and eventually ship as a native Android app via Capacitor.
+The Service Worker for `/waiter` provides **performance and resilience against brief connection drops**. It does NOT enable true offline functionality.
 
-The first layer — the **Service Worker** — is already deployed. Native packaging (Capacitor) comes next.
+**The waiter cannot operate without internet.** All order data, table state, authentication, and real-time updates come from `/api/*` routes, which are always NetworkOnly. If the restaurant loses internet for 10 minutes, the waiter cannot take orders.
+
+### What the SW actually solves
+
+1. **Speed on slow/congested restaurant Wi-Fi** — JS/CSS chunks are CacheFirst after the first load. Repeat navigations feel instant.
+2. **No accidental logout on connection blip** — without the SW + `navigator.onLine` guard, a 2-second Wi-Fi drop causes `GET /api/waiter/me` to fail → `.catch()` → `setIsWaiter(false)` → redirect to PIN. The guard prevents this.
+3. **Controlled degradation** — instead of a browser "no internet" dinosaur page, the waiter sees the cached HTML shell with a custom offline overlay and a "Retry" button.
+
+Both the Service Worker and the Capacitor Android app are **already in production**.
 
 ---
 

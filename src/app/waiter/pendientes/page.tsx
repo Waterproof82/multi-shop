@@ -13,6 +13,7 @@ interface PendienteItem {
   precio: number;
   tipo: 'comida' | 'bebida';
   complementos?: string;
+  nota?: string;
 }
 
 interface PendientePedido {
@@ -65,6 +66,7 @@ interface GroupedPendienteItem {
   groupKey: string;
   nombre: string;
   complementos?: string;
+  nota?: string;
   tipo: 'comida' | 'bebida';
   totalCantidad: number;
   items: MergedItem[];
@@ -75,9 +77,9 @@ function getGroupedItems(mergedItems: MergedItem[], paused: Set<string>): Groupe
   for (const item of mergedItems) {
     // Include paused state in key: paused and non-paused items stay separate
     const isPaused = paused.has(item.globalKey);
-    const key = `${item.tipo}|${item.nombre}|${item.complementos ?? ''}|${isPaused ? '1' : '0'}`;
+    const key = `${item.tipo}|${item.nombre}|${item.complementos ?? ''}|${item.nota ?? ''}|${isPaused ? '1' : '0'}`;
     if (!map.has(key)) {
-      map.set(key, { groupKey: key, nombre: item.nombre, complementos: item.complementos, tipo: item.tipo, totalCantidad: 0, items: [] });
+      map.set(key, { groupKey: key, nombre: item.nombre, complementos: item.complementos, nota: item.nota, tipo: item.tipo, totalCantidad: 0, items: [] });
     }
     const g = map.get(key)!;
     g.totalCantidad += item.cantidad;
@@ -259,6 +261,9 @@ function PedidoItemButton({ item, isSelected, isPaused, onToggleSelect, onToggle
           <span className="text-xs" style={{ color: TEXT_MAIN }}>{item.cantidad}× {item.nombre}</span>
           {item.complementos && (
             <div className="text-[10px] truncate" style={{ color: TEXT_DIM }}>({item.complementos})</div>
+          )}
+          {item.nota && (
+            <div className="text-[10px] italic truncate" style={{ color: 'oklch(72% 0.12 85)' }}>✎ {item.nota}</div>
           )}
         </div>
         {item.tipo === 'comida'
@@ -754,6 +759,9 @@ export default function WaiterPendientesPage() {
                               </span>
                               {group.complementos && (
                                 <span className="block text-[10px] truncate" style={{ color: TEXT_DIM }}>({group.complementos})</span>
+                              )}
+                              {group.nota && (
+                                <span className="block text-[10px] italic truncate" style={{ color: 'oklch(72% 0.12 85)' }}>✎ {group.nota}</span>
                               )}
                             </span>
                             {group.tipo === 'comida'

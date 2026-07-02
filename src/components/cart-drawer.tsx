@@ -224,6 +224,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                 item: { id: ci.item.id, name: ci.item.name, price: ci.item.price, translations: ci.item.translations },
                 quantity: ci.quantity,
                 selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
+                note: ci.note,
               })),
               idioma: language,
             }),
@@ -245,6 +246,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
               item: { id: ci.item.id, name: ci.item.name, price: ci.item.price, translations: ci.item.translations },
               quantity: ci.quantity,
               selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
+              note: ci.note,
             })),
             idioma: language,
           }),
@@ -296,6 +298,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                   item: { id: ci.item.id, name: ci.item.name, price: ci.item.price, translations: ci.item.translations },
                   quantity: ci.quantity,
                   selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
+                  note: ci.note,
                 })),
                 idioma: language,
               }),
@@ -345,6 +348,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
             item: { id: ci.item.id, name: ci.item.name, price: ci.item.price, translations: ci.item.translations },
             quantity: ci.quantity,
             selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
+            note: ci.note,
           })),
           nombre,
           telefono: dialCode + telefono.replaceAll(/\D/g, ''),
@@ -659,6 +663,11 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                         {ci.selectedComplements && ci.selectedComplements.length > 0 && (
                           <p className="text-xs text-muted-foreground truncate group-hover:text-muted-foreground/80 transition-colors duration-200">
                             + {ci.selectedComplements.map(c => c.name).join(', ')}
+                          </p>
+                        )}
+                        {ci.note && (
+                          <p className="text-xs text-muted-foreground italic truncate">
+                            {ci.note}
                           </p>
                         )}
                         <p className="text-sm text-muted-foreground group-hover:text-muted-foreground/90 transition-colors duration-200">
