@@ -21,6 +21,101 @@ function applyDeliveryFields(payload: Record<string, unknown>, d: DeliveryData):
   if (d.estimated_delivery_fee_cents !== undefined) payload.delivery_fee_cents = d.estimated_delivery_fee_cents;
 }
 
+// ── findPendientesValidacion helpers ──────────────────────────────────────────
+
+function mapPendienteItem(item: Record<string, unknown>, idx: number): PendienteValidacionItem {
+  return {
+    idx,
+    nombre: item['nombre'] as string,
+    cantidad: item['cantidad'] as number,
+    precio: item['precio'] as number,
+    tipo: ((item['tipo_producto'] as string | undefined) ?? 'comida') as 'comida' | 'bebida',
+    complementos: (item['complementos'] as Array<{ nombre?: string }> | undefined)
+      ?.map(c => c.nombre ?? '').filter(Boolean).join(', '),
+    nota: (item['nota'] as string | undefined) || undefined,
+  };
+}
+
+function buildIndexSetMap(rows: Array<Record<string, unknown>>): Map<string, Set<number>> {
+  const map = new Map<string, Set<number>>();
+  for (const r of rows) {
+    const pid = r['pedido_id'] as string;
+    const idx = r['item_idx'] as number;
+    if (!map.has(pid)) map.set(pid, new Set());
+    map.get(pid)!.add(idx);
+  }
+  return map;
+}
+
+function buildPendientesMesaMap(pedidos: Array<Record<string, unknown>>): Map<string, PendienteValidacionMesa> {
+  const mesaMap = new Map<string, PendienteValidacionMesa>();
+  for (const row of pedidos) {
+    const mesaData = row['mesas'] as Record<string, unknown> ?? {};
+    const mesaId = row['mesa_id'] as string;
+    const detalle = (row['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
+    if (!mesaMap.has(mesaId)) {
+      mesaMap.set(mesaId, {
+        mesaId,
+        mesaNumero: (mesaData['numero'] as number) ?? null,
+        mesaNombre: (mesaData['nombre'] as string | null) ?? null,
+        pedidos: [],
+      });
+    }
+    mesaMap.get(mesaId)!.pedidos.push({
+      id: row['id'] as string,
+      createdAt: row['created_at'] as string,
+      items: detalle.map((item, idx) => mapPendienteItem(item, idx)),
+    });
+  }
+  return mesaMap;
+}
+
+function applyCancelados(
+  mesaMap: Map<string, PendienteValidacionMesa>,
+  canceladoMap: Map<string, Set<number>>
+): void {
+  for (const mesa of mesaMap.values()) {
+    mesa.pedidos = mesa.pedidos
+      .map(p => ({ ...p, items: p.items.filter(i => !canceladoMap.get(p.id)?.has(i.idx)) }))
+      .filter(p => p.items.length > 0);
+  }
+  for (const [key, mesa] of mesaMap.entries()) {
+    if (mesa.pedidos.length === 0) mesaMap.delete(key);
+  }
+}
+
+function addValidatedRetenidos(
+  mesaMap: Map<string, PendienteValidacionMesa>,
+  validatedPedidos: Array<Record<string, unknown>>,
+  retenidoMap: Map<string, Set<number>>
+): void {
+  for (const row of validatedPedidos) {
+    const mesaData = row['mesas'] as Record<string, unknown> ?? {};
+    const mesaId = row['mesa_id'] as string;
+    const pedidoId = row['id'] as string;
+    const detalle = (row['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
+    const retenidoIndices = retenidoMap.get(pedidoId) ?? new Set<number>();
+    const items = detalle
+      .map((item, idx) => mapPendienteItem(item, idx))
+      .filter(item => retenidoIndices.has(item.idx));
+    if (items.length === 0) continue;
+    if (!mesaMap.has(mesaId)) {
+      mesaMap.set(mesaId, {
+        mesaId,
+        mesaNumero: (mesaData['numero'] as number) ?? null,
+        mesaNombre: (mesaData['nombre'] as string | null) ?? null,
+        pedidos: [],
+      });
+    }
+    mesaMap.get(mesaId)!.pedidos.push({
+      id: pedidoId,
+      createdAt: row['created_at'] as string,
+      items,
+      validated: true,
+    });
+  }
+}
+
 export class SupabasePedidoRepository implements IPedidoRepository {
   constructor(private readonly supabase: SupabaseClient) {}
 
@@ -1108,10 +1203,9 @@ export class SupabasePedidoRepository implements IPedidoRepository {
 
       const result: BarOrderItem[] = [];
       for (const order of orderRows) {
-        const row = order as Record<string, unknown>;
-        const items = (row['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
-        const mesaData = row['mesas'] as Record<string, unknown> ?? {};
-        const pedidoId = row['id'] as string;
+        const items = (order['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
+        const mesaData = order['mesas'] as Record<string, unknown> ?? {};
+        const pedidoId = order['id'] as string;
         const pedidoEstados = estadoMap.get(pedidoId) ?? new Map();
 
         const hasComida = items.some(i => i['tipo_producto'] === 'comida');
@@ -1133,14 +1227,14 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         if (bebidaItems.length === 0) continue;
 
         result.push({
-          id: row['id'] as string,
-          numeroPedido: row['numero_pedido'] as number,
+          id: order['id'] as string,
+          numeroPedido: order['numero_pedido'] as number,
           mesaNumero: (mesaData['numero'] as number) ?? null,
           mesaNombre: (mesaData['nombre'] as string | null) ?? null,
           items: bebidaItems,
-          estado: row['estado'] as string,
-          createdAt: (row['validated_at'] as string | null) ?? (row['created_at'] as string),
-          sesionId: (row['sesion_id'] as string | null) ?? null,
+          estado: order['estado'] as string,
+          createdAt: (order['validated_at'] as string | null) ?? (order['created_at'] as string),
+          sesionId: (order['sesion_id'] as string | null) ?? null,
           tipo: 'bebida',
           hasComida,
         });
@@ -1283,44 +1377,10 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pendientes de validación', module: 'repository', method: 'findPendientesValidacion' } };
       }
 
-      const mesaMap = new Map<string, PendienteValidacionMesa>();
-
-      const mapItem = (item: Record<string, unknown>, idx: number): PendienteValidacionItem => ({
-        idx,
-        nombre: item['nombre'] as string,
-        cantidad: item['cantidad'] as number,
-        precio: item['precio'] as number,
-        tipo: ((item['tipo_producto'] as string | undefined) ?? 'comida') as 'comida' | 'bebida',
-        complementos: (item['complementos'] as Array<{ nombre?: string }> | undefined)
-          ?.map(c => c.nombre ?? '').filter(Boolean).join(', '),
-        nota: (item['nota'] as string | undefined) || undefined,
-      });
-
-      for (const row of pedidos ?? []) {
-        const r = row as Record<string, unknown>;
-        const mesaData = r['mesas'] as Record<string, unknown> ?? {};
-        const mesaId = r['mesa_id'] as string;
-        const detalle = (r['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
-
-        if (!mesaMap.has(mesaId)) {
-          mesaMap.set(mesaId, {
-            mesaId,
-            mesaNumero: (mesaData['numero'] as number) ?? null,
-            mesaNombre: (mesaData['nombre'] as string | null) ?? null,
-            pedidos: [],
-          });
-        }
-
-        mesaMap.get(mesaId)!.pedidos.push({
-          id: r['id'] as string,
-          createdAt: r['created_at'] as string,
-          items: detalle.map(mapItem),
-        });
-      }
+      const mesaMap = buildPendientesMesaMap((pedidos ?? []) as Array<Record<string, unknown>>);
 
       // 2a. Ítems cancelados — excluirlos de la cola de pendientes
       const allPedidoIds = [...mesaMap.values()].flatMap(m => m.pedidos.map(p => p.id));
-      const canceladoMap = new Map<string, Set<number>>();
       if (allPedidoIds.length > 0) {
         const { data: cancelados } = await this.supabase
           .from('pedido_item_estados')
@@ -1328,26 +1388,8 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           .eq('empresa_id', empresaId)
           .eq('estado', 'cancelado')
           .in('pedido_id', allPedidoIds);
-        for (const r of cancelados ?? []) {
-          const pid = r['pedido_id'] as string;
-          const idx = r['item_idx'] as number;
-          if (!canceladoMap.has(pid)) canceladoMap.set(pid, new Set());
-          canceladoMap.get(pid)!.add(idx);
-        }
-        if (canceladoMap.size > 0) {
-          for (const mesa of mesaMap.values()) {
-            mesa.pedidos = mesa.pedidos
-              .map(p => ({
-                ...p,
-                items: p.items.filter(i => !canceladoMap.get(p.id)?.has(i.idx)),
-              }))
-              .filter(p => p.items.length > 0);
-          }
-          // Remove empty mesas
-          for (const [key, mesa] of mesaMap.entries()) {
-            if (mesa.pedidos.length === 0) mesaMap.delete(key);
-          }
-        }
+        const canceladoMap = buildIndexSetMap((cancelados ?? []) as Array<Record<string, unknown>>);
+        if (canceladoMap.size > 0) applyCancelados(mesaMap, canceladoMap);
       }
 
       // 2b. Ítems retenidos durante validación — el camarero los libera desde pendientes
@@ -1358,14 +1400,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         .eq('estado', 'retenido')
         .eq('from_validation', true);
 
-      const retenidoMap = new Map<string, Set<number>>();
-      for (const r of retenidos ?? []) {
-        const pid = r['pedido_id'] as string;
-        const idx = r['item_idx'] as number;
-        if (!retenidoMap.has(pid)) retenidoMap.set(pid, new Set());
-        retenidoMap.get(pid)!.add(idx);
-      }
-
+      const retenidoMap = buildIndexSetMap((retenidos ?? []) as Array<Record<string, unknown>>);
       if (retenidoMap.size > 0) {
         const { data: validatedPedidos } = await this.supabase
           .from('pedidos')
@@ -1374,34 +1409,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           .eq('estado', 'pendiente')
           .in('id', [...retenidoMap.keys()])
           .order('created_at', { ascending: true });
-
-        for (const row of validatedPedidos ?? []) {
-          const r = row as Record<string, unknown>;
-          const mesaData = r['mesas'] as Record<string, unknown> ?? {};
-          const mesaId = r['mesa_id'] as string;
-          const pedidoId = r['id'] as string;
-          const detalle = (r['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
-          const retenidoIndices = retenidoMap.get(pedidoId) ?? new Set<number>();
-
-          const items = detalle.map(mapItem).filter(item => retenidoIndices.has(item.idx));
-          if (items.length === 0) continue;
-
-          if (!mesaMap.has(mesaId)) {
-            mesaMap.set(mesaId, {
-              mesaId,
-              mesaNumero: (mesaData['numero'] as number) ?? null,
-              mesaNombre: (mesaData['nombre'] as string | null) ?? null,
-              pedidos: [],
-            });
-          }
-
-          mesaMap.get(mesaId)!.pedidos.push({
-            id: pedidoId,
-            createdAt: r['created_at'] as string,
-            items,
-            validated: true,
-          });
-        }
+        addValidatedRetenidos(mesaMap, (validatedPedidos ?? []) as Array<Record<string, unknown>>, retenidoMap);
       }
 
       return { success: true, data: Array.from(mesaMap.values()) };
