@@ -454,7 +454,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     totalAno: number;
     topPlatos: { nombre: string; cantidad: number; total: number }[];
     topPlatosAno: { nombre: string; cantidad: number; total: number }[];
-    pedidosPorDia: { dia: number; pedidos: number; ingresos: number }[];
+    pedidosPorDia: { dia: number; mesa: number; recogida: number; delivery: number; web: number }[];
     clientesNuevos: number;
     clientesRecurrentes: number;
     ticketMedio: number;
@@ -464,6 +464,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     byOrigen: {
       mesa:     { pedidos: number; total: number };
       recogida: { pedidos: number; total: number };
+      delivery: { pedidos: number; total: number };
       web:      { pedidos: number; total: number };
     };
   }>> {
@@ -473,121 +474,163 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       const monthStart = new Date(año, mes, 1).toISOString();
       const monthEnd = new Date(año, mes + 1, 0, 23, 59, 59).toISOString();
       const yearStart = new Date(año, 0, 1).toISOString();
+      const daysInMonth = new Date(año, mes + 1, 0).getDate();
 
-      // Previous month calculations
       const mesAnterior = mes === 0 ? 11 : mes - 1;
       const añoAnterior = mes === 0 ? año - 1 : año;
       const mesAnteriorStart = new Date(añoAnterior, mesAnterior, 1).toISOString();
       const mesAnteriorEnd = new Date(añoAnterior, mesAnterior + 1, 0, 23, 59, 59).toISOString();
 
-      const { data: pedidos, error } = await this.supabase
-        .from('pedidos')
-        .select('*, clientes!inner(*)')
-        .eq('empresa_id', empresaId)
-        .gte('created_at', yearStart);
+      // Year query: for totalAno, topPlatosAno, pedidosHoy, pedidosAnterior (uses created_at)
+      // Month-accurate queries: sesiones cerradas en el mes → mesa orders; non-mesa by created_at
+      const [yearRes, sesionesRes, nonMesaRes] = await Promise.all([
+        this.supabase
+          .from('pedidos')
+          .select('*, clientes!inner(*)')
+          .eq('empresa_id', empresaId)
+          .gte('created_at', yearStart),
+        this.supabase
+          .from('mesa_sesiones')
+          .select('id, cerrada_at')
+          .eq('empresa_id', empresaId)
+          .gte('cerrada_at', monthStart)
+          .lte('cerrada_at', monthEnd),
+        this.supabase
+          .from('pedidos')
+          .select('id, total, tracking_token, origen, created_at, sesion_id, cliente_id, detalle_pedido')
+          .eq('empresa_id', empresaId)
+          .is('sesion_id', null)
+          .gte('created_at', monthStart)
+          .lte('created_at', monthEnd),
+      ]);
 
-      if (error) {
-        await logger.logAndReturnError(
-          'DB_SELECT_ERROR',
-          error.message,
-          'repository',
-          'SupabasePedidoRepository.getStats',
-          { empresaId, details: { code: error.code } }
-        );
+      if (yearRes.error) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', yearRes.error.message, 'repository', 'SupabasePedidoRepository.getStats', { empresaId, details: { code: yearRes.error.code } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener estadísticas', module: 'repository', method: 'getStats' } };
+      }
+      if (sesionesRes.error) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', sesionesRes.error.message, 'repository', 'SupabasePedidoRepository.getStats', { empresaId, details: { code: sesionesRes.error.code } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener estadísticas', module: 'repository', method: 'getStats' } };
+      }
+      if (nonMesaRes.error) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', nonMesaRes.error.message, 'repository', 'SupabasePedidoRepository.getStats', { empresaId, details: { code: nonMesaRes.error.code } });
         return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener estadísticas', module: 'repository', method: 'getStats' } };
       }
 
-      const pedidosFiltrados = pedidos || [];
+      const pedidosFiltrados = yearRes.data || [];
+      const nonMesaMes = nonMesaRes.data ?? [];
 
-      const pedidosHoy = pedidosFiltrados.filter(p => {
+      // Build sesion → cerrada_at map and fetch mesa orders for the month
+      const sesionIds = (sesionesRes.data ?? []).map(s => (s as Record<string, unknown>)['id'] as string);
+      const sesionDateMap: Record<string, string> = {};
+      for (const s of sesionesRes.data ?? []) {
+        sesionDateMap[(s as Record<string, unknown>)['id'] as string] = (s as Record<string, unknown>)['cerrada_at'] as string;
+      }
+
+      let mesaMesPedidos: Array<{ id: string; total: number | null; sesion_id: string | null; cliente_id: string | null; detalle_pedido: PedidoItem[] | null }> = [];
+      if (sesionIds.length > 0) {
+        const { data: mesaData, error: mesaErr } = await this.supabase
+          .from('pedidos')
+          .select('id, total, sesion_id, cliente_id, detalle_pedido')
+          .eq('empresa_id', empresaId)
+          .in('sesion_id', sesionIds);
+        if (mesaErr) {
+          await logger.logAndReturnError('DB_SELECT_ERROR', mesaErr.message, 'repository', 'SupabasePedidoRepository.getStats', { empresaId, details: { code: mesaErr.code } });
+          return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener estadísticas', module: 'repository', method: 'getStats' } };
+        }
+        mesaMesPedidos = mesaData ?? [];
+      }
+
+      // --- Year-level stats (approximate for mesa, uses created_at) ---
+      const pedidosHoyArr = pedidosFiltrados.filter(p => {
         const fecha = new Date(p.created_at);
         return fecha >= new Date(todayStart) && fecha <= new Date(monthEnd);
       });
-      const pedidosMes = pedidosFiltrados.filter(p => new Date(p.created_at) >= new Date(monthStart) && new Date(p.created_at) <= new Date(monthEnd));
-      const pedidosAnterior = pedidosFiltrados.filter(p => {
+      const pedidosAnteriorArr = pedidosFiltrados.filter(p => {
         const fecha = new Date(p.created_at);
         return fecha >= new Date(mesAnteriorStart) && fecha <= new Date(mesAnteriorEnd);
       });
-
-      const totalHoy = pedidosHoy.reduce((sum, p) => sum + (p.total || 0), 0);
-      const totalMes = pedidosMes.reduce((sum, p) => sum + (p.total || 0), 0);
+      const totalHoy = pedidosHoyArr.reduce((sum, p) => sum + (p.total || 0), 0);
       const totalAno = pedidosFiltrados.reduce((sum, p) => sum + (p.total || 0), 0);
-      const ingresosAnterior = pedidosAnterior.reduce((sum, p) => sum + (p.total || 0), 0);
+      const ingresosAnterior = pedidosAnteriorArr.reduce((sum, p) => sum + (p.total || 0), 0);
 
-      // Build orders by day
-      const pedidosPorDiaMap: Record<number, { pedidos: number; ingresos: number }> = {};
-      const daysInMonth = new Date(año, mes + 1, 0).getDate();
+      // --- Month-accurate stats (cerrada_at for mesa, created_at for non-mesa) ---
+      const allPedidosMes = [...mesaMesPedidos, ...nonMesaMes];
+      const recogidaMes  = nonMesaMes.filter(p => p.origen !== 'delivery' && p.tracking_token);
+      const deliveryMes  = nonMesaMes.filter(p => p.origen === 'delivery');
+      const webMes       = nonMesaMes.filter(p => p.origen !== 'delivery' && !p.tracking_token);
+      const totalMes = allPedidosMes.reduce((sum, p) => sum + (p.total || 0), 0);
+      const ticketMedio = allPedidosMes.length > 0 ? totalMes / allPedidosMes.length : 0;
+      const ticketMedioAnterior = pedidosAnteriorArr.length > 0 ? ingresosAnterior / pedidosAnteriorArr.length : 0;
+
+      // Build pedidosPorDia with 4 series (cerrada_at for mesa)
+      const pedidosPorDiaMap: Record<number, { mesa: number; recogida: number; delivery: number; web: number }> = {};
       for (let d = 1; d <= daysInMonth; d++) {
-        pedidosPorDiaMap[d] = { pedidos: 0, ingresos: 0 };
+        pedidosPorDiaMap[d] = { mesa: 0, recogida: 0, delivery: 0, web: 0 };
       }
-      pedidosMes.forEach(p => {
+      for (const p of mesaMesPedidos) {
+        const cerradaAt = sesionDateMap[p.sesion_id ?? ''];
+        if (cerradaAt) {
+          const dia = new Date(cerradaAt).getDate();
+          if (pedidosPorDiaMap[dia]) pedidosPorDiaMap[dia].mesa++;
+        }
+      }
+      for (const p of nonMesaMes) {
         const dia = new Date(p.created_at).getDate();
         if (pedidosPorDiaMap[dia]) {
-          pedidosPorDiaMap[dia].pedidos++;
-          pedidosPorDiaMap[dia].ingresos += p.total || 0;
+          if (p.origen === 'delivery') pedidosPorDiaMap[dia].delivery++;
+          else if (p.tracking_token) pedidosPorDiaMap[dia].recogida++;
+          else pedidosPorDiaMap[dia].web++;
         }
-      });
+      }
       const pedidosPorDia = Object.entries(pedidosPorDiaMap).map(([dia, data]) => ({
         dia: Number.parseInt(dia),
-        pedidos: data.pedidos,
-        ingresos: data.ingresos
+        ...data,
       }));
 
-      // Client stats - track unique clients
+      // Client stats
       const clientesSet = new Set<string>();
-      pedidosMes.forEach(p => {
+      for (const p of allPedidosMes) {
         if (p.cliente_id) clientesSet.add(p.cliente_id);
-      });
-      const clientesNuevos = clientesSet.size;
-      const clientesRecurrentes = 0; // Would need historical data to calculate
+      }
 
-      // Ticket medio
-      const ticketMedio = pedidosMes.length > 0 ? totalMes / pedidosMes.length : 0;
-      const ticketMedioAnterior = pedidosAnterior.length > 0 ? ingresosAnterior / pedidosAnterior.length : 0;
-
-      const buildTopPlatos = (pedidosList: typeof pedidosFiltrados) => {
+      const buildTopPlatos = (pedidosList: Array<{ detalle_pedido?: PedidoItem[] | null }>) => {
         const dishCount: Record<string, { nombre: string; cantidad: number; total: number }> = {};
-        pedidosList.forEach(pedido => {
+        for (const pedido of pedidosList) {
           if (pedido.detalle_pedido) {
-            pedido.detalle_pedido.forEach((item: PedidoItem) => {
+            for (const item of pedido.detalle_pedido) {
               const key = String(item.nombre);
-              if (!dishCount[key]) {
-                dishCount[key] = { nombre: key, cantidad: 0, total: 0 };
-              }
+              if (!dishCount[key]) dishCount[key] = { nombre: key, cantidad: 0, total: 0 };
               dishCount[key].cantidad += Number(item.cantidad) || 1;
               dishCount[key].total += (Number(item.precio) * (Number(item.cantidad) || 1));
-            });
+            }
           }
-        });
+        }
         return Object.values(dishCount).sort((a, b) => b.cantidad - a.cantidad).slice(0, 10);
       };
-
-      // Origin breakdown for the selected month
-      const mesaPedidos    = pedidosMes.filter(p => p.mesa_id);
-      const recogidaPedidos = pedidosMes.filter(p => !p.mesa_id && p.tracking_token);
-      const webPedidos     = pedidosMes.filter(p => !p.mesa_id && !p.tracking_token);
 
       return {
         success: true,
         data: {
-          pedidosHoy: pedidosHoy.length,
-          pedidosMes: pedidosMes.length,
+          pedidosHoy: pedidosHoyArr.length,
+          pedidosMes: allPedidosMes.length,
           totalHoy,
           totalMes,
           totalAno,
-          topPlatos: buildTopPlatos(pedidosMes),
+          topPlatos: buildTopPlatos([...mesaMesPedidos, ...nonMesaMes]),
           topPlatosAno: buildTopPlatos(pedidosFiltrados),
           pedidosPorDia,
-          clientesNuevos,
-          clientesRecurrentes,
+          clientesNuevos: clientesSet.size,
+          clientesRecurrentes: 0,
           ticketMedio,
           ticketMedioAnterior,
-          pedidosAnterior: pedidosAnterior.length,
+          pedidosAnterior: pedidosAnteriorArr.length,
           ingresosAnterior,
           byOrigen: {
-            mesa:     { pedidos: mesaPedidos.length,    total: mesaPedidos.reduce((s, p) => s + (p.total || 0), 0) },
-            recogida: { pedidos: recogidaPedidos.length, total: recogidaPedidos.reduce((s, p) => s + (p.total || 0), 0) },
-            web:      { pedidos: webPedidos.length,      total: webPedidos.reduce((s, p) => s + (p.total || 0), 0) },
+            mesa:     { pedidos: mesaMesPedidos.length, total: mesaMesPedidos.reduce((s, p) => s + (p.total || 0), 0) },
+            recogida: { pedidos: recogidaMes.length,    total: recogidaMes.reduce((s, p) => s + (p.total || 0), 0) },
+            delivery: { pedidos: deliveryMes.length,    total: deliveryMes.reduce((s, p) => s + (p.total || 0), 0) },
+            web:      { pedidos: webMes.length,         total: webMes.reduce((s, p) => s + (p.total || 0), 0) },
           },
         }
       };

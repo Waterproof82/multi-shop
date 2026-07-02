@@ -44,13 +44,19 @@ export interface PedidoStats {
   totalAno: number;
   topPlatos: { nombre: string; cantidad: number; total: number }[];
   topPlatosAno: { nombre: string; cantidad: number; total: number }[];
-  pedidosPorDia: { dia: number; pedidos: number; ingresos: number }[];
+  pedidosPorDia: { dia: number; mesa: number; recogida: number; delivery: number; web: number }[];
   clientesNuevos: number;
   clientesRecurrentes: number;
   ticketMedio: number;
   ticketMedioAnterior: number;
   pedidosAnterior: number;
   ingresosAnterior: number;
+  byOrigen: {
+    mesa:     { pedidos: number; total: number };
+    recogida: { pedidos: number; total: number };
+    delivery: { pedidos: number; total: number };
+    web:      { pedidos: number; total: number };
+  };
 }
 
 /**
