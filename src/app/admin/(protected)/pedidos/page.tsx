@@ -32,6 +32,10 @@ interface MesaInfo {
   nombre: string | null;
 }
 
+interface MesaSesionDate {
+  cerrada_at: string | null;
+}
+
 interface Pedido {
   id: string;
   numero_pedido: number;
@@ -45,6 +49,7 @@ interface Pedido {
   mesa_id: string | null;
   tracking_token: string | null;
   mesas: MesaInfo | null;
+  sesion: MesaSesionDate | null;
   delivery_fee_cents?: number | null;
   origen?: string | null;
 }
@@ -230,6 +235,35 @@ async function loadPedidos(
   return data.pedidos ?? [];
 }
 
+function getEffectiveDate(pedido: Pedido): string {
+  return pedido.sesion?.cerrada_at ?? pedido.created_at;
+}
+
+interface GroupedItem {
+  nombre: string;
+  precio: number;
+  cantidad: number;
+  complementos: PedidoComplemento[];
+}
+
+function groupPedidoItems(items: PedidoItem[]): GroupedItem[] {
+  const map = new Map<string, GroupedItem>();
+  for (const item of items) {
+    const compKey = [...(item.complementos ?? [])]
+      .sort((a, b) => (a.nombre ?? a.name ?? '').localeCompare(b.nombre ?? b.name ?? ''))
+      .map(c => `${c.nombre ?? c.name}:${c.precio ?? c.price}`)
+      .join(',');
+    const key = `${item.nombre}||${item.precio}||${compKey}`;
+    const existing = map.get(key);
+    if (existing) {
+      existing.cantidad += item.cantidad;
+    } else {
+      map.set(key, { nombre: item.nombre, precio: item.precio, cantidad: item.cantidad, complementos: item.complementos ?? [] });
+    }
+  }
+  return Array.from(map.values());
+}
+
 function computePedidoStats(pedidos: Pedido[], selectedMonth: { mes: number; año: number }) {
   const today = new Date();
   const selectedMonthStart = new Date(selectedMonth.año, selectedMonth.mes, 1);
@@ -241,12 +275,12 @@ function computePedidoStats(pedidos: Pedido[], selectedMonth: { mes: number; añ
 
   if (isCurrentMonth) {
     const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    pedidosHoy = pedidos.filter(p => new Date(p.created_at) >= todayStart);
-    pedidosDelMes = pedidos.filter(p => new Date(p.created_at) >= selectedMonthStart);
+    pedidosHoy = pedidos.filter(p => new Date(getEffectiveDate(p)) >= todayStart);
+    pedidosDelMes = pedidos.filter(p => new Date(getEffectiveDate(p)) >= selectedMonthStart);
   } else {
     pedidosDelMes = pedidos.filter(p => {
-      const created = new Date(p.created_at);
-      return created >= selectedMonthStart && created <= selectedMonthEnd;
+      const d = new Date(getEffectiveDate(p));
+      return d >= selectedMonthStart && d <= selectedMonthEnd;
     });
   }
 
@@ -621,7 +655,7 @@ export default function PedidosPage() {
                         {renderEstadoBadge(pedido, language, updateEstado)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-muted-foreground text-sm">
-                        {formatDate(pedido.created_at, {
+                        {formatDate(getEffectiveDate(pedido), {
                           day: '2-digit', month: '2-digit', year: 'numeric',
                           hour: '2-digit', minute: '2-digit'
                         }, language)}
@@ -642,16 +676,16 @@ export default function PedidosPage() {
                           <div className="max-w-2xl">
                             <h4 className="font-medium mb-2 text-foreground">{t("orderDetails", language)}</h4>
                             <ul className="space-y-2 text-sm text-foreground">
-                              {pedido.detalle_pedido?.map((item: PedidoItem) => {
-                                const complementoTotal = item.complementos?.reduce((sum: number, comp: PedidoComplemento) => sum + (comp.precio || comp.price || 0), 0) || 0;
+                              {groupPedidoItems(pedido.detalle_pedido ?? []).map((item) => {
+                                const complementoTotal = item.complementos.reduce((sum, comp) => sum + (comp.precio || comp.price || 0), 0);
                                 const itemTotal = (item.precio * item.cantidad) + (complementoTotal * item.cantidad);
                                 return (
-                                  <li key={item.nombre + '-' + item.cantidad} className="flex flex-col">
+                                  <li key={item.nombre + '-' + item.precio + '-' + item.complementos.map(c => c.nombre ?? c.name).join(',')} className="flex flex-col">
                                     <div className="flex justify-between">
                                       <span>{item.cantidad}x {item.nombre}</span>
                                       <span className="font-medium">{formatPrice(itemTotal)}</span>
                                     </div>
-                                    {item.complementos && item.complementos.length > 0 && (
+                                    {item.complementos.length > 0 && (
                                       <ul className="ml-4 mt-1 text-xs text-muted-foreground">
                                         {item.complementos.map((comp: PedidoComplemento) => (
                                           <li key={comp.nombre || comp.name}>+ {comp.nombre || comp.name} ({formatPrice(comp.precio || comp.price || 0)})</li>

@@ -116,6 +116,14 @@ function addValidatedRetenidos(
   }
 }
 
+const PEDIDO_ADMIN_SELECT = '*, clientes:cliente_id (nombre, email, telefono), mesas:mesa_id (numero, nombre), sesion:sesion_id (cerrada_at)';
+
+function pedidoEffectiveDateMs(p: Record<string, unknown>): number {
+  const sesion = p['sesion'] as Record<string, unknown> | null;
+  const d = (sesion?.['cerrada_at'] as string | null) ?? (p['created_at'] as string);
+  return new Date(d).getTime();
+}
+
 export class SupabasePedidoRepository implements IPedidoRepository {
   constructor(private readonly supabase: SupabaseClient) {}
 
@@ -141,7 +149,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       const [{ data, error }, openSesionIds] = await Promise.all([
         this.supabase
           .from('pedidos')
-          .select(`*, clientes:cliente_id (nombre, email, telefono), mesas:mesa_id (numero, nombre)`)
+          .select(PEDIDO_ADMIN_SELECT)
           .eq('empresa_id', empresaId)
           .order('created_at', { ascending: false }),
         this.getOpenSesionIds(empresaId),
@@ -163,22 +171,58 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       const startDate = new Date(año, mes, 1).toISOString();
       const endDate = new Date(año, mes + 1, 0, 23, 59, 59).toISOString();
 
-      const [{ data, error }, openSesionIds] = await Promise.all([
-        this.supabase
-          .from('pedidos')
-          .select(`*, clientes:cliente_id (nombre, email, telefono), mesas:mesa_id (numero, nombre)`)
-          .eq('empresa_id', empresaId)
-          .gte('created_at', startDate)
-          .lte('created_at', endDate)
-          .order('created_at', { ascending: false }),
-        this.getOpenSesionIds(empresaId),
-      ]);
+      // For mesa orders, effective date = session cerrada_at. Fetch closed sessions in range first.
+      const { data: sesiones, error: sesionesErr } = await this.supabase
+        .from('mesa_sesiones')
+        .select('id')
+        .eq('empresa_id', empresaId)
+        .gte('cerrada_at', startDate)
+        .lte('cerrada_at', endDate);
 
-      if (error) {
-        await logger.logAndReturnError('DB_SELECT_ERROR', error.message, 'repository', 'SupabasePedidoRepository.findAllByTenantAndMonth', { empresaId, details: { code: error.code, mes, año } });
+      if (sesionesErr) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', sesionesErr.message, 'repository', 'SupabasePedidoRepository.findAllByTenantAndMonth', { empresaId, details: { code: sesionesErr.code, mes, año } });
         return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pedidos', module: 'repository', method: 'findAllByTenantAndMonth' } };
       }
-      return { success: true, data: this.excludeOpenSesionPedidos(data || [], openSesionIds) };
+
+      const sesionIds = (sesiones ?? []).map(s => (s as Record<string, unknown>)['id'] as string);
+
+      // Non-mesa orders: filter by created_at
+      const { data: nonMesa, error: nonMesaErr } = await this.supabase
+        .from('pedidos')
+        .select(PEDIDO_ADMIN_SELECT)
+        .eq('empresa_id', empresaId)
+        .is('sesion_id', null)
+        .gte('created_at', startDate)
+        .lte('created_at', endDate)
+        .order('created_at', { ascending: false });
+
+      if (nonMesaErr) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', nonMesaErr.message, 'repository', 'SupabasePedidoRepository.findAllByTenantAndMonth', { empresaId, details: { code: nonMesaErr.code } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pedidos', module: 'repository', method: 'findAllByTenantAndMonth' } };
+      }
+
+      // Mesa orders: filter by their session's cerrada_at
+      let mesa: Pedido[] = [];
+      if (sesionIds.length > 0) {
+        const { data: mesaData, error: mesaErr } = await this.supabase
+          .from('pedidos')
+          .select(PEDIDO_ADMIN_SELECT)
+          .eq('empresa_id', empresaId)
+          .in('sesion_id', sesionIds)
+          .order('created_at', { ascending: false });
+
+        if (mesaErr) {
+          await logger.logAndReturnError('DB_SELECT_ERROR', mesaErr.message, 'repository', 'SupabasePedidoRepository.findAllByTenantAndMonth', { empresaId, details: { code: mesaErr.code } });
+          return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pedidos', module: 'repository', method: 'findAllByTenantAndMonth' } };
+        }
+
+        mesa = (mesaData ?? []) as Pedido[];
+      }
+
+      const rows = [...(nonMesa ?? []) as Pedido[], ...mesa] as unknown as Record<string, unknown>[];
+      rows.sort((a, b) => pedidoEffectiveDateMs(b) - pedidoEffectiveDateMs(a));
+
+      return { success: true, data: rows as unknown as Pedido[] };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findAllByTenantAndMonth', { empresaId, details: { mes, año } });
       return { success: false, error: appError };
