@@ -1,4 +1,4 @@
-import { getSupabaseClient } from './supabase-client';
+import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { ITpvRepository } from '@/core/domain/repositories/ITpvRepository';
 import {
   TpvTurno,
