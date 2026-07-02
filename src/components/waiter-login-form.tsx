@@ -698,8 +698,8 @@ export function WaiterLoginForm() {
           />
           <dialog
             open
-            className="w-full max-w-xs rounded-2xl p-5 flex flex-col gap-4"
-            style={{ background: 'oklch(18% 0.03 252)', border: '1px solid oklch(42% 0.10 252 / 0.5)' }}
+            className="relative w-full max-w-xs rounded-2xl p-5 flex flex-col gap-4"
+            style={{ background: 'oklch(18% 0.03 252)', border: '1px solid oklch(42% 0.10 252 / 0.5)', margin: 0 }}
           >
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
