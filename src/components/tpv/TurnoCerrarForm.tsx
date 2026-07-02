@@ -1,0 +1,161 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import type { TpvTurno, TpvTurnoStats } from '@/core/domain/entities/tpv-types';
+
+interface Props {
+  readonly turno: TpvTurno;
+  readonly stats: TpvTurnoStats;
+}
+
+function fmt(cents: number) {
+  return (cents / 100).toLocaleString('es-ES', { minimumFractionDigits: 2 }) + ' €';
+}
+
+function getDiferenciaColorClass(diferenciaCents: number): string {
+  if (diferenciaCents === 0) return 'text-[#22c55e]';
+  if (diferenciaCents > 0) return 'text-[#eab308]';
+  return 'text-[#ef4444]';
+}
+
+function getDiferenciaBoxClass(diferenciaCents: number): string {
+  if (diferenciaCents === 0) return 'bg-[#22c55e15] border-[#22c55e44]';
+  if (Math.abs(diferenciaCents) < 100) return 'bg-[#eab30815] border-[#eab30844]';
+  return 'bg-[#ef444415] border-[#ef444444]';
+}
+
+function getDiferenciaLabel(diferenciaCents: number): string {
+  if (diferenciaCents === 0) return 'Cuadra perfectamente';
+  if (diferenciaCents > 0) return 'Sobrante';
+  return 'Faltante';
+}
+
+export function TurnoCerrarForm({ turno, stats }: Props) {
+  const router = useRouter();
+  const [efectivoContado, setEfectivoContado] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const contadoCents = Math.round(parseFloat(efectivoContado || '0') * 100);
+  const teoricoCents = turno.efectivoAperturaCents + stats.totalEfectivoCents;
+  const diferenciaCents = contadoCents - teoricoCents;
+  const hasContado = efectivoContado.trim() !== '';
+
+  const apertura = new Date(turno.aperturaAt);
+  const [duracion] = useState(() =>
+    Math.round((new Date().getTime() - apertura.getTime()) / 60_000)
+  );
+
+  async function handleCierre(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    const res = await fetch(`/api/tpv/turno/${turno.id}/cerrar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        efectivoCierreCents: contadoCents,
+        totalEfectivoTeoricoCents: teoricoCents,
+      }),
+    });
+
+    setLoading(false);
+    if (res.ok) {
+      router.push('/tpv/turno/abrir');
+    } else {
+      setError('Error al cerrar el turno. Intentalo de nuevo.');
+    }
+  }
+
+  return (
+    <form onSubmit={handleCierre} className="flex flex-col gap-6 w-full max-w-sm">
+      {/* Resumen */}
+      <div className="bg-[#22263a] border border-[#2e3347] rounded-xl p-5 flex flex-col gap-3">
+        <p className="text-[10px] font-bold text-[#6b7280] uppercase tracking-wider">Resumen del turno</p>
+        <div className="flex justify-between text-sm">
+          <span className="text-[#6b7280]">Operador</span>
+          <span>{turno.operadorNombre}</span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-[#6b7280]">Apertura</span>
+          <span>{apertura.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-[#6b7280]">Duración</span>
+          <span>{duracion} min</span>
+        </div>
+        <div className="h-px bg-[#2e3347]" />
+        <div className="flex justify-between text-sm">
+          <span className="text-[#6b7280]">Total efectivo (teórico)</span>
+          <span className="font-semibold">{fmt(teoricoCents)}</span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-[#6b7280]">Total tarjeta</span>
+          <span className="font-semibold">{fmt(stats.totalTarjetaCents)}</span>
+        </div>
+        <div className="flex justify-between text-sm font-bold">
+          <span>TOTAL TURNO</span>
+          <span>{fmt(teoricoCents + stats.totalTarjetaCents)}</span>
+        </div>
+      </div>
+
+      {/* Arqueo ciego */}
+      <div className="flex flex-col gap-2">
+        <label className="text-xs font-bold text-[#6b7280] uppercase tracking-wider">
+          Efectivo contado en caja
+        </label>
+        <div className="flex items-center gap-2 bg-[#22263a] border border-[#2e3347] rounded-xl px-4 focus-within:border-[#4f72ff] transition-colors">
+          <span className="text-[#6b7280] font-semibold">€</span>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={efectivoContado}
+            onChange={e => setEfectivoContado(e.target.value)}
+            className="flex-1 bg-transparent py-3.5 text-lg font-bold outline-none"
+            placeholder="0,00"
+            autoFocus
+          />
+        </div>
+      </div>
+
+      {/* Diferencia en tiempo real */}
+      {hasContado && (
+        <div className={`rounded-xl p-4 border ${getDiferenciaBoxClass(diferenciaCents)}`}>
+          <p className="text-xs font-bold text-[#6b7280] uppercase tracking-wider mb-1">Diferencia</p>
+          <p className={`text-2xl font-bold ${getDiferenciaColorClass(diferenciaCents)}`}>
+            {diferenciaCents >= 0 ? '+' : ''}{fmt(diferenciaCents)}
+          </p>
+          <p className="text-xs text-[#6b7280] mt-1">
+            {getDiferenciaLabel(diferenciaCents)}
+          </p>
+        </div>
+      )}
+
+      {error !== null && (
+        <p className="text-sm text-red-400 bg-red-400/10 border border-red-400/30 rounded-lg px-4 py-3">
+          {error}
+        </p>
+      )}
+
+      <div className="flex gap-3">
+        <button
+          type="button"
+          onClick={() => router.push('/tpv/mostrador')}
+          className="flex-1 py-3.5 rounded-xl border border-[#2e3347] text-[#6b7280] font-semibold hover:text-[#e8eaf0] transition-colors"
+        >
+          Cancelar
+        </button>
+        <button
+          type="submit"
+          disabled={!hasContado || loading}
+          className="flex-[2] py-3.5 rounded-xl bg-[#ef4444] text-white font-bold disabled:opacity-40 hover:brightness-110 transition-all"
+        >
+          {loading ? 'Cerrando...' : 'Cerrar turno'}
+        </button>
+      </div>
+    </form>
+  );
+}
