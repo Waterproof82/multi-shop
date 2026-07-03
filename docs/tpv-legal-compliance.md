@@ -16,7 +16,7 @@
 - [x] **Bloquear UPDATE de campos económicos** — Trigger `tpv_cobro_block_update` (20260703).
 - [x] **Ticket rectificativo** — `POST /api/tpv/cobro/rectificar` emite cobro de signo negativo con `rectifica_cobro_id` referenciando el original. Accesible desde el historial (tab Cobros) (20260703).
 - [x] Columna `rectifica_cobro_id UUID REFERENCES tpv_cobros(id)` añadida a `tpv_cobros` (20260703).
-- [ ] Documentar en `CLAUDE.md` y en la declaración de responsabilidad que el borrado directo de registros de venta está prohibido.
+- [x] Documentar en `CLAUDE.md` y en la declaración de responsabilidad que el borrado directo de registros de venta está prohibido (20260703).
 
 ### 1.2 Cadena de Hashes (Trazabilidad)
 
@@ -113,12 +113,7 @@
 
 ## 8. Pantalla de conformidad en el software
 
-- [ ] Crear `/tpv/legal` o sección "Acerca de" con:
-  - Nombre del software y versión
-  - Nombre y NIF del fabricante
-  - Texto completo de la Declaración de Responsabilidad
-  - Fecha de firma
-  - Enlace al RD 1007/2023
+- [x] Crear `/tpv/legal` con nombre del software y versión, NIF del fabricante, texto completo de la Declaración de Responsabilidad, fecha de firma y enlace al RD 1007/2023 (20260703).
 
 ---
 
@@ -127,3 +122,4 @@
 | Versión | Fecha      | Cambios                        |
 |---------|------------|--------------------------------|
 | 1.0     | 2026-07-02 | Creación inicial del documento |
+| 1.1     | 2026-07-03 | Marcados como completados: bloqueo DELETE/UPDATE, ticket rectificativo, cadena de hashes, endpoints de auditoría, pantalla `/tpv/legal`, Declaración de Responsabilidad |

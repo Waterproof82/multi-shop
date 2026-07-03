@@ -33,6 +33,22 @@ Plataforma **multi-tenant** de gestión de negocios de hostelería y retail. Cad
   - `/waiter/bar` — vista de bebidas para el camarero. Swipe directo a servido con countdown de 5 s. Botón "Todos servidos" por mesa.
   - Los camareros deslizan cada ítem para avanzar su estado con gestos de puntero.
 
+### 🖥️ TPV — Terminal Punto de Venta (Fase 1)
+
+Software de caja para restaurantes y tiendas, integrado en la misma plataforma y con cumplimiento legal completo (Ley Antifraude, RD 1007/2023).
+
+- **Gestión de turnos de caja**: apertura con efectivo inicial, cierre con arqueo ciego (el cajero declara el efectivo sin ver el teórico), diferencia calculada automáticamente.
+- **Mostrador táctil en 3 columnas**: grid de mesas/categorías a la izquierda, menú de productos en el centro, ticket activo a la derecha. Navegación por teclado + touch optimizada.
+- **Selección de complementos**: modal de selección cuando un producto tiene opciones obligatorias u opcionales (radio-select por complemento, validación pre-añadido).
+- **Flujo de cobro completo**: efectivo (calcula cambio automáticamente), tarjeta, propina opcional. Pantalla de confirmación con número de ticket, desglose de IVA y enlace de verificación AEAT.
+- **Cadena de hashes SHA-256** (Ley Antifraude): cada cobro encadena el hash del anterior vía trigger PostgreSQL + pgcrypto. Inmutable: triggers bloquean DELETE y UPDATE de campos económicos con EXCEPTION.
+- **Ticket rectificativo**: anula un cobro previo emitiendo un cobro de signo negativo con referencia al original — sin modificar registros inmutables.
+- **Historial de turno**: vista de pedidos y cobros del turno activo con tabs separados. Los cobros muestran número de ticket correlativo y botón de rectificación con confirmación.
+- **Auditoría para inspectores**: `GET /api/tpv/audit/chain` verifica la cadena de hashes recomputando SHA-256 en Node.js; `GET /api/tpv/audit/export` descarga todos los cobros del período como JSON con cabecera `Content-Disposition: attachment`.
+- **Pantalla de conformidad legal** `/tpv/legal`: Declaración de Responsabilidad del fabricante (RD 1007/2023), versión del software, fecha de firma, serie del sistema, checklist de cumplimiento, y acceso a verificación de cadena y exportación.
+- **NIF/CIF de la empresa**: campo configurable desde el panel admin, incluido en el ticket de cobro y en el enlace de verificación AEAT.
+- **Rutas TPV**: `/tpv/turno/abrir`, `/tpv/mostrador`, `/tpv/cobro/[sesionId]`, `/tpv/historial`, `/tpv/mesas`, `/tpv/legal`.
+
 ### 🤖 Notificaciones Telegram — dos modos de operación
 
 - **Tienda**: botones de acción rápida (Aceptar, Rechazar) directamente en el mensaje.
@@ -247,6 +263,13 @@ src/
 │   │       ├── delivery/            # Zona de entrega + credenciales Glovo + Redsys
 │   │       ├── estadisticas/
 │   │       └── configuracion/
+│   ├── tpv/                         # Terminal Punto de Venta
+│   │   ├── turno/abrir/page.tsx     # Apertura de turno con efectivo inicial
+│   │   ├── mostrador/page.tsx       # Mostrador táctil (3 columnas)
+│   │   ├── cobro/[sesionId]/page.tsx# Flujo de cobro (efectivo/tarjeta/propina)
+│   │   ├── historial/page.tsx       # Historial pedidos + cobros del turno
+│   │   ├── mesas/page.tsx           # Grid de mesas con estado de sesión
+│   │   └── legal/page.tsx           # Conformidad legal + Declaración RD 1007/2023
 │   ├── superadmin/                  # Panel Super Admin
 │   │   ├── layout.tsx               # Verifica rol superadmin
 │   │   ├── page.tsx                 # Dashboard global
@@ -311,6 +334,14 @@ src/
 │       │   ├── quote/               # POST — pública, cotización de envío en tiempo real
 │       │   ├── order/               # POST — admin, despacho manual de rider
 │       │   └── webhook/             # POST — callbacks de estado del rider Glovo
+│       ├── tpv/                     # TPV (admin auth)
+│       │   ├── turno/               # POST (abrir) + GET (activo)
+│       │   ├── cobro/               # POST — registrar cobro completo (hash chain)
+│       │   │   └── rectificar/      # POST — ticket rectificativo (cobro negativo)
+│       │   ├── pedidos/             # POST — crear pedido desde mostrador
+│       │   └── audit/
+│       │       ├── chain/           # GET — verificar cadena SHA-256 (Ley Antifraude)
+│       │       └── export/          # GET — exportar cobros como JSON (inspectores)
 │       └── unsubscribe/             # GET — pública, dar de baja/alta promo
 │
 ├── core/                            # Clean Architecture
@@ -872,6 +903,7 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 | **Kitchen & Bar In-App** | `/waiter/kitchen` y `/waiter/bar`: vistas en tiempo real para gestión de ítems sin Telegram. Estados por ítem: pendiente → en_preparacion → preparado → servido (swipe gestual). Colores por tiempo de espera (oklch, 6 rangos). GroupBy por pedido o por mesa. Filtro "Listos". Retenidos con sección propia. Badges con counts en WaiterBanner (neutral/verde/naranja). Timer de espera arranca desde `validated_at` (momento de validación), no desde `created_at` del pedido original. |
 | **Waiter Pendientes** | `/waiter/pendientes`: cola de validación antes de cocina/bar. Selección individual o por tipo (comida/bebida). Pausa (⏸) por ítem de comida → llega a cocina como retenido. Botón conjunto comida+bebida (botón morado) valida ambos tipos en un solo POST. La pausa prevalece sobre la selección en envíos conjuntos. |
 | **Realtime Híbrido** | Migración completa de polling a Supabase Realtime en todas las vistas del panel de sala (kitchen, bar, pendientes, waiter-banner, waiter-login). Sistema híbrido: Realtime CDC para cambios de datos (<100 ms latencia, sin carga en DB en reposo) + `setInterval` 1 s exclusivamente para actualización visual de timers. Un único canal multiplexado en WaiterBanner consolida conteos de cocina, bar y estado de pago. Eliminados ~30 requests HTTP/min por camarero activo. Ver sección [⚡ Arquitectura Realtime](#-arquitectura-realtime--sistema-híbrido). |
+| **TPV — Terminal Punto de Venta** | Software de caja integrado en la plataforma. Turnos con apertura/cierre y arqueo ciego. Mostrador táctil 3 columnas (mesas, menú, ticket). Cobro efectivo/tarjeta/propina. Cadena de hashes SHA-256 inmutable por trigger PostgreSQL (Ley Antifraude, RD 1007/2023): bloqueo de DELETE y UPDATE con EXCEPTION. Ticket rectificativo = cobro negativo con `rectifica_cobro_id`. Numeración correlativa por empresa (`serie-NNNNNN`). IVA desglosado (base imponible + iva_cents) calculado en DB. Verificación de cadena en `/api/tpv/audit/chain`. Exportación JSON para inspectores en `/api/tpv/audit/export`. Pantalla de conformidad legal `/tpv/legal` con Declaración de Responsabilidad RD 1007/2023. |
 | **Telegram Multi-modo** | tienda → quick-reply buttons. restaurante takeaway → time-selector + tracking en vivo. mesa → gestionado in-app (sin Telegram). |
 | **Delivery + Pago online** | Zona de cobertura por CP configurable. Cotización Glovo en tiempo real. Pago Redsys TPV Virtual obligatorio para delivery. Auto-despacho de rider al confirmar pago. Tracking page post-pago. |
 
@@ -890,6 +922,8 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 - [`docs/context/delivery.md`](docs/context/delivery.md) — Delivery: zona de cobertura, Glovo Business LaaS, Redsys TPV, flujo completo end-to-end
 - [`docs/context/qr-session-enforcement.md`](docs/context/qr-session-enforcement.md) — QR session enforcement: presencia física, mesa_client_tokens, QRScannerGate, rotación de sesión
 - [`docs/context/waiter-validation-flow.md`](docs/context/waiter-validation-flow.md) — Cola de validación: flujo pendiente_validacion → cocina/bar, from_validation flag, pausa, timer validated_at
+- [`docs/tpv-legal-compliance.md`](docs/tpv-legal-compliance.md) — TPV: checklist de cumplimiento legal (Ley Antifraude, TicketBAI, RD 1619/2012, RGPD, PCI-DSS)
+- [`docs/superpowers/specs/2026-07-02-tpv-design.md`](docs/superpowers/specs/2026-07-02-tpv-design.md) — Spec técnica del TPV Fase 1
 
 ---
 
