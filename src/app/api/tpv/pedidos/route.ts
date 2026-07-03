@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { pedidoUseCase, mesaUseCase } from '@/core/infrastructure/database';
 import { requireAuth, requireRole, validationErrorResponse } from '@/core/infrastructure/api/helpers';
+import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 
 const itemSchema = z.object({
   productId: z.string().uuid(),
@@ -15,6 +16,48 @@ const bodySchema = z.object({
   mesaId: z.string().uuid(),
   items: z.array(itemSchema).min(1).max(50),
 });
+
+export async function GET(req: NextRequest) {
+  const { empresaId, error: authError } = await requireAuth(req);
+  if (authError) return authError;
+  const forbidden = requireRole(req, ['admin', 'superadmin']);
+  if (forbidden) return forbidden;
+  if (!empresaId) return validationErrorResponse('empresaId requerido');
+
+  const sesionId = req.nextUrl.searchParams.get('sesionId');
+  if (!sesionId || !/^[0-9a-f-]{36}$/.test(sesionId)) {
+    return validationErrorResponse('sesionId inválido');
+  }
+
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from('pedidos')
+    .select('id, numero_pedido, detalle_pedido, total, estado, created_at')
+    .eq('empresa_id', empresaId)
+    .eq('sesion_id', sesionId)
+    .not('estado', 'in', '(cancelado,servido)')
+    .order('created_at');
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  type RawItem = { nombre?: string; precio?: number; cantidad?: number; complementos?: string[] };
+  type RawPedido = { id: string; numero_pedido: number; detalle_pedido: RawItem[]; total: number; estado: string };
+
+  const orders = ((data ?? []) as RawPedido[]).map(p => ({
+    id: p.id,
+    numeroPedido: p.numero_pedido,
+    estado: p.estado,
+    items: (p.detalle_pedido ?? []).map(it => ({
+      nombre: it.nombre ?? '',
+      precio: Number(it.precio ?? 0),
+      cantidad: Number(it.cantidad ?? 1),
+      complementos: it.complementos ?? [],
+    })),
+    total: Number(p.total),
+  }));
+
+  return NextResponse.json(orders);
+}
 
 export async function POST(req: NextRequest) {
   const { empresaId, error: authError } = await requireAuth(req);

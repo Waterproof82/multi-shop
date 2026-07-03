@@ -1,5 +1,6 @@
 'use client';
 
+import { useCallback, useState } from 'react';
 import type { TpvTurno } from '@/core/domain/entities/tpv-types';
 import type { Product, Category } from '@/core/domain/entities/types';
 import { useMesaActiva } from '@/hooks/tpv/useMesaActiva';
@@ -31,7 +32,22 @@ interface Props {
 }
 
 export function MostradorClient({ turno, products, categories, initialMesa }: Props) {
-  const { mesa, addItem, removeItem, clearPending } = useMesaActiva(initialMesa);
+  const { mesa, addItem, removeItem, clearPending, refreshOrders } = useMesaActiva(initialMesa);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    if (!mesa.sesionId) return;
+    setRefreshing(true);
+    try {
+      const res = await fetch(`/api/tpv/pedidos?sesionId=${mesa.sesionId}`);
+      if (res.ok) {
+        const orders = await res.json() as ExistingOrder[];
+        refreshOrders(orders);
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  }, [mesa.sesionId, refreshOrders]);
 
   return (
     <>
@@ -53,7 +69,12 @@ export function MostradorClient({ turno, products, categories, initialMesa }: Pr
         categories={categories}
         onAddItem={addItem}
       />
-      <AccionesPanel sesionId={mesa.sesionId} turnoId={turno.id} />
+      <AccionesPanel
+        sesionId={mesa.sesionId}
+        turnoId={turno.id}
+        onRefresh={handleRefresh}
+        refreshing={refreshing}
+      />
     </>
   );
 }

@@ -1,11 +1,12 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useTransition } from 'react';
 
 interface Props {
   readonly sesionId: string | null;
   readonly turnoId: string;
+  readonly onRefresh: () => Promise<void>;
+  readonly refreshing: boolean;
 }
 
 interface ActionButtonProps {
@@ -43,14 +44,9 @@ function ActionGroup({ title, children }: ActionGroupProps) {
   );
 }
 
-export function AccionesPanel({ sesionId, turnoId }: Props) {
+export function AccionesPanel({ sesionId, turnoId, onRefresh, refreshing }: Props) {
   const router = useRouter();
-  const [refreshing, startRefresh] = useTransition();
   const hasMesa = sesionId !== null;
-
-  function handleRefresh() {
-    startRefresh(() => { router.refresh(); });
-  }
 
   return (
     <aside className="w-[200px] shrink-0 bg-[#1a1d27] border-l border-[#2e3347] flex flex-col">
@@ -61,7 +57,7 @@ export function AccionesPanel({ sesionId, turnoId }: Props) {
       <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-5 pt-4">
         <ActionGroup title="Mesa">
           <ActionButton label="Seleccionar mesa" onClick={() => router.push('/tpv/mesas?seleccionar=1')} />
-          <ActionButton label={refreshing ? 'Actualizando…' : 'Actualizar estado'} onClick={handleRefresh} disabled={!hasMesa || refreshing} />
+          <ActionButton label={refreshing ? 'Actualizando…' : 'Actualizar estado'} onClick={() => { void onRefresh(); }} disabled={!hasMesa || refreshing} />
           <ActionButton label="Ver ticket completo" onClick={() => { if (sesionId) router.push(`/tpv/cobro/${sesionId}?turnoId=${turnoId}`); }} disabled={!hasMesa} />
           <ActionButton label="Liberar mesa" onClick={() => {}} disabled={!hasMesa} />
         </ActionGroup>
