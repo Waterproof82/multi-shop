@@ -32,7 +32,7 @@ export default async function CobroPage({ params, searchParams }: Readonly<Props
       .single(),
     supabase
       .from('empresas')
-      .select('nif')
+      .select('nif, tipo_impuesto, porcentaje_impuesto')
       .eq('id', admin.empresaId)
       .maybeSingle(),
   ]);
@@ -47,7 +47,9 @@ export default async function CobroPage({ params, searchParams }: Readonly<Props
     mesas: { numero: number } | null;
   };
 
-  const nif = (empresaRes.data as { nif: string | null } | null)?.nif ?? null;
+  const empresaRow = empresaRes.data as { nif: string | null; tipo_impuesto: string | null } | null;
+  const nif = empresaRow?.nif ?? null;
+  const tipoImpuesto = (empresaRow?.tipo_impuesto as 'iva' | 'igic' | null) ?? 'iva';
 
   return (
     <CobroFlow
@@ -57,6 +59,7 @@ export default async function CobroPage({ params, searchParams }: Readonly<Props
       mesaNumero={sesionData.mesas?.numero ?? 0}
       operadorNombre={admin.nombreCompleto ?? 'Operador'}
       empresaNif={nif}
+      tipoImpuesto={tipoImpuesto}
     />
   );
 }

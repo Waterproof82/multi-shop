@@ -24,6 +24,14 @@ export default async function TpvHistorialPage() {
   const turno = turnoResult.data;
   const supabase = getSupabaseClient();
 
+  const { data: empresaRow } = await supabase
+    .from('empresas')
+    .select('tipo_impuesto')
+    .eq('id', empresaId)
+    .maybeSingle();
+
+  const tipoImpuesto = ((empresaRow as { tipo_impuesto: string | null } | null)?.tipo_impuesto as 'iva' | 'igic' | null) ?? 'iva';
+
   const { data: pedidos } = await supabase
     .from('pedidos')
     .select('id, numero_pedido, total, estado, created_at, detalle_pedido, mesa_id, sesion_id, payment_status, mesas(numero, nombre)')
@@ -101,5 +109,5 @@ export default async function TpvHistorialPage() {
     rectificaCobroId: c.rectifica_cobro_id,
   }));
 
-  return <HistorialClient pedidos={rows} cobros={cobros} turnoAperturaAt={turno.aperturaAt} />;
+  return <HistorialClient pedidos={rows} cobros={cobros} turnoAperturaAt={turno.aperturaAt} tipoImpuesto={tipoImpuesto} />;
 }

@@ -11,6 +11,7 @@ interface Props {
   readonly operadorNombre: string;
   readonly cobro: TpvCobro | null;
   readonly empresaNif: string | null;
+  readonly tipoImpuesto: 'iva' | 'igic';
   readonly onNuevaOperacion: () => void;
 }
 
@@ -35,6 +36,7 @@ export function CobroConfirmado({
   operadorNombre,
   cobro,
   empresaNif,
+  tipoImpuesto,
   onNuevaOperacion,
 }: Props) {
   const now = new Date();
@@ -97,13 +99,13 @@ export function CobroConfirmado({
           {cobro !== null && (
             <>
               <div className="h-px bg-[#2e3347]" />
-              <p className="text-[10px] font-bold text-[#6b7280] uppercase tracking-wider">Desglose IVA</p>
+              <p className="text-[10px] font-bold text-[#6b7280] uppercase tracking-wider">Desglose {tipoImpuesto.toUpperCase()}</p>
               <div className="flex justify-between text-xs text-[#6b7280]">
-                <span>Base imponible ({cobro.ivaPorcentaje}% IVA)</span>
+                <span>Base imponible ({cobro.ivaPorcentaje}% {tipoImpuesto.toUpperCase()})</span>
                 <span>{fmt(cobro.baseImponibleCents)}</span>
               </div>
               <div className="flex justify-between text-xs text-[#6b7280]">
-                <span>IVA {cobro.ivaPorcentaje}%</span>
+                <span>{tipoImpuesto.toUpperCase()} {cobro.ivaPorcentaje}%</span>
                 <span>{fmt(cobro.ivaCents)}</span>
               </div>
               {propinaCents > 0 && (

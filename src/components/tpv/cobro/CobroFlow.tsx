@@ -16,11 +16,12 @@ interface Props {
   readonly mesaNumero: number;
   readonly operadorNombre: string;
   readonly empresaNif: string | null;
+  readonly tipoImpuesto: 'iva' | 'igic';
 }
 
 type Step = 'metodo' | 'efectivo' | 'tarjeta' | 'confirmado';
 
-export function CobroFlow({ sesionId, turnoId, totalCents, mesaNumero, operadorNombre, empresaNif }: Props) {
+export function CobroFlow({ sesionId, turnoId, totalCents, mesaNumero, operadorNombre, empresaNif, tipoImpuesto }: Props) {
   const router = useRouter();
   const [step, setStep] = useState<Step>('metodo');
   const [metodo, setMetodo] = useState<MetodoPago>('efectivo');
@@ -107,6 +108,7 @@ export function CobroFlow({ sesionId, turnoId, totalCents, mesaNumero, operadorN
       operadorNombre={operadorNombre}
       cobro={cobro}
       empresaNif={empresaNif}
+      tipoImpuesto={tipoImpuesto}
       onNuevaOperacion={() => router.push('/tpv/mostrador')}
     />
   );

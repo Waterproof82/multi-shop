@@ -40,6 +40,7 @@ interface Props {
   pedidos: PedidoRow[];
   cobros: CobroRow[];
   turnoAperturaAt: string;
+  tipoImpuesto: 'iva' | 'igic';
 }
 
 const ESTADO_LABEL: Record<string, string> = {
@@ -176,7 +177,7 @@ function CobrosList({ cobros }: Readonly<{ cobros: CobroRow[] }>) {
   );
 }
 
-export function HistorialClient({ pedidos, cobros, turnoAperturaAt }: Readonly<Props>) {
+export function HistorialClient({ pedidos, cobros, turnoAperturaAt, tipoImpuesto: _tipoImpuesto }: Readonly<Props>) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('pedidos');
 
