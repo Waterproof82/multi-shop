@@ -15,6 +15,7 @@ const CobroSchema = z.object({
   importeCobradoCents: z.number().int().positive(),
   propinaCents: z.number().int().min(0),
   turnoId: z.string().uuid(),
+  ivaPorcentaje: z.number().min(0).max(30).optional().default(10),
 });
 
 export async function POST(req: NextRequest) {

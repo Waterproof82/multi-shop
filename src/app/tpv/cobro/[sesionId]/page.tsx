@@ -47,9 +47,10 @@ export default async function CobroPage({ params, searchParams }: Readonly<Props
     mesas: { numero: number } | null;
   };
 
-  const empresaRow = empresaRes.data as { nif: string | null; tipo_impuesto: string | null } | null;
+  const empresaRow = empresaRes.data as { nif: string | null; tipo_impuesto: string | null; porcentaje_impuesto: number | null } | null;
   const nif = empresaRow?.nif ?? null;
   const tipoImpuesto = (empresaRow?.tipo_impuesto as 'iva' | 'igic' | null) ?? 'iva';
+  const porcentajeImpuesto = empresaRow?.porcentaje_impuesto ?? 10;
 
   return (
     <CobroFlow
@@ -60,6 +61,7 @@ export default async function CobroPage({ params, searchParams }: Readonly<Props
       operadorNombre={admin.nombreCompleto ?? 'Operador'}
       empresaNif={nif}
       tipoImpuesto={tipoImpuesto}
+      porcentajeImpuesto={porcentajeImpuesto}
     />
   );
 }

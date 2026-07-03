@@ -23,6 +23,7 @@ export interface TpvCobroPayload {
   importeCobradoCents: number;
   propinaCents: number;
   turnoId: string;
+  ivaPorcentaje?: number;
 }
 
 export interface TpvTurnoStats {

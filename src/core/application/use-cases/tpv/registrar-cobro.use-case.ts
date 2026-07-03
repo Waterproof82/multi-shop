@@ -66,5 +66,6 @@ export async function registrarCobroUseCase(
     metodoPago: payload.metodoPago,
     importeCobradoCents: payload.importeCobradoCents,
     propinaCents: payload.propinaCents,
+    ivaPorcentaje: payload.ivaPorcentaje,
   });
 }

@@ -17,11 +17,12 @@ interface Props {
   readonly operadorNombre: string;
   readonly empresaNif: string | null;
   readonly tipoImpuesto: 'iva' | 'igic';
+  readonly porcentajeImpuesto: number;
 }
 
 type Step = 'metodo' | 'efectivo' | 'tarjeta' | 'confirmado';
 
-export function CobroFlow({ sesionId, turnoId, totalCents, mesaNumero, operadorNombre, empresaNif, tipoImpuesto }: Props) {
+export function CobroFlow({ sesionId, turnoId, totalCents, mesaNumero, operadorNombre, empresaNif, tipoImpuesto, porcentajeImpuesto }: Props) {
   const router = useRouter();
   const [step, setStep] = useState<Step>('metodo');
   const [metodo, setMetodo] = useState<MetodoPago>('efectivo');
@@ -49,6 +50,7 @@ export function CobroFlow({ sesionId, turnoId, totalCents, mesaNumero, operadorN
         importeCobradoCents: totalFinalCents,
         propinaCents,
         turnoId,
+        ivaPorcentaje: porcentajeImpuesto,
       }),
     });
 
