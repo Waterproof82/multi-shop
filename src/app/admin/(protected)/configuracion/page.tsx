@@ -44,6 +44,7 @@ export default async function ConfiguracionPage() {
     instagram: empresaData?.instagram || '',
     url_mapa: empresaData?.urlMapa || '',
     direccion: empresaData?.direccion || '',
+    nif: empresaData?.nif || '',
   };
 
   const empresaApariencia = {

@@ -40,6 +40,9 @@ export async function POST(req: NextRequest) {
 
   if (!empresaId) return validationErrorResponse('empresaId requerido');
 
+  const userId = req.headers.get('x-admin-id');
+  if (!userId) return validationErrorResponse('userId requerido');
+
   let body: unknown;
   try {
     body = await req.json();
@@ -54,6 +57,7 @@ export async function POST(req: NextRequest) {
 
   const result = await abrirTurnoUseCase(repo, {
     empresaId,
+    userId,
     operadorNombre: parsed.data.operadorNombre,
     efectivoAperturaCents: parsed.data.efectivoAperturaCents,
   });

@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { MetodoPago } from '@/core/domain/entities/tpv-types';
+import type { MetodoPago, TpvCobro } from '@/core/domain/entities/tpv-types';
+import { getCsrfToken } from '@/lib/csrf-client';
 import { CobroMetodoPropina } from './CobroMetodoPropina';
 import { CobroEfectivo } from './CobroEfectivo';
 import { CobroTarjeta } from './CobroTarjeta';
@@ -14,17 +15,19 @@ interface Props {
   readonly totalCents: number;
   readonly mesaNumero: number;
   readonly operadorNombre: string;
+  readonly empresaNif: string | null;
 }
 
 type Step = 'metodo' | 'efectivo' | 'tarjeta' | 'confirmado';
 
-export function CobroFlow({ sesionId, turnoId, totalCents, mesaNumero, operadorNombre }: Props) {
+export function CobroFlow({ sesionId, turnoId, totalCents, mesaNumero, operadorNombre, empresaNif }: Props) {
   const router = useRouter();
   const [step, setStep] = useState<Step>('metodo');
   const [metodo, setMetodo] = useState<MetodoPago>('efectivo');
   const [propinaCents, setPropinaCents] = useState(0);
   const [entregadoCents, setEntregadoCents] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [cobro, setCobro] = useState<TpvCobro | null>(null);
 
   const totalFinalCents = totalCents + propinaCents;
 
@@ -32,9 +35,13 @@ export function CobroFlow({ sesionId, turnoId, totalCents, mesaNumero, operadorN
     setEntregadoCents(importe);
     setLoading(true);
 
+    const csrfToken = getCsrfToken();
     const res = await fetch('/api/tpv/cobro', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
+      },
       body: JSON.stringify({
         sesionId,
         metodoPago: metodo,
@@ -45,7 +52,11 @@ export function CobroFlow({ sesionId, turnoId, totalCents, mesaNumero, operadorN
     });
 
     setLoading(false);
-    if (res.ok) setStep('confirmado');
+    if (res.ok) {
+      const json = (await res.json()) as TpvCobro;
+      setCobro(json);
+      setStep('confirmado');
+    }
   }
 
   if (step === 'metodo') {
@@ -94,6 +105,8 @@ export function CobroFlow({ sesionId, turnoId, totalCents, mesaNumero, operadorN
       propinaCents={propinaCents}
       mesaNumero={mesaNumero}
       operadorNombre={operadorNombre}
+      cobro={cobro}
+      empresaNif={empresaNif}
       onNuevaOperacion={() => router.push('/tpv/mostrador')}
     />
   );

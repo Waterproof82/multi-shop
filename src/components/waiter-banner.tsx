@@ -124,8 +124,8 @@ export function WaiterBanner() {
 
   // Waiter auth — independent of mesa selection
   // Seed from sessionStorage so full-page SW cache loads don't flash-hide the banner.
-  const [isWaiter, setIsWaiter]       = useState(() => sessionStorage.getItem('waiter-authed') === '1');
-  const [authChecked, setAuthChecked] = useState(() => sessionStorage.getItem('waiter-authed') === '1');
+  const [isWaiter, setIsWaiter]       = useState(() => typeof sessionStorage !== 'undefined' && sessionStorage.getItem('waiter-authed') === '1');
+  const [authChecked, setAuthChecked] = useState(() => typeof sessionStorage !== 'undefined' && sessionStorage.getItem('waiter-authed') === '1');
 
   // Kitchen/bar badge counts
   const [counts, setCounts] = useState<CountsPayload | null>(null);

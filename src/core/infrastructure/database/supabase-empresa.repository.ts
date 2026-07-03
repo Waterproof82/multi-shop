@@ -11,7 +11,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
     try {
       const { data: empresa } = await this.supabase
         .from('empresas')
-        .select('email_notification, telefono_whatsapp, nombre, logo_url, mostrar_logo, fb, instagram, url_mapa, direccion, dominio, slug, url_image, banner_fit, descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de, mostrar_carrito, mostrar_promociones, mostrar_tgtg, mesas_habilitadas, moneda, subdomain_pedidos, tipo, color_primary, color_primary_foreground, color_secondary, color_secondary_foreground, color_accent, color_accent_foreground, color_background, color_foreground, descuento_bienvenida_activo, descuento_bienvenida_porcentaje, descuento_bienvenida_duracion, delivery_habilitado')
+        .select('email_notification, telefono_whatsapp, nombre, logo_url, mostrar_logo, fb, instagram, url_mapa, direccion, nif, dominio, slug, url_image, banner_fit, descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de, mostrar_carrito, mostrar_promociones, mostrar_tgtg, mesas_habilitadas, moneda, subdomain_pedidos, tipo, color_primary, color_primary_foreground, color_secondary, color_secondary_foreground, color_accent, color_accent_foreground, color_background, color_foreground, descuento_bienvenida_activo, descuento_bienvenida_porcentaje, descuento_bienvenida_duracion, delivery_habilitado')
         .eq('id', empresaId)
         .single();
 
@@ -50,6 +50,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
           instagram: empresa.instagram ?? null,
           urlMapa: empresa.url_mapa ?? null,
           direccion: empresa.direccion ?? null,
+          nif: (empresa.nif as string | null) ?? null,
           telefonoWhatsapp: empresa.telefono_whatsapp ?? null,
           urlImage: empresa.url_image ?? null,
           bannerFit: (empresa.banner_fit as "contain" | "cover" | "fill" | null) ?? "contain",
@@ -80,6 +81,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
       if (data.instagram !== undefined) updatePayload.instagram = data.instagram || null;
       if (data.url_mapa !== undefined) updatePayload.url_mapa = data.url_mapa || null;
       if (data.direccion !== undefined) updatePayload.direccion = data.direccion || null;
+      if (data.nif !== undefined) updatePayload.nif = data.nif || null;
       if (data.logo_url !== undefined) updatePayload.logo_url = data.logo_url || null;
       if (data.mostrar_logo !== undefined) updatePayload.mostrar_logo = data.mostrar_logo;
       if (data.url_image !== undefined) updatePayload.url_image = data.url_image || null;

@@ -3,14 +3,20 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import type { Product, Category } from '@/core/domain/entities/types';
-import type { PedidoItem } from '@/core/domain/entities/types';
+import type { PendingItem } from '@/hooks/tpv/useMesaActiva';
 
-type TicketItem = Pick<PedidoItem, 'nombre' | 'precio' | 'cantidad'>;
+type AddItemPayload = Omit<PendingItem, 'cantidad'>;
 
 interface Props {
   readonly products: Product[];
   readonly categories: Category[];
-  readonly onAddItem: (item: TicketItem) => void;
+  readonly onAddItem: (item: AddItemPayload) => void;
+}
+
+interface ComplementDialogState {
+  product: Product;
+  options: Product[];
+  required: boolean;
 }
 
 const ALL_CAT_ID = '__all__';
@@ -20,21 +26,162 @@ function matchesSearch(product: Product, query: string): boolean {
   return product.titulo_es.toLowerCase().includes(query.toLowerCase());
 }
 
+function buildComplementMaps(categories: Category[], products: Product[]) {
+  const complementsByCatId = new Map<string, Product[]>();
+  const requiredByCatId = new Map<string, boolean>();
+
+  for (const cat of categories) {
+    if (!cat.categoriaComplementoDe) continue;
+    const parentId = cat.categoriaComplementoDe;
+    const opts = products.filter(p => p.categoriaId === cat.id && p.activo);
+    if (opts.length === 0) continue;
+    const existing = complementsByCatId.get(parentId) ?? [];
+    complementsByCatId.set(parentId, [...existing, ...opts]);
+    if (cat.complementoObligatorio) {
+      requiredByCatId.set(parentId, true);
+    } else if (!requiredByCatId.has(parentId)) {
+      requiredByCatId.set(parentId, false);
+    }
+  }
+  return { complementsByCatId, requiredByCatId };
+}
+
+interface ComplementDialogProps {
+  state: ComplementDialogState;
+  onConfirm: (complementos: string[]) => void;
+  onClose: () => void;
+}
+
+function ComplementDialog({ state, onConfirm, onClose }: Readonly<ComplementDialogProps>) {
+  const [selected, setSelected] = useState<string | null>(null);
+  const canConfirm = !state.required || selected !== null;
+
+  function handleConfirm() {
+    if (!canConfirm) return;
+    onConfirm(selected !== null ? [selected] : []);
+  }
+
+  function fmt(euros: number): string {
+    return euros.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/60"
+        aria-label="Cerrar"
+        onClick={onClose}
+      />
+      <div className="relative bg-[#1a1d27] border border-[#2e3347] rounded-2xl p-5 w-80 flex flex-col gap-4 shadow-2xl">
+        <div>
+          <p className="text-[10px] font-bold text-[#6b7280] uppercase tracking-wider mb-0.5">Complementos</p>
+          <p className="text-base font-bold text-[#e8eaf0]">{state.product.titulo_es}</p>
+          {state.required && (
+            <p className="text-[11px] text-[#f59e0b] mt-0.5">Selección obligatoria</p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          {state.options.map(opt => {
+            const isSelected = selected === opt.titulo_es;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setSelected(isSelected ? null : opt.titulo_es)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all text-left"
+                style={{
+                  background: isSelected ? 'oklch(28% 0.10 260 / 0.5)' : 'oklch(20% 0.03 252 / 0.5)',
+                  borderColor: isSelected ? 'oklch(60% 0.18 260)' : 'oklch(35% 0.04 252)',
+                }}
+              >
+                <span
+                  className="w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center"
+                  style={{ borderColor: isSelected ? 'oklch(60% 0.18 260)' : '#4b5563' }}
+                >
+                  {isSelected && (
+                    <span className="w-2 h-2 rounded-full bg-[#4f72ff]" />
+                  )}
+                </span>
+                <span className="flex-1 text-sm text-[#c8cad4] font-medium">{opt.titulo_es}</span>
+                {opt.precio > 0 && (
+                  <span className="text-xs text-[#4f72ff] shrink-0">+{fmt(opt.precio)}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex gap-2 pt-1">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl border border-[#2e3347] text-sm text-[#6b7280] hover:text-white transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={!canConfirm}
+            className="flex-1 py-2.5 rounded-xl bg-[#4f72ff] text-white text-sm font-bold hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Añadir
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function MenuPanel({ products, categories, onAddItem }: Props) {
   const [activeCatId, setActiveCatId] = useState<string>(ALL_CAT_ID);
   const [search, setSearch] = useState('');
+  const [complementDialog, setComplementDialog] = useState<ComplementDialogState | null>(null);
+
+  const { complementsByCatId, requiredByCatId } = buildComplementMaps(categories, products);
+
+  const mainCategories = categories.filter(c => !c.categoriaComplementoDe);
 
   const activeProducts = products.filter(p => {
     if (!p.activo) return false;
+    if (!p.categoriaId) return false;
+    const cat = categories.find(c => c.id === p.categoriaId);
+    if (cat?.categoriaComplementoDe) return false; // hide complement products from grid
     if (activeCatId !== ALL_CAT_ID && p.categoriaId !== activeCatId) return false;
     return matchesSearch(p, search);
   });
 
   function handleAdd(p: Product) {
-    onAddItem({ nombre: p.titulo_es, precio: p.precio, cantidad: 1 });
+    const options = p.categoriaId ? (complementsByCatId.get(p.categoriaId) ?? []) : [];
+    if (options.length > 0) {
+      setComplementDialog({
+        product: p,
+        options,
+        required: p.categoriaId ? (requiredByCatId.get(p.categoriaId) ?? false) : false,
+      });
+    } else {
+      onAddItem({ productId: p.id, nombre: p.titulo_es, precio: p.precio, complementos: [] });
+    }
+  }
+
+  function handleComplementConfirm(complementos: string[]) {
+    if (!complementDialog) return;
+    const p = complementDialog.product;
+    onAddItem({ productId: p.id, nombre: p.titulo_es, precio: p.precio, complementos });
+    setComplementDialog(null);
   }
 
   return (
+    <>
+    {complementDialog !== null && (
+      <ComplementDialog
+        state={complementDialog}
+        onConfirm={handleComplementConfirm}
+        onClose={() => setComplementDialog(null)}
+      />
+    )}
     <section className="flex-1 flex flex-col overflow-hidden bg-[#0f1117]">
       {/* Category tabs */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-[#2e3347] overflow-x-auto shrink-0">
@@ -49,7 +196,7 @@ export function MenuPanel({ products, categories, onAddItem }: Props) {
         >
           Todo
         </button>
-        {categories.map(cat => (
+        {mainCategories.map(cat => (
           <button
             key={cat.id}
             type="button"
@@ -115,5 +262,6 @@ export function MenuPanel({ products, categories, onAddItem }: Props) {
         </div>
       </div>
     </section>
+    </>
   );
 }

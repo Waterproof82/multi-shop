@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MapPin, Phone, Mail, Link as LinkIcon, Users, Camera, Loader2, Facebook } from 'lucide-react';
+import { MapPin, Phone, Mail, Link as LinkIcon, Camera, Loader2, Facebook, FileText } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { logClientError } from '@/lib/client-error';
@@ -17,6 +17,7 @@ interface EmpresaDatosFormProps {
     instagram: string;
     url_mapa: string;
     direccion: string;
+    nif: string;
   };
 }
 
@@ -114,6 +115,26 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
             aria-describedby="direccion_help"
           />
           <span id="direccion_help" className="text-xs text-muted-foreground">{t('addressHelp', language)}</span>
+        </div>
+
+        {/* NIF/CIF */}
+        <div className="flex flex-col gap-2">
+          <label htmlFor="nif" className="text-sm font-medium text-foreground flex items-center gap-2">
+            <FileText className="w-4 h-4" />
+            NIF / CIF
+          </label>
+          <Input
+            id="nif"
+            name="nif"
+            type="text"
+            value={formData.nif}
+            onChange={(e) => handleChange('nif', e.target.value)}
+            placeholder="B12345678"
+            aria-describedby="nif_help"
+          />
+          <span id="nif_help" className="text-xs text-muted-foreground">
+            Requerido para tickets fiscales (Verifactu / RD 1619/2012)
+          </span>
         </div>
 
         {/* Facebook */}

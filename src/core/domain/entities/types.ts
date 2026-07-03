@@ -92,6 +92,7 @@ export interface Empresa {
   descuentoBienvenidaDuracion?: number | null;
   deliveryHabilitado: boolean;
   googleReviewsUrl: string | null;
+  nif?: string | null;
 }
 
 interface TranslatableText {

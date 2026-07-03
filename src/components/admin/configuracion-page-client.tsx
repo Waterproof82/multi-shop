@@ -17,6 +17,7 @@ interface EmpresaDatos {
   instagram: string;
   url_mapa: string;
   direccion: string;
+  nif: string;
 }
 
 interface EmpresaApariencia {

@@ -24,6 +24,7 @@ export interface UpdateEmpresaData {
   tipo?: 'tienda' | 'restaurante';
   validacion_pedidos_habilitada?: boolean;
   delivery_habilitado?: boolean;
+  nif?: string | null;
 }
 
 export interface IEmpresaRepository {

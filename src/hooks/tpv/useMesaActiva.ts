@@ -1,57 +1,95 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import type { PedidoItem } from '@/core/domain/entities/types';
+import type { ExistingOrder } from '@/components/tpv/MostradorClient';
 
-type TicketItem = Pick<PedidoItem, 'nombre' | 'precio' | 'cantidad'>;
+export interface PendingItem {
+  productId: string;
+  nombre: string;
+  precio: number;
+  cantidad: number;
+  complementos: string[];
+}
 
 interface MesaActiva {
   mesaId: string | null;
   sesionId: string | null;
   mesaNumero: number | null;
-  items: TicketItem[];
-  total: number;
+  mesaName: string | null;
+  existingOrders: ExistingOrder[];
+  pendingItems: PendingItem[];
+  existingTotal: number;
+  pendingTotal: number;
 }
 
-const EMPTY: MesaActiva = {
-  mesaId: null,
-  sesionId: null,
-  mesaNumero: null,
-  items: [],
-  total: 0,
-};
-
-function calcTotal(items: TicketItem[]): number {
-  return items.reduce((s, i) => s + i.precio * i.cantidad, 0);
+interface InitialMesa {
+  mesaId: string;
+  sesionId: string;
+  mesaNumero: number | null;
+  mesaName: string | null;
+  existingOrders: ExistingOrder[];
 }
 
-export function useMesaActiva() {
-  const [mesa, setMesa] = useState<MesaActiva>(EMPTY);
+function calcExistingTotal(orders: ExistingOrder[]): number {
+  return orders.reduce((sum, o) => sum + o.total, 0);
+}
 
-  const selectMesa = useCallback((id: string, sesion: string, numero: number) => {
-    setMesa(prev => ({ ...prev, mesaId: id, sesionId: sesion, mesaNumero: numero }));
+function calcPendingTotal(items: PendingItem[]): number {
+  return items.reduce((sum, i) => sum + i.precio * i.cantidad, 0);
+}
+
+function buildInitial(init: InitialMesa | null): MesaActiva {
+  if (!init) {
+    return { mesaId: null, sesionId: null, mesaNumero: null, mesaName: null, existingOrders: [], pendingItems: [], existingTotal: 0, pendingTotal: 0 };
+  }
+  return {
+    mesaId: init.mesaId,
+    sesionId: init.sesionId,
+    mesaNumero: init.mesaNumero,
+    mesaName: init.mesaName,
+    existingOrders: init.existingOrders,
+    pendingItems: [],
+    existingTotal: calcExistingTotal(init.existingOrders),
+    pendingTotal: 0,
+  };
+}
+
+export function useMesaActiva(initial: InitialMesa | null = null) {
+  const [mesa, setMesa] = useState<MesaActiva>(() => buildInitial(initial));
+
+  const selectMesa = useCallback((id: string, sesion: string, numero: number, name: string | null = null) => {
+    setMesa(prev => ({ ...prev, mesaId: id, sesionId: sesion, mesaNumero: numero, mesaName: name }));
   }, []);
 
-  const clearMesa = useCallback(() => setMesa(EMPTY), []);
+  const clearMesa = useCallback(() => setMesa(buildInitial(null)), []);
 
-  const addItem = useCallback((item: TicketItem) => {
+  const addItem = useCallback((item: Omit<PendingItem, 'cantidad'> & { complementos?: string[] }) => {
     setMesa(prev => {
-      const existing = prev.items.findIndex(i => i.nombre === item.nombre);
-      const items: TicketItem[] = existing >= 0
-        ? prev.items.map((it, idx) =>
+      const complementos = item.complementos ?? [];
+      const existing = prev.pendingItems.findIndex(
+        i => i.productId === item.productId && i.complementos.join(',') === complementos.join(',')
+      );
+      const pendingItems: PendingItem[] = existing >= 0
+        ? prev.pendingItems.map((it, idx) =>
             idx === existing ? { ...it, cantidad: it.cantidad + 1 } : it
           )
-        : [...prev.items, { nombre: item.nombre, precio: item.precio, cantidad: 1 }];
-      return { ...prev, items, total: calcTotal(items) };
+        : [...prev.pendingItems, { productId: item.productId, nombre: item.nombre, precio: item.precio, cantidad: 1, complementos }];
+      return { ...prev, pendingItems, pendingTotal: calcPendingTotal(pendingItems) };
     });
   }, []);
 
-  const removeItem = useCallback((nombre: string) => {
+  const removeItem = useCallback((nombre: string, complementos: string[] = []) => {
     setMesa(prev => {
-      const items = prev.items.filter(i => i.nombre !== nombre);
-      return { ...prev, items, total: calcTotal(items) };
+      const pendingItems = prev.pendingItems.filter(
+        i => !(i.nombre === nombre && i.complementos.join(',') === complementos.join(','))
+      );
+      return { ...prev, pendingItems, pendingTotal: calcPendingTotal(pendingItems) };
     });
   }, []);
 
-  return { mesa, selectMesa, clearMesa, addItem, removeItem };
+  const clearPending = useCallback(() => {
+    setMesa(prev => ({ ...prev, pendingItems: [], pendingTotal: 0 }));
+  }, []);
+
+  return { mesa, selectMesa, clearMesa, addItem, removeItem, clearPending };
 }

@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TPV — Pantalla Principal (Mockup)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0f1117;
+      --surface:   #1a1d27;
+      --surface2:  #22263a;
+      --border:    #2e3347;
+      --accent:    #4f72ff;
+      --accent-hover: #3a59e0;
+      --green:     #22c55e;
+      --red:       #ef4444;
+      --orange:    #f97316;
+      --yellow:    #eab308;
+      --text:      #e8eaf0;
+      --muted:     #6b7280;
+      --radius:    10px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      font-size: 14px;
+    }
+
+    /* ─── HEADER ─── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 20px;
+      height: 56px;
+      flex-shrink: 0;
+    }
+    .header-left { display: flex; align-items: center; gap: 16px; }
+    .logo { font-weight: 700; font-size: 16px; color: var(--accent); letter-spacing: -0.5px; }
+    .mesa-badge {
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      font-size: 13px;
+      padding: 4px 12px;
+      border-radius: 20px;
+    }
+    .comensales { color: var(--muted); font-size: 13px; }
+    .header-center { display: flex; align-items: center; gap: 6px; }
+    .nav-tab {
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      color: var(--muted);
+      border: none;
+      background: transparent;
+    }
+    .nav-tab.active { background: var(--surface2); color: var(--text); }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .clock { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .operator { font-size: 12px; color: var(--muted); }
+    .btn-caja {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    /* ─── MAIN BODY ─── */
+    .main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ─── LEFT: TICKET ─── */
+    .ticket-panel {
+      width: 300px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+    }
+    .ticket-header {
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .ticket-title { font-weight: 600; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+    .ticket-pedido { font-size: 12px; color: var(--muted); }
+    .ticket-items { flex: 1; overflow-y: auto; padding: 8px 0; }
+    .ticket-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 9px 16px;
+      transition: background .1s;
+    }
+    .ticket-item:hover { background: var(--surface2); }
+    .item-qty {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .item-info { flex: 1; }
+    .item-name { font-size: 13px; font-weight: 500; line-height: 1.3; }
+    .item-mod { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .item-price { font-size: 13px; font-weight: 600; color: var(--text); flex-shrink: 0; }
+    .item-remove {
+      color: var(--muted);
+      font-size: 16px;
+      cursor: pointer;
+      padding: 0 2px;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+    .item-remove:hover { color: var(--red); }
+
+    .ticket-divider { height: 1px; background: var(--border); margin: 8px 0; }
+
+    .ticket-footer {
+      border-top: 1px solid var(--border);
+      padding: 14px 16px;
+    }
+    .ticket-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+    .ticket-row .label { color: var(--muted); }
+    .ticket-total { font-size: 22px; font-weight: 700; margin: 10px 0 14px; }
+
+    .btn-cobrar {
+      width: 100%;
+      background: var(--green);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      padding: 14px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: .3px;
+    }
+    .btn-cobrar:hover { filter: brightness(1.1); }
+
+    /* ─── CENTER: MENU ─── */
+    .menu-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      overflow: hidden;
+    }
+
+    .category-bar {
+      display: flex;
+      gap: 6px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      overflow-x: auto;
+      flex-shrink: 0;
+    }
+    .category-bar::-webkit-scrollbar { height: 0; }
+    .cat-btn {
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--muted);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .cat-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    .search-bar {
+      padding: 10px 16px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .search-input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+    }
+    .search-input::placeholder { color: var(--muted); }
+    .search-input:focus { border-color: var(--accent); }
+
+    .product-grid {
+      flex: 1;
+      overflow-y: auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 10px;
+      padding: 14px 16px;
+      align-content: start;
+    }
+    .product-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 12px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: border-color .15s, transform .1s;
+      user-select: none;
+    }
+    .product-card:hover { border-color: var(--accent); }
+    .product-card:active { transform: scale(.97); }
+    .product-card.out-of-stock { opacity: .4; pointer-events: none; }
+
+    .product-img {
+      width: 100%;
+      aspect-ratio: 1;
+      border-radius: 6px;
+      background: var(--surface2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      overflow: hidden;
+    }
+    .product-img img { width: 100%; height: 100%; object-fit: cover; }
+    .product-name { font-size: 13px; font-weight: 600; line-height: 1.3; }
+    .product-price { font-size: 15px; font-weight: 700; color: var(--accent); }
+    .product-tag {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      width: fit-content;
+    }
+    .tag-especial { background: #fef08a22; color: var(--yellow); }
+    .tag-bebida { background: #3b82f622; color: #60a5fa; }
+
+    /* ─── RIGHT: ACTIONS ─── */
+    .actions-panel {
+      width: 180px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 14px 12px;
+      gap: 8px;
+    }
+    .action-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--muted);
+      letter-spacing: .6px;
+      margin-top: 6px;
+      margin-bottom: 2px;
+    }
+    .action-label:first-child { margin-top: 0; }
+    .action-btn {
+      width: 100%;
+      padding: 11px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: border-color .15s;
+    }
+    .action-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .action-btn .icon { font-size: 16px; flex-shrink: 0; }
+    .action-btn.danger { border-color: #ef444433; }
+    .action-btn.danger:hover { border-color: var(--red); color: var(--red); }
+    .action-btn.success { border-color: #22c55e33; }
+    .action-btn.success:hover { border-color: var(--green); color: var(--green); }
+
+    .divider-actions { height: 1px; background: var(--border); }
+
+    /* ─── SCROLLBAR ─── */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    /* ─── NOTA DEL MOCKUP ─── */
+    .mockup-note {
+      position: fixed;
+      bottom: 16px;
+      right: 16px;
+      background: #0f1117dd;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 11px;
+      color: var(--muted);
+      backdrop-filter: blur(8px);
+      max-width: 220px;
+      line-height: 1.5;
+    }
+    .mockup-note strong { color: var(--text); }
+  </style>
+</head>
+<body>
+
+<!-- ─── HEADER ─── -->
+<header class="header">
+  <div class="header-left">
+    <span class="logo">TPV</span>
+    <span class="mesa-badge">Mesa 4</span>
+    <span class="comensales">3 comensales · Sesión #42</span>
+  </div>
+  <div class="header-center">
+    <button class="nav-tab active">Mostrador</button>
+    <button class="nav-tab">Mesas</button>
+    <button class="nav-tab">Pendientes</button>
+    <button class="nav-tab">Historial</button>
+  </div>
+  <div class="header-right">
+    <span class="clock" id="clock">14:32</span>
+    <span class="operator">María García</span>
+    <button class="btn-caja">Cierre de Caja</button>
+  </div>
+</header>
+
+<!-- ─── MAIN ─── -->
+<div class="main">
+
+  <!-- LEFT: TICKET -->
+  <aside class="ticket-panel">
+    <div class="ticket-header">
+      <span class="ticket-title">Ticket activo</span>
+      <span class="ticket-pedido">#042</span>
+    </div>
+    <div class="ticket-items">
+
+      <div class="ticket-item">
+        <div class="item-qty">2</div>
+        <div class="item-info">
+          <div class="item-name">Hamburguesa Clásica</div>
+          <div class="item-mod">Al punto · Sin cebolla</div>
+        </div>
+        <div class="item-price">19,80 €</div>
+        <div class="item-remove">×</div>
+      </div>
+
+      <div class="ticket-item">
+        <div class="item-qty">1</div>
+        <div class="item-info">
+          <div class="item-name">Patatas Fritas</div>
+        </div>
+        <div class="item-price">3,50 €</div>
+        <div class="item-remove">×</div>
+      </div>
+
+      <div class="ticket-item">
+        <div class="item-qty">3</div>
+        <div class="item-info">
+          <div class="item-name">Coca-Cola</div>
+          <div class="item-mod">Sin hielo</div>
+        </div>
+        <div class="item-price">7,50 €</div>
+        <div class="item-remove">×</div>
+      </div>
+
+      <div class="ticket-item">
+        <div class="item-qty">1</div>
+        <div class="item-info">
+          <div class="item-name">Tarta de Queso</div>
+        </div>
+        <div class="item-price">4,90 €</div>
+        <div class="item-remove">×</div>
+      </div>
+
+    </div>
+    <div class="ticket-footer">
+      <div class="ticket-row"><span class="label">Subtotal</span><span>32,32 €</span></div>
+      <div class="ticket-row"><span class="label">IVA (10%)</span><span>3,23 €</span></div>
+      <div class="ticket-row"><span class="label">Propina</span><span>2,00 €</span></div>
+      <div class="ticket-divider"></div>
+      <div class="ticket-total">37,55 €</div>
+      <button class="btn-cobrar">Cobrar</button>
+    </div>
+  </aside>
+
+  <!-- CENTER: MENU -->
+  <section class="menu-panel">
+    <div class="category-bar">
+      <button class="cat-btn active">Todo</button>
+      <button class="cat-btn">Entrantes</button>
+      <button class="cat-btn">Carnes</button>
+      <button class="cat-btn">Pescados</button>
+      <button class="cat-btn">Hamburguesas</button>
+      <button class="cat-btn">Postres</button>
+      <button class="cat-btn">Bebidas</button>
+      <button class="cat-btn">Vinos</button>
+      <button class="cat-btn">Cócteles</button>
+    </div>
+    <div class="search-bar">
+      <input class="search-input" placeholder="Buscar producto..." />
+    </div>
+    <div class="product-grid">
+
+      <div class="product-card">
+        <div class="product-img">🍔</div>
+        <div class="product-name">Hamburguesa Clásica</div>
+        <span class="product-tag tag-especial">Especial</span>
+        <div class="product-price">9,90 €</div>
+      </div>
+
+      <div class="product-card">
+        <div class="product-img">🍟</div>
+        <div class="product-name">Patatas Fritas</div>
+        <div class="product-price">3,50 €</div>
+      </div>
+
+      <div class="product-card">
+        <div class="product-img">🥗</div>
+        <div class="product-name">Ensalada César</div>
+        <div class="product-price">8,50 €</div>
+      </div>
+
+      <div class="product-card">
+        <div class="product-img">🍖</div>
+        <div class="product-name">Chuletón 400g</div>
+        <span class="product-tag tag-especial">Especial</span>
+        <div class="product-price">24,90 €</div>
+      </div>
+
+      <div class="product-card">
+        <div class="product-img">🐟</div>
+        <div class="product-name">Salmón a la Plancha</div>
+        <div class="product-price">16,50 €</div>
+      </div>
+
+      <div class="product-card">
+        <div class="product-img">🍰</div>
+        <div class="product-name">Tarta de Queso</div>
+        <div class="product-price">4,90 €</div>
+      </div>
+
+      <div class="product-card">
+        <div class="product-img">🥤</div>
+        <div class="product-name">Coca-Cola</div>
+        <span class="product-tag tag-bebida">Bebida</span>
+        <div class="product-price">2,50 €</div>
+      </div>
+
+      <div class="product-card">
+        <div class="product-img">🍺</div>
+        <div class="product-name">Cerveza 1/3</div>
+        <span class="product-tag tag-bebida">Bebida</span>
+        <div class="product-price">2,20 €</div>
+      </div>
+
+      <div class="product-card">
+        <div class="product-img">☕</div>
+        <div class="product-name">Café Solo</div>
+        <span class="product-tag tag-bebida">Bebida</span>
+        <div class="product-price">1,50 €</div>
+      </div>
+
+      <div class="product-card out-of-stock">
+        <div class="product-img">🍤</div>
+        <div class="product-name">Gambas al Ajillo</div>
+        <div class="product-price">12,50 €</div>
+      </div>
+
+      <div class="product-card">
+        <div class="product-img">🥩</div>
+        <div class="product-name">Secreto Ibérico</div>
+        <div class="product-price">18,90 €</div>
+      </div>
+
+      <div class="product-card">
+        <div class="product-img">🍷</div>
+        <div class="product-name">Vino Tinto Copa</div>
+        <span class="product-tag tag-bebida">Bebida</span>
+        <div class="product-price">3,50 €</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- RIGHT: ACTIONS -->
+  <aside class="actions-panel">
+    <div class="action-label">Mesa</div>
+    <button class="action-btn"><span class="icon">🔄</span> Cambiar mesa</button>
+    <button class="action-btn"><span class="icon">👥</span> Comensales</button>
+    <button class="action-btn"><span class="icon">📋</span> Nota a cocina</button>
+
+    <div class="divider-actions"></div>
+
+    <div class="action-label">Ticket</div>
+    <button class="action-btn"><span class="icon">%</span> Descuento</button>
+    <button class="action-btn"><span class="icon">✂️</span> Dividir cuenta</button>
+    <button class="action-btn"><span class="icon">🖨️</span> Pre-factura</button>
+    <button class="action-btn"><span class="icon">💰</span> Propina</button>
+
+    <div class="divider-actions"></div>
+
+    <div class="action-label">Operaciones</div>
+    <button class="action-btn success"><span class="icon">➕</span> Nueva mesa</button>
+    <button class="action-btn"><span class="icon">🔃</span> Transferir items</button>
+    <button class="action-btn danger"><span class="icon">🗑️</span> Anular ticket</button>
+  </aside>
+
+</div>
+
+<div class="mockup-note">
+  <strong>Mockup v1 — Pantalla principal TPV</strong><br>
+  Layout 3 columnas: Ticket · Menu · Acciones.<br>
+  Modo oscuro. Touch-first, 44px min targets.
+</div>
+
+<script>
+  // Live clock
+  function tick() {
+    const now = new Date();
+    document.getElementById('clock').textContent =
+      now.getHours().toString().padStart(2,'0') + ':' +
+      now.getMinutes().toString().padStart(2,'0');
+  }
+  tick();
+  setInterval(tick, 10000);
+
+  // Category tab active state
+  document.querySelectorAll('.cat-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+</script>
+</body>
+</html>

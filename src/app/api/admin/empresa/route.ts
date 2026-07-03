@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
       instagram: empresa.instagram || '',
       url_mapa: empresa.urlMapa || '',
       direccion: empresa.direccion || '',
+      nif: empresa.nif || '',
       url_image: empresa.urlImage || null,
       descripcion_es: empresa.descripcion?.es || '',
       descripcion_en: empresa.descripcion?.en || '',

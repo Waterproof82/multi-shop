@@ -4,6 +4,8 @@ import {
   TpvTurno,
   TpvCobroPayload,
   TpvTurnoStats,
+  TpvCobro,
+  TpvCobroCompletoPayload,
 } from '@/core/domain/entities/tpv-types';
 import { Result } from '@/core/domain/entities/types';
 import { logger } from '../logging/logger';
@@ -64,6 +66,7 @@ export class SupabaseTpvRepository implements ITpvRepository {
 
   async abrirTurno(params: {
     empresaId: string;
+    userId: string;
     operadorNombre: string;
     efectivoAperturaCents: number;
   }): Promise<Result<TpvTurno>> {
@@ -73,6 +76,7 @@ export class SupabaseTpvRepository implements ITpvRepository {
         .from('tpv_turnos')
         .insert({
           empresa_id: params.empresaId,
+          user_id: params.userId,
           operador_nombre: params.operadorNombre,
           efectivo_apertura_cents: params.efectivoAperturaCents,
         })
@@ -185,6 +189,72 @@ export class SupabaseTpvRepository implements ITpvRepository {
           'registrarCobro'
         ),
       };
+    }
+  }
+
+  async crearCobroCompleto(payload: TpvCobroCompletoPayload): Promise<Result<TpvCobro>> {
+    try {
+      const supabase = getSupabaseClient();
+      const col = payload.metodoPago === 'efectivo' ? 'total_efectivo_cents' : 'total_tarjeta_cents';
+
+      // 1. Insert cobro — trigger computes numero_ticket, hash, IVA breakdown
+      const { data: cobro, error: cobroErr } = await supabase
+        .from('tpv_cobros')
+        .insert({
+          empresa_id: payload.empresaId,
+          turno_id: payload.turnoId,
+          sesion_id: payload.sesionId ?? null,
+          metodo_pago: payload.metodoPago,
+          importe_cobrado_cents: payload.importeCobradoCents,
+          propina_cents: payload.propinaCents,
+          iva_porcentaje: payload.ivaPorcentaje ?? 10,
+          rectifica_cobro_id: payload.rectificaCobroId ?? null,
+        })
+        .select()
+        .single();
+
+      if (cobroErr) {
+        return { success: false, error: await logger.logFromCatch(cobroErr, 'repository', 'crearCobroCompleto/insert') };
+      }
+
+      const row = cobro as Record<string, unknown>;
+
+      // 2. Increment turno totals
+      const { data: turnoRow } = await supabase
+        .from('tpv_turnos')
+        .select(col)
+        .eq('id', payload.turnoId)
+        .single();
+
+      const prev = (((turnoRow ?? {}) as Record<string, unknown>)[col] ?? 0) as number;
+      await supabase
+        .from('tpv_turnos')
+        .update({ [col]: prev + payload.importeCobradoCents })
+        .eq('id', payload.turnoId);
+
+      return {
+        success: true,
+        data: {
+          id: row.id as string,
+          empresaId: row.empresa_id as string,
+          turnoId: row.turno_id as string,
+          sesionId: row.sesion_id as string | null,
+          numeroTicket: row.numero_ticket as number,
+          serie: row.serie as string,
+          metodoPago: row.metodo_pago as TpvCobro['metodoPago'],
+          importeCobradoCents: row.importe_cobrado_cents as number,
+          propinaCents: row.propina_cents as number,
+          ivaPorcentaje: Number(row.iva_porcentaje),
+          baseImponibleCents: row.base_imponible_cents as number,
+          ivaCents: row.iva_cents as number,
+          hashAnterior: row.hash_anterior as string | null,
+          hash: row.hash as string,
+          cobradoAt: row.cobrado_at as string,
+          rectificaCobroId: row.rectifica_cobro_id as string | null ?? null,
+        },
+      };
+    } catch (e) {
+      return { success: false, error: await logger.logFromCatch(e, 'repository', 'crearCobroCompleto') };
     }
   }
 

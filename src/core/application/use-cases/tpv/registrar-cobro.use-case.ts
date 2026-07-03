@@ -1,12 +1,12 @@
 import { ITpvRepository } from '@/core/domain/repositories/ITpvRepository';
-import { TpvCobroPayload } from '@/core/domain/entities/tpv-types';
+import { TpvCobroPayload, TpvCobro } from '@/core/domain/entities/tpv-types';
 import { Result, AppError } from '@/core/domain/entities/types';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 
 export async function registrarCobroUseCase(
   repo: ITpvRepository,
   payload: TpvCobroPayload,
-): Promise<Result<void, AppError>> {
+): Promise<Result<TpvCobro, AppError>> {
   const supabase = getSupabaseClient();
 
   // 1. Update tip in mesa_sesiones if present
@@ -29,7 +29,7 @@ export async function registrarCobroUseCase(
     }
   }
 
-  // 2. Close the mesa session via existing RPC
+  // 2. Close the mesa session (computes total from pedidos, clears mesa.sesion_id)
   const { error: closeErr } = await supabase.rpc('close_mesa_sesion', {
     p_sesion_id: payload.sesionId,
   });
@@ -46,6 +46,25 @@ export async function registrarCobroUseCase(
     };
   }
 
-  // 3. Accumulate in tpv_turnos
-  return repo.registrarCobro(payload);
+  // 3. Create cobro record (hash chain) + accumulate turno totals
+  if (!payload.empresaId) {
+    return {
+      success: false,
+      error: {
+        code: 'TPV_EMPRESA_REQUIRED',
+        message: 'empresaId requerido para registrar cobro',
+        module: 'use-case',
+        method: 'registrarCobroUseCase',
+      },
+    };
+  }
+
+  return repo.crearCobroCompleto({
+    empresaId: payload.empresaId,
+    turnoId: payload.turnoId,
+    sesionId: payload.sesionId,
+    metodoPago: payload.metodoPago,
+    importeCobradoCents: payload.importeCobradoCents,
+    propinaCents: payload.propinaCents,
+  });
 }

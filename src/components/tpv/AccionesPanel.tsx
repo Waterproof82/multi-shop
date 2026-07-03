@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 
 interface Props {
   readonly sesionId: string | null;
+  readonly turnoId: string;
 }
 
 interface ActionButtonProps {
@@ -41,7 +42,7 @@ function ActionGroup({ title, children }: ActionGroupProps) {
   );
 }
 
-export function AccionesPanel({ sesionId }: Props) {
+export function AccionesPanel({ sesionId, turnoId }: Props) {
   const router = useRouter();
   const hasMesa = sesionId !== null;
 
@@ -53,20 +54,26 @@ export function AccionesPanel({ sesionId }: Props) {
 
       <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-5 pt-4">
         <ActionGroup title="Mesa">
-          <ActionButton label="Seleccionar mesa" onClick={() => router.push('/tpv/mesas')} />
-          <ActionButton label="Nueva mesa" onClick={() => router.push('/tpv/mesas')} />
+          <ActionButton label="Seleccionar mesa" onClick={() => router.push('/tpv/mesas?seleccionar=1')} />
+          <ActionButton label="Ver ticket completo" onClick={() => { if (sesionId) router.push(`/tpv/cobro/${sesionId}?turnoId=${turnoId}`); }} disabled={!hasMesa} />
           <ActionButton label="Liberar mesa" onClick={() => {}} disabled={!hasMesa} />
         </ActionGroup>
 
         <ActionGroup title="Ticket">
           <ActionButton label="Descuento" onClick={() => {}} disabled={!hasMesa} />
           <ActionButton label="Nota" onClick={() => {}} disabled={!hasMesa} />
-          <ActionButton label="Limpiar ticket" onClick={() => {}} disabled={!hasMesa} />
+        </ActionGroup>
+
+        <ActionGroup title="Historial">
+          <ActionButton label="Ver historial" onClick={() => router.push('/tpv/historial')} />
         </ActionGroup>
 
         <ActionGroup title="Operaciones">
-          <ActionButton label="Apertura de caja" onClick={() => {}} />
           <ActionButton label="Cierre de turno" onClick={() => router.push('/tpv/turno/cerrar')} />
+        </ActionGroup>
+
+        <ActionGroup title="Sistema">
+          <ActionButton label="Conformidad legal" onClick={() => router.push('/tpv/legal')} />
         </ActionGroup>
       </div>
     </aside>

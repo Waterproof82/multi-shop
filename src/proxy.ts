@@ -291,6 +291,11 @@ export async function proxy(request: NextRequest) {
     return handleWaiterAuth(request, origin);
   }
 
+  // TPV auth (protected routes — same admin token as /api/admin)
+  if (path.startsWith('/api/tpv')) {
+    return handleAdminAuth(request, origin);
+  }
+
   // Superadmin auth (protected routes)
   if (path.startsWith('/api/superadmin')) {
     const adminAuthResponse = await handleAdminAuth(request, origin);

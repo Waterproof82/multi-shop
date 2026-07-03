@@ -24,12 +24,20 @@ export default async function CobroPage({ params, searchParams }: Readonly<Props
   if (!turnoId) redirect('/tpv/mostrador');
 
   const supabase = getSupabaseClient();
-  const { data: sesion } = await supabase
-    .from('mesa_sesiones')
-    .select('id, total, propina_cents, mesas(numero)')
-    .eq('id', sesionId)
-    .single();
+  const [sesionRes, empresaRes] = await Promise.all([
+    supabase
+      .from('mesa_sesiones')
+      .select('id, total, propina_cents, mesas(numero)')
+      .eq('id', sesionId)
+      .single(),
+    supabase
+      .from('empresas')
+      .select('nif')
+      .eq('id', admin.empresaId)
+      .maybeSingle(),
+  ]);
 
+  const sesion = sesionRes.data;
   if (!sesion) redirect('/tpv/mostrador');
 
   const sesionData = sesion as unknown as {
@@ -39,6 +47,8 @@ export default async function CobroPage({ params, searchParams }: Readonly<Props
     mesas: { numero: number } | null;
   };
 
+  const nif = (empresaRes.data as { nif: string | null } | null)?.nif ?? null;
+
   return (
     <CobroFlow
       sesionId={sesionId}
@@ -46,6 +56,7 @@ export default async function CobroPage({ params, searchParams }: Readonly<Props
       totalCents={Math.round(sesionData.total * 100)}
       mesaNumero={sesionData.mesas?.numero ?? 0}
       operadorNombre={admin.nombreCompleto ?? 'Operador'}
+      empresaNif={nif}
     />
   );
 }

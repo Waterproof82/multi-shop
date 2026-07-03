@@ -17,6 +17,7 @@ export interface TpvTurno {
 export type MetodoPago = 'efectivo' | 'tarjeta';
 
 export interface TpvCobroPayload {
+  empresaId: string;
   sesionId: string;
   metodoPago: MetodoPago;
   importeCobradoCents: number;
@@ -28,4 +29,34 @@ export interface TpvTurnoStats {
   totalEfectivoCents: number;
   totalTarjetaCents: number;
   numOperaciones: number;
+}
+
+export interface TpvCobro {
+  id: string;
+  empresaId: string;
+  turnoId: string;
+  sesionId: string | null;
+  numeroTicket: number;
+  serie: string;
+  metodoPago: MetodoPago;
+  importeCobradoCents: number;
+  propinaCents: number;
+  ivaPorcentaje: number;
+  baseImponibleCents: number;
+  ivaCents: number;
+  hashAnterior: string | null;
+  hash: string;
+  cobradoAt: string;
+  rectificaCobroId?: string | null;
+}
+
+export interface TpvCobroCompletoPayload {
+  empresaId: string;
+  turnoId: string;
+  sesionId: string | null;
+  metodoPago: MetodoPago;
+  importeCobradoCents: number;
+  propinaCents: number;
+  ivaPorcentaje?: number;
+  rectificaCobroId?: string | null;
 }

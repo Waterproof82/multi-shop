@@ -4,6 +4,7 @@ import { Result, AppError } from '@/core/domain/entities/types';
 
 interface AbrirTurnoInput {
   empresaId: string;
+  userId: string;
   operadorNombre: string;
   efectivoAperturaCents: number;
 }
@@ -46,6 +47,7 @@ export async function abrirTurnoUseCase(
   // Open the shift
   return repo.abrirTurno({
     empresaId: input.empresaId,
+    userId: input.userId,
     operadorNombre: input.operadorNombre.trim(),
     efectivoAperturaCents: input.efectivoAperturaCents,
   });

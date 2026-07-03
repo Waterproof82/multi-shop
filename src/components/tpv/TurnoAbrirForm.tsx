@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { getCsrfToken } from '@/lib/csrf-client';
 
 export function TurnoAbrirForm() {
   const router = useRouter();
@@ -18,19 +19,23 @@ export function TurnoAbrirForm() {
     setLoading(true);
     setError(null);
 
+    const csrfToken = getCsrfToken();
     const res = await fetch('/api/tpv/turno', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
+      },
       body: JSON.stringify({
         operadorNombre:        operador.trim(),
         efectivoAperturaCents: Math.round(parseFloat(efectivo || '0') * 100),
       }),
     });
 
-    const json = await res.json() as { success?: boolean; error?: unknown };
+    await res.json();
     setLoading(false);
 
-    if (!res.ok || !json.success) {
+    if (!res.ok) {
       setError('Error al abrir el turno. Inténtalo de nuevo.');
       return;
     }
