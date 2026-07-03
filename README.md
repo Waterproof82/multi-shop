@@ -33,21 +33,37 @@ Plataforma **multi-tenant** de gestión de negocios de hostelería y retail. Cad
   - `/waiter/bar` — vista de bebidas para el camarero. Swipe directo a servido con countdown de 5 s. Botón "Todos servidos" por mesa.
   - Los camareros deslizan cada ítem para avanzar su estado con gestos de puntero.
 
-### 🖥️ TPV — Terminal Punto de Venta (Fase 1)
+### 🖥️ TPV — Terminal Punto de Venta (Fases 1 y 2)
 
-Software de caja para restaurantes y tiendas, integrado en la misma plataforma y con cumplimiento legal completo (Ley Antifraude, RD 1007/2023).
+Software de caja para restaurantes y tiendas integrado en la misma plataforma. Cumplimiento legal completo con la Ley Antifraude (RD 1007/2023) y RD 1619/2012. Dashboard de analítica con selector de período y configuración de tipo de impuesto (IVA/IGIC) por empresa.
+
+#### Gestión de turno y cobro
 
 - **Gestión de turnos de caja**: apertura con efectivo inicial, cierre con arqueo ciego (el cajero declara el efectivo sin ver el teórico), diferencia calculada automáticamente.
 - **Mostrador táctil en 3 columnas**: grid de mesas/categorías a la izquierda, menú de productos en el centro, ticket activo a la derecha. Navegación por teclado + touch optimizada.
 - **Selección de complementos**: modal de selección cuando un producto tiene opciones obligatorias u opcionales (radio-select por complemento, validación pre-añadido).
-- **Flujo de cobro completo**: efectivo (calcula cambio automáticamente), tarjeta, propina opcional. Pantalla de confirmación con número de ticket, desglose de IVA y enlace de verificación AEAT.
-- **Cadena de hashes SHA-256** (Ley Antifraude): cada cobro encadena el hash del anterior vía trigger PostgreSQL + pgcrypto. Inmutable: triggers bloquean DELETE y UPDATE de campos económicos con EXCEPTION.
-- **Ticket rectificativo**: anula un cobro previo emitiendo un cobro de signo negativo con referencia al original — sin modificar registros inmutables.
-- **Historial de turno**: vista de pedidos y cobros del turno activo con tabs separados. Los cobros muestran número de ticket correlativo y botón de rectificación con confirmación.
+- **Flujo de cobro completo**: efectivo (calcula cambio automáticamente), tarjeta, propina opcional. Pantalla de confirmación con número de ticket, desglose de IVA/IGIC y enlace de verificación AEAT. La tasa se toma del campo `porcentaje_impuesto` de la empresa (no hardcodeada).
+- **Historial de turno**: vista de pedidos y cobros del turno activo con tabs separados. Los cobros muestran número de ticket correlativo y botón de rectificación con confirmación. KPIs inline: ticket medio, IVA/IGIC total y porcentaje efectivo/tarjeta.
+
+#### Cumplimiento legal (Ley Antifraude + RD 1007/2023 + RD 1619/2012)
+
+- **Cadena de hashes SHA-256**: cada cobro encadena el hash del anterior vía trigger PostgreSQL + pgcrypto. Inmutable: triggers bloquean DELETE y UPDATE de campos económicos con EXCEPTION.
+- **Ticket rectificativo**: anula un cobro previo emitiendo un cobro de signo negativo con referencia al original — sin modificar registros inmutables (RD 1619/2012). Queda excluido automáticamente de las estadísticas de analítica (`rectifica_cobro_id IS NULL`).
+- **Numeración correlativa**: `serie-NNNNNN` sin saltos por empresa, atómica a nivel de base de datos.
+- **IVA/IGIC calculado en DB**: `iva_cents` y `base_imponible_cents` computados en el trigger de inserción — nunca en el cliente. El porcentaje queda grabado por cobro para que cambiar la config de la empresa no afecte al histórico.
 - **Auditoría para inspectores**: `GET /api/tpv/audit/chain` verifica la cadena de hashes recomputando SHA-256 en Node.js; `GET /api/tpv/audit/export` descarga todos los cobros del período como JSON con cabecera `Content-Disposition: attachment`.
 - **Pantalla de conformidad legal** `/tpv/legal`: Declaración de Responsabilidad del fabricante (RD 1007/2023), versión del software, fecha de firma, serie del sistema, checklist de cumplimiento, y acceso a verificación de cadena y exportación.
 - **NIF/CIF de la empresa**: campo configurable desde el panel admin, incluido en el ticket de cobro y en el enlace de verificación AEAT.
-- **Rutas TPV**: `/tpv/turno/abrir`, `/tpv/mostrador`, `/tpv/cobro/[sesionId]`, `/tpv/historial`, `/tpv/mesas`, `/tpv/legal`.
+
+#### Analítica (Fase 2)
+
+- **Dashboard `/tpv/analytics`**: selector de período (Hoy / Semana / Mes / Custom con fechas libres), 5 KPIs (facturado total, ticket medio, IVA/IGIC total + base imponible, propinas, número de turnos con duración media), gráfico de barras de ventas por hora en zona horaria Europe/Madrid (Recharts, lazy-loaded con `dynamic()`), split efectivo/tarjeta con barras de progreso, top 10 productos más vendidos (via `pedidos.detalle_pedido` JSONB), historial de turnos del período con operador, horario y totales.
+- **Endpoint único** `GET /api/tpv/analytics?desde=&hasta=`: validación Zod con rango máximo de 365 días. Ejecuta 3 RPCs PostgreSQL con `SECURITY DEFINER` (`tpv_analytics_kpis`, `tpv_analytics_por_hora`, `tpv_analytics_top_productos`) más query directa de turnos. `empresa_id` siempre derivado del JWT, nunca del query string.
+- **Configuración IVA/IGIC por empresa**: campos `tipo_impuesto` (`'iva'|'igic'`) y `porcentaje_impuesto` en tabla `empresas`. Configurable desde el panel admin con auto-relleno (IVA → 10%, IGIC → 7%). El label se propaga como prop SSR a todos los componentes TPV — sin hardcodear la etiqueta.
+
+#### Rutas TPV
+
+`/tpv/turno/abrir`, `/tpv/mostrador`, `/tpv/cobro/[sesionId]`, `/tpv/historial`, `/tpv/mesas`, `/tpv/legal`, `/tpv/analytics`.
 
 ### 🤖 Notificaciones Telegram — dos modos de operación
 
@@ -903,7 +919,7 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 | **Kitchen & Bar In-App** | `/waiter/kitchen` y `/waiter/bar`: vistas en tiempo real para gestión de ítems sin Telegram. Estados por ítem: pendiente → en_preparacion → preparado → servido (swipe gestual). Colores por tiempo de espera (oklch, 6 rangos). GroupBy por pedido o por mesa. Filtro "Listos". Retenidos con sección propia. Badges con counts en WaiterBanner (neutral/verde/naranja). Timer de espera arranca desde `validated_at` (momento de validación), no desde `created_at` del pedido original. |
 | **Waiter Pendientes** | `/waiter/pendientes`: cola de validación antes de cocina/bar. Selección individual o por tipo (comida/bebida). Pausa (⏸) por ítem de comida → llega a cocina como retenido. Botón conjunto comida+bebida (botón morado) valida ambos tipos en un solo POST. La pausa prevalece sobre la selección en envíos conjuntos. |
 | **Realtime Híbrido** | Migración completa de polling a Supabase Realtime en todas las vistas del panel de sala (kitchen, bar, pendientes, waiter-banner, waiter-login). Sistema híbrido: Realtime CDC para cambios de datos (<100 ms latencia, sin carga en DB en reposo) + `setInterval` 1 s exclusivamente para actualización visual de timers. Un único canal multiplexado en WaiterBanner consolida conteos de cocina, bar y estado de pago. Eliminados ~30 requests HTTP/min por camarero activo. Ver sección [⚡ Arquitectura Realtime](#-arquitectura-realtime--sistema-híbrido). |
-| **TPV — Terminal Punto de Venta** | Software de caja integrado en la plataforma. Turnos con apertura/cierre y arqueo ciego. Mostrador táctil 3 columnas (mesas, menú, ticket). Cobro efectivo/tarjeta/propina. Cadena de hashes SHA-256 inmutable por trigger PostgreSQL (Ley Antifraude, RD 1007/2023): bloqueo de DELETE y UPDATE con EXCEPTION. Ticket rectificativo = cobro negativo con `rectifica_cobro_id`. Numeración correlativa por empresa (`serie-NNNNNN`). IVA desglosado (base imponible + iva_cents) calculado en DB. Verificación de cadena en `/api/tpv/audit/chain`. Exportación JSON para inspectores en `/api/tpv/audit/export`. Pantalla de conformidad legal `/tpv/legal` con Declaración de Responsabilidad RD 1007/2023. |
+| **TPV — Terminal Punto de Venta** | Software de caja con cumplimiento legal completo (Ley Antifraude RD 1007/2023 + RD 1619/2012). Turnos con arqueo ciego. Mostrador táctil 3 columnas. Cobro efectivo/tarjeta/propina con tasa IVA/IGIC configurable por empresa. Cadena de hashes SHA-256 inmutable por trigger PostgreSQL: bloqueo de DELETE y UPDATE con EXCEPTION. Ticket rectificativo = cobro negativo con `rectifica_cobro_id` (excluido de estadísticas). Numeración correlativa atómica (`serie-NNNNNN`). IVA/IGIC calculado en DB trigger (no en cliente). Endpoints de auditoría para inspectores (`/api/tpv/audit/chain`, `/api/tpv/audit/export`). Pantalla `/tpv/legal` con Declaración de Responsabilidad RD 1007/2023. Dashboard `/tpv/analytics` con selector de período (Hoy/Semana/Mes/Custom), 5 KPIs, gráfico por hora (Recharts lazy), top productos (JSONB) e historial de turnos. Endpoint `GET /api/tpv/analytics` con 3 RPCs `SECURITY DEFINER`. Configuración IVA/IGIC por empresa con propagación SSR de label. |
 | **Telegram Multi-modo** | tienda → quick-reply buttons. restaurante takeaway → time-selector + tracking en vivo. mesa → gestionado in-app (sin Telegram). |
 | **Delivery + Pago online** | Zona de cobertura por CP configurable. Cotización Glovo en tiempo real. Pago Redsys TPV Virtual obligatorio para delivery. Auto-despacho de rider al confirmar pago. Tracking page post-pago. |
 
@@ -924,6 +940,7 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 - [`docs/context/waiter-validation-flow.md`](docs/context/waiter-validation-flow.md) — Cola de validación: flujo pendiente_validacion → cocina/bar, from_validation flag, pausa, timer validated_at
 - [`docs/tpv-legal-compliance.md`](docs/tpv-legal-compliance.md) — TPV: checklist de cumplimiento legal (Ley Antifraude, TicketBAI, RD 1619/2012, RGPD, PCI-DSS)
 - [`docs/superpowers/specs/2026-07-02-tpv-design.md`](docs/superpowers/specs/2026-07-02-tpv-design.md) — Spec técnica del TPV Fase 1
+- [`docs/superpowers/specs/2026-07-03-tpv-analytics-design.md`](docs/superpowers/specs/2026-07-03-tpv-analytics-design.md) — Spec técnica del TPV Fase 2 (Analytics + IVA/IGIC)
 
 ---
 

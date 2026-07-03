@@ -65,14 +65,15 @@
 
 > Aplica a cada ticket impreso o digital que emita el TPV.
 
-- [ ] **Número correlativo de ticket** sin saltos, con serie opcional (ej: `A-00001`).
+- [x] **Número correlativo de ticket** sin saltos (`serie-NNNNNN`), atómico en DB con `SELECT nextval()` (20260703).
 - [ ] **Fecha y hora** de expedición (ISO 8601, zona horaria Europe/Madrid).
-- [ ] **NIF, nombre y razón social** del emisor (el restaurante, desde `empresas`).
+- [x] **NIF, nombre y razón social** del emisor — `empresas.nif` configurable desde el panel admin; incluido en el ticket y en el enlace de verificación AEAT (20260703).
 - [ ] **Desglose de ítems**: nombre del producto, cantidad, precio unitario.
-- [ ] **Tipo impositivo** desglosado por línea o por total (IVA 10% restauración, 21% alcohol, 0% para exentos).
-- [ ] **Importe total** con y sin IVA.
-- [ ] Si es **ticket rectificativo**: referencia explícita al número de ticket original.
-- [ ] Implementar tipos de IVA por categoría de producto (`tipo_iva` en tabla `categorias` o `productos`).
+- [x] **Tipo impositivo configurable por empresa** — `empresas.tipo_impuesto` (`'iva'|'igic'`) y `empresas.porcentaje_impuesto`. Auto-relleno al cambiar tipo (IVA → 10%, IGIC → 7%). Propagado como prop SSR a todos los componentes del TPV. `tpv_cobros.iva_porcentaje` graba la tasa en el momento del cobro para preservar el histórico (20260703).
+- [x] **Importe IVA/IGIC y base imponible** calculados en trigger PostgreSQL — `iva_cents` y `base_imponible_cents` en `tpv_cobros`. No delegados al cliente (20260703).
+- [ ] **Importe total** con y sin IVA mostrado en ticket impreso/digital.
+- [x] Si es **ticket rectificativo**: referencia explícita al número de ticket original — `rectifica_cobro_id UUID REFERENCES tpv_cobros(id)` en DB; mostrado en pantalla de confirmación (20260703).
+- [ ] Implementar tipos de IVA diferenciados por categoría de producto (IVA 10% restauración, 21% alcohol, 0% exentos) — pendiente Fase 3.
 
 ---
 
@@ -97,9 +98,9 @@
 
 ## 6. Numeración Correlativa y Serie
 
-- [ ] Tabla o secuencia Postgres `tpv_numero_serie` por `empresa_id`: incremento atómico sin saltos.
-- [ ] El número debe sobrevivir reinicios del servidor y ser único aunque haya múltiples instancias del TPV abiertas simultáneamente (usar `SELECT nextval()` en Postgres, no lógica en aplicación).
-- [ ] Formato configurable por empresa: `{SERIE}-{AAAAMMDD}-{NUMERO}` ej: `A-20260702-00042`.
+- [x] Secuencia Postgres `tpv_numero_serie` por `empresa_id`: incremento atómico sin saltos (20260703).
+- [x] El número es único y sobrevive reinicios del servidor — generado con `SELECT nextval()` en trigger, no en lógica de aplicación (20260703).
+- [~] Formato actual: `{SERIE}-{NNNNNN}` (ej: `T-000042`). Formato con fecha (`{SERIE}-{AAAAMMDD}-{NUMERO}`) pendiente como opción configurable.
 
 ---
 
@@ -123,3 +124,4 @@
 |---------|------------|--------------------------------|
 | 1.0     | 2026-07-02 | Creación inicial del documento |
 | 1.1     | 2026-07-03 | Marcados como completados: bloqueo DELETE/UPDATE, ticket rectificativo, cadena de hashes, endpoints de auditoría, pantalla `/tpv/legal`, Declaración de Responsabilidad |
+| 1.2     | 2026-07-03 | Fase 2: tipo impuesto IVA/IGIC configurable por empresa, porcentaje grabado por cobro, numeración correlativa atómica, NIF en ticket, sección 3 actualizada |
