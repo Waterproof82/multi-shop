@@ -30,7 +30,7 @@ export default async function MostradorPage({
     redirect('/tpv/turno/abrir');
   }
 
-  const { mesaId, sesionId, mesaNumero } = await searchParams;
+  const { mesaId, sesionId: sesionIdParam, mesaNumero } = await searchParams;
 
   const [productsResult, categoriesResult] = await Promise.all([
     productUseCase.getAll(admin.empresaId),
@@ -40,12 +40,29 @@ export default async function MostradorPage({
   const products = productsResult.success ? productsResult.data : [];
   const categories = categoriesResult.success ? categoriesResult.data : [];
 
-  // If a mesa was selected, load its existing orders from the DB
+  // If a mesa was selected, load its existing orders from the DB.
+  // If sesionId is not in the URL (e.g. navigating to a libre mesa or after refresh),
+  // look up the active session for this mesa.
   let existingOrders: ExistingOrder[] = [];
   let mesaName: string | null = null;
-  if (mesaId && sesionId) {
+  let sesionId = sesionIdParam ?? null;
+
+  if (mesaId) {
     try {
       const supabase = getSupabaseClient();
+
+      // Resolve active session if not provided in URL
+      if (!sesionId) {
+        const { data: sesionRow } = await supabase
+          .from('mesa_sesiones')
+          .select('id')
+          .eq('mesa_id', mesaId)
+          .is('cerrada_at', null)
+          .maybeSingle();
+        sesionId = (sesionRow as { id: string } | null)?.id ?? null;
+      }
+
+      if (sesionId) {
       const [ordersRows, mesaRow] = await Promise.all([
         supabase
           .from('pedidos')
@@ -62,7 +79,8 @@ export default async function MostradorPage({
 
       mesaName = (mesaRow.data as { nombre: string | null } | null)?.nombre ?? null;
 
-      type RawItem = { nombre?: string; precio?: number; cantidad?: number; complementos?: string[] };
+      type RawComplement = string | { nombre?: string; name?: string };
+      type RawItem = { nombre?: string; precio?: number; cantidad?: number; complementos?: RawComplement[] };
       type RawPedido = { id: string; numero_pedido: number; detalle_pedido: RawItem[]; total: number; estado: string; created_at: string };
 
       existingOrders = ((ordersRows.data ?? []) as RawPedido[]).map(p => ({
@@ -73,10 +91,15 @@ export default async function MostradorPage({
           nombre: it.nombre ?? '',
           precio: Number(it.precio ?? 0),
           cantidad: Number(it.cantidad ?? 1),
-          complementos: it.complementos ?? [],
+          complementos: (it.complementos ?? []).map((c: RawComplement) =>
+            typeof c === 'string' ? c : (c.nombre ?? c.name ?? '')
+          ).filter(Boolean),
         })),
         total: Number(p.total),
       }));
+
+      mesaName = (mesaRow.data as { nombre: string | null } | null)?.nombre ?? null;
+      }
     } catch {
       // best-effort — mostrador still works without existing orders
     }
@@ -87,9 +110,9 @@ export default async function MostradorPage({
       turno={turnoResult.data}
       products={products}
       categories={categories}
-      initialMesa={mesaId && sesionId ? {
+      initialMesa={mesaId ? {
         mesaId,
-        sesionId,
+        sesionId: sesionId ?? null,
         mesaNumero: mesaNumero ? parseInt(mesaNumero, 10) : null,
         mesaName,
         existingOrders,

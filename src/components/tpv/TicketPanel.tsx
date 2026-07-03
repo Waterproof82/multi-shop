@@ -11,10 +11,12 @@ interface Props {
   readonly mesaId: string | null;
   readonly mesaNumero: number | null;
   readonly mesaName: string | null;
+  readonly mesaName: string | null;
   readonly existingOrders: ExistingOrder[];
   readonly pendingItems: PendingItem[];
   readonly existingTotal: number;
   readonly pendingTotal: number;
+  readonly yaCobradoCents: number;
   readonly turnoId: string;
   readonly onRemovePending: (nombre: string, complementos: string[]) => void;
   readonly onPendingSent: () => void;
@@ -36,18 +38,18 @@ const ESTADO_LABEL: Record<string, string> = {
 };
 
 const ESTADO_COLOR: Record<string, string> = {
-  pendiente: '#6b7280',
-  en_preparacion: '#f59e0b',
+  pendiente: '#ef4444',
+  en_preparacion: '#f97316',
   preparado: '#22c55e',
-  servido: '#6b7280',
+  servido: '#22c55e',
   retenido: '#f97316',
   pendiente_validacion: '#a78bfa',
 };
 
 export function TicketPanel({
   sesionId, mesaId, mesaNumero, mesaName, existingOrders, pendingItems,
-  existingTotal, pendingTotal, turnoId, onRemovePending, onPendingSent,
-}: Props) {
+  existingTotal, pendingTotal, yaCobradoCents, turnoId, onRemovePending, onPendingSent,
+}: Readonly<Props>) {
   const router = useRouter();
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
@@ -56,6 +58,10 @@ export function TicketPanel({
   const iva = total - subtotal;
   const hasContent = existingOrders.length > 0 || pendingItems.length > 0;
   const canCobrar = sesionId !== null;
+  const pendienteEuros = Math.max(0, existingTotal - yaCobradoCents / 100);
+  const hasPendingOrders = existingOrders.some(
+    o => ['pendiente_validacion', 'pendiente', 'en_preparacion', 'preparado', 'retenido'].includes(o.estado)
+  );
 
   const mesaLabel = mesaNumero !== null
     ? `Mesa ${mesaNumero}${mesaName ? ` · ${mesaName}` : ''}`
@@ -192,8 +198,16 @@ export function TicketPanel({
                   const err = await res.json() as { error?: string };
                   setSendError(err.error ?? 'Error al enviar el pedido');
                 } else {
+                  const json = await res.json() as { sesionId?: string | null };
                   onPendingSent();
-                  router.refresh();
+                  // If the mesa had no session yet, navigate to include the new sesionId in the URL
+                  if (!sesionId && json.sesionId && mesaId) {
+                    const params = new URLSearchParams({ mesaId, mesaNumero: String(mesaNumero ?? ''), sesionId: json.sesionId });
+                    if (mesaName) params.set('mesaName', mesaName);
+                    router.replace(`/tpv/mostrador?${params.toString()}`);
+                  } else {
+                    router.refresh();
+                  }
                 }
               } catch {
                 setSendError('Error de conexión');
@@ -205,13 +219,21 @@ export function TicketPanel({
             {sending ? 'Enviando...' : `Enviar a cocina (${fmt(pendingTotal)})`}
           </button>
         )}
+        {hasPendingOrders && canCobrar && (
+          <div className="flex items-start gap-2 rounded-xl px-3 py-2.5 bg-[#f9731615] border border-[#f9731640]">
+            <span className="text-sm leading-none mt-0.5">🍽</span>
+            <p className="text-xs leading-snug text-[#f97316]">
+              Quedan pedidos sin servir. Servilos antes de cobrar.
+            </p>
+          </div>
+        )}
         <button
           type="button"
-          disabled={!canCobrar}
+          disabled={!canCobrar || hasPendingOrders}
           onClick={() => router.push(`/tpv/cobro/${sesionId}?turnoId=${turnoId}`)}
           className="w-full bg-[#22c55e] text-white rounded-xl py-3.5 text-base font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition-all"
         >
-          Cobrar {existingTotal > 0 ? fmt(existingTotal) : ''}
+          Cobrar {pendienteEuros > 0 ? fmt(pendienteEuros) : ''}
         </button>
       </div>
     </aside>

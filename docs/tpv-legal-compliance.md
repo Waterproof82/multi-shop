@@ -32,12 +32,11 @@
 - [x] Formato JSON legible sin herramientas especiales, con cabecera `Content-Disposition: attachment` (20260703).
 - [~] Protección: admin de la empresa. Pendiente: token de auditoría de un solo uso para inspectores externos.
 
-### 1.4 Código QR de verificación AEAT
+### 1.4 Código QR / URL de verificación AEAT
 
-- [ ] Generar QR en cada ticket impreso/digital con la URL de la AEAT:
-  `https://www2.agenciatributaria.gob.es/wlpl/TIKE-CONT/ValidarQR?nif={NIF}&numserie={SERIE}&fecha={FECHA}&importe={IMPORTE}`
-- [ ] Implementar generación del QR en la capa de impresión térmica (Electron / Fase 2).
-- [ ] Mostrar el QR también en la pantalla de confirmación de cobro (`CobroConfirmado`).
+- [x] **URL de verificación AEAT** mostrada en `CobroConfirmado` con formato correcto: `DD-MM-AAAA` (no ISO 8601). Parámetros: `nif`, `numserie` (serie+ticket 6 dígitos), `fecha`, `importe` (20260703).
+- [ ] Generar QR visual con esa URL en cada ticket impreso/digital (Fase impresión térmica).
+- [ ] Verificar con la AEAT que el formato de `numserie` y `fecha` pasan la validación del servicio web.
 
 ### 1.5 Declaración de Responsabilidad del fabricante
 
@@ -72,7 +71,8 @@
 - [x] **Tipo impositivo configurable por empresa** — `empresas.tipo_impuesto` (`'iva'|'igic'`) y `empresas.porcentaje_impuesto`. Auto-relleno al cambiar tipo (IVA → 10%, IGIC → 7%). Propagado como prop SSR a todos los componentes del TPV. `tpv_cobros.iva_porcentaje` graba la tasa en el momento del cobro para preservar el histórico (20260703).
 - [x] **Importe IVA/IGIC y base imponible** calculados en trigger PostgreSQL — `iva_cents` y `base_imponible_cents` en `tpv_cobros`. No delegados al cliente (20260703).
 - [ ] **Importe total** con y sin IVA mostrado en ticket impreso/digital.
-- [x] Si es **ticket rectificativo**: referencia explícita al número de ticket original — `rectifica_cobro_id UUID REFERENCES tpv_cobros(id)` en DB; mostrado en pantalla de confirmación (20260703).
+- [x] Si es **ticket rectificativo**: referencia explícita al número de ticket original — `rectifica_cobro_id UUID REFERENCES tpv_cobros(id)` en DB; mostrado en pantalla de confirmación y en el historial del turno como "Rectificativo · anula SERIE-NNNNNN" (20260703).
+- [x] **Cross-turno**: el rectificativo puede emitirse en un turno distinto al del cobro original (legal). El historial resuelve esto server-side mostrando "Rectificado" en el original y la referencia cruzada en el negativo (20260703).
 - [ ] Implementar tipos de IVA diferenciados por categoría de producto (IVA 10% restauración, 21% alcohol, 0% exentos) — pendiente Fase 3.
 
 ---
@@ -125,3 +125,4 @@
 | 1.0     | 2026-07-02 | Creación inicial del documento |
 | 1.1     | 2026-07-03 | Marcados como completados: bloqueo DELETE/UPDATE, ticket rectificativo, cadena de hashes, endpoints de auditoría, pantalla `/tpv/legal`, Declaración de Responsabilidad |
 | 1.2     | 2026-07-03 | Fase 2: tipo impuesto IVA/IGIC configurable por empresa, porcentaje grabado por cobro, numeración correlativa atómica, NIF en ticket, sección 3 actualizada |
+| 1.3     | 2026-07-03 | Fase 3: URL AEAT con fecha DD-MM-AAAA corregida; rectificativo cross-turno documentado y visualizado en historial; fix bug guardado tipo_impuesto en panel admin (camelCase→snake_case) |

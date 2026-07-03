@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { getCsrfToken } from '@/lib/csrf-client';
 
 interface PedidoItem {
@@ -15,7 +16,6 @@ interface PedidoRow {
   total: number;
   estado: string;
   createdAt: string;
-  paymentStatus: string | null;
   mesaNumero: number | null;
   mesaNombre: string | null;
   items: PedidoItem[];
@@ -34,6 +34,16 @@ interface CobroRow {
   hash: string;
   cobradoAt: string;
   rectificaCobroId: string | null;
+  yaRectificado: boolean;
+  originalTicket: { serie: string; numeroTicket: number } | null;
+}
+
+interface TurnoOption {
+  id: string;
+  operadorNombre: string;
+  aperturaAt: string;
+  cierreAt: string | null;
+  activo: boolean;
 }
 
 interface Props {
@@ -41,6 +51,8 @@ interface Props {
   cobros: CobroRow[];
   turnoAperturaAt: string;
   tipoImpuesto: 'iva' | 'igic';
+  turnos: TurnoOption[];
+  turnoId: string;
 }
 
 const ESTADO_LABEL: Record<string, string> = {
@@ -78,16 +90,16 @@ function fmtDate(iso: string): string {
 type Tab = 'pedidos' | 'cobros';
 
 function CobrosList({ cobros }: Readonly<{ cobros: CobroRow[] }>) {
+  const router = useRouter();
   const [rectificando, setRectificando] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
-  const [rectificados, setRectificados] = useState<Set<string>>(() => {
-    const ids = new Set<string>();
-    cobros.forEach(c => { if (c.rectificaCobroId) ids.add(c.rectificaCobroId); });
-    return ids;
-  });
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // yaRectificado viene del servidor (cubre también rectificativos de otros turnos)
 
   async function handleRectificar(cobroId: string) {
     setRectificando(cobroId);
+    setErrorMsg(null);
     try {
       const csrfToken = getCsrfToken();
       const res = await fetch('/api/tpv/cobro/rectificar', {
@@ -99,8 +111,13 @@ function CobrosList({ cobros }: Readonly<{ cobros: CobroRow[] }>) {
         body: JSON.stringify({ cobroId }),
       });
       if (res.ok) {
-        setRectificados(prev => new Set([...prev, cobroId]));
+        router.refresh();
+      } else {
+        const json = await res.json().catch(() => ({})) as { error?: string };
+        setErrorMsg(json.error ?? 'Error al rectificar el cobro');
       }
+    } catch {
+      setErrorMsg('Error de conexión al rectificar');
     } finally {
       setRectificando(null);
       setConfirm(null);
@@ -113,11 +130,25 @@ function CobrosList({ cobros }: Readonly<{ cobros: CobroRow[] }>) {
 
   return (
     <div className="flex flex-col gap-2">
+      {errorMsg && (
+        <div className="bg-[#ef444420] border border-[#ef4444] text-[#ef4444] text-xs rounded-xl px-4 py-2 mb-1">
+          {errorMsg}
+        </div>
+      )}
       {cobros.map(c => {
         const isRectificativo = c.rectificaCobroId !== null;
-        const yaRectificado = rectificados.has(c.id);
         const importe = c.importeCobradoCents / 100;
         const isNegative = importe < 0;
+
+        // Ticket del original, buscando primero en la misma lista (mismo turno)
+        const originalEnLista = isRectificativo
+          ? cobros.find(o => o.id === c.rectificaCobroId) ?? null
+          : null;
+        const originalLabel = originalEnLista
+          ? `${originalEnLista.serie}-${String(originalEnLista.numeroTicket).padStart(6, '0')}`
+          : c.originalTicket
+          ? `${c.originalTicket.serie}-${String(c.originalTicket.numeroTicket).padStart(6, '0')} (otro turno)`
+          : null;
 
         return (
           <div key={c.id} className="bg-[#1a1d27] border border-[#2e3347] rounded-xl px-4 py-3 flex items-center gap-4">
@@ -130,14 +161,16 @@ function CobrosList({ cobros }: Readonly<{ cobros: CobroRow[] }>) {
             <span className="text-xs text-[#6b7280] capitalize flex-1">
               {c.metodoPago}
               {isRectificativo && (
-                <span className="ml-2 text-[#f59e0b] font-bold text-[10px] uppercase">Rectificativo</span>
+                <span className="ml-2 text-[#f59e0b] font-bold text-[10px] uppercase">
+                  Rectificativo{originalLabel ? ` · anula ${originalLabel}` : ''}
+                </span>
               )}
             </span>
             <span className={`text-sm font-bold shrink-0 ${isNegative ? 'text-[#ef4444]' : 'text-[#e8eaf0]'}`}>
               {fmt(importe)}
             </span>
 
-            {!isRectificativo && !yaRectificado && (
+            {!isRectificativo && !c.yaRectificado && (
               confirm === c.id ? (
                 <div className="flex gap-2 shrink-0">
                   <button
@@ -167,8 +200,8 @@ function CobrosList({ cobros }: Readonly<{ cobros: CobroRow[] }>) {
               )
             )}
 
-            {yaRectificado && (
-              <span className="shrink-0 text-[10px] text-[#6b7280] uppercase tracking-wider">Rectificado</span>
+            {c.yaRectificado && (
+              <span className="shrink-0 text-[10px] text-[#f59e0b] uppercase tracking-wider">Rectificado</span>
             )}
           </div>
         );
@@ -177,7 +210,17 @@ function CobrosList({ cobros }: Readonly<{ cobros: CobroRow[] }>) {
   );
 }
 
-export function HistorialClient({ pedidos, cobros, turnoAperturaAt, tipoImpuesto }: Readonly<Props>) {
+function turnoLabel(t: TurnoOption): string {
+  const apertura = new Date(t.aperturaAt).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  if (t.activo) return `Turno activo · desde ${apertura}`;
+  const cierre = t.cierreAt
+    ? new Date(t.cierreAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+    : '';
+  return `${apertura}–${cierre} · ${t.operadorNombre}`;
+}
+
+export function HistorialClient({ pedidos, cobros, turnoAperturaAt, tipoImpuesto, turnos, turnoId }: Readonly<Props>) {
+  const router = useRouter();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('pedidos');
 
@@ -185,9 +228,8 @@ export function HistorialClient({ pedidos, cobros, turnoAperturaAt, tipoImpuesto
     .filter(p => p.estado !== 'cancelado')
     .reduce((sum, p) => sum + p.total, 0);
 
-  const totalCobrado = pedidos
-    .filter(p => p.paymentStatus === 'paid')
-    .reduce((sum, p) => sum + p.total, 0);
+  const totalCobrado = cobros
+    .reduce((sum, c) => sum + c.importeCobradoCents, 0) / 100;
 
   const cobrosValidos = cobros.filter(c => c.rectificaCobroId === null);
   const ticketMedioCents = cobrosValidos.length > 0
@@ -213,6 +255,17 @@ export function HistorialClient({ pedidos, cobros, turnoAperturaAt, tipoImpuesto
             <p className="text-xs text-[#6b7280] mt-0.5">
               Desde las {fmtTime(turnoAperturaAt)} del {fmtDate(turnoAperturaAt)}
             </p>
+            {turnos.length > 1 && (
+              <select
+                value={turnoId}
+                onChange={e => router.push(`/tpv/historial?turnoId=${e.target.value}`)}
+                className="mt-2 text-xs bg-[#1a1d27] border border-[#2e3347] text-[#c8cad4] rounded-lg px-3 py-1.5 outline-none focus:border-[#4f72ff] cursor-pointer"
+              >
+                {turnos.map(t => (
+                  <option key={t.id} value={t.id}>{turnoLabel(t)}</option>
+                ))}
+              </select>
+            )}
             <div className="flex gap-1 mt-3">
               <button
                 type="button"
@@ -304,11 +357,6 @@ export function HistorialClient({ pedidos, cobros, turnoAperturaAt, tipoImpuesto
                     {ESTADO_LABEL[p.estado] ?? p.estado}
                   </span>
 
-                  {p.paymentStatus === 'paid' && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 text-[#22c55e] bg-[#22c55e22]">
-                      Cobrado
-                    </span>
-                  )}
 
                   <span className="text-sm font-bold text-[#e8eaf0] shrink-0 w-20 text-right">
                     {fmt(p.total)}

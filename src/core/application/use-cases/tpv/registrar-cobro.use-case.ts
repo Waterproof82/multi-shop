@@ -30,20 +30,23 @@ export async function registrarCobroUseCase(
   }
 
   // 2. Close the mesa session (computes total from pedidos, clears mesa.sesion_id)
-  const { error: closeErr } = await supabase.rpc('close_mesa_sesion', {
-    p_sesion_id: payload.sesionId,
-  });
+  //    Skip for partial payments — session remains open until fully paid.
+  if (payload.cerrarSesion !== false) {
+    const { error: closeErr } = await supabase.rpc('close_mesa_sesion', {
+      p_sesion_id: payload.sesionId,
+    });
 
-  if (closeErr) {
-    return {
-      success: false,
-      error: {
-        code: 'TPV_CIERRE_SESION_ERROR',
-        message: 'Error al cerrar la sesión de mesa',
-        module: 'use-case',
-        method: 'registrarCobroUseCase',
-      },
-    };
+    if (closeErr) {
+      return {
+        success: false,
+        error: {
+          code: 'TPV_CIERRE_SESION_ERROR',
+          message: 'Error al cerrar la sesión de mesa',
+          module: 'use-case',
+          method: 'registrarCobroUseCase',
+        },
+      };
+    }
   }
 
   // 3. Create cobro record (hash chain) + accumulate turno totals

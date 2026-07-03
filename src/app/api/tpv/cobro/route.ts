@@ -16,6 +16,7 @@ const CobroSchema = z.object({
   propinaCents: z.number().int().min(0),
   turnoId: z.string().uuid(),
   ivaPorcentaje: z.number().min(0).max(30).optional().default(10),
+  cerrarSesion: z.boolean().optional().default(true),
 });
 
 export async function POST(req: NextRequest) {
@@ -36,6 +37,6 @@ export async function POST(req: NextRequest) {
   }
 
   const repo = new SupabaseTpvRepository();
-  const result = await registrarCobroUseCase(repo, { ...parsed.data, empresaId });
+  const result = await registrarCobroUseCase(repo, { ...parsed.data, empresaId, cerrarSesion: parsed.data.cerrarSesion });
   return handleResult(result);
 }

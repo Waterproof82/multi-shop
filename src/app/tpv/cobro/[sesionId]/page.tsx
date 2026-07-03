@@ -4,6 +4,8 @@ import { authAdminUseCase } from '@/core/infrastructure/database';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { CobroFlow } from '@/components/tpv/cobro/CobroFlow';
 
+export const dynamic = 'force-dynamic';
+
 interface Props {
   params: Promise<{ sesionId: string }>;
   searchParams: Promise<{ turnoId?: string }>;
@@ -24,17 +26,26 @@ export default async function CobroPage({ params, searchParams }: Readonly<Props
   if (!turnoId) redirect('/tpv/mostrador');
 
   const supabase = getSupabaseClient();
-  const [sesionRes, empresaRes] = await Promise.all([
+  const [sesionRes, pedidosRes, empresaRes, cobrosRes] = await Promise.all([
     supabase
       .from('mesa_sesiones')
-      .select('id, total, propina_cents, mesas(numero)')
+      .select('id, propina_cents, mesas!mesa_sesiones_mesa_id_fkey(numero)')
       .eq('id', sesionId)
-      .single(),
+      .maybeSingle(),
+    supabase
+      .from('pedidos')
+      .select('total')
+      .eq('sesion_id', sesionId)
+      .neq('estado', 'cancelado'),
     supabase
       .from('empresas')
       .select('nif, tipo_impuesto, porcentaje_impuesto')
       .eq('id', admin.empresaId)
       .maybeSingle(),
+    supabase
+      .from('tpv_cobros')
+      .select('importe_cobrado_cents, rectifica_cobro_id')
+      .eq('sesion_id', sesionId),
   ]);
 
   const sesion = sesionRes.data;
@@ -42,10 +53,19 @@ export default async function CobroPage({ params, searchParams }: Readonly<Props
 
   const sesionData = sesion as unknown as {
     id: string;
-    total: number;
     propina_cents: number;
     mesas: { numero: number } | null;
   };
+
+  // Sum pedidos total — mesa_sesiones.total only reflects what was already charged;
+  // active sessions may have 0 there until the first cobro is registered.
+  const pedidosTotal = ((pedidosRes.data ?? []) as { total: number }[])
+    .reduce((sum, p) => sum + Number(p.total), 0);
+
+  // Sum cobros previos (netting out rectificaciones) to support cobro parcial.
+  type RawCobro = { importe_cobrado_cents: number; rectifica_cobro_id: string | null };
+  const yaCobradoCents = ((cobrosRes.data ?? []) as RawCobro[])
+    .reduce((sum, c) => sum + Number(c.importe_cobrado_cents), 0);
 
   const empresaRow = empresaRes.data as { nif: string | null; tipo_impuesto: string | null; porcentaje_impuesto: number | null } | null;
   const nif = empresaRow?.nif ?? null;
@@ -56,7 +76,8 @@ export default async function CobroPage({ params, searchParams }: Readonly<Props
     <CobroFlow
       sesionId={sesionId}
       turnoId={turnoId}
-      totalCents={Math.round(sesionData.total * 100)}
+      totalCents={Math.round(pedidosTotal * 100)}
+      yaCobradoCents={yaCobradoCents}
       mesaNumero={sesionData.mesas?.numero ?? 0}
       operadorNombre={admin.nombreCompleto ?? 'Operador'}
       empresaNif={nif}

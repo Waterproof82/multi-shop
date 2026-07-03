@@ -12,6 +12,8 @@ interface Props {
   readonly cobro: TpvCobro | null;
   readonly empresaNif: string | null;
   readonly tipoImpuesto: 'iva' | 'igic';
+  readonly esParcial?: boolean;
+  readonly pendienteCents?: number;
   readonly onNuevaOperacion: () => void;
 }
 
@@ -20,7 +22,9 @@ function fmt(cents: number) {
 }
 
 function buildAeatUrl(nif: string, cobro: TpvCobro): string {
-  const fecha = cobro.cobradoAt.slice(0, 10); // YYYY-MM-DD
+  // AEAT requiere DD-MM-AAAA
+  const [yyyy, mm, dd] = cobro.cobradoAt.slice(0, 10).split('-');
+  const fecha = `${dd}-${mm}-${yyyy}`;
   const importe = (cobro.importeCobradoCents / 100).toFixed(2);
   const serie = `${cobro.serie}${String(cobro.numeroTicket).padStart(6, '0')}`;
   const params = new URLSearchParams({ nif, numserie: serie, fecha, importe });
@@ -37,6 +41,8 @@ export function CobroConfirmado({
   cobro,
   empresaNif,
   tipoImpuesto,
+  esParcial = false,
+  pendienteCents = 0,
   onNuevaOperacion,
 }: Props) {
   const now = new Date();
@@ -47,13 +53,18 @@ export function CobroConfirmado({
   return (
     <div className="flex items-center justify-center w-full h-full">
       <div className="flex flex-col items-center gap-6 max-w-sm w-full">
-        <div className="w-20 h-20 rounded-full bg-[#22c55e22] border-2 border-[#22c55e] flex items-center justify-center text-4xl">
-          ✓
+        <div className={`w-20 h-20 rounded-full flex items-center justify-center text-4xl border-2 ${esParcial ? 'bg-[#f9731622] border-[#f97316]' : 'bg-[#22c55e22] border-[#22c55e]'}`}>
+          {esParcial ? '½' : '✓'}
         </div>
-        <h2 className="text-2xl font-bold">¡Cobrado!</h2>
+        <h2 className="text-2xl font-bold">{esParcial ? 'Cobro parcial registrado' : '¡Cobrado!'}</h2>
         <p className="text-sm text-[#6b7280]">
           Mesa {mesaNumero} · {operadorNombre}
         </p>
+        {esParcial && pendienteCents > 0 && (
+          <p className="text-sm text-[#f97316] font-semibold">
+            Pendiente: {fmt(pendienteCents)}
+          </p>
+        )}
 
         {/* Ticket header */}
         {cobro !== null && (
@@ -158,7 +169,7 @@ export function CobroConfirmado({
             onClick={onNuevaOperacion}
             className="flex-[2] py-3 rounded-xl bg-[#4f72ff] text-white font-bold hover:brightness-110 transition-all"
           >
-            Nueva operacion →
+            {esParcial ? 'Volver al mostrador →' : 'Nueva operación →'}
           </button>
         </div>
       </div>

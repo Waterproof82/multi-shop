@@ -1,11 +1,16 @@
 'use client';
 
+import { useState } from 'react';
 import type { MetodoPago } from '@/core/domain/entities/tpv-types';
 
 interface Props {
   readonly totalCents: number;
+  readonly yaCobradoCents: number;
+  readonly totalPendienteCents: number;
+  readonly importeParcialCents: number;
   readonly metodo: MetodoPago;
   readonly propinaCents: number;
+  readonly onImporteChange: (cents: number) => void;
   readonly onMetodoChange: (m: MetodoPago) => void;
   readonly onPropinaChange: (cents: number) => void;
   readonly onContinuar: () => void;
@@ -20,18 +25,45 @@ const QUICK_TIPS = [100, 200, 500] as const;
 
 export function CobroMetodoPropina({
   totalCents,
+  yaCobradoCents,
+  totalPendienteCents,
+  importeParcialCents,
   metodo,
   propinaCents,
+  onImporteChange,
   onMetodoChange,
   onPropinaChange,
   onContinuar,
   onCancel,
 }: Props) {
-  const totalFinal = totalCents + propinaCents;
+  const esParcial = importeParcialCents < totalPendienteCents;
+  const totalFinal = importeParcialCents + propinaCents;
+
+  const [rawImporte, setRawImporte] = useState((importeParcialCents / 100).toFixed(2));
 
   function handlePropinaInput(val: string) {
     const euros = parseFloat(val.replace(',', '.')) || 0;
     onPropinaChange(Math.round(euros * 100));
+  }
+
+  function handleImporteChange(val: string) {
+    setRawImporte(val);
+    const euros = parseFloat(val.replace(',', '.')) || 0;
+    const cents = Math.round(euros * 100);
+    onImporteChange(Math.min(Math.max(cents, 0), totalPendienteCents));
+  }
+
+  function handleImporteBlur() {
+    // Clamp and reformat on blur
+    const euros = parseFloat(rawImporte.replace(',', '.')) || 0;
+    const cents = Math.min(Math.max(Math.round(euros * 100), 1), totalPendienteCents);
+    onImporteChange(cents);
+    setRawImporte((cents / 100).toFixed(2));
+  }
+
+  function resetImporteToTotal() {
+    onImporteChange(totalPendienteCents);
+    setRawImporte((totalPendienteCents / 100).toFixed(2));
   }
 
   return (
@@ -40,8 +72,18 @@ export function CobroMetodoPropina({
       <div className="w-56 bg-[#1a1d27] border border-[#2e3347] rounded-2xl p-5 flex flex-col gap-3 self-start">
         <p className="text-[10px] font-bold text-[#6b7280] uppercase tracking-wider">Resumen</p>
         <div className="flex justify-between text-sm text-[#6b7280]">
-          <span>Consumo</span><span>{fmt(totalCents)}</span>
+          <span>Consumo total</span><span>{fmt(totalCents)}</span>
         </div>
+        {yaCobradoCents > 0 && (
+          <div className="flex justify-between text-sm text-[#22c55e]">
+            <span>Ya cobrado</span><span>− {fmt(yaCobradoCents)}</span>
+          </div>
+        )}
+        {yaCobradoCents > 0 && (
+          <div className="flex justify-between text-sm font-semibold">
+            <span>Pendiente</span><span>{fmt(totalPendienteCents)}</span>
+          </div>
+        )}
         {propinaCents > 0 && (
           <div className="flex justify-between text-sm text-[#eab308]">
             <span>Propina</span><span>{fmt(propinaCents)}</span>
@@ -49,14 +91,52 @@ export function CobroMetodoPropina({
         )}
         <div className="h-px bg-[#2e3347]" />
         <div className="flex justify-between items-baseline">
-          <span className="text-sm text-[#6b7280]">TOTAL</span>
+          <span className="text-sm text-[#6b7280]">{esParcial ? 'A COBRAR' : 'TOTAL'}</span>
           <span className="text-2xl font-bold">{fmt(totalFinal)}</span>
         </div>
+        {esParcial && (
+          <div className="text-[10px] text-[#f97316] font-semibold text-center bg-[#f9731615] border border-[#f9731640] rounded-lg py-1">
+            Cobro parcial
+          </div>
+        )}
       </div>
 
       {/* Panel principal */}
       <div className="bg-[#1a1d27] border border-[#2e3347] rounded-2xl p-7 flex flex-col gap-6 w-[420px]">
         <h2 className="text-lg font-bold">¿Cómo paga el cliente?</h2>
+
+        {/* Importe a cobrar */}
+        <div className="flex flex-col gap-2">
+          <label className="text-xs font-bold text-[#6b7280] uppercase tracking-wider">
+            Importe a cobrar
+          </label>
+          <div className="flex items-center gap-2 bg-[#22263a] border border-[#2e3347] rounded-xl px-4 focus-within:border-[#4f72ff] transition-colors">
+            <span className="text-[#6b7280] font-semibold">€</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={rawImporte}
+              onChange={e => handleImporteChange(e.target.value)}
+              onBlur={handleImporteBlur}
+              onFocus={e => e.target.select()}
+              className="flex-1 bg-transparent py-3 text-lg font-bold outline-none"
+            />
+            {esParcial && (
+              <button
+                type="button"
+                onClick={resetImporteToTotal}
+                className="text-[10px] text-[#4f72ff] font-bold hover:underline shrink-0"
+              >
+                Total
+              </button>
+            )}
+          </div>
+          {esParcial && (
+            <p className="text-[11px] text-[#6b7280]">
+              Quedan {fmt(totalPendienteCents - importeParcialCents)} por cobrar tras este pago
+            </p>
+          )}
+        </div>
 
         {/* Método de pago */}
         <div className="grid grid-cols-2 gap-3">

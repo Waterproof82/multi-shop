@@ -24,7 +24,7 @@ interface MesaActiva {
 
 interface InitialMesa {
   mesaId: string;
-  sesionId: string;
+  sesionId: string | null;
   mesaNumero: number | null;
   mesaName: string | null;
   existingOrders: ExistingOrder[];

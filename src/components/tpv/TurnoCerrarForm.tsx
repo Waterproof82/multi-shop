@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { TpvTurno, TpvTurnoStats } from '@/core/domain/entities/tpv-types';
+import { getCsrfToken } from '@/lib/csrf-client';
 
 interface Props {
   readonly turno: TpvTurno;
@@ -52,9 +53,13 @@ export function TurnoCerrarForm({ turno, stats }: Props) {
     setLoading(true);
     setError(null);
 
+    const csrfToken = getCsrfToken();
     const res = await fetch(`/api/tpv/turno/${turno.id}/cerrar`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
+      },
       body: JSON.stringify({
         efectivoCierreCents: contadoCents,
         totalEfectivoTeoricoCents: teoricoCents,

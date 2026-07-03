@@ -35,15 +35,19 @@ Plataforma **multi-tenant** de gestión de negocios de hostelería y retail. Cad
 
 ### 🖥️ TPV — Terminal Punto de Venta (Fases 1 y 2)
 
-Software de caja para restaurantes y tiendas integrado en la misma plataforma. Cumplimiento legal completo con la Ley Antifraude (RD 1007/2023) y RD 1619/2012. Dashboard de analítica con selector de período y configuración de tipo de impuesto (IVA/IGIC) por empresa.
+Software de caja para restaurantes y tiendas integrado en la misma plataforma. Cumplimiento legal completo con la Ley Antifraude (RD 1007/2023) y RD 1619/2012. Dashboard de analítica con selector de período y configuración de tipo de impuesto (IVA/IGIC) por empresa. Historial multi-turno, cobro parcial y rectificativos con trazabilidad cross-turno.
 
 #### Gestión de turno y cobro
 
 - **Gestión de turnos de caja**: apertura con efectivo inicial, cierre con arqueo ciego (el cajero declara el efectivo sin ver el teórico), diferencia calculada automáticamente.
 - **Mostrador táctil en 3 columnas**: grid de mesas/categorías a la izquierda, menú de productos en el centro, ticket activo a la derecha. Navegación por teclado + touch optimizada.
 - **Selección de complementos**: modal de selección cuando un producto tiene opciones obligatorias u opcionales (radio-select por complemento, validación pre-añadido).
-- **Flujo de cobro completo**: efectivo (calcula cambio automáticamente), tarjeta, propina opcional. Pantalla de confirmación con número de ticket, desglose de IVA/IGIC y enlace de verificación AEAT. La tasa se toma del campo `porcentaje_impuesto` de la empresa (no hardcodeada).
-- **Historial de turno**: vista de pedidos y cobros del turno activo con tabs separados. Los cobros muestran número de ticket correlativo y botón de rectificación con confirmación. KPIs inline: ticket medio, IVA/IGIC total y porcentaje efectivo/tarjeta.
+- **Flujo de cobro completo**: efectivo (calcula cambio automáticamente), tarjeta, propina opcional. Pantalla de confirmación con número de ticket, desglose de IVA/IGIC y enlace de verificación AEAT (formato DD-MM-AAAA requerido por la AEAT). La tasa se toma del campo `porcentaje_impuesto` de la empresa (no hardcodeada).
+- **Cobro parcial**: el operador puede editar el "Importe a cobrar" para pagar una fracción del total. La sesión de mesa permanece abierta hasta cobrar el total. El mostrador muestra en tiempo real el importe ya cobrado y el pendiente restante. Cada cobro parcial genera un ticket fiscal independiente.
+- **Detección de cobro externo**: si un camarero o cliente paga la mesa desde otro canal mientras está abierta en el TPV, el mostrador detecta el cierre de sesión vía Realtime (Supabase postgres_changes) y limpia el ticket automáticamente con un aviso al operador.
+- **Bloqueo preventivo de cobro**: el botón "Cobrar" se bloquea mientras algún pedido de la mesa tiene ítems sin servir (estado pendiente, en cocina o listo), igual que en el sistema de camarero.
+- **Historial multi-turno**: selector de turno en `/tpv/historial` que permite consultar cualquier turno pasado. Los pedidos se filtran entre `apertura_at` y `cierre_at` del turno seleccionado. Los cobros se filtran por `turno_id`. Navegación SSR mediante query param `?turnoId=`; muestra hasta los últimos 20 turnos.
+- **Rectificativos con trazabilidad cross-turno**: el historial resuelve server-side si un cobro fue rectificado en otro turno (`yaRectificado: boolean`). El rectificativo muestra "Rectificativo · anula SERIE-NNNNNN (otro turno)" cuando el original pertenece a un turno distinto. Tras confirmar la rectificación, `router.refresh()` recarga los datos SSR y actualiza los totales.
 
 #### Cumplimiento legal (Ley Antifraude + RD 1007/2023 + RD 1619/2012)
 
@@ -939,6 +943,7 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 - [`docs/context/qr-session-enforcement.md`](docs/context/qr-session-enforcement.md) — QR session enforcement: presencia física, mesa_client_tokens, QRScannerGate, rotación de sesión
 - [`docs/context/waiter-validation-flow.md`](docs/context/waiter-validation-flow.md) — Cola de validación: flujo pendiente_validacion → cocina/bar, from_validation flag, pausa, timer validated_at
 - [`docs/tpv-legal-compliance.md`](docs/tpv-legal-compliance.md) — TPV: checklist de cumplimiento legal (Ley Antifraude, TicketBAI, RD 1619/2012, RGPD, PCI-DSS)
+- [`docs/context/tpv-cobros-historial.md`](docs/context/tpv-cobros-historial.md) — TPV Fase 3: cobro parcial, historial multi-turno, rectificativos cross-turno, buenas prácticas
 - [`docs/superpowers/specs/2026-07-02-tpv-design.md`](docs/superpowers/specs/2026-07-02-tpv-design.md) — Spec técnica del TPV Fase 1
 - [`docs/superpowers/specs/2026-07-03-tpv-analytics-design.md`](docs/superpowers/specs/2026-07-03-tpv-analytics-design.md) — Spec técnica del TPV Fase 2 (Analytics + IVA/IGIC)
 

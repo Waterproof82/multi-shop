@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   requireAuth,
   requireRole,
-  handleResult,
+  errorResponse,
   validationErrorResponse,
   type AuthResult,
 } from '@/core/infrastructure/api/helpers';
@@ -49,5 +49,6 @@ export async function POST(
     totalEfectivoTeoricoCents: parsed.data.totalEfectivoTeoricoCents,
   });
 
-  return handleResult(result);
+  if (!result.success) return errorResponse(result.error.message);
+  return NextResponse.json({ ok: true });
 }

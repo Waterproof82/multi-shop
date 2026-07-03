@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { TpvTurno } from '@/core/domain/entities/tpv-types';
 import type { Product, Category } from '@/core/domain/entities/types';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
@@ -19,7 +19,7 @@ export interface ExistingOrder {
 
 interface InitialMesa {
   mesaId: string;
-  sesionId: string;
+  sesionId: string | null;
   mesaNumero: number | null;
   mesaName: string | null;
   existingOrders: ExistingOrder[];
@@ -33,10 +33,10 @@ interface Props {
 }
 
 export function MostradorClient({ turno, products, categories, initialMesa }: Props) {
-  const { mesa, addItem, removeItem, clearPending, refreshOrders } = useMesaActiva(initialMesa);
+  const { mesa, addItem, removeItem, clearPending, clearMesa, refreshOrders } = useMesaActiva(initialMesa);
   const [refreshing, setRefreshing] = useState(false);
-  // Stable ref for the channel name — avoids React StrictMode double-mount closing the channel.
-  const channelRef = useRef(`tpv-pedidos-${Math.random().toString(36).slice(2)}`);
+  const [yaCobradoCents, setYaCobradoCents] = useState(0);
+  const [externalCobro, setExternalCobro] = useState<string | null>(null);
 
   const handleRefresh = useCallback(async () => {
     if (!mesa.sesionId) return;
@@ -44,35 +44,78 @@ export function MostradorClient({ turno, products, categories, initialMesa }: Pr
     try {
       const res = await fetch(`/api/tpv/pedidos?sesionId=${mesa.sesionId}`);
       if (res.ok) {
-        const orders = await res.json() as ExistingOrder[];
-        refreshOrders(orders);
+        const json = await res.json() as { orders: ExistingOrder[]; yaCobradoCents: number };
+        refreshOrders(json.orders);
+        setYaCobradoCents(json.yaCobradoCents);
       }
     } finally {
       setRefreshing(false);
     }
   }, [mesa.sesionId, refreshOrders]);
 
-  // Real-time: re-fetch orders whenever any pedido changes.
-  // We intentionally skip the sesion_id filter here: Supabase postgres_changes
-  // only supports column filters on replica identity columns (usually just the PK),
-  // so filtering by sesion_id would silently drop all events. Instead we subscribe
-  // to the full table and let handleRefresh (which already scopes by sesionId) do
-  // the filtering. RLS limits events to this empresa anyway.
+  // Re-fetch on mount to always show fresh data after navigating back from cobro.
+  useEffect(() => {
+    void handleRefresh();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Real-time: re-fetch orders when new pedidos arrive or kitchen marks items.
   useEffect(() => {
     if (!mesa.sesionId) return;
     const supabase = getSupabaseAnonClient();
-    const channel = supabase
-      .channel(channelRef.current)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' },
-        () => { void handleRefresh(); })
+    const refresh = () => { void handleRefresh(); };
+
+    const chNew = supabase
+      .channel('waiter-new-order')
+      .on('broadcast', { event: 'new-order' }, refresh)
       .subscribe();
-    return () => { void supabase.removeChannel(channel); };
-  // handleRefresh is stable while sesionId stays the same.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mesa.sesionId]);
+
+    const chItems = supabase
+      .channel('waiter-items-update')
+      .on('broadcast', { event: 'item-update' }, refresh)
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(chNew);
+      void supabase.removeChannel(chItems);
+    };
+  }, [mesa.sesionId, handleRefresh]);
+
+  // Real-time: detect when the active session is closed externally
+  // (waiter cobro, customer direct payment, etc.)
+  useEffect(() => {
+    if (!mesa.sesionId || !mesa.mesaNumero) return;
+    const supabase = getSupabaseAnonClient();
+    const sesionId = mesa.sesionId;
+    const mesaNumero = mesa.mesaNumero;
+
+    const ch = supabase
+      .channel(`tpv-sesion-close-${sesionId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'mesa_sesiones', filter: `id=eq.${sesionId}` },
+        (payload) => {
+          const row = payload.new as { cerrada_at: string | null };
+          if (row.cerrada_at) {
+            setExternalCobro(`La mesa ${mesaNumero} ha sido cobrada desde otro canal.`);
+            clearMesa();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => { void supabase.removeChannel(ch); };
+  }, [mesa.sesionId, mesa.mesaNumero, clearMesa]);
 
   return (
     <>
+      {externalCobro && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-3 rounded-xl bg-[#22c55e] text-white text-sm font-semibold shadow-lg">
+          <span>✓</span>
+          <span>{externalCobro}</span>
+          <button type="button" onClick={() => setExternalCobro(null)} className="ml-2 text-white/70 hover:text-white text-lg leading-none">×</button>
+        </div>
+      )}
       <TicketPanel
         sesionId={mesa.sesionId}
         mesaId={mesa.mesaId}
@@ -82,6 +125,7 @@ export function MostradorClient({ turno, products, categories, initialMesa }: Pr
         pendingItems={mesa.pendingItems}
         existingTotal={mesa.existingTotal}
         pendingTotal={mesa.pendingTotal}
+        yaCobradoCents={yaCobradoCents}
         turnoId={turno.id}
         onRemovePending={removeItem}
         onPendingSent={clearPending}

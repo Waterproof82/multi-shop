@@ -24,6 +24,7 @@ export interface TpvCobroPayload {
   propinaCents: number;
   turnoId: string;
   ivaPorcentaje?: number;
+  cerrarSesion?: boolean;
 }
 
 export interface TpvTurnoStats {

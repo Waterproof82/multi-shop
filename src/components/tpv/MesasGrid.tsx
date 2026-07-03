@@ -131,13 +131,15 @@ function TpvMesaCard({ mesa, turnoId, modo }: Readonly<{ mesa: MesaWithSession; 
   const pulsing = !isPaid && (isPaymentInProgress || isOpen || isActive);
 
   const canInteract = modo === 'seleccionar'
-    ? !!mesa.sesionId && !isPaid
+    ? !isPaid
     : !!mesa.sesionId && !isPaid && !!turnoId;
 
   function handleClick() {
     if (!canInteract) return;
-    if (modo === 'seleccionar' && mesa.sesionId) {
-      router.push(`/tpv/mostrador?mesaId=${mesa.id}&sesionId=${mesa.sesionId}&mesaNumero=${mesa.numero}`);
+    if (modo === 'seleccionar') {
+      const params = new URLSearchParams({ mesaId: mesa.id, mesaNumero: String(mesa.numero) });
+      if (mesa.sesionId) params.set('sesionId', mesa.sesionId);
+      router.push(`/tpv/mostrador?${params.toString()}`);
     } else if (mesa.sesionId && turnoId) {
       router.push(`/tpv/cobro/${mesa.sesionId}?turnoId=${turnoId}`);
     }

@@ -47,7 +47,11 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
     try {
       const res = await fetchWithCsrf(`/api/admin/empresa?empresaId=${efectivoEmpresaId}`, {
         method: 'PUT',
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          tipo_impuesto: formData.tipoImpuesto,
+          porcentaje_impuesto: formData.porcentajeImpuesto,
+        }),
       });
 
       if (res.ok) {

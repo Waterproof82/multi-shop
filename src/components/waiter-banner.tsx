@@ -234,8 +234,11 @@ export function WaiterBanner() {
   }, [mesaId, fetchLock]);
 
   // Realtime: kitchen/bar counts + lock status via single multiplexed channel
+  // Skip on /tpv/* — the TPV has its own broadcast subscriptions on the same
+  // anon client singleton; a CHANNEL_ERROR here would poison that shared connection.
   useEffect(() => {
     if (!isWaiter) return;
+    if (pathname.startsWith('/tpv')) return;
     const fetchCounts = async () => {
       try {
         const r = await fetch('/api/waiter/orders/counts');
@@ -321,7 +324,7 @@ export function WaiterBanner() {
       void supabase.removeChannel(broadcastNewOrder);
       void supabase.removeChannel(broadcastItems);
     };
-  }, [isWaiter, mesaId, fetchLock]);
+  }, [isWaiter, mesaId, fetchLock, pathname]);
 
   // ── helper functions ──────────────────────────────────
 
@@ -427,8 +430,8 @@ export function WaiterBanner() {
   // Not a waiter at all → hide everything
   if (!isWaiter) return null;
 
-  // Admin/superadmin panels are never waiter context
-  if (pathname.startsWith('/admin') || pathname.startsWith('/superadmin')) return null;
+  // Admin/superadmin/TPV panels are never waiter context
+  if (pathname.startsWith('/admin') || pathname.startsWith('/superadmin') || pathname.startsWith('/tpv')) return null;
 
   // Kitchen page has its own header — don't render the waiter banner there
   if (pathname.startsWith('/kitchen')) return null;

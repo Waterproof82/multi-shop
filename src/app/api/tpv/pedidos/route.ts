@@ -30,33 +30,95 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = getSupabaseClient();
-  const pedidosRes = await supabase
-    .from('pedidos')
-    .select('id, numero_pedido, detalle_pedido, total, estado, created_at')
-    .eq('empresa_id', empresaId)
-    .eq('sesion_id', sesionId)
-    .neq('estado', 'cancelado')   // show all non-cancelled: pending, in kitchen, ready, served
-    .order('created_at');
+  const [pedidosRes, cobrosRes] = await Promise.all([
+    supabase
+      .from('pedidos')
+      .select('id, numero_pedido, detalle_pedido, total, estado, created_at')
+      .eq('empresa_id', empresaId)
+      .eq('sesion_id', sesionId)
+      .neq('estado', 'cancelado')   // show all non-cancelled: pending, in kitchen, ready, served
+      .order('created_at'),
+    supabase
+      .from('tpv_cobros')
+      .select('importe_cobrado_cents')
+      .eq('sesion_id', sesionId),
+  ]);
 
   if (pedidosRes.error) return NextResponse.json({ error: pedidosRes.error.message }, { status: 500 });
 
-  type RawItem = { nombre?: string; precio?: number; cantidad?: number; complementos?: string[] };
+  const yaCobradoCents = ((cobrosRes.data ?? []) as { importe_cobrado_cents: number }[])
+    .reduce((sum, c) => sum + Number(c.importe_cobrado_cents), 0);
+
+  type RawComplement = string | { nombre?: string; name?: string };
+  type RawItem = { nombre?: string; precio?: number; cantidad?: number; complementos?: RawComplement[] };
   type RawPedido = { id: string; numero_pedido: number; detalle_pedido: RawItem[]; total: number; estado: string };
 
-  const orders = ((pedidosRes.data ?? []) as RawPedido[]).map(p => ({
-      id: p.id,
-      numeroPedido: p.numero_pedido,
-      estado: p.estado,
-      items: (p.detalle_pedido ?? []).map(it => ({
-        nombre: it.nombre ?? '',
-        precio: Number(it.precio ?? 0),
-        cantidad: Number(it.cantidad ?? 1),
-        complementos: it.complementos ?? [],
-      })),
-      total: Number(p.total),
-    }));
+  const rawPedidos = (pedidosRes.data ?? []) as RawPedido[];
 
-  return NextResponse.json(orders);
+  // Synthesize effective estado from pedido_item_estados for ALL pedidos.
+  // pedidos.estado is never updated by kitchen — the source of truth is pedido_item_estados.
+  const synthesizedEstado = new Map<string, string>();
+  const allIds = rawPedidos.map(p => p.id);
+
+  if (allIds.length > 0) {
+    try {
+      const { data: itemEstados } = await supabase
+        .from('pedido_item_estados')
+        .select('pedido_id, item_idx, estado')
+        .in('pedido_id', allIds);
+
+      const overridesByPedido = new Map<string, Map<number, string>>();
+      for (const row of (itemEstados ?? []) as { pedido_id: string; item_idx: number; estado: string }[]) {
+        if (!overridesByPedido.has(row.pedido_id)) overridesByPedido.set(row.pedido_id, new Map());
+        overridesByPedido.get(row.pedido_id)!.set(row.item_idx, row.estado);
+      }
+
+      for (const p of rawPedidos) {
+        const detalle = (p.detalle_pedido as unknown[]) ?? [];
+        const overrides = overridesByPedido.get(p.id) ?? new Map<number, string>();
+
+        if (overrides.size === 0) continue; // No kitchen activity yet, keep original estado
+
+        if (p.estado === 'retenido') {
+          // Only synthesize retenido pedidos once ALL items have been released
+          const allReleased = detalle.length > 0 && detalle.every((_, idx) => {
+            const ov = overrides.get(idx);
+            return ov !== undefined && ov !== 'retenido';
+          });
+          if (!allReleased) continue;
+        }
+
+        const itemStates = detalle.map((_, idx) => overrides.get(idx) ?? 'pendiente');
+        const allDone          = itemStates.every(s => s === 'servido' || s === 'cancelado');
+        const anyListo         = itemStates.some(s => s === 'listo');
+        const anyEnPreparacion = itemStates.some(s => s === 'en_preparacion');
+
+        synthesizedEstado.set(p.id,
+          allDone ? 'servido' : anyListo ? 'preparado' : anyEnPreparacion ? 'en_preparacion' : 'pendiente'
+        );
+      }
+    } catch { /* best-effort */ }
+  }
+
+  function normComplement(c: RawComplement): string {
+    if (typeof c === 'string') return c;
+    return c.nombre ?? c.name ?? '';
+  }
+
+  const orders = rawPedidos.map(p => ({
+    id: p.id,
+    numeroPedido: p.numero_pedido,
+    estado: synthesizedEstado.get(p.id) ?? p.estado,
+    items: (p.detalle_pedido ?? []).map(it => ({
+      nombre: it.nombre ?? '',
+      precio: Number(it.precio ?? 0),
+      cantidad: Number(it.cantidad ?? 1),
+      complementos: (it.complementos ?? []).map(normComplement).filter(Boolean),
+    })),
+    total: Number(p.total),
+  }));
+
+  return NextResponse.json({ orders, yaCobradoCents });
 }
 
 export async function POST(req: NextRequest) {
@@ -94,7 +156,7 @@ export async function POST(req: NextRequest) {
       items: items.map(it => ({
         item: { id: it.productId, name: it.nombre, price: it.precio },
         quantity: it.cantidad,
-        selectedComplements: it.complementos.map(c => ({ id: c, name: c, price: 0 })),
+        selectedComplements: it.complementos.map(c => ({ id: '', name: c, price: 0 })),
       })),
     },
     mesa.numero,
@@ -106,9 +168,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: pedidoResult.error.message }, { status: 500 });
   }
 
+  // Fetch the active session created by the use case (needed when mesa was libre)
+  const { data: sesionRow } = await getSupabaseClient()
+    .from('mesa_sesiones')
+    .select('id')
+    .eq('mesa_id', mesaId)
+    .is('cerrada_at', null)
+    .maybeSingle();
+
   return NextResponse.json({
     ok: true,
     numeroPedido: pedidoResult.data.numero_pedido,
     pedidoId: pedidoResult.data.id,
+    sesionId: (sesionRow as { id: string } | null)?.id ?? null,
   }, { status: 201 });
 }
