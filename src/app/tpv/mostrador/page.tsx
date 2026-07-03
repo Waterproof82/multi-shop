@@ -64,19 +64,43 @@ export default async function MostradorPage({
 
       type RawItem = { nombre?: string; precio?: number; cantidad?: number; complementos?: string[] };
       type RawPedido = { id: string; numero_pedido: number; detalle_pedido: RawItem[]; total: number; estado: string; created_at: string };
+      const rawPedidos = (ordersRows.data ?? []) as RawPedido[];
 
-      existingOrders = ((ordersRows.data ?? []) as RawPedido[]).map(p => ({
-        id: p.id,
-        numeroPedido: p.numero_pedido,
-        estado: p.estado,
-        items: (p.detalle_pedido ?? []).map(it => ({
-          nombre: it.nombre ?? '',
-          precio: Number(it.precio ?? 0),
-          cantidad: Number(it.cantidad ?? 1),
-          complementos: it.complementos ?? [],
-        })),
-        total: Number(p.total),
-      }));
+      // Filter out pedidos whose kitchen items are all done (pedidos.estado is never
+      // updated by the kitchen system — can get stuck in 'retenido').
+      if (rawPedidos.length > 0) {
+        const pedidoIds = rawPedidos.map(p => p.id);
+        const { data: itemStatesData } = await supabase
+          .from('pedido_item_estados')
+          .select('pedido_id, estado')
+          .in('pedido_id', pedidoIds);
+
+        const finalStates = new Set(['servido', 'cancelado']);
+        const itemsByPedido = new Map<string, string[]>();
+        for (const row of ((itemStatesData ?? []) as { pedido_id: string; estado: string }[])) {
+          const list = itemsByPedido.get(row.pedido_id) ?? [];
+          list.push(row.estado);
+          itemsByPedido.set(row.pedido_id, list);
+        }
+
+        existingOrders = rawPedidos
+          .filter(p => {
+            const states = itemsByPedido.get(p.id);
+            return !states || states.length === 0 || !states.every(s => finalStates.has(s));
+          })
+          .map(p => ({
+            id: p.id,
+            numeroPedido: p.numero_pedido,
+            estado: p.estado,
+            items: (p.detalle_pedido ?? []).map(it => ({
+              nombre: it.nombre ?? '',
+              precio: Number(it.precio ?? 0),
+              cantidad: Number(it.cantidad ?? 1),
+              complementos: it.complementos ?? [],
+            })),
+            total: Number(p.total),
+          }));
+      }
     } catch {
       // best-effort — mostrador still works without existing orders
     }

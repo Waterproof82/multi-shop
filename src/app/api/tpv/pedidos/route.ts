@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
+  const pedidosRes = await supabase
     .from('pedidos')
     .select('id, numero_pedido, detalle_pedido, total, estado, created_at')
     .eq('empresa_id', empresaId)
@@ -38,23 +38,49 @@ export async function GET(req: NextRequest) {
     .not('estado', 'in', '(cancelado,servido)')
     .order('created_at');
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (pedidosRes.error) return NextResponse.json({ error: pedidosRes.error.message }, { status: 500 });
 
   type RawItem = { nombre?: string; precio?: number; cantidad?: number; complementos?: string[] };
   type RawPedido = { id: string; numero_pedido: number; detalle_pedido: RawItem[]; total: number; estado: string };
 
-  const orders = ((data ?? []) as RawPedido[]).map(p => ({
-    id: p.id,
-    numeroPedido: p.numero_pedido,
-    estado: p.estado,
-    items: (p.detalle_pedido ?? []).map(it => ({
-      nombre: it.nombre ?? '',
-      precio: Number(it.precio ?? 0),
-      cantidad: Number(it.cantidad ?? 1),
-      complementos: it.complementos ?? [],
-    })),
-    total: Number(p.total),
-  }));
+  const rawPedidos = (pedidosRes.data ?? []) as RawPedido[];
+
+  if (rawPedidos.length === 0) return NextResponse.json([]);
+
+  // Filter out pedidos whose kitchen items are all done.
+  // pedidos.estado is NEVER updated by the kitchen system (by design), so it can
+  // get stuck as 'retenido'. Cross-check against pedido_item_estados.
+  const pedidoIds = rawPedidos.map(p => p.id);
+  const itemStatesRes = await supabase
+    .from('pedido_item_estados')
+    .select('pedido_id, estado')
+    .in('pedido_id', pedidoIds);
+
+  const finalStates = new Set(['servido', 'cancelado']);
+  const itemsByPedido = new Map<string, string[]>();
+  for (const row of ((itemStatesRes.data ?? []) as { pedido_id: string; estado: string }[])) {
+    const list = itemsByPedido.get(row.pedido_id) ?? [];
+    list.push(row.estado);
+    itemsByPedido.set(row.pedido_id, list);
+  }
+
+  const orders = rawPedidos
+    .filter(p => {
+      const states = itemsByPedido.get(p.id);
+      return !states || states.length === 0 || !states.every(s => finalStates.has(s));
+    })
+    .map(p => ({
+      id: p.id,
+      numeroPedido: p.numero_pedido,
+      estado: p.estado,
+      items: (p.detalle_pedido ?? []).map(it => ({
+        nombre: it.nombre ?? '',
+        precio: Number(it.precio ?? 0),
+        cantidad: Number(it.cantidad ?? 1),
+        complementos: it.complementos ?? [],
+      })),
+      total: Number(p.total),
+    }));
 
   return NextResponse.json(orders);
 }
