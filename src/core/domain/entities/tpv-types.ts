@@ -60,3 +60,37 @@ export interface TpvCobroCompletoPayload {
   ivaPorcentaje?: number;
   rectificaCobroId?: string | null;
 }
+
+export type TipoImpuesto = 'iva' | 'igic';
+
+export interface TpvTurnoResumen {
+  id: string;
+  operadorNombre: string;
+  aperturaAt: string;
+  cierreAt: string | null;
+  totalCents: number;
+  numCobros: number;
+  activo: boolean;
+}
+
+export interface TpvAnalytics {
+  totalFacturadoCents: number;
+  numCobros: number;
+  ticketMedioCents: number;
+  totalIvaCents: number;
+  baseImponibleCents: number;
+  totalPropinaCents: number;
+  splitEfectivoCents: number;
+  splitTarjetaCents: number;
+  ventasPorHora: number[]; // 24 posiciones, índice = hora del día (0-23), zona Europe/Madrid
+  topProductos: { nombre: string; cantidad: number }[];
+  historialTurnos: TpvTurnoResumen[];
+  numTurnos: number;
+  duracionMediaMinutos: number | null;
+}
+
+export interface GetAnalyticsParams {
+  empresaId: string;
+  desde: string; // YYYY-MM-DD
+  hasta: string; // YYYY-MM-DD
+}

@@ -93,6 +93,8 @@ export interface Empresa {
   deliveryHabilitado: boolean;
   googleReviewsUrl: string | null;
   nif?: string | null;
+  tipoImpuesto?: 'iva' | 'igic';
+  porcentajeImpuesto?: number;
 }
 
 interface TranslatableText {
