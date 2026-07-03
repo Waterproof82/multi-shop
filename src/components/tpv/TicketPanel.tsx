@@ -55,7 +55,7 @@ export function TicketPanel({
   const subtotal = total / (1 + IVA_RATE);
   const iva = total - subtotal;
   const hasContent = existingOrders.length > 0 || pendingItems.length > 0;
-  const canCobrar = sesionId !== null && existingOrders.length > 0;
+  const canCobrar = sesionId !== null;
 
   const mesaLabel = mesaNumero !== null
     ? `Mesa ${mesaNumero}${mesaName ? ` · ${mesaName}` : ''}`
@@ -211,7 +211,7 @@ export function TicketPanel({
           onClick={() => router.push(`/tpv/cobro/${sesionId}?turnoId=${turnoId}`)}
           className="w-full bg-[#22c55e] text-white rounded-xl py-3.5 text-base font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition-all"
         >
-          Cobrar {canCobrar ? fmt(existingTotal) : ''}
+          Cobrar {existingTotal > 0 ? fmt(existingTotal) : ''}
         </button>
       </div>
     </aside>

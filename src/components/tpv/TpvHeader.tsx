@@ -25,9 +25,9 @@ function TpvClock() {
 }
 
 const NAV_ITEMS = [
-  { label: 'Mostrador', href: '/tpv/mostrador' },
-  { label: 'Mesas',     href: '/tpv/mesas' },
-  { label: 'Historial', href: '/tpv/historial' },
+  { label: 'Mostrador', href: '/tpv/mostrador', activePrefix: '/tpv/mostrador' },
+  { label: 'Mesas',     href: '/tpv/mesas?seleccionar=1', activePrefix: '/tpv/mesas' },
+  { label: 'Historial', href: '/tpv/historial', activePrefix: '/tpv/historial' },
 ] as const;
 
 export function TpvHeader({ empresaNombre }: Props) {
@@ -42,13 +42,13 @@ export function TpvHeader({ empresaNombre }: Props) {
       </div>
 
       <nav className="flex gap-1">
-        {NAV_ITEMS.map(({ label, href }) => (
+        {NAV_ITEMS.map(({ label, href, activePrefix }) => (
           <button
             key={href}
             type="button"
             onClick={() => router.push(href)}
             className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              pathname.startsWith(href)
+              pathname.startsWith(activePrefix)
                 ? 'bg-[#22263a] text-[#e8eaf0]'
                 : 'text-[#6b7280] hover:text-[#e8eaf0]'
             }`}
