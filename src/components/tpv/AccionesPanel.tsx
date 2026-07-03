@@ -73,6 +73,7 @@ export function AccionesPanel({ sesionId, turnoId }: Props) {
         </ActionGroup>
 
         <ActionGroup title="Sistema">
+          <ActionButton label="Analítica" onClick={() => router.push('/tpv/analytics')} />
           <ActionButton label="Conformidad legal" onClick={() => router.push('/tpv/legal')} />
         </ActionGroup>
       </div>
