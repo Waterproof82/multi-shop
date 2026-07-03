@@ -18,6 +18,8 @@ interface EmpresaDatosFormProps {
     url_mapa: string;
     direccion: string;
     nif: string;
+    tipoImpuesto: 'iva' | 'igic';
+    porcentajeImpuesto: number;
   };
 }
 
@@ -33,7 +35,7 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
     setFormData(initialData);
   }, [initialData]);
 
-  const handleChange = (field: string, value: string) => {
+  const handleChange = (field: string, value: string | number) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     setSaved(false);
   };
@@ -134,6 +136,48 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
           />
           <span id="nif_help" className="text-xs text-muted-foreground">
             Requerido para tickets fiscales (Verifactu / RD 1619/2012)
+          </span>
+        </div>
+
+        {/* Tipo de impuesto */}
+        <div className="space-y-2">
+          <label htmlFor="tipo_impuesto" className="text-sm font-medium text-foreground flex items-center gap-2">
+            Tipo de impuesto
+          </label>
+          <select
+            id="tipo_impuesto"
+            name="tipo_impuesto"
+            value={formData.tipoImpuesto}
+            onChange={(e) => {
+              const tipo = e.target.value as 'iva' | 'igic';
+              handleChange('tipoImpuesto', tipo);
+              handleChange('porcentajeImpuesto', tipo === 'igic' ? 7 : 10);
+            }}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          >
+            <option value="iva">IVA (Península y Baleares)</option>
+            <option value="igic">IGIC (Canarias)</option>
+          </select>
+        </div>
+
+        {/* Porcentaje impuesto */}
+        <div className="space-y-2">
+          <label htmlFor="porcentaje_impuesto" className="text-sm font-medium text-foreground">
+            Porcentaje %
+          </label>
+          <input
+            type="number"
+            id="porcentaje_impuesto"
+            name="porcentaje_impuesto"
+            min={0}
+            max={30}
+            step={0.1}
+            value={formData.porcentajeImpuesto}
+            onChange={(e) => handleChange('porcentajeImpuesto', parseFloat(e.target.value))}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          />
+          <span className="text-xs text-muted-foreground">
+            10% IVA estándar restauración · 7% IGIC general
           </span>
         </div>
 

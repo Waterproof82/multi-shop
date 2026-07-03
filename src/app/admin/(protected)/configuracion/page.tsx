@@ -45,6 +45,8 @@ export default async function ConfiguracionPage() {
     url_mapa: empresaData?.urlMapa || '',
     direccion: empresaData?.direccion || '',
     nif: empresaData?.nif || '',
+    tipoImpuesto: (empresaData?.tipoImpuesto as 'iva' | 'igic' | undefined) ?? 'iva',
+    porcentajeImpuesto: empresaData?.porcentajeImpuesto ?? 10,
   };
 
   const empresaApariencia = {

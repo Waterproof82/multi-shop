@@ -68,6 +68,8 @@ export async function GET(request: NextRequest) {
       descripcion_de: empresa.descripcion?.de || '',
       mostrar_promociones: empresa.mostrarPromociones ?? true,
       mostrar_tgtg: empresa.mostrarTgtg ?? true,
+      tipoImpuesto: empresa.tipoImpuesto ?? 'iva',
+      porcentajeImpuesto: empresa.porcentajeImpuesto ?? 10,
     }
   });
 }

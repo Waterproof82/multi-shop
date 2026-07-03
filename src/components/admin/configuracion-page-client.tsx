@@ -18,6 +18,8 @@ interface EmpresaDatos {
   url_mapa: string;
   direccion: string;
   nif: string;
+  tipoImpuesto: 'iva' | 'igic';
+  porcentajeImpuesto: number;
 }
 
 interface EmpresaApariencia {
