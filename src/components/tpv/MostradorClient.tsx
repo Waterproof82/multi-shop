@@ -52,18 +52,19 @@ export function MostradorClient({ turno, products, categories, initialMesa }: Pr
     }
   }, [mesa.sesionId, refreshOrders]);
 
-  // Real-time: re-fetch orders whenever a pedido for this session changes.
+  // Real-time: re-fetch orders whenever any pedido changes.
+  // We intentionally skip the sesion_id filter here: Supabase postgres_changes
+  // only supports column filters on replica identity columns (usually just the PK),
+  // so filtering by sesion_id would silently drop all events. Instead we subscribe
+  // to the full table and let handleRefresh (which already scopes by sesionId) do
+  // the filtering. RLS limits events to this empresa anyway.
   useEffect(() => {
     if (!mesa.sesionId) return;
     const supabase = getSupabaseAnonClient();
     const channel = supabase
       .channel(channelRef.current)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'pedidos',
-        filter: `sesion_id=eq.${mesa.sesionId}`,
-      }, () => { void handleRefresh(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' },
+        () => { void handleRefresh(); })
       .subscribe();
     return () => { void supabase.removeChannel(channel); };
   // handleRefresh is stable while sesionId stays the same.
