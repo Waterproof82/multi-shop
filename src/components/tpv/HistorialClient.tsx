@@ -177,7 +177,7 @@ function CobrosList({ cobros }: Readonly<{ cobros: CobroRow[] }>) {
   );
 }
 
-export function HistorialClient({ pedidos, cobros, turnoAperturaAt, tipoImpuesto: _tipoImpuesto }: Readonly<Props>) {
+export function HistorialClient({ pedidos, cobros, turnoAperturaAt, tipoImpuesto }: Readonly<Props>) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('pedidos');
 
@@ -188,6 +188,21 @@ export function HistorialClient({ pedidos, cobros, turnoAperturaAt, tipoImpuesto
   const totalCobrado = pedidos
     .filter(p => p.paymentStatus === 'paid')
     .reduce((sum, p) => sum + p.total, 0);
+
+  const cobrosValidos = cobros.filter(c => c.rectificaCobroId === null);
+  const ticketMedioCents = cobrosValidos.length > 0
+    ? Math.round(cobrosValidos.reduce((s, c) => s + c.importeCobradoCents, 0) / cobrosValidos.length)
+    : 0;
+
+  const totalIvaCents = cobrosValidos.reduce((s, c) => s + c.ivaCents, 0);
+  const totalEfectivoCents = cobrosValidos
+    .filter(c => c.metodoPago === 'efectivo')
+    .reduce((s, c) => s + c.importeCobradoCents, 0);
+  const totalTarjetaCents = cobrosValidos
+    .filter(c => c.metodoPago === 'tarjeta')
+    .reduce((s, c) => s + c.importeCobradoCents, 0);
+  const totalBruto = totalEfectivoCents + totalTarjetaCents;
+  const pctEfectivo = totalBruto > 0 ? Math.round((totalEfectivoCents / totalBruto) * 100) : 0;
 
   return (
     <div className="flex-1 overflow-auto p-6">
@@ -227,6 +242,19 @@ export function HistorialClient({ pedidos, cobros, turnoAperturaAt, tipoImpuesto
             <div className="bg-[#1a1d27] border border-[#22c55e]/40 rounded-xl px-4 py-3 text-center">
               <p className="text-[10px] text-[#6b7280] uppercase tracking-wider mb-1">Cobrado</p>
               <p className="text-xl font-bold text-[#22c55e]">{fmt(totalCobrado)}</p>
+            </div>
+            <div className="bg-[#1a1d27] border border-[#2e3347] rounded-xl px-4 py-3 text-center">
+              <p className="text-[10px] text-[#6b7280] uppercase tracking-wider mb-1">Ticket ∅</p>
+              <p className="text-xl font-bold text-[#4f72ff]">{fmt(ticketMedioCents / 100)}</p>
+            </div>
+            <div className="bg-[#1a1d27] border border-[#2e3347] rounded-xl px-4 py-3 text-center">
+              <p className="text-[10px] text-[#6b7280] uppercase tracking-wider mb-1">{tipoImpuesto.toUpperCase()}</p>
+              <p className="text-xl font-bold text-[#f59e0b]">{fmt(totalIvaCents / 100)}</p>
+            </div>
+            <div className="bg-[#1a1d27] border border-[#2e3347] rounded-xl px-4 py-3 text-center min-w-[90px]">
+              <p className="text-[10px] text-[#6b7280] uppercase tracking-wider mb-1">Efectivo</p>
+              <p className="text-xl font-bold text-[#22c55e]">{pctEfectivo}%</p>
+              <p className="text-[10px] text-[#6b7280]">{100 - pctEfectivo}% tarjeta</p>
             </div>
           </div>
         </div>
