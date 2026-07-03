@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { ExistingOrder } from '@/components/tpv/MostradorClient';
 
 export interface PendingItem {
@@ -56,6 +56,21 @@ function buildInitial(init: InitialMesa | null): MesaActiva {
 
 export function useMesaActiva(initial: InitialMesa | null = null) {
   const [mesa, setMesa] = useState<MesaActiva>(() => buildInitial(initial));
+
+  // Sync existingOrders when SSR data refreshes (router.refresh() re-renders the server
+  // component with fresh DB data, but useState ignores updated props).
+  useEffect(() => {
+    if (initial === null) return;
+    setMesa(prev => {
+      if (prev.sesionId !== initial.sesionId) return prev; // different mesa — don't overwrite
+      return {
+        ...prev,
+        existingOrders: initial.existingOrders,
+        existingTotal: calcExistingTotal(initial.existingOrders),
+      };
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initial]);
 
   const selectMesa = useCallback((id: string, sesion: string, numero: number, name: string | null = null) => {
     setMesa(prev => ({ ...prev, mesaId: id, sesionId: sesion, mesaNumero: numero, mesaName: name }));
