@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TpvTurno } from '@/core/domain/entities/tpv-types';
 import type { Product, Category } from '@/core/domain/entities/types';
+import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { useMesaActiva } from '@/hooks/tpv/useMesaActiva';
 import { TicketPanel } from './TicketPanel';
 import { MenuPanel } from './MenuPanel';
@@ -34,6 +35,8 @@ interface Props {
 export function MostradorClient({ turno, products, categories, initialMesa }: Props) {
   const { mesa, addItem, removeItem, clearPending, refreshOrders } = useMesaActiva(initialMesa);
   const [refreshing, setRefreshing] = useState(false);
+  // Stable ref for the channel name — avoids React StrictMode double-mount closing the channel.
+  const channelRef = useRef(`tpv-pedidos-${Math.random().toString(36).slice(2)}`);
 
   const handleRefresh = useCallback(async () => {
     if (!mesa.sesionId) return;
@@ -48,6 +51,24 @@ export function MostradorClient({ turno, products, categories, initialMesa }: Pr
       setRefreshing(false);
     }
   }, [mesa.sesionId, refreshOrders]);
+
+  // Real-time: re-fetch orders whenever a pedido for this session changes.
+  useEffect(() => {
+    if (!mesa.sesionId) return;
+    const supabase = getSupabaseAnonClient();
+    const channel = supabase
+      .channel(channelRef.current)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'pedidos',
+        filter: `sesion_id=eq.${mesa.sesionId}`,
+      }, () => { void handleRefresh(); })
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  // handleRefresh is stable while sesionId stays the same.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mesa.sesionId]);
 
   return (
     <>
