@@ -34,7 +34,7 @@ interface Props {
 }
 
 export function MostradorClient({ turno, products, categories, initialMesa }: Props) {
-  const { mesa, addItem, removeItem, clearPending, clearMesa, refreshOrders } = useMesaActiva(initialMesa);
+  const { mesa, addItem, removeItem, clearPending, clearMesa, refreshOrders, updatePendingNota } = useMesaActiva(initialMesa);
   const [refreshing, setRefreshing] = useState(false);
   const [yaCobradoCents, setYaCobradoCents] = useState(0);
   const [externalCobro, setExternalCobro] = useState<string | null>(null);
@@ -129,6 +129,7 @@ export function MostradorClient({ turno, products, categories, initialMesa }: Pr
         yaCobradoCents={yaCobradoCents}
         turnoId={turno.id}
         onRemovePending={removeItem}
+        onUpdatePendingNota={updatePendingNota}
         onPendingSent={clearPending}
       />
       <MenuPanel

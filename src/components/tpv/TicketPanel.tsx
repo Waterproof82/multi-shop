@@ -18,6 +18,7 @@ interface Props {
   readonly yaCobradoCents: number;
   readonly turnoId: string;
   readonly onRemovePending: (nombre: string, complementos: string[]) => void;
+  readonly onUpdatePendingNota: (productId: string, complementos: string[], nota: string | undefined) => void;
   readonly onPendingSent: () => void;
 }
 
@@ -47,12 +48,13 @@ const ESTADO_COLOR: Record<string, string> = {
 
 export function TicketPanel({
   sesionId, mesaId, mesaNumero, mesaName, existingOrders, pendingItems,
-  existingTotal, pendingTotal, yaCobradoCents, turnoId, onRemovePending, onPendingSent,
+  existingTotal, pendingTotal, yaCobradoCents, turnoId, onRemovePending, onUpdatePendingNota, onPendingSent,
 }: Readonly<Props>) {
   const router = useRouter();
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [notaExpandida, setNotaExpandida] = useState<string | null>(null); // pedido id expandido
+  const [pendingNotaExpandida, setPendingNotaExpandida] = useState<string | null>(null); // pending item key expandido
   const [notasLocal, setNotasLocal] = useState<Record<string, string>>({});
   const [pendingNota, setPendingNota] = useState('');
   const notaSaveRef = useRef<NodeJS.Timeout | null>(null);
@@ -163,31 +165,58 @@ export function TicketPanel({
             <div className="px-4 py-1.5">
               <span className="text-[10px] font-bold text-[#4f72ff] uppercase tracking-wider">Nuevo pedido</span>
             </div>
-            {pendingItems.map((item) => (
-              <div
-                key={item.nombre + item.complementos.join(',')}
-                className="flex items-start gap-2.5 px-4 py-2.5 hover:bg-[#22263a] transition-colors"
-              >
-                <span className="w-6 h-6 rounded-md bg-[#4f72ff] text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
-                  {item.cantidad}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{item.nombre}</p>
-                  {item.complementos.length > 0 && (
-                    <p className="text-[10px] text-[#6b7280] truncate">{item.complementos.join(', ')}</p>
+            {pendingItems.map((item) => {
+              const itemKey = item.productId + item.complementos.join(',');
+              const notaOpen = pendingNotaExpandida === itemKey;
+              return (
+                <div key={itemKey} className="border-b border-[#2e3347]/30 last:border-b-0">
+                  <div className="flex items-start gap-2.5 px-4 py-2.5 hover:bg-[#22263a] transition-colors">
+                    <span className="w-6 h-6 rounded-md bg-[#4f72ff] text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                      {item.cantidad}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{item.nombre}</p>
+                      {item.complementos.length > 0 && (
+                        <p className="text-[10px] text-[#6b7280] truncate">{item.complementos.join(', ')}</p>
+                      )}
+                      {item.nota && !notaOpen && (
+                        <p className="text-[10px] italic text-[#a78bfa] truncate">✎ {item.nota}</p>
+                      )}
+                    </div>
+                    <span className="text-sm font-semibold shrink-0">{fmt(item.precio * item.cantidad)}</span>
+                    <button
+                      type="button"
+                      onClick={() => setPendingNotaExpandida(prev => prev === itemKey ? null : itemKey)}
+                      className={`text-xs leading-none shrink-0 mt-0.5 px-1 transition-colors ${notaOpen || item.nota ? 'text-[#a78bfa]' : 'text-[#6b7280] hover:text-[#a78bfa]'}`}
+                      aria-label="Nota del ítem"
+                    >
+                      ✎
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onRemovePending(item.nombre, item.complementos)}
+                      className="text-[#6b7280] hover:text-red-400 text-base leading-none shrink-0 mt-0.5"
+                      aria-label={`Eliminar ${item.nombre}`}
+                    >
+                      ×
+                    </button>
+                  </div>
+                  {notaOpen && (
+                    <div className="px-4 pb-3">
+                      <textarea
+                        rows={2}
+                        maxLength={500}
+                        value={item.nota ?? ''}
+                        onChange={e => onUpdatePendingNota(item.productId, item.complementos, e.target.value || undefined)}
+                        placeholder="Nota para este ítem..."
+                        className="w-full bg-[#0f1117] border border-[#2e3347] rounded-lg px-3 py-2 text-xs text-[#e8eaf0] placeholder:text-[#4b5563] focus:outline-none focus:border-[#a78bfa] transition-colors resize-none"
+                        autoFocus
+                      />
+                    </div>
                   )}
                 </div>
-                <span className="text-sm font-semibold shrink-0">{fmt(item.precio * item.cantidad)}</span>
-                <button
-                  type="button"
-                  onClick={() => onRemovePending(item.nombre, item.complementos)}
-                  className="text-[#6b7280] hover:text-red-400 text-base leading-none shrink-0 mt-0.5"
-                  aria-label={`Eliminar ${item.nombre}`}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -242,6 +271,7 @@ export function TicketPanel({
                       precio: i.precio,
                       cantidad: i.cantidad,
                       complementos: i.complementos,
+                      ...(i.nota ? { nota: i.nota } : {}),
                     })),
                     nota: pendingNota || undefined,
                   }),

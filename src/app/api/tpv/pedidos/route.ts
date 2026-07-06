@@ -10,6 +10,7 @@ const itemSchema = z.object({
   precio: z.number().nonnegative(),
   cantidad: z.number().int().min(1).max(99),
   complementos: z.array(z.string().max(200)).max(20).optional().default([]),
+  nota: z.string().max(500).optional(),
 });
 
 const bodySchema = z.object({
@@ -159,6 +160,7 @@ export async function POST(req: NextRequest) {
         item: { id: it.productId, name: it.nombre, price: it.precio },
         quantity: it.cantidad,
         selectedComplements: it.complementos.map(c => ({ id: '', name: c, price: 0 })),
+        ...(it.nota ? { note: it.nota } : {}),
       })),
       nota,
     },

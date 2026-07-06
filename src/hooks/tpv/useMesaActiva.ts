@@ -9,6 +9,7 @@ export interface PendingItem {
   precio: number;
   cantidad: number;
   complementos: string[];
+  nota?: string;
 }
 
 interface MesaActiva {
@@ -99,5 +100,16 @@ export function useMesaActiva(initial: InitialMesa | null = null) {
     setMesa(prev => ({ ...prev, pendingItems: [], pendingTotal: 0 }));
   }, []);
 
-  return { mesa, selectMesa, clearMesa, addItem, removeItem, clearPending, refreshOrders };
+  const updatePendingNota = useCallback((productId: string, complementos: string[], nota: string | undefined) => {
+    setMesa(prev => ({
+      ...prev,
+      pendingItems: prev.pendingItems.map(it =>
+        it.productId === productId && it.complementos.join(',') === complementos.join(',')
+          ? { ...it, nota: nota || undefined }
+          : it
+      ),
+    }));
+  }, []);
+
+  return { mesa, selectMesa, clearMesa, addItem, removeItem, clearPending, refreshOrders, updatePendingNota };
 }
