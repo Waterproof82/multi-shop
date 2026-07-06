@@ -14,6 +14,7 @@ export interface KitchenOrderItem {
   estado: string;
   createdAt: string;
   sesionId: string | null;
+  pase: string | null;
 }
 
 export interface RetenidoItem {
@@ -71,6 +72,7 @@ export interface KitchenItemRecord {
   mesaNumero: number | null;
   mesaNombre: string | null;
   createdAt: string;
+  pase: string | null;
 }
 
 export interface PendienteValidacionItem {

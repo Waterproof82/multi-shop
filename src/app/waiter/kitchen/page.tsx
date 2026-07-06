@@ -21,7 +21,16 @@ interface KitchenItem {
   mesaNumero: number | null;
   mesaNombre: string | null;
   createdAt: string;
+  pase: string | null;
 }
+
+const PASE_ORDER = ['primer', 'segundo', 'postre', 'bebida', null] as const;
+const PASE_LABEL: Record<string, string> = {
+  primer: '1er Pase',
+  segundo: '2º Pase',
+  postre: 'Postre',
+  bebida: 'Bebidas',
+};
 
 const BG        = 'oklch(13% 0.02 252)';
 const TEXT_MAIN = 'oklch(92% 0.02 252)';
@@ -892,20 +901,41 @@ export default function WaiterKitchenPage() {
                 </span>
               </div>
               <div className="flex flex-col gap-4">
-                {Array.from(groupByPedido(nuevosItems).entries()).map(([pedidoId, group]) => {
-                  const tableLabel = group.mesaNombre ?? `Mesa ${group.mesaNumero ?? '—'}`;
-                  const elapsed    = getElapsedMinutes(group.createdAt);
-                  return (
-                    <div key={pedidoId}>
-                      <div className="flex items-center gap-2 px-1 mb-1.5">
-                        <span className="text-xs font-bold" style={{ color: 'oklch(72% 0.14 62)' }}>#{group.numeroPedido}</span>
-                        <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{tableLabel}</span>
-                        <span className="text-[10px] font-mono ml-auto" style={{ color: TEXT_DIM }}>{formatTimer(elapsed)}</span>
-                      </div>
-                      <div className="flex flex-col gap-2">{group.items.map(renderItemCard)}</div>
+                {(() => {
+                  const nuevosByPase = PASE_ORDER
+                    .map(pase => ({
+                      pase,
+                      label: pase ? (PASE_LABEL[pase] ?? pase) : 'Sin pase',
+                      items: nuevosItems.filter(i => (i.pase ?? null) === pase),
+                    }))
+                    .filter(g => g.items.length > 0);
+                  const showPaseHeaders = nuevosByPase.length > 1 || (nuevosByPase.length === 1 && nuevosByPase[0]?.pase !== null);
+                  return nuevosByPase.map(grupo => (
+                    <div key={grupo.pase ?? 'null'}>
+                      {showPaseHeaders && (
+                        <div className="px-1 py-1.5 mb-1 border-b" style={{ borderColor: 'oklch(35% 0.06 252 / 0.5)' }}>
+                          <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'oklch(65% 0.18 270)' }}>
+                            {grupo.label}
+                          </span>
+                        </div>
+                      )}
+                      {Array.from(groupByPedido(grupo.items).entries()).map(([pedidoId, group]) => {
+                        const tableLabel = group.mesaNombre ?? `Mesa ${group.mesaNumero ?? '—'}`;
+                        const elapsed    = getElapsedMinutes(group.createdAt);
+                        return (
+                          <div key={pedidoId}>
+                            <div className="flex items-center gap-2 px-1 mb-1.5">
+                              <span className="text-xs font-bold" style={{ color: 'oklch(72% 0.14 62)' }}>#{group.numeroPedido}</span>
+                              <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{tableLabel}</span>
+                              <span className="text-[10px] font-mono ml-auto" style={{ color: TEXT_DIM }}>{formatTimer(elapsed)}</span>
+                            </div>
+                            <div className="flex flex-col gap-2">{group.items.map(renderItemCard)}</div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
+                  ));
+                })()}
               </div>
             </div>
           )}

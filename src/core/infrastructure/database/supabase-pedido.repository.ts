@@ -1192,7 +1192,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       // are marked servido/cerrado/cancelado.
       const { data: orders, error: ordersError } = await this.supabase
         .from('pedidos')
-        .select(`id, numero_pedido, sesion_id, detalle_pedido, estado, created_at, validated_at, mesas!inner(numero, nombre)`)
+        .select(`id, numero_pedido, sesion_id, detalle_pedido, estado, created_at, validated_at, pase, mesas!inner(numero, nombre)`)
         .eq('empresa_id', empresaId)
         .in('estado', ['pendiente', 'anotado', 'preparado'])
         .order('created_at', { ascending: true });
@@ -1223,6 +1223,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           estado: row['estado'] as string,
           createdAt: (row['validated_at'] as string | null) ?? (row['created_at'] as string),
           sesionId: (row['sesion_id'] as string | null) ?? null,
+          pase: (row['pase'] as string | null) ?? null,
         });
       }
 
@@ -1341,7 +1342,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     try {
       const { data: orders, error: ordersError } = await this.supabase
         .from('pedidos')
-        .select('id, estado, numero_pedido, sesion_id, detalle_pedido, created_at, mesas!inner(numero, nombre)')
+        .select('id, estado, numero_pedido, sesion_id, detalle_pedido, created_at, pase, mesas!inner(numero, nombre)')
         .eq('empresa_id', empresaId)
         .not('estado', 'in', '("servido","cerrado","cancelado","pendiente_validacion")')
         .order('created_at', { ascending: true });
@@ -1408,6 +1409,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
             mesaNumero: (mesaData['numero'] as number) ?? null,
             mesaNombre: (mesaData['nombre'] as string | null) ?? null,
             createdAt: row['created_at'] as string,
+            pase: (row['pase'] as string | null) ?? null,
           });
         });
       }
