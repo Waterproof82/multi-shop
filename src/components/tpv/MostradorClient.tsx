@@ -16,6 +16,7 @@ export interface ExistingOrder {
   items: { nombre: string; precio: number; cantidad: number; complementos: string[] }[];
   total: number;
   nota: string | null;
+  pase: string | null;
 }
 
 interface InitialMesa {

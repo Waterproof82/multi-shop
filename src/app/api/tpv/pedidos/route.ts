@@ -17,6 +17,7 @@ const bodySchema = z.object({
   mesaId: z.string().uuid(),
   items: z.array(itemSchema).min(1).max(50),
   nota: z.string().max(500).optional(),
+  pase: z.enum(['primer', 'segundo', 'postre', 'bebida']).optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest) {
   const [pedidosRes, cobrosRes] = await Promise.all([
     supabase
       .from('pedidos')
-      .select('id, numero_pedido, detalle_pedido, total, estado, created_at, nota')
+      .select('id, numero_pedido, detalle_pedido, total, estado, created_at, nota, pase')
       .eq('empresa_id', empresaId)
       .eq('sesion_id', sesionId)
       .neq('estado', 'cancelado')   // show all non-cancelled: pending, in kitchen, ready, served
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest) {
 
   type RawComplement = string | { nombre?: string; name?: string };
   type RawItem = { nombre?: string; precio?: number; cantidad?: number; complementos?: RawComplement[] };
-  type RawPedido = { id: string; numero_pedido: number; detalle_pedido: RawItem[]; total: number; estado: string; nota?: string | null };
+  type RawPedido = { id: string; numero_pedido: number; detalle_pedido: RawItem[]; total: number; estado: string; nota?: string | null; pase?: string | null };
 
   const rawPedidos = (pedidosRes.data ?? []) as RawPedido[];
 
@@ -122,6 +123,7 @@ export async function GET(req: NextRequest) {
       })),
       total: Number(p.total),
       nota: p.nota ?? null,
+      pase: p.pase ?? null,
     }));
 
   return NextResponse.json({ orders, yaCobradoCents });
@@ -146,7 +148,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
   }
 
-  const { mesaId, items, nota } = parsed.data;
+  const { mesaId, items, nota, pase } = parsed.data;
 
   const mesaResult = await mesaUseCase.getMesa(mesaId);
   if (!mesaResult.success || !mesaResult.data) {
@@ -174,6 +176,14 @@ export async function POST(req: NextRequest) {
 
   if (!pedidoResult.success) {
     return NextResponse.json({ error: pedidoResult.error.message }, { status: 500 });
+  }
+
+  // Set pase if provided (best-effort — does not fail the request if update fails)
+  if (pase) {
+    await getSupabaseClient()
+      .from('pedidos')
+      .update({ pase })
+      .eq('id', pedidoResult.data.id);
   }
 
   // Fetch the active session created by the use case (needed when mesa was libre)
