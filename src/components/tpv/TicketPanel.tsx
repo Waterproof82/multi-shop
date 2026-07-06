@@ -17,12 +17,13 @@ interface Props {
   readonly pendingTotal: number;
   readonly yaCobradoCents: number;
   readonly turnoId: string;
+  readonly tipoImpuesto: 'iva' | 'igic';
+  readonly porcentajeImpuesto: number;
+  readonly sesionPagada: boolean;
   readonly onRemovePending: (nombre: string, complementos: string[]) => void;
   readonly onUpdatePendingNota: (productId: string, complementos: string[], nota: string | undefined) => void;
   readonly onPendingSent: () => void;
 }
-
-const IVA_RATE = 0.1;
 
 function fmt(euros: number): string {
   return euros.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
@@ -48,7 +49,8 @@ const ESTADO_COLOR: Record<string, string> = {
 
 export function TicketPanel({
   sesionId, mesaId, mesaNumero, mesaName, existingOrders, pendingItems,
-  existingTotal, pendingTotal, yaCobradoCents, turnoId, onRemovePending, onUpdatePendingNota, onPendingSent,
+  existingTotal, pendingTotal, yaCobradoCents, turnoId, tipoImpuesto, porcentajeImpuesto,
+  sesionPagada, onRemovePending, onUpdatePendingNota, onPendingSent,
 }: Readonly<Props>) {
   const router = useRouter();
   const [sending, setSending] = useState(false);
@@ -59,7 +61,8 @@ export function TicketPanel({
   const [pendingNota, setPendingNota] = useState('');
   const notaSaveRef = useRef<NodeJS.Timeout | null>(null);
   const total = existingTotal + pendingTotal;
-  const subtotal = total / (1 + IVA_RATE);
+  const impuestoRate = porcentajeImpuesto / 100;
+  const subtotal = total / (1 + impuestoRate);
   const iva = total - subtotal;
   const hasContent = existingOrders.length > 0 || pendingItems.length > 0;
   const canCobrar = sesionId !== null;
@@ -228,7 +231,7 @@ export function TicketPanel({
               <span>Subtotal</span><span>{fmt(subtotal)}</span>
             </div>
             <div className="flex justify-between text-sm text-[#6b7280]">
-              <span>IVA (10%)</span><span>{fmt(iva)}</span>
+              <span>{tipoImpuesto.toUpperCase()} ({porcentajeImpuesto}%)</span><span>{fmt(iva)}</span>
             </div>
             <div className="text-2xl font-bold mt-1">{fmt(total)}</div>
           </>
@@ -302,7 +305,7 @@ export function TicketPanel({
             {sending ? 'Enviando...' : `Enviar a cocina (${fmt(pendingTotal)})`}
           </button>
         )}
-        {hasPendingOrders && canCobrar && (
+        {hasPendingOrders && canCobrar && !sesionPagada && (
           <div className="flex items-start gap-2 rounded-xl px-3 py-2.5 bg-[#f9731615] border border-[#f9731640]">
             <span className="text-sm leading-none mt-0.5">🍽</span>
             <p className="text-xs leading-snug text-[#f97316]">
@@ -310,9 +313,17 @@ export function TicketPanel({
             </p>
           </div>
         )}
+        {sesionPagada && (
+          <div className="flex items-start gap-2 rounded-xl px-3 py-2.5 bg-[#22c55e15] border border-[#22c55e40]">
+            <span className="text-sm leading-none mt-0.5">✓</span>
+            <p className="text-xs leading-snug text-[#22c55e]">
+              Mesa cobrada por el camarero.
+            </p>
+          </div>
+        )}
         <button
           type="button"
-          disabled={!canCobrar || hasPendingOrders}
+          disabled={!canCobrar || hasPendingOrders || sesionPagada}
           onClick={() => router.push(`/tpv/cobro/${sesionId}?turnoId=${turnoId}`)}
           className="w-full bg-[#22c55e] text-white rounded-xl py-3.5 text-base font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition-all"
         >

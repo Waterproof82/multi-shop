@@ -32,6 +32,16 @@ export default async function MostradorPage({
 
   const { mesaId, sesionId: sesionIdParam, mesaNumero } = await searchParams;
 
+  const supabaseForEmpresa = getSupabaseClient();
+  const empresaRes = await supabaseForEmpresa
+    .from('empresas')
+    .select('tipo_impuesto, porcentaje_impuesto')
+    .eq('id', admin.empresaId)
+    .maybeSingle();
+  const empresaRow = empresaRes.data as { tipo_impuesto: string | null; porcentaje_impuesto: number | null } | null;
+  const tipoImpuesto = (empresaRow?.tipo_impuesto as 'iva' | 'igic' | null) ?? 'iva';
+  const porcentajeImpuesto = empresaRow?.porcentaje_impuesto ?? 10;
+
   const [productsResult, categoriesResult] = await Promise.all([
     productUseCase.getAll(admin.empresaId),
     categoryUseCase.getAll(admin.empresaId),
@@ -46,6 +56,7 @@ export default async function MostradorPage({
   let existingOrders: ExistingOrder[] = [];
   let mesaName: string | null = null;
   let sesionId = sesionIdParam ?? null;
+  let sesionPagada = false;
 
   if (mesaId) {
     try {
@@ -55,11 +66,19 @@ export default async function MostradorPage({
       if (!sesionId) {
         const { data: sesionRow } = await supabase
           .from('mesa_sesiones')
-          .select('id')
+          .select('id, sesion_pagada')
           .eq('mesa_id', mesaId)
           .is('cerrada_at', null)
           .maybeSingle();
-        sesionId = (sesionRow as { id: string } | null)?.id ?? null;
+        sesionId = (sesionRow as { id: string; sesion_pagada: boolean } | null)?.id ?? null;
+        sesionPagada = (sesionRow as { id: string; sesion_pagada: boolean } | null)?.sesion_pagada ?? false;
+      } else {
+        const { data: sesionRow } = await supabase
+          .from('mesa_sesiones')
+          .select('sesion_pagada')
+          .eq('id', sesionId)
+          .maybeSingle();
+        sesionPagada = (sesionRow as { sesion_pagada: boolean } | null)?.sesion_pagada ?? false;
       }
 
       if (sesionId) {
@@ -111,12 +130,15 @@ export default async function MostradorPage({
       turno={turnoResult.data}
       products={products}
       categories={categories}
+      tipoImpuesto={tipoImpuesto}
+      porcentajeImpuesto={porcentajeImpuesto}
       initialMesa={mesaId ? {
         mesaId,
         sesionId: sesionId ?? null,
         mesaNumero: mesaNumero ? parseInt(mesaNumero, 10) : null,
         mesaName,
         existingOrders,
+        sesionPagada,
       } : null}
     />
   );
