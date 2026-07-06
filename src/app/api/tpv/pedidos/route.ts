@@ -91,12 +91,13 @@ export async function GET(req: NextRequest) {
         }
 
         const itemStates = detalle.map((_, idx) => overrides.get(idx) ?? 'pendiente');
+        const allCancelled     = itemStates.length > 0 && itemStates.every(s => s === 'cancelado');
         const allDone          = itemStates.every(s => s === 'servido' || s === 'cancelado');
         const anyListo         = itemStates.some(s => s === 'listo');
         const anyEnPreparacion = itemStates.some(s => s === 'en_preparacion');
 
         synthesizedEstado.set(p.id,
-          allDone ? 'servido' : anyListo ? 'preparado' : anyEnPreparacion ? 'en_preparacion' : 'pendiente'
+          allCancelled ? 'cancelado' : allDone ? 'servido' : anyListo ? 'preparado' : anyEnPreparacion ? 'en_preparacion' : 'pendiente'
         );
       }
     } catch { /* best-effort */ }
@@ -107,19 +108,21 @@ export async function GET(req: NextRequest) {
     return c.nombre ?? c.name ?? '';
   }
 
-  const orders = rawPedidos.map(p => ({
-    id: p.id,
-    numeroPedido: p.numero_pedido,
-    estado: synthesizedEstado.get(p.id) ?? p.estado,
-    items: (p.detalle_pedido ?? []).map(it => ({
-      nombre: it.nombre ?? '',
-      precio: Number(it.precio ?? 0),
-      cantidad: Number(it.cantidad ?? 1),
-      complementos: (it.complementos ?? []).map(normComplement).filter(Boolean),
-    })),
-    total: Number(p.total),
-    nota: p.nota ?? null,
-  }));
+  const orders = rawPedidos
+    .filter(p => synthesizedEstado.get(p.id) !== 'cancelado')
+    .map(p => ({
+      id: p.id,
+      numeroPedido: p.numero_pedido,
+      estado: synthesizedEstado.get(p.id) ?? p.estado,
+      items: (p.detalle_pedido ?? []).map(it => ({
+        nombre: it.nombre ?? '',
+        precio: Number(it.precio ?? 0),
+        cantidad: Number(it.cantidad ?? 1),
+        complementos: (it.complementos ?? []).map(normComplement).filter(Boolean),
+      })),
+      total: Number(p.total),
+      nota: p.nota ?? null,
+    }));
 
   return NextResponse.json({ orders, yaCobradoCents });
 }
