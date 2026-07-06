@@ -111,7 +111,9 @@ export function TurnoCerrarForm({ turno, stats, mesasAbiertas }: Props) {
         <div className="h-px bg-[#2e3347]" />
         <div className="flex justify-between text-sm">
           <span className="text-[#6b7280]">Total efectivo (teórico)</span>
-          <span className="font-semibold">{fmt(teoricoCents)}</span>
+          <span className="font-semibold">
+            {hasContado ? fmt(teoricoCents) : '—'}
+          </span>
         </div>
         <div className="flex justify-between text-sm">
           <span className="text-[#6b7280]">Total tarjeta</span>
@@ -126,7 +128,7 @@ export function TurnoCerrarForm({ turno, stats, mesasAbiertas }: Props) {
       {/* Arqueo ciego */}
       <div className="flex flex-col gap-2">
         <label className="text-xs font-bold text-[#6b7280] uppercase tracking-wider">
-          Efectivo contado en caja
+          Cuenta el efectivo sin mirar el sistema
         </label>
         <div className="flex items-center gap-2 bg-[#22263a] border border-[#2e3347] rounded-xl px-4 focus-within:border-[#4f72ff] transition-colors">
           <span className="text-[#6b7280] font-semibold">€</span>
