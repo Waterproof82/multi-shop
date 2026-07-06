@@ -22,6 +22,7 @@ export interface TpvCobroPayload {
   metodoPago: MetodoPago;
   importeCobradoCents: number;
   propinaCents: number;
+  descuentoCents: number;
   turnoId: string;
   ivaPorcentaje?: number;
   cerrarSesion?: boolean;
@@ -43,6 +44,7 @@ export interface TpvCobro {
   metodoPago: MetodoPago;
   importeCobradoCents: number;
   propinaCents: number;
+  descuentoCents: number;
   ivaPorcentaje: number;
   baseImponibleCents: number;
   ivaCents: number;
@@ -59,6 +61,7 @@ export interface TpvCobroCompletoPayload {
   metodoPago: MetodoPago;
   importeCobradoCents: number;
   propinaCents: number;
+  descuentoCents?: number;
   ivaPorcentaje?: number;
   rectificaCobroId?: string | null;
 }

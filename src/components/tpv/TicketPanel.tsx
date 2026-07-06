@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ExistingOrder } from './MostradorClient';
 import type { PendingItem } from '@/hooks/tpv/useMesaActiva';
@@ -52,6 +52,10 @@ export function TicketPanel({
   const router = useRouter();
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [notaExpandida, setNotaExpandida] = useState<string | null>(null); // pedido id expandido
+  const [notasLocal, setNotasLocal] = useState<Record<string, string>>({});
+  const [pendingNota, setPendingNota] = useState('');
+  const notaSaveRef = useRef<NodeJS.Timeout | null>(null);
   const total = existingTotal + pendingTotal;
   const subtotal = total / (1 + IVA_RATE);
   const iva = total - subtotal;
@@ -65,6 +69,27 @@ export function TicketPanel({
   const mesaLabel = mesaNumero !== null
     ? `Mesa ${mesaNumero}${mesaName ? ` · ${mesaName}` : ''}`
     : null;
+
+  function saveNota(pedidoId: string, nota: string) {
+    if (notaSaveRef.current) clearTimeout(notaSaveRef.current);
+    notaSaveRef.current = setTimeout(() => {
+      const csrfToken = getCsrfToken();
+      void fetch(`/api/tpv/pedidos/${pedidoId}/nota`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}) },
+        body: JSON.stringify({ nota: nota || null }),
+      });
+    }, 600);
+  }
+
+  function handleNotaChange(pedidoId: string, value: string) {
+    setNotasLocal(prev => ({ ...prev, [pedidoId]: value }));
+    saveNota(pedidoId, value);
+  }
+
+  function getNota(order: ExistingOrder): string {
+    return notasLocal[order.id] ?? order.nota ?? '';
+  }
 
   return (
     <aside className="w-[300px] shrink-0 bg-[#1a1d27] border-r border-[#2e3347] flex flex-col">
@@ -85,9 +110,14 @@ export function TicketPanel({
         {/* Existing orders from DB */}
         {existingOrders.map(order => (
           <div key={order.id} className="border-b border-[#2e3347]/50 last:border-b-0">
-            <div className="flex items-center justify-between px-4 py-1.5">
+            <button
+              type="button"
+              onClick={() => setNotaExpandida(prev => prev === order.id ? null : order.id)}
+              className="w-full flex items-center justify-between px-4 py-1.5 hover:bg-[#22263a]/40 transition-colors"
+            >
               <span className="text-[10px] font-bold text-[#6b7280] uppercase tracking-wider">
                 Pedido #{order.numeroPedido}
+                {getNota(order) && <span className="ml-1.5 text-[#4f72ff]">✎</span>}
               </span>
               <span
                 className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
@@ -95,7 +125,7 @@ export function TicketPanel({
               >
                 {ESTADO_LABEL[order.estado] ?? order.estado}
               </span>
-            </div>
+            </button>
             {order.items.map((item, idx) => (
               <div key={idx} className="flex items-start gap-2.5 px-4 py-2 hover:bg-[#22263a]/50 transition-colors">
                 <span className="w-5 h-5 rounded bg-[#22263a] text-[#6b7280] text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
@@ -112,6 +142,18 @@ export function TicketPanel({
                 </span>
               </div>
             ))}
+            {notaExpandida === order.id && (
+              <div className="px-4 pb-3">
+                <textarea
+                  rows={2}
+                  maxLength={500}
+                  value={getNota(order)}
+                  onChange={e => handleNotaChange(order.id, e.target.value)}
+                  placeholder="Añadir nota al pedido..."
+                  className="w-full bg-[#0f1117] border border-[#2e3347] rounded-lg px-3 py-2 text-xs text-[#e8eaf0] placeholder:text-[#4b5563] focus:outline-none focus:border-[#4f72ff] transition-colors resize-none"
+                />
+              </div>
+            )}
           </div>
         ))}
 
@@ -166,6 +208,16 @@ export function TicketPanel({
           <p className="text-xs text-red-400 text-center">{sendError}</p>
         )}
         {pendingItems.length > 0 && (
+          <textarea
+            rows={2}
+            maxLength={500}
+            value={pendingNota}
+            onChange={e => setPendingNota(e.target.value)}
+            placeholder="Nota del pedido (opcional)..."
+            className="w-full bg-[#0f1117] border border-[#2e3347] rounded-xl px-3 py-2 text-xs text-[#e8eaf0] placeholder:text-[#4b5563] focus:outline-none focus:border-[#4f72ff] transition-colors resize-none"
+          />
+        )}
+        {pendingItems.length > 0 && (
           <button
             type="button"
             disabled={sending || !mesaId}
@@ -191,6 +243,7 @@ export function TicketPanel({
                       cantidad: i.cantidad,
                       complementos: i.complementos,
                     })),
+                    nota: pendingNota || undefined,
                   }),
                 });
                 if (!res.ok) {
@@ -199,6 +252,7 @@ export function TicketPanel({
                 } else {
                   const json = await res.json() as { sesionId?: string | null };
                   onPendingSent();
+                  setPendingNota('');
                   // If the mesa had no session yet, navigate to include the new sesionId in the URL
                   if (!sesionId && json.sesionId && mesaId) {
                     const params = new URLSearchParams({ mesaId, mesaNumero: String(mesaNumero ?? ''), sesionId: json.sesionId });

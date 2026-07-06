@@ -11,6 +11,7 @@ export interface OfflineCobroEntry {
   metodoPago: MetodoPago;
   importeCobradoCents: number;
   propinaCents: number;
+  descuentoCents: number;
   operadorNombre: string;
   turnoId: string;
   empresaId: string;

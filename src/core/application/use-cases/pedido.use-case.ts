@@ -34,6 +34,7 @@ export interface CreateMesaPedidoDTO {
   items: CreatePedidoDTO['items'];
   mesa_id: string; // UUID
   idioma?: string;
+  nota?: string;
 }
 
 export interface PedidoStats {
@@ -513,6 +514,7 @@ export class PedidoUseCase {
         trackingToken,
         sesionId,
         initialEstado,
+        nota: data.nota,
       });
       if (!pedidoResult.success) {
         return { success: false, error: pedidoResult.error };

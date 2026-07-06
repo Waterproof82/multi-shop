@@ -705,6 +705,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     trackingToken: string;
     sesionId: string | null;
     initialEstado?: 'pendiente' | 'retenido' | 'pendiente_validacion';
+    nota?: string;
   }): Promise<Result<{ id: string; numero_pedido: number; tracking_token: string }>> {
     try {
       const { data: nextNum, error: rpcError } = await this.supabase
@@ -742,6 +743,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         estado: params.initialEstado ?? 'pendiente',
         tracking_token: params.trackingToken,
         sesion_id: params.sesionId,
+        ...(params.nota ? { nota: params.nota } : {}),
       };
 
       const { data: pedido, error } = await this.supabase

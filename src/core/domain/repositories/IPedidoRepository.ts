@@ -113,6 +113,7 @@ export interface IPedidoRepository {
     trackingToken: string;
     sesionId: string | null;
     initialEstado?: 'pendiente' | 'retenido' | 'pendiente_validacion';
+    nota?: string;
   }): Promise<Result<{ id: string; numero_pedido: number; tracking_token: string }>>;
   findEstimatedReadyAtById(pedidoId: string): Promise<Result<string | null>>;
   findStatusById(pedidoId: string): Promise<Result<string | null>>;

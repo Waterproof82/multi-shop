@@ -66,7 +66,7 @@ export default async function MostradorPage({
       const [ordersRows, mesaRow] = await Promise.all([
         supabase
           .from('pedidos')
-          .select('id, numero_pedido, detalle_pedido, total, estado, created_at')
+          .select('id, numero_pedido, detalle_pedido, total, estado, nota, created_at')
           .eq('sesion_id', sesionId)
           .neq('estado', 'cancelado')   // show all non-cancelled: pending, in kitchen, ready, served
           .order('created_at'),
@@ -81,7 +81,7 @@ export default async function MostradorPage({
 
       type RawComplement = string | { nombre?: string; name?: string };
       type RawItem = { nombre?: string; precio?: number; cantidad?: number; complementos?: RawComplement[] };
-      type RawPedido = { id: string; numero_pedido: number; detalle_pedido: RawItem[]; total: number; estado: string; created_at: string };
+      type RawPedido = { id: string; numero_pedido: number; detalle_pedido: RawItem[]; total: number; estado: string; nota?: string | null; created_at: string };
 
       existingOrders = ((ordersRows.data ?? []) as RawPedido[]).map(p => ({
         id: p.id,
@@ -96,6 +96,7 @@ export default async function MostradorPage({
           ).filter(Boolean),
         })),
         total: Number(p.total),
+        nota: p.nota ?? null,
       }));
 
       mesaName = (mesaRow.data as { nombre: string | null } | null)?.nombre ?? null;

@@ -73,6 +73,7 @@ export function CobroFlow({
   const [step, setStep] = useState<Step>('metodo');
   const [metodo, setMetodo] = useState<MetodoPago>('efectivo');
   const [propinaCents, setPropinaCents] = useState(0);
+  const [descuentoCents, setDescuentoCents] = useState(0);
   const [entregadoCents, setEntregadoCents] = useState(0);
   const [loading, setLoading] = useState(false);
   const [cobro, setCobro] = useState<TpvCobro | null>(null);
@@ -81,7 +82,8 @@ export function CobroFlow({
   const totalPendienteCents = totalCents - yaCobradoCents;
   const [importeParcialCents, setImporteParcialCents] = useState(totalPendienteCents);
 
-  const esParcial = importeParcialCents < totalPendienteCents;
+  const efectivoPendienteCents = totalPendienteCents - descuentoCents;
+  const esParcial = importeParcialCents < efectivoPendienteCents;
   const totalFinalCents = importeParcialCents + propinaCents;
 
   // Flush queue when connectivity is restored
@@ -102,6 +104,7 @@ export function CobroFlow({
         metodoPago: metodo,
         importeCobradoCents: totalFinalCents,
         propinaCents,
+        descuentoCents,
         operadorNombre,
         turnoId,
         empresaId,
@@ -115,7 +118,7 @@ export function CobroFlow({
     },
     [
       sesionId, mesaNumero, metodo, totalFinalCents,
-      propinaCents, operadorNombre, turnoId, empresaId, porcentajeImpuesto,
+      propinaCents, descuentoCents, operadorNombre, turnoId, empresaId, porcentajeImpuesto,
     ],
   );
 
@@ -136,6 +139,7 @@ export function CobroFlow({
           metodoPago: metodo,
           importeCobradoCents: totalFinalCents,
           propinaCents,
+          descuentoCents,
           turnoId,
           ivaPorcentaje: porcentajeImpuesto,
           cerrarSesion: !esParcial,
@@ -149,7 +153,7 @@ export function CobroFlow({
         setStep('confirmado');
       }
     },
-    [sesionId, metodo, totalFinalCents, propinaCents, turnoId, porcentajeImpuesto, esParcial],
+    [sesionId, metodo, totalFinalCents, propinaCents, descuentoCents, turnoId, porcentajeImpuesto, esParcial],
   );
 
   function confirmarCobro(importe: number) {
@@ -169,9 +173,11 @@ export function CobroFlow({
         importeParcialCents={importeParcialCents}
         metodo={metodo}
         propinaCents={propinaCents}
+        descuentoCents={descuentoCents}
         onImporteChange={setImporteParcialCents}
         onMetodoChange={setMetodo}
         onPropinaChange={setPropinaCents}
+        onDescuentoChange={setDescuentoCents}
         onContinuar={() => setStep(metodo === 'efectivo' ? 'efectivo' : 'tarjeta')}
         onCancel={() => router.push('/tpv/mostrador')}
       />
@@ -208,6 +214,7 @@ export function CobroFlow({
       metodo={metodo}
       entregadoCents={entregadoCents}
       propinaCents={propinaCents}
+      descuentoCents={descuentoCents}
       mesaNumero={mesaNumero}
       operadorNombre={operadorNombre}
       empresaNombre={empresaNombre}
@@ -216,7 +223,7 @@ export function CobroFlow({
       tipoImpuesto={tipoImpuesto}
       esParcial={esParcial}
       esOffline={esOffline}
-      pendienteCents={totalPendienteCents - importeParcialCents}
+      pendienteCents={efectivoPendienteCents - importeParcialCents}
       onNuevaOperacion={() => { router.refresh(); router.push('/tpv/mostrador'); }}
     />
   );

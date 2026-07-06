@@ -11,9 +11,11 @@ interface Props {
   readonly importeParcialCents: number;
   readonly metodo: MetodoPago;
   readonly propinaCents: number;
+  readonly descuentoCents: number;
   readonly onImporteChange: (cents: number) => void;
   readonly onMetodoChange: (m: MetodoPago) => void;
   readonly onPropinaChange: (cents: number) => void;
+  readonly onDescuentoChange: (cents: number) => void;
   readonly onContinuar: () => void;
   readonly onCancel: () => void;
 }
@@ -31,16 +33,20 @@ export function CobroMetodoPropina({
   importeParcialCents,
   metodo,
   propinaCents,
+  descuentoCents,
   onImporteChange,
   onMetodoChange,
   onPropinaChange,
+  onDescuentoChange,
   onContinuar,
   onCancel,
 }: Props) {
-  const esParcial = importeParcialCents < totalPendienteCents;
+  const efectivoPendienteCents = totalPendienteCents - descuentoCents;
+  const esParcial = importeParcialCents < efectivoPendienteCents;
   const totalFinal = importeParcialCents + propinaCents;
 
   const [rawImporte, setRawImporte] = useState((importeParcialCents / 100).toFixed(2));
+  const [rawDescuento, setRawDescuento] = useState((descuentoCents / 100).toFixed(2));
 
   function handlePropinaInput(val: string) {
     const euros = parseFloat(val.replace(',', '.')) || 0;
@@ -51,20 +57,37 @@ export function CobroMetodoPropina({
     setRawImporte(val);
     const euros = parseFloat(val.replace(',', '.')) || 0;
     const cents = Math.round(euros * 100);
-    onImporteChange(Math.min(Math.max(cents, 0), totalPendienteCents));
+    onImporteChange(Math.min(Math.max(cents, 0), efectivoPendienteCents));
   }
 
   function handleImporteBlur() {
-    // Clamp and reformat on blur
     const euros = parseFloat(rawImporte.replace(',', '.')) || 0;
-    const cents = Math.min(Math.max(Math.round(euros * 100), 1), totalPendienteCents);
+    const cents = Math.min(Math.max(Math.round(euros * 100), 1), efectivoPendienteCents);
     onImporteChange(cents);
     setRawImporte((cents / 100).toFixed(2));
   }
 
   function resetImporteToTotal() {
-    onImporteChange(totalPendienteCents);
-    setRawImporte((totalPendienteCents / 100).toFixed(2));
+    onImporteChange(efectivoPendienteCents);
+    setRawImporte((efectivoPendienteCents / 100).toFixed(2));
+  }
+
+  function handleDescuentoChange(val: string) {
+    setRawDescuento(val);
+    const euros = parseFloat(val.replace(',', '.')) || 0;
+    const cents = Math.min(Math.round(euros * 100), totalPendienteCents - 1);
+    onDescuentoChange(Math.max(cents, 0));
+    onImporteChange(Math.max(totalPendienteCents - Math.max(cents, 0), 1));
+    setRawImporte(((Math.max(totalPendienteCents - Math.max(cents, 0), 1)) / 100).toFixed(2));
+  }
+
+  function handleDescuentoBlur() {
+    const euros = parseFloat(rawDescuento.replace(',', '.')) || 0;
+    const cents = Math.min(Math.max(Math.round(euros * 100), 0), totalPendienteCents - 1);
+    onDescuentoChange(cents);
+    onImporteChange(totalPendienteCents - cents);
+    setRawDescuento((cents / 100).toFixed(2));
+    setRawImporte(((totalPendienteCents - cents) / 100).toFixed(2));
   }
 
   return (
@@ -83,6 +106,11 @@ export function CobroMetodoPropina({
         {yaCobradoCents > 0 && (
           <div className="flex justify-between text-sm font-semibold">
             <span>Pendiente</span><span>{fmt(totalPendienteCents)}</span>
+          </div>
+        )}
+        {descuentoCents > 0 && (
+          <div className="flex justify-between text-sm text-[#ef4444]">
+            <span>Descuento</span><span>− {fmt(descuentoCents)}</span>
           </div>
         )}
         {propinaCents > 0 && (
@@ -137,6 +165,35 @@ export function CobroMetodoPropina({
               Quedan {fmt(totalPendienteCents - importeParcialCents)} por cobrar tras este pago
             </p>
           )}
+        </div>
+
+        {/* Descuento */}
+        <div className="flex flex-col gap-2">
+          <label className="text-xs font-bold text-[#6b7280] uppercase tracking-wider">
+            Descuento <span className="normal-case font-normal">(opcional)</span>
+          </label>
+          <div className="flex items-center gap-2 bg-[#22263a] border border-[#2e3347] rounded-xl px-4 focus-within:border-[#ef4444] transition-colors">
+            <span className="text-[#6b7280] font-semibold">€</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={rawDescuento}
+              onChange={e => handleDescuentoChange(e.target.value)}
+              onBlur={handleDescuentoBlur}
+              onFocus={e => e.target.select()}
+              className="flex-1 bg-transparent py-2.5 text-base font-bold outline-none"
+              placeholder="0.00"
+            />
+            {descuentoCents > 0 && (
+              <button
+                type="button"
+                onClick={() => { onDescuentoChange(0); onImporteChange(totalPendienteCents); setRawDescuento('0.00'); setRawImporte((totalPendienteCents / 100).toFixed(2)); }}
+                className="text-[10px] text-[#6b7280] hover:text-[#ef4444] font-bold shrink-0"
+              >
+                Quitar
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Método de pago */}

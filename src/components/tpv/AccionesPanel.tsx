@@ -59,12 +59,6 @@ export function AccionesPanel({ sesionId, turnoId, onRefresh, refreshing }: Prop
           <ActionButton label="Seleccionar mesa" onClick={() => router.push('/tpv/mesas?seleccionar=1')} />
           <ActionButton label={refreshing ? 'Actualizando…' : 'Actualizar estado'} onClick={() => { void onRefresh(); }} disabled={!hasMesa || refreshing} />
           <ActionButton label="Ver ticket completo" onClick={() => { if (sesionId) router.push(`/tpv/cobro/${sesionId}?turnoId=${turnoId}`); }} disabled={!hasMesa} />
-          <ActionButton label="Liberar mesa" onClick={() => {}} disabled={!hasMesa} />
-        </ActionGroup>
-
-        <ActionGroup title="Ticket">
-          <ActionButton label="Descuento" onClick={() => {}} disabled={!hasMesa} />
-          <ActionButton label="Nota" onClick={() => {}} disabled={!hasMesa} />
         </ActionGroup>
 
         <ActionGroup title="Historial">

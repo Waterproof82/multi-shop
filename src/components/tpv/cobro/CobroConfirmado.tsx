@@ -9,6 +9,7 @@ interface Props {
   readonly metodo: MetodoPago;
   readonly entregadoCents: number;
   readonly propinaCents: number;
+  readonly descuentoCents: number;
   readonly mesaNumero: number;
   readonly operadorNombre: string;
   readonly empresaNombre: string;
@@ -40,6 +41,7 @@ export function CobroConfirmado({
   metodo,
   entregadoCents,
   propinaCents,
+  descuentoCents,
   mesaNumero,
   operadorNombre,
   empresaNombre,
@@ -123,6 +125,12 @@ export function CobroConfirmado({
             <span className="text-[#6b7280]">Total cobrado</span>
             <span className="font-semibold">{fmt(totalFinalCents)}</span>
           </div>
+          {descuentoCents > 0 && (
+            <div className="flex justify-between text-sm text-[#ef4444]">
+              <span>Descuento aplicado</span>
+              <span>− {fmt(descuentoCents)}</span>
+            </div>
+          )}
           {propinaCents > 0 && (
             <div className="flex justify-between text-sm text-[#eab308] font-semibold">
               <span>Propina registrada</span>
@@ -211,9 +219,14 @@ export function CobroConfirmado({
             onClick={onNuevaOperacion}
             className="flex-[2] py-3 rounded-xl bg-[#4f72ff] text-white font-bold hover:brightness-110 transition-all"
           >
-            {esParcial ? 'Volver al mostrador →' : 'Nueva operación →'}
+            {esParcial ? 'Volver al mostrador →' : 'Cerrar mesa →'}
           </button>
         </div>
+        {!esParcial && !esOffline && (
+          <p className="text-xs text-[#6b7280] text-center">
+            La sesión de mesa se ha cerrado automáticamente al cobrar.
+          </p>
+        )}
         {printError !== null && (
           <p className="text-xs text-[#ef4444] text-center">{printError}</p>
         )}

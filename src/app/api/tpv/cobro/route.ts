@@ -14,6 +14,7 @@ const CobroSchema = z.object({
   metodoPago: z.enum(['efectivo', 'tarjeta']),
   importeCobradoCents: z.number().int().positive(),
   propinaCents: z.number().int().min(0),
+  descuentoCents: z.number().int().min(0).optional().default(0),
   turnoId: z.string().uuid(),
   ivaPorcentaje: z.number().min(0).max(30).optional().default(10),
   cerrarSesion: z.boolean().optional().default(true),

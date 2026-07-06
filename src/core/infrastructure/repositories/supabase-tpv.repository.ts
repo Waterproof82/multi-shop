@@ -210,6 +210,7 @@ export class SupabaseTpvRepository implements ITpvRepository {
           metodo_pago: payload.metodoPago,
           importe_cobrado_cents: payload.importeCobradoCents,
           propina_cents: payload.propinaCents,
+          descuento_cents: payload.descuentoCents ?? 0,
           iva_porcentaje: payload.ivaPorcentaje ?? 10,
           rectifica_cobro_id: payload.rectificaCobroId ?? null,
         })
@@ -247,6 +248,7 @@ export class SupabaseTpvRepository implements ITpvRepository {
           metodoPago: row.metodo_pago as TpvCobro['metodoPago'],
           importeCobradoCents: row.importe_cobrado_cents as number,
           propinaCents: row.propina_cents as number,
+          descuentoCents: (row.descuento_cents as number) ?? 0,
           ivaPorcentaje: Number(row.iva_porcentaje),
           baseImponibleCents: row.base_imponible_cents as number,
           ivaCents: row.iva_cents as number,
