@@ -5,9 +5,15 @@ import { useRouter } from 'next/navigation';
 import type { TpvTurno, TpvTurnoStats } from '@/core/domain/entities/tpv-types';
 import { getCsrfToken } from '@/lib/csrf-client';
 
+interface MesaAbierta {
+  mesaNumero: number | null;
+  mesaNombre: string | null;
+}
+
 interface Props {
   readonly turno: TpvTurno;
   readonly stats: TpvTurnoStats;
+  readonly mesasAbiertas: MesaAbierta[];
 }
 
 function fmt(cents: number) {
@@ -32,7 +38,7 @@ function getDiferenciaLabel(diferenciaCents: number): string {
   return 'Faltante';
 }
 
-export function TurnoCerrarForm({ turno, stats }: Props) {
+export function TurnoCerrarForm({ turno, stats, mesasAbiertas }: Props) {
   const router = useRouter();
   const [efectivoContado, setEfectivoContado] = useState('');
   const [loading, setLoading] = useState(false);
@@ -42,6 +48,7 @@ export function TurnoCerrarForm({ turno, stats }: Props) {
   const teoricoCents = turno.efectivoAperturaCents + stats.totalEfectivoCents;
   const diferenciaCents = contadoCents - teoricoCents;
   const hasContado = efectivoContado.trim() !== '';
+  const hayMesasAbiertas = mesasAbiertas.length > 0;
 
   const apertura = new Date(turno.aperturaAt);
   const [duracion] = useState(() =>
@@ -149,6 +156,25 @@ export function TurnoCerrarForm({ turno, stats }: Props) {
         </div>
       )}
 
+      {hayMesasAbiertas && (
+        <div className="bg-[#f9731615] border border-[#f9731640] rounded-xl p-4 flex flex-col gap-2">
+          <p className="text-sm font-semibold text-[#f97316]">
+            Hay {mesasAbiertas.length} {mesasAbiertas.length === 1 ? 'mesa sin cobrar' : 'mesas sin cobrar'}
+          </p>
+          <ul className="flex flex-col gap-0.5">
+            {mesasAbiertas.map((m, i) => (
+              <li key={i} className="text-xs text-[#f97316]/80">
+                {m.mesaNumero !== null ? `Mesa ${m.mesaNumero}` : 'Mesa s/n'}
+                {m.mesaNombre ? ` · ${m.mesaNombre}` : ''}
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-[#f97316]/70 mt-1">
+            Cerrá o cobrá todas las mesas antes de cerrar el turno.
+          </p>
+        </div>
+      )}
+
       {error !== null && (
         <p className="text-sm text-red-400 bg-red-400/10 border border-red-400/30 rounded-lg px-4 py-3">
           {error}
@@ -165,7 +191,7 @@ export function TurnoCerrarForm({ turno, stats }: Props) {
         </button>
         <button
           type="submit"
-          disabled={!hasContado || loading}
+          disabled={!hasContado || loading || hayMesasAbiertas}
           className="flex-[2] py-3.5 rounded-xl bg-[#ef4444] text-white font-bold disabled:opacity-40 hover:brightness-110 transition-all"
         >
           {loading ? 'Cerrando...' : 'Cerrar turno'}

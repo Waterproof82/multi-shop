@@ -8,6 +8,7 @@ import {
 } from '@/core/infrastructure/api/helpers';
 import { SupabaseTpvRepository } from '@/core/infrastructure/repositories/supabase-tpv.repository';
 import { cerrarTurnoUseCase } from '@/core/application/use-cases/tpv/cerrar-turno.use-case';
+import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { z } from 'zod';
 
 const repo = new SupabaseTpvRepository();
@@ -42,6 +43,22 @@ export async function POST(
   }
 
   const { id } = await params;
+
+  // Guard: no cerrar si hay mesas con sesión abierta
+  const supabase = getSupabaseClient();
+  const { data: sesionesAbiertas } = await supabase
+    .from('mesa_sesiones')
+    .select('id')
+    .eq('empresa_id', empresaId)
+    .is('cerrada_at', null)
+    .limit(1);
+
+  if (sesionesAbiertas && sesionesAbiertas.length > 0) {
+    return NextResponse.json(
+      { error: 'Hay mesas sin cobrar. Cerrá o cobrá todas las mesas antes de cerrar el turno.' },
+      { status: 409 },
+    );
+  }
 
   const result = await cerrarTurnoUseCase(repo, {
     turnoId: id,
