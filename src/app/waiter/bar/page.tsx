@@ -339,7 +339,7 @@ export default function BarPage() {
     // trigger for ALL pedido inserts (including waiter-placed estado='pendiente'/'retenido').
     // Needed because postgres_changes on pedidos is unreliable on the singleton client.
     const newOrderChannel = supabase
-      .channel('waiter-new-order-bar')
+      .channel('waiter-new-order')
       .on('broadcast', { event: 'new-order' }, () => {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => { void fetchOrders(); }, 100);
