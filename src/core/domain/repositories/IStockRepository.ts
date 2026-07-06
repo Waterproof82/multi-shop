@@ -48,4 +48,6 @@ export interface IStockRepository {
   ): Promise<Result<MovimientoStock>>;
 
   findLowStockAlerts(empresaId: string): Promise<Result<Ingrediente[]>>;
+
+  rehabilitarProductos(ingredienteId: string): Promise<Result<void>>;
 }

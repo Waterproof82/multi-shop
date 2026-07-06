@@ -35,7 +35,7 @@ function mapMovimiento(row: Record<string, unknown>): MovimientoStock {
   return {
     id: row.id as string,
     empresaId: row.empresa_id as string,
-    ingredienteId: row.ingrediente_id as string,
+    ingredienteId: (row.ingrediente_id as string) ?? null,
     tipo: row.tipo as MovimientoStock['tipo'],
     cantidad: Number(row.cantidad),
     referenciaId: (row.referencia_id as string) ?? null,
@@ -382,7 +382,7 @@ export class SupabaseStockRepository implements IStockRepository {
         .from('movimientos_stock')
         .insert({
           empresa_id: data.empresaId,
-          ingrediente_id: data.ingredienteId,
+          ingrediente_id: data.ingredienteId ?? null,
           tipo: data.tipo,
           cantidad: data.cantidad,
           referencia_id: data.referenciaId,
@@ -398,6 +398,43 @@ export class SupabaseStockRepository implements IStockRepository {
       return { success: true, data: mapMovimiento(row as Record<string, unknown>) };
     } catch (e) {
       return { success: false, error: await logger.logFromCatch(e, 'repository', 'createMovimiento') };
+    }
+  }
+
+  async rehabilitarProductos(ingredienteId: string): Promise<Result<void>> {
+    try {
+      const supabase = getSupabaseClient();
+
+      // Step 1: get all product IDs linked to this ingredient
+      const { data: recetaRows, error: recetaError } = await supabase
+        .from('receta_items')
+        .select('producto_id')
+        .eq('ingrediente_id', ingredienteId);
+
+      if (recetaError) {
+        return { success: false, error: await logger.logFromCatch(recetaError, 'repository', 'rehabilitarProductos') };
+      }
+
+      const productoIds = (recetaRows as { producto_id: string }[]).map((r) => r.producto_id);
+      if (productoIds.length === 0) return { success: true, data: undefined };
+
+      // Step 2: re-enable the disabled ones.
+      // Note: consistent with the trigger — acts only on the ingredient that changed.
+      // A product with multiple low-stock ingredients may be re-enabled prematurely,
+      // but the trigger will disable it again on the next deduction.
+      const { error } = await supabase
+        .from('productos')
+        .update({ activo: true })
+        .in('id', productoIds)
+        .eq('activo', false);
+
+      if (error) {
+        return { success: false, error: await logger.logFromCatch(error, 'repository', 'rehabilitarProductos') };
+      }
+
+      return { success: true, data: undefined };
+    } catch (e) {
+      return { success: false, error: await logger.logFromCatch(e, 'repository', 'rehabilitarProductos') };
     }
   }
 

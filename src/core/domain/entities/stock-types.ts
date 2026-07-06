@@ -22,7 +22,7 @@ export interface RecetaItem {
 export interface MovimientoStock {
   id: string;
   empresaId: string;
-  ingredienteId: string;
+  ingredienteId: string | null;
   tipo: TipoMovimiento;
   cantidad: number;
   referenciaId: string | null;

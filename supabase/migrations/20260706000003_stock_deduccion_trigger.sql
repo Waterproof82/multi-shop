@@ -58,9 +58,12 @@ BEGIN
     END IF;
   END LOOP;
 
-  -- v_tiene_receta = FALSE means no recipe configured for this product.
-  -- We skip writing a movimiento row since there is no valid ingrediente_id to reference.
-  -- Future improvement: log to a separate stock_warnings table.
+  -- If no recipe is configured, write a sin_receta warning row for traceability.
+  -- ingrediente_id is NULL because there is no specific ingredient to reference.
+  IF NOT v_tiene_receta THEN
+    INSERT INTO movimientos_stock (empresa_id, ingrediente_id, tipo, cantidad, referencia_id, turno_id)
+    VALUES (v_empresa_id, NULL, 'sin_receta', 0, NEW.pedido_id, NULL);
+  END IF;
 
   RETURN NEW;
 END;

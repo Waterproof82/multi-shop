@@ -125,7 +125,8 @@ export default function MovimientosPage() {
 
   const totalPages = data ? Math.ceil(data.total / LIMIT) : 1;
 
-  function getIngredienteNombre(id: string): string {
+  function getIngredienteNombre(id: string | null): string {
+    if (!id) return '—';
     return ingredientes.find((i) => i.id === id)?.nombre ?? id.slice(0, 8);
   }
 

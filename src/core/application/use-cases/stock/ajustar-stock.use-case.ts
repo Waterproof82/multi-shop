@@ -12,11 +12,7 @@ async function rehabilitarProductosSiUmbralSuperado(
   const { cantidadActual, umbralAlerta } = ingredienteResult.data;
   if (umbralAlerta <= 0 || cantidadActual < umbralAlerta) return;
 
-  // Re-enable products linked to this ingredient via receta_items.
-  // The actual UPDATE productos query lives at the infrastructure layer —
-  // we delegate via the repository's dedicated method if available,
-  // otherwise this is a no-op (the trigger handles auto-disable; re-enable is manual here).
-  // Note: full re-enable logic is implemented in the API route (Phase 3) using getSupabaseClient().
+  await repo.rehabilitarProductos(ingredienteId);
 }
 
 export async function ajustarStockUseCase(
