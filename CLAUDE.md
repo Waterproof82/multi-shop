@@ -183,6 +183,20 @@ Solución: `WaiterLoginForm.handlePinSubmit` dispara `window.dispatchEvent(new C
 - **`hasPlatosPoServir`** en `mesa-orders-client.tsx` bloquea pago y cierre cuando algún pedido sintetizado tiene estado ∈ `{pendiente_validacion, pendiente, en_preparacion, preparado}`. Ver `docs/context/waiter-ticket-ux.md`.
 - **`propina_cents`** en `mesa_sesiones`: propina acordada por la mesa en céntimos. Se expone como `propinaCents` en `GET /api/mesas/[mesaId]/orders` y se suma al total cobrado en Redsys (full payment y división). Actualizable por cualquier participante vía `PATCH /api/mesas/[mesaId]/propina`. Ver `docs/context/propina.md`.
 
+## 📦 Sistema de Stock & Mermas — Trampas Críticas
+
+> Ver doc completo: `docs/context/stock-system.md`
+
+- **Columna en `productos` es `activo`**, no `disponible`. El trigger y `rehabilitarProductos()` usan `activo`.
+- **Trigger `deducir_stock_on_servido`** resuelve `producto_id` desde `pedidos.detalle_pedido->item_idx->>'producto_id'` (JSONB). Si el campo no existe en el payload de `createMesaOrder`, el trigger salta silenciosamente sin descontar. Asegurarse de que `detalle_pedido[item_idx].producto_id` esté siempre presente al crear pedidos.
+- **`movimientos_stock.ingrediente_id` es nullable** (desde migration 4) — filas `sin_receta` tienen `NULL`. Todo mapper debe usar `(row.ingrediente_id as string) ?? null`, nunca `as string` directo.
+- **`replaceReceta` es destructiva**: `PUT /api/admin/stock/recetas/[productoId]` borra y reinserta todos los items. El cliente debe enviar la lista COMPLETA, no un delta.
+- **`cantidadActual` nunca por PUT**: `PUT /api/admin/stock/ingredientes/[id]` ignora cantidad. Usar `/ajuste` o `/mermas`.
+- **Re-habilitación**: `ajustarStockUseCase` solo re-habilita si `delta > 0` y `cantidadActual >= umbralAlerta` tras el ajuste. Consistente con el trigger — actúa solo sobre el ingrediente modificado.
+- **`findLowStockAlerts` filtra en memoria**: supabase-js no soporta comparaciones col-to-col. Se traen todos los ingredientes con `umbral_alerta > 0` y se filtra en JS. No usar `.lt('cantidad_actual', 'umbral_alerta')` — no funciona.
+- **Sidebar stock**: `requiresRestaurant: true` en los tres ítems de stock — invisible para tiendas.
+- **`LowStockBadge`** montado en `TpvHeader` y `CobroMetodoPropina`. Nunca bloquea el flujo de cobro.
+
 ## 🍽 Sistema Tipo Producto (Restaurante)
 
 - **`categorias.tipo_producto`** (`'comida'|'bebida'`, DEFAULT `'comida'`) es la fuente de verdad para el enrutado cocina/bar. NO leer `productos.tipo_producto` para determinar el tab del menú.
