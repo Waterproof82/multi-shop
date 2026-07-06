@@ -134,6 +134,7 @@ export function MostradorClient({ turno, products, categories, initialMesa }: Pr
         products={products}
         categories={categories}
         onAddItem={addItem}
+        mesaSeleccionada={!!mesa.mesaId}
       />
       <AccionesPanel
         sesionId={mesa.sesionId}

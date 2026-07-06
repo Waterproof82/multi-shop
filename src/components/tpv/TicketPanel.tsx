@@ -11,7 +11,6 @@ interface Props {
   readonly mesaId: string | null;
   readonly mesaNumero: number | null;
   readonly mesaName: string | null;
-  readonly mesaName: string | null;
   readonly existingOrders: ExistingOrder[];
   readonly pendingItems: PendingItem[];
   readonly existingTotal: number;

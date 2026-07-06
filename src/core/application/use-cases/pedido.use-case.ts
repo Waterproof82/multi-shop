@@ -484,6 +484,7 @@ export class PedidoUseCase {
 
       // Step 2: Build items for repo (nombre + cantidad + precio + complementos)
       const repoItems = data.items.map(ci => ({
+        producto_id: ci.item?.id,
         nombre: ci.item?.name ?? '',
         cantidad: ci.quantity,
         precio: priceMap.get(ci.item?.id ?? '') ?? ci.item?.price ?? 0,

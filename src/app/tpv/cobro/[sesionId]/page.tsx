@@ -39,7 +39,7 @@ export default async function CobroPage({ params, searchParams }: Readonly<Props
       .neq('estado', 'cancelado'),
     supabase
       .from('empresas')
-      .select('nif, tipo_impuesto, porcentaje_impuesto')
+      .select('nombre, nif, tipo_impuesto, porcentaje_impuesto')
       .eq('id', admin.empresaId)
       .maybeSingle(),
     supabase
@@ -67,7 +67,13 @@ export default async function CobroPage({ params, searchParams }: Readonly<Props
   const yaCobradoCents = ((cobrosRes.data ?? []) as RawCobro[])
     .reduce((sum, c) => sum + Number(c.importe_cobrado_cents), 0);
 
-  const empresaRow = empresaRes.data as { nif: string | null; tipo_impuesto: string | null; porcentaje_impuesto: number | null } | null;
+  const empresaRow = empresaRes.data as {
+    nombre: string | null;
+    nif: string | null;
+    tipo_impuesto: string | null;
+    porcentaje_impuesto: number | null;
+  } | null;
+  const empresaNombre = empresaRow?.nombre ?? 'Empresa';
   const nif = empresaRow?.nif ?? null;
   const tipoImpuesto = (empresaRow?.tipo_impuesto as 'iva' | 'igic' | null) ?? 'iva';
   const porcentajeImpuesto = empresaRow?.porcentaje_impuesto ?? 10;
@@ -80,6 +86,8 @@ export default async function CobroPage({ params, searchParams }: Readonly<Props
       yaCobradoCents={yaCobradoCents}
       mesaNumero={sesionData.mesas?.numero ?? 0}
       operadorNombre={admin.nombreCompleto ?? 'Operador'}
+      empresaId={admin.empresaId ?? ''}
+      empresaNombre={empresaNombre}
       empresaNif={nif}
       tipoImpuesto={tipoImpuesto}
       porcentajeImpuesto={porcentajeImpuesto}

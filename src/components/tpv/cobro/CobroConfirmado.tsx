@@ -1,6 +1,8 @@
 'use client';
 
 import type { MetodoPago, TpvCobro } from '@/core/domain/entities/tpv-types';
+import { usePrinter } from '@/hooks/tpv/usePrinter';
+import type { PrintTicket } from '@/lib/tpv/printer';
 
 interface Props {
   readonly totalFinalCents: number;
@@ -9,10 +11,12 @@ interface Props {
   readonly propinaCents: number;
   readonly mesaNumero: number;
   readonly operadorNombre: string;
+  readonly empresaNombre: string;
   readonly cobro: TpvCobro | null;
   readonly empresaNif: string | null;
   readonly tipoImpuesto: 'iva' | 'igic';
   readonly esParcial?: boolean;
+  readonly esOffline?: boolean;
   readonly pendienteCents?: number;
   readonly onNuevaOperacion: () => void;
 }
@@ -38,25 +42,61 @@ export function CobroConfirmado({
   propinaCents,
   mesaNumero,
   operadorNombre,
+  empresaNombre,
   cobro,
   empresaNif,
   tipoImpuesto,
   esParcial = false,
+  esOffline = false,
   pendienteCents = 0,
   onNuevaOperacion,
 }: Props) {
+  const { print, isPrinting, printError } = usePrinter();
   const now = new Date();
   const hora =
     String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
   const cambio = metodo === 'efectivo' ? Math.max(0, entregadoCents - totalFinalCents) : 0;
 
+  function buildTicket(): PrintTicket | null {
+    if (cobro === null) return null;
+    return {
+      empresaNombre,
+      empresaNif,
+      mesaNumero,
+      operadorNombre,
+      serie: cobro.serie,
+      numeroTicket: cobro.numeroTicket,
+      hash: cobro.hash,
+      metodoPago: metodo,
+      importeCobradoCents: totalFinalCents,
+      propinaCents,
+      baseImponibleCents: cobro.baseImponibleCents,
+      ivaPorcentaje: cobro.ivaPorcentaje,
+      ivaCents: cobro.ivaCents,
+      cobradoAt: cobro.cobradoAt,
+      entregadoCents,
+      tipoImpuesto,
+    };
+  }
+
+  function handlePrint() {
+    const ticket = buildTicket();
+    if (ticket === null) return;
+    void print(ticket);
+  }
+
   return (
     <div className="flex items-center justify-center w-full h-full">
       <div className="flex flex-col items-center gap-6 max-w-sm w-full">
-        <div className={`w-20 h-20 rounded-full flex items-center justify-center text-4xl border-2 ${esParcial ? 'bg-[#f9731622] border-[#f97316]' : 'bg-[#22c55e22] border-[#22c55e]'}`}>
-          {esParcial ? '½' : '✓'}
+        <div className={`w-20 h-20 rounded-full flex items-center justify-center text-4xl border-2 ${esOffline ? 'bg-[#f59e0b22] border-[#f59e0b]' : esParcial ? 'bg-[#f9731622] border-[#f97316]' : 'bg-[#22c55e22] border-[#22c55e]'}`}>
+          {esOffline ? '~' : esParcial ? '½' : '✓'}
         </div>
-        <h2 className="text-2xl font-bold">{esParcial ? 'Cobro parcial registrado' : '¡Cobrado!'}</h2>
+        <h2 className="text-2xl font-bold">{esOffline ? 'Cobro en cola offline' : esParcial ? 'Cobro parcial registrado' : '¡Cobrado!'}</h2>
+        {esOffline && (
+          <p className="text-xs text-[#f59e0b] text-center">
+            Sin conexión — se sincronizará automáticamente al recuperar la red.
+          </p>
+        )}
         <p className="text-sm text-[#6b7280]">
           Mesa {mesaNumero} · {operadorNombre}
         </p>
@@ -160,9 +200,11 @@ export function CobroConfirmado({
         <div className="flex gap-3 w-full">
           <button
             type="button"
-            className="flex-1 py-3 rounded-xl border border-[#2e3347] text-sm font-semibold hover:border-[#e8eaf0] transition-colors"
+            disabled={cobro === null || isPrinting}
+            onClick={handlePrint}
+            className="flex-1 py-3 rounded-xl border border-[#2e3347] text-sm font-semibold hover:border-[#e8eaf0] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Imprimir
+            {isPrinting ? '...' : 'Imprimir'}
           </button>
           <button
             type="button"
@@ -172,6 +214,9 @@ export function CobroConfirmado({
             {esParcial ? 'Volver al mostrador →' : 'Nueva operación →'}
           </button>
         </div>
+        {printError !== null && (
+          <p className="text-xs text-[#ef4444] text-center">{printError}</p>
+        )}
       </div>
     </div>
   );

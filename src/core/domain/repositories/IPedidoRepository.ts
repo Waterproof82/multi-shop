@@ -108,7 +108,7 @@ export interface IPedidoRepository {
   createMesaOrder(params: {
     empresaId: string;
     mesaId: string;
-    items: { nombre: string; cantidad: number; precio: number; tipo_producto?: string; translations?: unknown; nota?: string; complementos?: { nombre: string; precio: number }[] }[];
+    items: { producto_id?: string; nombre: string; cantidad: number; precio: number; tipo_producto?: string; translations?: unknown; nota?: string; complementos?: { nombre: string; precio: number }[] }[];
     total: number;
     trackingToken: string;
     sesionId: string | null;

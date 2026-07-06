@@ -2,6 +2,9 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { useOnlineStatus } from '@/hooks/tpv/useOnlineStatus';
+import { getQueueCount } from '@/lib/tpv/offline-queue';
+import { LowStockBadge } from '@/components/tpv/LowStockBadge';
 
 interface Props {
   readonly empresaNombre: string;
@@ -28,13 +31,33 @@ const NAV_ITEMS = [
   { label: 'Mostrador', href: '/tpv/mostrador', activePrefix: '/tpv/mostrador' },
   { label: 'Mesas',     href: '/tpv/mesas?seleccionar=1', activePrefix: '/tpv/mesas' },
   { label: 'Historial', href: '/tpv/historial', activePrefix: '/tpv/historial' },
+  { label: 'Mermas',    href: '/tpv/mermas', activePrefix: '/tpv/mermas' },
 ] as const;
 
 export function TpvHeader({ empresaNombre }: Props) {
   const pathname = usePathname();
   const router = useRouter();
+  const isOnline = useOnlineStatus();
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    getQueueCount()
+      .then(setPendingCount)
+      .catch(() => { /* IndexedDB not available */ });
+  }, [isOnline]);
 
   return (
+    <>
+    {!isOnline && (
+      <div className="flex items-center justify-center gap-2 h-8 px-4 bg-[#f59e0b] text-black text-xs font-semibold shrink-0">
+        <span>Sin conexión — modo local</span>
+        {pendingCount > 0 && (
+          <span className="bg-black text-[#f59e0b] rounded-full px-2 py-0.5 text-[10px] font-bold">
+            {pendingCount} pendiente{pendingCount !== 1 ? 's' : ''}
+          </span>
+        )}
+      </div>
+    )}
     <header className="flex items-center justify-between h-14 px-5 bg-[#1a1d27] border-b border-[#2e3347] shrink-0">
       <div className="flex items-center gap-4">
         <span className="font-bold text-[#4f72ff] text-sm tracking-wide">TPV</span>
@@ -59,6 +82,7 @@ export function TpvHeader({ empresaNombre }: Props) {
       </nav>
 
       <div className="flex items-center gap-4">
+        <LowStockBadge />
         <TpvClock />
         <button
           type="button"
@@ -69,5 +93,6 @@ export function TpvHeader({ empresaNombre }: Props) {
         </button>
       </div>
     </header>
+    </>
   );
 }

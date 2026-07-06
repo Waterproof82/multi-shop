@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { MetodoPago } from '@/core/domain/entities/tpv-types';
+import { LowStockBadge } from '@/components/tpv/LowStockBadge';
 
 interface Props {
   readonly totalCents: number;
@@ -201,6 +202,8 @@ export function CobroMetodoPropina({
             />
           </div>
         </div>
+
+        <LowStockBadge className="mb-2" />
 
         <div className="flex gap-3">
           <button

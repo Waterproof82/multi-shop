@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, Tags, LogOut, Menu, X, ShoppingCart, BarChart3, Users, Megaphone, Settings, ExternalLink, ShoppingBag, UtensilsCrossed, MapPin, Star } from 'lucide-react';
+import { LayoutDashboard, Package, Tags, LogOut, Menu, X, ShoppingCart, BarChart3, Users, Megaphone, Settings, ExternalLink, ShoppingBag, UtensilsCrossed, MapPin, Star, Archive, BookOpen, History } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useAdmin } from '@/lib/admin-context';
 import { useLanguage } from '@/lib/language-context';
@@ -28,6 +28,9 @@ const BASE_NAV_ITEMS: (NavItem & { requiresPromo?: boolean; requiresTgtg?: boole
   { href: '/admin/mesas', labelKey: 'sidebarMesas', icon: UtensilsCrossed, requiresRestaurant: true },
   { href: '/admin/valoraciones', labelKey: 'adminValoraciones', icon: Star, requiresRestaurant: true },
   { href: '/admin/delivery', labelKey: 'sidebarDelivery', icon: MapPin, requiresDelivery: true },
+  { href: '/admin/stock/ingredientes', labelKey: 'sidebarStockIngredientes', icon: Archive },
+  { href: '/admin/stock/recetas', labelKey: 'sidebarStockRecetas', icon: BookOpen },
+  { href: '/admin/stock/movimientos', labelKey: 'sidebarStockMovimientos', icon: History },
   { href: '/admin/configuracion', labelKey: 'sidebarSettings', icon: Settings },
 ];
 

@@ -53,24 +53,34 @@ export function TurnoCerrarForm({ turno, stats }: Props) {
     setLoading(true);
     setError(null);
 
-    const csrfToken = getCsrfToken();
-    const res = await fetch(`/api/tpv/turno/${turno.id}/cerrar`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
-      },
-      body: JSON.stringify({
-        efectivoCierreCents: contadoCents,
-        totalEfectivoTeoricoCents: teoricoCents,
-      }),
-    });
+    try {
+      const csrfToken = getCsrfToken();
+      const res = await fetch(`/api/tpv/turno/${turno.id}/cerrar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
+        },
+        body: JSON.stringify({
+          efectivoCierreCents: contadoCents,
+          totalEfectivoTeoricoCents: teoricoCents,
+        }),
+      });
 
-    setLoading(false);
-    if (res.ok) {
-      router.push('/tpv/turno/abrir');
-    } else {
-      setError('Error al cerrar el turno. Intentalo de nuevo.');
+      if (res.ok) {
+        router.push('/tpv/turno/abrir');
+      } else {
+        let msg = 'Error al cerrar el turno. Inténtalo de nuevo.';
+        try {
+          const err = (await res.json()) as { error?: string };
+          if (typeof err.error === 'string') msg = err.error;
+        } catch { /* usa msg por defecto */ }
+        setError(msg);
+      }
+    } catch {
+      setError('Sin conexión. Comprueba la red e inténtalo de nuevo.');
+    } finally {
+      setLoading(false);
     }
   }
 

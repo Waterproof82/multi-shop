@@ -11,6 +11,7 @@ interface Props {
   readonly products: Product[];
   readonly categories: Category[];
   readonly onAddItem: (item: AddItemPayload) => void;
+  readonly mesaSeleccionada: boolean;
 }
 
 interface ComplementDialogState {
@@ -135,7 +136,7 @@ function ComplementDialog({ state, onConfirm, onClose }: Readonly<ComplementDial
   );
 }
 
-export function MenuPanel({ products, categories, onAddItem }: Props) {
+export function MenuPanel({ products, categories, onAddItem, mesaSeleccionada }: Props) {
   const [activeCatId, setActiveCatId] = useState<string>(ALL_CAT_ID);
   const [search, setSearch] = useState('');
   const [complementDialog, setComplementDialog] = useState<ComplementDialogState | null>(null);
@@ -224,7 +225,16 @@ export function MenuPanel({ products, categories, onAddItem }: Props) {
       </div>
 
       {/* Product grid */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-4 relative">
+        {!mesaSeleccionada && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#0f1117]/80 backdrop-blur-[2px]">
+            <div className="flex flex-col items-center gap-2 text-center px-6">
+              <span className="text-3xl">🪑</span>
+              <p className="text-sm font-semibold text-[#e8eaf0]">Selecciona una mesa</p>
+              <p className="text-xs text-[#6b7280]">Elige una mesa en el panel izquierdo para añadir productos.</p>
+            </div>
+          </div>
+        )}
         {activeProducts.length === 0 && (
           <p className="text-center text-sm text-[#6b7280] py-12">Sin productos</p>
         )}
