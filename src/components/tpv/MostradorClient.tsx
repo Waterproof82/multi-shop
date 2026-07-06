@@ -24,6 +24,7 @@ interface InitialMesa {
   mesaNumero: number | null;
   mesaName: string | null;
   existingOrders: ExistingOrder[];
+  sesionPagada: boolean;
 }
 
 interface Props {
@@ -31,13 +32,16 @@ interface Props {
   readonly products: Product[];
   readonly categories: Category[];
   readonly initialMesa: InitialMesa | null;
+  readonly tipoImpuesto: 'iva' | 'igic';
+  readonly porcentajeImpuesto: number;
 }
 
-export function MostradorClient({ turno, products, categories, initialMesa }: Props) {
+export function MostradorClient({ turno, products, categories, initialMesa, tipoImpuesto, porcentajeImpuesto }: Props) {
   const { mesa, addItem, removeItem, clearPending, clearMesa, refreshOrders, updatePendingNota } = useMesaActiva(initialMesa);
   const [refreshing, setRefreshing] = useState(false);
   const [yaCobradoCents, setYaCobradoCents] = useState(0);
   const [externalCobro, setExternalCobro] = useState<string | null>(null);
+  const [isSesionPagada, setIsSesionPagada] = useState(initialMesa?.sesionPagada ?? false);
 
   const handleRefresh = useCallback(async () => {
     if (!mesa.sesionId) return;
@@ -96,10 +100,12 @@ export function MostradorClient({ turno, products, categories, initialMesa }: Pr
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'mesa_sesiones', filter: `id=eq.${sesionId}` },
         (payload) => {
-          const row = payload.new as { cerrada_at: string | null };
+          const row = payload.new as { cerrada_at: string | null; sesion_pagada: boolean };
           if (row.cerrada_at) {
             setExternalCobro(`La mesa ${mesaNumero} ha sido cobrada desde otro canal.`);
             clearMesa();
+          } else if (row.sesion_pagada) {
+            setIsSesionPagada(true);
           }
         }
       )
@@ -128,6 +134,9 @@ export function MostradorClient({ turno, products, categories, initialMesa }: Pr
         pendingTotal={mesa.pendingTotal}
         yaCobradoCents={yaCobradoCents}
         turnoId={turno.id}
+        tipoImpuesto={tipoImpuesto}
+        porcentajeImpuesto={porcentajeImpuesto}
+        sesionPagada={isSesionPagada}
         onRemovePending={removeItem}
         onUpdatePendingNota={updatePendingNota}
         onPendingSent={clearPending}

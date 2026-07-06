@@ -283,7 +283,7 @@ export default function KitchenPage() {
       .subscribe();
 
     const broadcastOrders = supabase
-      .channel('waiter-new-order-kitchen')
+      .channel('waiter-new-order')
       .on('broadcast', { event: 'new-order' }, scheduleRefresh)
       .subscribe();
 
