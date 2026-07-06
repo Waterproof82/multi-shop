@@ -55,6 +55,7 @@ export function TicketPanel({
   const router = useRouter();
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [pendingPase, setPendingPase] = useState<'primer' | 'segundo' | 'postre' | 'bebida' | ''>('');
   const [notaExpandida, setNotaExpandida] = useState<string | null>(null); // pedido id expandido
   const [pendingNotaExpandida, setPendingNotaExpandida] = useState<string | null>(null); // pending item key expandido
   const [notasLocal, setNotasLocal] = useState<Record<string, string>>({});
@@ -123,6 +124,11 @@ export function TicketPanel({
               <span className="text-[10px] font-bold text-[#6b7280] uppercase tracking-wider">
                 Pedido #{order.numeroPedido}
                 {getNota(order) && <span className="ml-1.5 text-[#4f72ff]">✎</span>}
+                {order.pase && (
+                  <span className="ml-2 text-[#4f72ff]">
+                    {order.pase === 'primer' ? '1er' : order.pase === 'segundo' ? '2º' : order.pase === 'postre' ? 'Postre' : 'Bebida'}
+                  </span>
+                )}
               </span>
               <span
                 className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
@@ -240,6 +246,24 @@ export function TicketPanel({
           <p className="text-xs text-red-400 text-center">{sendError}</p>
         )}
         {pendingItems.length > 0 && (
+          <div className="flex gap-1 flex-wrap">
+            {(['primer', 'segundo', 'postre', 'bebida'] as const).map(p => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPendingPase(prev => prev === p ? '' : p)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                  pendingPase === p
+                    ? 'bg-[#4f72ff] border-[#4f72ff] text-white'
+                    : 'border-[#2e3347] text-[#6b7280] hover:text-white hover:border-[#4f72ff]'
+                }`}
+              >
+                {p === 'primer' ? '1er pase' : p === 'segundo' ? '2º pase' : p === 'postre' ? 'Postre' : 'Bebida'}
+              </button>
+            ))}
+          </div>
+        )}
+        {pendingItems.length > 0 && (
           <textarea
             rows={2}
             maxLength={500}
@@ -277,6 +301,7 @@ export function TicketPanel({
                       ...(i.nota ? { nota: i.nota } : {}),
                     })),
                     nota: pendingNota || undefined,
+                    pase: pendingPase || undefined,
                   }),
                 });
                 if (!res.ok) {
@@ -286,6 +311,7 @@ export function TicketPanel({
                   const json = await res.json() as { sesionId?: string | null };
                   onPendingSent();
                   setPendingNota('');
+                  setPendingPase('');
                   // If the mesa had no session yet, navigate to include the new sesionId in the URL
                   if (!sesionId && json.sesionId && mesaId) {
                     const params = new URLSearchParams({ mesaId, mesaNumero: String(mesaNumero ?? ''), sesionId: json.sesionId });
