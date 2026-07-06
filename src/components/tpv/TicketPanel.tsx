@@ -105,7 +105,7 @@ export function TicketPanel({
       <div className="flex-1 overflow-y-auto py-2">
         {!hasContent && (
           <p className="px-4 py-8 text-center text-sm text-[#6b7280]">
-            Seleccioná una mesa para ver el ticket
+            Selecciona una mesa para ver el ticket
           </p>
         )}
 

@@ -50,7 +50,7 @@ export default async function TurnoCerrarPage() {
           <span className="text-xs font-bold text-[#ef4444] uppercase tracking-wider">Cierre de Caja</span>
           <h1 className="text-2xl font-bold">Arqueo final</h1>
           <p className="text-sm text-[#6b7280] leading-relaxed">
-            Contá el efectivo en la caja. El sistema calculará la diferencia.
+            Cuenta el efectivo en la caja. El sistema calculará la diferencia.
           </p>
         </div>
         <TurnoCerrarForm turno={turno} stats={stats} mesasAbiertas={mesasAbiertas} />

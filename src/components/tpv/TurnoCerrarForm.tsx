@@ -170,7 +170,7 @@ export function TurnoCerrarForm({ turno, stats, mesasAbiertas }: Props) {
             ))}
           </ul>
           <p className="text-xs text-[#f97316]/70 mt-1">
-            Cerrá o cobrá todas las mesas antes de cerrar el turno.
+            Cierra o cobra todas las mesas antes de cerrar el turno.
           </p>
         </div>
       )}
