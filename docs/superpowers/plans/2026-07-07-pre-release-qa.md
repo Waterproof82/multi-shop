@@ -2,516 +2,594 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ejecutar el smoke-test completo de operador antes de empaquetar con Electron/Capacitor y confirmar que el sistema esta listo para produccion.
+**Goal:** Verificar que el sistema esta listo para packaging ejecutando QA en tres fases: filtro web rapido, luego QA nativo de cada plataforma (Electron para TPV, Capacitor para waiter).
 
-**Architecture:** QA manual organizado en 6 sesiones de trabajo. Cada sesion cubre bloques funcionales del spec (`docs/superpowers/specs/2026-07-07-pre-release-qa-design.md`). Al final de cada sesion se hace commit del resultado. Si algun check critico falla, se abre un issue y se bloquea el packaging hasta resolverlo.
+**Architecture:**
+- **Fase 1 (Web):** filtro funcional en navegador — detecta el 90% de bugs antes de empaquetar. Cubre admin, TPV y waiter en browser. Si falla algo critico, se corrige antes de seguir.
+- **Fase 2 (Electron):** QA nativo del TPV en Windows. Verifica solo lo que el browser no puede: ventana, shortcuts, instalador, auto-update.
+- **Fase 3 (Capacitor):** QA nativo del waiter en Android/PDA. Verifica: cookie SameSite, persistencia de sesion, bridge, offline.
 
-**Tech Stack:** Next.js 15 (pnpm build/start), Supabase, APK Android instalada en PDA, DevTools Chrome/Chromium.
+**Tech Stack:** Next.js 15 (pnpm build/start), Supabase, Electron (Windows), APK Android en PDA, DevTools Chrome/Chromium.
 
 ---
 
 ## Datos de prueba necesarios (preparar antes de empezar)
 
-Tener listos en Supabase (o en la empresa de prueba):
+Tener listos en Supabase (empresa de prueba):
 
-- **Admin completo**: credenciales de un usuario con `rol = 'admin'`
-- **Cajero**: credenciales de un usuario con `rol = 'cajero'`
-- **Encargado**: credenciales de un usuario con `rol = 'encargado'`
-- **Waiter PIN**: PIN de un camarero activo en la empresa de prueba
-- **Productos con receta**: al menos 1 producto con ingredientes y cantidades configuradas en `/admin/stock/recetas`
+- **Admin**: credenciales con `rol = 'admin'`
+- **Cajero**: credenciales con `rol = 'cajero'`
+- **Encargado**: credenciales con `rol = 'encargado'`
+- **Waiter PIN**: PIN de un camarero activo
+- **Producto con receta**: al menos 1 producto con ingredientes configurados en `/admin/stock/recetas`
 - **Ingrediente con umbral**: al menos 1 ingrediente con `umbral_alerta > 0` y `cantidad_actual` cerca del umbral
-- **Mesa activa**: al menos 2 mesas configuradas en la empresa de prueba
+- **Mesas**: al menos 2 mesas configuradas
+
+---
+
+# FASE 1 — QA Web (filtro funcional)
+
+> Entorno: `pnpm build && pnpm start`, navegador desktop.
+> Objetivo: detectar bugs funcionales antes de empaquetar cualquier plataforma.
+> Criterio de salida: 0 fallos criticos en Bloques 0-1; 0 fallos criticos en flujos core (Bloques 2-7).
 
 ---
 
 ## Sesion 1 — Infraestructura y Autenticacion (Bloques 0 y 1)
 
-**Duracion estimada:** 20-30 min
-**Entorno:** Navegador (pnpm start) + APK
-
 ### Task 1: Preparar el entorno
 
-**Files:**
-- No se modifica ningun archivo — solo setup
-
-- [ ] **Step 1: Lint y build**
+- [ ] **Step 1: Lint**
 
 ```bash
-cd multi_shop
 pnpm lint
 ```
 
-Esperado: 0 errores. Si hay errores, resolverlos antes de continuar.
+Esperado: `EXIT:0`, 0 errores.
+
+- [ ] **Step 2: Build**
 
 ```bash
 pnpm build
 ```
 
-Esperado: build completo. Ignorar "Skipping validation of types". Si hay errores de compilacion, resolverlos antes de continuar.
+Esperado: build completo. Ignorar warnings de `baseline-browser-mapping`. Si hay errores de compilacion, resolverlos antes de continuar.
 
-- [ ] **Step 2: Levantar servidor de produccion**
+- [ ] **Step 3: Levantar servidor**
 
 ```bash
 pnpm start
 ```
 
-Esperado: `ready - started server on 0.0.0.0:3000`
-
-- [ ] **Step 3: Verificar servidor**
-
-Abrir `http://localhost:3000/admin/login` en Chrome. Debe mostrar el formulario de login sin errores de red en consola.
-
-- [ ] **Step 4: Instalar APK en PDA**
-
-```
-adb install -r waiter-N.apk
-```
-
-O instalar manualmente desde el gestor de archivos. Abrir la app y verificar que carga sin crash.
-
-- [ ] **Step 5: Verificar Capacitor bridge**
-
-En la WebView del PDA, navegar a `/waiter`. Abrir DevTools remoto (`chrome://inspect`). Verificar que la consola no muestra errores de `CapacitorBridge` ni `Failed to load`.
-
-- [ ] **Step 6: Commit estado inicial**
-
-```bash
-# No hay cambios de codigo — solo verificar que el entorno esta OK
-# Si hubo fixes de lint/build en Step 1, commitearlos antes de continuar
-git status
-```
+Abrir `http://localhost:3000/admin/login`. Debe mostrar el formulario sin errores de red en consola.
 
 ---
 
-### Task 2: Verificar autenticacion admin y RBAC
+### Task 2: Autenticacion y RBAC
 
 - [ ] **Step 1: Login admin**
 
-Navegar a `http://localhost:3000/admin/login`. Introducir credenciales del admin. Esperado: redirige a `/admin`. La cookie `admin_token` debe estar presente en DevTools → Application → Cookies.
+Navegar a `/admin/login`. Credenciales admin → redirige a `/admin`. Cookie `admin_token` presente en DevTools → Application → Cookies.
 
-- [ ] **Step 2: Logout admin**
+- [ ] **Step 2: Logout**
 
-Hacer click en "Cerrar sesion". Esperado: redirige a `/admin/login`. Cookie `admin_token` eliminada.
+Cerrar sesion → redirige a `/admin/login`. Cookie `admin_token` eliminada.
 
 - [ ] **Step 3: Acceso sin sesion**
 
-Navegar directamente a `http://localhost:3000/admin`. Esperado: redirige a `/admin/login`.
+Navegar directamente a `/admin` → redirige a `/admin/login`.
 
 - [ ] **Step 4: Login superadmin**
 
-Introducir credenciales de superadmin. Esperado: redirige a `/superadmin`, lista de empresas visible.
+Credenciales superadmin → redirige a `/superadmin`, lista de empresas visible.
 
 - [ ] **Step 5: Login cajero**
 
-Iniciar sesion con el usuario `rol = 'cajero'`. Esperado: redirige a `/tpv`, NO a `/admin`. El sidebar no muestra opciones de backoffice.
+Credenciales cajero → redirige a `/tpv`, NO a `/admin`. Sidebar sin opciones de backoffice.
 
 - [ ] **Step 6: Cajero bloqueado en admin**
 
-Con la sesion de cajero activa, navegar a `http://localhost:3000/admin`. Esperado: redirige a `/admin/login` o devuelve 403. Navegar a `http://localhost:3000/admin/stock`. Esperado: idem.
+Con sesion cajero, navegar a `/admin` → redirige o 403. Navegar a `/admin/stock` → idem.
 
 - [ ] **Step 7: Login encargado**
 
-Iniciar sesion con el usuario `rol = 'encargado'`. Esperado: accede a `/admin`. Verificar que ve Stock y Analytics en el sidebar pero NO ve "Configuracion de empresa" ni "Empleados".
+Credenciales encargado → accede a `/admin`. Ve Stock y Analytics en sidebar. NO ve "Configuracion de empresa" ni gestion de empleados.
 
-- [ ] **Step 8: Login waiter PIN en navegador**
+- [ ] **Step 8: Encargado puede cerrar turno**
 
-Navegar a `http://localhost:3000/waiter`. Debe mostrar el formulario de PIN. Introducir PIN correcto. Esperado: redirige a la grilla de mesas.
+Con sesion encargado activa, navegar a `/tpv`. Si hay turno abierto, verificar que el boton "Cerrar turno" es accesible. (No hace falta cerrarlo — solo confirmar que no esta bloqueado.)
 
-- [ ] **Step 9: PIN incorrecto**
+- [ ] **Step 9: Login waiter PIN**
 
-En el formulario PIN, introducir un PIN erroneo. Esperado: mensaje de error visible, sin crash.
+Navegar a `/waiter` → formulario PIN. PIN correcto → grilla de mesas. PIN incorrecto → error visible, sin crash.
 
-- [ ] **Step 10: Verificar cookie waiter SameSite**
+- [ ] **Step 10: Cookie waiter SameSite**
 
-Con sesion waiter activa, abrir DevTools → Application → Cookies → `localhost`. Buscar `waiter_token`. Verificar que `SameSite` es `Lax`.
+Con sesion waiter activa, DevTools → Application → Cookies → buscar `waiter_token`. Verificar que `SameSite = Lax`.
 
-- [ ] **Step 11: Sesion waiter en APK**
+- [ ] **Step 11: Commit resultados Sesion 1**
 
-En el PDA, abrir la app. Si ya habia sesion activa (del setup), debe mostrar la grilla de mesas directamente — NO el formulario PIN. Verificar que el spinner de `isCheckingAuth` aparece brevemente antes de la grilla (sin flash de PIN).
-
-- [ ] **Step 12: Persistencia tras kill**
-
-En el PDA, matar la app desde el gestor de aplicaciones recientes. Reabrir. Esperado: sesion intacta, grilla de mesas directamente.
-
-- [ ] **Step 13: Anotar resultados**
-
-En `docs/superpowers/specs/2026-07-07-pre-release-qa-design.md`, marcar con `[x]` los items que pasaron y con `[!]` los que fallaron (anotar el sintoma junto al `[!]`).
-
-- [ ] **Step 14: Commit resultados Sesion 1**
+Marcar en `docs/superpowers/specs/2026-07-07-pre-release-qa-design.md` los Bloques 0 y 1 con `[x]` o `[!]`.
 
 ```bash
 git add docs/superpowers/specs/2026-07-07-pre-release-qa-design.md
-git commit -m "qa: sesion 1 — infraestructura y autenticacion"
+git commit -m "qa(web): sesion 1 — infraestructura y autenticacion"
 ```
 
 ---
 
-## Sesion 2 — TPV y Waiter/Mesas (Bloques 2 y 3)
+## Sesion 2 — TPV y Waiter (Bloques 2 y 3)
 
-**Duracion estimada:** 30-40 min
-**Entorno:** Navegador (pnpm start)
+### Task 3: Flujo completo de turno TPV
 
-### Task 3: Flujo completo de turno de caja
+- [ ] **Step 1: Abrir turno**
 
-- [ ] **Step 1: Iniciar sesion como admin o encargado**
+Login admin o encargado. Navegar a `/tpv`. Si no hay turno, "Abrir turno" → completar y confirmar. Verificar nombre del operador y hora de apertura visible.
 
-Navegar a `http://localhost:3000/tpv`. Si no hay turno activo, debe mostrar la pantalla "Abrir turno".
+```sql
+-- Verificar en Supabase:
+SELECT estado, operador_nombre, abierto_at FROM tpv_turnos ORDER BY created_at DESC LIMIT 1;
+```
 
-- [ ] **Step 2: Abrir turno**
+Esperado: `estado = 'abierto'`.
 
-Hacer click en "Abrir turno". Introducir los datos requeridos. Confirmar. Esperado: el TPV muestra la pantalla principal con nombre del operador y hora de apertura. Verificar en Supabase que hay un registro en `tpv_turnos` con `estado = 'abierto'`.
+- [ ] **Step 2: Pedido con pase**
 
-- [ ] **Step 3: Crear pedido en mostrador**
+Seleccionar una mesa en el mostrador. Anadir 2 productos. Seleccionar "1er pase". Enviar pedido.
 
-Seleccionar una mesa. Anadir al menos 2 productos al ticket. Esperado: productos aparecen en la lista de pendientes del ticket.
+```sql
+SELECT pase FROM pedidos ORDER BY created_at DESC LIMIT 1;
+```
 
-- [ ] **Step 4: Selector de pase**
+Esperado: `pase = 'primer'`.
 
-Con items en el ticket, verificar que aparecen los botones "1er pase", "2 pase", "Postre", "Bebida". Seleccionar "1er pase". Esperado: boton queda activo (resaltado).
+- [ ] **Step 3: Pedido sin pase**
 
-- [ ] **Step 5: Enviar pedido con pase**
+Nuevo pedido, sin seleccionar pase. Enviar.
 
-Hacer click en "Enviar pedido". Verificar en Supabase (`SELECT pase FROM pedidos ORDER BY created_at DESC LIMIT 1`) que el campo `pase` es `'primer'`.
+```sql
+SELECT pase FROM pedidos ORDER BY created_at DESC LIMIT 1;
+```
 
-- [ ] **Step 6: Enviar pedido sin pase**
+Esperado: `pase = NULL`.
 
-Crear otro pedido sin seleccionar pase. Enviar. Verificar en Supabase que `pase` es `NULL`.
+- [ ] **Step 4: Arqueo ciego — vacio**
 
-- [ ] **Step 7: Arqueo ciego — campo vacio**
+Navegar a "Cerrar turno". Campo de conteo vacio → total teorico debe mostrar `—`.
 
-Navegar a "Cerrar turno". En el formulario, el campo de conteo de efectivo debe estar vacio. Verificar que el total teorico aparece como `—` (no como un numero).
+- [ ] **Step 5: Arqueo ciego — relleno**
 
-- [ ] **Step 8: Arqueo ciego — campo relleno**
+Introducir una cifra (ej: `150`). El total teorico se revela y aparece la diferencia.
 
-Introducir una cifra en el campo de conteo (por ejemplo, `100`). Verificar que el total teorico se revela y aparece la diferencia calculada.
+- [ ] **Step 6: Cerrar turno**
 
-- [ ] **Step 9: Cerrar turno**
+Completar el formulario y confirmar.
 
-Completar el formulario y confirmar el cierre. Esperado: turno cerrado, `/tpv` vuelve a mostrar la pantalla "Abrir turno". Verificar en Supabase que el registro en `tpv_turnos` tiene `estado = 'cerrado'`.
+```sql
+SELECT estado FROM tpv_turnos ORDER BY created_at DESC LIMIT 1;
+```
 
-- [ ] **Step 10: RBAC cajero — abrir turno**
+Esperado: `estado = 'cerrado'`. `/tpv` muestra pantalla "Abrir turno".
 
-Iniciar sesion como cajero. Navegar a `/tpv`. Verificar que puede abrir turno.
+- [ ] **Step 7: RBAC cajero — abrir turno**
+
+Login cajero → navegar a `/tpv` → verificar que puede abrir turno sin bloqueo.
 
 ### Task 4: Waiter — mesas y pedidos
 
-- [ ] **Step 1: Login waiter**
+- [ ] **Step 1: Grilla de mesas**
 
-Navegar a `http://localhost:3000/waiter`. Introducir PIN. Grilla de mesas visible.
+Login waiter PIN → grilla de mesas con estado correcto (libre/ocupada).
 
-- [ ] **Step 2: Estado de mesas**
+- [ ] **Step 2: Crear pedido desde waiter**
 
-Verificar que las mesas muestran su estado correcto (libre / ocupada). Las ocupadas deben mostrar badge con numero de items.
+Seleccionar mesa libre → anadir pedido → enviar. Verificar en `/waiter/pendientes` que aparece en `pendiente_validacion`.
 
-- [ ] **Step 3: Crear pedido desde waiter**
+- [ ] **Step 3: Validar pedido**
 
-Seleccionar una mesa libre. Anadir un pedido. Enviar. Esperado: pedido aparece en `/waiter/pendientes` con estado `pendiente_validacion`.
+En pendientes, seleccionar pedido y validar sin pausar items. Pedido desaparece de pendientes no validados.
 
-- [ ] **Step 4: Validar pedido**
+- [ ] **Step 4: Pausar y liberar item**
 
-En `/waiter/pendientes`, seleccionar el pedido. Hacer click en validar (sin pausar nada). Esperado: pedido pasa a cocina, desaparece de pendientes sin validar.
+Crear pedido nuevo. En validacion, pausar 1 item. Confirmar. Verificar: badge de retenidos en banner visible, item NO aparece en `/waiter/kitchen`. Luego liberar el item desde el banner → aparece en kitchen.
 
-- [ ] **Step 5: Pausar item (retener)**
+- [ ] **Step 5: Commit Sesion 2**
 
-Crear otro pedido. En el formulario de validacion, pausar al menos 1 item. Validar. Esperado: el item pausado aparece como retenido (badge en banner superior con icono pausa + numero). El item NO aparece en `/waiter/kitchen`.
-
-- [ ] **Step 6: Liberar item retenido**
-
-Desde el banner o la lista de retenidos, liberar el item pausado. Esperado: el item aparece ahora en `/waiter/kitchen`.
-
-- [ ] **Step 7: Anotar resultados Sesion 2**
-
-Marcar items en el spec con `[x]` o `[!]`.
-
-- [ ] **Step 8: Commit**
+Marcar Bloques 2 y 3 en el spec.
 
 ```bash
 git add docs/superpowers/specs/2026-07-07-pre-release-qa-design.md
-git commit -m "qa: sesion 2 — tpv turno y waiter mesas"
+git commit -m "qa(web): sesion 2 — tpv y waiter mesas"
 ```
 
 ---
 
 ## Sesion 3 — Cocina, Bar y Realtime (Bloques 4 y 5)
 
-**Duracion estimada:** 25-35 min
-**Entorno:** Dos ventanas/dispositivos con sesion waiter activa
-
 ### Task 5: Cocina y Bar
 
-- [ ] **Step 1: Verificar pedido en kitchen**
+Abrir DOS ventanas: una con `/waiter/kitchen`, otra con el mostrador o mesas.
 
-Navegar a `http://localhost:3000/waiter/kitchen`. Verificar que el pedido validado en Sesion 2 aparece aqui. Los pedidos en `pendiente_validacion` NO deben aparecer.
+- [ ] **Step 1: Pedido validado aparece en kitchen**
+
+Confirmar que el pedido validado en Sesion 2 aparece en `/waiter/kitchen`. Items en `pendiente_validacion` NO deben aparecer.
 
 - [ ] **Step 2: Agrupacion por pase**
 
-Si hay pedidos con pase asignado, verificar que el KDS muestra secciones separadas: "1er Pase", etc. Si todos los pedidos son sin pase, crear uno con pase desde el mostrador TPV, validarlo, y verificar la agrupacion en kitchen.
+Verificar que el pedido con pase `'primer'` aparece en seccion "1er Pase". Items sin pase en "Sin pase". Si todos los pedidos son sin pase, crear uno con pase desde el mostrador, validarlo y verificar agrupacion.
 
 - [ ] **Step 3: Item retenido no visible**
 
-Verificar que el item retenido de la Sesion 2 NO aparece en kitchen (hasta que se libere).
+Confirmar que el item pausado en Sesion 2 NO aparece en kitchen hasta liberarlo.
 
-- [ ] **Step 4: Marcar item preparado**
+- [ ] **Step 4: Marcar preparado**
 
-En kitchen, hacer click en un item para marcarlo como preparado. Esperado: item desaparece de "Nuevos" y aparece en "Listos". El badge de "listos para servir" aparece en el banner del waiter.
+Marcar un item como preparado en kitchen → desaparece de "Nuevos", aparece en "Listos". Badge de "listos para servir" aparece en el banner waiter.
 
 - [ ] **Step 5: Bar — bebidas**
 
-Navegar a `http://localhost:3000/waiter/bar`. Verificar que solo aparecen items de categorias con `tipo_producto = 'bebida'`. Marcar una bebida como lista. Verificar que el badge del icono de bebidas en el banner se actualiza.
-
-- [ ] **Step 6: Items servidos no visibles**
-
-Una vez servido un item desde el ticket de mesa, verificar que no reaparece en kitchen ni bar.
+En `/waiter/bar`, solo items de categorias `tipo_producto = 'bebida'`. Marcar bebida como lista → badge de bebidas en banner se actualiza.
 
 ### Task 6: Realtime
 
-Para este bloque, abrir DOS ventanas: una con `/waiter/kitchen` y otra con la vista de mesas o el mostrador TPV.
+- [ ] **Step 1: Update en kitchen sin reload**
 
-- [ ] **Step 1: Update en tiempo real — kitchen**
+En la segunda ventana crear y validar un pedido nuevo. En `/waiter/kitchen` debe aparecer en menos de 3 segundos sin recargar.
 
-En la segunda ventana, crear un pedido nuevo y validarlo. En la primera ventana (`/waiter/kitchen`), verificar que el pedido aparece SIN recargar la pagina. Tiempo maximo de aparicion esperado: 2-3 segundos.
+- [ ] **Step 2: Badge waiter sin reload**
 
-- [ ] **Step 2: Update en tiempo real — banner waiter**
+Marcar item preparado en kitchen → badge del banner waiter en la otra ventana se actualiza solo.
 
-Marcar un item como preparado en kitchen. En la ventana de mesas, verificar que el badge del banner se actualiza sin recargar.
+- [ ] **Step 3: Dos ventanas simultaneas**
 
-- [ ] **Step 3: Llamada de mesa**
+Abrir `/waiter/kitchen` en dos pestanas. Marcar item en una → desaparece en la otra sin recargar.
 
-Desde la vista del cliente (o simulando la llamada en Supabase: `UPDATE mesa_sesiones SET llamada_activa = true WHERE id = '...'`), verificar que el badge de llamadas del banner waiter se actualiza en tiempo real.
+- [ ] **Step 4: Inactividad 5 min**
 
-- [ ] **Step 4: Dos dispositivos**
+Dejar ambas ventanas abiertas 5-10 min sin interaccion. Crear pedido → update llega sin recargar (WebSocket no se cierra silenciosamente).
 
-Abrir `/waiter/kitchen` en el PDA y en el navegador desktop. Marcar un item en el desktop. Verificar que desaparece en el PDA sin recargar. Idem en sentido inverso.
+- [ ] **Step 5: Commit Sesion 3**
 
-- [ ] **Step 5: Inactividad prolongada**
-
-Dejar ambas ventanas abiertas 5-10 minutos sin interaccion. Luego crear un pedido. Verificar que el update llega sin necesidad de recargar (el WebSocket de Supabase no se cierra silenciosamente).
-
-- [ ] **Step 6: Anotar resultados Sesion 3**
-
-Marcar items en el spec.
-
-- [ ] **Step 7: Commit**
+Marcar Bloques 4 y 5 en el spec.
 
 ```bash
 git add docs/superpowers/specs/2026-07-07-pre-release-qa-design.md
-git commit -m "qa: sesion 3 — cocina bar y realtime"
+git commit -m "qa(web): sesion 3 — cocina bar y realtime"
 ```
 
 ---
 
 ## Sesion 4 — Cobro y Stock (Bloques 6 y 7)
 
-**Duracion estimada:** 30-40 min
-**Entorno:** Navegador (pnpm start) + acceso a Supabase SQL Editor
-
 ### Task 7: Cobro y cierre de mesa
 
-- [ ] **Step 1: Acceder al ticket de mesa**
+- [ ] **Step 1: Ticket de mesa**
 
-Desde la grilla de mesas waiter, seleccionar una mesa con pedidos. Navegar al ticket. Verificar que todos los pedidos de la mesa son visibles con sus items.
+Desde la grilla waiter, seleccionar mesa con pedidos. Ticket muestra todos los pedidos.
 
-- [ ] **Step 2: Boton servir bloqueado**
+- [ ] **Step 2: Bloqueo de cobro**
 
-Si hay items en estado `en_preparacion` o `pendiente`, verificar que el boton de cobro esta bloqueado (`hasPlatosPoServir`). El mensaje de bloqueo debe ser claro.
+Si hay items no servidos, el boton de cobro debe estar bloqueado. Mensaje claro.
 
 - [ ] **Step 3: Servir items**
 
-Marcar todos los items como servidos desde el ticket. Esperado: boton de cobro se desbloquea.
+Marcar todos como servidos → boton de cobro se desbloquea.
 
 - [ ] **Step 4: Propina**
 
-Introducir una propina en euros. Verificar que el total se actualiza sumando la propina.
+Introducir propina → total se actualiza.
 
 - [ ] **Step 5: Cobro efectivo**
 
-Seleccionar "Efectivo". Introducir el importe. Confirmar. Esperado: sesion de mesa cerrada, mesa vuelve a estado libre en la grilla.
+Seleccionar "Efectivo" → confirmar → sesion de mesa cerrada. Mesa vuelve a libre en la grilla.
 
 - [ ] **Step 6: Cobro tarjeta**
 
-Repetir el flujo completo con otra mesa y seleccionar "Tarjeta". Verificar que el redirect de Redsys se inicia sin error 500. (No es necesario completar el pago real — verificar solo que el redirect ocurre correctamente.)
+Repetir con otra mesa. Seleccionar "Tarjeta" → verificar que el redirect Redsys se inicia sin error 500.
 
 ### Task 8: Stock
 
 - [ ] **Step 1: CRUD ingredientes**
 
-Navegar a `http://localhost:3000/admin/stock/ingredientes`. Crear un ingrediente nuevo. Editar su nombre y umbral. Verificar que aparece en la lista. Eliminarlo. Verificar que desaparece.
+`/admin/stock/ingredientes`: crear → editar nombre y umbral → verificar en lista → eliminar.
 
 - [ ] **Step 2: Recetas**
 
-Navegar a `/admin/stock/recetas`. Seleccionar un producto. Asignar ingredientes con cantidades. Guardar. Verificar que la receta se muestra correctamente.
+`/admin/stock/recetas`: seleccionar producto → asignar ingredientes con cantidades → guardar → verificar que se muestra.
 
 - [ ] **Step 3: Mermas**
 
-Navegar a `/admin/stock/mermas`. Registrar una merma para un ingrediente. Verificar que aparece en `/admin/stock/movimientos` con tipo `merma`.
+`/admin/stock/mermas`: registrar merma. Verificar en `/admin/stock/movimientos` que aparece con tipo `merma`.
 
 - [ ] **Step 4: Deduccion automatica**
 
-Antes del test, anotar el `cantidad_actual` del ingrediente con receta configurada:
+Anotar `cantidad_actual` antes:
 
 ```sql
 SELECT nombre, cantidad_actual FROM ingredientes WHERE nombre = 'nombre_del_ingrediente';
 ```
 
-Crear un pedido con ese producto en el TPV, enviarlo a cocina, marcarlo como servido. Luego verificar:
+Crear pedido con ese producto en el TPV → enviar a cocina → marcar como servido. Verificar despues:
 
 ```sql
 SELECT nombre, cantidad_actual FROM ingredientes WHERE nombre = 'nombre_del_ingrediente';
 ```
 
-Esperado: `cantidad_actual` decrementado segun la cantidad de la receta.
+Esperado: `cantidad_actual` decrementado segun la receta.
 
 - [ ] **Step 5: Badge de stock bajo**
 
-Si el ingrediente cayo bajo `umbral_alerta`, verificar que el badge de stock bajo aparece en el header del TPV (`TpvHeader` y `CobroMetodoPropina`).
+Si el ingrediente quedo bajo `umbral_alerta`, badge de stock bajo visible en header TPV.
 
 - [ ] **Step 6: Inventario fisico**
 
-Navegar a `/admin/stock/inventario`. Verificar que aparecen todos los ingredientes con inputs. Introducir cantidades para 2-3 ingredientes. Hacer click en "Revisar desviaciones". Verificar que las desviaciones se muestran correctamente. Confirmar. Verificar en Supabase:
+`/admin/stock/inventario`: introducir cantidades para 2-3 ingredientes → revisar desviaciones → confirmar.
 
 ```sql
-SELECT * FROM movimientos_stock WHERE tipo = 'inventario' ORDER BY created_at DESC LIMIT 5;
+SELECT tipo, cantidad, created_at FROM movimientos_stock WHERE tipo = 'inventario' ORDER BY created_at DESC LIMIT 5;
 ```
 
-Esperado: filas con tipo `inventario` para los ingredientes modificados.
+Esperado: filas con tipo `inventario`.
 
-- [ ] **Step 7: Anotar resultados Sesion 4**
+- [ ] **Step 7: Commit Sesion 4**
 
-Marcar items en el spec.
-
-- [ ] **Step 8: Commit**
+Marcar Bloques 6 y 7 en el spec.
 
 ```bash
 git add docs/superpowers/specs/2026-07-07-pre-release-qa-design.md
-git commit -m "qa: sesion 4 — cobro y stock"
+git commit -m "qa(web): sesion 4 — cobro y stock"
 ```
 
 ---
 
-## Sesion 5 — Admin, Analytics, PWA y Capacitor (Bloques 8 y 9)
-
-**Duracion estimada:** 25-35 min
-**Entorno:** Navegador (pnpm start) + PDA con APK
+## Sesion 5 — Admin, Analytics y PWA (Bloques 8 y 9-parcial)
 
 ### Task 9: Admin y Analytics
 
 - [ ] **Step 1: CRUD productos**
 
-Navegar a `/admin/productos`. Crear un producto nuevo con imagen. Editar su nombre. Verificar que aparece en la carta publica. Eliminarlo.
+`/admin/productos`: crear con imagen → editar nombre → verificar en lista → eliminar.
 
-- [ ] **Step 2: Categorias — tipo producto**
+- [ ] **Step 2: Categorias tipo producto**
 
-Navegar a `/admin/categorias`. Cambiar el tipo de una categoria de "comida" a "bebida". Verificar que los productos de esa categoria ahora aparecen en la vista de bar (`/waiter/bar`) y no en kitchen. Revertir el cambio.
+`/admin/categorias`: cambiar tipo de una categoria de "comida" a "bebida" → los productos de esa categoria aparecen en `/waiter/bar`. Revertir.
 
-- [ ] **Step 3: TPV Analytics — carga**
+- [ ] **Step 3: TPV Analytics**
 
-Navegar a `/tpv/analytics`. Verificar que los KPIs cargan (ventas, covers, ticket medio). Si no hay datos del dia, cambiar el selector a "Esta semana" o "Este mes".
+`/tpv/analytics`: KPIs cargan. Si no hay datos hoy, cambiar selector a "Esta semana". Grafico de horas se renderiza sin error. Top productos e historial visibles.
 
-- [ ] **Step 4: TPV Analytics — grafico**
+- [ ] **Step 4: Historial de turnos**
 
-Verificar que el grafico de ventas por hora se renderiza sin errores de consola. (Recharts se carga con `dynamic()` — verificar que no hay flash de "loading" permanente.)
+`/tpv/historial`: turnos cerrados anteriores visibles con totales.
 
-- [ ] **Step 5: Historial de turnos**
+- [ ] **Step 5: Cajero bloqueado en admin**
 
-Navegar a `/tpv/historial`. Verificar que aparecen los turnos cerrados en sesiones anteriores.
+Login cajero → navegar a `/admin` → bloqueado.
 
-- [ ] **Step 6: Cajero bloqueado en admin**
+### Task 10: Service Worker (PWA — browser)
 
-Iniciar sesion como cajero. Intentar navegar a `/admin`. Esperado: bloqueado (403 o redirect a login TPV).
+- [ ] **Step 1: SW registrado**
 
-### Task 10: PWA — Service Worker
+DevTools → Application → Service Workers: SW activo con scope `/waiter`.
 
-- [ ] **Step 1: Verificar registro del SW**
+- [ ] **Step 2: Offline**
 
-Con el servidor en `pnpm start` (produccion), abrir DevTools → Application → Service Workers. Verificar que hay un SW activo con scope `/waiter`.
-
-- [ ] **Step 2: Offline — waiter**
-
-Con el SW activo, ir a DevTools → Network → marcar "Offline". Navegar a `http://localhost:3000/waiter`. Esperado: se muestra la pagina offline (`/waiter/offline`), no una pantalla en blanco.
+DevTools → Network → marcar Offline → navegar a `/waiter` → pagina offline visible (no pantalla en blanco).
 
 - [ ] **Step 3: API no cacheada**
 
-Desmarcar "Offline". En DevTools → Network, verificar que los requests a `/api/*` NO muestran "from ServiceWorker" (son siempre NetworkOnly).
+Desmarcar Offline → verificar en Network que requests a `/api/*` NO muestran "from ServiceWorker".
 
-- [ ] **Step 4: Reconexion**
+- [ ] **Step 4: Commit Sesion 5**
 
-Volver a marcar Online. Navegar en la app. Verificar que todo funciona normalmente sin recargar manualmente.
-
-### Task 11: Capacitor — checks especificos del PDA
-
-- [ ] **Step 1: Apertura directa con sesion**
-
-Con sesion previa activa en el PDA, abrir la app. Verificar que va directamente a la grilla de mesas sin mostrar PIN (spinner breve, luego grilla).
-
-- [ ] **Step 2: Kill y persistencia**
-
-Matar la app. Reabrir. Sesion intacta.
-
-- [ ] **Step 3: Borrar datos**
-
-En Ajustes → Apps → [nombre app] → Borrar datos. Reabrir la app. Debe mostrar el formulario PIN (sesion limpia).
-
-- [ ] **Step 4: Check de version**
-
-Verificar que la app no muestra un error al checkear la version (aunque no haya una actualizacion disponible, no debe crashear).
-
-- [ ] **Step 5: Offline en APK**
-
-En el PDA, desactivar WiFi y datos. Abrir la app. Esperado: muestra la pagina offline, no pantalla en blanco.
-
-- [ ] **Step 6: Reconexion en APK**
-
-Reactivar WiFi. La app debe recuperar estado sin crash.
-
-- [ ] **Step 7: Anotar resultados Sesion 5**
-
-Marcar todos los items restantes del spec con `[x]` o `[!]`.
-
-- [ ] **Step 8: Commit**
+Marcar Bloques 8 y 9 (parcial) en el spec.
 
 ```bash
 git add docs/superpowers/specs/2026-07-07-pre-release-qa-design.md
-git commit -m "qa: sesion 5 — admin analytics pwa capacitor"
+git commit -m "qa(web): sesion 5 — admin analytics y pwa"
 ```
 
 ---
 
-## Sesion 6 — Decision Go / No-Go
+## Decision Go / No-Go — Fase 1
 
-### Task 12: Evaluar resultados y decidir
+### Task 11: Evaluar resultados web
 
-- [ ] **Step 1: Contar fallos**
+- [ ] **Step 1: Contar fallos por bloque**
 
-Abrir `docs/superpowers/specs/2026-07-07-pre-release-qa-design.md`. Contar items marcados con `[!]` por bloque.
+Abrir el spec y contar items `[!]` por bloque.
 
-- [ ] **Step 2: Aplicar criterio de paso**
+- [ ] **Step 2: Criterio**
 
-Del spec:
-- Bloque 0 y 1 (infraestructura + autenticacion): **0 fallos tolerados**. Cualquier fallo bloquea.
-- Bloques 2-6 (flujos core de negocio): **0 fallos criticos** (crash, dato incorrecto, flujo bloqueado).
-- Bloques 7-9 (stock, admin, PWA, Capacitor): se admite **1 fallo menor por bloque** si no bloquea el flujo principal.
+- Bloques 0-1 (infraestructura + auth): **0 fallos tolerados**
+- Bloques 2-7 (flujos core): **0 fallos criticos** (crash, dato incorrecto, flujo bloqueado)
+- Bloques 8-9 (admin, analytics, PWA): se admite 1 fallo menor si no bloquea el flujo principal
 
-- [ ] **Step 3a: Si GO**
+- [ ] **Step 3a: Si NO-GO web**
+
+Abrir tarea por cada `[!]` critico con: sintoma, bloque/step, reproduccion minima. Resolver y re-ejecutar solo los bloques afectados.
+
+- [ ] **Step 3b: Si GO web**
+
+```bash
+git tag qa-web-passed-v1
+```
+
+Proceder a Fase 2 (Electron) y Fase 3 (Capacitor) segun prioridad.
+
+---
+
+# FASE 2 — QA Electron (TPV Windows)
+
+> Entorno: instalador Electron ejecutado en Windows.
+> Objetivo: verificar solo lo que el browser no puede — ventana nativa, shortcuts, auto-update.
+> El build de Electron se genera DESPUES de que Fase 1 sea GO.
+
+---
+
+### Task 12: Build y setup Electron
+
+- [ ] **Step 1: Generar build Electron**
+
+Seguir el proceso de packaging Electron del proyecto (consultar `docs/context/` o el script de build correspondiente). Instalar el `.exe` o ejecutar el `.AppImage` en Windows.
+
+- [ ] **Step 2: Abrir la app**
+
+La app debe abrir sin crash. La ventana carga `/tpv` directamente.
+
+- [ ] **Step 3: Login TPV en Electron**
+
+Hacer login con rol admin o cajero dentro de la ventana Electron. Flujo de autenticacion identico al web.
+
+### Task 13: Checks Electron-especificos
+
+- [ ] **Step 1: Ventana y pantalla completa**
+
+Verificar que la app entra en modo kiosk / pantalla completa correctamente (segun la configuracion del proyecto).
+
+- [ ] **Step 2: Shortcuts de teclado**
+
+Verificar que los shortcuts TPV (si los hay) funcionan dentro de la ventana Electron.
+
+- [ ] **Step 3: Flujo TPV core**
+
+Ejecutar el flujo minimo: abrir turno → pedido → cobro efectivo → cerrar turno. Todo dentro de la ventana Electron. Esperado: identico al web.
+
+- [ ] **Step 4: Auto-update check**
+
+La app consulta `/api/app/version`. Verificar que no crashea al checkear (aunque no haya actualizacion disponible).
+
+- [ ] **Step 5: Cierre de app**
+
+Cerrar la ventana Electron. Reabrir. Sesion admin debe persistir (cookie en electron store).
+
+- [ ] **Step 6: Sin conexion**
+
+Desconectar red. Abrir la app. Esperado: pagina offline o mensaje claro, no crash.
+
+- [ ] **Step 7: Commit resultado Electron**
+
+Marcar checks Electron en el spec con `[x]` o `[!]`.
+
+```bash
+git add docs/superpowers/specs/2026-07-07-pre-release-qa-design.md
+git commit -m "qa(electron): checks nativos tpv windows"
+```
+
+### Task 14: Go / No-Go Electron
+
+- [ ] **Step 1: Criterio**
+
+0 fallos criticos (crash, flujo core bloqueado, autenticacion rota).
+
+- [ ] **Step 2a: Si GO**
+
+```bash
+git tag qa-electron-passed-v1
+```
+
+- [ ] **Step 2b: Si NO-GO**
+
+Abrir issue con reproduccion en Electron. Resolver y re-ejecutar Task 13.
+
+---
+
+# FASE 3 — QA Capacitor (Waiter Android/PDA)
+
+> Entorno: APK instalada en PDA Android.
+> Objetivo: verificar solo lo que el browser no puede — cookie SameSite, persistencia de sesion, bridge, offline nativo.
+> El build APK se genera DESPUES de que Fase 1 sea GO.
+
+---
+
+### Task 15: Build y setup APK
+
+- [ ] **Step 1: Generar APK**
+
+Seguir el proceso documentado en `docs/context/capacitor-android-pda.md`:
+
+```bash
+# 1. Editar www/index.html si es necesario
+# 2. Copiar assets
+npx cap copy android
+# 3. Bump versionCode en android/app/build.gradle
+# 4. Build firmado
+KEYSTORE_PASSWORD=... KEY_PASSWORD=... ./gradlew assembleRelease
+```
+
+- [ ] **Step 2: Instalar APK en PDA**
+
+```bash
+adb install -r waiter-N.apk
+```
+
+O instalar manualmente. Verificar que abre sin crash.
+
+### Task 16: Checks Capacitor-especificos
+
+- [ ] **Step 1: Sesion directa sin PIN**
+
+Si habia sesion previa activa, abrir la app → spinner breve → grilla de mesas directamente. Sin flash de PIN.
+
+- [ ] **Step 2: Persistencia tras kill**
+
+Matar la app desde recientes → reabrir → sesion intacta.
+
+- [ ] **Step 3: Borrar datos → sesion limpia**
+
+Ajustes → Apps → [nombre app] → Borrar datos → reabrir → formulario PIN.
+
+- [ ] **Step 4: Cookie SameSite**
+
+Con sesion activa, abrir DevTools remoto (`chrome://inspect` en desktop conectado por USB). Verificar `waiter_token` tiene `SameSite = Lax`.
+
+- [ ] **Step 5: Capacitor bridge**
+
+En la consola de DevTools remoto, verificar que no hay errores de `CapacitorBridge` al cargar `/waiter`.
+
+- [ ] **Step 6: Offline en APK**
+
+Desactivar WiFi y datos en el PDA. Abrir la app → pagina offline, no pantalla en blanco. Reactivar WiFi → app recupera estado sin crash.
+
+- [ ] **Step 7: Auto-update check**
+
+Verificar que la app no crashea al consultar la version disponible.
+
+- [ ] **Step 8: Flujo waiter core en APK**
+
+Ejecutar el flujo minimo: login PIN → abrir sesion de mesa → crear pedido → validar → marcar preparado en kitchen → servir → cerrar mesa. Todo dentro de la APK.
+
+- [ ] **Step 9: Commit resultado APK**
+
+Marcar checks Capacitor en el spec con `[x]` o `[!]`.
+
+```bash
+git add docs/superpowers/specs/2026-07-07-pre-release-qa-design.md
+git commit -m "qa(capacitor): checks nativos waiter android"
+```
+
+### Task 17: Go / No-Go final
+
+- [ ] **Step 1: Criterio**
+
+0 fallos criticos en flujo waiter core ni en persistencia de sesion. Fallos menores documentados como known issues.
+
+- [ ] **Step 2a: Si GO en las 3 fases**
 
 ```bash
 git tag qa-passed-v1
 git push origin develop --tags
 ```
 
-Continuar con el proceso de packaging (Electron o Capacitor segun corresponda).
+Sistema listo para release.
 
-- [ ] **Step 3b: Si NO-GO**
+- [ ] **Step 2b: Si NO-GO en alguna fase**
 
-Para cada item `[!]` critico, abrir un issue o tarea con:
-- Sintoma exacto observado
-- Bloque y numero de step donde fallo
-- Reproduccion minima
+Resolver fallos, re-ejecutar solo los tasks afectados de esa fase. No es necesario repetir fases anteriores salvo que el fix toque codigo compartido.
 
-Resolver los fallos, volver a ejecutar solo los bloques afectados, y re-evaluar.
-
-- [ ] **Step 4: Commit final**
+- [ ] **Step 3: Commit final**
 
 ```bash
 git add docs/superpowers/specs/2026-07-07-pre-release-qa-design.md
-git commit -m "qa: resultado final pre-release — go/no-go documentado"
+git commit -m "qa: resultado final — go/no-go documentado por fase"
 ```
