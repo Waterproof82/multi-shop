@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   requireAuth,
+  requireRole,
   validationErrorResponse,
   type AuthResult,
 } from '@/core/infrastructure/api/helpers';
@@ -83,6 +84,10 @@ async function processEntry(
 export async function POST(req: NextRequest) {
   const { empresaId, error: authError } = (await requireAuth(req)) as AuthResult;
   if (authError) return authError;
+
+  const forbidden = requireRole(req, ['cajero', 'encargado', 'admin', 'superadmin']);
+  if (forbidden) return forbidden;
+
   if (!empresaId) return validationErrorResponse('empresaId requerido');
 
   let body: unknown;

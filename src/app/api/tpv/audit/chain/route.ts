@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'crypto';
-import { requireAuth, type AuthResult } from '@/core/infrastructure/api/helpers';
+import { requireAuth, requireRole, type AuthResult } from '@/core/infrastructure/api/helpers';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 
 // Replicates the Postgres trigger hash formula exactly:
@@ -46,6 +46,10 @@ type CobrosRow = {
 export async function GET(req: NextRequest) {
   const { empresaId, error: authError } = (await requireAuth(req)) as AuthResult;
   if (authError) return authError;
+
+  const forbidden = requireRole(req, ['encargado', 'admin', 'superadmin']);
+  if (forbidden) return forbidden;
+
   if (!empresaId) return NextResponse.json({ error: 'empresaId requerido' }, { status: 401 });
 
   const supabase = getSupabaseClient();
