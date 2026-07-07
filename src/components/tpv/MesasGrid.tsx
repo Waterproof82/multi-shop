@@ -132,7 +132,7 @@ function TpvMesaCard({ mesa, turnoId, modo }: Readonly<{ mesa: MesaWithSession; 
 
   const canInteract = modo === 'seleccionar'
     ? !isPaid
-    : !!mesa.sesionId && !isPaid && !!turnoId;
+    : !isPaid && !!turnoId;
 
   function handleClick() {
     if (!canInteract) return;
@@ -142,6 +142,10 @@ function TpvMesaCard({ mesa, turnoId, modo }: Readonly<{ mesa: MesaWithSession; 
       router.push(`/tpv/mostrador?${params.toString()}`);
     } else if (mesa.sesionId && turnoId) {
       router.push(`/tpv/cobro/${mesa.sesionId}?turnoId=${turnoId}`);
+    } else if (turnoId) {
+      // Mesa sin sesión activa: abrir mostrador para crear una nueva sesión
+      const params = new URLSearchParams({ mesaId: mesa.id, mesaNumero: String(mesa.numero) });
+      router.push(`/tpv/mostrador?${params.toString()}`);
     }
   }
 

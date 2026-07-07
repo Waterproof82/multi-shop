@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { TpvTurno } from '@/core/domain/entities/tpv-types';
 import type { Product, Category } from '@/core/domain/entities/types';
+import type { MesaWithSession } from '@/core/domain/repositories/IMesaRepository';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { useMesaActiva } from '@/hooks/tpv/useMesaActiva';
 import { TicketPanel } from './TicketPanel';
 import { MenuPanel } from './MenuPanel';
+import { MesasGrid } from './MesasGrid';
 import { AccionesPanel } from './AccionesPanel';
 
 export interface ExistingOrder {
@@ -35,9 +37,10 @@ interface Props {
   readonly initialMesa: InitialMesa | null;
   readonly tipoImpuesto: 'iva' | 'igic';
   readonly porcentajeImpuesto: number;
+  readonly mesas?: MesaWithSession[] | null;
 }
 
-export function MostradorClient({ turno, products, categories, initialMesa, tipoImpuesto, porcentajeImpuesto }: Props) {
+export function MostradorClient({ turno, products, categories, initialMesa, tipoImpuesto, porcentajeImpuesto, mesas }: Props) {
   const { mesa, addItem, removeItem, clearPending, clearMesa, refreshOrders, updatePendingNota } = useMesaActiva(initialMesa);
   const [refreshing, setRefreshing] = useState(false);
   const [yaCobradoCents, setYaCobradoCents] = useState(0);
@@ -142,12 +145,16 @@ export function MostradorClient({ turno, products, categories, initialMesa, tipo
         onUpdatePendingNota={updatePendingNota}
         onPendingSent={clearPending}
       />
-      <MenuPanel
-        products={products}
-        categories={categories}
-        onAddItem={addItem}
-        mesaSeleccionada={!!mesa.mesaId}
-      />
+      {!mesa.mesaId && mesas ? (
+        <MesasGrid mesas={mesas} turnoId={turno.id} modo="seleccionar" />
+      ) : (
+        <MenuPanel
+          products={products}
+          categories={categories}
+          onAddItem={addItem}
+          mesaSeleccionada={!!mesa.mesaId}
+        />
+      )}
       <AccionesPanel
         sesionId={mesa.sesionId}
         turnoId={turno.id}
