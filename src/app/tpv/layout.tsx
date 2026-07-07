@@ -4,6 +4,7 @@ import { authAdminUseCase } from '@/core/infrastructure/database';
 import { TpvHeader } from '@/components/tpv/TpvHeader';
 import { TpvRolProvider } from '@/lib/tpv-rol-context';
 import type { RolAdmin } from '@/core/domain/repositories/IAdminRepository';
+import { TpvSwRegistrar } from '@/components/tpv-sw-registrar';
 
 const VALID_ROLES: RolAdmin[] = ['superadmin', 'admin', 'encargado', 'cajero'];
 
@@ -23,6 +24,7 @@ export default async function TpvLayout({ children }: { readonly children: React
 
   return (
     <TpvRolProvider rol={admin.rol}>
+      <TpvSwRegistrar />
       <div className="flex flex-col h-screen bg-[#0f1117] text-[#e8eaf0] overflow-hidden">
         <TpvHeader empresaNombre={admin.empresa?.nombre ?? ''} />
         <main className="flex flex-1 overflow-hidden">
