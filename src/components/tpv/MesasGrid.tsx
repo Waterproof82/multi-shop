@@ -132,7 +132,7 @@ function TpvMesaCard({ mesa, turnoId, modo }: Readonly<{ mesa: MesaWithSession; 
 
   const canInteract = modo === 'seleccionar'
     ? !isPaid
-    : !isPaid && !!turnoId;
+    : !!turnoId;
 
   function handleClick() {
     if (!canInteract) return;
