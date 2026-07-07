@@ -11,9 +11,7 @@ interface Ingrediente {
   cantidadActual: number;
 }
 
-interface ApiResponse {
-  items: { id: string; nombre: string; unidad: string; cantidadActual: number }[];
-}
+type ApiResponse = { id: string; nombre: string; unidad: string; cantidadActual: number }[];
 
 export default function InventarioFisicoPage() {
   const [ingredientes, setIngredientes] = useState<Ingrediente[]>([]);
@@ -28,7 +26,7 @@ export default function InventarioFisicoPage() {
       if (!res.ok) throw new Error('Error al cargar ingredientes');
       const json = await res.json() as ApiResponse;
       setIngredientes(
-        json.items.map(i => ({
+        json.map(i => ({
           id: i.id,
           nombre: i.nombre,
           unidad: i.unidad,
