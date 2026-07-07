@@ -51,55 +51,59 @@ public class MainActivity extends BridgeActivity {
         CookieManager.getInstance().flush();
     }
 
-    private void handleIntent(Intent intent) {
-        if (intent == null) return;
+    private String extractRouteFromData(String data) {
+        if (data == null) return null;
+        try {
+            return new JSONObject(data).optString("route", null);
+        } catch (Exception ignored) {
+            // malformed JSON — route not extractable from data field
+            return null;
+        }
+    }
 
-        // Try common places where push/tap data may be stored
-        String route = null;
+    private String extractRouteFromIntent(Intent intent) {
         if (intent.getExtras() != null) {
-            // explicit 'route' key used by our payloads
-            route = intent.getExtras().getString("route");
+            String route = intent.getExtras().getString("route");
             if (route == null) route = intent.getExtras().getString("click_action");
             if (route == null) route = intent.getExtras().getString("gcm.notification.click_action");
-            if (route == null) {
-                // some providers pack a JSON string under "data"
-                String data = intent.getExtras().getString("data");
-                if (data != null) {
-                    try {
-                        JSONObject j = new JSONObject(data);
-                        route = j.optString("route", null);
-                    } catch (Exception ignored) { }
-                }
-            }
+            if (route == null) route = extractRouteFromData(intent.getExtras().getString("data"));
+            if (route != null) return route;
         }
+        return intent.getData() != null ? intent.getData().toString() : null;
+    }
 
-        // Fallback: intent data URI
-        if (route == null && intent.getData() != null) {
-            route = intent.getData().toString();
-        }
-
-        if (route == null) return;
-
-        // Save route to Capacitor Preferences storage so web side can pick it up on cold start
+    private void saveRouteToPreferences(String route) {
         try {
             SharedPreferences prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
             prefs.edit().putString("push_route", route).apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) {
+            // SharedPreferences unavailable — non-critical, route dispatch continues
+        }
+    }
 
-        // If the WebView is available, evaluate JS to navigate immediately (background -> foreground)
+    private void dispatchRouteToWebView(String route) {
         try {
-            if (getBridge() != null && getBridge().getWebView() != null) {
-                final String quoted = JSONObject.quote(route);
-                final String js = "window.dispatchEvent(new CustomEvent('push-navigate',{ detail: " + quoted + " }));";
-                runOnUiThread(() -> {
-                    try {
-                        getBridge().getWebView().evaluateJavascript(js, null);
-                    } catch (Exception e) {
-                        // ignore — webview might not accept evaluateJavascript yet
-                    }
-                });
-            }
-        } catch (Exception ignored) { }
+            if (getBridge() == null || getBridge().getWebView() == null) return;
+            final String quoted = JSONObject.quote(route);
+            final String js = "window.dispatchEvent(new CustomEvent('push-navigate',{ detail: " + quoted + " }));";
+            runOnUiThread(() -> {
+                try {
+                    getBridge().getWebView().evaluateJavascript(js, null);
+                } catch (Exception ignored) {
+                    // WebView not ready to execute JS yet — route already saved to prefs as fallback
+                }
+            });
+        } catch (Exception ignored) {
+            // Bridge unavailable — route saved to prefs as fallback
+        }
+    }
+
+    private void handleIntent(Intent intent) {
+        if (intent == null) return;
+        String route = extractRouteFromIntent(intent);
+        if (route == null) return;
+        saveRouteToPreferences(route);
+        dispatchRouteToWebView(route);
     }
 
     private void createNotificationChannels() {
@@ -123,6 +127,27 @@ public class MainActivity extends BridgeActivity {
         // @capacitor/preferences stores in SharedPreferences named "CapacitorStorage"
         SharedPreferences prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
         return prefs.getString("domain", null);
+    }
+
+    private static class VersionInfo {
+        final int versionCode;
+        final String apkUrl;
+
+        VersionInfo(int versionCode, String apkUrl) {
+            this.versionCode = versionCode;
+            this.apkUrl = apkUrl;
+        }
+    }
+
+    private VersionInfo parseVersionResponse(String body) {
+        try {
+            JSONObject json = new JSONObject(body);
+            int code = json.optInt("versionCode", 0);
+            String url = json.isNull("apkUrl") ? "" : json.optString("apkUrl", "");
+            return new VersionInfo(code, url);
+        } catch (Exception e) {
+            return new VersionInfo(0, "");
+        }
     }
 
     private void checkForUpdate() {
@@ -151,26 +176,22 @@ public class MainActivity extends BridgeActivity {
                         }
                     }
 
-                    JSONObject json = new JSONObject(sb.toString());
-                    int remoteVersionCode = json.optInt("versionCode", 0);
-                    String apkUrl = json.isNull("apkUrl") ? "" : json.optString("apkUrl", "");
-
-                    if (remoteVersionCode == 0 || apkUrl.isEmpty()) return;
+                    VersionInfo remote = parseVersionResponse(sb.toString());
+                    if (remote.versionCode == 0 || remote.apkUrl.isEmpty()) return;
 
                     @SuppressWarnings("deprecation")
                     int currentVersionCode = getPackageManager()
                             .getPackageInfo(getPackageName(), 0)
                             .versionCode;
 
-                    if (remoteVersionCode > currentVersionCode) {
-                        final String finalApkUrl = apkUrl;
-                        runOnUiThread(() -> showUpdateDialog(finalApkUrl));
+                    if (remote.versionCode > currentVersionCode) {
+                        runOnUiThread(() -> showUpdateDialog(remote.apkUrl));
                     }
                 } finally {
                     conn.disconnect();
                 }
             } catch (Exception e) {
-                // Network error or version check failure — silently ignore
+                // Network error or version check failure — silently ignored
             }
         }).start();
     }
