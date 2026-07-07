@@ -36,7 +36,7 @@ export default async function AdminProtectedLayout({
     redirect('/admin/login');
   }
 
-  if (admin.rol === 'cajero' || admin.rol === 'encargado') {
+  if (admin.rol === 'cajero') {
     redirect('/tpv');
   }
 

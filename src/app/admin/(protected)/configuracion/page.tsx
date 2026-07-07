@@ -20,6 +20,10 @@ export default async function ConfiguracionPage() {
     redirect('/admin/login');
   }
 
+  if (admin.rol === 'encargado') {
+    redirect('/admin');
+  }
+
   let empresaId = admin.empresaId;
 
   if (admin.rol === SUPERADMIN_ROLE) {
