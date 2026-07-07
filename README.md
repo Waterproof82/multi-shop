@@ -79,7 +79,7 @@ Software de caja para restaurantes y tiendas integrado en la misma plataforma. C
 
 #### Rutas TPV
 
-`/tpv/turno/abrir`, `/tpv/mostrador`, `/tpv/cobro/[sesionId]`, `/tpv/historial`, `/tpv/mesas`, `/tpv/legal`, `/tpv/analytics`, `/tpv/mermas`.
+`/tpv/turno/abrir`, `/tpv/turno/cerrar`, `/tpv/mostrador`, `/tpv/cobro/[sesionId]`, `/tpv/historial`, `/tpv/mesas`, `/tpv/legal`, `/tpv/analytics`, `/tpv/mermas`.
 Admin stock: `/admin/stock/ingredientes`, `/admin/stock/recetas`, `/admin/stock/movimientos`, `/admin/stock/inventario`.
 
 ### 🤖 Notificaciones Telegram — dos modos de operación
@@ -438,7 +438,7 @@ Documentación completa en [`docs/context/security.md`](docs/context/security.md
 | **XSS emails** | `escapeHtml()` en todos los templates HTML, logging centralizado sin PII |
 | **Price tampering** | Total recalculado server-side + rechazo de productos desconocidos (`PRODUCT_NOT_FOUND`) |
 | **Anti-enumeración** | Login devuelve mensaje genérico para todos los tipos de fallo auth |
-| **RBAC** | `requireRole(request, ['admin'])` en todos los handlers mutativos de `/api/admin/*` |
+| **RBAC** | `RolAdmin` union type + CHECK constraint en DB. `requireRole(request, roles[])` en todos los handlers de `/api/admin/*` y `/api/tpv/*`. Cuatro roles: `superadmin`, `admin`, `encargado`, `cajero`. Guards en layouts y páginas (redirect SSR). |
 | **Unsubscribe** | HMAC-SHA256 con `UNSUBSCRIBE_HMAC_SECRET` dedicado, TTL 1 año (GDPR/CAN-SPAM), acción explícita `'baja'` |
 | **CORS** | Whitelist de dominios, `Vary: Origin`, preflight 204, headers en rutas públicas |
 | **Cart tokens** | Validación con audience claim `'cart-access'` para prevenir token confusion |
@@ -615,16 +615,19 @@ function toAdminProduct(prod: Product) {
 
 ### Roles de Usuario
 
-El sistema soporta dos roles:
+El sistema soporta cuatro roles (`RolAdmin` union type, CHECK constraint en DB):
 
 | Rol | Descripción | Acceso |
 |-----|-------------|--------|
-| `admin` | Admin de empresa | Panel admin de su empresa, solo datos de su tenant |
+| `admin` | Admin de empresa | Panel admin completo + TPV |
 | `superadmin` | Super Admin | Panel superadmin, acceso a TODAS las empresas |
+| `encargado` | Encargado de turno | TPV completo (analytics, historial, mermas, cierre de turno). Sin acceso a `/admin/*` |
+| `cajero` | Cajero | Solo TPV mostrador, cobro y pedidos. Sin acceso a analytics, historial, mermas ni cierre de turno |
 
-El rol se define en la columna `rol` de la tabla `perfiles_admin`:
+El rol se define en la columna `rol` de la tabla `perfiles_admin` (CHECK constraint desde `20260707000001_rbac_roles_constraint.sql`):
 - `admin` → redirige a `/admin`
 - `superadmin` → redirige a `/superadmin`
+- `encargado` / `cajero` → redirigen a `/tpv`
 
 ### Panel Super Admin
 
@@ -713,7 +716,7 @@ const main = parseMainDomain(domain); // elimina subdominio pedidos
 | Tabla | PK | FK | Notas |
 |-------|----|----|-------|
 | `empresas` | id (uuid) | — | dominio, subdomain_pedidos, colores, fb, instagram, url_mapa, telefono_whatsapp, **descuento_bienvenida_activo/porcentaje**, telegram_chat_id, **waiter_pin_hash** |
-| `perfiles_admin` | id (uuid) | empresa_id → empresas (nullable) | → auth.users, `rol` = 'admin' o 'superadmin' |
+| `perfiles_admin` | id (uuid) | empresa_id → empresas (nullable) | → auth.users, `rol` ∈ {'admin','superadmin','encargado','cajero'} |
 | `categorias` | id (uuid) | empresa_id → empresas | categoria_padre_id, categoriaComplementoDe |
 | `productos` | id (uuid) | empresa_id, categoria_id | i18n: titulo_es/en/fr/it/de |
 | `clientes` | id (uuid) | empresa_id | telefono único por empresa |
