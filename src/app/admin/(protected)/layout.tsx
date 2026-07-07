@@ -32,6 +32,10 @@ export default async function AdminProtectedLayout({
     redirect('/admin/login');
   }
 
+  if (admin.rol === 'cajero' || admin.rol === 'encargado') {
+    redirect('/tpv');
+  }
+
   let empresaId: string;
   let empresa = admin.empresa;
   let isSuperAdminView = false;

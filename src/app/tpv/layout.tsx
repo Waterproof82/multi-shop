@@ -2,6 +2,10 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { authAdminUseCase } from '@/core/infrastructure/database';
 import { TpvHeader } from '@/components/tpv/TpvHeader';
+import { TpvRolProvider } from '@/lib/tpv-rol-context';
+import type { RolAdmin } from '@/core/domain/repositories/IAdminRepository';
+
+const VALID_ROLES: RolAdmin[] = ['superadmin', 'admin', 'encargado', 'cajero'];
 
 export const dynamic = 'force-dynamic';
 
@@ -15,12 +19,16 @@ export default async function TpvLayout({ children }: { readonly children: React
 
   if (!admin) redirect('/admin/login');
 
+  if (!VALID_ROLES.includes(admin.rol)) redirect('/admin/login');
+
   return (
-    <div className="flex flex-col h-screen bg-[#0f1117] text-[#e8eaf0] overflow-hidden">
-      <TpvHeader empresaNombre={admin.empresa?.nombre ?? ''} />
-      <main className="flex flex-1 overflow-hidden">
-        {children}
-      </main>
-    </div>
+    <TpvRolProvider rol={admin.rol}>
+      <div className="flex flex-col h-screen bg-[#0f1117] text-[#e8eaf0] overflow-hidden">
+        <TpvHeader empresaNombre={admin.empresa?.nombre ?? ''} />
+        <main className="flex flex-1 overflow-hidden">
+          {children}
+        </main>
+      </div>
+    </TpvRolProvider>
   );
 }
