@@ -25,7 +25,7 @@ export async function POST(
   const { empresaId, error: authError } = (await requireAuth(req)) as AuthResult;
   if (authError) return authError;
 
-  const forbidden = requireRole(req, ['admin', 'superadmin']);
+  const forbidden = requireRole(req, ['encargado', 'admin', 'superadmin']);
   if (forbidden) return forbidden;
 
   if (!empresaId) return validationErrorResponse('empresaId requerido');

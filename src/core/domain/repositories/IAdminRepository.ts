@@ -1,10 +1,12 @@
 import { Empresa, Result } from "../entities/types";
 
+export type RolAdmin = 'superadmin' | 'admin' | 'encargado' | 'cajero';
+
 export interface AdminProfile {
   id: string;
   empresaId: string | null;
   nombreCompleto: string | null;
-  rol: string;
+  rol: RolAdmin;
   email: string;
 }
 
@@ -17,8 +19,10 @@ export interface IAdminRepository {
   findById(id: string): Promise<Result<AdminWithEmpresa | null>>;
 }
 
-export const SUPERADMIN_ROLE = 'superadmin';
-export const ADMIN_ROLE = 'admin';
+export const SUPERADMIN_ROLE = 'superadmin' as const satisfies RolAdmin;
+export const ADMIN_ROLE = 'admin' as const satisfies RolAdmin;
+export const ENCARGADO_ROLE = 'encargado' as const satisfies RolAdmin;
+export const CAJERO_ROLE = 'cajero' as const satisfies RolAdmin;
 
 export function isSuperAdmin(profile: AdminProfile): boolean {
   return profile.rol === SUPERADMIN_ROLE;

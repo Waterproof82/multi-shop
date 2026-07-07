@@ -1,5 +1,5 @@
 import { SupabaseClient } from "@supabase/supabase-js";
-import { IAdminRepository, AdminWithEmpresa, SUPERADMIN_ROLE } from "@/core/domain/repositories/IAdminRepository";
+import { IAdminRepository, AdminWithEmpresa, RolAdmin, SUPERADMIN_ROLE } from "@/core/domain/repositories/IAdminRepository";
 import { Empresa, Result } from "@/core/domain/entities/types";
 import { DEFAULT_EMPRESA_COLORES } from "@/core/domain/constants/empresa-defaults";
 import { logger } from "@/core/infrastructure/logging/logger";
@@ -97,7 +97,7 @@ export class SupabaseAdminRepository implements IAdminRepository {
             id: perfil.id,
             empresaId: null,
             nombreCompleto: perfil.nombre_completo,
-            rol: perfil.rol,
+            rol: perfil.rol as RolAdmin,
             email: "",
             empresa: null,
           },
@@ -140,7 +140,7 @@ export class SupabaseAdminRepository implements IAdminRepository {
           id: perfil.id,
           empresaId: perfil.empresa_id,
           nombreCompleto: perfil.nombre_completo,
-          rol: perfil.rol,
+          rol: perfil.rol as RolAdmin,
           email: "",
           empresa: this.mapEmpresa(empresa),
         },

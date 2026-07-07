@@ -16,6 +16,8 @@ export default async function TpvAnalyticsPage() {
   const admin = await authAdminUseCase.verifyToken(token);
   if (!admin || !admin.empresa) redirect('/admin/login');
 
+  if (admin.rol === 'cajero') redirect('/tpv/mostrador');
+
   const empresaId = admin.empresa.id;
   const repo = new SupabaseTpvRepository();
   const turnoResult = await repo.findTurnoActivo(empresaId);

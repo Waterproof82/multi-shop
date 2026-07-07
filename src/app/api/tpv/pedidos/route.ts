@@ -23,7 +23,7 @@ const bodySchema = z.object({
 export async function GET(req: NextRequest) {
   const { empresaId, error: authError } = await requireAuth(req);
   if (authError) return authError;
-  const forbidden = requireRole(req, ['admin', 'superadmin']);
+  const forbidden = requireRole(req, ['cajero', 'encargado', 'admin', 'superadmin']);
   if (forbidden) return forbidden;
   if (!empresaId) return validationErrorResponse('empresaId requerido');
 
@@ -132,7 +132,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const { empresaId, error: authError } = await requireAuth(req);
   if (authError) return authError;
-  const forbidden = requireRole(req, ['admin', 'superadmin']);
+  const forbidden = requireRole(req, ['cajero', 'encargado', 'admin', 'superadmin']);
   if (forbidden) return forbidden;
   if (!empresaId) return validationErrorResponse('empresaId requerido');
 
