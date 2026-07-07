@@ -9,11 +9,13 @@ import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useAdmin } from '@/lib/admin-context';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
+import type { RolAdmin } from '@/core/domain/repositories/IAdminRepository';
 
 interface NavItem {
   href: string;
   labelKey: Parameters<typeof t>[0];
   icon: React.ComponentType<{ className?: string }>;
+  requiresRole?: RolAdmin[];
 }
 
 const BASE_NAV_ITEMS: (NavItem & { requiresPromo?: boolean; requiresTgtg?: boolean; requiresRestaurant?: boolean; requiresDelivery?: boolean })[] = [
