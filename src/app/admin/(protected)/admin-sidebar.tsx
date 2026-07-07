@@ -30,10 +30,10 @@ const BASE_NAV_ITEMS: (NavItem & { requiresPromo?: boolean; requiresTgtg?: boole
   { href: '/admin/mesas', labelKey: 'sidebarMesas', icon: UtensilsCrossed, requiresRestaurant: true },
   { href: '/admin/valoraciones', labelKey: 'adminValoraciones', icon: Star, requiresRestaurant: true },
   { href: '/admin/delivery', labelKey: 'sidebarDelivery', icon: MapPin, requiresDelivery: true },
-  { href: '/admin/stock/ingredientes', labelKey: 'sidebarStockIngredientes', icon: Archive },
-  { href: '/admin/stock/recetas', labelKey: 'sidebarStockRecetas', icon: BookOpen },
-  { href: '/admin/stock/movimientos', labelKey: 'sidebarStockMovimientos', icon: History },
-  { href: '/admin/stock/inventario', labelKey: 'sidebarStockInventario', icon: ClipboardList },
+  { href: '/admin/stock/ingredientes', labelKey: 'sidebarStockIngredientes', icon: Archive, requiresRestaurant: true },
+  { href: '/admin/stock/recetas', labelKey: 'sidebarStockRecetas', icon: BookOpen, requiresRestaurant: true },
+  { href: '/admin/stock/movimientos', labelKey: 'sidebarStockMovimientos', icon: History, requiresRestaurant: true },
+  { href: '/admin/stock/inventario', labelKey: 'sidebarStockInventario', icon: ClipboardList, requiresRestaurant: true },
   { href: '/admin/configuracion', labelKey: 'sidebarSettings', icon: Settings },
 ];
 
