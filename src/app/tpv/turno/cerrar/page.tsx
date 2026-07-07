@@ -17,6 +17,7 @@ export default async function TurnoCerrarPage() {
 
   if (!admin) redirect('/admin/login');
   if (!admin.empresaId) redirect('/admin/login');
+  if (admin.rol === 'cajero') redirect('/tpv/mostrador');
 
   const repo = new SupabaseTpvRepository();
   const turnoResult = await repo.findTurnoActivo(admin.empresaId);
