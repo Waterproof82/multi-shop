@@ -197,12 +197,22 @@ On re-login with PIN, the turno is already active and the employee lands on `/tp
 ## Security notes
 
 - PIN hash uses the existing `hashPin(pin, empresaId)` — scoped per empresa so the same PIN in different empresas produces different hashes.
-- `tpv_employee_token` is HttpOnly, SameSite=lax, 1h max-age. The proxy renews it on every authenticated TPV request (sliding window).
+- `tpv_employee_token` is HttpOnly, SameSite=lax, 1h max-age.
 - `/api/tpv/empleados/login` is rate-limited with `rateLimitAdmin`.
 - Employees cannot log in to admin panel. The admin layout already redirects `cajero`; it will also redirect sessions authenticated via `tpv_employee_token` (which lack an `admin_token`).
 - PIN entry page has no lockout UI but the rate limit on the API protects brute force.
-- If an employee is deactivated while their token is active, the proxy will still honor the token for up to 1h. Acceptable trade-off given the sliding refresh stops as soon as they stop using the TPV.
 - The unique partial index `WHERE activo = true` means a deactivated employee's PIN hash is no longer checked against active employees — reactivating them re-enters them into the uniqueness check.
+
+### Token refresh strategy (late-window + DB check on renewal)
+
+The app runs on Vercel serverless — there is no shared memory or Redis, so a blacklist is not viable. Instead:
+
+1. On **every** TPV request: proxy validates only the JWT signature (no DB call). Fast path.
+2. If the token has **< 15 minutes remaining**: proxy queries `empleados_tpv` for `activo = true`.
+   - Active → issue a fresh 1h token (sliding window, but infrequent).
+   - Inactive → do NOT renew. The current token expires within 15 min.
+
+This limits the deactivation gap to the remaining lifetime of the last issued token — at most ~1h, in practice 15–60 min. For a physical POS device in a restaurant this is operationally acceptable; the admin can also physically reclaim the device or press "Bloquear TPV" to force immediate re-authentication.
 
 ---
 
