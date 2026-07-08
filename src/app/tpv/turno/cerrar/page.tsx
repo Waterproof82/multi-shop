@@ -1,37 +1,52 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { authAdminUseCase } from '@/core/infrastructure/database';
+import { verifyTpvEmployeeToken } from '@/lib/tpv-employee-auth';
 import { SupabaseTpvRepository } from '@/core/infrastructure/repositories/supabase-tpv.repository';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { TurnoCerrarForm } from '@/components/tpv/TurnoCerrarForm';
+import type { RolAdmin } from '@/core/domain/repositories/IAdminRepository';
 
 const EMPTY_STATS = { totalEfectivoCents: 0, totalTarjetaCents: 0, numOperaciones: 0 };
 
 export default async function TurnoCerrarPage() {
   const cookieStore = await cookies();
-  const token = cookieStore.get('admin_token')?.value;
+  let rol: RolAdmin = 'cajero';
+  let empresaId: string | null = null;
 
-  if (!token) redirect('/admin/login');
+  const adminToken = cookieStore.get('admin_token')?.value;
+  if (adminToken) {
+    const admin = await authAdminUseCase.verifyToken(adminToken);
+    if (!admin || !admin.empresaId) redirect('/admin/login');
+    rol = admin.rol;
+    empresaId = admin.empresaId;
+  } else {
+    const employeeToken = cookieStore.get('tpv_employee_token')?.value;
+    if (!employeeToken) redirect('/tpv/login');
+    const payload = await verifyTpvEmployeeToken(employeeToken);
+    if (!payload) redirect('/tpv/login');
+    rol = payload.rol;
+    empresaId = payload.empresaId;
+  }
 
-  const admin = await authAdminUseCase.verifyToken(token);
+  if (!empresaId) redirect('/tpv/login');
 
-  if (!admin) redirect('/admin/login');
-  if (!admin.empresaId) redirect('/admin/login');
-  if (admin.rol === 'cajero') redirect('/tpv/mostrador');
+  const isBlindClose = rol === 'cajero';
 
   const repo = new SupabaseTpvRepository();
-  const turnoResult = await repo.findTurnoActivo(admin.empresaId);
+  const turnoResult = await repo.findTurnoActivo(empresaId);
   if (!turnoResult.success || turnoResult.data === null) redirect('/tpv/turno/abrir');
 
   const turno = turnoResult.data;
-
   const supabase = getSupabaseClient();
+
+  // Only fetch full stats for encargado/admin (cajero sees blind close)
   const [statsResult, sesionesRes] = await Promise.all([
-    repo.getTurnoStats(turno.id),
+    isBlindClose ? Promise.resolve({ success: true, data: EMPTY_STATS }) : repo.getTurnoStats(turno.id),
     supabase
       .from('mesa_sesiones')
       .select('id, mesas!mesa_sesiones_mesa_id_fkey(numero, nombre)')
-      .eq('empresa_id', admin.empresaId)
+      .eq('empresa_id', empresaId)
       .is('cerrada_at', null),
   ]);
 
@@ -49,12 +64,14 @@ export default async function TurnoCerrarPage() {
       <div className="bg-[#1a1d27] border border-[#2e3347] rounded-2xl p-12 flex flex-col gap-8 w-[440px]">
         <div className="flex flex-col gap-2">
           <span className="text-xs font-bold text-[#ef4444] uppercase tracking-wider">Cierre de Caja</span>
-          <h1 className="text-2xl font-bold">Arqueo final</h1>
+          <h1 className="text-2xl font-bold">{isBlindClose ? 'Cerrar turno' : 'Arqueo final'}</h1>
           <p className="text-sm text-[#6b7280] leading-relaxed">
-            Cuenta el efectivo en la caja. El sistema calculará la diferencia.
+            {isBlindClose
+              ? 'Cuenta el efectivo y declara el total. El encargado revisará el arqueo.'
+              : 'Cuenta el efectivo en la caja. El sistema calculará la diferencia.'}
           </p>
         </div>
-        <TurnoCerrarForm turno={turno} stats={stats} mesasAbiertas={mesasAbiertas} />
+        <TurnoCerrarForm turno={turno} stats={stats} mesasAbiertas={mesasAbiertas} isBlindClose={isBlindClose} />
       </div>
     </div>
   );

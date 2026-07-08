@@ -70,6 +70,13 @@ public/*.webp
 !public/MERMELADA-TOMATE-web-transp-sombra-1920w.webp.superpowers/
 .worktrees/
 
+# Electron build output
+dist/
+electron/dist/
+
+# Misc project files
+productos-table.yml
+
 # Capacitor Android — commit only config files
 # Note: git won't descend into ignored dirs, so intermediate paths must be un-ignored explicitly
 android/

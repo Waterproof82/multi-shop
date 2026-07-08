@@ -3,15 +3,25 @@
 import { createContext, useContext } from 'react';
 import type { RolAdmin } from '@/core/domain/repositories/IAdminRepository';
 
-const TpvRolContext = createContext<RolAdmin>('cajero');
+interface TpvRolContextValue {
+  rol: RolAdmin;
+  isEmployeeSession: boolean;
+}
+
+const TpvRolContext = createContext<TpvRolContextValue>({ rol: 'cajero', isEmployeeSession: false });
 
 export function TpvRolProvider({
   children,
   rol,
-}: Readonly<{ children: React.ReactNode; rol: RolAdmin }>) {
-  return <TpvRolContext.Provider value={rol}>{children}</TpvRolContext.Provider>;
+  isEmployeeSession,
+}: Readonly<{ children: React.ReactNode; rol: RolAdmin; isEmployeeSession: boolean }>) {
+  return <TpvRolContext.Provider value={{ rol, isEmployeeSession }}>{children}</TpvRolContext.Provider>;
 }
 
 export function useTpvRol(): RolAdmin {
-  return useContext(TpvRolContext);
+  return useContext(TpvRolContext).rol;
+}
+
+export function useTpvIsEmployeeSession(): boolean {
+  return useContext(TpvRolContext).isEmployeeSession;
 }

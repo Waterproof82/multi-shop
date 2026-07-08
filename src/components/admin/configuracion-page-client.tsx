@@ -1,11 +1,12 @@
 'use client';
 
-import { Settings, Palette, Building2, ToggleLeft, Gift } from 'lucide-react';
+import { Settings, Palette, Building2, ToggleLeft, Gift, Users } from 'lucide-react';
 import { ColoresForm } from '@/components/admin/colores-form';
 import { EmpresaDatosForm } from '@/components/admin/empresa-datos-form';
 import { EmpresaAparienciaForm } from '@/components/admin/empresa-apariencia-form';
 import { ModulosForm } from '@/components/admin/modulos-form';
 import { DescuentoBienvenidaForm } from '@/components/admin/descuento-bienvenida-form';
+import { EmpleadosTpvPanel } from '@/components/admin/EmpleadosTpvPanel';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import type { EmpresaColores } from '@/core/domain/entities/types';
@@ -157,6 +158,18 @@ export function ConfiguracionPageClient({
           coloresIniciales={colores}
           empresaId={empresaId}
         />
+      </div>
+
+      {/* Empleados TPV */}
+      <div className="bg-card rounded-lg shadow-elegant border border-border p-6">
+        <h2 className="text-lg font-semibold mb-6 text-foreground flex items-center gap-2">
+          <Users className="w-5 h-5" />
+          Empleados TPV
+        </h2>
+        <p className="text-sm text-muted-foreground mb-6">
+          Gestiona los cajeros y encargados que acceden al TPV con PIN.
+        </p>
+        <EmpleadosTpvPanel empresaId={empresaId} />
       </div>
     </div>
   );

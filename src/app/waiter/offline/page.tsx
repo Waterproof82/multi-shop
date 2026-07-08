@@ -45,7 +45,7 @@ export default function WaiterOfflinePage() {
           className="text-sm max-w-xs"
           style={{ color: 'oklch(58% 0.05 252)' }}
         >
-          La app se reconectará automáticamente cuando vuelva la señal. Comprobá
+          La app se reconectará automáticamente cuando vuelva la señal. Comprueba
           que el dispositivo está conectado a la red del local.
         </p>
       </div>

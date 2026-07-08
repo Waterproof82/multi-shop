@@ -77,10 +77,28 @@ Software de caja para restaurantes y tiendas integrado en la misma plataforma. C
 - **Inventario físico a ciegas** (`/admin/stock/inventario`): flujo de 3 pasos para el conteo periódico del almacén. (1) El operador introduce la cantidad real de cada ingrediente sin ver el teórico. (2) El sistema calcula y muestra las desviaciones (verde = sobrante, rojo = faltante). (3) Al confirmar, se insertan movimientos de tipo `inventario` y se actualiza `cantidad_actual`. El tipo `inventario` se añadió como nuevo valor al enum `tipo_movimiento`.
 - **Alerta de stock bajo en cobro**: badge `LowStockBadge` (ámbar, clicable) en el header del TPV y en la pantalla de cobro. Refresco cada 3 minutos. Informativo, nunca bloquea el pago.
 
+#### Empleados TPV — autenticación por PIN
+
+Sistema de cajeros y encargados que acceden al TPV con PIN numérico, sin necesidad de email/password ni cuenta en `auth.users`. Los empleados se gestionan desde `/admin/configuracion` → tab "Empleados".
+
+- **Login por PIN**: pantalla `/tpv/login` con entrada numérica (4-8 dígitos). El PIN se hashea con PBKDF2 SHA-256 scoped por empresa.
+- **Cookie `tpv_employee_token`**: JWT HS256, audience `'tpv-employee'`, 1h. Sliding window lazy: solo se renueva (con consulta a DB) cuando quedan <15 min de vida.
+- **Dual-auth en proxy**: para rutas `/tpv/*`, el proxy intenta `admin_token` primero; si falla, prueba `tpv_employee_token`. Si ninguno es válido → redirect `/tpv/login`.
+- **Botón "Bloquear TPV"**: visible solo en sesiones de empleado. Llama `POST /api/tpv/empleados/logout`, limpia la cookie y redirige a `/tpv/login` sin afectar el turno activo. Permite handoff entre empleados en el mismo dispositivo.
+- **Permisos por rol**:
+  - `encargado`: TPV completo. Puede abrir turno, ver mermas, cierre con arqueo completo. No accede al panel admin.
+  - `cajero`: mostrador + cobro únicamente. Mermas ocultas. Cierre de caja en modo **arqueo ciego** (no ve el total teórico; el servidor calcula la diferencia internamente).
+- **Precarga de nombre**: al abrir turno, `operadorNombre` se pre-rellena desde el token del empleado (campo readonly).
+- **`operador_id` en `tpv_turnos`**: FK nullable a `empleados_tpv`. Turnos de admin tienen `operador_id = NULL`.
+
+Tabla DB: `empleados_tpv` con índice parcial único `ON (empresa_id, pin_hash) WHERE activo = true`.
+CRUD admin: `GET|POST /api/admin/empleados-tpv`, `PATCH|DELETE /api/admin/empleados-tpv/[id]`.
+
 #### Rutas TPV
 
-`/tpv/turno/abrir`, `/tpv/turno/cerrar`, `/tpv/mostrador`, `/tpv/cobro/[sesionId]`, `/tpv/historial`, `/tpv/mesas`, `/tpv/legal`, `/tpv/analytics`, `/tpv/mermas`.
+`/tpv/login`, `/tpv/turno/abrir`, `/tpv/turno/cerrar`, `/tpv/mostrador`, `/tpv/cobro/[sesionId]`, `/tpv/historial`, `/tpv/mesas`, `/tpv/legal`, `/tpv/analytics`, `/tpv/mermas`.
 Admin stock: `/admin/stock/ingredientes`, `/admin/stock/recetas`, `/admin/stock/movimientos`, `/admin/stock/inventario`.
+Admin empleados: `/admin/configuracion` → tab "Empleados".
 
 ### 🤖 Notificaciones Telegram — dos modos de operación
 
@@ -629,6 +647,8 @@ El rol se define en la columna `rol` de la tabla `perfiles_admin` (CHECK constra
 - `superadmin` → redirige a `/superadmin`
 - `encargado` / `cajero` → redirigen a `/tpv`
 
+> **Nota**: `encargado` y `cajero` pueden autenticarse en el TPV de dos formas independientes: (a) mediante cuenta `perfiles_admin` + email/password (flujo legacy), o (b) mediante la tabla `empleados_tpv` + PIN numérico (`tpv_employee_token` cookie). El panel admin solo reconoce el flujo (a); el TPV reconoce ambos.
+
 ### Panel Super Admin
 
 Acceso: `/superadmin` - Ver resumen de todas las empresas y editar cualquier campo.
@@ -687,6 +707,8 @@ if (!admin) redirect('/admin/login');
 - Aplica CORS headers a todas las rutas `/api/*` (admin y públicas)
 - Valida cart access tokens con audience claim `'cart-access'`
 - Rutas públicas sin JWT (match exacto): `/api/admin/login`, `/api/unsubscribe`, `/api/admin/promociones/unsubscribe`, `/api/csp-report`
+- **Dual-auth para rutas TPV**: para `/tpv/*` y `/api/tpv/*` intenta `admin_token` primero, luego `tpv_employee_token` (audience `'tpv-employee'`). La cookie `tpv_employee_token` implementa sliding window lazy (DB check solo en los últimos 15 min de vida).
+- Inyecta `x-pathname` en todas las rutas de página — el layout TPV lo usa para saltarse la verificación de auth en `/tpv/login`.
 
 > Agregar nuevas rutas públicas a `isPublicRoute` en `proxy.ts` (usar `===`, no `startsWith`)
 
@@ -939,6 +961,8 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 | **Kitchen & Bar In-App** | `/waiter/kitchen` y `/waiter/bar`: vistas en tiempo real para gestión de ítems sin Telegram. Estados por ítem: pendiente → en_preparacion → preparado → servido (swipe gestual). Colores por tiempo de espera (oklch, 6 rangos). GroupBy por pedido o por mesa. Filtro "Listos". Retenidos con sección propia. Badges con counts en WaiterBanner (neutral/verde/naranja). Timer de espera arranca desde `validated_at` (momento de validación), no desde `created_at` del pedido original. |
 | **Waiter Pendientes** | `/waiter/pendientes`: cola de validación antes de cocina/bar. Selección individual o por tipo (comida/bebida). Pausa (⏸) por ítem de comida → llega a cocina como retenido. Botón conjunto comida+bebida (botón morado) valida ambos tipos en un solo POST. La pausa prevalece sobre la selección en envíos conjuntos. |
 | **Realtime Híbrido** | Migración completa de polling a Supabase Realtime en todas las vistas del panel de sala (kitchen, bar, pendientes, waiter-banner, waiter-login). Sistema híbrido: Realtime CDC para cambios de datos (<100 ms latencia, sin carga en DB en reposo) + `setInterval` 1 s exclusivamente para actualización visual de timers. Un único canal multiplexado en WaiterBanner consolida conteos de cocina, bar y estado de pago. Eliminados ~30 requests HTTP/min por camarero activo. Ver sección [⚡ Arquitectura Realtime](#-arquitectura-realtime--sistema-híbrido). |
+| **TPV Empleados PIN** | Cajeros y encargados acceden al TPV con PIN numérico. Tabla `empleados_tpv`, cookie `tpv_employee_token` (JWT 1h sliding window lazy), dual-auth en proxy. Permisos por rol: encargado (TPV completo), cajero (mostrador + cobro + arqueo ciego). Botón "Bloquear TPV" para handoff entre empleados. CRUD desde `/admin/configuracion` tab Empleados. |
+| **Electron TPV Windows** | Shell Electron para TPV en Windows. Carga la URL remota de producción (`https://{domain}/tpv`). IPC para impresión térmica ESC/POS (node-thermal-printer). Auto-update vía electron-updater (endpoint `/api/app/version/latest.yml`). Atajos de teclado globales. Bundling con esbuild. |
 | **TPV — Terminal Punto de Venta** | Software de caja con cumplimiento legal completo (Ley Antifraude RD 1007/2023 + RD 1619/2012). **Arqueo ciego**: el teórico queda oculto hasta que el operador introduce su conteo. Mostrador táctil 3 columnas con selector de pase/marcha (1er/2º/Postre/Bebida). Cobro efectivo/tarjeta/propina con tasa IVA/IGIC configurable por empresa. Cadena de hashes SHA-256 inmutable por trigger PostgreSQL: bloqueo de DELETE y UPDATE con EXCEPTION. Ticket rectificativo = cobro negativo con `rectifica_cobro_id` (excluido de estadísticas). Numeración correlativa atómica (`serie-NNNNNN`). IVA/IGIC calculado en DB trigger (no en cliente). Endpoints de auditoría para inspectores (`/api/tpv/audit/chain`, `/api/tpv/audit/export`). Pantalla `/tpv/legal` con Declaración de Responsabilidad RD 1007/2023. Dashboard `/tpv/analytics` con selector de período (Hoy/Semana/Mes/Custom), 5 KPIs, gráfico por hora (Recharts lazy), top productos (JSONB) e historial de turnos. Endpoint `GET /api/tpv/analytics` con 3 RPCs `SECURITY DEFINER`. Configuración IVA/IGIC por empresa con propagación SSR de label. **Stock & Mermas**: trigger `deducir_stock_on_servido` descuenta ingredientes al servir (atómico, mismo tx). Auto-disable/re-enable de productos por umbral. Registro de mermas por turno. Audit log inmutable (`movimientos_stock`). Badge `LowStockBadge` en pantalla de cobro. **Inventario físico** (`/admin/stock/inventario`): conteo a ciegas, revisión de desviaciones, confirmación con movimientos tipo `inventario`. |
 | **KDS Pases/Marchas** | Campo `pase` opcional en `pedidos` (CHECK: primer/segundo/postre/bebida). Selector en TicketPanel antes de enviar a cocina. KDS de cocina agrupa ítems por pase con cabeceras de sección cuando hay múltiples pases activos. Propagado en cadena: `pedidos.pase` → `KitchenItemRecord.pase` → `KitchenItem.pase` → render KDS. |
 | **Telegram Multi-modo** | tienda → quick-reply buttons. restaurante takeaway → time-selector + tracking en vivo. mesa → gestionado in-app (sin Telegram). |
@@ -966,6 +990,8 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 - [`docs/superpowers/specs/2026-07-06-tpv-future-roadmap.md`](docs/superpowers/specs/2026-07-06-tpv-future-roadmap.md) — Roadmap de features futuras (Proveedores, Food Cost, BCG, RBAC, Integraciones)
 - [`docs/superpowers/specs/2026-07-02-tpv-design.md`](docs/superpowers/specs/2026-07-02-tpv-design.md) — Spec técnica del TPV Fase 1
 - [`docs/superpowers/specs/2026-07-03-tpv-analytics-design.md`](docs/superpowers/specs/2026-07-03-tpv-analytics-design.md) — Spec técnica del TPV Fase 2 (Analytics + IVA/IGIC)
+- [`docs/context/tpv-empleados-pin.md`](docs/context/tpv-empleados-pin.md) — TPV empleados PIN: arquitectura dual-auth, permisos por rol, arqueo ciego, trampas críticas
+- [`docs/superpowers/specs/2026-07-08-empleados-tpv-permisos-design.md`](docs/superpowers/specs/2026-07-08-empleados-tpv-permisos-design.md) — Spec de diseño del sistema de empleados TPV con PIN
 
 ---
 

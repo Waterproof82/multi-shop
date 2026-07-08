@@ -322,8 +322,8 @@ function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onClickListos, on
         </button>
       )}
 
-      {/* Cerrar mesa — visible si hay pedidos O si un cliente real entró al menú */}
-      {!!mesa.sesionId && (mesa.activeOrderCount > 0 || mesa.clienteActivo) && !isPaymentInProgress && onCloseMesa && (
+      {/* Cerrar mesa — visible si hay pedidos, cliente activo, o sesión ya pagada pendiente de cierre */}
+      {!!mesa.sesionId && (mesa.activeOrderCount > 0 || mesa.clienteActivo || isPaid) && !isPaymentInProgress && onCloseMesa && (
         <button
           onClick={onCloseMesa}
           className="w-full rounded-lg px-3 py-2.5 flex items-center justify-center gap-1.5 hover:brightness-125 transition-all"
@@ -696,10 +696,11 @@ export function WaiterLoginForm() {
             onClick={() => { if (!launching) { setDeferredMesa(null); } }}
             onKeyDown={e => { if (e.key === 'Escape' && !launching) { setDeferredMesa(null); } }}
           />
-          <dialog
-            open
+          <div
+            role="dialog"
+            aria-modal="true"
             className="relative w-full max-w-xs rounded-2xl p-5 flex flex-col gap-4"
-            style={{ background: 'oklch(18% 0.03 252)', border: '1px solid oklch(42% 0.10 252 / 0.5)', margin: 0 }}
+            style={{ background: 'oklch(18% 0.03 252)', border: '1px solid oklch(42% 0.10 252 / 0.5)' }}
           >
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
@@ -745,7 +746,7 @@ export function WaiterLoginForm() {
             >
               Cancelar
             </button>
-          </dialog>
+          </div>
         </div>
       )}
 

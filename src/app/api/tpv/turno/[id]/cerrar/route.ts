@@ -15,7 +15,8 @@ const repo = new SupabaseTpvRepository();
 
 const CerrarSchema = z.object({
   efectivoCierreCents: z.number().int().min(0),
-  totalEfectivoTeoricoCents: z.number().int().min(0),
+  // Optional for cajero (blind close) — server fetches theoretical total
+  totalEfectivoTeoricoCents: z.number().int().min(0).optional(),
 });
 
 export async function POST(
@@ -25,10 +26,13 @@ export async function POST(
   const { empresaId, error: authError } = (await requireAuth(req)) as AuthResult;
   if (authError) return authError;
 
-  const forbidden = requireRole(req, ['encargado', 'admin', 'superadmin']);
+  // Now allows cajero (blind close)
+  const forbidden = requireRole(req, ['cajero', 'encargado', 'admin', 'superadmin']);
   if (forbidden) return forbidden;
 
   if (!empresaId) return validationErrorResponse('empresaId requerido');
+
+  const rol = req.headers.get('x-admin-rol') ?? '';
 
   let body: unknown;
   try {
@@ -60,10 +64,20 @@ export async function POST(
     );
   }
 
+  let totalEfectivoTeoricoCents = parsed.data.totalEfectivoTeoricoCents ?? 0;
+
+  // For cajero (blind close): fetch the theoretical total server-side
+  if (rol === 'cajero' || parsed.data.totalEfectivoTeoricoCents === undefined) {
+    const statsResult = await repo.getTurnoStats(id);
+    if (statsResult.success) {
+      totalEfectivoTeoricoCents = statsResult.data.totalEfectivoCents;
+    }
+  }
+
   const result = await cerrarTurnoUseCase(repo, {
     turnoId: id,
     efectivoCierreCents: parsed.data.efectivoCierreCents,
-    totalEfectivoTeoricoCents: parsed.data.totalEfectivoTeoricoCents,
+    totalEfectivoTeoricoCents,
   });
 
   if (!result.success) return errorResponse(result.error.message);

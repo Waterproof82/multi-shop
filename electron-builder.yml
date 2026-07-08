@@ -1,0 +1,20 @@
+appId: com.multishop.tpv
+productName: TPV MultiShop
+directories:
+  output: dist/
+files:
+  - electron/dist/**
+  - electron/setup.html
+  - electron/setup.js
+  - electron/package.json
+  - package.json
+extraMetadata:
+  main: electron/dist/main.js
+win:
+  target: nsis
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+publish:
+  provider: generic
+  url: https://app.multishop.es/api/app/version/

@@ -4,7 +4,8 @@ import { Result, AppError } from '@/core/domain/entities/types';
 
 interface AbrirTurnoInput {
   empresaId: string;
-  userId: string;
+  userId?: string;
+  operadorId?: string;
   operadorNombre: string;
   efectivoAperturaCents: number;
 }
@@ -48,6 +49,7 @@ export async function abrirTurnoUseCase(
   return repo.abrirTurno({
     empresaId: input.empresaId,
     userId: input.userId,
+    operadorId: input.operadorId,
     operadorNombre: input.operadorNombre.trim(),
     efectivoAperturaCents: input.efectivoAperturaCents,
   });

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, Tags, LogOut, Menu, X, ShoppingCart, BarChart3, Users, Megaphone, Settings, ExternalLink, ShoppingBag, UtensilsCrossed, MapPin, Star, Archive, BookOpen, History, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, Package, Tags, LogOut, Menu, X, ShoppingCart, BarChart3, Users, Megaphone, Settings, ExternalLink, ShoppingBag, UtensilsCrossed, MapPin, Star, Archive, BookOpen, History, ClipboardList, MonitorCheck } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useAdmin } from '@/lib/admin-context';
 import { useLanguage } from '@/lib/language-context';
@@ -159,6 +159,14 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
           </nav>
 
           <div className="p-4 border-t border-white/10 space-y-2">
+            <Link
+              href="/tpv"
+              onClick={closeMenu}
+              className="flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm text-slate-300 hover:bg-white/5 hover:text-white w-full rounded-lg transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+            >
+              <MonitorCheck className="h-5 w-5 flex-shrink-0" />
+              Ir al TPV
+            </Link>
             <Link
               href="/"
               className="flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm text-slate-300 hover:bg-white/5 hover:text-white w-full rounded-lg transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
