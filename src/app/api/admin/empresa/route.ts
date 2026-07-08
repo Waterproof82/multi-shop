@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
       instagram: empresa.instagram || '',
       url_mapa: empresa.urlMapa || '',
       direccion: empresa.direccion || '',
+      nif: empresa.nif || '',
       url_image: empresa.urlImage || null,
       descripcion_es: empresa.descripcion?.es || '',
       descripcion_en: empresa.descripcion?.en || '',
@@ -67,6 +68,8 @@ export async function GET(request: NextRequest) {
       descripcion_de: empresa.descripcion?.de || '',
       mostrar_promociones: empresa.mostrarPromociones ?? true,
       mostrar_tgtg: empresa.mostrarTgtg ?? true,
+      tipoImpuesto: empresa.tipoImpuesto ?? 'iva',
+      porcentajeImpuesto: empresa.porcentajeImpuesto ?? 10,
     }
   });
 }

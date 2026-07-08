@@ -346,7 +346,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
       </div>
       <SiteFooter empresa={empresa} />
       {/* Welcome discount popup - shows after 30 seconds for empresas with feature enabled */}
-      {showCart && empresa?.descuentoBienvenidaActivo && (
+      {showCart && !isWaiterMode && empresa?.descuentoBienvenidaActivo && (
         <WelcomeDiscountPopup
           empresaId={empresa.id}
           empresaNombre={empresa.nombre}

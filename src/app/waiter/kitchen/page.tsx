@@ -15,12 +15,22 @@ interface KitchenItem {
   nombre: string;
   cantidad: number;
   complementos?: string;
+  nota?: string;
   estado: ItemEstado;
   mesaId?: string | null;
   mesaNumero: number | null;
   mesaNombre: string | null;
   createdAt: string;
+  pase: string | null;
 }
+
+const PASE_ORDER = ['primer', 'segundo', 'postre', 'bebida', null] as const;
+const PASE_LABEL: Record<string, string> = {
+  primer: '1er Pase',
+  segundo: '2º Pase',
+  postre: 'Postre',
+  bebida: 'Bebidas',
+};
 
 const BG        = 'oklch(13% 0.02 252)';
 const TEXT_MAIN = 'oklch(92% 0.02 252)';
@@ -93,6 +103,7 @@ interface MergedKitchenItem {
   mergeKey: string;
   nombre: string;
   complementos?: string;
+  nota?: string;
   totalCantidad: number;
   representativeEstado: ItemEstado;
   firstCreatedAt: string;
@@ -102,13 +113,14 @@ interface MergedKitchenItem {
 function groupKitchenMesaItems(items: KitchenItem[]): MergedKitchenItem[] {
   const map = new Map<string, MergedKitchenItem>();
   for (const item of items) {
-    // Include estado in key: same name but different estado stays separate
-    const key = `${item.nombre}|${item.complementos ?? ''}|${item.estado}`;
+    // Include estado and nota in key: same name but different estado/nota stays separate
+    const key = `${item.nombre}|${item.complementos ?? ''}|${item.nota ?? ''}|${item.estado}`;
     if (!map.has(key)) {
       map.set(key, {
         mergeKey: key,
         nombre: item.nombre,
         complementos: item.complementos,
+        nota: item.nota,
         totalCantidad: 0,
         representativeEstado: item.estado,
         firstCreatedAt: item.createdAt,
@@ -238,6 +250,8 @@ export default function WaiterKitchenPage() {
   const channelNameRef = useRef(`waiter-kitchen-${Math.random().toString(36).slice(2)}`);
   const pointerStartX = useRef<number | null>(null);
   const swipingKey    = useRef<string | null>(null);
+  const headerRef     = useRef<HTMLDivElement>(null);
+  const [headerHeight, setHeaderHeight] = useState(120);
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
   const fetchItems = useCallback(async () => {
@@ -286,16 +300,47 @@ export default function WaiterKitchenPage() {
         }
       });
 
+    // Broadcast channel — receives 'new-order' events from notify_waiter_new_order
+    // trigger for ALL pedido inserts (including waiter-placed estado='pendiente'/'retenido').
+    // Needed because postgres_changes on pedidos is unreliable on the singleton client.
+    const newOrderChannel = supabase
+      .channel('waiter-new-order')
+      .on('broadcast', { event: 'new-order' }, () => {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => { void fetchItems(); }, 100);
+      })
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('[Realtime] waiter-new-order broadcast error (kitchen):', status);
+        }
+      });
+
+    // Re-fetch on app resume from background (visibilitychange relay from WaiterBanner).
+    const onResumeRelay = () => { void fetchItems(); };
+    globalThis.addEventListener('waiter-realtime-update', onResumeRelay);
+
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
+      globalThis.removeEventListener('waiter-realtime-update', onResumeRelay);
       void supabase.removeChannel(channel);
       void supabase.removeChannel(broadcastChannel);
+      void supabase.removeChannel(newOrderChannel);
     };
   }, [fetchItems]);
 
   useEffect(() => {
     const tick = setInterval(() => setItems(p => [...p]), 1000);
     return () => clearInterval(tick);
+  }, []);
+
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => {
+      setHeaderHeight(entry.contentRect.height);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
   }, []);
 
   // Scroll to target mesa and collapse all others when arriving from grid with a mesa param
@@ -584,7 +629,7 @@ export default function WaiterKitchenPage() {
         </div>
 
         {/* Card content — this div translates during drag */}
-        <div data-card-content="" className="relative flex items-center gap-3 px-3 py-2.5" style={{ background: cardColor.bg }}>
+        <div data-card-content="" className="relative flex items-center gap-3 px-3 py-3.5" style={{ background: cardColor.bg }}>
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline gap-1.5">
               <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{item.cantidad}×</span>
@@ -594,6 +639,9 @@ export default function WaiterKitchenPage() {
               <div className="mt-0.5">
                 <span className="text-[10px]" style={{ color: 'oklch(78% 0.03 252)' }}>({item.complementos})</span>
               </div>
+            )}
+            {item.nota && (
+              <span className="text-xs font-medium italic block mt-0.5 px-1.5 py-0.5 rounded" style={{ color: 'oklch(88% 0.18 85)', background: 'oklch(28% 0.12 85 / 0.45)' }}>✎ {item.nota}</span>
             )}
           </div>
 
@@ -699,7 +747,7 @@ export default function WaiterKitchenPage() {
             {t('kitchenCancelSwipeHint', lang)}
           </span>
         </div>
-        <div data-card-content="" className="relative flex items-center gap-3 px-3 py-2.5" style={{ background: cardColor.bg }}>
+        <div data-card-content="" className="relative flex items-center gap-3 px-3 py-3.5" style={{ background: cardColor.bg }}>
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline gap-1.5">
               <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{merged.totalCantidad}×</span>
@@ -709,6 +757,9 @@ export default function WaiterKitchenPage() {
               <div className="mt-0.5">
                 <span className="text-[10px]" style={{ color: 'oklch(78% 0.03 252)' }}>({merged.complementos})</span>
               </div>
+            )}
+            {merged.nota && (
+              <span className="text-xs font-medium italic block mt-0.5 px-1.5 py-0.5 rounded" style={{ color: 'oklch(88% 0.18 85)', background: 'oklch(28% 0.12 85 / 0.45)' }}>✎ {merged.nota}</span>
             )}
           </div>
           <div className="shrink-0">
@@ -729,6 +780,7 @@ export default function WaiterKitchenPage() {
     <div className="min-h-screen" style={{ background: BG }}>
       {/* Header */}
       <div
+        ref={headerRef}
         className="fixed top-0 left-0 right-0 z-10 shadow-lg"
         style={{ background: 'oklch(17% 0.025 252)', borderBottom: '1px solid oklch(42% 0.14 62 / 0.35)' }}
       >
@@ -743,7 +795,7 @@ export default function WaiterKitchenPage() {
           <span className="text-[10px]" style={{ color: TEXT_DIM }}>({nuevosItems.length + listosItems.length})</span>
         </div>
         {/* Row 2: time legend */}
-        <div className="flex flex-wrap gap-1 py-2 px-3">
+        <div className="flex flex-nowrap overflow-x-auto gap-1 py-2 px-3 scrollbar-none" style={{ scrollbarWidth: 'none' }}>
           {TIME_COLORS.map((c) => (
             <span
               key={c.label}
@@ -755,7 +807,7 @@ export default function WaiterKitchenPage() {
           ))}
         </div>
         {/* Row 3: filter toggle */}
-        <div className="flex items-center gap-1 px-3 pb-2 flex-wrap">
+        <div className="flex items-center gap-1 px-3 pb-2 overflow-x-auto scrollbar-none" style={{ scrollbarWidth: 'none' }}>
           {/* Group: Por pedido / Por mesa */}
           {(['order', 'mesa'] as const).map(mode => {
             const isActive = groupBy === mode;
@@ -764,7 +816,7 @@ export default function WaiterKitchenPage() {
               <button
                 key={mode}
                 onClick={() => setGroupBy(mode)}
-                className="rounded px-3 py-1 text-[11px] font-semibold transition-colors"
+                className="rounded-lg px-4 py-2 text-xs font-semibold transition-colors"
                 style={isActive
                   ? { background: 'oklch(32% 0.10 252)', color: TEXT_MAIN, border: '1px solid oklch(50% 0.10 252 / 0.6)' }
                   : { background: 'transparent', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.4)' }
@@ -790,7 +842,7 @@ export default function WaiterKitchenPage() {
               <button
                 key={mode}
                 onClick={() => setGroupBy(mode)}
-                className="rounded px-3 py-1 text-[11px] font-semibold transition-colors"
+                className="rounded-lg px-4 py-2 text-xs font-semibold transition-colors"
                 style={isActive ? activeStyle : { background: 'transparent', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.4)' }}
               >
                 {label}
@@ -832,7 +884,7 @@ export default function WaiterKitchenPage() {
         </div>
       </div>
 
-      <div className="pt-[112px] px-3 pb-6">
+      <div className="px-3 pb-6" style={{ paddingTop: headerHeight }}>
         {!hasAny && (
           <div className="text-center py-10 text-sm" style={{ color: TEXT_DIM }}>
             {t('kitchenEmpty', lang)}
@@ -849,20 +901,41 @@ export default function WaiterKitchenPage() {
                 </span>
               </div>
               <div className="flex flex-col gap-4">
-                {Array.from(groupByPedido(nuevosItems).entries()).map(([pedidoId, group]) => {
-                  const tableLabel = group.mesaNombre ?? `Mesa ${group.mesaNumero ?? '—'}`;
-                  const elapsed    = getElapsedMinutes(group.createdAt);
-                  return (
-                    <div key={pedidoId}>
-                      <div className="flex items-center gap-2 px-1 mb-1.5">
-                        <span className="text-xs font-bold" style={{ color: 'oklch(72% 0.14 62)' }}>#{group.numeroPedido}</span>
-                        <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{tableLabel}</span>
-                        <span className="text-[10px] font-mono ml-auto" style={{ color: TEXT_DIM }}>{formatTimer(elapsed)}</span>
-                      </div>
-                      <div className="flex flex-col gap-2">{group.items.map(renderItemCard)}</div>
+                {(() => {
+                  const nuevosByPase = PASE_ORDER
+                    .map(pase => ({
+                      pase,
+                      label: pase ? (PASE_LABEL[pase] ?? pase) : 'Sin pase',
+                      items: nuevosItems.filter(i => (i.pase ?? null) === pase),
+                    }))
+                    .filter(g => g.items.length > 0);
+                  const showPaseHeaders = nuevosByPase.length > 1 || (nuevosByPase.length === 1 && nuevosByPase[0]?.pase !== null);
+                  return nuevosByPase.map(grupo => (
+                    <div key={grupo.pase ?? 'null'}>
+                      {showPaseHeaders && (
+                        <div className="px-1 py-1.5 mb-1 border-b" style={{ borderColor: 'oklch(35% 0.06 252 / 0.5)' }}>
+                          <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'oklch(65% 0.18 270)' }}>
+                            {grupo.label}
+                          </span>
+                        </div>
+                      )}
+                      {Array.from(groupByPedido(grupo.items).entries()).map(([pedidoId, group]) => {
+                        const tableLabel = group.mesaNombre ?? `Mesa ${group.mesaNumero ?? '—'}`;
+                        const elapsed    = getElapsedMinutes(group.createdAt);
+                        return (
+                          <div key={pedidoId}>
+                            <div className="flex items-center gap-2 px-1 mb-1.5">
+                              <span className="text-xs font-bold" style={{ color: 'oklch(72% 0.14 62)' }}>#{group.numeroPedido}</span>
+                              <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{tableLabel}</span>
+                              <span className="text-[10px] font-mono ml-auto" style={{ color: TEXT_DIM }}>{formatTimer(elapsed)}</span>
+                            </div>
+                            <div className="flex flex-col gap-2">{group.items.map(renderItemCard)}</div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
+                  ));
+                })()}
               </div>
             </div>
           )}
@@ -967,7 +1040,7 @@ export default function WaiterKitchenPage() {
                           disabled={isServing}
                           title={t('kitchenTodosServidos', lang)}
                           className="flex items-center justify-center rounded-lg disabled:opacity-50"
-                          style={{ width: 44, height: 32, background: 'oklch(26% 0.16 148)', color: 'oklch(80% 0.22 148)', border: '1px solid oklch(45% 0.22 148 / 0.6)' }}
+                          style={{ width: 44, height: 40, background: 'oklch(26% 0.16 148)', color: 'oklch(80% 0.22 148)', border: '1px solid oklch(45% 0.22 148 / 0.6)' }}
                         >
                           {isServing ? <span className="text-[10px]">…</span> : <CheckCheck className="w-4 h-4" />}
                         </button>
@@ -978,7 +1051,7 @@ export default function WaiterKitchenPage() {
                           disabled={isLiberating}
                           title={t('kitchenLiberarPedidos', lang)}
                           className="flex items-center justify-center rounded-lg disabled:opacity-50"
-                          style={{ width: 44, height: 32, background: 'oklch(21% 0.10 65)', color: 'oklch(72% 0.18 65)', border: '1px solid oklch(50% 0.22 65 / 0.55)' }}
+                          style={{ width: 44, height: 40, background: 'oklch(21% 0.10 65)', color: 'oklch(72% 0.18 65)', border: '1px solid oklch(50% 0.22 65 / 0.55)' }}
                         >
                           {isLiberating ? <span className="text-[10px]">…</span> : <PlayCircle className="w-4 h-4" />}
                         </button>
@@ -992,7 +1065,7 @@ export default function WaiterKitchenPage() {
                         title="Agrupar ítems"
                         className="flex items-center justify-center rounded-lg"
                         style={{
-                          width: 44, height: 32,
+                          width: 44, height: 40,
                           background: isGrouped ? 'oklch(28% 0.16 228)' : 'oklch(20% 0.04 252)',
                           color: isGrouped ? 'oklch(78% 0.20 228)' : TEXT_DIM,
                           border: isGrouped ? '1px solid oklch(50% 0.22 228 / 0.6)' : '1px solid oklch(35% 0.06 252 / 0.5)',
@@ -1055,7 +1128,7 @@ export default function WaiterKitchenPage() {
                             disabled={isServing}
                             title={t('kitchenTodosServidos', lang)}
                             className="flex items-center justify-center rounded-lg disabled:opacity-50"
-                            style={{ width: 44, height: 32, background: 'oklch(26% 0.16 148)', color: 'oklch(80% 0.22 148)', border: '1px solid oklch(45% 0.22 148 / 0.6)' }}
+                            style={{ width: 44, height: 40, background: 'oklch(26% 0.16 148)', color: 'oklch(80% 0.22 148)', border: '1px solid oklch(45% 0.22 148 / 0.6)' }}
                           >
                             {isServing ? <span className="text-[10px]">…</span> : <CheckCheck className="w-4 h-4" />}
                           </button>
@@ -1116,7 +1189,7 @@ export default function WaiterKitchenPage() {
                             disabled={isLiberating}
                             title={t('kitchenLiberarPedidos', lang)}
                             className="flex items-center justify-center rounded-lg disabled:opacity-50"
-                            style={{ width: 44, height: 32, background: 'oklch(21% 0.10 65)', color: 'oklch(72% 0.18 65)', border: '1px solid oklch(50% 0.22 65 / 0.55)' }}
+                            style={{ width: 44, height: 40, background: 'oklch(21% 0.10 65)', color: 'oklch(72% 0.18 65)', border: '1px solid oklch(50% 0.22 65 / 0.55)' }}
                           >
                             {isLiberating ? <span className="text-[10px]">…</span> : <PlayCircle className="w-4 h-4" />}
                           </button>

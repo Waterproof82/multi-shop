@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import { BarChart3, ShoppingCart, Euro, TrendingUp, Users, ArrowUpRight, ArrowDownRight, ChevronLeft, ChevronRight, Loader2, UtensilsCrossed, ShoppingBag, Globe } from 'lucide-react';
+import { BarChart3, ShoppingCart, Euro, TrendingUp, Users, ArrowUpRight, ArrowDownRight, ChevronLeft, ChevronRight, Loader2, UtensilsCrossed, ShoppingBag, Globe, Truck } from 'lucide-react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { logClientError } from '@/lib/client-error';
@@ -33,7 +33,7 @@ interface Stats {
   totalAno: number;
   topPlatos: { nombre: string; cantidad: number; total: number }[];
   topPlatosAno: { nombre: string; cantidad: number; total: number }[];
-  pedidosPorDia: { dia: number; pedidos: number; ingresos: number }[];
+  pedidosPorDia: { dia: number; mesa: number; recogida: number; delivery: number; web: number }[];
   clientesNuevos: number;
   clientesRecurrentes: number;
   ticketMedio: number;
@@ -44,6 +44,7 @@ interface Stats {
   byOrigen?: {
     mesa:     { pedidos: number; total: number };
     recogida: { pedidos: number; total: number };
+    delivery: { pedidos: number; total: number };
     web:      { pedidos: number; total: number };
   };
 }
@@ -462,7 +463,7 @@ export default function EstadisticasPage() {
           <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">
             {t("ordersMonth", lang)} — {t("byOrigin", lang)}
           </h3>
-          <div className={`grid gap-3 ${empresaTipo === 'restaurante' ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          <div className={`grid gap-3 ${empresaTipo === 'restaurante' ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'}`}>
             {empresaTipo === 'restaurante' && (
               <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-400/20 rounded-xl px-4 py-3">
                 <UtensilsCrossed className="w-5 h-5 text-amber-400 shrink-0" />
@@ -479,6 +480,14 @@ export default function EstadisticasPage() {
                 <p className="text-xs text-blue-300/70 truncate">{t("orderTypeRecogida", lang)}</p>
                 <p className="text-lg font-bold text-white">{stats.byOrigen.recogida.pedidos}</p>
                 <p className="text-xs text-blue-300/70">{formatPrice(stats.byOrigen.recogida.total)}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-400/20 rounded-xl px-4 py-3">
+              <Truck className="w-5 h-5 text-emerald-400 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs text-emerald-300/70 truncate">{t("orderTypeDelivery", lang)}</p>
+                <p className="text-lg font-bold text-white">{stats.byOrigen.delivery.pedidos}</p>
+                <p className="text-xs text-emerald-300/70">{formatPrice(stats.byOrigen.delivery.total)}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 bg-slate-500/10 border border-slate-400/20 rounded-xl px-4 py-3">

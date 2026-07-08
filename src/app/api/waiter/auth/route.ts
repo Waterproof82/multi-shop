@@ -54,7 +54,7 @@ export async function POST(request: Request) {
   const response = NextResponse.json({ ok: true, empresaId: empresa.id as string });
   response.cookies.set('waiter_token', token, {
     httpOnly: true,
-    sameSite: 'strict',
+    sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
     path: '/',
     maxAge: 43200, // 12 hours

@@ -13,6 +13,7 @@ import { SupabaseTgtgRepository } from './supabase-tgtg.repository';
 import { SupabaseDescuentoRepository } from './supabase-descuento.repository';
 import { SupabaseMesaClientTokenRepository } from './supabase-mesa-client-token.repository';
 import { SupabaseValoracionRepository } from './supabase-valoracion.repository';
+import { SupabaseEmpleadoTpvRepository } from '../repositories/supabase-empleado-tpv.repository';
 import { ProductUseCase } from '@/core/application/use-cases/product.use-case';
 import { CategoryUseCase } from '@/core/application/use-cases/category.use-case';
 import { ClienteUseCase } from '@/core/application/use-cases/cliente.use-case';
@@ -27,6 +28,7 @@ import { SuperAdminUseCase } from '@/core/application/use-cases/superadmin.use-c
 import { DescuentoUseCase } from '@/core/application/use-cases/descuento.use-case';
 import { MesaClientTokenUseCase } from '@/core/application/use-cases/mesa-client-token.use-case';
 import { ValoracionUseCase } from '@/core/application/use-cases/valoracion.use-case';
+import { EmpleadoTpvLoginUseCase } from '@/core/application/use-cases/tpv/empleado-tpv-login.use-case';
 
 const supabase = getSupabaseClient();
 const supabaseAnon = getSupabaseAnonClient();
@@ -45,6 +47,7 @@ const tgtgRepository = new SupabaseTgtgRepository(supabase);
 const descuentoRepository = new SupabaseDescuentoRepository(supabase);
 const mesaClientTokenRepository = new SupabaseMesaClientTokenRepository(supabase);
 export const valoracionRepository = new SupabaseValoracionRepository(supabase);
+export const empleadoTpvRepository = new SupabaseEmpleadoTpvRepository();
 
 // Public repository (anon key) for public-facing pages
 export const empresaPublicRepository = new SupabaseEmpresaRepository(supabaseAnon);
@@ -64,3 +67,4 @@ export const superAdminUseCase = new SuperAdminUseCase(superAdminRepository);
 export const descuentoUseCase = new DescuentoUseCase(descuentoRepository, empresaRepository);
 export const mesaClientTokenUseCase = new MesaClientTokenUseCase(mesaClientTokenRepository, mesaSesionRepository);
 export const valoracionUseCase = new ValoracionUseCase(valoracionRepository);
+export const empleadoTpvLoginUseCase = new EmpleadoTpvLoginUseCase(empleadoTpvRepository);

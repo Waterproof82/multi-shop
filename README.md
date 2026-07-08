@@ -25,11 +25,80 @@ Plataforma **multi-tenant** de gestión de negocios de hostelería y retail. Cad
 - **Pago en mesa** vía Redsys TPV: pago total o división de cuenta entre 2 y 20 personas. Lock atómico (PostgreSQL `FOR UPDATE`) para pago total; división permite pagos simultáneos independientes mediante RPC transaccional. Verificación de total antes de pagar (detecta productos añadidos en el último momento). Idempotencia de webhook garantizada con update atómico `WHERE status='pending'`. Actualización en tiempo real vía Supabase Realtime.
 - **Registro manual de pagos** por el camarero (efectivo / pago externo) para desbloquear la sesión en escenarios de división.
 - **Gestión de pedidos takeaway** desde un entorno de chat de Telegram: con un solo botón se indica el tiempo de recogida (10, 15, 20, 30 o 45 minutos). El cliente recibe la notificación automáticamente en su pantalla de seguimiento, sin necesidad de llamar por teléfono.
-- **Gestión de pedidos en mesa (cocina y bar)** íntegramente en la app:
+- **Notas por ítem:** clientes y camareros pueden añadir una nota libre a cada producto del carrito ("sin cebolla", "punto medio", etc.). La nota viaja por todo el pipeline hasta las pantallas de cocina y bar, donde aparece como pill ámbar debajo del nombre.
+- **Gestión de pedidos en mesa (cocina y bar)** íntegramente en la app — tres pantallas especializadas:
+  - `/kitchen` — pantalla standalone para tablet en cocina. Sin login. Muestra ítems de comida con avance de estado por swipe (pendiente → en preparación → listo). Colores por tiempo de espera (azul → teal → ámbar → rojo).
+  - `/waiter/kitchen` — vista de cocina dentro del panel de camarero (PIN requerido). Añade filtros por Listos y Retenidos, retención de ítems por mesa, y release masivo. Timer arranca desde la validación, no desde el pedido original.
   - `/waiter/pendientes` — cola de validación: pedidos en `pendiente_validacion` que el camarero revisa antes de mandar a cocina/bar. Selección individual o por tipo (comida/bebida), pausa por ítem (→ kitchen retenido), envío conjunto comida+bebida en un solo tap.
-  - `/waiter/kitchen` — vista de cocina con todos los ítems de comida en curso, agrupados por pedido o por mesa. Colores por tiempo de espera (azul → teal → ámbar → rojo). Filtro "Listos" para servicio. Timer arranca desde la validación, no desde el pedido original.
-  - `/waiter/bar` — vista equivalente para bebidas.
-  - Los camareros deslizan cada ítem para avanzar su estado (`pendiente → en preparación → listo → servido`) con gestos de puntero.
+  - `/waiter/bar` — vista de bebidas para el camarero. Swipe directo a servido con countdown de 5 s. Botón "Todos servidos" por mesa.
+  - Los camareros deslizan cada ítem para avanzar su estado con gestos de puntero.
+
+### 🖥️ TPV — Terminal Punto de Venta (Fases 1 y 2)
+
+Software de caja para restaurantes y tiendas integrado en la misma plataforma. Cumplimiento legal completo con la Ley Antifraude (RD 1007/2023) y RD 1619/2012. Dashboard de analítica con selector de período y configuración de tipo de impuesto (IVA/IGIC) por empresa. Historial multi-turno, cobro parcial y rectificativos con trazabilidad cross-turno.
+
+#### Gestión de turno y cobro
+
+- **Gestión de turnos de caja**: apertura con efectivo inicial, cierre con arqueo ciego real — el teórico queda oculto con `—` hasta que el operador introduce su conteo; solo entonces se revela la diferencia. Flujo completamente ciego para garantizar objetividad.
+- **Mostrador táctil en 3 columnas**: grid de mesas/categorías a la izquierda, menú de productos en el centro, ticket activo a la derecha. Navegación por teclado + touch optimizada.
+- **Selección de complementos**: modal de selección cuando un producto tiene opciones obligatorias u opcionales (radio-select por complemento, validación pre-añadido).
+- **Flujo de cobro completo**: efectivo (calcula cambio automáticamente), tarjeta, propina opcional. Pantalla de confirmación con número de ticket, desglose de IVA/IGIC y enlace de verificación AEAT (formato DD-MM-AAAA requerido por la AEAT). La tasa se toma del campo `porcentaje_impuesto` de la empresa (no hardcodeada).
+- **Cobro parcial**: el operador puede editar el "Importe a cobrar" para pagar una fracción del total. La sesión de mesa permanece abierta hasta cobrar el total. El mostrador muestra en tiempo real el importe ya cobrado y el pendiente restante. Cada cobro parcial genera un ticket fiscal independiente.
+- **Detección de cobro externo**: si un camarero o cliente paga la mesa desde otro canal mientras está abierta en el TPV, el mostrador detecta el cierre de sesión vía Realtime (Supabase postgres_changes) y limpia el ticket automáticamente con un aviso al operador.
+- **Bloqueo preventivo de cobro**: el botón "Cobrar" se bloquea mientras algún pedido de la mesa tiene ítems sin servir (estado pendiente, en cocina o listo), igual que en el sistema de camarero.
+- **Selector de pase/marcha**: antes de enviar un pedido a cocina, el operador puede asignarle un pase (`1er pase`, `2º pase`, `Postre`, `Bebida`). El campo se guarda en `pedidos.pase` y se muestra como badge en el ticket activo. El KDS de cocina agrupa los ítems por sección de pase cuando hay pedidos con distintos pases activos.
+- **Historial multi-turno**: selector de turno en `/tpv/historial` que permite consultar cualquier turno pasado. Los pedidos se filtran entre `apertura_at` y `cierre_at` del turno seleccionado. Los cobros se filtran por `turno_id`. Navegación SSR mediante query param `?turnoId=`; muestra hasta los últimos 20 turnos.
+- **Rectificativos con trazabilidad cross-turno**: el historial resuelve server-side si un cobro fue rectificado en otro turno (`yaRectificado: boolean`). El rectificativo muestra "Rectificativo · anula SERIE-NNNNNN (otro turno)" cuando el original pertenece a un turno distinto. Tras confirmar la rectificación, `router.refresh()` recarga los datos SSR y actualiza los totales.
+
+#### Cumplimiento legal (Ley Antifraude + RD 1007/2023 + RD 1619/2012)
+
+- **Cadena de hashes SHA-256**: cada cobro encadena el hash del anterior vía trigger PostgreSQL + pgcrypto. Inmutable: triggers bloquean DELETE y UPDATE de campos económicos con EXCEPTION.
+- **Ticket rectificativo**: anula un cobro previo emitiendo un cobro de signo negativo con referencia al original — sin modificar registros inmutables (RD 1619/2012). Queda excluido automáticamente de las estadísticas de analítica (`rectifica_cobro_id IS NULL`).
+- **Numeración correlativa**: `serie-NNNNNN` sin saltos por empresa, atómica a nivel de base de datos.
+- **IVA/IGIC calculado en DB**: `iva_cents` y `base_imponible_cents` computados en el trigger de inserción — nunca en el cliente. El porcentaje queda grabado por cobro para que cambiar la config de la empresa no afecte al histórico.
+- **Auditoría para inspectores**: `GET /api/tpv/audit/chain` verifica la cadena de hashes recomputando SHA-256 en Node.js; `GET /api/tpv/audit/export` descarga todos los cobros del período como JSON con cabecera `Content-Disposition: attachment`.
+- **Pantalla de conformidad legal** `/tpv/legal`: Declaración de Responsabilidad del fabricante (RD 1007/2023), versión del software, fecha de firma, serie del sistema, checklist de cumplimiento, y acceso a verificación de cadena y exportación.
+- **NIF/CIF de la empresa**: campo configurable desde el panel admin, incluido en el ticket de cobro y en el enlace de verificación AEAT.
+
+#### Analítica (Fase 2)
+
+- **Dashboard `/tpv/analytics`**: selector de período (Hoy / Semana / Mes / Custom con fechas libres), 5 KPIs (facturado total, ticket medio, IVA/IGIC total + base imponible, propinas, número de turnos con duración media), gráfico de barras de ventas por hora en zona horaria Europe/Madrid (Recharts, lazy-loaded con `dynamic()`), split efectivo/tarjeta con barras de progreso, top 10 productos más vendidos (via `pedidos.detalle_pedido` JSONB), historial de turnos del período con operador, horario y totales.
+- **Endpoint único** `GET /api/tpv/analytics?desde=&hasta=`: validación Zod con rango máximo de 365 días. Ejecuta 3 RPCs PostgreSQL con `SECURITY DEFINER` (`tpv_analytics_kpis`, `tpv_analytics_por_hora`, `tpv_analytics_top_productos`) más query directa de turnos. `empresa_id` siempre derivado del JWT, nunca del query string.
+- **Configuración IVA/IGIC por empresa**: campos `tipo_impuesto` (`'iva'|'igic'`) y `porcentaje_impuesto` en tabla `empresas`. Configurable desde el panel admin con auto-relleno (IVA → 10%, IGIC → 7%). El label se propaga como prop SSR a todos los componentes TPV — sin hardcodear la etiqueta.
+
+#### Stock & Mermas (Fase 2)
+
+- **Gestión de ingredientes** (`/admin/stock/ingredientes`): CRUD con badge visual de stock (rojo = bajo mínimo, verde = OK). Unidades: kg, l, ud. Umbral de alerta configurable por ingrediente.
+- **Editor de escandallo** (`/admin/stock/recetas`): vincula ingredientes a productos con cantidad necesaria por servicio. Un producto sin receta no descuenta stock pero genera un aviso `sin_receta` en el audit log.
+- **Descuento automático al servir**: trigger PostgreSQL `deducir_stock_on_servido` se ejecuta en el mismo transaction que el cambio de estado. Decremento atómico (`cantidad_actual = cantidad_actual - X`). Si el ingrediente cae por debajo del umbral, el producto se desactiva automáticamente del menú (`activo = false`).
+- **Re-habilitación automática**: cuando admin registra una entrada de stock que supera el umbral, los productos vinculados se reactivan sin intervención manual.
+- **Registro de mermas** (`/tpv/mermas`): operador elige ingrediente, cantidad y motivo (caducidad / rotura / error de preparación / otro). Requiere turno activo. Genera fila en `mermas` + `movimientos_stock` (tipo=`merma`) de forma atómica.
+- **Audit log inmutable** (`/admin/stock/movimientos`): historial paginado de todos los movimientos (entrada, deducción, ajuste, merma, sin_receta, **inventario**). Filtrable por ingrediente, tipo y rango de fechas. `movimientos_stock` es append-only — ni `authenticated` ni `anon` pueden modificar o borrar filas.
+- **Inventario físico a ciegas** (`/admin/stock/inventario`): flujo de 3 pasos para el conteo periódico del almacén. (1) El operador introduce la cantidad real de cada ingrediente sin ver el teórico. (2) El sistema calcula y muestra las desviaciones (verde = sobrante, rojo = faltante). (3) Al confirmar, se insertan movimientos de tipo `inventario` y se actualiza `cantidad_actual`. El tipo `inventario` se añadió como nuevo valor al enum `tipo_movimiento`.
+- **Alerta de stock bajo en cobro**: badge `LowStockBadge` (ámbar, clicable) en el header del TPV y en la pantalla de cobro. Refresco cada 3 minutos. Informativo, nunca bloquea el pago.
+
+#### Empleados TPV — autenticación por PIN
+
+Sistema de cajeros y encargados que acceden al TPV con PIN numérico, sin necesidad de email/password ni cuenta en `auth.users`. Los empleados se gestionan desde `/admin/configuracion` → tab "Empleados".
+
+- **Login por PIN**: pantalla `/tpv/login` con entrada numérica (4-8 dígitos). El PIN se hashea con PBKDF2 SHA-256 scoped por empresa.
+- **Cookie `tpv_employee_token`**: JWT HS256, audience `'tpv-employee'`, 1h. Sliding window lazy: solo se renueva (con consulta a DB) cuando quedan <15 min de vida.
+- **Dual-auth en proxy**: para rutas `/tpv/*`, el proxy intenta `admin_token` primero; si falla, prueba `tpv_employee_token`. Si ninguno es válido → redirect `/tpv/login`.
+- **Botón "Bloquear TPV"**: visible solo en sesiones de empleado. Llama `POST /api/tpv/empleados/logout`, limpia la cookie y redirige a `/tpv/login` sin afectar el turno activo. Permite handoff entre empleados en el mismo dispositivo.
+- **Permisos por rol**:
+  - `encargado`: TPV completo. Puede abrir turno, ver mermas, cierre con arqueo completo. No accede al panel admin.
+  - `cajero`: mostrador + cobro únicamente. Mermas ocultas. Cierre de caja en modo **arqueo ciego** (no ve el total teórico; el servidor calcula la diferencia internamente).
+- **Precarga de nombre**: al abrir turno, `operadorNombre` se pre-rellena desde el token del empleado (campo readonly).
+- **`operador_id` en `tpv_turnos`**: FK nullable a `empleados_tpv`. Turnos de admin tienen `operador_id = NULL`.
+
+Tabla DB: `empleados_tpv` con índice parcial único `ON (empresa_id, pin_hash) WHERE activo = true`.
+CRUD admin: `GET|POST /api/admin/empleados-tpv`, `PATCH|DELETE /api/admin/empleados-tpv/[id]`.
+
+#### Rutas TPV
+
+`/tpv/login`, `/tpv/turno/abrir`, `/tpv/turno/cerrar`, `/tpv/mostrador`, `/tpv/cobro/[sesionId]`, `/tpv/historial`, `/tpv/mesas`, `/tpv/legal`, `/tpv/analytics`, `/tpv/mermas`.
+Admin stock: `/admin/stock/ingredientes`, `/admin/stock/recetas`, `/admin/stock/movimientos`, `/admin/stock/inventario`.
+Admin empleados: `/admin/configuracion` → tab "Empleados".
 
 ### 🤖 Notificaciones Telegram — dos modos de operación
 
@@ -126,6 +195,39 @@ Estas tablas deben estar publicadas en Supabase antes de que los canales Realtim
 
 ---
 
+## PWA & Resiliencia — Panel Camarero
+
+El panel `/waiter` incluye un Service Worker vanilla (sin Workbox/Serwist) cuyo objetivo es **rendimiento y resiliencia ante micro-cortes de red**, no funcionamiento offline real.
+
+> **Importante:** el camarero no puede operar sin conexión. Todos los datos (pedidos, mesas, estados) vienen de `/api/*`, que es siempre NetworkOnly. Lo que el SW previene es que un corte breve de Wi-Fi expulse al camarero al PIN o rompa la UI con una pantalla de error del browser.
+
+### Service Worker (activo, scope `/waiter`)
+
+| Estrategia | Ruta | Qué resuelve |
+|------------|------|--------|
+| CacheFirst | `/_next/static/*` | Chunks con hash — carga instantánea en visitas repetidas |
+| NetworkFirst + fallback | `/waiter/*`, `bell.mp3` | Corte breve → shell cacheado visible + overlay "sin conexión" |
+| NetworkOnly | `/api/*` | Auth y datos de pedidos siempre frescos — nunca cachear |
+
+- GET-only guard: mutaciones (POST/PATCH/DELETE) siempre van a red.
+- `skipWaiting()` + `clients.claim()`: el nuevo SW toma control sin recargar.
+- Página offline estática en `/waiter/offline` pre-cacheada en el install event.
+- `navigator.onLine` guard en `WaiterBanner`: evita redirigir al PIN cuando la red cae brevemente.
+- **Solo se registra en producción.** En dev (`pnpm dev`) no hay SW para no interferir con HMR.
+
+### Capacitor Android (activo — en producción)
+
+El panel `/waiter` se distribuye como **APK nativo para Android** en PDAs de camarero. Capacitor envuelve la webapp en un WebView nativo sin reescribir el código.
+
+- APK firmado, distribuido vía Supabase Storage (sin Play Store)
+- Auto-update: al abrir la app compara `versionCode` con `/api/app/version` y redirige a la descarga si hay nueva versión
+- `SameSite=lax` obligatorio en la cookie `waiter_token` para que el WebView la reciba
+- `CookieManager.flush()` en `onPause()` para persistir la sesión si el proceso es killed
+
+Ver `docs/context/capacitor-android-pda.md` para el proceso de build y release.
+
+---
+
 ## Stack Tecnológico
 
 | Tecnología | Versión | Uso |
@@ -145,6 +247,7 @@ Estas tablas deben estar publicadas en Supabase antes de que los canales Realtim
 | Redsys TPV Virtual | — | Pago online (HMAC_SHA256_V1) |
 | Glovo Business LaaS | — | Despacho de riders (DH On Demand Rider API) |
 | @zxing/browser | — | Decodificación QR in-app (iOS Safari + Android Chrome) |
+| Service Worker (vanilla) | — | Caching offline para `/waiter` — sin Workbox/Serwist |
 
 ---
 
@@ -211,6 +314,13 @@ src/
 │   │       ├── delivery/            # Zona de entrega + credenciales Glovo + Redsys
 │   │       ├── estadisticas/
 │   │       └── configuracion/
+│   ├── tpv/                         # Terminal Punto de Venta
+│   │   ├── turno/abrir/page.tsx     # Apertura de turno con efectivo inicial
+│   │   ├── mostrador/page.tsx       # Mostrador táctil (3 columnas)
+│   │   ├── cobro/[sesionId]/page.tsx# Flujo de cobro (efectivo/tarjeta/propina)
+│   │   ├── historial/page.tsx       # Historial pedidos + cobros del turno
+│   │   ├── mesas/page.tsx           # Grid de mesas con estado de sesión
+│   │   └── legal/page.tsx           # Conformidad legal + Declaración RD 1007/2023
 │   ├── superadmin/                  # Panel Super Admin
 │   │   ├── layout.tsx               # Verifica rol superadmin
 │   │   ├── page.tsx                 # Dashboard global
@@ -275,6 +385,14 @@ src/
 │       │   ├── quote/               # POST — pública, cotización de envío en tiempo real
 │       │   ├── order/               # POST — admin, despacho manual de rider
 │       │   └── webhook/             # POST — callbacks de estado del rider Glovo
+│       ├── tpv/                     # TPV (admin auth)
+│       │   ├── turno/               # POST (abrir) + GET (activo)
+│       │   ├── cobro/               # POST — registrar cobro completo (hash chain)
+│       │   │   └── rectificar/      # POST — ticket rectificativo (cobro negativo)
+│       │   ├── pedidos/             # POST — crear pedido desde mostrador
+│       │   └── audit/
+│       │       ├── chain/           # GET — verificar cadena SHA-256 (Ley Antifraude)
+│       │       └── export/          # GET — exportar cobros como JSON (inspectores)
 │       └── unsubscribe/             # GET — pública, dar de baja/alta promo
 │
 ├── core/                            # Clean Architecture
@@ -338,7 +456,7 @@ Documentación completa en [`docs/context/security.md`](docs/context/security.md
 | **XSS emails** | `escapeHtml()` en todos los templates HTML, logging centralizado sin PII |
 | **Price tampering** | Total recalculado server-side + rechazo de productos desconocidos (`PRODUCT_NOT_FOUND`) |
 | **Anti-enumeración** | Login devuelve mensaje genérico para todos los tipos de fallo auth |
-| **RBAC** | `requireRole(request, ['admin'])` en todos los handlers mutativos de `/api/admin/*` |
+| **RBAC** | `RolAdmin` union type + CHECK constraint en DB. `requireRole(request, roles[])` en todos los handlers de `/api/admin/*` y `/api/tpv/*`. Cuatro roles: `superadmin`, `admin`, `encargado`, `cajero`. Guards en layouts y páginas (redirect SSR). |
 | **Unsubscribe** | HMAC-SHA256 con `UNSUBSCRIBE_HMAC_SECRET` dedicado, TTL 1 año (GDPR/CAN-SPAM), acción explícita `'baja'` |
 | **CORS** | Whitelist de dominios, `Vary: Origin`, preflight 204, headers en rutas públicas |
 | **Cart tokens** | Validación con audience claim `'cart-access'` para prevenir token confusion |
@@ -515,16 +633,21 @@ function toAdminProduct(prod: Product) {
 
 ### Roles de Usuario
 
-El sistema soporta dos roles:
+El sistema soporta cuatro roles (`RolAdmin` union type, CHECK constraint en DB):
 
 | Rol | Descripción | Acceso |
 |-----|-------------|--------|
-| `admin` | Admin de empresa | Panel admin de su empresa, solo datos de su tenant |
+| `admin` | Admin de empresa | Panel admin completo + TPV |
 | `superadmin` | Super Admin | Panel superadmin, acceso a TODAS las empresas |
+| `encargado` | Encargado de turno | TPV completo (analytics, historial, mermas, cierre de turno). Sin acceso a `/admin/*` |
+| `cajero` | Cajero | Solo TPV mostrador, cobro y pedidos. Sin acceso a analytics, historial, mermas ni cierre de turno |
 
-El rol se define en la columna `rol` de la tabla `perfiles_admin`:
+El rol se define en la columna `rol` de la tabla `perfiles_admin` (CHECK constraint desde `20260707000001_rbac_roles_constraint.sql`):
 - `admin` → redirige a `/admin`
 - `superadmin` → redirige a `/superadmin`
+- `encargado` / `cajero` → redirigen a `/tpv`
+
+> **Nota**: `encargado` y `cajero` pueden autenticarse en el TPV de dos formas independientes: (a) mediante cuenta `perfiles_admin` + email/password (flujo legacy), o (b) mediante la tabla `empleados_tpv` + PIN numérico (`tpv_employee_token` cookie). El panel admin solo reconoce el flujo (a); el TPV reconoce ambos.
 
 ### Panel Super Admin
 
@@ -584,6 +707,8 @@ if (!admin) redirect('/admin/login');
 - Aplica CORS headers a todas las rutas `/api/*` (admin y públicas)
 - Valida cart access tokens con audience claim `'cart-access'`
 - Rutas públicas sin JWT (match exacto): `/api/admin/login`, `/api/unsubscribe`, `/api/admin/promociones/unsubscribe`, `/api/csp-report`
+- **Dual-auth para rutas TPV**: para `/tpv/*` y `/api/tpv/*` intenta `admin_token` primero, luego `tpv_employee_token` (audience `'tpv-employee'`). La cookie `tpv_employee_token` implementa sliding window lazy (DB check solo en los últimos 15 min de vida).
+- Inyecta `x-pathname` en todas las rutas de página — el layout TPV lo usa para saltarse la verificación de auth en `/tpv/login`.
 
 > Agregar nuevas rutas públicas a `isPublicRoute` en `proxy.ts` (usar `===`, no `startsWith`)
 
@@ -613,7 +738,7 @@ const main = parseMainDomain(domain); // elimina subdominio pedidos
 | Tabla | PK | FK | Notas |
 |-------|----|----|-------|
 | `empresas` | id (uuid) | — | dominio, subdomain_pedidos, colores, fb, instagram, url_mapa, telefono_whatsapp, **descuento_bienvenida_activo/porcentaje**, telegram_chat_id, **waiter_pin_hash** |
-| `perfiles_admin` | id (uuid) | empresa_id → empresas (nullable) | → auth.users, `rol` = 'admin' o 'superadmin' |
+| `perfiles_admin` | id (uuid) | empresa_id → empresas (nullable) | → auth.users, `rol` ∈ {'admin','superadmin','encargado','cajero'} |
 | `categorias` | id (uuid) | empresa_id → empresas | categoria_padre_id, categoriaComplementoDe |
 | `productos` | id (uuid) | empresa_id, categoria_id | i18n: titulo_es/en/fr/it/de |
 | `clientes` | id (uuid) | empresa_id | telefono único por empresa |
@@ -836,6 +961,10 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 | **Kitchen & Bar In-App** | `/waiter/kitchen` y `/waiter/bar`: vistas en tiempo real para gestión de ítems sin Telegram. Estados por ítem: pendiente → en_preparacion → preparado → servido (swipe gestual). Colores por tiempo de espera (oklch, 6 rangos). GroupBy por pedido o por mesa. Filtro "Listos". Retenidos con sección propia. Badges con counts en WaiterBanner (neutral/verde/naranja). Timer de espera arranca desde `validated_at` (momento de validación), no desde `created_at` del pedido original. |
 | **Waiter Pendientes** | `/waiter/pendientes`: cola de validación antes de cocina/bar. Selección individual o por tipo (comida/bebida). Pausa (⏸) por ítem de comida → llega a cocina como retenido. Botón conjunto comida+bebida (botón morado) valida ambos tipos en un solo POST. La pausa prevalece sobre la selección en envíos conjuntos. |
 | **Realtime Híbrido** | Migración completa de polling a Supabase Realtime en todas las vistas del panel de sala (kitchen, bar, pendientes, waiter-banner, waiter-login). Sistema híbrido: Realtime CDC para cambios de datos (<100 ms latencia, sin carga en DB en reposo) + `setInterval` 1 s exclusivamente para actualización visual de timers. Un único canal multiplexado en WaiterBanner consolida conteos de cocina, bar y estado de pago. Eliminados ~30 requests HTTP/min por camarero activo. Ver sección [⚡ Arquitectura Realtime](#-arquitectura-realtime--sistema-híbrido). |
+| **TPV Empleados PIN** | Cajeros y encargados acceden al TPV con PIN numérico. Tabla `empleados_tpv`, cookie `tpv_employee_token` (JWT 1h sliding window lazy), dual-auth en proxy. Permisos por rol: encargado (TPV completo), cajero (mostrador + cobro + arqueo ciego). Botón "Bloquear TPV" para handoff entre empleados. CRUD desde `/admin/configuracion` tab Empleados. |
+| **Electron TPV Windows** | Shell Electron para TPV en Windows. Carga la URL remota de producción (`https://{domain}/tpv`). IPC para impresión térmica ESC/POS (node-thermal-printer). Auto-update vía electron-updater (endpoint `/api/app/version/latest.yml`). Atajos de teclado globales. Bundling con esbuild. |
+| **TPV — Terminal Punto de Venta** | Software de caja con cumplimiento legal completo (Ley Antifraude RD 1007/2023 + RD 1619/2012). **Arqueo ciego**: el teórico queda oculto hasta que el operador introduce su conteo. Mostrador táctil 3 columnas con selector de pase/marcha (1er/2º/Postre/Bebida). Cobro efectivo/tarjeta/propina con tasa IVA/IGIC configurable por empresa. Cadena de hashes SHA-256 inmutable por trigger PostgreSQL: bloqueo de DELETE y UPDATE con EXCEPTION. Ticket rectificativo = cobro negativo con `rectifica_cobro_id` (excluido de estadísticas). Numeración correlativa atómica (`serie-NNNNNN`). IVA/IGIC calculado en DB trigger (no en cliente). Endpoints de auditoría para inspectores (`/api/tpv/audit/chain`, `/api/tpv/audit/export`). Pantalla `/tpv/legal` con Declaración de Responsabilidad RD 1007/2023. Dashboard `/tpv/analytics` con selector de período (Hoy/Semana/Mes/Custom), 5 KPIs, gráfico por hora (Recharts lazy), top productos (JSONB) e historial de turnos. Endpoint `GET /api/tpv/analytics` con 3 RPCs `SECURITY DEFINER`. Configuración IVA/IGIC por empresa con propagación SSR de label. **Stock & Mermas**: trigger `deducir_stock_on_servido` descuenta ingredientes al servir (atómico, mismo tx). Auto-disable/re-enable de productos por umbral. Registro de mermas por turno. Audit log inmutable (`movimientos_stock`). Badge `LowStockBadge` en pantalla de cobro. **Inventario físico** (`/admin/stock/inventario`): conteo a ciegas, revisión de desviaciones, confirmación con movimientos tipo `inventario`. |
+| **KDS Pases/Marchas** | Campo `pase` opcional en `pedidos` (CHECK: primer/segundo/postre/bebida). Selector en TicketPanel antes de enviar a cocina. KDS de cocina agrupa ítems por pase con cabeceras de sección cuando hay múltiples pases activos. Propagado en cadena: `pedidos.pase` → `KitchenItemRecord.pase` → `KitchenItem.pase` → render KDS. |
 | **Telegram Multi-modo** | tienda → quick-reply buttons. restaurante takeaway → time-selector + tracking en vivo. mesa → gestionado in-app (sin Telegram). |
 | **Delivery + Pago online** | Zona de cobertura por CP configurable. Cotización Glovo en tiempo real. Pago Redsys TPV Virtual obligatorio para delivery. Auto-despacho de rider al confirmar pago. Tracking page post-pago. |
 
@@ -854,6 +983,15 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 - [`docs/context/delivery.md`](docs/context/delivery.md) — Delivery: zona de cobertura, Glovo Business LaaS, Redsys TPV, flujo completo end-to-end
 - [`docs/context/qr-session-enforcement.md`](docs/context/qr-session-enforcement.md) — QR session enforcement: presencia física, mesa_client_tokens, QRScannerGate, rotación de sesión
 - [`docs/context/waiter-validation-flow.md`](docs/context/waiter-validation-flow.md) — Cola de validación: flujo pendiente_validacion → cocina/bar, from_validation flag, pausa, timer validated_at
+- [`docs/tpv-legal-compliance.md`](docs/tpv-legal-compliance.md) — TPV: checklist de cumplimiento legal (Ley Antifraude, TicketBAI, RD 1619/2012, RGPD, PCI-DSS)
+- [`docs/context/tpv-cobros-historial.md`](docs/context/tpv-cobros-historial.md) — TPV Fase 3: cobro parcial, historial multi-turno, rectificativos cross-turno, buenas prácticas
+- [`docs/context/stock-system.md`](docs/context/stock-system.md) — TPV Fase 2: stock & mermas, trigger de deducción, re-habilitación de productos, audit log, LowStockBadge, inventario físico
+- [`docs/context/tpv-pases.md`](docs/context/tpv-pases.md) — Pases/Marchas: campo `pase` en pedidos, selector en mostrador, agrupación en KDS
+- [`docs/superpowers/specs/2026-07-06-tpv-future-roadmap.md`](docs/superpowers/specs/2026-07-06-tpv-future-roadmap.md) — Roadmap de features futuras (Proveedores, Food Cost, BCG, RBAC, Integraciones)
+- [`docs/superpowers/specs/2026-07-02-tpv-design.md`](docs/superpowers/specs/2026-07-02-tpv-design.md) — Spec técnica del TPV Fase 1
+- [`docs/superpowers/specs/2026-07-03-tpv-analytics-design.md`](docs/superpowers/specs/2026-07-03-tpv-analytics-design.md) — Spec técnica del TPV Fase 2 (Analytics + IVA/IGIC)
+- [`docs/context/tpv-empleados-pin.md`](docs/context/tpv-empleados-pin.md) — TPV empleados PIN: arquitectura dual-auth, permisos por rol, arqueo ciego, trampas críticas
+- [`docs/superpowers/specs/2026-07-08-empleados-tpv-permisos-design.md`](docs/superpowers/specs/2026-07-08-empleados-tpv-permisos-design.md) — Spec de diseño del sistema de empleados TPV con PIN
 
 ---
 

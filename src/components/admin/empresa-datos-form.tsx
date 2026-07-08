@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MapPin, Phone, Mail, Link as LinkIcon, Users, Camera, Loader2, Facebook } from 'lucide-react';
+import { MapPin, Phone, Mail, Link as LinkIcon, Camera, Loader2, Facebook, FileText } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { logClientError } from '@/lib/client-error';
@@ -17,6 +17,9 @@ interface EmpresaDatosFormProps {
     instagram: string;
     url_mapa: string;
     direccion: string;
+    nif: string;
+    tipoImpuesto: 'iva' | 'igic';
+    porcentajeImpuesto: number;
   };
 }
 
@@ -32,7 +35,7 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
     setFormData(initialData);
   }, [initialData]);
 
-  const handleChange = (field: string, value: string) => {
+  const handleChange = (field: string, value: string | number) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     setSaved(false);
   };
@@ -44,7 +47,11 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
     try {
       const res = await fetchWithCsrf(`/api/admin/empresa?empresaId=${efectivoEmpresaId}`, {
         method: 'PUT',
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          tipo_impuesto: formData.tipoImpuesto,
+          porcentaje_impuesto: formData.porcentajeImpuesto,
+        }),
       });
 
       if (res.ok) {
@@ -114,6 +121,68 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
             aria-describedby="direccion_help"
           />
           <span id="direccion_help" className="text-xs text-muted-foreground">{t('addressHelp', language)}</span>
+        </div>
+
+        {/* NIF/CIF */}
+        <div className="flex flex-col gap-2">
+          <label htmlFor="nif" className="text-sm font-medium text-foreground flex items-center gap-2">
+            <FileText className="w-4 h-4" />
+            NIF / CIF
+          </label>
+          <Input
+            id="nif"
+            name="nif"
+            type="text"
+            value={formData.nif}
+            onChange={(e) => handleChange('nif', e.target.value)}
+            placeholder="B12345678"
+            aria-describedby="nif_help"
+          />
+          <span id="nif_help" className="text-xs text-muted-foreground">
+            Requerido para tickets fiscales (Verifactu / RD 1619/2012)
+          </span>
+        </div>
+
+        {/* Tipo de impuesto */}
+        <div className="space-y-2">
+          <label htmlFor="tipo_impuesto" className="text-sm font-medium text-foreground flex items-center gap-2">
+            Tipo de impuesto
+          </label>
+          <select
+            id="tipo_impuesto"
+            name="tipo_impuesto"
+            value={formData.tipoImpuesto}
+            onChange={(e) => {
+              const tipo = e.target.value as 'iva' | 'igic';
+              handleChange('tipoImpuesto', tipo);
+              handleChange('porcentajeImpuesto', tipo === 'igic' ? 7 : 10);
+            }}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          >
+            <option value="iva">IVA (Península y Baleares)</option>
+            <option value="igic">IGIC (Canarias)</option>
+          </select>
+        </div>
+
+        {/* Porcentaje impuesto */}
+        <div className="space-y-2">
+          <label htmlFor="porcentaje_impuesto" className="text-sm font-medium text-foreground">
+            Porcentaje %
+          </label>
+          <input
+            type="number"
+            id="porcentaje_impuesto"
+            name="porcentaje_impuesto"
+            min={0}
+            max={30}
+            step={0.1}
+            value={formData.porcentajeImpuesto}
+            onChange={(e) => handleChange('porcentajeImpuesto', parseFloat(e.target.value))}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          />
+          <span className="text-xs text-muted-foreground">
+            10% IVA estándar restauración · 7% IGIC general
+          </span>
         </div>
 
         {/* Facebook */}

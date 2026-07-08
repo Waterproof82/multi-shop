@@ -145,7 +145,9 @@ Usar siempre en RLS policies para aislar datos por empresa.
 | Canal | Tipo | Tabla/evento | Quién escucha |
 |---|---|---|---|
 | `waiter-banner-{uid}` | postgres_changes | pedidos, pedido_item_estados, mesa_sesiones | WaiterBanner |
-| `waiter-new-order` | broadcast `new-order` | trigger notify_waiter_new_order | WaiterBanner |
+| `waiter-new-order` | broadcast `new-order` | trigger notify_waiter_new_order (todos los INSERTs) | WaiterBanner |
+| `waiter-new-order-kitchen` | broadcast `new-order` | trigger notify_waiter_new_order | WaiterKitchenPage |
+| `waiter-new-order-bar` | broadcast `new-order` | trigger notify_waiter_new_order | BarPage |
 | `waiter-items-update` | broadcast `item-update` | trigger notify_waiter_items_update | WaiterBanner, BarPage, WaiterLoginForm |
 | `waiter-kitchen-{uid}` | postgres_changes | pedido_item_estados, pedidos | WaiterKitchenPage |
 | `waiter-bar-{uid}` | postgres_changes | pedido_item_estados, pedidos | BarPage |
@@ -181,6 +183,20 @@ Solución: `WaiterLoginForm.handlePinSubmit` dispara `window.dispatchEvent(new C
 - **`hasPlatosPoServir`** en `mesa-orders-client.tsx` bloquea pago y cierre cuando algún pedido sintetizado tiene estado ∈ `{pendiente_validacion, pendiente, en_preparacion, preparado}`. Ver `docs/context/waiter-ticket-ux.md`.
 - **`propina_cents`** en `mesa_sesiones`: propina acordada por la mesa en céntimos. Se expone como `propinaCents` en `GET /api/mesas/[mesaId]/orders` y se suma al total cobrado en Redsys (full payment y división). Actualizable por cualquier participante vía `PATCH /api/mesas/[mesaId]/propina`. Ver `docs/context/propina.md`.
 
+## 📦 Sistema de Stock & Mermas — Trampas Críticas
+
+> Ver doc completo: `docs/context/stock-system.md`
+
+- **Columna en `productos` es `activo`**, no `disponible`. El trigger y `rehabilitarProductos()` usan `activo`.
+- **Trigger `deducir_stock_on_servido`** resuelve `producto_id` desde `pedidos.detalle_pedido->item_idx->>'producto_id'` (JSONB). Si el campo no existe en el payload de `createMesaOrder`, el trigger salta silenciosamente sin descontar. Asegurarse de que `detalle_pedido[item_idx].producto_id` esté siempre presente al crear pedidos.
+- **`movimientos_stock.ingrediente_id` es nullable** (desde migration 4) — filas `sin_receta` tienen `NULL`. Todo mapper debe usar `(row.ingrediente_id as string) ?? null`, nunca `as string` directo.
+- **`replaceReceta` es destructiva**: `PUT /api/admin/stock/recetas/[productoId]` borra y reinserta todos los items. El cliente debe enviar la lista COMPLETA, no un delta.
+- **`cantidadActual` nunca por PUT**: `PUT /api/admin/stock/ingredientes/[id]` ignora cantidad. Usar `/ajuste` o `/mermas`.
+- **Re-habilitación**: `ajustarStockUseCase` solo re-habilita si `delta > 0` y `cantidadActual >= umbralAlerta` tras el ajuste. Consistente con el trigger — actúa solo sobre el ingrediente modificado.
+- **`findLowStockAlerts` filtra en memoria**: supabase-js no soporta comparaciones col-to-col. Se traen todos los ingredientes con `umbral_alerta > 0` y se filtra en JS. No usar `.lt('cantidad_actual', 'umbral_alerta')` — no funciona.
+- **Sidebar stock**: `requiresRestaurant: true` en los tres ítems de stock — invisible para tiendas.
+- **`LowStockBadge`** montado en `TpvHeader` y `CobroMetodoPropina`. Nunca bloquea el flujo de cobro.
+
 ## 🍽 Sistema Tipo Producto (Restaurante)
 
 - **`categorias.tipo_producto`** (`'comida'|'bebida'`, DEFAULT `'comida'`) es la fuente de verdad para el enrutado cocina/bar. NO leer `productos.tipo_producto` para determinar el tab del menú.
@@ -195,6 +211,18 @@ Solución: `WaiterLoginForm.handlePinSubmit` dispara `window.dispatchEvent(new C
 - **`delivery_habilitado`** en `empresas` (DEFAULT `false`): activa el ítem "Zona de entrega" en el sidebar del admin (`requiresDelivery` flag). Controlable desde la columna "Globo envíos" de la tabla de empresas en superadmin. Si está en `false`, la ruta `/admin/delivery` NO aparece aunque la empresa sea restaurante o tienda.
 - **`EmpresasTable`** extrae cada fila en `EmpresaTableRow` con su propio `useState(tipo)`. El `TipoSelector` llama `onTipoChange` solo cuando el PUT es OK — así Mesas/Pagos Mesa/Validación reaccionan al cambio de tipo SIN recargar la página.
 - Mesas / Pagos Mesa / Validación solo se muestran para `tipo === 'restaurante'`. Las tiendas dejan esas celdas vacías.
+
+## 📱 Service Worker PWA — Trampas Críticas
+
+- `public/sw.js` es **plain JS**, no TypeScript. Vive en `/public`, no pasa por la compilación de Next.js.
+- El SW solo se registra en **producción** (`SwRegistrar` verifica `process.env.NODE_ENV !== 'production'`). En dev no hay SW.
+- **Scope** del SW: `{ scope: '/waiter' }` — solo intercepta requests de páginas bajo `/waiter/*`. Sin impacto en carta pública ni admin.
+- **`/api/*` es NetworkOnly siempre** — nunca cachear auth ni datos de pedidos.
+- **`navigator.onLine` guard obligatorio en `WaiterBanner`**: cuando el dispositivo está offline, `GET /api/waiter/me` lanza `TypeError: Failed to fetch`. Sin el guard, `.catch(() => setIsWaiter(false))` dispara el efecto de redirección a login, expulsando al camarero. El guard `if (!navigator.onLine) return` en el effect de redirect evita esto.
+- **DevTools 0 bytes**: Chrome DevTools Cache Storage muestra `0 B` para respuestas gzip cacheadas. Es un bug de visualización — el contenido real está ahí (verificado con `arrayBuffer()`).
+- **RSC prefetch**: Next.js App Router envía payloads `text/x-component` para navegación client-side. El guard `isWaiterHtml` (verifica `content-type` incluye `text/html`) los excluye correctamente del caché NetworkFirst.
+- **SonarLint S7764 en sw.js**: usar `globalThis.skipWaiting()` y `globalThis.clients.claim()` en lugar de `self.*`.
+- Para testear el SW: `pnpm build && pnpm start` (modo producción). Ver `docs/context/pwa-offline-system.md`.
 
 ## 🔍 SEO Multi-Tenant
 
@@ -219,3 +247,50 @@ Solución: `WaiterLoginForm.handlePinSubmit` dispara `window.dispatchEvent(new C
 - `empresa.descripcion` - Descripciones i18n (es/en/fr/it/de)
 - `empresa.url_mapa` - Google Maps (parsea coordenadas)
 - `empresa.updated_at` / `actualizado_en` - Para sitemap
+
+## 📱 Capacitor Android PDA — Trampas Críticas
+
+> Ver doc completo: `docs/context/capacitor-android-pda.md`
+
+### Proceso de build — orden OBLIGATORIO
+1. Editar `www/index.html` (fuente en el worktree, NUNCA editar `assets/public/` directamente)
+2. `npx cap copy android` — copia `www/` a `android/app/src/main/assets/public/`. **Sin este paso, cualquier cambio en `www/index.html` se ignora silenciosamente.**
+3. Bumping de `versionCode` en `android/app/build.gradle`
+4. `KEYSTORE_PASSWORD=... KEY_PASSWORD=... ./gradlew assembleRelease`
+5. Subir `waiter-{N}.apk` a Supabase Storage bucket `app-releases`
+6. Actualizar defaults en `src/app/api/app/version/route.ts`
+
+### Trampas de alto impacto
+- **`SameSite=lax` obligatorio** en `waiter_token` cookie. Con `strict`, la WebView navegando de `capacitor://localhost` → `https://domain.com` nunca recibe el cookie → siempre muestra PIN.
+- **`CookieManager.getInstance().flush()` en `onPause()`** — sin esto, el cookie se pierde si el proceso es killed → PIN en cada apertura.
+- **`style.display = ''` NO muestra elementos** si hay un CSS rule `display:none`. Usar siempre `style.display = 'block'`.
+- **`window.load` no `DOMContentLoaded`** — el bridge de Capacitor no está disponible en DOMContentLoaded.
+- **`isNativePlatform()` no `isNative`** — API correcta en Capacitor 5+.
+- **`/waiter/mesas` no existe** — la grilla de mesas vive en `/waiter`. No redirigir a rutas inexistentes.
+- **`WaiterLoginForm` flash de PIN** — inicializa en `step="pin"`. Mostrar spinner mientras `isCheckingAuth=true` (hasta que `/api/waiter/me` resuelve).
+- **`BuildConfig.DEFAULT_DOMAIN`** — fallback para el update check cuando el usuario borra datos. Requiere `buildFeatures { buildConfig = true }` en `build.gradle`.
+- **Vercel env vars** `APP_VERSION` / `APP_VERSION_CODE` sobreescriben los defaults del código. Actualizar en Vercel al hacer release si están seteadas.
+## 🖥 Electron TPV Windows — Trampas Críticas
+
+> Ver `electron/main.ts` y `electron/preload.ts`.
+
+- **Bundling con esbuild** — `electron/dist/main.js` y `electron/dist/preload.js` son bundles generados por esbuild. No editar los `.js` directamente; editar los `.ts` fuente y recompilar.
+- **`electron/package.json` con `"type": "commonjs"`** — el proceso main de Electron necesita CJS. El `package.json` raíz tiene `"type": "module"`, por eso el sub-package tiene su propio `type`.
+- **URL remota siempre** — el shell carga `https://{dominio}/tpv` desde producción. No hay Next.js local dentro de Electron.
+- **IPC para impresión** — el renderer llama `window.electronAPI.print(data)` vía contextBridge. El main process recibe el IPC y llama a `node-thermal-printer`. Nunca acceder a módulos de Node directamente desde el renderer.
+- **Auto-update endpoint** — `GET /api/app/version/latest.yml` sirve el archivo YAML para `electron-updater`. El endpoint está en `src/app/api/app/version/latest.yml/route.ts`.
+- **`electron/dist/` en `.gitignore`** — los bundles compilados no se commitean. El proceso de build es: `pnpm build:electron:prep` (esbuild) → `pnpm build:electron:rebuild` (native modules) → `electron-builder --win`.
+
+## 🔑 TPV Empleados — Autenticación por PIN (Trampas Críticas)
+
+> Ver doc completo: `docs/context/tpv-empleados-pin.md`
+
+- **`pinHash` NUNCA en respuestas API** — las rutas `GET` y `POST` de `/api/admin/empleados-tpv` deben strippear `pinHash` antes de devolver. Usar `({ pinHash: _, ...rest }) => rest`. No agregar `pinHash` a DTOs de respuesta.
+- **Dual-auth en proxy — orden importa** — el proxy prueba `admin_token` PRIMERO, luego `tpv_employee_token`. Agregar nuevas rutas TPV públicas a la lista explícita (`/tpv/login`, `/api/tpv/empleados/login`, `/api/tpv/empleados/logout`) en `proxy.ts`.
+- **`x-pathname` para bypass del layout TPV** — el proxy inyecta `x-pathname` en headers de página. El layout `src/app/tpv/layout.tsx` hace early return `<>{children}</>` cuando el path es `/tpv/login`. Sin este header, el layout bloquearía la página de login.
+- **`user_id` nullable en `tpv_turnos`** — desde la migración `20260708000001`. Nunca asumir que `user_id` existe en un turno. Los turnos abiertos por empleado tienen `user_id = NULL` y `operador_id` apuntando a `empleados_tpv`.
+- **Solo `encargado` puede abrir turno por PIN** — en `src/app/tpv/turno/abrir/page.tsx`, si el payload del token tiene `rol === 'cajero'`, se redirige a `/tpv/mostrador`. El cajero nunca ve la pantalla de abrir turno.
+- **Sliding window lazy** — el token `tpv_employee_token` NO se renueva en cada request (sin Redis en Vercel). Solo se renueva cuando quedan <15 min de vida, y en ese momento el proxy consulta la DB para verificar `activo = true`. Si el empleado está desactivado en ese momento, el token expira sin renovarse (gap máximo ≤1h).
+- **Arqueo ciego para cajero** — `isBlindClose = (rol === 'cajero')`. La diferencia entre contado y teórico se calcula SERVER-SIDE en `/api/tpv/turno/[id]/cerrar`. `TurnoCerrarForm` con `isBlindClose=true` oculta totales teóricos y diferencia — no enviarlos desde el cliente no es suficiente (el server los calcula).
+- **`tpv_employee_token` audience** — el JWT usa audience `'tpv-employee'`. No confundir con el `admin_token` que no tiene audience explícita. `verifyTpvEmployeeToken` en `src/lib/tpv-employee-auth.ts` valida esta audience; si falla silenciosamente, comprobar que el token se generó con `signTpvEmployeeToken`, no con `authAdminUseCase`.
+- **CSRF requerido** — el proxy aplica validación CSRF también a requests de `tpv_employee_token`. El cliente debe usar `fetchWithCsrf` en todas las mutaciones del TPV.

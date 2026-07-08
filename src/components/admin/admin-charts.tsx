@@ -4,7 +4,7 @@
 // It's loaded dynamically to reduce initial bundle size (~100KB)
 import {
   BarChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Cell, PieChart, LineChart, Line, Bar, Pie,
+  Cell, PieChart, LineChart, Line, Bar, Pie, Legend,
   type TooltipProps,
 } from 'recharts';
 import { formatPrice } from '@/lib/format-price';
@@ -25,7 +25,7 @@ interface ChartTheme {
 
 interface Stats {
   topPlatos: { nombre: string; cantidad: number; total: number }[];
-  pedidosPorDia: { dia: number; pedidos: number; ingresos: number }[];
+  pedidosPorDia: { dia: number; mesa: number; recogida: number; delivery: number; web: number }[];
 }
 
 interface PromoStat {
@@ -69,15 +69,23 @@ interface AdminChartsProps {
   mostrarTgtg?: boolean;
 }
 
+// ─── Helpers ───────────────────────────────────────────────────
+function labelForOrigin(name: string, language: Language, t: TranslateFn): string {
+  if (name === 'mesa') return t('orderTypeMesa', language);
+  if (name === 'recogida') return t('orderTypeRecogida', language);
+  if (name === 'delivery') return t('orderTypeDelivery', language);
+  return t('orderTypeWeb', language);
+}
+
 // ─── Daily Orders Chart ────────────────────────────────────────
-function DailyOrdersChart({ 
-  pedidosPorDia, 
-  chartTheme, 
-  language, 
-  meses, 
+function DailyOrdersChart({
+  pedidosPorDia,
+  chartTheme,
+  language,
+  meses,
   mesActual,
-  t 
-}: { 
+  t
+}: {
   pedidosPorDia: Stats['pedidosPorDia'];
   chartTheme: ChartTheme;
   language: Language;
@@ -86,7 +94,9 @@ function DailyOrdersChart({
   t: TranslateFn;
 }) {
   if (!pedidosPorDia?.length) return null;
-  
+
+  const hasAnyData = pedidosPorDia.some(d => d.mesa > 0 || d.recogida > 0 || d.delivery > 0 || d.web > 0);
+
   return (
     <div className="bg-card rounded-lg border border-border p-6 mb-6">
       <h2 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
@@ -95,46 +105,83 @@ function DailyOrdersChart({
         </svg>
         {t("ordersByDay", language)} ({meses[mesActual]})
       </h2>
-      <div className="h-40 sm:h-48 w-full">
-        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-          <LineChart data={pedidosPorDia}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartTheme.gridStroke} />
-            <XAxis
-              dataKey="dia"
-              tick={{ fontSize: 12, fill: chartTheme.tickFill }}
-              tickFormatter={(value) => `${value}`}
-              axisLine={{ stroke: chartTheme.gridStroke }}
-              tickLine={{ stroke: chartTheme.gridStroke }}
-            />
-            <YAxis
-              tick={{ fontSize: 12, fill: chartTheme.tickFill }}
-              axisLine={{ stroke: chartTheme.gridStroke }}
-              tickLine={{ stroke: chartTheme.gridStroke }}
-            />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: chartTheme.tooltipBg,
-                border: `1px solid ${chartTheme.tooltipBorder}`,
-                borderRadius: '8px',
-              }}
-              labelStyle={{ color: chartTheme.tooltipColor }}
-              itemStyle={{ color: chartTheme.tooltipColor }}
-              formatter={((value: number, name: string) => [
-                name === 'pedidos' ? `${value} ${t("xOrders", language)}` : formatPrice(value, 'EUR', language),
-                name === 'pedidos' ? t("xOrders", language) : t("revenueLabel", language)
-              ]) as TooltipProps<number, string>['formatter']}
-            />
-            <Line
-              type="monotone"
-              dataKey="pedidos"
-              stroke={chartTheme.colors[0]}
-              strokeWidth={2}
-              dot={{ fill: chartTheme.colors[0], r: 3 }}
-              activeDot={{ r: 5 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
+      {!hasAnyData ? (
+        <p className="text-muted-foreground text-center py-8 text-sm">{t("noStatsData", language)}</p>
+      ) : (
+        <div className="h-52 sm:h-64 w-full">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+            <LineChart data={pedidosPorDia}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartTheme.gridStroke} />
+              <XAxis
+                dataKey="dia"
+                tick={{ fontSize: 12, fill: chartTheme.tickFill }}
+                tickFormatter={(value) => `${value}`}
+                axisLine={{ stroke: chartTheme.gridStroke }}
+                tickLine={{ stroke: chartTheme.gridStroke }}
+              />
+              <YAxis
+                allowDecimals={false}
+                tick={{ fontSize: 12, fill: chartTheme.tickFill }}
+                axisLine={{ stroke: chartTheme.gridStroke }}
+                tickLine={{ stroke: chartTheme.gridStroke }}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: chartTheme.tooltipBg,
+                  border: `1px solid ${chartTheme.tooltipBorder}`,
+                  borderRadius: '8px',
+                }}
+                labelStyle={{ color: chartTheme.tooltipColor, fontWeight: 600 }}
+                itemStyle={{ color: chartTheme.tooltipColor }}
+                formatter={((value: number, name: string) => [
+                  `${value}`,
+                  labelForOrigin(name, language, t),
+                ]) as TooltipProps<number, string>['formatter']}
+              />
+              <Legend
+                formatter={(value) => labelForOrigin(value, language, t)}
+                wrapperStyle={{ fontSize: 12, color: chartTheme.tickFill }}
+              />
+              <Line
+                type="monotone"
+                dataKey="mesa"
+                name="mesa"
+                stroke={chartTheme.colors[0]}
+                strokeWidth={2}
+                dot={{ fill: chartTheme.colors[0], r: 3 }}
+                activeDot={{ r: 5 }}
+              />
+              <Line
+                type="monotone"
+                dataKey="recogida"
+                name="recogida"
+                stroke={chartTheme.colors[1]}
+                strokeWidth={2}
+                dot={{ fill: chartTheme.colors[1], r: 3 }}
+                activeDot={{ r: 5 }}
+              />
+              <Line
+                type="monotone"
+                dataKey="delivery"
+                name="delivery"
+                stroke={chartTheme.colors[2]}
+                strokeWidth={2}
+                dot={{ fill: chartTheme.colors[2], r: 3 }}
+                activeDot={{ r: 5 }}
+              />
+              <Line
+                type="monotone"
+                dataKey="web"
+                name="web"
+                stroke={chartTheme.colors[3]}
+                strokeWidth={2}
+                dot={{ fill: chartTheme.colors[3], r: 3 }}
+                activeDot={{ r: 5 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </div>
   );
 }

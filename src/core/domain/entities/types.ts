@@ -92,6 +92,9 @@ export interface Empresa {
   descuentoBienvenidaDuracion?: number | null;
   deliveryHabilitado: boolean;
   googleReviewsUrl: string | null;
+  nif?: string | null;
+  tipoImpuesto?: 'iva' | 'igic';
+  porcentajeImpuesto?: number;
 }
 
 interface TranslatableText {
@@ -159,6 +162,7 @@ export interface PedidoItem {
   precio: number;
   cantidad: number;
   complementos?: PedidoComplemento[];
+  nota?: string;
 }
 
 export interface CartItem {
@@ -170,6 +174,7 @@ export interface CartItem {
   };
   quantity: number;
   selectedComplements?: { name: string; price: number }[];
+  note?: string;
 }
 
 export interface Pedido {

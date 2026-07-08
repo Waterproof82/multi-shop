@@ -14,6 +14,10 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+function resolveEmpresaTipo(tipo: string | undefined | null): 'tienda' | 'restaurante' {
+  return tipo === 'restaurante' ? 'restaurante' : 'tienda';
+}
+
 export default async function AdminProtectedLayout({
   children,
 }: Readonly<{
@@ -32,6 +36,10 @@ export default async function AdminProtectedLayout({
     redirect('/admin/login');
   }
 
+  if (admin.rol === 'cajero') {
+    redirect('/tpv');
+  }
+
   let empresaId: string;
   let empresa = admin.empresa;
   let isSuperAdminView = false;
@@ -39,7 +47,7 @@ export default async function AdminProtectedLayout({
   let mostrarTgtg = empresa?.mostrarTgtg ?? true;
   let mesasHabilitadas = empresa?.mesasHabilitadas ?? true;
   let deliveryHabilitado = empresa?.deliveryHabilitado ?? false;
-  let empresaTipo: 'tienda' | 'restaurante' = (empresa?.tipo === 'restaurante') ? 'restaurante' : 'tienda';
+  let empresaTipo: 'tienda' | 'restaurante' = resolveEmpresaTipo(empresa?.tipo);
 
   if (admin.rol === SUPERADMIN_ROLE) {
     const cookieList = await cookies();
@@ -57,7 +65,7 @@ export default async function AdminProtectedLayout({
       mostrarTgtg = empresaResult.data.mostrarTgtg ?? true;
       mesasHabilitadas = empresaResult.data.mesasHabilitadas ?? true;
       deliveryHabilitado = empresaResult.data.deliveryHabilitado ?? false;
-      empresaTipo = (empresaResult.data.tipo === 'restaurante') ? 'restaurante' : 'tienda';
+      empresaTipo = resolveEmpresaTipo(empresaResult.data.tipo);
     }
   } else {
     empresaId = admin.empresaId!;

@@ -312,7 +312,7 @@ function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onClickListos, on
       {hasSession && (
         <button
           onClick={onViewTicket}
-          className="w-full rounded-lg px-2 py-1.5 flex items-center justify-center gap-1.5 hover:brightness-125 transition-all"
+          className="w-full rounded-lg px-3 py-2.5 flex items-center justify-center gap-1.5 hover:brightness-125 transition-all"
           style={{ background: 'oklch(18% 0.04 252 / 0.7)', border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
         >
           <ReceiptText className="w-3 h-3 shrink-0" style={{ color: 'oklch(62% 0.08 252)' }} />
@@ -322,11 +322,11 @@ function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onClickListos, on
         </button>
       )}
 
-      {/* Cerrar mesa — visible si hay pedidos O si un cliente real entró al menú */}
-      {!!mesa.sesionId && (mesa.activeOrderCount > 0 || mesa.clienteActivo) && !isPaymentInProgress && onCloseMesa && (
+      {/* Cerrar mesa — visible si hay pedidos, cliente activo, o sesión ya pagada pendiente de cierre */}
+      {!!mesa.sesionId && (mesa.activeOrderCount > 0 || mesa.clienteActivo || isPaid) && !isPaymentInProgress && onCloseMesa && (
         <button
           onClick={onCloseMesa}
-          className="w-full rounded-lg px-2 py-1.5 flex items-center justify-center gap-1.5 hover:brightness-125 transition-all"
+          className="w-full rounded-lg px-3 py-2.5 flex items-center justify-center gap-1.5 hover:brightness-125 transition-all"
           style={{ background: 'oklch(18% 0.06 290 / 0.7)', border: '1px solid oklch(42% 0.14 290 / 0.5)' }}
         >
           <X className="w-3 h-3 shrink-0" style={{ color: 'oklch(68% 0.16 290)' }} />
@@ -343,6 +343,7 @@ export function WaiterLoginForm() {
   const router = useRouter();
 
   const [step, setStep] = useState<Step>("pin");
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [pin, setPin] = useState("");
   const [mesas, setMesas] = useState<MesaWithSession[]>([]);
   const [empresaId, setEmpresaId] = useState<string | null>(null);
@@ -412,7 +413,8 @@ export function WaiterLoginForm() {
           setStep("tables");
         }
       })
-      .catch(() => null);
+      .catch(() => null)
+      .finally(() => setIsCheckingAuth(false));
   }, []);
 
   async function handlePinSubmit() {
@@ -534,6 +536,14 @@ export function WaiterLoginForm() {
     }
   }
 
+  if (isCheckingAuth) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "oklch(42% 0.06 252)", borderTopColor: "transparent" }} />
+      </div>
+    );
+  }
+
   if (step === "pin") {
     return (
       <div className="flex flex-col items-center gap-8">
@@ -652,7 +662,7 @@ export function WaiterLoginForm() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
           {mesas.map((mesa) => (
             <MesaCard
               key={mesa.id}
@@ -686,9 +696,10 @@ export function WaiterLoginForm() {
             onClick={() => { if (!launching) { setDeferredMesa(null); } }}
             onKeyDown={e => { if (e.key === 'Escape' && !launching) { setDeferredMesa(null); } }}
           />
-          <dialog
-            open
-            className="w-full max-w-xs rounded-2xl p-5 flex flex-col gap-4"
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="relative w-full max-w-xs rounded-2xl p-5 flex flex-col gap-4"
             style={{ background: 'oklch(18% 0.03 252)', border: '1px solid oklch(42% 0.10 252 / 0.5)' }}
           >
             <div className="flex flex-col gap-1">
@@ -735,7 +746,7 @@ export function WaiterLoginForm() {
             >
               Cancelar
             </button>
-          </dialog>
+          </div>
         </div>
       )}
 

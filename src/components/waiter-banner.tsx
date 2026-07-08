@@ -123,8 +123,9 @@ export function WaiterBanner() {
   const [unlocking, setUnlocking]     = useState(false);
 
   // Waiter auth — independent of mesa selection
-  const [isWaiter, setIsWaiter]       = useState(false);
-  const [authChecked, setAuthChecked] = useState(false);
+  // Seed from sessionStorage so full-page SW cache loads don't flash-hide the banner.
+  const [isWaiter, setIsWaiter]       = useState(() => typeof sessionStorage !== 'undefined' && sessionStorage.getItem('waiter-authed') === '1');
+  const [authChecked, setAuthChecked] = useState(() => typeof sessionStorage !== 'undefined' && sessionStorage.getItem('waiter-authed') === '1');
 
   // Kitchen/bar badge counts
   const [counts, setCounts] = useState<CountsPayload | null>(null);
@@ -137,8 +138,20 @@ export function WaiterBanner() {
   const [switchingId, setSwitchingId]     = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Check waiter auth on mount and path change
+  // Sync isWaiter to sessionStorage so remounts (SW full-page cache loads) start correctly.
   useEffect(() => {
+    if (isWaiter) {
+      sessionStorage.setItem('waiter-authed', '1');
+    } else {
+      sessionStorage.removeItem('waiter-authed');
+    }
+  }, [isWaiter]);
+
+  // Check waiter auth on mount and path change
+  // Skip fetch when offline — network errors are not auth failures.
+  // Keep existing isWaiter state so the banner stays visible.
+  useEffect(() => {
+    if (!navigator.onLine) { setAuthChecked(true); return; }
     fetch('/api/waiter/me')
       .then(r => { setIsWaiter(r.ok); })
       .catch(() => setIsWaiter(false))
@@ -158,8 +171,10 @@ export function WaiterBanner() {
   }, []);
 
   // Session expired on a waiter sub-page → back to PIN
+  // Skip redirect when offline — network errors are not auth failures (SW serves cached pages)
   useEffect(() => {
     if (!authChecked || isWaiter) return;
+    if (!navigator.onLine) return;
     if (pathname.startsWith('/waiter/')) {
       globalThis.location.href = '/waiter';
     }
@@ -169,6 +184,11 @@ export function WaiterBanner() {
     const stored = getWaiterMesa();
     if (!stored) { setMesaLabel(null); setMesaId(null); return; }
 
+    if (!navigator.onLine) {
+      setMesaLabel(stored.mesaNombre ?? `Mesa ${stored.mesaNumero}`);
+      setMesaId(stored.mesaId);
+      return;
+    }
     fetch("/api/waiter/me")
       .then((r) => {
         if (r.ok) {
@@ -214,8 +234,11 @@ export function WaiterBanner() {
   }, [mesaId, fetchLock]);
 
   // Realtime: kitchen/bar counts + lock status via single multiplexed channel
+  // Skip on /tpv/* — the TPV has its own broadcast subscriptions on the same
+  // anon client singleton; a CHANNEL_ERROR here would poison that shared connection.
   useEffect(() => {
     if (!isWaiter) return;
+    if (pathname.startsWith('/tpv')) return;
     const fetchCounts = async () => {
       try {
         const r = await fetch('/api/waiter/orders/counts');
@@ -242,6 +265,16 @@ export function WaiterBanner() {
         globalThis.dispatchEvent(new CustomEvent('waiter-realtime-update'));
       }, 100);
     };
+
+    // On app resume from background (visibilitychange fires on Capacitor WebView).
+    // Re-fetch counts and relay so all waiter screens refresh stale data.
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void fetchCounts();
+        globalThis.dispatchEvent(new CustomEvent('waiter-realtime-update'));
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
     const channel = supabase
       .channel(channelNameRef.current)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, triggerUpdate)
@@ -286,11 +319,12 @@ export function WaiterBanner() {
 
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       void supabase.removeChannel(channel);
       void supabase.removeChannel(broadcastNewOrder);
       void supabase.removeChannel(broadcastItems);
     };
-  }, [isWaiter, mesaId, fetchLock]);
+  }, [isWaiter, mesaId, fetchLock, pathname]);
 
   // ── helper functions ──────────────────────────────────
 
@@ -396,10 +430,11 @@ export function WaiterBanner() {
   // Not a waiter at all → hide everything
   if (!isWaiter) return null;
 
-  // Admin/superadmin panels are never waiter context
-  if (pathname.startsWith('/admin') || pathname.startsWith('/superadmin')) return null;
+  // Admin/superadmin/TPV panels are never waiter context
+  if (pathname.startsWith('/admin') || pathname.startsWith('/superadmin') || pathname.startsWith('/tpv')) return null;
 
   // Kitchen page has its own header — don't render the waiter banner there
+  if (pathname.startsWith('/kitchen')) return null;
 
   // Tracking page is customer-facing — never show the waiter banner there
   if (pathname.startsWith('/tracking/')) return null;
@@ -482,7 +517,7 @@ export function WaiterBanner() {
 
   return (
     <>
-      <div aria-hidden className="h-12" />
+      <div aria-hidden className="h-14" />
       {closeError && (
         <div
           role="alert"
@@ -495,7 +530,7 @@ export function WaiterBanner() {
       <div
         role="status"
         aria-live="polite"
-        className="fixed top-0 left-0 right-0 z-[200] flex h-12 items-center justify-between px-4 shadow-lg"
+        className="fixed top-0 left-0 right-0 z-[200] flex h-14 items-center justify-between px-4 shadow-lg"
         style={{ background: BG, borderBottom: `1px solid ${BORDER}`, pointerEvents: 'all' }}
         onPointerDown={(e) => e.stopPropagation()}
       >
@@ -536,7 +571,7 @@ export function WaiterBanner() {
           {hasMesa && pathname !== '/waiter' && pathname !== '/waiter/pendientes' && pathname !== '/waiter/kitchen' && pathname !== '/waiter/bar' && (
             <button
               onClick={openCart}
-              className="relative flex items-center justify-center rounded-md p-2 transition-colors duration-150 min-h-[32px] min-w-[32px]"
+              className="relative flex items-center justify-center rounded-md p-2.5 transition-colors duration-150 min-h-[40px] min-w-[40px]"
               style={{ color: BTN_CART_TEXT, backgroundColor: BTN_CART_BG }}
               onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_CART_HOVER)}
               onMouseLeave={e => (e.currentTarget.style.backgroundColor = BTN_CART_BG)}
@@ -554,7 +589,7 @@ export function WaiterBanner() {
           {/* Llamadas — visual indicator only, no action */}
           {counts && (counts.llamadas ?? 0) > 0 && (
             <div
-              className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium min-h-[32px] pointer-events-none select-none"
+              className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium min-h-[40px] pointer-events-none select-none"
               style={{ color: BTN_LLAMADAS_TEXT, backgroundColor: BTN_LLAMADAS_BG }}
               aria-label="Llamadas de mesa"
             >
@@ -579,7 +614,7 @@ export function WaiterBanner() {
           {counts && counts.pendientes > 0 && (
             <button
               onClick={() => { globalThis.location.href = '/waiter/pendientes'; }}
-              className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150 min-h-[32px]"
+              className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px]"
               style={{ color: BTN_PENDIENTES_TEXT, backgroundColor: BTN_PENDIENTES_BG }}
               onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_PENDIENTES_HOVER)}
               onMouseLeave={e => (e.currentTarget.style.backgroundColor = BTN_PENDIENTES_BG)}
@@ -598,7 +633,7 @@ export function WaiterBanner() {
           {/* Kitchen — always visible for authenticated waiters */}
           <button
             onClick={() => { globalThis.location.href = '/waiter/kitchen'; }}
-            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150 min-h-[32px]"
+            className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px]"
             style={{ color: BTN_KITCHEN_TEXT, backgroundColor: BTN_KITCHEN_BG }}
             onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_KITCHEN_HOVER)}
             onMouseLeave={e => (e.currentTarget.style.backgroundColor = BTN_KITCHEN_BG)}
@@ -617,7 +652,7 @@ export function WaiterBanner() {
           {/* Bar — always visible for authenticated waiters */}
           <button
             onClick={() => { globalThis.location.href = '/waiter/bar'; }}
-            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150 min-h-[32px]"
+            className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px]"
             style={{ color: BTN_BAR_TEXT, backgroundColor: BTN_BAR_BG }}
             onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_BAR_HOVER)}
             onMouseLeave={e => (e.currentTarget.style.backgroundColor = BTN_BAR_BG)}
@@ -637,7 +672,7 @@ export function WaiterBanner() {
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={handleToggleDropdown}
-              className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150 min-h-[32px]"
+              className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px]"
               style={{ color: BTN_TABLE_TEXT, backgroundColor: BTN_TABLE_BG }}
               onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_TABLE_HOVER)}
               onMouseLeave={e => (e.currentTarget.style.backgroundColor = BTN_TABLE_BG)}
@@ -667,7 +702,7 @@ export function WaiterBanner() {
             <button
               onClick={handleUnlockPayment}
               disabled={unlocking}
-              className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150 min-h-[32px] disabled:opacity-40"
+              className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px] disabled:opacity-40"
               style={{ color: BTN_UNLOCK_TEXT, backgroundColor: BTN_UNLOCK_BG }}
               onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_UNLOCK_HOVER)}
               onMouseLeave={e => (e.currentTarget.style.backgroundColor = BTN_UNLOCK_BG)}
@@ -683,7 +718,7 @@ export function WaiterBanner() {
             <button
               onClick={handleCloseTable}
               disabled={closing}
-              className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150 min-h-[32px] disabled:opacity-40"
+              className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px] disabled:opacity-40"
               style={{ color: BTN_CLOSE_TEXT, backgroundColor: BTN_CLOSE_BG }}
               onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_CLOSE_HOVER)}
               onMouseLeave={e => (e.currentTarget.style.backgroundColor = BTN_CLOSE_BG)}
@@ -697,7 +732,7 @@ export function WaiterBanner() {
           {/* Logout */}
           <button
             onClick={handleLogout}
-            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150 min-h-[32px]"
+            className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px]"
             style={{ color: BTN_EXIT_TEXT, backgroundColor: BTN_EXIT_BG }}
             onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_EXIT_HOVER)}
             onMouseLeave={e => (e.currentTarget.style.backgroundColor = BTN_EXIT_BG)}

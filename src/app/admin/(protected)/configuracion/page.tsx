@@ -20,6 +20,10 @@ export default async function ConfiguracionPage() {
     redirect('/admin/login');
   }
 
+  if (admin.rol === 'encargado') {
+    redirect('/admin');
+  }
+
   let empresaId = admin.empresaId;
 
   if (admin.rol === SUPERADMIN_ROLE) {
@@ -44,6 +48,9 @@ export default async function ConfiguracionPage() {
     instagram: empresaData?.instagram || '',
     url_mapa: empresaData?.urlMapa || '',
     direccion: empresaData?.direccion || '',
+    nif: empresaData?.nif || '',
+    tipoImpuesto: (empresaData?.tipoImpuesto as 'iva' | 'igic' | undefined) ?? 'iva',
+    porcentajeImpuesto: empresaData?.porcentajeImpuesto ?? 10,
   };
 
   const empresaApariencia = {

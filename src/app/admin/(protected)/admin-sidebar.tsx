@@ -4,16 +4,18 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, Tags, LogOut, Menu, X, ShoppingCart, BarChart3, Users, Megaphone, Settings, ExternalLink, ShoppingBag, UtensilsCrossed, MapPin, Star } from 'lucide-react';
+import { LayoutDashboard, Package, Tags, LogOut, Menu, X, ShoppingCart, BarChart3, Users, Megaphone, Settings, ExternalLink, ShoppingBag, UtensilsCrossed, MapPin, Star, Archive, BookOpen, History, ClipboardList, MonitorCheck } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useAdmin } from '@/lib/admin-context';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
+import type { RolAdmin } from '@/core/domain/repositories/IAdminRepository';
 
 interface NavItem {
   href: string;
   labelKey: Parameters<typeof t>[0];
   icon: React.ComponentType<{ className?: string }>;
+  requiresRole?: RolAdmin[];
 }
 
 const BASE_NAV_ITEMS: (NavItem & { requiresPromo?: boolean; requiresTgtg?: boolean; requiresRestaurant?: boolean; requiresDelivery?: boolean })[] = [
@@ -28,6 +30,10 @@ const BASE_NAV_ITEMS: (NavItem & { requiresPromo?: boolean; requiresTgtg?: boole
   { href: '/admin/mesas', labelKey: 'sidebarMesas', icon: UtensilsCrossed, requiresRestaurant: true },
   { href: '/admin/valoraciones', labelKey: 'adminValoraciones', icon: Star, requiresRestaurant: true },
   { href: '/admin/delivery', labelKey: 'sidebarDelivery', icon: MapPin, requiresDelivery: true },
+  { href: '/admin/stock/ingredientes', labelKey: 'sidebarStockIngredientes', icon: Archive, requiresRestaurant: true },
+  { href: '/admin/stock/recetas', labelKey: 'sidebarStockRecetas', icon: BookOpen, requiresRestaurant: true },
+  { href: '/admin/stock/movimientos', labelKey: 'sidebarStockMovimientos', icon: History, requiresRestaurant: true },
+  { href: '/admin/stock/inventario', labelKey: 'sidebarStockInventario', icon: ClipboardList, requiresRestaurant: true },
   { href: '/admin/configuracion', labelKey: 'sidebarSettings', icon: Settings },
 ];
 
@@ -153,6 +159,14 @@ export function AdminSidebar({ empresaId }: Readonly<AdminSidebarProps>) {
           </nav>
 
           <div className="p-4 border-t border-white/10 space-y-2">
+            <Link
+              href="/tpv"
+              onClick={closeMenu}
+              className="flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm text-slate-300 hover:bg-white/5 hover:text-white w-full rounded-lg transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+            >
+              <MonitorCheck className="h-5 w-5 flex-shrink-0" />
+              Ir al TPV
+            </Link>
             <Link
               href="/"
               className="flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm text-slate-300 hover:bg-white/5 hover:text-white w-full rounded-lg transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"

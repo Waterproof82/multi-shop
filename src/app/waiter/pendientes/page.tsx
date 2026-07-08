@@ -13,6 +13,7 @@ interface PendienteItem {
   precio: number;
   tipo: 'comida' | 'bebida';
   complementos?: string;
+  nota?: string;
 }
 
 interface PendientePedido {
@@ -65,6 +66,7 @@ interface GroupedPendienteItem {
   groupKey: string;
   nombre: string;
   complementos?: string;
+  nota?: string;
   tipo: 'comida' | 'bebida';
   totalCantidad: number;
   items: MergedItem[];
@@ -75,9 +77,9 @@ function getGroupedItems(mergedItems: MergedItem[], paused: Set<string>): Groupe
   for (const item of mergedItems) {
     // Include paused state in key: paused and non-paused items stay separate
     const isPaused = paused.has(item.globalKey);
-    const key = `${item.tipo}|${item.nombre}|${item.complementos ?? ''}|${isPaused ? '1' : '0'}`;
+    const key = `${item.tipo}|${item.nombre}|${item.complementos ?? ''}|${item.nota ?? ''}|${isPaused ? '1' : '0'}`;
     if (!map.has(key)) {
-      map.set(key, { groupKey: key, nombre: item.nombre, complementos: item.complementos, tipo: item.tipo, totalCantidad: 0, items: [] });
+      map.set(key, { groupKey: key, nombre: item.nombre, complementos: item.complementos, nota: item.nota, tipo: item.tipo, totalCantidad: 0, items: [] });
     }
     const g = map.get(key)!;
     g.totalCantidad += item.cantidad;
@@ -242,7 +244,7 @@ function PedidoItemButton({ item, isSelected, isPaused, onToggleSelect, onToggle
     >
       <button
         type="button"
-        className="flex flex-1 items-center gap-2 px-3 py-2 text-left"
+        className="flex flex-1 items-center gap-2 px-3 py-3 text-left"
         onClick={onToggleSelect}
       >
         <span
@@ -260,6 +262,9 @@ function PedidoItemButton({ item, isSelected, isPaused, onToggleSelect, onToggle
           {item.complementos && (
             <div className="text-[10px] truncate" style={{ color: TEXT_DIM }}>({item.complementos})</div>
           )}
+          {item.nota && (
+            <div className="text-[10px] italic truncate" style={{ color: 'oklch(72% 0.12 85)' }}>✎ {item.nota}</div>
+          )}
         </div>
         {item.tipo === 'comida'
           ? <UtensilsCrossed className="w-3 h-3 shrink-0" style={{ color: 'oklch(62% 0.14 62)' }} />
@@ -272,7 +277,7 @@ function PedidoItemButton({ item, isSelected, isPaused, onToggleSelect, onToggle
           onClick={onTogglePause}
           className="shrink-0 flex items-center justify-center rounded"
           style={{
-            width: 28, height: 28, margin: '0 4px',
+            width: 36, height: 36, margin: '0 4px',
             background: isPaused ? 'oklch(28% 0.14 65)' : 'oklch(20% 0.04 252)',
             color: isPaused ? 'oklch(78% 0.20 65)' : 'oklch(42% 0.06 252)',
             border: `1px solid ${isPaused ? 'oklch(50% 0.22 65 / 0.6)' : 'oklch(35% 0.06 252 / 0.4)'}`,
@@ -607,7 +612,7 @@ export default function WaiterPendientesPage() {
                         <button
                           onClick={() => void handleConfirmBoth(mesa.mesaId)}
                           disabled={isConfirming}
-                          className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-[11px] font-semibold disabled:opacity-50"
+                          className="flex items-center gap-1 rounded-lg px-3 py-2.5 text-xs font-semibold disabled:opacity-50"
                           style={{ background: 'oklch(20% 0.12 300)', color: 'oklch(78% 0.18 300)', border: '1px solid oklch(52% 0.22 300 / 0.6)' }}>
                           <CheckCheck className="w-3.5 h-3.5 shrink-0" />
                           <UtensilsCrossed className="w-3 h-3 shrink-0" />
@@ -618,7 +623,7 @@ export default function WaiterPendientesPage() {
                         <button
                           onClick={() => void handleConfirm(mesa.mesaId, 'comida', 'selected')}
                           disabled={isConfirming}
-                          className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-[11px] font-semibold disabled:opacity-50"
+                          className="flex items-center gap-1 rounded-lg px-3 py-2.5 text-xs font-semibold disabled:opacity-50"
                           style={{ background: 'oklch(22% 0.14 148)', color: 'oklch(74% 0.20 148)', border: '1px solid oklch(46% 0.22 148 / 0.6)' }}>
                           <CheckCheck className="w-3.5 h-3.5 shrink-0" />
                           <UtensilsCrossed className="w-3.5 h-3.5 shrink-0" />
@@ -628,7 +633,7 @@ export default function WaiterPendientesPage() {
                         <button
                           onClick={() => void handleConfirm(mesa.mesaId, 'bebida', 'selected')}
                           disabled={isConfirming}
-                          className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-[11px] font-semibold disabled:opacity-50"
+                          className="flex items-center gap-1 rounded-lg px-3 py-2.5 text-xs font-semibold disabled:opacity-50"
                           style={{ background: 'oklch(20% 0.10 252)', color: 'oklch(70% 0.16 252)', border: '1px solid oklch(45% 0.18 252 / 0.6)' }}>
                           <CheckCheck className="w-3.5 h-3.5 shrink-0" />
                           <Wine className="w-3.5 h-3.5 shrink-0" />
@@ -638,7 +643,7 @@ export default function WaiterPendientesPage() {
                         onClick={() => setGroupedMesas(prev => { const next = new Set(prev); if (next.has(mesa.mesaId)) { next.delete(mesa.mesaId); } else { next.add(mesa.mesaId); } return next; })}
                         title="Agrupar ítems"
                         className="flex items-center justify-center rounded-lg"
-                        style={{ width: 34, height: 30, background: isGrouped ? 'oklch(28% 0.16 228)' : 'oklch(20% 0.04 252)', color: isGrouped ? 'oklch(78% 0.20 228)' : TEXT_DIM, border: isGrouped ? '1px solid oklch(50% 0.22 228 / 0.6)' : '1px solid oklch(35% 0.06 252 / 0.5)' }}
+                        style={{ width: 40, height: 38, background: isGrouped ? 'oklch(28% 0.16 228)' : 'oklch(20% 0.04 252)', color: isGrouped ? 'oklch(78% 0.20 228)' : TEXT_DIM, border: isGrouped ? '1px solid oklch(50% 0.22 228 / 0.6)' : '1px solid oklch(35% 0.06 252 / 0.5)' }}
                       >
                         <Layers className="w-3.5 h-3.5" />
                       </button>
@@ -646,7 +651,7 @@ export default function WaiterPendientesPage() {
                         onClick={() => setCollapsedMesas(prev => { const next = new Set(prev); if (next.has(mesa.mesaId)) { next.delete(mesa.mesaId); } else { next.add(mesa.mesaId); } return next; })}
                         title={isCollapsed ? 'Expandir' : 'Contraer'}
                         className="flex items-center justify-center rounded-lg"
-                        style={{ width: 34, height: 30, background: 'oklch(20% 0.04 252)', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
+                        style={{ width: 40, height: 38, background: 'oklch(20% 0.04 252)', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
                       >
                         <ChevronDown className="w-3.5 h-3.5 transition-transform" style={{ transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }} />
                       </button>
@@ -655,7 +660,7 @@ export default function WaiterPendientesPage() {
                           onClick={() => setPendingDelete(mesa.mesaId)}
                           disabled={isConfirming}
                           className="flex items-center justify-center rounded-lg disabled:opacity-50"
-                          style={{ width: 34, height: 30, background: 'oklch(26% 0.26 25)', color: 'oklch(82% 0.26 25)', border: '2px solid oklch(50% 0.30 25 / 0.7)' }}
+                          style={{ width: 40, height: 38, background: 'oklch(26% 0.26 25)', color: 'oklch(82% 0.26 25)', border: '2px solid oklch(50% 0.30 25 / 0.7)' }}
                           title={t('pendientesDeleteConfirmTitle', lang)}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -755,6 +760,9 @@ export default function WaiterPendientesPage() {
                               {group.complementos && (
                                 <span className="block text-[10px] truncate" style={{ color: TEXT_DIM }}>({group.complementos})</span>
                               )}
+                              {group.nota && (
+                                <span className="block text-[10px] italic truncate" style={{ color: 'oklch(72% 0.12 85)' }}>✎ {group.nota}</span>
+                              )}
                             </span>
                             {group.tipo === 'comida'
                               ? <UtensilsCrossed className="w-3 h-3 shrink-0" style={{ color: 'oklch(62% 0.14 62)' }} />
@@ -766,7 +774,7 @@ export default function WaiterPendientesPage() {
                               type="button"
                               onClick={toggleGroupPause}
                               className="shrink-0 flex items-center justify-center rounded"
-                              style={{ width: 28, height: 28, background: anyGroupPaused ? 'oklch(28% 0.14 65)' : 'oklch(20% 0.04 252)', color: anyGroupPaused ? 'oklch(78% 0.20 65)' : 'oklch(42% 0.06 252)', border: `1px solid ${anyGroupPaused ? 'oklch(50% 0.22 65 / 0.6)' : 'oklch(35% 0.06 252 / 0.4)'}` }}
+                              style={{ width: 36, height: 36, background: anyGroupPaused ? 'oklch(28% 0.14 65)' : 'oklch(20% 0.04 252)', color: anyGroupPaused ? 'oklch(78% 0.20 65)' : 'oklch(42% 0.06 252)', border: `1px solid ${anyGroupPaused ? 'oklch(50% 0.22 65 / 0.6)' : 'oklch(35% 0.06 252 / 0.4)'}` }}
                             >
                               <Pause className="w-3 h-3" />
                             </button>

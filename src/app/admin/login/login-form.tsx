@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,7 @@ interface LoginFormProps {
 
 export default function LoginForm({ empresaNombre }: LoginFormProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { language } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -68,7 +69,9 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
       if (data.data?.admin?.rol === 'superadmin') {
         router.push('/superadmin');
       } else {
-        router.push('/admin');
+        const next = searchParams.get('next');
+        const destination = next?.startsWith('/') ? next : '/admin';
+        router.push(destination);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : t('unknownError', language));

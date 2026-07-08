@@ -12,6 +12,7 @@ export interface CreatePedidoDTO {
     item: { id: string; name: string; price: number; translations?: { en?: { name: string }; fr?: { name: string }; it?: { name: string }; de?: { name: string } } };
     quantity: number;
     selectedComplements?: { id: string; name: string; price: number }[];
+    note?: string;
   }[];
   /** Client-supplied total is ignored — the server recalculates it from DB prices */
   total?: number;
@@ -33,6 +34,7 @@ export interface CreateMesaPedidoDTO {
   items: CreatePedidoDTO['items'];
   mesa_id: string; // UUID
   idioma?: string;
+  nota?: string;
 }
 
 export interface PedidoStats {
@@ -43,13 +45,19 @@ export interface PedidoStats {
   totalAno: number;
   topPlatos: { nombre: string; cantidad: number; total: number }[];
   topPlatosAno: { nombre: string; cantidad: number; total: number }[];
-  pedidosPorDia: { dia: number; pedidos: number; ingresos: number }[];
+  pedidosPorDia: { dia: number; mesa: number; recogida: number; delivery: number; web: number }[];
   clientesNuevos: number;
   clientesRecurrentes: number;
   ticketMedio: number;
   ticketMedioAnterior: number;
   pedidosAnterior: number;
   ingresosAnterior: number;
+  byOrigen: {
+    mesa:     { pedidos: number; total: number };
+    recogida: { pedidos: number; total: number };
+    delivery: { pedidos: number; total: number };
+    web:      { pedidos: number; total: number };
+  };
 }
 
 /**
@@ -477,12 +485,14 @@ export class PedidoUseCase {
 
       // Step 2: Build items for repo (nombre + cantidad + precio + complementos)
       const repoItems = data.items.map(ci => ({
+        producto_id: ci.item?.id,
         nombre: ci.item?.name ?? '',
         cantidad: ci.quantity,
         precio: priceMap.get(ci.item?.id ?? '') ?? ci.item?.price ?? 0,
         tipo_producto: tipoProductoMap.get(ci.item?.id ?? '') ?? 'comida',
         translations: ci.item?.translations,
         complementos: ci.selectedComplements?.map(c => ({ nombre: c.name, precio: c.price })) ?? [],
+        nota: ci.note || undefined,
       }));
 
       // Step 3: Ensure an active session exists (idempotent), then attach it to the order.
@@ -504,6 +514,7 @@ export class PedidoUseCase {
         trackingToken,
         sesionId,
         initialEstado,
+        nota: data.nota,
       });
       if (!pedidoResult.success) {
         return { success: false, error: pedidoResult.error };

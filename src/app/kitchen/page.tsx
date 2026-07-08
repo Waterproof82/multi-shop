@@ -1,10 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
-import { UtensilsCrossed, Layers } from 'lucide-react';
+import { UtensilsCrossed, LogOut } from 'lucide-react';
 import type { ItemEstado } from '@/core/domain/repositories/IPedidoRepository';
 
 interface KitchenItem {
@@ -14,6 +14,7 @@ interface KitchenItem {
   nombre: string;
   cantidad: number;
   complementos?: string;
+  nota?: string;
   estado: ItemEstado;
   mesaNumero: number | null;
   mesaNombre: string | null;
@@ -25,15 +26,15 @@ const TEXT_MAIN = 'oklch(92% 0.02 252)';
 const TEXT_DIM  = 'oklch(55% 0.04 252)';
 
 const TIME_COLORS = [
-  { max: 10,       bg: 'oklch(18% 0.06 228)', border: 'oklch(50% 0.22 228 / 0.55)' },
-  { max: 20,       bg: 'oklch(19% 0.09 168)', border: 'oklch(52% 0.26 168 / 0.55)' },
-  { max: 30,       bg: 'oklch(22% 0.14 100)', border: 'oklch(56% 0.28 100 / 0.55)' },
-  { max: 45,       bg: 'oklch(24% 0.18 68)',  border: 'oklch(58% 0.30 68  / 0.60)' },
-  { max: 60,       bg: 'oklch(24% 0.20 35)',  border: 'oklch(58% 0.33 35  / 0.65)' },
-  { max: Infinity, bg: 'oklch(22% 0.22 16)',  border: 'oklch(56% 0.36 16  / 0.70)' },
+  { max: 10,       label: '< 10 min',  bg: 'oklch(18% 0.06 228)', border: 'oklch(50% 0.22 228 / 0.55)', text: 'oklch(72% 0.20 228)' },
+  { max: 20,       label: '10 – 20 m', bg: 'oklch(19% 0.09 168)', border: 'oklch(52% 0.26 168 / 0.55)', text: 'oklch(74% 0.24 168)' },
+  { max: 30,       label: '20 – 30 m', bg: 'oklch(22% 0.14 100)', border: 'oklch(56% 0.28 100 / 0.55)', text: 'oklch(78% 0.26 100)' },
+  { max: 45,       label: '30 – 45 m', bg: 'oklch(24% 0.18 68)',  border: 'oklch(58% 0.30 68  / 0.60)', text: 'oklch(80% 0.28 68)'  },
+  { max: 60,       label: '45 – 60 m', bg: 'oklch(24% 0.20 35)',  border: 'oklch(58% 0.33 35  / 0.65)', text: 'oklch(80% 0.30 35)'  },
+  { max: Infinity, label: '60+ min',   bg: 'oklch(22% 0.22 16)',  border: 'oklch(56% 0.36 16  / 0.70)', text: 'oklch(78% 0.34 16)'  },
 ];
 const COUNTDOWN_COLOR = { bg: 'oklch(24% 0.18 148)', border: 'oklch(55% 0.28 148 / 0.65)' };
-const EN_PREP_COLOR   = { bg: 'oklch(28% 0.22 90)',  border: 'oklch(62% 0.30 90  / 0.65)' };
+const EN_PREP_BORDER  = 'oklch(80% 0.32 142)'; // bright lime — overrides time border when en_preparacion
 
 const THRESHOLD         = 80;
 const COUNTDOWN_SECONDS = 5;
@@ -63,6 +64,7 @@ interface MergedItem {
   mergeKey: string;
   nombre: string;
   complementos?: string;
+  nota?: string;
   totalCantidad: number;
   estado: ItemEstado;
   firstCreatedAt: string;
@@ -71,8 +73,8 @@ interface MergedItem {
 
 function resolveCardColor(isCountdown: boolean, isEnPrep: boolean, elapsed: number) {
   if (isCountdown) return COUNTDOWN_COLOR;
-  if (isEnPrep) return EN_PREP_COLOR;
-  return getTimeColor(elapsed);
+  const timeColor = getTimeColor(elapsed);
+  return { bg: timeColor.bg, border: isEnPrep ? EN_PREP_BORDER : timeColor.border };
 }
 
 function notMatchingItem(pedidoId: string, itemIdx: number): (i: KitchenItem) => boolean {
@@ -88,9 +90,9 @@ function getMergedActionLabel(action: ItemEstado): string {
 function mergeByName(items: KitchenItem[]): MergedItem[] {
   const map = new Map<string, MergedItem>();
   for (const item of items) {
-    const key = `${item.nombre}|${item.complementos ?? ''}|${item.estado}`;
+    const key = `${item.nombre}|${item.complementos ?? ''}|${item.nota ?? ''}|${item.estado}`;
     if (!map.has(key)) {
-      map.set(key, { mergeKey: key, nombre: item.nombre, complementos: item.complementos, totalCantidad: 0, estado: item.estado, firstCreatedAt: item.createdAt, items: [] });
+      map.set(key, { mergeKey: key, nombre: item.nombre, complementos: item.complementos, nota: item.nota, totalCantidad: 0, estado: item.estado, firstCreatedAt: item.createdAt, items: [] });
     }
     const g = map.get(key)!;
     g.totalCantidad += item.cantidad;
@@ -136,17 +138,18 @@ function CountdownCard({ item, remaining, lang, onCancelCountdown }: Readonly<Co
   return (
     <div className="relative rounded-xl overflow-hidden select-none"
       style={{ background: COUNTDOWN_COLOR.bg, border: `1px solid ${COUNTDOWN_COLOR.border}`, touchAction: 'pan-y' }}>
-      <div data-card-content="" className="flex items-center gap-3 px-3 py-2.5" style={{ background: COUNTDOWN_COLOR.bg }}>
+      <div data-card-content="" className="flex items-center gap-3 px-4 py-4" style={{ background: COUNTDOWN_COLOR.bg }}>
         <div className="shrink-0 flex items-center justify-center w-9 h-9 rounded-full text-base font-bold"
           style={{ background: 'oklch(32% 0.20 148)', color: 'oklch(80% 0.22 148)', border: '2px solid oklch(55% 0.28 148 / 0.7)' }}>
           {remaining}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-1.5">
-            <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{item.cantidad}&times;</span>
-            <span className="text-xs font-medium truncate" style={{ color: TEXT_MAIN }}>{item.nombre}</span>
+            <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{item.cantidad}&times;</span>
+            <span className="text-sm font-medium truncate" style={{ color: TEXT_MAIN }}>{item.nombre}</span>
           </div>
           {item.complementos && <span className="text-[10px]" style={{ color: 'oklch(78% 0.03 252)' }}>({item.complementos})</span>}
+          {item.nota && <span className="text-xs font-medium italic block mt-0.5 px-1.5 py-0.5 rounded" style={{ color: 'oklch(88% 0.18 85)', background: 'oklch(28% 0.12 85 / 0.45)' }}>✎ {item.nota}</span>}
         </div>
         <button className="rounded px-2 py-1 text-[10px] font-bold shrink-0"
           style={{ background: 'oklch(26% 0.08 25)', color: 'oklch(75% 0.18 25)' }}
@@ -163,17 +166,18 @@ function SwipeCard({ item, lang, onPointerDown, onPointerMove, onPointerUp, onPo
   const key      = makeKey(item.pedidoId, item.itemIdx);
   const isEnPrep = item.estado === 'en_preparacion';
   const elapsed  = getElapsedMinutes(item.createdAt);
-  const color    = isEnPrep ? EN_PREP_COLOR : getTimeColor(elapsed);
+  const timeColor = getTimeColor(elapsed);
+  const color    = { bg: timeColor.bg, border: isEnPrep ? EN_PREP_BORDER : timeColor.border };
   return (
     <div className="relative rounded-xl overflow-hidden select-none"
-      style={{ background: color.bg, border: `1px solid ${color.border}`, touchAction: 'pan-y', willChange: 'transform' }}
+      style={{ background: color.bg, border: `${isEnPrep ? 2 : 1}px solid ${color.border}`, boxShadow: isEnPrep ? `0 0 10px ${EN_PREP_BORDER}33` : undefined, touchAction: 'pan-y', willChange: 'transform' }}
       onPointerDown={e => onPointerDown(e, key)}
       onPointerMove={e => onPointerMove(e, key)}
       onPointerUp={e => onPointerUp(e, item)}
       onPointerCancel={onPointerCancel}
     >
       <div data-hint-fwd="" className="absolute inset-0 flex items-center justify-end px-3 rounded-xl pointer-events-none"
-        style={{ opacity: 0, background: isEnPrep ? COUNTDOWN_COLOR.bg : EN_PREP_COLOR.bg, transition: 'opacity 0.1s' }}>
+        style={{ opacity: 0, background: isEnPrep ? COUNTDOWN_COLOR.bg : 'oklch(28% 0.22 90)', transition: 'opacity 0.1s' }}>
         <span className="text-[10px] font-bold" style={{ color: isEnPrep ? 'oklch(78% 0.22 148)' : 'oklch(82% 0.24 90)' }}>
           {isEnPrep ? `\u2713 ${t('kitchenItemListo', lang)}` : `\u2192 ${t('orderStatusAnotado', lang)}`}
         </span>
@@ -186,20 +190,22 @@ function SwipeCard({ item, lang, onPointerDown, onPointerMove, onPointerUp, onPo
           </span>
         </div>
       )}
-      <div data-card-content="" className="flex items-center gap-3 px-3 py-2.5" style={{ background: color.bg }}>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{item.cantidad}&times;</span>
-            <span className="text-xs font-medium truncate" style={{ color: TEXT_MAIN }}>{item.nombre}</span>
-          </div>
-          {item.complementos && <span className="text-[10px]" style={{ color: 'oklch(78% 0.03 252)' }}>({item.complementos})</span>}
+      <div data-card-content="" className="flex items-center gap-3 px-4 py-4" style={{ background: color.bg }}>
+        <div className="shrink-0 flex items-center justify-center w-9 h-9 rounded-full text-sm font-bold"
+          style={{ background: 'oklch(24% 0.08 252)', color: TEXT_MAIN, border: `1px solid ${color.border}` }}>
+          {item.cantidad}
         </div>
-        <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold shrink-0"
-          style={isEnPrep
-            ? { background: 'oklch(32% 0.16 90 / 0.5)', color: 'oklch(82% 0.20 90)' }
-            : { background: 'oklch(30% 0.10 252 / 0.4)', color: 'oklch(75% 0.12 252)' }}>
-          {isEnPrep ? t('orderStatusAnotado', lang) : t('orderStatusPending', lang)}
-        </span>
+        <div className="flex-1 min-w-0">
+          <span className="text-sm font-medium truncate block" style={{ color: TEXT_MAIN }}>{item.nombre}</span>
+          {item.complementos && <span className="text-[10px]" style={{ color: 'oklch(78% 0.03 252)' }}>({item.complementos})</span>}
+          {item.nota && <span className="text-xs font-medium italic block mt-0.5 px-1.5 py-0.5 rounded" style={{ color: 'oklch(88% 0.18 85)', background: 'oklch(28% 0.12 85 / 0.45)' }}>✎ {item.nota}</span>}
+        </div>
+        {isEnPrep && (
+          <span className="rounded px-1.5 py-0.5 text-[10px] font-bold shrink-0"
+            style={{ background: 'oklch(34% 0.20 90)', color: 'oklch(90% 0.22 90)', border: '1px solid oklch(55% 0.28 90 / 0.6)' }}>
+            En prep.
+          </span>
+        )}
       </div>
     </div>
   );
@@ -222,10 +228,12 @@ export default function KitchenPage() {
   const [globalGrouped, setGlobalGrouped]             = useState(false);
   const [pendingMergedAction, setPendingMergedAction] = useState<{ items: KitchenItem[]; action: ItemEstado } | null>(null);
 
-  const timersRef     = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
-  const pointerStartX = useRef<number | null>(null);
-  const swipingKey    = useRef<string | null>(null);
-  const prevCountRef  = useRef<number | null>(null);
+  const timersRef      = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
+  const pointerStartX  = useRef<number | null>(null);
+  const swipingKey     = useRef<string | null>(null);
+  const prevCountRef   = useRef<number | null>(null);
+  const instanceId     = useId();
+  const channelNameRef = useRef(`kitchen-standalone-${instanceId}`);
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
@@ -242,6 +250,13 @@ export default function KitchenPage() {
     } catch { /* ignore */ }
   }, []);
 
+  // Push notification foreground: play bell + refresh (dispatched by PushRegistrar when role=kitchen)
+  useEffect(() => {
+    function onPushReceived() { void fetchItems(); }
+    globalThis.window?.addEventListener('kitchen-push-received', onPushReceived);
+    return () => globalThis.window?.removeEventListener('kitchen-push-received', onPushReceived);
+  }, [fetchItems]);
+
   // Realtime: react to changes in pedido_item_estados + new pedidos
   useEffect(() => {
     void fetchItems();
@@ -249,21 +264,34 @@ export default function KitchenPage() {
     const supabase = getSupabaseAnonClient();
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
+    function scheduleRefresh() {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => { void fetchItems(); }, 100);
+    }
+
+    // postgres_changes — catches direct DB mutations (unique name avoids StrictMode stale-channel bug)
     const channel = supabase
-      .channel('kitchen-standalone')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados' }, () => {
-        if (debounceTimer) clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => { void fetchItems(); }, 100);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => {
-        if (debounceTimer) clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => { void fetchItems(); }, 100);
-      })
+      .channel(channelNameRef.current)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, scheduleRefresh)
+      .subscribe();
+
+    // Broadcast channels — fired by DB triggers; catches validation events that postgres_changes may miss
+    const broadcastItems = supabase
+      .channel('waiter-items-update')
+      .on('broadcast', { event: 'item-update' }, scheduleRefresh)
+      .subscribe();
+
+    const broadcastOrders = supabase
+      .channel('waiter-new-order')
+      .on('broadcast', { event: 'new-order' }, scheduleRefresh)
       .subscribe();
 
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       void supabase.removeChannel(channel);
+      void supabase.removeChannel(broadcastItems);
+      void supabase.removeChannel(broadcastOrders);
     };
   }, [fetchItems]);
 
@@ -412,51 +440,74 @@ export default function KitchenPage() {
     <div className="min-h-screen flex flex-col" style={{ background: BG, color: TEXT_MAIN }}>
 
       {/* Header */}
-      <div className="sticky top-0 z-20 px-4 pt-4 pb-3" style={{ background: BG, borderBottom: '1px solid oklch(28% 0.06 252 / 0.5)' }}>
-        <div className="flex items-center gap-3 mb-3">
-          <div className="flex items-center justify-center w-8 h-8 rounded-xl" style={{ background: 'oklch(26% 0.12 252)' }}>
-            <UtensilsCrossed className="w-4 h-4" style={{ color: 'oklch(72% 0.18 252)' }} />
-          </div>
-          <span className="text-base font-bold" style={{ color: TEXT_MAIN }}>Cocina</span>
-          {activeItems.length > 0 && (
-            <span className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: 'oklch(26% 0.14 35)', color: 'oklch(78% 0.22 35)' }}>
-              {activeItems.length}
-            </span>
-          )}
+      <div className="sticky top-0 z-20 flex flex-col" style={{ background: BG, borderBottom: '1px solid oklch(28% 0.06 252 / 0.5)' }}>
+      <div className="px-4 pt-4 pb-2 flex items-center gap-3 overflow-x-auto scrollbar-none" style={{ scrollbarWidth: 'none' }}>
+        <div className="flex items-center justify-center w-9 h-9 rounded-xl" style={{ background: 'oklch(26% 0.12 252)' }}>
+          <UtensilsCrossed className="w-5 h-5" style={{ color: 'oklch(72% 0.18 252)' }} />
         </div>
-
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {/* Grouping buttons: Por pedido / Por mesa */}
-          {(['order', 'mesa'] as const).map(mode => (
+        <span className="text-lg font-bold" style={{ color: TEXT_MAIN }}>Cocina</span>
+        {activeItems.length > 0 && (
+          <span className="text-sm font-bold px-2.5 py-0.5 rounded-full" style={{ background: 'oklch(26% 0.14 35)', color: 'oklch(78% 0.22 35)' }}>
+            {activeItems.length}
+          </span>
+        )}
+        <div className="ml-auto flex items-center gap-2">
+          <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid oklch(32% 0.08 252 / 0.5)' }}>
             <button
-              key={mode}
-              onClick={() => setGroupBy(mode)}
-              className="rounded-lg px-3 py-1.5 text-xs font-semibold"
-              style={groupBy === mode && !globalGrouped
-                ? { background: 'oklch(28% 0.10 252)', color: TEXT_MAIN, border: '1px solid oklch(50% 0.10 252 / 0.6)' }
-                : { background: 'oklch(20% 0.06 252)', color: TEXT_DIM, border: '1px solid oklch(32% 0.08 252 / 0.5)' }
-              }
+              type="button"
+              onClick={() => { setGroupBy('order'); setGlobalGrouped(false); }}
+              className="px-2.5 py-1.5 text-[10px] font-semibold"
+              style={groupBy === 'order' && !globalGrouped
+                ? { background: 'oklch(32% 0.12 252)', color: TEXT_MAIN }
+                : { background: 'oklch(18% 0.04 252)', color: TEXT_DIM }}
             >
-              {mode === 'order' ? 'Por pedido' : 'Por mesa'}
+              Por pedido
             </button>
-          ))}
-
-          {/* Separator */}
-          <span style={{ width: 1, height: 18, background: 'oklch(38% 0.06 252 / 0.5)', margin: '0 2px', display: 'inline-block', alignSelf: 'center' }} />
-
+            <button
+              type="button"
+              onClick={() => { setGroupBy('mesa'); setGlobalGrouped(false); }}
+              className="px-2.5 py-1.5 text-[10px] font-semibold border-l"
+              style={groupBy === 'mesa' && !globalGrouped
+                ? { background: 'oklch(32% 0.12 252)', color: TEXT_MAIN, borderColor: 'oklch(32% 0.08 252 / 0.5)' }
+                : { background: 'oklch(18% 0.04 252)', color: TEXT_DIM, borderColor: 'oklch(32% 0.08 252 / 0.5)' }}
+            >
+              Por mesa
+            </button>
+            <button
+              type="button"
+              onClick={() => setGlobalGrouped(true)}
+              className="px-2.5 py-1.5 text-[10px] font-semibold border-l"
+              style={globalGrouped
+                ? { background: 'oklch(32% 0.12 252)', color: TEXT_MAIN, borderColor: 'oklch(32% 0.08 252 / 0.5)' }
+                : { background: 'oklch(18% 0.04 252)', color: TEXT_DIM, borderColor: 'oklch(32% 0.08 252 / 0.5)' }}
+            >
+              Agrupar
+            </button>
+          </div>
           <button
-            onClick={() => setGlobalGrouped(g => !g)}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold"
-            style={{
-              background: globalGrouped ? 'oklch(26% 0.14 252)' : 'oklch(20% 0.06 252)',
-              color:      globalGrouped ? 'oklch(75% 0.20 252)' : TEXT_DIM,
-              border: `1px solid ${globalGrouped ? 'oklch(52% 0.18 252 / 0.5)' : 'oklch(32% 0.08 252 / 0.5)'}`,
-            }}
+            type="button"
+            onClick={() => { void fetch('/api/waiter/logout', { method: 'POST' }).then(() => { globalThis.location.reload(); }); }}
+            className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold"
+            style={{ background: 'oklch(20% 0.06 252)', color: TEXT_DIM, border: '1px solid oklch(32% 0.08 252 / 0.5)' }}
           >
-            <Layers className="w-3 h-3" />
-            Agrupar
+            <LogOut className="w-4 h-4" />
+            Salir
           </button>
         </div>
+      </div>
+      {/* Time legend */}
+      <div className="flex flex-nowrap overflow-x-auto gap-1 px-4 pb-2 scrollbar-none" style={{ scrollbarWidth: 'none' }}>
+        {TIME_COLORS.map(c => (
+          <span key={c.label} className="rounded px-1.5 py-0.5 text-[10px] font-medium"
+            style={{ background: c.bg, color: c.text, border: `1px solid ${c.border}` }}>
+            {c.label}
+          </span>
+        ))}
+        <span className="rounded px-1.5 py-0.5 text-[10px] font-medium"
+          style={{ background: 'oklch(16% 0.04 142)', color: EN_PREP_BORDER, border: `1px solid ${EN_PREP_BORDER}66` }}>
+          En prep.
+        </span>
+      </div>
       </div>
 
       {/* Body */}
@@ -471,55 +522,58 @@ export default function KitchenPage() {
         )}
 
         {/* Global grouped view */}
-        {globalGrouped && activeItems.length > 0 && (
-          <div className="flex flex-col gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: TEXT_DIM }}>Todos los ítems</span>
-            {mergeByName(activeItems).map(merged => {
-              const isEnPrep  = merged.estado === 'en_preparacion';
-              const elapsed   = getElapsedMinutes(merged.firstCreatedAt);
-              const cardColor = isEnPrep ? EN_PREP_COLOR : getTimeColor(elapsed);
-              return (
-                <div
-                  key={merged.mergeKey}
-                  className="relative w-full rounded-xl overflow-hidden select-none"
-                  style={{ background: cardColor.bg, border: `1px solid ${cardColor.border}`, touchAction: 'pan-y', willChange: 'transform' }}
-                  onPointerDown={e => handlePointerDown(e, merged.mergeKey)}
-                  onPointerMove={e => handlePointerMove(e, merged.mergeKey)}
-                  onPointerUp={e => handlePointerUpMerged(e, merged)}
-                  onPointerCancel={handlePointerCancel}
-                >
-                  <div data-hint-fwd="" className="absolute inset-0 flex items-center justify-end px-3 rounded-xl pointer-events-none"
-                    style={{ opacity: 0, background: isEnPrep ? COUNTDOWN_COLOR.bg : EN_PREP_COLOR.bg, transition: 'opacity 0.1s' }}>
-                    <span className="text-[10px] font-bold" style={{ color: isEnPrep ? 'oklch(78% 0.22 148)' : 'oklch(82% 0.24 90)' }}>
-                      {isEnPrep ? `\u2713 ${t('kitchenItemListo', lang)}` : `\u2192 ${t('orderStatusAnotado', lang)}`}
-                    </span>
-                  </div>
-                  {isEnPrep && (
-                    <div data-hint-bck="" className="absolute inset-0 flex items-center px-3 rounded-xl pointer-events-none"
-                      style={{ opacity: 0, transition: 'opacity 0.1s' }}>
-                      <span className="text-[10px] font-bold" style={{ color: 'oklch(68% 0.18 240)' }}>
-                        {`\u2190 ${t('orderStatusPending', lang)}`}
-                      </span>
-                    </div>
-                  )}
-                  <div data-card-content="" className="flex items-center gap-3 px-3 py-2.5" style={{ background: cardColor.bg }}>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-1.5">
-                        <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{merged.totalCantidad}&times;</span>
-                        <span className="text-xs font-medium truncate" style={{ color: TEXT_MAIN }}>{merged.nombre}</span>
-                      </div>
-                      {merged.complementos && <span className="text-[10px]" style={{ color: 'oklch(78% 0.03 252)' }}>({merged.complementos})</span>}
-                    </div>
-                    <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold"
-                      style={isEnPrep ? { background: 'oklch(32% 0.16 90 / 0.5)', color: 'oklch(82% 0.20 90)' } : { background: 'oklch(30% 0.10 252 / 0.4)', color: 'oklch(75% 0.12 252)' }}>
-                      {isEnPrep ? t('orderStatusAnotado', lang) : t('orderStatusPending', lang)}
-                    </span>
-                  </div>
+        {globalGrouped && mergeByName(activeItems).map(merged => {
+          const elapsed = getElapsedMinutes(merged.firstCreatedAt);
+          const isEnPrep = merged.estado === 'en_preparacion';
+          const color = resolveCardColor(false, isEnPrep, elapsed);
+          return (
+            <div key={merged.mergeKey} className="relative rounded-xl overflow-hidden select-none"
+              style={{ background: color.bg, border: `${isEnPrep ? 2 : 1}px solid ${color.border}`, boxShadow: isEnPrep ? `0 0 10px ${EN_PREP_BORDER}33` : undefined, touchAction: 'pan-y', willChange: 'transform' }}
+              onPointerDown={e => handlePointerDown(e, merged.mergeKey)}
+              onPointerMove={e => handlePointerMove(e, merged.mergeKey)}
+              onPointerUp={e => handlePointerUpMerged(e, merged)}
+              onPointerCancel={handlePointerCancel}
+            >
+              <div data-hint-fwd="" className="absolute inset-0 flex items-center justify-end px-3 rounded-xl pointer-events-none"
+                style={{ opacity: 0, background: isEnPrep ? COUNTDOWN_COLOR.bg : 'oklch(28% 0.22 90)', transition: 'opacity 0.1s' }}>
+                <span className="text-[10px] font-bold" style={{ color: isEnPrep ? 'oklch(78% 0.22 148)' : 'oklch(82% 0.24 90)' }}>
+                  {isEnPrep ? `✓ ${t('kitchenItemListo', lang)}` : `→ ${t('orderStatusAnotado', lang)}`}
+                </span>
+              </div>
+              {isEnPrep && (
+                <div data-hint-bck="" className="absolute inset-0 flex items-center px-3 rounded-xl pointer-events-none"
+                  style={{ opacity: 0, transition: 'opacity 0.1s' }}>
+                  <span className="text-[10px] font-bold" style={{ color: 'oklch(68% 0.18 240)' }}>
+                    {`← ${t('orderStatusPending', lang)}`}
+                  </span>
                 </div>
-              );
-            })}
-          </div>
-        )}
+              )}
+              <div data-card-content="" className="flex items-center gap-3 px-4 py-4" style={{ background: color.bg }}>
+                <div className="shrink-0 flex items-center justify-center w-9 h-9 rounded-full text-base font-bold"
+                  style={{ background: 'oklch(24% 0.08 252)', color: TEXT_MAIN, border: `1px solid ${color.border}` }}>
+                  {merged.totalCantidad}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-medium truncate block" style={{ color: TEXT_MAIN }}>{merged.nombre}</span>
+                  {merged.complementos && <span className="text-[10px]" style={{ color: 'oklch(78% 0.03 252)' }}>({merged.complementos})</span>}
+                  {merged.nota && <span className="text-[10px] italic block" style={{ color: 'oklch(72% 0.12 85)' }}>✎ {merged.nota}</span>}
+                </div>
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  {isEnPrep && (
+                    <span className="rounded px-1.5 py-0.5 text-[10px] font-bold"
+                      style={{ background: 'oklch(34% 0.20 90)', color: 'oklch(90% 0.22 90)', border: '1px solid oklch(55% 0.28 90 / 0.6)' }}>
+                      En preparación
+                    </span>
+                  )}
+                  <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                    style={{ background: 'oklch(30% 0.10 252 / 0.4)', color: 'oklch(75% 0.12 252)' }}>
+                    {merged.items.length} {merged.items.length === 1 ? 'ítem' : 'ítems'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
 
         {/* Per-order / per-mesa view */}
         {!globalGrouped && Array.from(grouped.entries()).map(([groupKey, group]) => {
