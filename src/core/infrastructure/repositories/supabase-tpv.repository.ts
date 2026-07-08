@@ -69,7 +69,8 @@ export class SupabaseTpvRepository implements ITpvRepository {
 
   async abrirTurno(params: {
     empresaId: string;
-    userId: string;
+    userId?: string;
+    operadorId?: string;
     operadorNombre: string;
     efectivoAperturaCents: number;
   }): Promise<Result<TpvTurno>> {
@@ -79,7 +80,8 @@ export class SupabaseTpvRepository implements ITpvRepository {
         .from('tpv_turnos')
         .insert({
           empresa_id: params.empresaId,
-          user_id: params.userId,
+          user_id: params.userId ?? null,
+          operador_id: params.operadorId ?? null,
           operador_nombre: params.operadorNombre,
           efectivo_apertura_cents: params.efectivoAperturaCents,
         })

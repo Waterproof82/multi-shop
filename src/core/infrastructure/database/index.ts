@@ -13,6 +13,7 @@ import { SupabaseTgtgRepository } from './supabase-tgtg.repository';
 import { SupabaseDescuentoRepository } from './supabase-descuento.repository';
 import { SupabaseMesaClientTokenRepository } from './supabase-mesa-client-token.repository';
 import { SupabaseValoracionRepository } from './supabase-valoracion.repository';
+import { SupabaseEmpleadoTpvRepository } from '../repositories/supabase-empleado-tpv.repository';
 import { ProductUseCase } from '@/core/application/use-cases/product.use-case';
 import { CategoryUseCase } from '@/core/application/use-cases/category.use-case';
 import { ClienteUseCase } from '@/core/application/use-cases/cliente.use-case';
@@ -45,6 +46,7 @@ const tgtgRepository = new SupabaseTgtgRepository(supabase);
 const descuentoRepository = new SupabaseDescuentoRepository(supabase);
 const mesaClientTokenRepository = new SupabaseMesaClientTokenRepository(supabase);
 export const valoracionRepository = new SupabaseValoracionRepository(supabase);
+export const empleadoTpvRepository = new SupabaseEmpleadoTpvRepository();
 
 // Public repository (anon key) for public-facing pages
 export const empresaPublicRepository = new SupabaseEmpresaRepository(supabaseAnon);
