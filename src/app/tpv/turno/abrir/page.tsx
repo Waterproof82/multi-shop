@@ -25,7 +25,7 @@ export default async function TurnoAbrirPage() {
     defaultOperador = payload.nombre;
 
     // Only encargado can open a turno
-    if (payload.rol !== 'encargado') redirect('/tpv/mostrador');
+    if (payload.rol === 'cajero') redirect('/tpv/mostrador');
   }
 
   const repo = new SupabaseTpvRepository();
