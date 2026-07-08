@@ -152,7 +152,7 @@ export function TurnoCerrarForm({ turno, stats, mesasAbiertas, isBlindClose }: P
       </div>
 
       {/* Diferencia en tiempo real */}
-      {hasContado && (
+      {hasContado && !isBlindClose && (
         <div className={`rounded-xl p-4 border ${getDiferenciaBoxClass(diferenciaCents)}`}>
           <p className="text-xs font-bold text-[#6b7280] uppercase tracking-wider mb-1">Diferencia</p>
           <p className={`text-2xl font-bold ${getDiferenciaColorClass(diferenciaCents)}`}>

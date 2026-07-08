@@ -35,6 +35,7 @@ export function EmpleadosTpvPanel({ empresaId: _empresaId }: Props) {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [pinModalId, setPinModalId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Create form state
@@ -248,14 +249,33 @@ export function EmpleadosTpvPanel({ empresaId: _empresaId }: Props) {
                   >
                     <Power className="h-4 w-4" />
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(emp.id)}
-                    title="Eliminar"
-                    className="p-1.5 rounded-lg text-[#6b7280] hover:text-[#ef4444] transition-colors"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  {confirmDeleteId === emp.id ? (
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => { void handleDelete(emp.id); setConfirmDeleteId(null); }}
+                        className="text-[10px] bg-[#ef4444] text-white px-2 py-0.5 rounded-md"
+                      >
+                        Sí, borrar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="text-[10px] text-[#6b7280] px-1"
+                      >
+                        No
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteId(emp.id)}
+                      title="Eliminar"
+                      className="p-1.5 rounded-lg text-[#6b7280] hover:text-[#ef4444] transition-colors"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
                 </>
               )}
             </div>

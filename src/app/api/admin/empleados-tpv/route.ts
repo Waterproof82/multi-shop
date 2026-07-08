@@ -23,7 +23,9 @@ export async function GET(req: NextRequest) {
   if (!empresaId) return NextResponse.json({ error: 'empresaId requerido' }, { status: 400 });
 
   const result = await empleadoTpvRepository.findAllByEmpresa(empresaId);
-  return handleResult(result);
+  if (!result.success) return handleResult(result);
+  const safeList = result.data.map(({ pinHash: _, ...rest }) => rest);
+  return NextResponse.json(safeList);
 }
 
 export async function POST(req: NextRequest) {
@@ -59,5 +61,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 409 });
   }
 
-  return NextResponse.json(result.data, { status: 201 });
+  const { pinHash: _, ...safe } = result.data;
+  return NextResponse.json(safe, { status: 201 });
 }
