@@ -14,6 +14,7 @@ interface Props {
   readonly turno: TpvTurno;
   readonly stats: TpvTurnoStats;
   readonly mesasAbiertas: MesaAbierta[];
+  readonly isBlindClose: boolean;
 }
 
 function fmt(cents: number) {
@@ -38,7 +39,7 @@ function getDiferenciaLabel(diferenciaCents: number): string {
   return 'Faltante';
 }
 
-export function TurnoCerrarForm({ turno, stats, mesasAbiertas }: Props) {
+export function TurnoCerrarForm({ turno, stats, mesasAbiertas, isBlindClose }: Props) {
   const router = useRouter();
   const [efectivoContado, setEfectivoContado] = useState('');
   const [loading, setLoading] = useState(false);
@@ -68,10 +69,11 @@ export function TurnoCerrarForm({ turno, stats, mesasAbiertas }: Props) {
           'Content-Type': 'application/json',
           ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
         },
-        body: JSON.stringify({
-          efectivoCierreCents: contadoCents,
-          totalEfectivoTeoricoCents: teoricoCents,
-        }),
+        body: JSON.stringify(
+          isBlindClose
+            ? { efectivoCierreCents: contadoCents }
+            : { efectivoCierreCents: contadoCents, totalEfectivoTeoricoCents: teoricoCents },
+        ),
       });
 
       if (res.ok) {
@@ -108,21 +110,25 @@ export function TurnoCerrarForm({ turno, stats, mesasAbiertas }: Props) {
           <span className="text-[#6b7280]">Duración</span>
           <span>{duracion} min</span>
         </div>
-        <div className="h-px bg-[#2e3347]" />
-        <div className="flex justify-between text-sm">
-          <span className="text-[#6b7280]">Total efectivo (teórico)</span>
-          <span className="font-semibold">
-            {hasContado ? fmt(teoricoCents) : '—'}
-          </span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-[#6b7280]">Total tarjeta</span>
-          <span className="font-semibold">{fmt(stats.totalTarjetaCents)}</span>
-        </div>
-        <div className="flex justify-between text-sm font-bold">
-          <span>TOTAL TURNO</span>
-          <span>{fmt(teoricoCents + stats.totalTarjetaCents)}</span>
-        </div>
+        {!isBlindClose && (
+          <>
+            <div className="h-px bg-[#2e3347]" />
+            <div className="flex justify-between text-sm">
+              <span className="text-[#6b7280]">Total efectivo (teórico)</span>
+              <span className="font-semibold">
+                {hasContado ? fmt(teoricoCents) : '—'}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-[#6b7280]">Total tarjeta</span>
+              <span className="font-semibold">{fmt(stats.totalTarjetaCents)}</span>
+            </div>
+            <div className="flex justify-between text-sm font-bold">
+              <span>TOTAL TURNO</span>
+              <span>{fmt(teoricoCents + stats.totalTarjetaCents)}</span>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Arqueo ciego */}
