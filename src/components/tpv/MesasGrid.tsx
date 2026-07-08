@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { UtensilsCrossed } from 'lucide-react';
 import type { MesaWithSession } from '@/core/domain/repositories/IMesaRepository';
 import { formatPrice } from '@/lib/format-price';
+import { fetchWithCsrf } from '@/lib/csrf-client';
 
 interface Props {
   mesas: MesaWithSession[];
@@ -121,8 +123,16 @@ function MesaFooter({ isPaid, isPaymentInProgress, isOpen, isActive, sessionTota
   );
 }
 
+async function cerrarMesaPagada(mesaId: string): Promise<boolean> {
+  const res = await fetchWithCsrf(`/api/tpv/mesas/${mesaId}/cerrar`, { method: 'POST' });
+  return res.ok;
+}
+
 function TpvMesaCard({ mesa, turnoId, modo }: Readonly<{ mesa: MesaWithSession; turnoId: string | null; modo: 'cobrar' | 'seleccionar' }>) {
   const router = useRouter();
+  const [confirmingClose, setConfirmingClose] = useState(false);
+  const [closing, setClosing] = useState(false);
+
   const isPaid = mesa.sesionPagada;
   const isPaymentInProgress = (mesa.pagoEnCurso || mesa.divisionActiva) && !mesa.sesionPagada;
   const isOpen = !!mesa.sesionId && mesa.activeOrderCount > 0 && !isPaid && !isPaymentInProgress;
@@ -130,12 +140,14 @@ function TpvMesaCard({ mesa, turnoId, modo }: Readonly<{ mesa: MesaWithSession; 
   const colors = getMesaColors(isPaid, isPaymentInProgress, isOpen, isActive);
   const pulsing = !isPaid && (isPaymentInProgress || isOpen || isActive);
 
-  const canInteract = modo === 'seleccionar'
-    ? !isPaid
-    : !!turnoId;
+  const canInteract = isPaid ? true : (modo === 'seleccionar' ? true : !!turnoId);
 
   function handleClick() {
     if (!canInteract) return;
+    if (isPaid) {
+      setConfirmingClose(true);
+      return;
+    }
     if (modo === 'seleccionar') {
       const params = new URLSearchParams({ mesaId: mesa.id, mesaNumero: String(mesa.numero) });
       if (mesa.sesionId) params.set('sesionId', mesa.sesionId);
@@ -147,6 +159,53 @@ function TpvMesaCard({ mesa, turnoId, modo }: Readonly<{ mesa: MesaWithSession; 
       const params = new URLSearchParams({ mesaId: mesa.id, mesaNumero: String(mesa.numero) });
       router.push(`/tpv/mostrador?${params.toString()}`);
     }
+  }
+
+  async function handleConfirmClose() {
+    setClosing(true);
+    const ok = await cerrarMesaPagada(mesa.id);
+    setClosing(false);
+    setConfirmingClose(false);
+    if (ok) router.refresh();
+  }
+
+  function handleCancelClose() {
+    setConfirmingClose(false);
+  }
+
+  if (confirmingClose) {
+    return (
+      <div
+        className="relative flex flex-col items-center justify-between rounded-2xl p-4 w-full"
+        style={{ minHeight: '128px', background: colors.bg, border: colors.border, boxShadow: colors.shadow }}
+      >
+        <div className="absolute top-3 right-3">
+          <MesaDot pulsing={false} dotColor={colors.dot} />
+        </div>
+        <div className="flex flex-col items-center justify-center gap-2 flex-1 w-full">
+          <span className="text-[11px] font-semibold text-center leading-tight" style={{ color: 'oklch(82% 0.18 290)' }}>
+            ¿Cerrar mesa {mesa.numero}?
+          </span>
+          <button
+            type="button"
+            onClick={handleConfirmClose}
+            disabled={closing}
+            className="w-full text-[11px] font-bold py-1 rounded-lg transition-colors disabled:opacity-50"
+            style={{ background: 'oklch(35% 0.16 290 / 0.8)', color: 'oklch(90% 0.12 290)' }}
+          >
+            {closing ? 'Cerrando…' : 'Confirmar'}
+          </button>
+          <button
+            type="button"
+            onClick={handleCancelClose}
+            className="w-full text-[11px] font-medium py-1 rounded-lg transition-colors"
+            style={{ background: 'oklch(25% 0.04 252 / 0.6)', color: 'oklch(60% 0.05 252)' }}
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (

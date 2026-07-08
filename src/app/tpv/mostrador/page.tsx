@@ -143,6 +143,7 @@ export default async function MostradorPage({
 
   return (
     <MostradorClient
+      key={mesaId ?? 'no-mesa'}
       turno={turnoResult.data}
       products={products}
       categories={categories}
