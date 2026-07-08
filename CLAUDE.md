@@ -270,3 +270,27 @@ Solución: `WaiterLoginForm.handlePinSubmit` dispara `window.dispatchEvent(new C
 - **`WaiterLoginForm` flash de PIN** — inicializa en `step="pin"`. Mostrar spinner mientras `isCheckingAuth=true` (hasta que `/api/waiter/me` resuelve).
 - **`BuildConfig.DEFAULT_DOMAIN`** — fallback para el update check cuando el usuario borra datos. Requiere `buildFeatures { buildConfig = true }` en `build.gradle`.
 - **Vercel env vars** `APP_VERSION` / `APP_VERSION_CODE` sobreescriben los defaults del código. Actualizar en Vercel al hacer release si están seteadas.
+## 🖥 Electron TPV Windows — Trampas Críticas
+
+> Ver `electron/main.ts` y `electron/preload.ts`.
+
+- **Bundling con esbuild** — `electron/dist/main.js` y `electron/dist/preload.js` son bundles generados por esbuild. No editar los `.js` directamente; editar los `.ts` fuente y recompilar.
+- **`electron/package.json` con `"type": "commonjs"`** — el proceso main de Electron necesita CJS. El `package.json` raíz tiene `"type": "module"`, por eso el sub-package tiene su propio `type`.
+- **URL remota siempre** — el shell carga `https://{dominio}/tpv` desde producción. No hay Next.js local dentro de Electron.
+- **IPC para impresión** — el renderer llama `window.electronAPI.print(data)` vía contextBridge. El main process recibe el IPC y llama a `node-thermal-printer`. Nunca acceder a módulos de Node directamente desde el renderer.
+- **Auto-update endpoint** — `GET /api/app/version/latest.yml` sirve el archivo YAML para `electron-updater`. El endpoint está en `src/app/api/app/version/latest.yml/route.ts`.
+- **`electron/dist/` en `.gitignore`** — los bundles compilados no se commitean. El proceso de build es: `pnpm build:electron:prep` (esbuild) → `pnpm build:electron:rebuild` (native modules) → `electron-builder --win`.
+
+## 🔑 TPV Empleados — Autenticación por PIN (Trampas Críticas)
+
+> Ver doc completo: `docs/context/tpv-empleados-pin.md`
+
+- **`pinHash` NUNCA en respuestas API** — las rutas `GET` y `POST` de `/api/admin/empleados-tpv` deben strippear `pinHash` antes de devolver. Usar `({ pinHash: _, ...rest }) => rest`. No agregar `pinHash` a DTOs de respuesta.
+- **Dual-auth en proxy — orden importa** — el proxy prueba `admin_token` PRIMERO, luego `tpv_employee_token`. Agregar nuevas rutas TPV públicas a la lista explícita (`/tpv/login`, `/api/tpv/empleados/login`, `/api/tpv/empleados/logout`) en `proxy.ts`.
+- **`x-pathname` para bypass del layout TPV** — el proxy inyecta `x-pathname` en headers de página. El layout `src/app/tpv/layout.tsx` hace early return `<>{children}</>` cuando el path es `/tpv/login`. Sin este header, el layout bloquearía la página de login.
+- **`user_id` nullable en `tpv_turnos`** — desde la migración `20260708000001`. Nunca asumir que `user_id` existe en un turno. Los turnos abiertos por empleado tienen `user_id = NULL` y `operador_id` apuntando a `empleados_tpv`.
+- **Solo `encargado` puede abrir turno por PIN** — en `src/app/tpv/turno/abrir/page.tsx`, si el payload del token tiene `rol === 'cajero'`, se redirige a `/tpv/mostrador`. El cajero nunca ve la pantalla de abrir turno.
+- **Sliding window lazy** — el token `tpv_employee_token` NO se renueva en cada request (sin Redis en Vercel). Solo se renueva cuando quedan <15 min de vida, y en ese momento el proxy consulta la DB para verificar `activo = true`. Si el empleado está desactivado en ese momento, el token expira sin renovarse (gap máximo ≤1h).
+- **Arqueo ciego para cajero** — `isBlindClose = (rol === 'cajero')`. La diferencia entre contado y teórico se calcula SERVER-SIDE en `/api/tpv/turno/[id]/cerrar`. `TurnoCerrarForm` con `isBlindClose=true` oculta totales teóricos y diferencia — no enviarlos desde el cliente no es suficiente (el server los calcula).
+- **`tpv_employee_token` audience** — el JWT usa audience `'tpv-employee'`. No confundir con el `admin_token` que no tiene audience explícita. `verifyTpvEmployeeToken` en `src/lib/tpv-employee-auth.ts` valida esta audience; si falla silenciosamente, comprobar que el token se generó con `signTpvEmployeeToken`, no con `authAdminUseCase`.
+- **CSRF requerido** — el proxy aplica validación CSRF también a requests de `tpv_employee_token`. El cliente debe usar `fetchWithCsrf` en todas las mutaciones del TPV.
