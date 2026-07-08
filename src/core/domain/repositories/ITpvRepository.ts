@@ -5,7 +5,8 @@ export interface ITpvRepository {
   findTurnoActivo(empresaId: string): Promise<Result<TpvTurno | null>>;
   abrirTurno(params: {
     empresaId: string;
-    userId: string;
+    userId?: string;          // auth.users UUID — null for employee sessions
+    operadorId?: string;      // empleados_tpv UUID — null for admin sessions
     operadorNombre: string;
     efectivoAperturaCents: number;
   }): Promise<Result<TpvTurno>>;
