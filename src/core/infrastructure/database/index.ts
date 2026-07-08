@@ -28,6 +28,7 @@ import { SuperAdminUseCase } from '@/core/application/use-cases/superadmin.use-c
 import { DescuentoUseCase } from '@/core/application/use-cases/descuento.use-case';
 import { MesaClientTokenUseCase } from '@/core/application/use-cases/mesa-client-token.use-case';
 import { ValoracionUseCase } from '@/core/application/use-cases/valoracion.use-case';
+import { EmpleadoTpvLoginUseCase } from '@/core/application/use-cases/tpv/empleado-tpv-login.use-case';
 
 const supabase = getSupabaseClient();
 const supabaseAnon = getSupabaseAnonClient();
@@ -66,3 +67,4 @@ export const superAdminUseCase = new SuperAdminUseCase(superAdminRepository);
 export const descuentoUseCase = new DescuentoUseCase(descuentoRepository, empresaRepository);
 export const mesaClientTokenUseCase = new MesaClientTokenUseCase(mesaClientTokenRepository, mesaSesionRepository);
 export const valoracionUseCase = new ValoracionUseCase(valoracionRepository);
+export const empleadoTpvLoginUseCase = new EmpleadoTpvLoginUseCase(empleadoTpvRepository);
