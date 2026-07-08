@@ -12,7 +12,7 @@
     "typecheck": "tsc -p tsconfig.typecheck.json --noEmit",
     "sonar": "sonar-scanner",
     "start:electron": "electron electron/dist/main.js",
-    "build:electron:prep": "tsc -p electron/tsconfig.json",
+    "build:electron:prep": "tsc -p electron/tsconfig.json --noEmit && esbuild electron/main.ts --bundle --platform=node --target=node20 --external:electron --outfile=electron/dist/main.js && esbuild electron/preload.ts --bundle --platform=node --target=node20 --external:electron --outfile=electron/dist/preload.js",
     "build:electron:rebuild": "electron-rebuild",
     "build:electron": "pnpm build:electron:prep && pnpm build:electron:rebuild && electron-builder --win",
     "dev:electron": "cross-env NODE_ENV=development electron electron/dist/main.js"
@@ -74,6 +74,7 @@
     "electron": "^31.7.7",
     "electron-builder": "^24.13.3",
     "electron-rebuild": "^3.2.9",
+    "esbuild": "^0.28.1",
     "eslint": "^9.39.3",
     "eslint-config-next": "^16.1.6",
     "postcss": "^8.5",
