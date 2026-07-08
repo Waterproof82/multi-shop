@@ -40,8 +40,10 @@ export async function POST(req: NextRequest) {
 
   if (!empresaId) return validationErrorResponse('empresaId requerido');
 
-  const userId = req.headers.get('x-admin-id');
-  if (!userId) return validationErrorResponse('userId requerido');
+  const userId = req.headers.get('x-admin-id') || null;
+  const operadorId = req.headers.get('x-employee-id') || null;
+
+  if (!userId && !operadorId) return validationErrorResponse('usuario requerido');
 
   let body: unknown;
   try {
@@ -57,7 +59,8 @@ export async function POST(req: NextRequest) {
 
   const result = await abrirTurnoUseCase(repo, {
     empresaId,
-    userId,
+    userId: userId ?? undefined,
+    operadorId: operadorId ?? undefined,
     operadorNombre: parsed.data.operadorNombre,
     efectivoAperturaCents: parsed.data.efectivoAperturaCents,
   });

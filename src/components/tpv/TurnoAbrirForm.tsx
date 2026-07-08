@@ -4,13 +4,18 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getCsrfToken } from '@/lib/csrf-client';
 
-export function TurnoAbrirForm() {
+interface Props {
+  readonly defaultOperador?: string;
+}
+
+export function TurnoAbrirForm({ defaultOperador = '' }: Props) {
   const router = useRouter();
-  const [operador, setOperador] = useState('');
+  const [operador, setOperador] = useState(defaultOperador);
   const [efectivo, setEfectivo] = useState('0');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isReadOnly = defaultOperador.length > 0;
   const canSubmit = operador.trim().length >= 2 && !loading;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -52,12 +57,20 @@ export function TurnoAbrirForm() {
         <input
           type="text"
           value={operador}
-          onChange={e => setOperador(e.target.value)}
+          onChange={e => !isReadOnly && setOperador(e.target.value)}
+          readOnly={isReadOnly}
           placeholder="Escribe tu nombre..."
-          autoFocus
+          autoFocus={!isReadOnly}
           maxLength={100}
-          className="bg-[#22263a] border border-[#2e3347] rounded-xl px-4 py-3.5 text-lg font-medium outline-none focus:border-[#4f72ff] transition-colors placeholder:text-[#6b7280] placeholder:text-base placeholder:font-normal"
+          className={`bg-[#22263a] border border-[#2e3347] rounded-xl px-4 py-3.5 text-lg font-medium outline-none transition-colors placeholder:text-[#6b7280] placeholder:text-base placeholder:font-normal ${
+            isReadOnly
+              ? 'cursor-default opacity-70'
+              : 'focus:border-[#4f72ff]'
+          }`}
         />
+        {isReadOnly && (
+          <span className="text-xs text-[#6b7280]">Nombre registrado en tu perfil de empleado</span>
+        )}
       </div>
 
       <div className="flex flex-col gap-2">

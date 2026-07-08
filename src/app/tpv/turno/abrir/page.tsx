@@ -1,22 +1,35 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { authAdminUseCase } from '@/core/infrastructure/database';
+import { verifyTpvEmployeeToken } from '@/lib/tpv-employee-auth';
 import { SupabaseTpvRepository } from '@/core/infrastructure/repositories/supabase-tpv.repository';
 import { TurnoAbrirForm } from '@/components/tpv/TurnoAbrirForm';
 
 export default async function TurnoAbrirPage() {
   const cookieStore = await cookies();
-  const token = cookieStore.get('admin_token')?.value;
 
-  if (!token) redirect('/admin/login');
+  let empresaId: string | null = null;
+  let defaultOperador = '';
 
-  const admin = await authAdminUseCase.verifyToken(token);
+  const adminToken = cookieStore.get('admin_token')?.value;
+  if (adminToken) {
+    const admin = await authAdminUseCase.verifyToken(adminToken);
+    if (!admin || !admin.empresaId) redirect('/admin/login');
+    empresaId = admin.empresaId;
+  } else {
+    const employeeToken = cookieStore.get('tpv_employee_token')?.value;
+    if (!employeeToken) redirect('/tpv/login');
+    const payload = await verifyTpvEmployeeToken(employeeToken);
+    if (!payload) redirect('/tpv/login');
+    empresaId = payload.empresaId;
+    defaultOperador = payload.nombre;
 
-  if (!admin) redirect('/admin/login');
-  if (!admin.empresaId) redirect('/admin/login');
+    // Only encargado can open a turno
+    if (payload.rol !== 'encargado') redirect('/tpv/mostrador');
+  }
 
   const repo = new SupabaseTpvRepository();
-  const turnoResult = await repo.findTurnoActivo(admin.empresaId);
+  const turnoResult = await repo.findTurnoActivo(empresaId);
   if (turnoResult.success && turnoResult.data !== null) redirect('/tpv/mostrador');
 
   return (
@@ -29,7 +42,7 @@ export default async function TurnoAbrirPage() {
             Este nombre quedará registrado en el turno de caja y en todas las operaciones.
           </p>
         </div>
-        <TurnoAbrirForm />
+        <TurnoAbrirForm defaultOperador={defaultOperador} />
       </div>
     </div>
   );
