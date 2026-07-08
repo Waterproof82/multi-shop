@@ -8,6 +8,8 @@ import { AUTH_ERRORS, SERVER_ERRORS, createErrorResponse } from '@/core/domain/c
 import { errorResponse } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import { verifyWaiterToken } from '@/lib/waiter-auth';
+import { verifyTpvEmployeeToken, signTpvEmployeeToken } from '@/lib/tpv-employee-auth';
+import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 
 function getAdminTokenSecret(): string | undefined {
   return process.env.ACCESS_TOKEN_SECRET;
@@ -266,6 +268,95 @@ async function handleWaiterAuth(request: NextRequest, origin: string | null): Pr
   return addCorsHeaders(response, origin);
 }
 
+async function handleTpvEmployeeAuth(request: NextRequest, origin: string | null): Promise<NextResponse> {
+  const token = request.cookies.get('tpv_employee_token')?.value;
+  if (!token) {
+    return addCorsHeaders(
+      NextResponse.json(createErrorResponse(AUTH_ERRORS.UNAUTHORIZED), { status: 401 }),
+      origin
+    );
+  }
+
+  const payload = await verifyTpvEmployeeToken(token);
+  if (!payload) {
+    return addCorsHeaders(
+      NextResponse.json(createErrorResponse(AUTH_ERRORS.INVALID_TOKEN), { status: 401 }),
+      origin
+    );
+  }
+
+  // CSRF check for mutative methods
+  const isMutativeMethod = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(request.method);
+  if (isMutativeMethod) {
+    const csrfCookie = request.cookies.get('csrf_token')?.value;
+    const csrfHeader = request.headers.get('x-csrf-token');
+    if (!csrfHeader || !csrfCookie) {
+      return addCorsHeaders(
+        NextResponse.json(createErrorResponse(AUTH_ERRORS.CSRF_REQUIRED), { status: 403 }),
+        origin
+      );
+    }
+    const [tokenCsrf, signature] = csrfCookie.split(':');
+    const csrfHeaderMatchesToken = (() => {
+      try { return timingSafeEqual(Buffer.from(csrfHeader), Buffer.from(tokenCsrf)); }
+      catch { return false; }
+    })();
+    if (!tokenCsrf || !signature || !verifyCsrfToken(tokenCsrf, signature) || !csrfHeaderMatchesToken) {
+      return addCorsHeaders(
+        NextResponse.json(createErrorResponse(AUTH_ERRORS.CSRF_INVALID), { status: 403 }),
+        origin
+      );
+    }
+  }
+
+  // Late-window refresh: if token expires in < 15 min, verify employee is still active
+  const now = Math.floor(Date.now() / 1000);
+  const REFRESH_THRESHOLD_SECS = 15 * 60;
+  let refreshedToken: string | undefined;
+
+  if (payload.exp - now < REFRESH_THRESHOLD_SECS) {
+    const supabase = getSupabaseClient();
+    const { data } = await supabase
+      .from('empleados_tpv')
+      .select('id')
+      .eq('id', payload.empleadoId)
+      .eq('activo', true)
+      .maybeSingle();
+
+    if (data) {
+      refreshedToken = await signTpvEmployeeToken({
+        empleadoId: payload.empleadoId,
+        empresaId: payload.empresaId,
+        nombre: payload.nombre,
+        rol: payload.rol,
+      });
+    }
+    // If not active, don't renew — token will expire within 15 min
+  }
+
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-empresa-id', payload.empresaId);
+  requestHeaders.set('x-admin-rol', payload.rol);
+  requestHeaders.set('x-employee-id', payload.empleadoId);
+
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  response.headers.set('x-empresa-id', payload.empresaId);
+  response.headers.set('x-admin-rol', payload.rol);
+  response.headers.set('x-employee-id', payload.empleadoId);
+
+  if (refreshedToken) {
+    response.cookies.set('tpv_employee_token', refreshedToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60,
+    });
+  }
+
+  return addCorsHeaders(response, origin);
+}
+
 export async function proxy(request: NextRequest) {
   const url = request.nextUrl.clone();
   const path = request.nextUrl.pathname;
@@ -291,9 +382,14 @@ export async function proxy(request: NextRequest) {
     return handleWaiterAuth(request, origin);
   }
 
-  // TPV auth (protected routes — same admin token as /api/admin)
+  // TPV auth: login and logout are public; all others try admin_token then tpv_employee_token
   if (path.startsWith('/api/tpv')) {
-    return handleAdminAuth(request, origin);
+    if (path === '/api/tpv/empleados/login' || path === '/api/tpv/empleados/logout') {
+      return NextResponse.next();
+    }
+    const adminResult = await handleAdminAuth(request, origin);
+    if (adminResult.status === 200) return adminResult;
+    return handleTpvEmployeeAuth(request, origin);
   }
 
   // Superadmin auth (protected routes)
@@ -319,6 +415,7 @@ export async function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-nonce', nonce);
+  requestHeaders.set('x-pathname', path);
 
   const csp = buildCsp(nonce, path);
   // Set on request so server components can read it via headers()
