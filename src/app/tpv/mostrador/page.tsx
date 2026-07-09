@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { authAdminUseCase, productUseCase, categoryUseCase, mesaSesionUseCase } from '@/core/infrastructure/database';
+import { verifyTpvEmployeeToken } from '@/lib/tpv-employee-auth';
 import { SupabaseTpvRepository } from '@/core/infrastructure/repositories/supabase-tpv.repository';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { MostradorClient } from '@/components/tpv/MostradorClient';
@@ -95,17 +96,26 @@ export default async function MostradorPage({
   readonly searchParams: Promise<{ mesaId?: string; sesionId?: string; mesaNumero?: string }>;
 }) {
   const cookieStore = await cookies();
-  const token = cookieStore.get('admin_token')?.value;
+  let empresaId: string | null = null;
 
-  if (!token) redirect('/admin/login');
+  const adminToken = cookieStore.get('admin_token')?.value;
+  if (adminToken) {
+    const admin = await authAdminUseCase.verifyToken(adminToken);
+    if (admin?.empresaId) empresaId = empresaId;
+  }
 
-  const admin = await authAdminUseCase.verifyToken(token);
+  if (!empresaId) {
+    const employeeToken = cookieStore.get('tpv_employee_token')?.value;
+    if (!employeeToken) redirect('/tpv/login');
+    const payload = await verifyTpvEmployeeToken(employeeToken);
+    if (!payload) redirect('/tpv/login');
+    empresaId = payload.empresaId;
+  }
 
-  if (!admin) redirect('/admin/login');
-  if (!admin.empresaId) redirect('/admin/login');
+  if (!empresaId) redirect('/tpv/login');
 
   const repo = new SupabaseTpvRepository();
-  const turnoResult = await repo.findTurnoActivo(admin.empresaId);
+  const turnoResult = await repo.findTurnoActivo(empresaId);
 
   if (!turnoResult.success || turnoResult.data === null) {
     redirect('/tpv/turno/abrir');
@@ -117,7 +127,7 @@ export default async function MostradorPage({
   const empresaRes = await supabaseForEmpresa
     .from('empresas')
     .select('tipo_impuesto, porcentaje_impuesto')
-    .eq('id', admin.empresaId)
+    .eq('id', empresaId)
     .maybeSingle();
   const empresaRow = empresaRes.data as { tipo_impuesto: string | null; porcentaje_impuesto: number | null } | null;
   const tipoImpuesto = (empresaRow?.tipo_impuesto as 'iva' | 'igic' | null) ?? 'iva';
@@ -125,11 +135,11 @@ export default async function MostradorPage({
 
   const mesasPromise = mesaId
     ? Promise.resolve(null)
-    : mesaSesionUseCase.getMesasWithSessions(admin.empresaId);
+    : mesaSesionUseCase.getMesasWithSessions(empresaId);
 
   const [productsResult, categoriesResult, mesasResult] = await Promise.all([
-    productUseCase.getAll(admin.empresaId),
-    categoryUseCase.getAll(admin.empresaId),
+    productUseCase.getAll(empresaId),
+    categoryUseCase.getAll(empresaId),
     mesasPromise,
   ]);
 
