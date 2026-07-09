@@ -399,13 +399,14 @@ export default function WaiterKitchenPage() {
 
   // ── PATCH helper ───────────────────────────────────────────────────────────
 
-  const patchEstado = useCallback(async (pedidoId: string, itemIdx: number, estado: ItemEstado, onSuccess: () => void) => {
+  const patchEstado = useCallback(async (pedidoId: string, itemIdx: number, estado: ItemEstado, applyOptimistic: () => void, rollback: () => void) => {
+    applyOptimistic();
     const r = await fetch(`/api/waiter/kitchen/items/${encodeURIComponent(pedidoId)}/${itemIdx}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ estado }),
     });
-    if (r.ok) onSuccess();
+    if (!r.ok) rollback();
   }, []);
 
   const setItemEstado = useCallback((pedidoId: string, itemIdx: number, newEstado: ItemEstado) => {
@@ -479,18 +480,30 @@ export default function WaiterKitchenPage() {
           el.style.transition = 'transform 0.18s ease';
           el.style.transform  = 'translateX(-110%)';
         }
-        void patchEstado(item.pedidoId, item.itemIdx, 'retenido', () => setItemEstado(item.pedidoId, item.itemIdx, 'retenido'));
+        void patchEstado(
+          item.pedidoId, item.itemIdx, 'retenido',
+          () => setItemEstado(item.pedidoId, item.itemIdx, 'retenido'),
+          () => setItemEstado(item.pedidoId, item.itemIdx, item.estado),
+        );
       }
     } else if (isListo) {
       // Left swipe on listo → servido: snap inner content, fly outer card left
       snapCardInstant(el);
       el.style.transition = 'transform 0.18s ease';
       el.style.transform  = 'translateX(-110%)';
-      void patchEstado(item.pedidoId, item.itemIdx, 'servido', () => removeItem(item.pedidoId, item.itemIdx));
+      void patchEstado(
+        item.pedidoId, item.itemIdx, 'servido',
+        () => removeItem(item.pedidoId, item.itemIdx),
+        () => setItems(prev => prev.some(i => i.pedidoId === item.pedidoId && i.itemIdx === item.itemIdx) ? prev : [...prev, item]),
+      );
     } else if (isRetenido) {
       // Left swipe on retenido → restore to pendiente
       snapBack(el);
-      void patchEstado(item.pedidoId, item.itemIdx, 'pendiente', () => setItemEstado(item.pedidoId, item.itemIdx, 'pendiente'));
+      void patchEstado(
+        item.pedidoId, item.itemIdx, 'pendiente',
+        () => setItemEstado(item.pedidoId, item.itemIdx, 'pendiente'),
+        () => setItemEstado(item.pedidoId, item.itemIdx, item.estado),
+      );
     } else {
       snapBack(el);
     }
@@ -533,10 +546,13 @@ export default function WaiterKitchenPage() {
     const { items: toProcess, action } = pendingMergedWaiterAction;
     setPendingMergedWaiterAction(null);
     await Promise.all(toProcess.map(item => {
-      const onSuccess = action === 'servido'
+      const applyOptimistic = action === 'servido'
         ? () => removeItem(item.pedidoId, item.itemIdx)
         : () => setItemEstado(item.pedidoId, item.itemIdx, action);
-      return patchEstado(item.pedidoId, item.itemIdx, action, onSuccess);
+      const rollback = action === 'servido'
+        ? () => setItems(prev => prev.some(i => i.pedidoId === item.pedidoId && i.itemIdx === item.itemIdx) ? prev : [...prev, item])
+        : () => setItemEstado(item.pedidoId, item.itemIdx, item.estado);
+      return patchEstado(item.pedidoId, item.itemIdx, action, applyOptimistic, rollback);
     }));
   }, [pendingMergedWaiterAction, patchEstado, setItemEstado, removeItem]);
 
@@ -596,7 +612,11 @@ export default function WaiterKitchenPage() {
     if (!pendingRetain) return;
     const item = pendingRetain;
     setPendingRetain(null);
-    await patchEstado(item.pedidoId, item.itemIdx, 'retenido', () => setItemEstado(item.pedidoId, item.itemIdx, 'retenido'));
+    await patchEstado(
+      item.pedidoId, item.itemIdx, 'retenido',
+      () => setItemEstado(item.pedidoId, item.itemIdx, 'retenido'),
+      () => setItemEstado(item.pedidoId, item.itemIdx, item.estado),
+    );
   }, [pendingRetain, patchEstado, setItemEstado]);
 
   const confirmCancel = useCallback(async () => {
@@ -604,7 +624,11 @@ export default function WaiterKitchenPage() {
     const toCancel = pendingCancel;
     setPendingCancel(null);
     await Promise.all(toCancel.map(item =>
-      patchEstado(item.pedidoId, item.itemIdx, 'cancelado', () => removeItem(item.pedidoId, item.itemIdx))
+      patchEstado(
+        item.pedidoId, item.itemIdx, 'cancelado',
+        () => removeItem(item.pedidoId, item.itemIdx),
+        () => setItems(prev => prev.some(i => i.pedidoId === item.pedidoId && i.itemIdx === item.itemIdx) ? prev : [...prev, item]),
+      )
     ));
   }, [pendingCancel, patchEstado, removeItem]);
 

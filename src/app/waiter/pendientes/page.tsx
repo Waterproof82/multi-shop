@@ -461,15 +461,20 @@ export default function WaiterPendientesPage() {
 
       const removedItemsMap = new Map<string, number[]>();
 
-      for (const pedido of mesa.pedidos) {
-        if (!pedido.items.some(i => i.tipo === sendTipo)) continue;
-        if (pedido.validated) {
-          const released = await releaseRetainedPedidoItems(pedido.id, pedido.items, sendTipo, selected, paused, mode);
-          if (released.length > 0) removedItemsMap.set(pedido.id, released);
-        } else {
-          const ok = await validateNewPedido(pedido.id, pedido.items, sendTipo, selected, paused, mode);
-          if (ok) removedItemsMap.set(pedido.id, pedido.items.map(i => i.idx));
-        }
+      const results = await Promise.all(
+        mesa.pedidos.map(async pedido => {
+          if (!pedido.items.some(i => i.tipo === sendTipo)) return null;
+          if (pedido.validated) {
+            const released = await releaseRetainedPedidoItems(pedido.id, pedido.items, sendTipo, selected, paused, mode);
+            return released.length > 0 ? ([pedido.id, released] as const) : null;
+          } else {
+            const ok = await validateNewPedido(pedido.id, pedido.items, sendTipo, selected, paused, mode);
+            return ok ? ([pedido.id, pedido.items.map(i => i.idx)] as const) : null;
+          }
+        })
+      );
+      for (const entry of results) {
+        if (entry) removedItemsMap.set(entry[0], entry[1] as number[]);
       }
 
       if (removedItemsMap.size === 0) return;
@@ -500,14 +505,19 @@ export default function WaiterPendientesPage() {
 
       const removedItemsMap = new Map<string, number[]>();
 
-      for (const pedido of mesa.pedidos) {
-        if (pedido.validated) {
-          const released = await releaseSelectedPedidoItems(pedido.id, pedido.items, selected);
-          if (released.length > 0) removedItemsMap.set(pedido.id, released);
-        } else {
-          const ok = await validateBothTypesPedido(pedido.id, pedido.items, selected, paused);
-          if (ok) removedItemsMap.set(pedido.id, pedido.items.map(i => i.idx));
-        }
+      const bothResults = await Promise.all(
+        mesa.pedidos.map(async pedido => {
+          if (pedido.validated) {
+            const released = await releaseSelectedPedidoItems(pedido.id, pedido.items, selected);
+            return released.length > 0 ? ([pedido.id, released] as const) : null;
+          } else {
+            const ok = await validateBothTypesPedido(pedido.id, pedido.items, selected, paused);
+            return ok ? ([pedido.id, pedido.items.map(i => i.idx)] as const) : null;
+          }
+        })
+      );
+      for (const entry of bothResults) {
+        if (entry) removedItemsMap.set(entry[0], entry[1] as number[]);
       }
 
       if (removedItemsMap.size === 0) return;
