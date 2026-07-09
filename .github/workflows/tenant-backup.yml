@@ -1,0 +1,22 @@
+name: Tenant Backup
+
+on:
+  schedule:
+    - cron: '0 3 * * *'   # 3:00 AM UTC daily
+  workflow_dispatch:        # manual trigger
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger tenant-backup Edge Function
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST "${{ secrets.SUPABASE_URL }}/functions/v1/tenant-backup" \
+            -H "Authorization: Bearer ${{ secrets.BACKUP_SECRET }}" \
+            -H "Content-Type: application/json")
+          echo "HTTP status: $response"
+          if [ "$response" != "200" ] && [ "$response" != "207" ]; then
+            echo "Backup failed with status $response"
+            exit 1
+          fi
