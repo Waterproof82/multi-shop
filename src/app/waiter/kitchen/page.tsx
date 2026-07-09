@@ -248,10 +248,29 @@ export default function WaiterKitchenPage() {
   const [groupedMesas, setGroupedMesas] = useState<Set<string>>(new Set());
   const [pendingMergedWaiterAction, setPendingMergedWaiterAction] = useState<{ items: KitchenItem[]; action: ItemEstado } | null>(null);
   const channelNameRef = useRef(`waiter-kitchen-${Math.random().toString(36).slice(2)}`);
+  const [isTabVisible, setIsTabVisible] = useState(true);
+  const [waiterEmpresaId, setWaiterEmpresaId] = useState<string | null>(null);
   const pointerStartX = useRef<number | null>(null);
   const swipingKey    = useRef<string | null>(null);
   const headerRef     = useRef<HTMLDivElement>(null);
   const [headerHeight, setHeaderHeight] = useState(120);
+  // Visibility lifecycle — disconnect Realtime when tab is hidden, reconnect on visible
+  useEffect(() => {
+    const onVis = () => setIsTabVisible(document.visibilityState === 'visible');
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, []);
+
+  // Fetch empresaId on mount for tenant-scoped Realtime filter
+  useEffect(() => {
+    fetch('/api/waiter/me')
+      .then(r => r.ok ? r.json() : null)
+      .then((json: { empresaId: string } | null) => {
+        if (json) setWaiterEmpresaId(json.empresaId);
+      })
+      .catch(() => null);
+  }, []);
+
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
   const fetchItems = useCallback(async () => {
@@ -265,17 +284,20 @@ export default function WaiterKitchenPage() {
   }, []);
 
   useEffect(() => {
+    if (!isTabVisible) return;
+    if (!waiterEmpresaId) return;
+
     void fetchItems();
 
     const supabase = getSupabaseAnonClient();
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const channel = supabase
       .channel(channelNameRef.current)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos', filter: `empresa_id=eq.${waiterEmpresaId}` }, () => {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => { void fetchItems(); }, 100);
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados', filter: `empresa_id=eq.${waiterEmpresaId}` }, () => {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => { void fetchItems(); }, 100);
       })
@@ -326,7 +348,15 @@ export default function WaiterKitchenPage() {
       void supabase.removeChannel(broadcastChannel);
       void supabase.removeChannel(newOrderChannel);
     };
-  }, [fetchItems]);
+  }, [fetchItems, isTabVisible, waiterEmpresaId]);
+
+  // Re-fetch items when tab becomes visible again so stale data is refreshed immediately.
+  useEffect(() => {
+    if (isTabVisible && waiterEmpresaId) {
+      void fetchItems();
+      globalThis.dispatchEvent(new CustomEvent('waiter-realtime-update'));
+    }
+  }, [isTabVisible, waiterEmpresaId, fetchItems]);
 
   useEffect(() => {
     const tick = setInterval(() => setItems(p => [...p]), 1000);
