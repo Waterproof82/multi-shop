@@ -1,4 +1,4 @@
-import { getMenuUseCase, getEmpresaByDomain, isPedidosSubdomain, extractMainDomain } from "@/lib/server-services"
+import { getCachedMenu, getEmpresaByDomain, isPedidosSubdomain, extractMainDomain } from "@/lib/server-services"
 import { MenuPage } from "@/components/client-menu-page"
 import SiteHeaderWrapper from "@/components/site-header-wrapper";
 import type { MenuCategoryVM } from "@/core/application/dtos/menu-view-model"
@@ -9,7 +9,6 @@ import { JsonLd } from "@/components/json-ld";
 import { cookies } from "next/headers";
 
 export const dynamic = 'force-dynamic';
-export const revalidate = 0;
 
 export default async function Home({
   searchParams,
@@ -63,7 +62,7 @@ export default async function Home({
   let menuData: MenuCategoryVM[] = [];
 
   try {
-    const menuResult = await getMenuUseCase.execute(empresaId!);
+    const menuResult = await getCachedMenu(empresaId!);
     if (menuResult.data) {
       menuData = menuResult.data;
     } else if (menuResult.error) {
