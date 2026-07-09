@@ -17,10 +17,13 @@ export default async function TurnoCerrarPage() {
   const adminToken = cookieStore.get('admin_token')?.value;
   if (adminToken) {
     const admin = await authAdminUseCase.verifyToken(adminToken);
-    if (!admin || !admin.empresaId) redirect('/admin/login');
-    rol = admin.rol;
-    empresaId = admin.empresaId;
-  } else {
+    if (admin?.empresaId) {
+      rol = admin.rol;
+      empresaId = admin.empresaId;
+    }
+  }
+
+  if (!empresaId) {
     const employeeToken = cookieStore.get('tpv_employee_token')?.value;
     if (!employeeToken) redirect('/tpv/login');
     const payload = await verifyTpvEmployeeToken(employeeToken);

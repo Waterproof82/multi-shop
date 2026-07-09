@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { authAdminUseCase } from '@/core/infrastructure/database';
+import { verifyTpvEmployeeToken } from '@/lib/tpv-employee-auth';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { CobroFlow } from '@/components/tpv/cobro/CobroFlow';
 
@@ -13,13 +14,28 @@ interface Props {
 
 export default async function CobroPage({ params, searchParams }: Readonly<Props>) {
   const cookieStore = await cookies();
-  const token = cookieStore.get('admin_token')?.value;
+  let empresaId: string | null = null;
+  let operadorNombre = 'Operador';
 
-  if (!token) redirect('/admin/login');
+  const adminToken = cookieStore.get('admin_token')?.value;
+  if (adminToken) {
+    const admin = await authAdminUseCase.verifyToken(adminToken);
+    if (admin?.empresaId) {
+      empresaId = admin.empresaId;
+      operadorNombre = admin.nombreCompleto ?? 'Operador';
+    }
+  }
 
-  const admin = await authAdminUseCase.verifyToken(token);
+  if (!empresaId) {
+    const employeeToken = cookieStore.get('tpv_employee_token')?.value;
+    if (!employeeToken) redirect('/tpv/login');
+    const payload = await verifyTpvEmployeeToken(employeeToken);
+    if (!payload) redirect('/tpv/login');
+    empresaId = payload.empresaId;
+    operadorNombre = payload.nombre;
+  }
 
-  if (!admin) redirect('/admin/login');
+  if (!empresaId) redirect('/tpv/login');
 
   const { sesionId } = await params;
   const { turnoId } = await searchParams;
@@ -40,7 +56,7 @@ export default async function CobroPage({ params, searchParams }: Readonly<Props
     supabase
       .from('empresas')
       .select('nombre, nif, tipo_impuesto, porcentaje_impuesto')
-      .eq('id', admin.empresaId)
+      .eq('id', empresaId)
       .maybeSingle(),
     supabase
       .from('tpv_cobros')
@@ -85,8 +101,8 @@ export default async function CobroPage({ params, searchParams }: Readonly<Props
       totalCents={Math.round(pedidosTotal * 100)}
       yaCobradoCents={yaCobradoCents}
       mesaNumero={sesionData.mesas?.numero ?? 0}
-      operadorNombre={admin.nombreCompleto ?? 'Operador'}
-      empresaId={admin.empresaId ?? ''}
+      operadorNombre={operadorNombre}
+      empresaId={empresaId}
       empresaNombre={empresaNombre}
       empresaNif={nif}
       tipoImpuesto={tipoImpuesto}

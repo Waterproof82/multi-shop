@@ -44,8 +44,9 @@ export async function POST(req: NextRequest) {
   }
 
   const token = await signTpvEmployeeToken(result.data);
+  const nextUrl = result.data.rol === 'cajero' ? '/tpv/mostrador' : '/tpv/turno/abrir';
 
-  const response = NextResponse.json({ ok: true });
+  const response = NextResponse.json({ ok: true, nextUrl, rol: result.data.rol });
   response.cookies.set('tpv_employee_token', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',

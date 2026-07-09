@@ -3,7 +3,7 @@ import { cookies, headers } from 'next/headers';
 import { authAdminUseCase } from '@/core/infrastructure/database';
 import { verifyTpvEmployeeToken } from '@/lib/tpv-employee-auth';
 import { TpvHeader } from '@/components/tpv/TpvHeader';
-import { TpvRolProvider } from '@/lib/tpv-rol-context';
+import { TpvRolProvider } from '@/lib/tpv-rol-ctx';
 import type { RolAdmin } from '@/core/domain/repositories/IAdminRepository';
 import { TpvSwRegistrar } from '@/components/tpv-sw-registrar';
 

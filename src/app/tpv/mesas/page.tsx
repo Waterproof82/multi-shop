@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { authAdminUseCase, mesaSesionUseCase } from '@/core/infrastructure/database';
+import { verifyTpvEmployeeToken } from '@/lib/tpv-employee-auth';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { MesasGrid } from '@/components/tpv/MesasGrid';
 
@@ -12,13 +13,23 @@ export default async function TpvMesasPage({
   readonly searchParams: Promise<{ seleccionar?: string }>;
 }) {
   const cookieStore = await cookies();
-  const token = cookieStore.get('admin_token')?.value;
-  if (!token) redirect('/admin/login');
+  let empresaId: string | null = null;
 
-  const admin = await authAdminUseCase.verifyToken(token);
-  if (!admin || !admin.empresa) redirect('/admin/login');
+  const adminToken = cookieStore.get('admin_token')?.value;
+  if (adminToken) {
+    const admin = await authAdminUseCase.verifyToken(adminToken);
+    if (admin?.empresa) empresaId = admin.empresa.id;
+  }
 
-  const empresaId = admin.empresa.id;
+  if (!empresaId) {
+    const employeeToken = cookieStore.get('tpv_employee_token')?.value;
+    if (!employeeToken) redirect('/tpv/login');
+    const payload = await verifyTpvEmployeeToken(employeeToken);
+    if (!payload) redirect('/tpv/login');
+    empresaId = payload.empresaId;
+  }
+
+  if (!empresaId) redirect('/tpv/login');
   const { seleccionar } = await searchParams;
   const modo = seleccionar === '1' ? 'seleccionar' : 'cobrar';
 

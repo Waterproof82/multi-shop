@@ -9,7 +9,7 @@ import { useMesaActiva } from '@/hooks/tpv/useMesaActiva';
 import { TicketPanel } from './TicketPanel';
 import { MenuPanel } from './MenuPanel';
 import { MesasGrid } from './MesasGrid';
-import { AccionesPanel } from './AccionesPanel';
+import { AccionesPanel } from './AccionesActions';
 
 export interface ExistingOrder {
   id: string;

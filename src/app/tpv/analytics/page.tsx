@@ -1,24 +1,39 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { authAdminUseCase } from '@/core/infrastructure/database';
+import { verifyTpvEmployeeToken } from '@/lib/tpv-employee-auth';
 import { SupabaseTpvRepository } from '@/core/infrastructure/repositories/supabase-tpv.repository';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { AnalyticsClient } from '@/components/tpv/AnalyticsClient';
 import type { TipoImpuesto } from '@/core/domain/entities/tpv-types';
+import type { RolAdmin } from '@/core/domain/repositories/IAdminRepository';
 
 export const dynamic = 'force-dynamic';
 
 export default async function TpvAnalyticsPage() {
   const cookieStore = await cookies();
-  const token = cookieStore.get('admin_token')?.value;
-  if (!token) redirect('/admin/login');
+  let empresaId: string | null = null;
+  let userRol: RolAdmin = 'cajero';
 
-  const admin = await authAdminUseCase.verifyToken(token);
-  if (!admin || !admin.empresa) redirect('/admin/login');
+  const adminToken = cookieStore.get('admin_token')?.value;
+  if (adminToken) {
+    const admin = await authAdminUseCase.verifyToken(adminToken);
+    if (admin?.empresa) {
+      empresaId = admin.empresa.id;
+      userRol = admin.rol;
+    }
+  }
 
-  if (admin.rol === 'cajero') redirect('/tpv/mostrador');
+  if (!empresaId) {
+    const employeeToken = cookieStore.get('tpv_employee_token')?.value;
+    if (!employeeToken) redirect('/tpv/login');
+    const payload = await verifyTpvEmployeeToken(employeeToken);
+    if (!payload) redirect('/tpv/login');
+    empresaId = payload.empresaId;
+    userRol = payload.rol;
+  }
 
-  const empresaId = admin.empresa.id;
+  if (userRol === 'cajero') redirect('/tpv/mostrador');
   const repo = new SupabaseTpvRepository();
   const turnoResult = await repo.findTurnoActivo(empresaId);
 
