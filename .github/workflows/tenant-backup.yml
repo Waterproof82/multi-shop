@@ -9,10 +9,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger tenant-backup Edge Function
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          BACKUP_SECRET: ${{ secrets.BACKUP_SECRET }}
         run: |
           response=$(curl -s -o /dev/null -w "%{http_code}" \
-            -X POST "${{ secrets.SUPABASE_URL }}/functions/v1/tenant-backup" \
-            -H "Authorization: Bearer ${{ secrets.BACKUP_SECRET }}" \
+            -X POST "$SUPABASE_URL/functions/v1/tenant-backup" \
+            -H "Authorization: Bearer $BACKUP_SECRET" \
             -H "Content-Type: application/json")
           echo "HTTP status: $response"
           if [ "$response" != "200" ] && [ "$response" != "207" ]; then

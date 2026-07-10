@@ -7,7 +7,7 @@ import { TpvRolProvider } from '@/lib/tpv-rol-ctx';
 import type { RolAdmin } from '@/core/domain/repositories/IAdminRepository';
 import { TpvSwRegistrar } from '@/components/tpv-sw-registrar';
 
-const VALID_ROLES: RolAdmin[] = ['superadmin', 'admin', 'encargado', 'cajero'];
+const VALID_ROLES = new Set<RolAdmin>(['superadmin', 'admin', 'encargado', 'cajero']);
 
 export const dynamic = 'force-dynamic';
 
@@ -28,7 +28,7 @@ export default async function TpvLayout({ children }: { readonly children: React
   const adminToken = cookieStore.get('admin_token')?.value;
   if (adminToken) {
     const admin = await authAdminUseCase.verifyToken(adminToken);
-    if (admin && VALID_ROLES.includes(admin.rol)) {
+    if (admin && VALID_ROLES.has(admin.rol)) {
       rol = admin.rol;
       empresaNombre = admin.empresa?.nombre ?? '';
     }

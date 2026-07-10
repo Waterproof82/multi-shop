@@ -104,13 +104,26 @@ async function handleLogout() {
   globalThis.location.href = "/waiter";
 }
 
+// S3776: extracted from WaiterBanner to keep cognitive complexity ≤ 15
+async function applyWaiterMeResponse(
+  r: Response,
+  setIsWaiter: (v: boolean) => void,
+  setWaiterEmpresaId: (id: string | null) => void,
+) {
+  setIsWaiter(r.ok);
+  if (r.ok) {
+    const json = await r.json() as { empresaId: string };
+    setWaiterEmpresaId(json.empresaId);
+  }
+}
+
 export function WaiterBanner() {
   const pathname = usePathname();
   const pathnameRef = useRef(pathname);
   pathnameRef.current = pathname;
   // Unique channel name per instance — avoids React StrictMode returning a stale
   // closed channel on the second mount when using a fixed name.
-  const channelNameRef = useRef(`waiter-banner-${Math.random().toString(36).slice(2)}`);
+  const channelNameRef = useRef(`waiter-banner-${crypto.randomUUID().slice(0, 8)}`);
   const { language: lang } = useLanguage();
   const { openCart, totalItems, clearCart } = useCart();
   const [closeDialog, setCloseDialog] = useState<'confirm' | 'cart' | 'payment' | 'unpaid' | 'free' | null>(null);
@@ -162,13 +175,7 @@ export function WaiterBanner() {
   useEffect(() => {
     if (!navigator.onLine) { setAuthChecked(true); return; }
     fetch('/api/waiter/me')
-      .then(async r => {
-        setIsWaiter(r.ok);
-        if (r.ok) {
-          const json = await r.json() as { empresaId: string };
-          setWaiterEmpresaId(json.empresaId);
-        }
-      })
+      .then(r => applyWaiterMeResponse(r, setIsWaiter, setWaiterEmpresaId))
       .catch(() => setIsWaiter(false))
       .finally(() => setAuthChecked(true));
   }, [pathname]);
@@ -177,13 +184,7 @@ export function WaiterBanner() {
   useEffect(() => {
     function handleAuthChanged() {
       fetch('/api/waiter/me')
-        .then(async r => {
-          setIsWaiter(r.ok);
-          if (r.ok) {
-            const json = await r.json() as { empresaId: string };
-            setWaiterEmpresaId(json.empresaId);
-          }
-        })
+        .then(r => applyWaiterMeResponse(r, setIsWaiter, setWaiterEmpresaId))
         .catch(() => setIsWaiter(false))
         .finally(() => setAuthChecked(true));
     }
