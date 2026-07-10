@@ -24,7 +24,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: empresas, error: empError } = await supabase
     .from('empresas')
-    .select('id, nombre, dominio');
+    .select('*');
 
   if (empError) {
     return new Response(JSON.stringify({ error: empError.message }), { status: 500 });
@@ -35,28 +35,45 @@ Deno.serve(async (req: Request) => {
 
   for (const empresa of empresas ?? []) {
     try {
-      const [prodResult, catResult] = await Promise.all([
+      const [prodResult, catResult, mesasResult, ingResult, empTpvResult] = await Promise.all([
         supabase.from('productos').select('*').eq('empresa_id', empresa.id),
         supabase.from('categorias').select('*').eq('empresa_id', empresa.id),
+        supabase.from('mesas').select('*').eq('empresa_id', empresa.id),
+        supabase.from('ingredientes').select('*').eq('empresa_id', empresa.id),
+        supabase.from('empleados_tpv').select('*').eq('empresa_id', empresa.id),
       ]);
 
       if (prodResult.error) throw new Error(`productos: ${prodResult.error.message}`);
       if (catResult.error) throw new Error(`categorias: ${catResult.error.message}`);
+      if (mesasResult.error) throw new Error(`mesas: ${mesasResult.error.message}`);
+      if (ingResult.error) throw new Error(`ingredientes: ${ingResult.error.message}`);
+      if (empTpvResult.error) throw new Error(`empleados_tpv: ${empTpvResult.error.message}`);
+
+      // receta_items: no empresa_id, filter via producto_id
+      const prodIds = (prodResult.data ?? []).map((p: { id: string }) => p.id);
+      const recetaResult = prodIds.length > 0
+        ? await supabase.from('receta_items').select('*').in('producto_id', prodIds)
+        : { data: [], error: null };
+
+      if (recetaResult.error) throw new Error(`receta_items: ${recetaResult.error.message}`);
 
       const snapshot = {
         empresa,
-        productos: prodResult.data,
         categorias: catResult.data,
+        productos: prodResult.data,
+        mesas: mesasResult.data,
+        ingredientes: ingResult.data,
+        empleados_tpv: empTpvResult.data,
+        receta_items: recetaResult.data,
         exportedAt: new Date().toISOString(),
       };
 
-      // Plain minified JSON — for a single tenant the payload is typically < 500 KB.
-      // Gzip adds Deno complexity for marginal gain; revisit if snapshots exceed 2 MB.
+      // Plain minified JSON — single tenant payload typically < 500 KB.
       const body = JSON.stringify(snapshot);
       const key = `backups/${empresa.id}/${today}.json`;
 
       await s3.send(new PutObjectCommand({
-        Bucket: Deno.env.get('R2_BUCKET_NAME')!,
+        Bucket: Deno.env.get('R2_BACKUP_BUCKET_NAME')!,
         Key: key,
         Body: body,
         ContentType: 'application/json',

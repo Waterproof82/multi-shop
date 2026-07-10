@@ -15,8 +15,20 @@ function getS3Client() {
 }
 
 function getR2Bucket() {
-  return process.env.R2_BUCKET_NAME!;
+  return process.env.R2_BACKUP_BUCKET_NAME!;
 }
+
+type SnapshotRow = Record<string, unknown>;
+
+type Snapshot = {
+  empresa: SnapshotRow;
+  categorias: SnapshotRow[];
+  productos: SnapshotRow[];
+  mesas: SnapshotRow[];
+  ingredientes: SnapshotRow[];
+  empleados_tpv: SnapshotRow[];
+  receta_items: SnapshotRow[];
+};
 
 // GET — list available backup dates for an empresa
 export async function GET(request: NextRequest) {
@@ -70,51 +82,54 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `Backup ${date} not found` }, { status: 404 });
   }
 
-  const snapshot = JSON.parse(snapshotText) as {
-    productos: Record<string, unknown>[];
-    categorias: Record<string, unknown>[];
-  };
+  const snapshot = JSON.parse(snapshotText) as Snapshot;
+  const supabase = getSupabaseClient();
 
   // SECURITY: force empresa_id on every row to match the authenticated tenant.
   // Prevents a malicious/corrupted snapshot from writing into another tenant's data.
-  const categoriasSanitizadas = snapshot.categorias.map(c => ({
-    ...c,
-    empresa_id: empresaId,
-  }));
-  const productosSanitizados = snapshot.productos.map(p => ({
-    ...p,
-    empresa_id: empresaId,
-  }));
+  const sanitize = (rows: SnapshotRow[]) =>
+    rows.map(r => ({ ...r, empresa_id: empresaId }));
 
-  const supabase = getSupabaseClient();
+  // empresas: UPDATE only (row always exists, avoid unique constraint conflicts on dominio/slug)
+  const { error: empErr } = await supabase
+    .from('empresas')
+    .update({ ...snapshot.empresa, id: empresaId })
+    .eq('id', empresaId);
+  if (empErr) return NextResponse.json({ error: 'Failed to restore empresa', details: empErr.message }, { status: 500 });
 
-  // FK-SAFE ORDER: categorias first (productos have a FK → categorias).
-  // Promise.all would race and could violate the FK constraint.
-  const catUpsert = await supabase
-    .from('categorias')
-    .upsert(categoriasSanitizadas, { onConflict: 'id' });
+  // mesas: null out sesion_id — sessions are transient, FK would fail on restore
+  const mesasSanitizadas = sanitize(snapshot.mesas ?? []).map(m => ({ ...m, sesion_id: null }));
+  const { error: mesasErr } = await supabase.from('mesas').upsert(mesasSanitizadas, { onConflict: 'id' });
+  if (mesasErr) return NextResponse.json({ error: 'Failed to restore mesas', details: mesasErr.message }, { status: 500 });
 
-  if (catUpsert.error) {
-    return NextResponse.json({
-      error: 'Failed to restore categorias',
-      details: catUpsert.error.message,
-    }, { status: 500 });
-  }
+  // ingredientes
+  const { error: ingErr } = await supabase.from('ingredientes').upsert(sanitize(snapshot.ingredientes ?? []), { onConflict: 'id' });
+  if (ingErr) return NextResponse.json({ error: 'Failed to restore ingredientes', details: ingErr.message }, { status: 500 });
 
-  const prodUpsert = await supabase
-    .from('productos')
-    .upsert(productosSanitizados, { onConflict: 'id' });
+  // FK-SAFE ORDER: categorias before productos (productos FK → categorias)
+  const { error: catErr } = await supabase.from('categorias').upsert(sanitize(snapshot.categorias ?? []), { onConflict: 'id' });
+  if (catErr) return NextResponse.json({ error: 'Failed to restore categorias', details: catErr.message }, { status: 500 });
 
-  if (prodUpsert.error) {
-    return NextResponse.json({
-      error: 'Failed to restore productos',
-      details: prodUpsert.error.message,
-    }, { status: 500 });
-  }
+  const { error: prodErr } = await supabase.from('productos').upsert(sanitize(snapshot.productos ?? []), { onConflict: 'id' });
+  if (prodErr) return NextResponse.json({ error: 'Failed to restore productos', details: prodErr.message }, { status: 500 });
+
+  // empleados_tpv
+  const { error: tpvErr } = await supabase.from('empleados_tpv').upsert(sanitize(snapshot.empleados_tpv ?? []), { onConflict: 'id' });
+  if (tpvErr) return NextResponse.json({ error: 'Failed to restore empleados_tpv', details: tpvErr.message }, { status: 500 });
+
+  // receta_items: last — depends on productos + ingredientes (no empresa_id to sanitize)
+  const { error: recetaErr } = await supabase.from('receta_items').upsert(snapshot.receta_items ?? [], { onConflict: 'id' });
+  if (recetaErr) return NextResponse.json({ error: 'Failed to restore receta_items', details: recetaErr.message }, { status: 500 });
 
   return NextResponse.json({
     restored: date,
-    productosCount: productosSanitizados.length,
-    categoriasCount: categoriasSanitizadas.length,
+    counts: {
+      mesas: mesasSanitizadas.length,
+      ingredientes: (snapshot.ingredientes ?? []).length,
+      categorias: (snapshot.categorias ?? []).length,
+      productos: (snapshot.productos ?? []).length,
+      empleados_tpv: (snapshot.empleados_tpv ?? []).length,
+      receta_items: (snapshot.receta_items ?? []).length,
+    },
   });
 }
