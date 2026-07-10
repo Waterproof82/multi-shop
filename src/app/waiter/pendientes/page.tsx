@@ -294,7 +294,7 @@ export default function WaiterPendientesPage() {
   const { language: lang } = useLanguage();
   // Unique channel name per instance — avoids React StrictMode double-mount
   // returning a stale closed channel on the second mount.
-  const channelNameRef = useRef(`waiter-pendientes-${Math.random().toString(36).slice(2)}`);
+  const channelNameRef = useRef(`waiter-pendientes-${crypto.randomUUID().slice(0, 8)}`);
   const [isTabVisible, setIsTabVisible] = useState(true);
   const [waiterEmpresaId, setWaiterEmpresaId] = useState<string | null>(null);
   const [mesas, setMesas] = useState<PendienteMesa[]>([]);

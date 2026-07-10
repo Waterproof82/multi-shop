@@ -12,9 +12,9 @@ export const dynamic = 'force-dynamic';
 
 export default async function Home({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+}>) {
   const resolvedParams = await searchParams;
   const rawMesaParam = typeof resolvedParams.mesa === 'string' && resolvedParams.mesa.length > 0;
   const cookieStore = await cookies();

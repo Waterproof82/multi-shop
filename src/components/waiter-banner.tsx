@@ -105,6 +105,23 @@ async function handleLogout() {
 }
 
 // S3776: extracted from WaiterBanner to keep cognitive complexity ≤ 15
+type WaiterMesaStore = { mesaId: string; mesaNumero: number; mesaNombre: string | null };
+function applyMesaAuthResponse(
+  r: Response,
+  stored: WaiterMesaStore,
+  setMesaLabel: (v: string | null) => void,
+  setMesaId: (v: string | null) => void,
+) {
+  if (r.ok) {
+    setMesaLabel(stored.mesaNombre ?? `Mesa ${stored.mesaNumero}`);
+    setMesaId(stored.mesaId);
+  } else {
+    clearWaiterMesa();
+    setMesaLabel(null);
+    setMesaId(null);
+  }
+}
+
 async function applyWaiterMeResponse(
   r: Response,
   setIsWaiter: (v: boolean) => void,
@@ -212,16 +229,7 @@ export function WaiterBanner() {
       return;
     }
     fetch("/api/waiter/me")
-      .then((r) => {
-        if (r.ok) {
-          setMesaLabel(stored.mesaNombre ?? `Mesa ${stored.mesaNumero}`);
-          setMesaId(stored.mesaId);
-        } else {
-          clearWaiterMesa();
-          setMesaLabel(null);
-          setMesaId(null);
-        }
-      })
+      .then(r => applyMesaAuthResponse(r, stored, setMesaLabel, setMesaId))
       .catch(() => null);
   }, [pathname]);
 
