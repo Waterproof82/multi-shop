@@ -1,8 +1,10 @@
 import { NextRequest } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import { productUseCase } from '@/core/infrastructure/database';
 import { createProductSchema, updateProductSchema, productIdSchema } from '@/core/application/dtos/product.dto';
 import { requireAuth, requireRole, handleResult, handleResultWithStatus, validationErrorResponse, type AuthResult } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
+import { catalogTag } from '@/lib/cache-tags';
 import type { Product } from '@/core/domain/entities/types';
 
 // Transform domain format to admin UI format
@@ -98,11 +100,12 @@ export async function POST(request: NextRequest) {
   }
 
   const result = await productUseCase.create(parsed.data);
-  
+
   if (!result.success) {
     return handleResult(result);
   }
-  
+
+  revalidateTag(catalogTag(empresaId!), {});
   return handleResultWithStatus({ success: true, data: toAdminProduct(result.data) }, 201);
 }
 
@@ -151,11 +154,12 @@ export async function PUT(request: NextRequest) {
   }
 
   const result = await productUseCase.update(idParsed.data.id, empresaId!, parsed.data);
-  
+
   if (!result.success) {
     return handleResult(result);
   }
-  
+
+  revalidateTag(catalogTag(empresaId!), {});
   return handleResult({ success: true, data: toAdminProduct(result.data) });
 }
 
@@ -188,10 +192,11 @@ export async function DELETE(request: NextRequest) {
   }
   
   const result = await productUseCase.delete(idParsed.data.id, empresaId);
-  
+
   if (!result.success) {
     return handleResult(result);
   }
-  
+
+  revalidateTag(catalogTag(empresaId!), {});
   return handleResult({ success: true, data: { success: true } });
 }

@@ -294,7 +294,9 @@ export default function WaiterPendientesPage() {
   const { language: lang } = useLanguage();
   // Unique channel name per instance — avoids React StrictMode double-mount
   // returning a stale closed channel on the second mount.
-  const channelNameRef = useRef(`waiter-pendientes-${Math.random().toString(36).slice(2)}`);
+  const channelNameRef = useRef(`waiter-pendientes-${crypto.randomUUID().slice(0, 8)}`);
+  const [isTabVisible, setIsTabVisible] = useState(true);
+  const [waiterEmpresaId, setWaiterEmpresaId] = useState<string | null>(null);
   const [mesas, setMesas] = useState<PendienteMesa[]>([]);
   // selectedMap: ítems marcados con ✓ (se incluirán en la confirmación selectiva)
   const [selectedMap, setSelectedMap] = useState<Record<string, Set<string>>>({});
@@ -309,6 +311,23 @@ export default function WaiterPendientesPage() {
   const [collapsedMesas, setCollapsedMesas] = useState<Set<string>>(new Set());
   const [mesaFilter, setMesaFilter] = useState('');
 
+  // Visibility lifecycle — disconnect Realtime when tab is hidden, reconnect on visible
+  useEffect(() => {
+    const onVis = () => setIsTabVisible(document.visibilityState === 'visible');
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, []);
+
+  // Fetch empresaId on mount for tenant-scoped Realtime filter
+  useEffect(() => {
+    fetch('/api/waiter/me')
+      .then(r => r.ok ? r.json() : null)
+      .then((json: { empresaId: string } | null) => {
+        if (json) setWaiterEmpresaId(json.empresaId);
+      })
+      .catch(() => null);
+  }, []);
+
   const fetchPendientes = useCallback(async () => {
     try {
       const r = await fetch('/api/waiter/pendientes/orders');
@@ -320,6 +339,9 @@ export default function WaiterPendientesPage() {
   }, []);
 
   useEffect(() => {
+    if (!isTabVisible) return;
+    if (!waiterEmpresaId) return;
+
     void fetchPendientes();
 
     const supabase = getSupabaseAnonClient();
@@ -330,9 +352,9 @@ export default function WaiterPendientesPage() {
     };
     const channel = supabase
       .channel(channelNameRef.current)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, trigger)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados' }, trigger)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'mesa_sesiones' }, trigger)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos', filter: `empresa_id=eq.${waiterEmpresaId}` }, trigger)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados', filter: `empresa_id=eq.${waiterEmpresaId}` }, trigger)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mesa_sesiones', filter: `empresa_id=eq.${waiterEmpresaId}` }, trigger)
       .subscribe((status) => {
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           console.error('[Realtime] waiter-pendientes error:', status);
@@ -358,7 +380,15 @@ export default function WaiterPendientesPage() {
       void supabase.removeChannel(channel);
       globalThis.removeEventListener('waiter-realtime-update', bannerRelay);
     };
-  }, [fetchPendientes]);
+  }, [fetchPendientes, isTabVisible, waiterEmpresaId]);
+
+  // Re-fetch when tab becomes visible again so stale data is refreshed immediately.
+  useEffect(() => {
+    if (isTabVisible && waiterEmpresaId && confirmingRef.current.size === 0) {
+      void fetchPendientes();
+      globalThis.dispatchEvent(new CustomEvent('waiter-realtime-update'));
+    }
+  }, [isTabVisible, waiterEmpresaId, fetchPendientes]);
 
   useEffect(() => {
     const tick = setInterval(() => setMesas(p => [...p]), 1000);
@@ -431,15 +461,20 @@ export default function WaiterPendientesPage() {
 
       const removedItemsMap = new Map<string, number[]>();
 
-      for (const pedido of mesa.pedidos) {
-        if (!pedido.items.some(i => i.tipo === sendTipo)) continue;
-        if (pedido.validated) {
-          const released = await releaseRetainedPedidoItems(pedido.id, pedido.items, sendTipo, selected, paused, mode);
-          if (released.length > 0) removedItemsMap.set(pedido.id, released);
-        } else {
-          const ok = await validateNewPedido(pedido.id, pedido.items, sendTipo, selected, paused, mode);
-          if (ok) removedItemsMap.set(pedido.id, pedido.items.map(i => i.idx));
-        }
+      const results = await Promise.all(
+        mesa.pedidos.map(async pedido => {
+          if (!pedido.items.some(i => i.tipo === sendTipo)) return null;
+          if (pedido.validated) {
+            const released = await releaseRetainedPedidoItems(pedido.id, pedido.items, sendTipo, selected, paused, mode);
+            return released.length > 0 ? ([pedido.id, released] as const) : null;
+          } else {
+            const ok = await validateNewPedido(pedido.id, pedido.items, sendTipo, selected, paused, mode);
+            return ok ? ([pedido.id, pedido.items.map(i => i.idx)] as const) : null;
+          }
+        })
+      );
+      for (const entry of results) {
+        if (entry) removedItemsMap.set(entry[0], entry[1] as number[]);
       }
 
       if (removedItemsMap.size === 0) return;
@@ -470,14 +505,19 @@ export default function WaiterPendientesPage() {
 
       const removedItemsMap = new Map<string, number[]>();
 
-      for (const pedido of mesa.pedidos) {
-        if (pedido.validated) {
-          const released = await releaseSelectedPedidoItems(pedido.id, pedido.items, selected);
-          if (released.length > 0) removedItemsMap.set(pedido.id, released);
-        } else {
-          const ok = await validateBothTypesPedido(pedido.id, pedido.items, selected, paused);
-          if (ok) removedItemsMap.set(pedido.id, pedido.items.map(i => i.idx));
-        }
+      const bothResults = await Promise.all(
+        mesa.pedidos.map(async pedido => {
+          if (pedido.validated) {
+            const released = await releaseSelectedPedidoItems(pedido.id, pedido.items, selected);
+            return released.length > 0 ? ([pedido.id, released] as const) : null;
+          } else {
+            const ok = await validateBothTypesPedido(pedido.id, pedido.items, selected, paused);
+            return ok ? ([pedido.id, pedido.items.map(i => i.idx)] as const) : null;
+          }
+        })
+      );
+      for (const entry of bothResults) {
+        if (entry) removedItemsMap.set(entry[0], entry[1] as number[]);
       }
 
       if (removedItemsMap.size === 0) return;

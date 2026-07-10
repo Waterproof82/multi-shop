@@ -816,13 +816,20 @@ UPSTASH_REDIS_REST_TOKEN=xxx
 CORS_ALLOWED_ORIGINS=https://tudominio.com,https://pedidos.tudominio.com
 CORS_ALLOWED_DOMAINS=tudominio.com
 
-# Cloudflare R2
+# Cloudflare R2 — bucket de imágenes
 R2_ACCOUNT_ID=xxx
 R2_ACCESS_KEY_ID=xxx
 R2_SECRET_ACCESS_KEY=xxx
 R2_BUCKET_NAME=images
 NEXT_PUBLIC_R2_DOMAIN=https://imagenes.tudominio.com
 CLOUDFLARE_API_TOKEN=xxx                           # opcional, fallback a AWS SDK
+
+# Cloudflare R2 — bucket de backups (DISTINTO del de imágenes)
+R2_BACKUP_BUCKET_NAME=multi-shop-backups
+R2_ENDPOINT=https://{account_id}.r2.cloudflarestorage.com
+
+# Backup del sistema
+BACKUP_SECRET=hex64chars                           # openssl rand -hex 32 — auth del Edge Function
 
 # Email (Brevo)
 BREVO_API_KEY=xxx
@@ -937,6 +944,342 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 
 ---
 
+## 💾 Sistema de Backup Automático (Tenant Snapshot)
+
+Backup diario automático de todos los datos operativos de cada empresa a Cloudflare R2. Sistema completamente serverless — cero infraestructura adicional.
+
+### Arquitectura
+
+```
+GitHub Actions (cron 03:00 UTC)
+    → POST supabase/functions/v1/tenant-backup  (Bearer BACKUP_SECRET)
+        → Supabase Edge Function (Deno)
+            → Consulta todos los tenants en paralelo
+            → Serializa snapshot JSON por empresa
+            → PUT a R2 como backups/{empresa_id}/{YYYY-MM-DD}.json
+```
+
+### Tablas incluidas en el snapshot
+
+| Tabla | Notas |
+|-------|-------|
+| `empresas` | Fila completa incluyendo credenciales de la empresa |
+| `categorias` | Filtrado por `empresa_id` |
+| `productos` | Filtrado por `empresa_id` |
+| `mesas` | Filtrado por `empresa_id` |
+| `ingredientes` | Filtrado por `empresa_id` |
+| `empleados_tpv` | Filtrado por `empresa_id` |
+| `receta_items` | Sin `empresa_id` — filtrado vía `producto_id IN (...)` |
+
+### Restore
+
+`POST /api/admin/backup/restore` — restaura el último snapshot del día desde R2.
+
+Orden de inserción FK-safe:
+1. `empresas` → UPDATE (nunca upsert — evita conflictos de unicidad en dominio/slug)
+2. `mesas` → sanitiza `empresa_id` + fuerza `sesion_id = null` (sesiones son transitorias)
+3. `ingredientes` → sanitiza `empresa_id`
+4. `categorias` → sanitiza `empresa_id`
+5. `productos` → sanitiza `empresa_id`
+6. `empleados_tpv` → sanitiza `empresa_id`
+7. `receta_items` → sin `empresa_id` (no sanitizar)
+
+```typescript
+// Seguridad: empresa_id siempre sobreescrito desde el token JWT del admin
+const sanitize = (rows: SnapshotRow[]) =>
+  rows.map(r => ({ ...r, empresa_id: empresaId }));
+```
+
+> ⚠️ `mesas.sesion_id` DEBE ponerse a `null` en el restore — las sesiones activas son transitorias y no se restauran.
+
+### Variables de entorno requeridas (backup)
+
+```env
+# Cloudflare R2 — bucket exclusivo de backups (NO el de imágenes)
+R2_BACKUP_BUCKET_NAME=multi-shop-backups   # Variable distinta a R2_BUCKET_NAME
+
+# Autenticación del Edge Function
+BACKUP_SECRET=hex64chars                    # openssl rand -hex 32
+```
+
+> ⚠️ **`R2_BUCKET_NAME` vs `R2_BACKUP_BUCKET_NAME`**: son dos variables distintas. `R2_BUCKET_NAME` apunta al bucket de imágenes. `R2_BACKUP_BUCKET_NAME` apunta al bucket de backups. NUNCA usar la misma.
+
+### Archivos clave
+
+| Archivo | Descripción |
+|---------|-------------|
+| `supabase/functions/tenant-backup/index.ts` | Edge Function Deno — genera y sube el snapshot |
+| `src/app/api/admin/backup/restore/route.ts` | API Route — descarga y restaura el snapshot |
+| `.github/workflows/tenant-backup.yml` | GitHub Actions — disparo diario a las 03:00 UTC |
+
+### Secretos en GitHub Actions
+
+Los secrets deben estar definidos en GitHub → Settings → Secrets:
+- `SUPABASE_URL` — URL pública del proyecto Supabase
+- `BACKUP_SECRET` — mismo valor que la variable de entorno del Edge Function
+
+> ⚠️ En el workflow YAML, los secrets **deben** estar en el bloque `env:` del step, no interpolados directamente en el shell script (`$SUPABASE_URL` no `${{ secrets.SUPABASE_URL }}`). VS Code mostrará un falso positivo de "Context access might be invalid" — es un bug del plugin de GitHub Actions para VS Code; en runtime funciona correctamente.
+
+### Deno Edge Functions — TypeScript en VS Code
+
+Los archivos en `supabase/functions/` usan la runtime Deno con imports URL (`https://esm.sh/`) y el global `Deno`. El servidor de TypeScript de VS Code (Node.js) no reconoce estos y genera errores TS2307/TS2304.
+
+**Fix**: añadir `// @ts-nocheck` como primera línea de cada Edge Function. No afecta a la ejecución real en Deno.
+
+```typescript
+// @ts-nocheck — Deno Edge Function: URL imports and Deno globals are valid at runtime
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+```
+
+---
+
+## 🐛 Errores Comunes — Registro de Bugs y Anti-patrones
+
+Registro de bugs encontrados y corregidos. Leer antes de programar para no repetirlos.
+
+### SonarLint — Reglas críticas aplicadas en este codebase
+
+#### S2245 — `Math.random()` no apto para identificadores únicos
+
+`Math.random()` no es criptográficamente seguro y SonarLint lo marca en contextos donde se usa como identificador (nombres de canales Supabase Realtime, etc.).
+
+```typescript
+// ❌ MAL
+const channelRef = useRef(`waiter-banner-${Math.random().toString(36).slice(2)}`);
+
+// ✅ BIEN
+const channelRef = useRef(`waiter-banner-${crypto.randomUUID().slice(0, 8)}`);
+```
+
+`crypto.randomUUID()` está disponible en todos los browsers modernos, en Node.js 14.17+ y en Deno. Sin dependencias extra.
+
+---
+
+#### S3776 — Complejidad cognitiva ≤ 15
+
+Cuando un componente React supera 15 unidades de complejidad cognitiva, SonarLint lo marca. La complejidad se acumula de forma diferente a la ciclomática: las funciones anidadas dentro del componente (handlers, callbacks, funciones internas) suman al componente padre.
+
+**Síntomas**: `useEffect` con múltiples `if`, handlers con `try/catch` + `if/else` anidados.
+
+**Fix estándar**: extraer handlers y callbacks a funciones puras de módulo (fuera del componente):
+
+```typescript
+// ❌ MAL — el if/else anidado en el .then() suma complejidad a WaiterBanner
+fetch('/api/waiter/me')
+  .then(async r => {
+    setIsWaiter(r.ok);
+    if (r.ok) {
+      const json = await r.json() as { empresaId: string };
+      setWaiterEmpresaId(json.empresaId);
+    }
+  });
+
+// ✅ BIEN — función de módulo, no suma al componente
+async function applyWaiterMeResponse(
+  r: Response,
+  setIsWaiter: (v: boolean) => void,
+  setWaiterEmpresaId: (id: string | null) => void,
+) {
+  setIsWaiter(r.ok);
+  if (r.ok) {
+    const json = await r.json() as { empresaId: string };
+    setWaiterEmpresaId(json.empresaId);
+  }
+}
+
+// En el componente:
+fetch('/api/waiter/me')
+  .then(r => applyWaiterMeResponse(r, setIsWaiter, setWaiterEmpresaId));
+```
+
+**En páginas SSR**: extraer cadenas de auth a helper de módulo:
+
+```typescript
+// ❌ MAL — múltiples if anidados dentro de la page function
+async function MostradorPage() {
+  const adminToken = cookieStore.get('admin_token')?.value;
+  if (adminToken) {
+    const admin = await authAdminUseCase.verifyToken(adminToken);
+    if (admin?.empresaId) empresaId = admin.empresaId;
+  }
+  if (!empresaId) {
+    const employeeToken = cookieStore.get('tpv_employee_token')?.value;
+    if (employeeToken) { ... }
+  }
+  // ...
+}
+
+// ✅ BIEN — helper de módulo
+async function resolveEmpresaId(
+  cookieStore: Awaited<ReturnType<typeof cookies>>
+): Promise<string | null> {
+  const adminToken = cookieStore.get('admin_token')?.value;
+  if (adminToken) {
+    const admin = await authAdminUseCase.verifyToken(adminToken);
+    if (admin?.empresaId) return admin.empresaId;
+  }
+  const employeeToken = cookieStore.get('tpv_employee_token')?.value;
+  if (!employeeToken) return null;
+  const payload = await verifyTpvEmployeeToken(employeeToken);
+  return payload?.empresaId ?? null;
+}
+```
+
+---
+
+#### S7776 — Usar `Set` en lugar de `Array` para comprobaciones de pertenencia
+
+```typescript
+// ❌ MAL — Array.includes() es O(n) y SonarLint lo marca
+const VALID_ROLES: RolAdmin[] = ['superadmin', 'admin', 'encargado', 'cajero'];
+if (VALID_ROLES.includes(admin.rol)) { ... }
+
+// ✅ BIEN — Set.has() es O(1) y semánticamente correcto
+const VALID_ROLES = new Set<RolAdmin>(['superadmin', 'admin', 'encargado', 'cajero']);
+if (VALID_ROLES.has(admin.rol)) { ... }
+```
+
+---
+
+#### S1874 — `React.FormEvent` deprecado en React 18.3+
+
+`React.FormEvent` fue marcado `@deprecated` en `@types/react`. El tipo base correcto es `React.SyntheticEvent<T>`.
+
+```typescript
+// ❌ MAL
+async function handleSubmit(e: React.FormEvent) { ... }
+async function handleSubmit(e: React.FormEvent<HTMLFormElement>) { ... }  // sigue siendo deprecated
+
+// ✅ BIEN
+async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) { ... }
+```
+
+---
+
+#### S6759 — Props de componentes deben ser `Readonly<>`
+
+```typescript
+// ❌ MAL
+export default async function Home({ searchParams }: { searchParams: Promise<...> }) { ... }
+
+// ✅ BIEN
+export default async function Home({ searchParams }: Readonly<{ searchParams: Promise<...> }>) { ... }
+
+// Para componentes funcionales el patrón es:
+function MiComponente({ prop1, prop2 }: Readonly<MiComponenteProps>) { ... }
+```
+
+---
+
+#### S1656 — Asignación de variable a sí misma
+
+Error silencioso: la variable se asigna a sí misma en lugar de al valor correcto.
+
+```typescript
+// ❌ MAL — empresaId no cambia, bug silencioso
+if (admin?.empresaId) empresaId = empresaId;
+
+// ✅ BIEN
+if (admin?.empresaId) empresaId = admin.empresaId;
+```
+
+---
+
+#### S6582 — Usar optional chaining en lugar de `&&`
+
+```typescript
+// ❌ MAL
+const mesas = mesasResult && mesasResult.success ? mesasResult.data : null;
+
+// ✅ BIEN
+const mesas = mesasResult?.success ? mesasResult.data : null;
+```
+
+---
+
+#### S2004 — Máximo 4 niveles de funciones anidadas
+
+Contar desde el componente: `Componente → useCallback → .then → setItems(prev => ...)` son 4 niveles. Si hay un `if` dentro, son 5 → violación.
+
+**Fix**: extraer el predicado o callback a función de módulo:
+
+```typescript
+// ❌ MAL — 5 niveles
+const rollback = useCallback(() => {
+  fetch('/api/...').then(() => {
+    setItems(prev => prev.some(i => i.id === item.id) ? prev : [...prev, item]);
+  });
+}, [item]);
+
+// ✅ BIEN — predicado en módulo
+function addItemBackIfMissing(item: KitchenItem) {
+  return (prev: KitchenItem[]) =>
+    prev.some(i => i.pedidoId === item.pedidoId && i.itemIdx === item.itemIdx)
+      ? prev
+      : [...prev, item];
+}
+// En el componente:
+setItems(addItemBackIfMissing(item));
+```
+
+---
+
+#### S3358 — Prohibido ternario anidado
+
+```typescript
+// ❌ MAL
+const color = isReady ? 'green' : isWarning ? 'amber' : 'red';
+
+// ✅ BIEN — función de módulo con if/return
+function resolveColor(isReady: boolean, isWarning: boolean): string {
+  if (isReady) return 'green';
+  if (isWarning) return 'amber';
+  return 'red';
+}
+```
+
+---
+
+### Trampas de arquitectura — errores no obvios
+
+#### `R2_BUCKET_NAME` vs `R2_BACKUP_BUCKET_NAME`
+
+El proyecto usa **dos buckets distintos en R2**:
+- `R2_BUCKET_NAME` → bucket de imágenes de productos/empresas
+- `R2_BACKUP_BUCKET_NAME` → bucket de backups (tenant snapshots)
+
+Usar la misma variable para ambos mezcla los datos. Cada bucket tiene su propia variable de entorno. Definir ambas en Vercel, en GitHub Secrets y en `.env.local`.
+
+#### Deno Edge Functions — no pasar por ESLint/TypeScript del proyecto
+
+Los archivos en `supabase/functions/` corren en Deno, no en Node.js. VS Code mostrará errores TS en:
+- Imports con URL (`https://esm.sh/...`, `jsr:...`, `npm:...`)
+- El global `Deno`
+
+Estos son **falsos positivos del editor**, no errores reales. La función se despliega y ejecuta correctamente en la runtime Deno de Supabase.
+
+**No intentar "arreglar" estos imports** cambiándolos a imports de npm — romperá el Edge Function. La solución es `// @ts-nocheck` en la primera línea del archivo.
+
+#### YAML GitHub Actions — secrets en `env:` del step
+
+```yaml
+# ❌ MAL — VS Code muestra warning "Context access might be invalid"
+run: |
+  curl -H "Authorization: Bearer ${{ secrets.BACKUP_SECRET }}" ...
+
+# ✅ BIEN — secrets en env: block, referencias como variables de shell
+- name: Trigger backup
+  env:
+    BACKUP_SECRET: ${{ secrets.BACKUP_SECRET }}
+    SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  run: |
+    curl -H "Authorization: Bearer $BACKUP_SECRET" "$SUPABASE_URL/functions/v1/..."
+```
+
+El warning de VS Code es un falso positivo del plugin de GitHub Actions (no conoce los secrets en tiempo de edición). Pero el patrón `env:` también es la forma más segura y recomendada porque evita que los valores aparezcan en logs de shell.
+
+---
+
 ## Estado del Proyecto
 
 | Aspecto | Estado |
@@ -960,7 +1303,8 @@ WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@connect.com');
 | **Waiter Panel** | Panel PIN-auth en /waiter. Grid de mesas, ciclo de sesión open/close, ítems diferidos, pago manual. WaiterBanner sticky global con badges de cocina y bar en tiempo real. Re-autenticación sin recarga: `WaiterLoginForm` dispara `CustomEvent('waiter-auth-changed')` → banner revalida sesión automáticamente. |
 | **Kitchen & Bar In-App** | `/waiter/kitchen` y `/waiter/bar`: vistas en tiempo real para gestión de ítems sin Telegram. Estados por ítem: pendiente → en_preparacion → preparado → servido (swipe gestual). Colores por tiempo de espera (oklch, 6 rangos). GroupBy por pedido o por mesa. Filtro "Listos". Retenidos con sección propia. Badges con counts en WaiterBanner (neutral/verde/naranja). Timer de espera arranca desde `validated_at` (momento de validación), no desde `created_at` del pedido original. |
 | **Waiter Pendientes** | `/waiter/pendientes`: cola de validación antes de cocina/bar. Selección individual o por tipo (comida/bebida). Pausa (⏸) por ítem de comida → llega a cocina como retenido. Botón conjunto comida+bebida (botón morado) valida ambos tipos en un solo POST. La pausa prevalece sobre la selección en envíos conjuntos. |
-| **Realtime Híbrido** | Migración completa de polling a Supabase Realtime en todas las vistas del panel de sala (kitchen, bar, pendientes, waiter-banner, waiter-login). Sistema híbrido: Realtime CDC para cambios de datos (<100 ms latencia, sin carga en DB en reposo) + `setInterval` 1 s exclusivamente para actualización visual de timers. Un único canal multiplexado en WaiterBanner consolida conteos de cocina, bar y estado de pago. Eliminados ~30 requests HTTP/min por camarero activo. Ver sección [⚡ Arquitectura Realtime](#-arquitectura-realtime--sistema-híbrido). |
+| **Realtime Híbrido** | Migración completa de polling a Supabase Realtime en todas las vistas del panel de sala (kitchen, bar, pendientes, waiter-banner, waiter-login). Sistema híbrido: Realtime CDC para cambios de datos (<100 ms latencia, sin carga en DB en reposo) + `setInterval` 1 s exclusivamente para actualización visual de timers. Un único canal multiplexado en WaiterBanner consolida conteos de cocina, bar y estado de pago. Eliminados ~30 requests HTTP/min por camarero activo. **Tab visibility lifecycle**: canales Realtime se desconectan cuando el tab está oculto (ahorra quota de Supabase) y se reconectan al volver. Ver sección [⚡ Arquitectura Realtime](#-arquitectura-realtime--sistema-híbrido). |
+| **Backup Automático (Tenant Snapshot)** | Edge Function Deno en `supabase/functions/tenant-backup` genera snapshots JSON diarios de todos los tenants (categorias, productos, mesas, ingredientes, empleados_tpv, receta_items + fila completa de empresa). Upload automático a Cloudflare R2 en `backups/{empresa_id}/{YYYY-MM-DD}.json`. GitHub Actions cron dispara el backup a las 03:00 UTC con autenticación Bearer. Restore via `POST /api/admin/backup/restore` con orden FK-safe y sanitización de `empresa_id`. Bucket separado `R2_BACKUP_BUCKET_NAME` (distinto del bucket de imágenes `R2_BUCKET_NAME`). |
 | **TPV Empleados PIN** | Cajeros y encargados acceden al TPV con PIN numérico. Tabla `empleados_tpv`, cookie `tpv_employee_token` (JWT 1h sliding window lazy), dual-auth en proxy. Permisos por rol: encargado (TPV completo), cajero (mostrador + cobro + arqueo ciego). Botón "Bloquear TPV" para handoff entre empleados. CRUD desde `/admin/configuracion` tab Empleados. |
 | **Electron TPV Windows** | Shell Electron para TPV en Windows. Carga la URL remota de producción (`https://{domain}/tpv`). IPC para impresión térmica ESC/POS (node-thermal-printer). Auto-update vía electron-updater (endpoint `/api/app/version/latest.yml`). Atajos de teclado globales. Bundling con esbuild. |
 | **TPV — Terminal Punto de Venta** | Software de caja con cumplimiento legal completo (Ley Antifraude RD 1007/2023 + RD 1619/2012). **Arqueo ciego**: el teórico queda oculto hasta que el operador introduce su conteo. Mostrador táctil 3 columnas con selector de pase/marcha (1er/2º/Postre/Bebida). Cobro efectivo/tarjeta/propina con tasa IVA/IGIC configurable por empresa. Cadena de hashes SHA-256 inmutable por trigger PostgreSQL: bloqueo de DELETE y UPDATE con EXCEPTION. Ticket rectificativo = cobro negativo con `rectifica_cobro_id` (excluido de estadísticas). Numeración correlativa atómica (`serie-NNNNNN`). IVA/IGIC calculado en DB trigger (no en cliente). Endpoints de auditoría para inspectores (`/api/tpv/audit/chain`, `/api/tpv/audit/export`). Pantalla `/tpv/legal` con Declaración de Responsabilidad RD 1007/2023. Dashboard `/tpv/analytics` con selector de período (Hoy/Semana/Mes/Custom), 5 KPIs, gráfico por hora (Recharts lazy), top productos (JSONB) e historial de turnos. Endpoint `GET /api/tpv/analytics` con 3 RPCs `SECURITY DEFINER`. Configuración IVA/IGIC por empresa con propagación SSR de label. **Stock & Mermas**: trigger `deducir_stock_on_servido` descuenta ingredientes al servir (atómico, mismo tx). Auto-disable/re-enable de productos por umbral. Registro de mermas por turno. Audit log inmutable (`movimientos_stock`). Badge `LowStockBadge` en pantalla de cobro. **Inventario físico** (`/admin/stock/inventario`): conteo a ciegas, revisión de desviaciones, confirmación con movimientos tipo `inventario`. |

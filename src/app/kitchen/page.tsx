@@ -228,6 +228,8 @@ export default function KitchenPage() {
   const [globalGrouped, setGlobalGrouped]             = useState(false);
   const [pendingMergedAction, setPendingMergedAction] = useState<{ items: KitchenItem[]; action: ItemEstado } | null>(null);
 
+  const [waiterEmpresaId, setWaiterEmpresaId] = useState<string | null>(null);
+
   const timersRef      = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
   const pointerStartX  = useRef<number | null>(null);
   const swipingKey     = useRef<string | null>(null);
@@ -250,6 +252,21 @@ export default function KitchenPage() {
     } catch { /* ignore */ }
   }, []);
 
+  // Fetch empresaId on mount — guards the Realtime subscription against StrictMode double-mount.
+  // Without this guard, React StrictMode (dev) runs the subscription effect twice: mount → cleanup
+  // → mount. The second mount tries to re-subscribe to fixed broadcast channel names after
+  // removeChannel() closed them, leaving the channels in a state where they never receive events.
+  // The waiterEmpresaId arrives after the async fetch, by which time StrictMode's second mount
+  // has already run its early-return, so subscriptions are created exactly once.
+  useEffect(() => {
+    fetch('/api/waiter/me')
+      .then(r => r.ok ? r.json() : null)
+      .then((json: { empresaId: string } | null) => {
+        if (json) setWaiterEmpresaId(json.empresaId);
+      })
+      .catch(() => null);
+  }, []);
+
   // Push notification foreground: play bell + refresh (dispatched by PushRegistrar when role=kitchen)
   useEffect(() => {
     function onPushReceived() { void fetchItems(); }
@@ -257,8 +274,11 @@ export default function KitchenPage() {
     return () => globalThis.window?.removeEventListener('kitchen-push-received', onPushReceived);
   }, [fetchItems]);
 
-  // Realtime: react to changes in pedido_item_estados + new pedidos
+  // Realtime: react to changes in pedido_item_estados + new pedidos.
+  // Guarded by waiterEmpresaId so the effect only runs once StrictMode's double-mount is over.
   useEffect(() => {
+    if (!waiterEmpresaId) return;
+
     void fetchItems();
 
     const supabase = getSupabaseAnonClient();
@@ -269,31 +289,48 @@ export default function KitchenPage() {
       debounceTimer = setTimeout(() => { void fetchItems(); }, 100);
     }
 
-    // postgres_changes — catches direct DB mutations (unique name avoids StrictMode stale-channel bug)
+    // postgres_changes — tenant-scoped filter improves delivery reliability with anon client
     const channel = supabase
       .channel(channelNameRef.current)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, scheduleRefresh)
-      .subscribe();
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados', filter: `empresa_id=eq.${waiterEmpresaId}` }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos', filter: `empresa_id=eq.${waiterEmpresaId}` }, scheduleRefresh)
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('[Realtime] kitchen-standalone postgres_changes error:', status);
+        }
+      });
 
-    // Broadcast channels — fired by DB triggers; catches validation events that postgres_changes may miss
+    // Broadcast channels — fired by DB triggers
     const broadcastItems = supabase
       .channel('waiter-items-update')
       .on('broadcast', { event: 'item-update' }, scheduleRefresh)
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('[Realtime] kitchen waiter-items-update error:', status);
+        }
+      });
 
     const broadcastOrders = supabase
       .channel('waiter-new-order')
       .on('broadcast', { event: 'new-order' }, scheduleRefresh)
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('[Realtime] kitchen waiter-new-order error:', status);
+        }
+      });
+
+    // DOM relay — fallback for when WaiterBanner (on waiter pages) dispatches this event
+    const onRealtimeRelay = () => { void fetchItems(); };
+    globalThis.addEventListener('waiter-realtime-update', onRealtimeRelay);
 
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
+      globalThis.removeEventListener('waiter-realtime-update', onRealtimeRelay);
       void supabase.removeChannel(channel);
       void supabase.removeChannel(broadcastItems);
       void supabase.removeChannel(broadcastOrders);
     };
-  }, [fetchItems]);
+  }, [fetchItems, waiterEmpresaId]);
 
   // Visual timer tick — no network calls
   useEffect(() => {

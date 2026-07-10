@@ -9,6 +9,18 @@ import type { ExistingOrder } from '@/components/tpv/MostradorClient';
 
 export const dynamic = 'force-dynamic';
 
+async function resolveEmpresaId(cookieStore: Awaited<ReturnType<typeof cookies>>): Promise<string | null> {
+  const adminToken = cookieStore.get('admin_token')?.value;
+  if (adminToken) {
+    const admin = await authAdminUseCase.verifyToken(adminToken);
+    if (admin?.empresaId) return admin.empresaId;
+  }
+  const employeeToken = cookieStore.get('tpv_employee_token')?.value;
+  if (!employeeToken) return null;
+  const payload = await verifyTpvEmployeeToken(employeeToken);
+  return payload?.empresaId ?? null;
+}
+
 type RawComplement = string | { nombre?: string; name?: string };
 type RawItem = { nombre?: string; precio?: number; cantidad?: number; complementos?: RawComplement[] };
 type RawPedido = { id: string; numero_pedido: number; detalle_pedido: RawItem[]; total: number; estado: string; nota?: string | null; pase?: string | null; created_at: string };
@@ -96,22 +108,7 @@ export default async function MostradorPage({
   readonly searchParams: Promise<{ mesaId?: string; sesionId?: string; mesaNumero?: string }>;
 }) {
   const cookieStore = await cookies();
-  let empresaId: string | null = null;
-
-  const adminToken = cookieStore.get('admin_token')?.value;
-  if (adminToken) {
-    const admin = await authAdminUseCase.verifyToken(adminToken);
-    if (admin?.empresaId) empresaId = empresaId;
-  }
-
-  if (!empresaId) {
-    const employeeToken = cookieStore.get('tpv_employee_token')?.value;
-    if (!employeeToken) redirect('/tpv/login');
-    const payload = await verifyTpvEmployeeToken(employeeToken);
-    if (!payload) redirect('/tpv/login');
-    empresaId = payload.empresaId;
-  }
-
+  const empresaId = await resolveEmpresaId(cookieStore);
   if (!empresaId) redirect('/tpv/login');
 
   const repo = new SupabaseTpvRepository();
@@ -145,7 +142,7 @@ export default async function MostradorPage({
 
   const products = productsResult.success ? productsResult.data : [];
   const categories = categoriesResult.success ? categoriesResult.data : [];
-  const mesas = mesasResult && mesasResult.success ? mesasResult.data : null;
+  const mesas = mesasResult?.success ? mesasResult.data : null;
 
   const mesaData = mesaId
     ? await loadMesaData(mesaId, sesionIdParam ?? null)

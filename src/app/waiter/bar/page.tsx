@@ -265,8 +265,10 @@ export default function BarPage() {
   const [pendingServeAll, setPendingServeAll] = useState<string | null>(null);
   const [pendingBarCancel, setPendingBarCancel] = useState<FlatBarItem[] | null>(null);
   const [groupedMesas, setGroupedMesas] = useState<Set<string>>(new Set());
-  const [channelName] = useState(() => `waiter-bar-${Math.random().toString(36).slice(2)}`);
+  const [channelName] = useState(() => `waiter-bar-${crypto.randomUUID().slice(0, 8)}`);
   const channelNameRef = useRef(channelName);
+  const [isTabVisible, setIsTabVisible] = useState(true);
+  const [waiterEmpresaId, setWaiterEmpresaId] = useState<string | null>(null);
   const timersRef     = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
   const pointerStartX = useRef<number | null>(null);
   const swipingId     = useRef<string | null>(null);
@@ -289,6 +291,23 @@ export default function BarPage() {
     return () => observer.disconnect();
   }, []);
 
+  // Visibility lifecycle — disconnect Realtime when tab is hidden, reconnect on visible
+  useEffect(() => {
+    const onVis = () => setIsTabVisible(document.visibilityState === 'visible');
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, []);
+
+  // Fetch empresaId on mount for tenant-scoped Realtime filter
+  useEffect(() => {
+    fetch('/api/waiter/me')
+      .then(r => r.ok ? r.json() : null)
+      .then((json: { empresaId: string } | null) => {
+        if (json) setWaiterEmpresaId(json.empresaId);
+      })
+      .catch(() => null);
+  }, []);
+
   const fetchOrders = useCallback(async () => {
     try {
       const r = await fetch('/api/waiter/bar/orders');
@@ -300,17 +319,20 @@ export default function BarPage() {
   }, []);
 
   useEffect(() => {
+    if (!isTabVisible) return;
+    if (!waiterEmpresaId) return;
+
     void fetchOrders();
 
     const supabase = getSupabaseAnonClient();
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const channel = supabase
       .channel(channelNameRef.current)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos', filter: `empresa_id=eq.${waiterEmpresaId}` }, () => {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => { void fetchOrders(); }, 100);
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados', filter: `empresa_id=eq.${waiterEmpresaId}` }, () => {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => { void fetchOrders(); }, 100);
       })
@@ -361,7 +383,15 @@ export default function BarPage() {
       void supabase.removeChannel(broadcastChannel);
       void supabase.removeChannel(newOrderChannel);
     };
-  }, [fetchOrders]);
+  }, [fetchOrders, isTabVisible, waiterEmpresaId]);
+
+  // Re-fetch orders when tab becomes visible again so stale data is refreshed immediately.
+  useEffect(() => {
+    if (isTabVisible && waiterEmpresaId) {
+      void fetchOrders();
+      globalThis.dispatchEvent(new CustomEvent('waiter-realtime-update'));
+    }
+  }, [isTabVisible, waiterEmpresaId, fetchOrders]);
 
   // Trigger re-render every second so timers update without refetching
   useEffect(() => {

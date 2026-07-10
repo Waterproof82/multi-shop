@@ -1,4 +1,6 @@
 import "server-only"; // Ensures this never reaches the client
+import { unstable_cache } from 'next/cache';
+import { catalogTag } from '@/lib/cache-tags';
 import { getSupabaseAnonClient } from "@/core/infrastructure/database/supabase-client";
 import { SupabaseProductRepository } from "@/core/infrastructure/database/SupabaseProductRepository";
 import { SupabaseCategoryRepository } from "@/core/infrastructure/database/SupabaseCategoryRepository";
@@ -45,4 +47,16 @@ export function extractMainDomain(fullDomain: string, subdomainConfig: string | 
     return fullDomain.substring(subdomainConfig.length + 1);
   }
   return fullDomain;
+}
+
+/**
+ * Returns the public menu for an empresa, cached in Vercel's data cache.
+ * TTL: 1 hour. Busted by revalidateTag(catalogTag(empresaId)) on mutations.
+ */
+export function getCachedMenu(empresaId: string) {
+  return unstable_cache(
+    async () => getMenuUseCase.execute(empresaId),
+    [catalogTag(empresaId)],
+    { tags: [catalogTag(empresaId)], revalidate: 3600 }
+  )();
 }
