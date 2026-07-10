@@ -36,9 +36,14 @@ async function backupEmpresa(supabase: any, s3: S3Client, empresa: any, today: s
     exportedAt: new Date().toISOString(),
   };
 
+  // Human-readable folder: slug preferred, dominio as fallback, raw id as last resort.
+  // Spaces and special chars replaced so the R2 key is always URL-safe.
+  const folderName = (empresa.slug ?? empresa.dominio ?? empresa.id)
+    .replace(/[^a-zA-Z0-9._-]/g, '-');
+
   await s3.send(new PutObjectCommand({
     Bucket: Deno.env.get('R2_BACKUP_BUCKET_NAME')!,
-    Key: `backups/${empresa.id}/${today}.json`,
+    Key: `backups/${folderName}/${today}.json`,
     Body: JSON.stringify(snapshot),
     ContentType: 'application/json',
   }));
