@@ -1,5 +1,4 @@
 name: Tenant Backup
-
 on:
   schedule:
     - cron: '0 3 * * *'   # 3:00 AM UTC daily

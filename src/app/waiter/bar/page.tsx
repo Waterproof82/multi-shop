@@ -265,7 +265,7 @@ export default function BarPage() {
   const [pendingServeAll, setPendingServeAll] = useState<string | null>(null);
   const [pendingBarCancel, setPendingBarCancel] = useState<FlatBarItem[] | null>(null);
   const [groupedMesas, setGroupedMesas] = useState<Set<string>>(new Set());
-  const [channelName] = useState(() => `waiter-bar-${Math.random().toString(36).slice(2)}`);
+  const [channelName] = useState(() => `waiter-bar-${crypto.randomUUID().slice(0, 8)}`);
   const channelNameRef = useRef(channelName);
   const [isTabVisible, setIsTabVisible] = useState(true);
   const [waiterEmpresaId, setWaiterEmpresaId] = useState<string | null>(null);
