@@ -839,10 +839,11 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                 </div>
               )}
 
-              {/* Delivery method selector — only for restaurants with delivery enabled in non-mesa mode */}
-              {!mesaToken && isRestaurant && deliveryHabilitado && (
+              {/* Delivery method selector — only for restaurants in non-mesa mode */}
+              {!mesaToken && isRestaurant && (
                 <DeliveryMethodSelector
                   value={deliveryMethod}
+                  deliveryHabilitado={deliveryHabilitado}
                   onChange={(v, deliveryData) => {
                     setDeliveryMethod(v);
                     setErrors(prev => ({ ...prev, delivery: undefined }));
