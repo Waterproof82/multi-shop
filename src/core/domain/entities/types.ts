@@ -135,6 +135,7 @@ export interface EmpresaPublic {
   descuentoBienvenidaDuracion?: number | null;
   mesasHabilitadas?: boolean;
   pagosPickupHabilitados?: boolean;
+  deliveryHabilitado?: boolean;
 }
 
 export interface Cliente {
