@@ -1,12 +1,25 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { authAdminUseCase, productUseCase, categoryUseCase, mesaSesionUseCase } from '@/core/infrastructure/database';
+import { verifyTpvEmployeeToken } from '@/lib/tpv-employee-auth';
 import { SupabaseTpvRepository } from '@/core/infrastructure/repositories/supabase-tpv.repository';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { MostradorClient } from '@/components/tpv/MostradorClient';
 import type { ExistingOrder } from '@/components/tpv/MostradorClient';
 
 export const dynamic = 'force-dynamic';
+
+async function resolveEmpresaId(cookieStore: Awaited<ReturnType<typeof cookies>>): Promise<string | null> {
+  const adminToken = cookieStore.get('admin_token')?.value;
+  if (adminToken) {
+    const admin = await authAdminUseCase.verifyToken(adminToken);
+    if (admin?.empresaId) return admin.empresaId;
+  }
+  const employeeToken = cookieStore.get('tpv_employee_token')?.value;
+  if (!employeeToken) return null;
+  const payload = await verifyTpvEmployeeToken(employeeToken);
+  return payload?.empresaId ?? null;
+}
 
 type RawComplement = string | { nombre?: string; name?: string };
 type RawItem = { nombre?: string; precio?: number; cantidad?: number; complementos?: RawComplement[] };
@@ -95,17 +108,11 @@ export default async function MostradorPage({
   readonly searchParams: Promise<{ mesaId?: string; sesionId?: string; mesaNumero?: string }>;
 }) {
   const cookieStore = await cookies();
-  const token = cookieStore.get('admin_token')?.value;
-
-  if (!token) redirect('/admin/login');
-
-  const admin = await authAdminUseCase.verifyToken(token);
-
-  if (!admin) redirect('/admin/login');
-  if (!admin.empresaId) redirect('/admin/login');
+  const empresaId = await resolveEmpresaId(cookieStore);
+  if (!empresaId) redirect('/tpv/login');
 
   const repo = new SupabaseTpvRepository();
-  const turnoResult = await repo.findTurnoActivo(admin.empresaId);
+  const turnoResult = await repo.findTurnoActivo(empresaId);
 
   if (!turnoResult.success || turnoResult.data === null) {
     redirect('/tpv/turno/abrir');
@@ -117,7 +124,7 @@ export default async function MostradorPage({
   const empresaRes = await supabaseForEmpresa
     .from('empresas')
     .select('tipo_impuesto, porcentaje_impuesto')
-    .eq('id', admin.empresaId)
+    .eq('id', empresaId)
     .maybeSingle();
   const empresaRow = empresaRes.data as { tipo_impuesto: string | null; porcentaje_impuesto: number | null } | null;
   const tipoImpuesto = (empresaRow?.tipo_impuesto as 'iva' | 'igic' | null) ?? 'iva';
@@ -125,17 +132,17 @@ export default async function MostradorPage({
 
   const mesasPromise = mesaId
     ? Promise.resolve(null)
-    : mesaSesionUseCase.getMesasWithSessions(admin.empresaId);
+    : mesaSesionUseCase.getMesasWithSessions(empresaId);
 
   const [productsResult, categoriesResult, mesasResult] = await Promise.all([
-    productUseCase.getAll(admin.empresaId),
-    categoryUseCase.getAll(admin.empresaId),
+    productUseCase.getAll(empresaId),
+    categoryUseCase.getAll(empresaId),
     mesasPromise,
   ]);
 
   const products = productsResult.success ? productsResult.data : [];
   const categories = categoriesResult.success ? categoriesResult.data : [];
-  const mesas = mesasResult && mesasResult.success ? mesasResult.data : null;
+  const mesas = mesasResult?.success ? mesasResult.data : null;
 
   const mesaData = mesaId
     ? await loadMesaData(mesaId, sesionIdParam ?? null)

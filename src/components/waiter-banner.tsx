@@ -104,13 +104,43 @@ async function handleLogout() {
   globalThis.location.href = "/waiter";
 }
 
+// S3776: extracted from WaiterBanner to keep cognitive complexity ≤ 15
+type WaiterMesaStore = { mesaId: string; mesaNumero: number; mesaNombre: string | null };
+function applyMesaAuthResponse(
+  r: Response,
+  stored: WaiterMesaStore,
+  setMesaLabel: (v: string | null) => void,
+  setMesaId: (v: string | null) => void,
+) {
+  if (r.ok) {
+    setMesaLabel(stored.mesaNombre ?? `Mesa ${stored.mesaNumero}`);
+    setMesaId(stored.mesaId);
+  } else {
+    clearWaiterMesa();
+    setMesaLabel(null);
+    setMesaId(null);
+  }
+}
+
+async function applyWaiterMeResponse(
+  r: Response,
+  setIsWaiter: (v: boolean) => void,
+  setWaiterEmpresaId: (id: string | null) => void,
+) {
+  setIsWaiter(r.ok);
+  if (r.ok) {
+    const json = await r.json() as { empresaId: string };
+    setWaiterEmpresaId(json.empresaId);
+  }
+}
+
 export function WaiterBanner() {
   const pathname = usePathname();
   const pathnameRef = useRef(pathname);
   pathnameRef.current = pathname;
   // Unique channel name per instance — avoids React StrictMode returning a stale
   // closed channel on the second mount when using a fixed name.
-  const channelNameRef = useRef(`waiter-banner-${Math.random().toString(36).slice(2)}`);
+  const channelNameRef = useRef(`waiter-banner-${crypto.randomUUID().slice(0, 8)}`);
   const { language: lang } = useLanguage();
   const { openCart, totalItems, clearCart } = useCart();
   const [closeDialog, setCloseDialog] = useState<'confirm' | 'cart' | 'payment' | 'unpaid' | 'free' | null>(null);
@@ -126,6 +156,8 @@ export function WaiterBanner() {
   // Seed from sessionStorage so full-page SW cache loads don't flash-hide the banner.
   const [isWaiter, setIsWaiter]       = useState(() => typeof sessionStorage !== 'undefined' && sessionStorage.getItem('waiter-authed') === '1');
   const [authChecked, setAuthChecked] = useState(() => typeof sessionStorage !== 'undefined' && sessionStorage.getItem('waiter-authed') === '1');
+  const [waiterEmpresaId, setWaiterEmpresaId] = useState<string | null>(null);
+  const [isTabVisible, setIsTabVisible] = useState(true);
 
   // Kitchen/bar badge counts
   const [counts, setCounts] = useState<CountsPayload | null>(null);
@@ -137,6 +169,13 @@ export function WaiterBanner() {
   const [loadingMesas, setLoadingMesas]   = useState(false);
   const [switchingId, setSwitchingId]     = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Visibility lifecycle — disconnect Realtime when tab is hidden, reconnect on visible
+  useEffect(() => {
+    const onVis = () => setIsTabVisible(document.visibilityState === 'visible');
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, []);
 
   // Sync isWaiter to sessionStorage so remounts (SW full-page cache loads) start correctly.
   useEffect(() => {
@@ -153,7 +192,7 @@ export function WaiterBanner() {
   useEffect(() => {
     if (!navigator.onLine) { setAuthChecked(true); return; }
     fetch('/api/waiter/me')
-      .then(r => { setIsWaiter(r.ok); })
+      .then(r => applyWaiterMeResponse(r, setIsWaiter, setWaiterEmpresaId))
       .catch(() => setIsWaiter(false))
       .finally(() => setAuthChecked(true));
   }, [pathname]);
@@ -162,7 +201,7 @@ export function WaiterBanner() {
   useEffect(() => {
     function handleAuthChanged() {
       fetch('/api/waiter/me')
-        .then(r => { setIsWaiter(r.ok); })
+        .then(r => applyWaiterMeResponse(r, setIsWaiter, setWaiterEmpresaId))
         .catch(() => setIsWaiter(false))
         .finally(() => setAuthChecked(true));
     }
@@ -190,16 +229,7 @@ export function WaiterBanner() {
       return;
     }
     fetch("/api/waiter/me")
-      .then((r) => {
-        if (r.ok) {
-          setMesaLabel(stored.mesaNombre ?? `Mesa ${stored.mesaNumero}`);
-          setMesaId(stored.mesaId);
-        } else {
-          clearWaiterMesa();
-          setMesaLabel(null);
-          setMesaId(null);
-        }
-      })
+      .then(r => applyMesaAuthResponse(r, stored, setMesaLabel, setMesaId))
       .catch(() => null);
   }, [pathname]);
 
@@ -236,9 +266,13 @@ export function WaiterBanner() {
   // Realtime: kitchen/bar counts + lock status via single multiplexed channel
   // Skip on /tpv/* — the TPV has its own broadcast subscriptions on the same
   // anon client singleton; a CHANNEL_ERROR here would poison that shared connection.
+  // Guards: skip when tab is hidden (saves Supabase quota) or empresaId not yet known.
   useEffect(() => {
     if (!isWaiter) return;
     if (pathname.startsWith('/tpv')) return;
+    if (!isTabVisible) return;
+    if (!waiterEmpresaId) return;
+
     const fetchCounts = async () => {
       try {
         const r = await fetch('/api/waiter/orders/counts');
@@ -266,20 +300,11 @@ export function WaiterBanner() {
       }, 100);
     };
 
-    // On app resume from background (visibilitychange fires on Capacitor WebView).
-    // Re-fetch counts and relay so all waiter screens refresh stale data.
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        void fetchCounts();
-        globalThis.dispatchEvent(new CustomEvent('waiter-realtime-update'));
-      }
-    };
-    document.addEventListener('visibilitychange', onVisibilityChange);
     const channel = supabase
       .channel(channelNameRef.current)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, triggerUpdate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados' }, triggerUpdate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'mesa_sesiones' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos', filter: `empresa_id=eq.${waiterEmpresaId}` }, triggerUpdate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados', filter: `empresa_id=eq.${waiterEmpresaId}` }, triggerUpdate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mesa_sesiones', filter: `empresa_id=eq.${waiterEmpresaId}` }, () => {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
           void fetchCounts();
@@ -319,12 +344,27 @@ export function WaiterBanner() {
 
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
-      document.removeEventListener('visibilitychange', onVisibilityChange);
       void supabase.removeChannel(channel);
       void supabase.removeChannel(broadcastNewOrder);
       void supabase.removeChannel(broadcastItems);
     };
-  }, [isWaiter, mesaId, fetchLock, pathname]);
+  }, [isWaiter, mesaId, fetchLock, pathname, isTabVisible, waiterEmpresaId]);
+
+  // Re-fetch counts when tab becomes visible again so stale data is refreshed immediately.
+  useEffect(() => {
+    if (isTabVisible && isWaiter && !pathname.startsWith('/tpv')) {
+      void (async () => {
+        try {
+          const r = await fetch('/api/waiter/orders/counts');
+          if (!r.ok) return;
+          const json = await r.json() as CountsPayload;
+          prevCountsRef.current = json;
+          setCounts(json);
+        } catch { /* ignore */ }
+      })();
+      globalThis.dispatchEvent(new CustomEvent('waiter-realtime-update'));
+    }
+  }, [isTabVisible, isWaiter, pathname]);
 
   // ── helper functions ──────────────────────────────────
 

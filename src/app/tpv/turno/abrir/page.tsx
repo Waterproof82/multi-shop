@@ -14,9 +14,12 @@ export default async function TurnoAbrirPage() {
   const adminToken = cookieStore.get('admin_token')?.value;
   if (adminToken) {
     const admin = await authAdminUseCase.verifyToken(adminToken);
-    if (!admin || !admin.empresaId) redirect('/admin/login');
-    empresaId = admin.empresaId;
-  } else {
+    if (admin?.empresaId) {
+      empresaId = admin.empresaId;
+    }
+  }
+
+  if (!empresaId) {
     const employeeToken = cookieStore.get('tpv_employee_token')?.value;
     if (!employeeToken) redirect('/tpv/login');
     const payload = await verifyTpvEmployeeToken(employeeToken);
@@ -27,6 +30,8 @@ export default async function TurnoAbrirPage() {
     // Only encargado can open a turno
     if (payload.rol === 'cajero') redirect('/tpv/mostrador');
   }
+
+  if (!empresaId) redirect('/tpv/login');
 
   const repo = new SupabaseTpvRepository();
   const turnoResult = await repo.findTurnoActivo(empresaId);

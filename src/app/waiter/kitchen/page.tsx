@@ -230,6 +230,14 @@ function getItemActionColor(estado: ItemEstado): string {
   return RETENIDO_COLOR.bg;
 }
 
+// S2004: rollback factory — avoids 5-level nesting inside Promise.all map callbacks
+function addItemBackIfMissing(item: KitchenItem) {
+  return (prev: KitchenItem[]) =>
+    prev.some(i => i.pedidoId === item.pedidoId && i.itemIdx === item.itemIdx)
+      ? prev
+      : [...prev, item];
+}
+
 export default function WaiterKitchenPage() {
   const { language } = useLanguage();
   const lang = language;
@@ -247,11 +255,30 @@ export default function WaiterKitchenPage() {
   const [collapsedMesas, setCollapsedMesas] = useState<Set<string>>(new Set());
   const [groupedMesas, setGroupedMesas] = useState<Set<string>>(new Set());
   const [pendingMergedWaiterAction, setPendingMergedWaiterAction] = useState<{ items: KitchenItem[]; action: ItemEstado } | null>(null);
-  const channelNameRef = useRef(`waiter-kitchen-${Math.random().toString(36).slice(2)}`);
+  const channelNameRef = useRef(`waiter-kitchen-${crypto.randomUUID().slice(0, 8)}`);
+  const [isTabVisible, setIsTabVisible] = useState(true);
+  const [waiterEmpresaId, setWaiterEmpresaId] = useState<string | null>(null);
   const pointerStartX = useRef<number | null>(null);
   const swipingKey    = useRef<string | null>(null);
   const headerRef     = useRef<HTMLDivElement>(null);
   const [headerHeight, setHeaderHeight] = useState(120);
+  // Visibility lifecycle — disconnect Realtime when tab is hidden, reconnect on visible
+  useEffect(() => {
+    const onVis = () => setIsTabVisible(document.visibilityState === 'visible');
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, []);
+
+  // Fetch empresaId on mount for tenant-scoped Realtime filter
+  useEffect(() => {
+    fetch('/api/waiter/me')
+      .then(r => r.ok ? r.json() : null)
+      .then((json: { empresaId: string } | null) => {
+        if (json) setWaiterEmpresaId(json.empresaId);
+      })
+      .catch(() => null);
+  }, []);
+
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
   const fetchItems = useCallback(async () => {
@@ -265,17 +292,20 @@ export default function WaiterKitchenPage() {
   }, []);
 
   useEffect(() => {
+    if (!isTabVisible) return;
+    if (!waiterEmpresaId) return;
+
     void fetchItems();
 
     const supabase = getSupabaseAnonClient();
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const channel = supabase
       .channel(channelNameRef.current)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos', filter: `empresa_id=eq.${waiterEmpresaId}` }, () => {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => { void fetchItems(); }, 100);
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados', filter: `empresa_id=eq.${waiterEmpresaId}` }, () => {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => { void fetchItems(); }, 100);
       })
@@ -326,7 +356,15 @@ export default function WaiterKitchenPage() {
       void supabase.removeChannel(broadcastChannel);
       void supabase.removeChannel(newOrderChannel);
     };
-  }, [fetchItems]);
+  }, [fetchItems, isTabVisible, waiterEmpresaId]);
+
+  // Re-fetch items when tab becomes visible again so stale data is refreshed immediately.
+  useEffect(() => {
+    if (isTabVisible && waiterEmpresaId) {
+      void fetchItems();
+      globalThis.dispatchEvent(new CustomEvent('waiter-realtime-update'));
+    }
+  }, [isTabVisible, waiterEmpresaId, fetchItems]);
 
   useEffect(() => {
     const tick = setInterval(() => setItems(p => [...p]), 1000);
@@ -369,13 +407,14 @@ export default function WaiterKitchenPage() {
 
   // ── PATCH helper ───────────────────────────────────────────────────────────
 
-  const patchEstado = useCallback(async (pedidoId: string, itemIdx: number, estado: ItemEstado, onSuccess: () => void) => {
+  const patchEstado = useCallback(async (pedidoId: string, itemIdx: number, estado: ItemEstado, applyOptimistic: () => void, rollback: () => void) => {
+    applyOptimistic();
     const r = await fetch(`/api/waiter/kitchen/items/${encodeURIComponent(pedidoId)}/${itemIdx}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ estado }),
     });
-    if (r.ok) onSuccess();
+    if (!r.ok) rollback();
   }, []);
 
   const setItemEstado = useCallback((pedidoId: string, itemIdx: number, newEstado: ItemEstado) => {
@@ -449,18 +488,30 @@ export default function WaiterKitchenPage() {
           el.style.transition = 'transform 0.18s ease';
           el.style.transform  = 'translateX(-110%)';
         }
-        void patchEstado(item.pedidoId, item.itemIdx, 'retenido', () => setItemEstado(item.pedidoId, item.itemIdx, 'retenido'));
+        void patchEstado(
+          item.pedidoId, item.itemIdx, 'retenido',
+          () => setItemEstado(item.pedidoId, item.itemIdx, 'retenido'),
+          () => setItemEstado(item.pedidoId, item.itemIdx, item.estado),
+        );
       }
     } else if (isListo) {
       // Left swipe on listo → servido: snap inner content, fly outer card left
       snapCardInstant(el);
       el.style.transition = 'transform 0.18s ease';
       el.style.transform  = 'translateX(-110%)';
-      void patchEstado(item.pedidoId, item.itemIdx, 'servido', () => removeItem(item.pedidoId, item.itemIdx));
+      void patchEstado(
+        item.pedidoId, item.itemIdx, 'servido',
+        () => removeItem(item.pedidoId, item.itemIdx),
+        () => setItems(addItemBackIfMissing(item)),
+      );
     } else if (isRetenido) {
       // Left swipe on retenido → restore to pendiente
       snapBack(el);
-      void patchEstado(item.pedidoId, item.itemIdx, 'pendiente', () => setItemEstado(item.pedidoId, item.itemIdx, 'pendiente'));
+      void patchEstado(
+        item.pedidoId, item.itemIdx, 'pendiente',
+        () => setItemEstado(item.pedidoId, item.itemIdx, 'pendiente'),
+        () => setItemEstado(item.pedidoId, item.itemIdx, item.estado),
+      );
     } else {
       snapBack(el);
     }
@@ -503,10 +554,13 @@ export default function WaiterKitchenPage() {
     const { items: toProcess, action } = pendingMergedWaiterAction;
     setPendingMergedWaiterAction(null);
     await Promise.all(toProcess.map(item => {
-      const onSuccess = action === 'servido'
+      const applyOptimistic = action === 'servido'
         ? () => removeItem(item.pedidoId, item.itemIdx)
         : () => setItemEstado(item.pedidoId, item.itemIdx, action);
-      return patchEstado(item.pedidoId, item.itemIdx, action, onSuccess);
+      const rollback = action === 'servido'
+        ? () => setItems(addItemBackIfMissing(item))
+        : () => setItemEstado(item.pedidoId, item.itemIdx, item.estado);
+      return patchEstado(item.pedidoId, item.itemIdx, action, applyOptimistic, rollback);
     }));
   }, [pendingMergedWaiterAction, patchEstado, setItemEstado, removeItem]);
 
@@ -566,7 +620,11 @@ export default function WaiterKitchenPage() {
     if (!pendingRetain) return;
     const item = pendingRetain;
     setPendingRetain(null);
-    await patchEstado(item.pedidoId, item.itemIdx, 'retenido', () => setItemEstado(item.pedidoId, item.itemIdx, 'retenido'));
+    await patchEstado(
+      item.pedidoId, item.itemIdx, 'retenido',
+      () => setItemEstado(item.pedidoId, item.itemIdx, 'retenido'),
+      () => setItemEstado(item.pedidoId, item.itemIdx, item.estado),
+    );
   }, [pendingRetain, patchEstado, setItemEstado]);
 
   const confirmCancel = useCallback(async () => {
@@ -574,7 +632,11 @@ export default function WaiterKitchenPage() {
     const toCancel = pendingCancel;
     setPendingCancel(null);
     await Promise.all(toCancel.map(item =>
-      patchEstado(item.pedidoId, item.itemIdx, 'cancelado', () => removeItem(item.pedidoId, item.itemIdx))
+      patchEstado(
+        item.pedidoId, item.itemIdx, 'cancelado',
+        () => removeItem(item.pedidoId, item.itemIdx),
+        () => setItems(addItemBackIfMissing(item)),
+      )
     ));
   }, [pendingCancel, patchEstado, removeItem]);
 
@@ -660,59 +722,18 @@ export default function WaiterKitchenPage() {
   }
 
   function renderMergedCard(merged: MergedKitchenItem) {
-    const mKey        = `merged:${merged.mergeKey}`;
-    const isListo     = merged.representativeEstado === 'listo';
-    const isRetenido  = merged.representativeEstado === 'retenido';
-    const isEnPrep    = merged.representativeEstado === 'en_preparacion';
-    const elapsed     = getElapsedMinutes(merged.firstCreatedAt);
+    const mKey     = `merged:${merged.mergeKey}`;
+    const estado   = merged.representativeEstado;
+    const isListo  = estado === 'listo';
+    const isRetenido = estado === 'retenido';
+    const elapsed  = getElapsedMinutes(merged.firstCreatedAt);
 
-    let cardColor: { bg: string; border: string };
-    if (isListo) {
-      cardColor = LISTO_COLOR;
-    } else if (isRetenido) {
-      cardColor = RETENIDO_COLOR;
-    } else {
-      cardColor = getTimeColor(elapsed);
-    }
-
-    let hintText: string;
-    if (isListo) {
-      hintText = t('kitchenSwipeToServe', lang);
-    } else if (isRetenido) {
-      hintText = t('kitchenSwipeRestore', lang);
-    } else {
-      hintText = t('kitchenSwipeToRetenido', lang);
-    }
-
-    const hintColor = isListo ? 'oklch(75% 0.18 148)' : 'oklch(75% 0.20 65)';
-
-    let badgeStyle: { background: string; color: string };
-    if (isListo) {
-      badgeStyle = { background: 'oklch(28% 0.16 148 / 0.5)', color: 'oklch(80% 0.22 148)' };
-    } else if (isEnPrep) {
-      badgeStyle = { background: 'oklch(32% 0.16 90 / 0.5)',  color: 'oklch(82% 0.20 90)' };
-    } else if (isRetenido) {
-      badgeStyle = { background: 'oklch(28% 0.14 65 / 0.5)',  color: 'oklch(78% 0.20 65)' };
-    } else {
-      badgeStyle = { background: 'oklch(30% 0.10 252 / 0.4)', color: 'oklch(75% 0.12 252)' };
-    }
-
-    let statusText: string;
-    if (isListo) {
-      statusText = t('kitchenItemListo', lang);
-    } else if (isRetenido) {
-      statusText = t('kitchenItemRetenido', lang);
-    } else if (isEnPrep) {
-      statusText = t('orderStatusAnotado', lang);
-    } else {
-      statusText = t('orderStatusPending', lang);
-    }
-
-    const mergedActionColor = isRetenido
-      ? 'oklch(28% 0.12 65)'
-      : isListo
-        ? 'oklch(28% 0.16 148)'
-        : RETENIDO_COLOR.bg;
+    const cardColor         = getItemCardColor(estado, elapsed);
+    const hintText          = getItemHintText(estado, lang);
+    const hintColor         = isListo ? 'oklch(75% 0.18 148)' : 'oklch(75% 0.20 65)';
+    const badgeStyle        = getItemBadgeStyle(estado);
+    const statusText        = getItemStatusText(estado, lang);
+    const mergedActionColor = getItemActionColor(estado);
 
     return (
       <div

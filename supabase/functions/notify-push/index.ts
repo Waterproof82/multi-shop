@@ -1,3 +1,4 @@
+// @ts-nocheck — Deno Edge Function: JSR/npm specifiers and Deno globals are valid at runtime
 // supabase/functions/notify-push/index.ts
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { GoogleAuth } from 'npm:google-auth-library@9';

@@ -1,8 +1,10 @@
 import { NextRequest } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import { categoryUseCase } from '@/core/infrastructure/database';
 import { createCategorySchema, updateCategorySchema, categoryIdSchema } from '@/core/application/dtos/category.dto';
 import { requireAuth, requireRole, handleResult, handleResultWithStatus, validationErrorResponse, type AuthResult } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
+import { catalogTag } from '@/lib/cache-tags';
 import type { Category } from '@/core/domain/entities/types';
 
 // Transform domain format to admin UI format
@@ -77,11 +79,12 @@ export async function POST(request: NextRequest) {
   }
 
   const result = await categoryUseCase.create(parsed.data);
-  
+
   if (!result.success) {
     return handleResult(result);
   }
-  
+
+  revalidateTag(catalogTag(empresaId!), {});
   return handleResultWithStatus({ success: true, data: toAdminCategory(result.data) }, 201);
 }
 
@@ -118,11 +121,12 @@ export async function PUT(request: NextRequest) {
   }
 
   const result = await categoryUseCase.update(idParsed.data.id, empresaId!, parsed.data);
-  
+
   if (!result.success) {
     return handleResult(result);
   }
-  
+
+  revalidateTag(catalogTag(empresaId!), {});
   return handleResult({ success: true, data: toAdminCategory(result.data) });
 }
 
@@ -146,10 +150,11 @@ export async function DELETE(request: NextRequest) {
   }
 
   const result = await categoryUseCase.delete(idParsed.data.id, empresaId!);
-  
+
   if (!result.success) {
     return handleResult(result);
   }
-  
+
+  revalidateTag(catalogTag(empresaId!), {});
   return handleResult({ success: true, data: { success: true } });
 }

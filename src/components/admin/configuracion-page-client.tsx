@@ -39,6 +39,7 @@ interface ConfiguracionPageClientProps {
   empresaNombre: string;
   empresaId: string;
   empresaSlug: string;
+  empresaTipo: 'tienda' | 'restaurante' | null;
   empresaDatos: EmpresaDatos;
   empresaApariencia: EmpresaApariencia;
   colores: EmpresaColores | null;
@@ -54,6 +55,7 @@ export function ConfiguracionPageClient({
   empresaNombre,
   empresaId,
   empresaSlug,
+  empresaTipo,
   empresaDatos,
   empresaApariencia,
   colores,
@@ -160,17 +162,19 @@ export function ConfiguracionPageClient({
         />
       </div>
 
-      {/* Empleados TPV */}
-      <div className="bg-card rounded-lg shadow-elegant border border-border p-6">
-        <h2 className="text-lg font-semibold mb-6 text-foreground flex items-center gap-2">
-          <Users className="w-5 h-5" />
-          Empleados TPV
-        </h2>
-        <p className="text-sm text-muted-foreground mb-6">
-          Gestiona los cajeros y encargados que acceden al TPV con PIN.
-        </p>
-        <EmpleadosTpvPanel empresaId={empresaId} />
-      </div>
+      {/* Empleados TPV — solo restaurantes */}
+      {empresaTipo !== 'tienda' && (
+        <div className="bg-card rounded-lg shadow-elegant border border-border p-6">
+          <h2 className="text-lg font-semibold mb-6 text-foreground flex items-center gap-2">
+            <Users className="w-5 h-5" />
+            Empleados TPV
+          </h2>
+          <p className="text-sm text-muted-foreground mb-6">
+            Gestiona los cajeros y encargados que acceden al TPV con PIN.
+          </p>
+          <EmpleadosTpvPanel empresaId={empresaId} />
+        </div>
+      )}
     </div>
   );
 }

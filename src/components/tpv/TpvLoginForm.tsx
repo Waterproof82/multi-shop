@@ -1,15 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 export function TpvLoginForm() {
-  const router = useRouter();
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
     if (pin.length < 4 || loading) return;
     setLoading(true);
@@ -21,25 +19,37 @@ export function TpvLoginForm() {
       body: JSON.stringify({ pin }),
     });
 
-    setLoading(false);
     if (!res.ok) {
+      setLoading(false);
       setError('PIN incorrecto');
       setPin('');
       return;
     }
 
-    router.push('/tpv/turno/abrir');
+    const data = await res.json() as { nextUrl?: string; rol?: string };
+    // Notify TpvRolProvider of the new role before navigating so the cached layout
+    // context updates immediately (Next.js Router Cache reuses the layout component).
+    window.dispatchEvent(new CustomEvent('tpv-auth-changed', {
+      detail: { rol: data.rol ?? 'cajero', isEmployeeSession: true },
+    }));
+    const form = document.createElement('form');
+    form.method = 'GET';
+    form.action = data.nextUrl ?? '/tpv/mostrador';
+    document.body.appendChild(form);
+    form.submit();
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       <input
-        type="password"
+        type="text"
         inputMode="numeric"
+        autoComplete="one-time-code"
         value={pin}
         onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
         placeholder="PIN (4-8 dígitos)"
         autoFocus
+        style={{ WebkitTextSecurity: 'disc' } as React.CSSProperties}
         className="bg-[#22263a] border border-[#2e3347] rounded-xl px-4 py-3.5 text-2xl font-bold text-center tracking-widest outline-none focus:border-[#4f72ff] transition-colors placeholder:text-base placeholder:font-normal placeholder:tracking-normal placeholder:text-[#6b7280]"
       />
       {error !== null && (

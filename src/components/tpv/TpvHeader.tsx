@@ -6,7 +6,7 @@ import { Settings, Package, Tags, BookOpen, Archive, LayoutDashboard, Lock } fro
 import { useOnlineStatus } from '@/hooks/tpv/useOnlineStatus';
 import { getQueueCount } from '@/lib/tpv/offline-queue';
 import { LowStockBadge } from '@/components/tpv/LowStockBadge';
-import { useTpvRol, useTpvIsEmployeeSession } from '@/lib/tpv-rol-context';
+import { useTpvRol, useTpvIsEmployeeSession } from '@/lib/tpv-rol-ctx';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 
 const ADMIN_SHORTCUTS = [
@@ -55,7 +55,7 @@ export function TpvHeader({ empresaNombre }: Props) {
   const NAV_ITEMS = [
     { label: 'Mostrador', href: '/tpv/mostrador', activePrefix: '/tpv/mostrador' },
     { label: 'Mesas',     href: '/tpv/mesas?seleccionar=1', activePrefix: '/tpv/mesas' },
-    { label: 'Historial', href: '/tpv/historial', activePrefix: '/tpv/historial' },
+    ...(!isCajero ? [{ label: 'Historial', href: '/tpv/historial', activePrefix: '/tpv/historial' }] : []),
     ...(!isCajero ? [{ label: 'Mermas', href: '/tpv/mermas', activePrefix: '/tpv/mermas' }] : []),
   ];
 
@@ -79,8 +79,11 @@ export function TpvHeader({ empresaNombre }: Props) {
   async function handleLock() {
     setLocking(true);
     await fetchWithCsrf('/api/tpv/empleados/logout', { method: 'POST' });
-    setLocking(false);
-    router.push('/tpv/login');
+    const form = document.createElement('form');
+    form.method = 'GET';
+    form.action = '/tpv/login';
+    document.body.appendChild(form);
+    form.submit();
   }
 
   return (
