@@ -132,7 +132,7 @@ Usar siempre en RLS policies para aislar datos por empresa.
 
 ### Trampas conocidas
 
-1. **React StrictMode double-mount con canal de nombre fijo** → el cleanup del primer mount cierra el canal; el segundo mount recibe un canal ya cerrado y nunca escucha. **Fix:** usar `useRef` con sufijo aleatorio: `useRef(\`waiter-banner-\${Math.random().toString(36).slice(2)}\`)` y pasar ese ref como nombre de canal.
+1. **React StrictMode double-mount con canal de nombre fijo** → el cleanup del primer mount cierra el canal; el segundo mount recibe un canal ya cerrado y nunca escucha. **Fix para `postgres_changes`:** usar `useRef` con sufijo aleatorio: `useRef(\`waiter-banner-\${Math.random().toString(36).slice(2)}\`)` y pasar ese ref como nombre de canal. **Fix para broadcast channels (nombre fijo obligatorio):** usar un guard de estado async — por ej. `if (!waiterEmpresaId) return` — de modo que el efecto hace early return en el segundo mount de StrictMode (cuando el fetch todavía no terminó) y las suscripciones se crean una sola vez. Afecta a `/kitchen` standalone que usaba canales broadcast fijos sin guard: `src/app/kitchen/page.tsx`.
 
 2. **`postgres_changes` silenciado en cliente singleton** → Supabase JS comparte una única conexión WebSocket. Varios componentes suscribiendo al mismo tabla desde distintos canales pueden dejar de recibir eventos. **Fix híbrido:** el componente central (`WaiterBanner`) escucha `postgres_changes` y además dispara un `CustomEvent('waiter-realtime-update')` por DOM, que los demás componentes capturan como fallback.
 
