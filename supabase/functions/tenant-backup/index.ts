@@ -1,8 +1,8 @@
+// @ts-nocheck — Deno Edge Function: URL imports and Deno globals are valid at runtime
 // supabase/functions/tenant-backup/index.ts
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { S3Client, PutObjectCommand } from 'https://esm.sh/@aws-sdk/client-s3@3';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function backupEmpresa(supabase: any, s3: S3Client, empresa: any, today: string): Promise<void> {
   const [prodResult, catResult, mesasResult, ingResult, empTpvResult] = await Promise.all([
     supabase.from('productos').select('*').eq('empresa_id', empresa.id),
