@@ -3,13 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { UtensilsCrossed } from 'lucide-react';
-import type { MesaWithSession } from '@/core/domain/repositories/IMesaRepository';
 import { formatPrice } from '@/lib/format-price';
 import { fetchWithCsrf } from '@/lib/csrf-client';
+import { useTpvCatalog } from '@/lib/tpv-catalog-ctx';
 
 interface Props {
-  mesas: MesaWithSession[];
-  turnoId: string | null;
   modo?: 'cobrar' | 'seleccionar';
 }
 
@@ -247,7 +245,9 @@ function TpvMesaCard({ mesa, turnoId, modo }: Readonly<{ mesa: MesaWithSession; 
   );
 }
 
-export function MesasGrid({ mesas, turnoId, modo }: Readonly<Props>) {
+export function MesasGrid({ modo }: Readonly<Props>) {
+  const { mesas, turno } = useTpvCatalog();
+  const turnoId = turno?.id ?? null;
   return (
     <div className="flex-1 overflow-auto p-6">
       <h2 className="text-lg font-bold mb-5 text-[#e8eaf0]">Mesas</h2>

@@ -1,11 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import type { TpvTurno } from '@/core/domain/entities/tpv-types';
-import type { Product, Category } from '@/core/domain/entities/types';
-import type { MesaWithSession } from '@/core/domain/repositories/IMesaRepository';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { useMesaActiva } from '@/hooks/tpv/useMesaActiva';
+import { useTpvCatalog } from '@/lib/tpv-catalog-ctx';
 import { TicketPanel } from './TicketPanel';
 import { MenuPanel } from './MenuPanel';
 import { MesasGrid } from './MesasGrid';
@@ -31,16 +29,11 @@ interface InitialMesa {
 }
 
 interface Props {
-  readonly turno: TpvTurno;
-  readonly products: Product[];
-  readonly categories: Category[];
   readonly initialMesa: InitialMesa | null;
-  readonly tipoImpuesto: 'iva' | 'igic';
-  readonly porcentajeImpuesto: number;
-  readonly mesas?: MesaWithSession[] | null;
 }
 
-export function MostradorClient({ turno, products, categories, initialMesa, tipoImpuesto, porcentajeImpuesto, mesas }: Props) {
+export function MostradorClient({ initialMesa }: Readonly<Props>) {
+  const { turno, products, categories, tipoImpuesto, porcentajeImpuesto, mesas } = useTpvCatalog();
   const { mesa, addItem, removeItem, clearPending, clearMesa, refreshOrders, updatePendingNota } = useMesaActiva(initialMesa);
   const [refreshing, setRefreshing] = useState(false);
   const [yaCobradoCents, setYaCobradoCents] = useState(0);
@@ -118,6 +111,8 @@ export function MostradorClient({ turno, products, categories, initialMesa, tipo
     return () => { void supabase.removeChannel(ch); };
   }, [mesa.sesionId, mesa.mesaNumero, clearMesa]);
 
+  if (!turno) return null;
+
   return (
     <>
       {externalCobro && (
@@ -145,8 +140,8 @@ export function MostradorClient({ turno, products, categories, initialMesa, tipo
         onUpdatePendingNota={updatePendingNota}
         onPendingSent={clearPending}
       />
-      {!mesa.mesaId && mesas ? (
-        <MesasGrid mesas={mesas} turnoId={turno.id} modo="seleccionar" />
+      {!mesa.mesaId ? (
+        <MesasGrid modo="seleccionar" />
       ) : (
         <MenuPanel
           products={products}

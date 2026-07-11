@@ -1,25 +1,8 @@
-import { redirect } from 'next/navigation';
-import { cookies } from 'next/headers';
-import { authAdminUseCase, productUseCase, categoryUseCase, mesaSesionUseCase } from '@/core/infrastructure/database';
-import { verifyTpvEmployeeToken } from '@/lib/tpv-employee-auth';
-import { SupabaseTpvRepository } from '@/core/infrastructure/repositories/supabase-tpv.repository';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { MostradorClient } from '@/components/tpv/MostradorClient';
 import type { ExistingOrder } from '@/components/tpv/MostradorClient';
 
 export const dynamic = 'force-dynamic';
-
-async function resolveEmpresaId(cookieStore: Awaited<ReturnType<typeof cookies>>): Promise<string | null> {
-  const adminToken = cookieStore.get('admin_token')?.value;
-  if (adminToken) {
-    const admin = await authAdminUseCase.verifyToken(adminToken);
-    if (admin?.empresaId) return admin.empresaId;
-  }
-  const employeeToken = cookieStore.get('tpv_employee_token')?.value;
-  if (!employeeToken) return null;
-  const payload = await verifyTpvEmployeeToken(employeeToken);
-  return payload?.empresaId ?? null;
-}
 
 type RawComplement = string | { nombre?: string; name?: string };
 type RawItem = { nombre?: string; precio?: number; cantidad?: number; complementos?: RawComplement[] };
@@ -52,6 +35,8 @@ interface MesaData {
   sesionId: string | null;
   sesionPagada: boolean;
 }
+
+const EMPTY_MESA_DATA: MesaData = { existingOrders: [], mesaName: null, sesionId: null, sesionPagada: false };
 
 async function loadMesaData(mesaId: string, sesionIdParam: string | null): Promise<MesaData> {
   try {
@@ -107,56 +92,15 @@ export default async function MostradorPage({
 }: {
   readonly searchParams: Promise<{ mesaId?: string; sesionId?: string; mesaNumero?: string }>;
 }) {
-  const cookieStore = await cookies();
-  const empresaId = await resolveEmpresaId(cookieStore);
-  if (!empresaId) redirect('/tpv/login');
-
-  const repo = new SupabaseTpvRepository();
-  const turnoResult = await repo.findTurnoActivo(empresaId);
-
-  if (!turnoResult.success || turnoResult.data === null) {
-    redirect('/tpv/turno/abrir');
-  }
-
   const { mesaId, sesionId: sesionIdParam, mesaNumero } = await searchParams;
-
-  const supabaseForEmpresa = getSupabaseClient();
-  const empresaRes = await supabaseForEmpresa
-    .from('empresas')
-    .select('tipo_impuesto, porcentaje_impuesto')
-    .eq('id', empresaId)
-    .maybeSingle();
-  const empresaRow = empresaRes.data as { tipo_impuesto: string | null; porcentaje_impuesto: number | null } | null;
-  const tipoImpuesto = (empresaRow?.tipo_impuesto as 'iva' | 'igic' | null) ?? 'iva';
-  const porcentajeImpuesto = empresaRow?.porcentaje_impuesto ?? 10;
-
-  const mesasPromise = mesaId
-    ? Promise.resolve(null)
-    : mesaSesionUseCase.getMesasWithSessions(empresaId);
-
-  const [productsResult, categoriesResult, mesasResult] = await Promise.all([
-    productUseCase.getAll(empresaId),
-    categoryUseCase.getAll(empresaId),
-    mesasPromise,
-  ]);
-
-  const products = productsResult.success ? productsResult.data : [];
-  const categories = categoriesResult.success ? categoriesResult.data : [];
-  const mesas = mesasResult?.success ? mesasResult.data : null;
 
   const mesaData = mesaId
     ? await loadMesaData(mesaId, sesionIdParam ?? null)
-    : { existingOrders: [], mesaName: null, sesionId: null, sesionPagada: false };
+    : EMPTY_MESA_DATA;
 
   return (
     <MostradorClient
       key={mesaId ?? 'no-mesa'}
-      turno={turnoResult.data}
-      products={products}
-      categories={categories}
-      tipoImpuesto={tipoImpuesto}
-      porcentajeImpuesto={porcentajeImpuesto}
-      mesas={mesas}
       initialMesa={mesaId ? {
         mesaId,
         sesionId: mesaData.sesionId,
