@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { TpvTurno, TpvTurnoStats } from '@/core/domain/entities/tpv-types';
 import { getCsrfToken } from '@/lib/csrf-client';
+import { useTpvCatalog } from '@/lib/tpv-catalog-ctx';
 
 interface MesaAbierta {
   mesaNumero: number | null;
@@ -39,8 +40,9 @@ function getDiferenciaLabel(diferenciaCents: number): string {
   return 'Faltante';
 }
 
-export function TurnoCerrarForm({ turno, stats, mesasAbiertas, isBlindClose }: Props) {
+export function TurnoCerrarForm({ turno, stats, mesasAbiertas, isBlindClose }: Readonly<Props>) {
   const router = useRouter();
+  const { setTurno } = useTpvCatalog();
   const [efectivoContado, setEfectivoContado] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,6 +79,7 @@ export function TurnoCerrarForm({ turno, stats, mesasAbiertas, isBlindClose }: P
       });
 
       if (res.ok) {
+        setTurno(null);
         router.push('/tpv/turno/abrir');
       } else {
         let msg = 'Error al cerrar el turno. Inténtalo de nuevo.';
