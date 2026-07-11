@@ -281,6 +281,20 @@ Solución: `WaiterLoginForm.handlePinSubmit` dispara `window.dispatchEvent(new C
 - **Auto-update endpoint** — `GET /api/app/version/latest.yml` sirve el archivo YAML para `electron-updater`. El endpoint está en `src/app/api/app/version/latest.yml/route.ts`.
 - **`electron/dist/` en `.gitignore`** — los bundles compilados no se commitean. El proceso de build es: `pnpm build:electron:prep` (esbuild) → `pnpm build:electron:rebuild` (native modules) → `electron-builder --win`.
 
+## 🗂 TPV Catalog Cache — Contexto Cliente + Offline
+
+> Ver doc completo: `docs/context/tpv-catalog-cache.md`
+
+- **`TpvCatalogProvider`** en `src/app/tpv/layout.tsx` — fetches en paralelo al montar (una vez por sesión). Persiste entre navegaciones client-side porque Next.js App Router no re-ejecuta layouts en tab switches.
+- **Contexto:** `useTpvCatalog()` expone `products`, `categories`, `tipoImpuesto`, `porcentajeImpuesto`, `turno`, `setTurno`, `mesas`, `refreshMesas`, `refreshCatalog`.
+- **Realtime debounced:** suscripción a `productos` + `categorias` → debounce 400ms → `GET /api/tpv/catalog`. Previene storm de requests en ediciones masivas del admin.
+- **Turno zombi:** `TurnoCerrarForm` llama `setTurno(null)` antes de `router.push('/tpv/turno/abrir')`. Sin esto, el layout mantiene el turno anterior en memoria.
+- **Redirect de turno en layout:** usa `x-pathname` (ya inyectado por proxy). `TURNO_OPTIONAL_PREFIXES = ['/tpv/turno', '/tpv/historial', '/tpv/analytics', '/tpv/mermas']`.
+- **IndexedDB `tpv_catalog`:** separada de `tpv_offline`. Stores: `products`, `categories`, `config`. Snapshot único por store (`put()` sobreescribe — sin fantasmas por DELETEs). Ver `src/lib/tpv/tpv-catalog-db.ts`.
+- **`useId()` para canales Realtime:** NO usar `Math.random()` en `useRef` — ESLint `react-hooks/purity` lo prohíbe. Usar `const instanceId = useId().replace(/:/g, '-')`.
+- **Rules of Hooks:** guards `if (!turno) return null` van DESPUÉS de todos los hooks.
+- **SW `/tpv/*`:** `public/sw-tpv.js`, scope `/tpv`. Estrategias: NetworkOnly para `/api/*`, CacheFirst para `/_next/static/`, NetworkFirst con fallback `/tpv/offline` para el resto.
+
 ## 🔑 TPV Empleados — Autenticación por PIN (Trampas Críticas)
 
 > Ver doc completo: `docs/context/tpv-empleados-pin.md`
