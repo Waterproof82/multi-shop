@@ -6,6 +6,7 @@ import { UtensilsCrossed } from 'lucide-react';
 import { formatPrice } from '@/lib/format-price';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useTpvCatalog } from '@/lib/tpv-catalog-ctx';
+import type { MesaWithSession } from '@/core/domain/repositories/IMesaRepository';
 
 interface Props {
   modo?: 'cobrar' | 'seleccionar';
@@ -138,7 +139,7 @@ function TpvMesaCard({ mesa, turnoId, modo }: Readonly<{ mesa: MesaWithSession; 
   const colors = getMesaColors(isPaid, isPaymentInProgress, isOpen, isActive);
   const pulsing = !isPaid && (isPaymentInProgress || isOpen || isActive);
 
-  const canInteract = isPaid ? true : (modo === 'seleccionar' ? true : !!turnoId);
+  const canInteract = isPaid || modo === 'seleccionar' || !!turnoId;
 
   function handleClick() {
     if (!canInteract) return;
@@ -211,7 +212,7 @@ function TpvMesaCard({ mesa, turnoId, modo }: Readonly<{ mesa: MesaWithSession; 
       type="button"
       onClick={handleClick}
       disabled={!canInteract}
-      aria-label={`Mesa ${mesa.numero}${mesa.nombre ? ` — ${mesa.nombre}` : ''}`}
+      aria-label={mesa.nombre ? `Mesa ${mesa.numero} — ${mesa.nombre}` : `Mesa ${mesa.numero}`}
       className="relative flex flex-col items-center justify-between rounded-2xl p-4 transition-all duration-200 hover:scale-[1.04] active:scale-[0.97] focus-visible:outline-none disabled:opacity-50 disabled:cursor-default w-full"
       style={{ minHeight: '128px', background: colors.bg, border: colors.border, boxShadow: colors.shadow }}
     >
