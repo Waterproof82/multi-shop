@@ -5,6 +5,7 @@ import type { Category, Product } from '@/core/domain/entities/types';
 import type { TpvTurno } from '@/core/domain/entities/tpv-types';
 import type { MesaWithSession } from '@/core/domain/repositories/IMesaRepository';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
+import { saveCatalogToIDB, loadCatalogFromIDB } from '@/lib/tpv/tpv-catalog-db';
 
 interface TpvCatalogContextValue {
   products: Product[];
@@ -76,7 +77,8 @@ export function TpvCatalogProvider({
     const json = await res.json() as CatalogResponse;
     setProducts(json.products);
     setCategories(json.categories);
-  }, []);
+    void saveCatalogToIDB(json.products, json.categories, { tipoImpuesto, porcentajeImpuesto });
+  }, [tipoImpuesto, porcentajeImpuesto]);
 
   const refreshMesas = useCallback(async () => {
     const res = await fetch('/api/tpv/mesas');
@@ -84,6 +86,21 @@ export function TpvCatalogProvider({
     const json = await res.json() as MesasResponse;
     setMesas(json.mesas);
   }, []);
+
+  // Sync catalog with IndexedDB on every fresh load
+  useEffect(() => {
+    if (initialProducts.length > 0) {
+      void saveCatalogToIDB(initialProducts, initialCategories, { tipoImpuesto, porcentajeImpuesto });
+      return;
+    }
+    // Layout returned empty (e.g. Supabase unreachable) — try IDB fallback
+    loadCatalogFromIDB().then(snapshot => {
+      if (!snapshot) return;
+      setProducts(snapshot.products);
+      setCategories(snapshot.categories);
+    }).catch(() => { /* IDB unavailable, stay empty */ });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // only on mount — initialProducts is the server snapshot
 
   const scheduleCatalogRefresh = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);

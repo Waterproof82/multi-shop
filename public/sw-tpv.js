@@ -54,9 +54,10 @@ globalThis.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() =>
-          caches.match(OFFLINE_URL).then(
-            (cached) => cached ?? new Response('Sin conexión', { status: 503 })
-          )
+          // Try cached version of the requested page first, then fallback to offline shell
+          caches.match(request)
+            .then((cachedPage) => cachedPage ?? caches.match(OFFLINE_URL))
+            .then((fallback) => fallback ?? new Response('Sin conexión', { status: 503 }))
         )
     );
   }
