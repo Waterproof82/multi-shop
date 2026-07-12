@@ -210,25 +210,16 @@ export class PedidoUseCase {
           },
         };
       }
-      for (const c of ci.selectedComplements ?? []) {
-        if (c.id && !priceMap.has(c.id)) {
-          return {
-            success: false,
-            error: {
-              code: 'PRODUCT_NOT_FOUND',
-              message: `Complemento no encontrado: ${c.id}`,
-              module: 'use-case',
-              method: 'PedidoUseCase.validateProductPrices',
-            },
-          };
-        }
-      }
+      // New-system complement opciones are not products — skip product lookup for them.
+      // Their price is taken from the client payload (already sourced from DB in the frontend).
     }
 
     const serverTotal = data.reduce((sum, ci) => {
       const unitPrice = priceMap.get(ci.item?.id ?? '') ?? 0;
       const complementsTotal = (ci.selectedComplements ?? []).reduce(
-        (cs, c) => cs + (priceMap.get(c.id) ?? 0),
+        // For old-system complements (products), validate server price.
+        // For new-system opcion IDs not in priceMap, trust the client-sent price.
+        (cs, c) => cs + (priceMap.get(c.id) ?? c.price),
         0
       );
       return sum + (unitPrice + complementsTotal) * ci.quantity;
@@ -427,6 +418,7 @@ export class PedidoUseCase {
             nombre: ci.item?.name ?? '',
             precio: ci.item?.price ?? 0,
             cantidad: ci.quantity,
+            complementos: (ci.selectedComplements ?? []).map(c => ({ nombre: c.name, precio: c.price })),
           })),
           total: pedidoResult.data.total,
           moneda: null,

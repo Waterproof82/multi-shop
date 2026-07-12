@@ -281,6 +281,20 @@ Solución: `WaiterLoginForm.handlePinSubmit` dispara `window.dispatchEvent(new C
 - **Auto-update endpoint** — `GET /api/app/version/latest.yml` sirve el archivo YAML para `electron-updater`. El endpoint está en `src/app/api/app/version/latest.yml/route.ts`.
 - **`electron/dist/` en `.gitignore`** — los bundles compilados no se commitean. El proceso de build es: `pnpm build:electron:prep` (esbuild) → `pnpm build:electron:rebuild` (native modules) → `electron-builder --win`.
 
+## 🗂 TPV Catalog Cache — Contexto Cliente + Offline
+
+> Ver doc completo: `docs/context/tpv-catalog-cache.md`
+
+- **`TpvCatalogProvider`** en `src/app/tpv/layout.tsx` — fetches en paralelo al montar (una vez por sesión). Persiste entre navegaciones client-side porque Next.js App Router no re-ejecuta layouts en tab switches.
+- **Contexto:** `useTpvCatalog()` expone `products`, `categories`, `tipoImpuesto`, `porcentajeImpuesto`, `turno`, `setTurno`, `mesas`, `refreshMesas`, `refreshCatalog`.
+- **Realtime debounced:** suscripción a `productos` + `categorias` → debounce 400ms → `GET /api/tpv/catalog`. Previene storm de requests en ediciones masivas del admin.
+- **Turno zombi:** `TurnoCerrarForm` llama `setTurno(null)` antes de `router.push('/tpv/turno/abrir')`. Sin esto, el layout mantiene el turno anterior en memoria.
+- **Redirect de turno en layout:** usa `x-pathname` (ya inyectado por proxy). `TURNO_OPTIONAL_PREFIXES = ['/tpv/turno', '/tpv/historial', '/tpv/analytics', '/tpv/mermas']`.
+- **IndexedDB `tpv_catalog`:** separada de `tpv_offline`. Stores: `products`, `categories`, `config`. Snapshot único por store (`put()` sobreescribe — sin fantasmas por DELETEs). Ver `src/lib/tpv/tpv-catalog-db.ts`.
+- **`useId()` para canales Realtime:** NO usar `Math.random()` en `useRef` — ESLint `react-hooks/purity` lo prohíbe. Usar `const instanceId = useId().replace(/:/g, '-')`.
+- **Rules of Hooks:** guards `if (!turno) return null` van DESPUÉS de todos los hooks.
+- **SW `/tpv/*`:** `public/sw-tpv.js`, scope `/tpv`. Estrategias: NetworkOnly para `/api/*`, CacheFirst para `/_next/static/`, NetworkFirst con fallback `/tpv/offline` para el resto.
+
 ## 🔑 TPV Empleados — Autenticación por PIN (Trampas Críticas)
 
 > Ver doc completo: `docs/context/tpv-empleados-pin.md`
@@ -294,3 +308,15 @@ Solución: `WaiterLoginForm.handlePinSubmit` dispara `window.dispatchEvent(new C
 - **Arqueo ciego para cajero** — `isBlindClose = (rol === 'cajero')`. La diferencia entre contado y teórico se calcula SERVER-SIDE en `/api/tpv/turno/[id]/cerrar`. `TurnoCerrarForm` con `isBlindClose=true` oculta totales teóricos y diferencia — no enviarlos desde el cliente no es suficiente (el server los calcula).
 - **`tpv_employee_token` audience** — el JWT usa audience `'tpv-employee'`. No confundir con el `admin_token` que no tiene audience explícita. `verifyTpvEmployeeToken` en `src/lib/tpv-employee-auth.ts` valida esta audience; si falla silenciosamente, comprobar que el token se generó con `signTpvEmployeeToken`, no con `authAdminUseCase`.
 - **CSRF requerido** — el proxy aplica validación CSRF también a requests de `tpv_employee_token`. El cliente debe usar `fetchWithCsrf` en todas las mutaciones del TPV.
+
+## 🧩 Sistema de Complementos por Producto — Trampas Críticas
+
+> Ver doc completo: `docs/context/complementos-system.md`
+
+- **Dos sistemas coexisten**: el legacy (`categoria_complemento_de` en `categorias`) y el nuevo (tablas `complemento_grupos` / `complemento_opciones` / `producto_complemento_grupos`). No eliminar el legacy — backward compat obligatoria.
+- **`getEffectiveGroups()`** en `QuantitySelectorDialog` y `MenuPanel.tsx` prioriza el nuevo sistema (`complementGroups`) y adapta el legacy al mismo formato `ComplementGroupVM` si no hay grupos nuevos.
+- **Opciones del nuevo sistema no son `producto_id`** — `pedido.use-case.ts` las salta en la validación de precio server-side. No mezclar ids de opciones con ids de productos.
+- **`setProductoGrupos` es destructiva**: `PUT /api/admin/productos/[productoId]/complementos` reemplaza TODOS los grupos. El cliente envía la lista completa, no un delta.
+- **NO llamar `revalidateTag`** en `/api/admin/productos/[productoId]/complementos` — no tiene `unstable_cache`. Fue la causa del TypeError en MostradorClient al cargar el TPV.
+- **`selectedComplements` en `PendingItem`**: `{ id, name, price }[]`. Se serializa como `{ nombre, precio }` en `detalle_pedido[i].complementos` al crear pedido.
+- **Admin gestión**: `/admin/complementos` — crear/editar grupos globales del tenant. Asignación por producto en el tab "Complementos" de `ProductFormDialog`.

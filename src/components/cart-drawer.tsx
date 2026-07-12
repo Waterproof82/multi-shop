@@ -90,9 +90,10 @@ function validatePhoneInput(phone: string, translate: TranslateFn, language: Lan
 interface CartDrawerProps {
   isRestaurant?: boolean;
   pagosPickupHabilitados?: boolean;
+  deliveryHabilitado?: boolean;
 }
 
-export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = false }: Readonly<CartDrawerProps>) {
+export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = false, deliveryHabilitado = false }: Readonly<CartDrawerProps>) {
   const {
     items,
     updateQuantity,
@@ -842,6 +843,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
               {!mesaToken && isRestaurant && (
                 <DeliveryMethodSelector
                   value={deliveryMethod}
+                  deliveryHabilitado={deliveryHabilitado}
                   onChange={(v, deliveryData) => {
                     setDeliveryMethod(v);
                     setErrors(prev => ({ ...prev, delivery: undefined }));

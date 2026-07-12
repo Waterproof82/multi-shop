@@ -1,5 +1,8 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+# Git worktrees
+.worktrees/
+
 # Node modules
 node_modules/
 
@@ -91,3 +94,4 @@ android/app/src/main/*
 !android/app/src/main/AndroidManifest.xml
 !android/app/src/main/java/
 !android/app/src/main/res/
+.superpowers/

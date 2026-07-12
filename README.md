@@ -94,6 +94,13 @@ Sistema de cajeros y encargados que acceden al TPV con PIN numérico, sin necesi
 Tabla DB: `empleados_tpv` con índice parcial único `ON (empresa_id, pin_hash) WHERE activo = true`.
 CRUD admin: `GET|POST /api/admin/empleados-tpv`, `PATCH|DELETE /api/admin/empleados-tpv/[id]`.
 
+#### Rendimiento y resiliencia offline
+
+- **Navegación instantánea entre pestañas**: catálogo, categorías, configuración fiscal, turno activo y grilla de mesas se cargan una única vez al arrancar la sesión. Navegar entre Mostrador, Mesas, Historial y Analytics no genera ninguna consulta adicional a la base de datos — el contexto React persiste entre navegaciones client-side.
+- **Invalidación reactiva del catálogo**: si un administrador edita precios o desactiva productos desde `/admin/productos` mientras el servicio está en marcha, el TPV recibe la actualización vía Supabase Realtime en ≤400 ms (debounce para ediciones en lote).
+- **Resilencia offline (IndexedDB)**: el catálogo se replica en `IndexedDB` local al arrancar. Si Supabase no está disponible en un reload, el TPV carga los datos del snapshot local en lugar de mostrar una pantalla de error.
+- **Service Worker para `/tpv/*`**: caché NetworkFirst para páginas TPV con fallback a shell offline. Los chunks estáticos (JS/CSS) se sirven CacheFirst tras la primera carga.
+
 #### Rutas TPV
 
 `/tpv/login`, `/tpv/turno/abrir`, `/tpv/turno/cerrar`, `/tpv/mostrador`, `/tpv/cobro/[sesionId]`, `/tpv/historial`, `/tpv/mesas`, `/tpv/legal`, `/tpv/analytics`, `/tpv/mermas`.

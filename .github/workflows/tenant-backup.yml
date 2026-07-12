@@ -10,7 +10,7 @@ jobs:
     steps:
       - name: Trigger tenant-backup Edge Function
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           BACKUP_SECRET: ${{ secrets.BACKUP_SECRET }}
         run: |
           response=$(curl -s -o /dev/null -w "%{http_code}" \

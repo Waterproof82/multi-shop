@@ -5,7 +5,7 @@ import { getSupabaseAnonClient } from "@/core/infrastructure/database/supabase-c
 import { SupabaseProductRepository } from "@/core/infrastructure/database/SupabaseProductRepository";
 import { SupabaseCategoryRepository } from "@/core/infrastructure/database/SupabaseCategoryRepository";
 import { GetMenuUseCase } from "@/core/application/use-cases/get-menu.use-case";
-import { empresaPublicRepository } from "@/core/infrastructure/database";
+import { empresaPublicRepository, complementoGrupoRepository } from "@/core/infrastructure/database";
 import { parseMainDomain } from "@/lib/domain-utils";
 import { logger } from "@/core/infrastructure/logging/logger";
 import type { EmpresaPublic } from "@/core/domain/entities/types";
@@ -16,7 +16,7 @@ const productRepo = new SupabaseProductRepository(supabase);
 const categoryRepo = new SupabaseCategoryRepository(supabase);
 
 // Use Case instantiation
-export const getMenuUseCase = new GetMenuUseCase(productRepo, categoryRepo);
+export const getMenuUseCase = new GetMenuUseCase(productRepo, categoryRepo, complementoGrupoRepository);
 
 // DO NOT cache empresa - changes must be visible immediately
 export async function getEmpresaByDomain(domain: string): Promise<EmpresaPublic | null> {

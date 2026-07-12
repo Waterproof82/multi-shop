@@ -3,13 +3,12 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { UtensilsCrossed } from 'lucide-react';
-import type { MesaWithSession } from '@/core/domain/repositories/IMesaRepository';
 import { formatPrice } from '@/lib/format-price';
 import { fetchWithCsrf } from '@/lib/csrf-client';
+import { useTpvCatalog } from '@/lib/tpv-catalog-ctx';
+import type { MesaWithSession } from '@/core/domain/repositories/IMesaRepository';
 
 interface Props {
-  mesas: MesaWithSession[];
-  turnoId: string | null;
   modo?: 'cobrar' | 'seleccionar';
 }
 
@@ -140,7 +139,7 @@ function TpvMesaCard({ mesa, turnoId, modo }: Readonly<{ mesa: MesaWithSession; 
   const colors = getMesaColors(isPaid, isPaymentInProgress, isOpen, isActive);
   const pulsing = !isPaid && (isPaymentInProgress || isOpen || isActive);
 
-  const canInteract = isPaid ? true : (modo === 'seleccionar' ? true : !!turnoId);
+  const canInteract = isPaid || modo === 'seleccionar' || !!turnoId;
 
   function handleClick() {
     if (!canInteract) return;
@@ -213,7 +212,7 @@ function TpvMesaCard({ mesa, turnoId, modo }: Readonly<{ mesa: MesaWithSession; 
       type="button"
       onClick={handleClick}
       disabled={!canInteract}
-      aria-label={`Mesa ${mesa.numero}${mesa.nombre ? ` — ${mesa.nombre}` : ''}`}
+      aria-label={mesa.nombre ? `Mesa ${mesa.numero} — ${mesa.nombre}` : `Mesa ${mesa.numero}`}
       className="relative flex flex-col items-center justify-between rounded-2xl p-4 transition-all duration-200 hover:scale-[1.04] active:scale-[0.97] focus-visible:outline-none disabled:opacity-50 disabled:cursor-default w-full"
       style={{ minHeight: '128px', background: colors.bg, border: colors.border, boxShadow: colors.shadow }}
     >
@@ -247,7 +246,9 @@ function TpvMesaCard({ mesa, turnoId, modo }: Readonly<{ mesa: MesaWithSession; 
   );
 }
 
-export function MesasGrid({ mesas, turnoId, modo }: Readonly<Props>) {
+export function MesasGrid({ modo }: Readonly<Props>) {
+  const { mesas, turno } = useTpvCatalog();
+  const turnoId = turno?.id ?? null;
   return (
     <div className="flex-1 overflow-auto p-6">
       <h2 className="text-lg font-bold mb-5 text-[#e8eaf0]">Mesas</h2>

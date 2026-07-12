@@ -26,6 +26,7 @@ interface DeliveryMethodSelectorProps {
   onChange: (method: 'recogida' | 'delivery', deliveryData?: DeliveryData) => void;
   orderTotalCents: number;
   disabled?: boolean;
+  deliveryHabilitado?: boolean;
 }
 
 
@@ -34,6 +35,7 @@ export function DeliveryMethodSelector({
   onChange,
   orderTotalCents,
   disabled,
+  deliveryHabilitado = false,
 }: Readonly<DeliveryMethodSelectorProps>) {
   const { language } = useLanguage();
 
@@ -47,6 +49,13 @@ export function DeliveryMethodSelector({
   const [loadingFee, setLoadingFee] = useState(false);
   const [feeError, setFeeError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Auto-select recogida when it's the only available method
+  useEffect(() => {
+    if (!deliveryHabilitado && value === null) {
+      onChange('recogida');
+    }
+  }, [deliveryHabilitado, value, onChange]);
 
   // Clear state when method changes away from delivery
   useEffect(() => {
@@ -151,7 +160,7 @@ export function DeliveryMethodSelector({
         {t('deliveryMethodTitle', language)}
       </p>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className={`grid gap-2 ${deliveryHabilitado ? 'grid-cols-2' : 'grid-cols-1'}`}>
         <button
           type="button"
           onClick={() => onChange('recogida')}
@@ -170,23 +179,25 @@ export function DeliveryMethodSelector({
           <span className="text-center leading-tight">{t('deliveryMethodPickup', language)}</span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => onChange('delivery')}
-          disabled={disabled}
-          className={`
-            flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 px-3 py-3 min-h-[64px] text-sm font-medium transition-all duration-150
-            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
-            disabled:opacity-50 disabled:cursor-not-allowed
-            ${value === 'delivery'
-              ? 'border-primary bg-primary/10 text-primary'
-              : 'border-border bg-background text-foreground hover:border-primary/50 hover:bg-muted/40'}
-          `}
-          aria-pressed={value === 'delivery'}
-        >
-          <MapPin className="size-5 shrink-0" aria-hidden="true" />
-          <span className="text-center leading-tight">{t('deliveryMethodHome', language)}</span>
-        </button>
+        {deliveryHabilitado && (
+          <button
+            type="button"
+            onClick={() => onChange('delivery')}
+            disabled={disabled}
+            className={`
+              flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 px-3 py-3 min-h-[64px] text-sm font-medium transition-all duration-150
+              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
+              disabled:opacity-50 disabled:cursor-not-allowed
+              ${value === 'delivery'
+                ? 'border-primary bg-primary/10 text-primary'
+                : 'border-border bg-background text-foreground hover:border-primary/50 hover:bg-muted/40'}
+            `}
+            aria-pressed={value === 'delivery'}
+          >
+            <MapPin className="size-5 shrink-0" aria-hidden="true" />
+            <span className="text-center leading-tight">{t('deliveryMethodHome', language)}</span>
+          </button>
+        )}
       </div>
 
       {value === 'delivery' && (
