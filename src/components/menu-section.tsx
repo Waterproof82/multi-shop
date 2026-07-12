@@ -87,7 +87,7 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
     setIsDetailOpen(true);
   }, []);
 
-  const isCategoryWithComplements = category.items.some((item) => item.complements && item.complements.length > 0);
+  const isCategoryWithComplements = category.items.some((item) => (item.complements && item.complements.length > 0) || (item.complementGroups && item.complementGroups.length > 0));
   const translationLang = (['en', 'fr', 'it', 'de'].includes(language) ? language : undefined) as LanguageKey | undefined;
 
   const displayDescripcion = translationLang && category.descripcionTranslations?.[translationLang]
@@ -331,7 +331,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
     }
   }, []);
   
-  const hasComplements = item.complements && item.complements.length > 0;
+  const hasComplements = (item.complements && item.complements.length > 0) || (item.complementGroups && item.complementGroups.length > 0);
   const isClickable = showCart || hasComplements;
 
   const displayName = getTranslatedField(language, item.translations, 'name', item.name);
@@ -340,12 +340,12 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
   const complementLabel = getComplementCategoryDisplay(language, complementCategoryName, complementCategoryTranslations)
     || t("complementsAvailable", safeLanguage);
 
-  const minComplementPrice = hasComplements
-    ? Math.min(...item.complements!.map((c) => c.price))
+  const minComplementPrice = (item.complements && item.complements.length > 0)
+    ? Math.min(...item.complements.map((c) => c.price))
     : 0;
 
   const handleClick = () => {
-    if (showCart) {
+    if (showCart || (item.complementGroups && item.complementGroups.length > 0)) {
       onItemClick(item);
     } else if (hasComplements) {
       onDetailClick(item);

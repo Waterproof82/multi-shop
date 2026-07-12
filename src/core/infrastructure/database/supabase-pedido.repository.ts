@@ -474,7 +474,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           translations: ci.item?.translations,
           precio: ci.item?.price,
           cantidad: ci.quantity,
-          complementos: ci.selectedComplements || [],
+          complementos: (ci.selectedComplements ?? []).map(c => ({ nombre: c.name, precio: c.price })),
           ...(ci.note ? { nota: ci.note } : {}),
         })),
         total: total,
@@ -688,7 +688,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           mesa_nombre: (mesaRaw?.['nombre'] as string | null) ?? null,
           delivery_fee_cents: (raw['delivery_fee_cents'] as number | null) ?? null,
           payment_status: (raw['payment_status'] as string | null) ?? null,
-          items: ((raw['detalle_pedido'] as { nombre: string; translations?: { en?: { name: string }; fr?: { name: string }; it?: { name: string }; de?: { name: string } }; cantidad: number; precio: number }[] | null) ?? []),
+          items: ((raw['detalle_pedido'] as { nombre: string; translations?: { en?: { name: string }; fr?: { name: string }; it?: { name: string }; de?: { name: string } }; cantidad: number; precio: number; complementos?: { nombre: string; precio: number }[] }[] | null) ?? []),
         },
       };
     } catch (e) {

@@ -20,8 +20,8 @@ interface Props {
   readonly tipoImpuesto: 'iva' | 'igic';
   readonly porcentajeImpuesto: number;
   readonly sesionPagada: boolean;
-  readonly onRemovePending: (nombre: string, complementos: string[]) => void;
-  readonly onUpdatePendingNota: (productId: string, complementos: string[], nota: string | undefined) => void;
+  readonly onRemovePending: (nombre: string, complementos: { nombre: string; precio: number }[]) => void;
+  readonly onUpdatePendingNota: (productId: string, complementos: { nombre: string; precio: number }[], nota: string | undefined) => void;
   readonly onPendingSent: () => void;
 }
 
@@ -175,7 +175,7 @@ export function TicketPanel({
               <span className="text-[10px] font-bold text-[#4f72ff] uppercase tracking-wider">Nuevo pedido</span>
             </div>
             {pendingItems.map((item) => {
-              const itemKey = item.productId + item.complementos.join(',');
+              const itemKey = item.productId + item.complementos.map(c => c.nombre).join(',');
               const notaOpen = pendingNotaExpandida === itemKey;
               return (
                 <div key={itemKey} className="border-b border-[#2e3347]/30 last:border-b-0">
@@ -186,13 +186,13 @@ export function TicketPanel({
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{item.nombre}</p>
                       {item.complementos.length > 0 && (
-                        <p className="text-[10px] text-[#6b7280] truncate">{item.complementos.join(', ')}</p>
+                        <p className="text-[10px] text-[#6b7280] truncate">{item.complementos.map(c => c.nombre).join(', ')}</p>
                       )}
                       {item.nota && !notaOpen && (
                         <p className="text-[10px] italic text-[#a78bfa] truncate">✎ {item.nota}</p>
                       )}
                     </div>
-                    <span className="text-sm font-semibold shrink-0">{fmt(item.precio * item.cantidad)}</span>
+                    <span className="text-sm font-semibold shrink-0">{fmt(item.precioTotal * item.cantidad)}</span>
                     <button
                       type="button"
                       onClick={() => setPendingNotaExpandida(prev => prev === itemKey ? null : itemKey)}
@@ -295,7 +295,7 @@ export function TicketPanel({
                     items: pendingItems.map(i => ({
                       productId: i.productId,
                       nombre: i.nombre,
-                      precio: i.precio,
+                      precio: i.precioTotal,
                       cantidad: i.cantidad,
                       complementos: i.complementos,
                       ...(i.nota ? { nota: i.nota } : {}),

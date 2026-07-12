@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getCsrfToken } from '@/lib/csrf-client';
+import { useTpvCatalog } from '@/lib/tpv-catalog-ctx';
+import type { TpvTurno } from '@/core/domain/entities/tpv-types';
 
 interface Props {
   readonly defaultOperador?: string;
@@ -10,6 +12,7 @@ interface Props {
 
 export function TurnoAbrirForm({ defaultOperador = '' }: Props) {
   const router = useRouter();
+  const { setTurno } = useTpvCatalog();
   const [operador, setOperador] = useState(defaultOperador);
   const [efectivo, setEfectivo] = useState('0');
   const [loading, setLoading] = useState(false);
@@ -37,7 +40,7 @@ export function TurnoAbrirForm({ defaultOperador = '' }: Props) {
       }),
     });
 
-    await res.json();
+    const json = await res.json() as { data?: TpvTurno };
     setLoading(false);
 
     if (!res.ok) {
@@ -45,6 +48,7 @@ export function TurnoAbrirForm({ defaultOperador = '' }: Props) {
       return;
     }
 
+    if (json.data) setTurno(json.data);
     router.push('/tpv/mostrador');
   }
 

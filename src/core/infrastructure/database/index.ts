@@ -29,6 +29,8 @@ import { DescuentoUseCase } from '@/core/application/use-cases/descuento.use-cas
 import { MesaClientTokenUseCase } from '@/core/application/use-cases/mesa-client-token.use-case';
 import { ValoracionUseCase } from '@/core/application/use-cases/valoracion.use-case';
 import { EmpleadoTpvLoginUseCase } from '@/core/application/use-cases/tpv/empleado-tpv-login.use-case';
+import { SupabaseComplementoGrupoRepository } from './supabase-complemento-grupo.repository';
+import { ComplementoGrupoUseCase } from '@/core/application/use-cases/complemento-grupo.use-case';
 
 const supabase = getSupabaseClient();
 const supabaseAnon = getSupabaseAnonClient();
@@ -48,6 +50,7 @@ const descuentoRepository = new SupabaseDescuentoRepository(supabase);
 const mesaClientTokenRepository = new SupabaseMesaClientTokenRepository(supabase);
 export const valoracionRepository = new SupabaseValoracionRepository(supabase);
 export const empleadoTpvRepository = new SupabaseEmpleadoTpvRepository();
+export const complementoGrupoRepository = new SupabaseComplementoGrupoRepository(supabase);
 
 // Public repository (anon key) for public-facing pages
 export const empresaPublicRepository = new SupabaseEmpresaRepository(supabaseAnon);
@@ -68,3 +71,4 @@ export const descuentoUseCase = new DescuentoUseCase(descuentoRepository, empres
 export const mesaClientTokenUseCase = new MesaClientTokenUseCase(mesaClientTokenRepository, mesaSesionRepository);
 export const valoracionUseCase = new ValoracionUseCase(valoracionRepository);
 export const empleadoTpvLoginUseCase = new EmpleadoTpvLoginUseCase(empleadoTpvRepository);
+export const complementoGrupoUseCase = new ComplementoGrupoUseCase(complementoGrupoRepository);

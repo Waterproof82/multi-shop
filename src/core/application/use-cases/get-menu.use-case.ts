@@ -1,14 +1,17 @@
 import type { IProductRepository } from "@/core/domain/repositories/IProductRepository";
 import type { ICategoryRepository } from "@/core/domain/repositories/ICategoryRepository";
+import type { IComplementoGrupoRepository } from '@/core/domain/repositories/IComplementoGrupoRepository';
 import type { MenuCategoryVM } from "@/core/application/dtos/menu-view-model";
 import type { Category, Product } from "@/core/domain/entities/types";
+import type { ComplementoGrupo } from '@/core/domain/entities/complemento-types';
 import { MenuMapper } from "@/core/application/mappers/menu.mapper";
 import { logger } from "@/core/infrastructure/logging/logger";
 
 export class GetMenuUseCase {
   constructor(
     private readonly productRepo: IProductRepository,
-    private readonly categoryRepo: ICategoryRepository
+    private readonly categoryRepo: ICategoryRepository,
+    private readonly complementoRepo: IComplementoGrupoRepository,
   ) {}
 
   async execute(empresaId: string): Promise<{ data?: MenuCategoryVM[]; error?: string }> {
@@ -44,6 +47,30 @@ export class GetMenuUseCase {
 
       const products = productsResult.data;
       const categories = categoriesResult.data;
+
+      // Fetch complement groups for all active products
+      const activeProductIds = products
+        .filter(p => p.activo)
+        .map(p => p.id);
+
+      const [assignmentsResult, gruposResult] = await Promise.all([
+        this.complementoRepo.findAssignmentsByProductos(activeProductIds, empresaId),
+        this.complementoRepo.findAllByTenant(empresaId),
+      ]);
+
+      // Build map: productoId -> ComplementoGrupo[] ordered by assignment orden
+      const complementoGruposByProductId = new Map<string, ComplementoGrupo[]>();
+      if (assignmentsResult.success && gruposResult.success) {
+        const gruposById = new Map(gruposResult.data.map(g => [g.id, g]));
+        const sorted = [...assignmentsResult.data].sort((a, b) => a.orden - b.orden);
+        for (const asig of sorted) {
+          const grupo = gruposById.get(asig.grupoId);
+          if (!grupo) continue;
+          const arr = complementoGruposByProductId.get(asig.productoId) ?? [];
+          arr.push(grupo);
+          complementoGruposByProductId.set(asig.productoId, arr);
+        }
+      }
 
       const mainCategories = categories.filter((cat) => !cat.categoriaComplementoDe);
       const complementCategories = categories.filter((cat) => cat.categoriaComplementoDe);
@@ -118,6 +145,7 @@ export class GetMenuUseCase {
           products,
           complementCategoryName,
           complementCategoryTranslations,
+          complementoGruposByProductId,
         );
       });
 

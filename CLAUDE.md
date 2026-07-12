@@ -308,3 +308,15 @@ Solución: `WaiterLoginForm.handlePinSubmit` dispara `window.dispatchEvent(new C
 - **Arqueo ciego para cajero** — `isBlindClose = (rol === 'cajero')`. La diferencia entre contado y teórico se calcula SERVER-SIDE en `/api/tpv/turno/[id]/cerrar`. `TurnoCerrarForm` con `isBlindClose=true` oculta totales teóricos y diferencia — no enviarlos desde el cliente no es suficiente (el server los calcula).
 - **`tpv_employee_token` audience** — el JWT usa audience `'tpv-employee'`. No confundir con el `admin_token` que no tiene audience explícita. `verifyTpvEmployeeToken` en `src/lib/tpv-employee-auth.ts` valida esta audience; si falla silenciosamente, comprobar que el token se generó con `signTpvEmployeeToken`, no con `authAdminUseCase`.
 - **CSRF requerido** — el proxy aplica validación CSRF también a requests de `tpv_employee_token`. El cliente debe usar `fetchWithCsrf` en todas las mutaciones del TPV.
+
+## 🧩 Sistema de Complementos por Producto — Trampas Críticas
+
+> Ver doc completo: `docs/context/complementos-system.md`
+
+- **Dos sistemas coexisten**: el legacy (`categoria_complemento_de` en `categorias`) y el nuevo (tablas `complemento_grupos` / `complemento_opciones` / `producto_complemento_grupos`). No eliminar el legacy — backward compat obligatoria.
+- **`getEffectiveGroups()`** en `QuantitySelectorDialog` y `MenuPanel.tsx` prioriza el nuevo sistema (`complementGroups`) y adapta el legacy al mismo formato `ComplementGroupVM` si no hay grupos nuevos.
+- **Opciones del nuevo sistema no son `producto_id`** — `pedido.use-case.ts` las salta en la validación de precio server-side. No mezclar ids de opciones con ids de productos.
+- **`setProductoGrupos` es destructiva**: `PUT /api/admin/productos/[productoId]/complementos` reemplaza TODOS los grupos. El cliente envía la lista completa, no un delta.
+- **NO llamar `revalidateTag`** en `/api/admin/productos/[productoId]/complementos` — no tiene `unstable_cache`. Fue la causa del TypeError en MostradorClient al cargar el TPV.
+- **`selectedComplements` en `PendingItem`**: `{ id, name, price }[]`. Se serializa como `{ nombre, precio }` en `detalle_pedido[i].complementos` al crear pedido.
+- **Admin gestión**: `/admin/complementos` — crear/editar grupos globales del tenant. Asignación por producto en el tab "Complementos" de `ProductFormDialog`.

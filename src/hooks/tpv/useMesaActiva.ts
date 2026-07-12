@@ -6,9 +6,10 @@ import type { ExistingOrder } from '@/components/tpv/MostradorClient';
 export interface PendingItem {
   productId: string;
   nombre: string;
-  precio: number;
+  precio: number;       // base price — immutable
+  precioTotal: number;  // precio + sum of complementos[].precio
   cantidad: number;
-  complementos: string[];
+  complementos: { nombre: string; precio: number }[];
   nota?: string;
 }
 
@@ -36,7 +37,7 @@ function calcExistingTotal(orders: ExistingOrder[]): number {
 }
 
 function calcPendingTotal(items: PendingItem[]): number {
-  return items.reduce((sum, i) => sum + i.precio * i.cantidad, 0);
+  return items.reduce((sum, i) => sum + i.precioTotal * i.cantidad, 0);
 }
 
 function buildInitial(init: InitialMesa | null): MesaActiva {
@@ -72,25 +73,35 @@ export function useMesaActiva(initial: InitialMesa | null = null) {
 
   const clearMesa = useCallback(() => setMesa(buildInitial(null)), []);
 
-  const addItem = useCallback((item: Omit<PendingItem, 'cantidad'> & { complementos?: string[] }) => {
+  const addItem = useCallback((item: Omit<PendingItem, 'cantidad'>) => {
     setMesa(prev => {
       const complementos = item.complementos ?? [];
+      const key = complementos.map((c: { nombre: string; precio: number }) => c.nombre).join(',');
       const existing = prev.pendingItems.findIndex(
-        i => i.productId === item.productId && i.complementos.join(',') === complementos.join(',')
+        i => i.productId === item.productId && i.complementos.map(c => c.nombre).join(',') === key
       );
       const pendingItems: PendingItem[] = existing >= 0
         ? prev.pendingItems.map((it, idx) =>
             idx === existing ? { ...it, cantidad: it.cantidad + 1 } : it
           )
-        : [...prev.pendingItems, { productId: item.productId, nombre: item.nombre, precio: item.precio, cantidad: 1, complementos }];
+        : [...prev.pendingItems, {
+            productId: item.productId,
+            nombre: item.nombre,
+            precio: item.precio,
+            precioTotal: item.precioTotal,
+            cantidad: 1,
+            complementos,
+            nota: item.nota,
+          }];
       return { ...prev, pendingItems, pendingTotal: calcPendingTotal(pendingItems) };
     });
   }, []);
 
-  const removeItem = useCallback((nombre: string, complementos: string[] = []) => {
+  const removeItem = useCallback((nombre: string, complementos: { nombre: string; precio: number }[] = []) => {
     setMesa(prev => {
+      const key = complementos.map(c => c.nombre).join(',');
       const pendingItems = prev.pendingItems.filter(
-        i => !(i.nombre === nombre && i.complementos.join(',') === complementos.join(','))
+        i => !(i.nombre === nombre && i.complementos.map(c => c.nombre).join(',') === key)
       );
       return { ...prev, pendingItems, pendingTotal: calcPendingTotal(pendingItems) };
     });
@@ -100,15 +111,18 @@ export function useMesaActiva(initial: InitialMesa | null = null) {
     setMesa(prev => ({ ...prev, pendingItems: [], pendingTotal: 0 }));
   }, []);
 
-  const updatePendingNota = useCallback((productId: string, complementos: string[], nota: string | undefined) => {
-    setMesa(prev => ({
-      ...prev,
-      pendingItems: prev.pendingItems.map(it =>
-        it.productId === productId && it.complementos.join(',') === complementos.join(',')
-          ? { ...it, nota: nota || undefined }
-          : it
-      ),
-    }));
+  const updatePendingNota = useCallback((productId: string, complementos: { nombre: string; precio: number }[], nota: string | undefined) => {
+    setMesa(prev => {
+      const key = complementos.map(c => c.nombre).join(',');
+      return {
+        ...prev,
+        pendingItems: prev.pendingItems.map(it =>
+          it.productId === productId && it.complementos.map(c => c.nombre).join(',') === key
+            ? { ...it, nota: nota || undefined }
+            : it
+        ),
+      };
+    });
   }, []);
 
   return { mesa, selectMesa, clearMesa, addItem, removeItem, clearPending, refreshOrders, updatePendingNota };

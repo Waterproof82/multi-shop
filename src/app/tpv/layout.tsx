@@ -5,6 +5,7 @@ import {
   productUseCase,
   categoryUseCase,
   mesaSesionUseCase,
+  complementoGrupoRepository,
 } from '@/core/infrastructure/database';
 import { verifyTpvEmployeeToken } from '@/lib/tpv-employee-auth';
 import { SupabaseTpvRepository } from '@/core/infrastructure/repositories/supabase-tpv.repository';
@@ -78,7 +79,7 @@ export default async function TpvLayout({ children }: { readonly children: React
   const repo = new SupabaseTpvRepository();
   const supabase = getSupabaseClient();
 
-  const [productsResult, categoriesResult, mesasResult, turnoResult, empresaRes] = await Promise.all([
+  const [productsResult, categoriesResult, mesasResult, turnoResult, empresaRes, gruposResult] = await Promise.all([
     productUseCase.getAll(empresaId),
     categoryUseCase.getAll(empresaId),
     mesaSesionUseCase.getMesasWithSessions(empresaId),
@@ -88,6 +89,7 @@ export default async function TpvLayout({ children }: { readonly children: React
       .select('tipo_impuesto, porcentaje_impuesto')
       .eq('id', empresaId)
       .maybeSingle(),
+    complementoGrupoRepository.findAllByTenant(empresaId),
   ]);
 
   // Redirect to turno/abrir if no active turno — skip for pages that don't need one
@@ -100,6 +102,11 @@ export default async function TpvLayout({ children }: { readonly children: React
   const categories = categoriesResult.success ? categoriesResult.data : [];
   const mesas = mesasResult.success ? mesasResult.data : [];
   const turno = turnoResult.success ? turnoResult.data : null;
+  const complementoGrupos = gruposResult.success ? gruposResult.data : [];
+
+  const activeProductIds = products.filter(p => p.activo).map(p => p.id);
+  const assignmentsResult = await complementoGrupoRepository.findAssignmentsByProductos(activeProductIds, empresaId);
+  const productoGrupos = assignmentsResult.success ? assignmentsResult.data : [];
 
   const empresaRow = empresaRes.data as { tipo_impuesto: string | null; porcentaje_impuesto: number | null } | null;
   const tipoImpuesto = (empresaRow?.tipo_impuesto as 'iva' | 'igic' | null) ?? 'iva';
@@ -115,6 +122,8 @@ export default async function TpvLayout({ children }: { readonly children: React
         initialTurno={turno}
         initialMesas={mesas}
         empresaId={empresaId}
+        initialComplementoGrupos={complementoGrupos}
+        initialProductoGrupos={productoGrupos}
       >
         <TpvSwRegistrar />
         <div className="flex flex-col h-screen bg-[#0f1117] text-[#e8eaf0] overflow-hidden">
