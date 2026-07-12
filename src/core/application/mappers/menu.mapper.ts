@@ -1,5 +1,6 @@
 import type { Product, Category } from "@/core/domain/entities/types";
-import type { MenuItemVM, MenuSubcategoryVM, MenuCategoryVM, ComplementVM } from "@/core/application/dtos/menu-view-model";
+import type { MenuItemVM, MenuSubcategoryVM, MenuCategoryVM, ComplementVM, ComplementGroupVM } from "@/core/application/dtos/menu-view-model";
+import type { ComplementoGrupo } from '@/core/domain/entities/complemento-types';
 
 type TranslationMap = MenuItemVM["translations"];
 type DescriptionTranslationMap = MenuCategoryVM["descripcionTranslations"];
@@ -56,6 +57,32 @@ function mapProductToItem(product: Product, categoryName: string): MenuItemVM {
   };
 }
 
+function mapComplementoGrupoToGroupVM(grupo: ComplementoGrupo): ComplementGroupVM {
+  return {
+    id: grupo.id,
+    name: grupo.nombre_es,
+    tipo: grupo.tipo,
+    obligatorio: grupo.obligatorio,
+    translations: {
+      en: grupo.nombre_en ?? undefined,
+      fr: grupo.nombre_fr ?? undefined,
+      it: grupo.nombre_it ?? undefined,
+      de: grupo.nombre_de ?? undefined,
+    },
+    opciones: grupo.opciones.map(o => ({
+      id: o.id,
+      name: o.nombre_es,
+      price: o.precioAdicional,
+      translations: {
+        en: o.nombre_en ? { name: o.nombre_en } : undefined,
+        fr: o.nombre_fr ? { name: o.nombre_fr } : undefined,
+        it: o.nombre_it ? { name: o.nombre_it } : undefined,
+        de: o.nombre_de ? { name: o.nombre_de } : undefined,
+      },
+    })),
+  };
+}
+
 export class MenuMapper {
   static toSubcategoryVM(
     subCat: Category,
@@ -82,6 +109,7 @@ export class MenuMapper {
     products: Product[],
     complementCategoryName?: string,
     complementCategoryTranslations?: Category['translations'],
+    complementoGruposByProductId?: Map<string, ComplementoGrupo[]>,
   ): MenuCategoryVM {
     const parentProducts = allProducts.filter((p) => p.categoriaId === parentCat.id && p.activo);
     const subcategoryProducts = childSubcategories.flatMap((subCat) =>
@@ -117,6 +145,7 @@ export class MenuMapper {
             ? categoryComplements.map(mapComplementProduct)
             : undefined,
           requiresComplement: requiresComplement || undefined,
+          complementGroups: complementoGruposByProductId?.get(p.id)?.map(mapComplementoGrupoToGroupVM),
         };
       }),
     };

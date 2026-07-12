@@ -33,7 +33,7 @@ interface Props {
 }
 
 export function MostradorClient({ initialMesa }: Readonly<Props>) {
-  const { turno, products, categories, tipoImpuesto, porcentajeImpuesto, mesas } = useTpvCatalog();
+  const { turno, products, categories, tipoImpuesto, porcentajeImpuesto } = useTpvCatalog();
   const { mesa, addItem, removeItem, clearPending, clearMesa, refreshOrders, updatePendingNota } = useMesaActiva(initialMesa);
   const [refreshing, setRefreshing] = useState(false);
   const [yaCobradoCents, setYaCobradoCents] = useState(0);

@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useId, useRef, useSt
 import type { Category, Product } from '@/core/domain/entities/types';
 import type { TpvTurno } from '@/core/domain/entities/tpv-types';
 import type { MesaWithSession } from '@/core/domain/repositories/IMesaRepository';
+import type { ComplementoGrupo, ProductoComplementoAsignacion } from '@/core/domain/entities/complemento-types';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { saveCatalogToIDB, loadCatalogFromIDB } from '@/lib/tpv/tpv-catalog-db';
 
@@ -17,6 +18,7 @@ interface TpvCatalogContextValue {
   mesas: MesaWithSession[];
   refreshMesas: () => Promise<void>;
   refreshCatalog: () => Promise<void>;
+  complementoGruposByProductId: Map<string, ComplementoGrupo[]>;
 }
 
 const TpvCatalogContext = createContext<TpvCatalogContextValue>({
@@ -29,6 +31,7 @@ const TpvCatalogContext = createContext<TpvCatalogContextValue>({
   mesas: [],
   refreshMesas: async () => { /* no-op default */ },
   refreshCatalog: async () => { /* no-op default */ },
+  complementoGruposByProductId: new Map(),
 });
 
 interface TpvCatalogProviderProps {
@@ -40,12 +43,32 @@ interface TpvCatalogProviderProps {
   readonly initialTurno: TpvTurno | null;
   readonly initialMesas: MesaWithSession[];
   readonly empresaId: string;
+  readonly initialComplementoGrupos: ComplementoGrupo[];
+  readonly initialProductoGrupos: ProductoComplementoAsignacion[];
 }
 
 type CatalogResponse = {
   products: Product[];
   categories: Category[];
+  complementoGrupos: ComplementoGrupo[];
+  productoGrupos: ProductoComplementoAsignacion[];
 };
+
+function buildComplementoMap(
+  grupos: ComplementoGrupo[],
+  asignaciones: ProductoComplementoAsignacion[],
+): Map<string, ComplementoGrupo[]> {
+  const gruposById = new Map(grupos.map(g => [g.id, g]));
+  const map = new Map<string, ComplementoGrupo[]>();
+  for (const asig of asignaciones) {
+    const grupo = gruposById.get(asig.grupoId);
+    if (!grupo) continue;
+    const arr = map.get(asig.productoId) ?? [];
+    arr.push(grupo);
+    map.set(asig.productoId, arr);
+  }
+  return map;
+}
 
 type MesasResponse = {
   mesas: MesaWithSession[];
@@ -60,11 +83,16 @@ export function TpvCatalogProvider({
   initialTurno,
   initialMesas,
   empresaId,
+  initialComplementoGrupos,
+  initialProductoGrupos,
 }: Readonly<TpvCatalogProviderProps>) {
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [turno, setTurno] = useState<TpvTurno | null>(initialTurno);
   const [mesas, setMesas] = useState<MesaWithSession[]>(initialMesas);
+  const [complementoGruposByProductId, setComplementoGruposByProductId] = useState<Map<string, ComplementoGrupo[]>>(
+    () => buildComplementoMap(initialComplementoGrupos, initialProductoGrupos)
+  );
 
   const instanceId = useId().replace(/:/g, '-');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -77,6 +105,9 @@ export function TpvCatalogProvider({
     const json = await res.json() as CatalogResponse;
     setProducts(json.products);
     setCategories(json.categories);
+    setComplementoGruposByProductId(
+      buildComplementoMap(json.complementoGrupos ?? [], json.productoGrupos ?? [])
+    );
     void saveCatalogToIDB(json.products, json.categories, { tipoImpuesto, porcentajeImpuesto });
   }, [tipoImpuesto, porcentajeImpuesto]);
 
@@ -156,6 +187,7 @@ export function TpvCatalogProvider({
         mesas,
         refreshMesas,
         refreshCatalog,
+        complementoGruposByProductId,
       }}
     >
       {children}

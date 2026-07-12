@@ -13,6 +13,20 @@ export interface ComplementVM {
   };
 }
 
+export interface ComplementGroupVM {
+  id: string;
+  name: string;
+  tipo: 'radio' | 'checkbox';
+  obligatorio: boolean;
+  translations?: {
+    en?: string;
+    fr?: string;
+    it?: string;
+    de?: string;
+  };
+  opciones: ComplementVM[];
+}
+
 export type ImageFit = 'contain' | 'cover' | 'fill' | 'none' | 'scale-down';
 
 export interface MenuItemVM {
@@ -33,6 +47,7 @@ export interface MenuItemVM {
   };
   complements?: ComplementVM[];
   requiresComplement?: boolean;
+  complementGroups?: ComplementGroupVM[];
 }
 
 export interface MenuSubcategoryVM {

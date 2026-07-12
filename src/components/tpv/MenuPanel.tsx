@@ -4,6 +4,8 @@ import { useState } from 'react';
 import Image from 'next/image';
 import type { Product, Category } from '@/core/domain/entities/types';
 import type { PendingItem } from '@/hooks/tpv/useMesaActiva';
+import type { ComplementoGrupo } from '@/core/domain/entities/complemento-types';
+import { useTpvCatalog } from '@/lib/tpv-catalog-ctx';
 
 type AddItemPayload = Omit<PendingItem, 'cantidad'>;
 
@@ -16,8 +18,9 @@ interface Props {
 
 interface ComplementDialogState {
   product: Product;
-  options: Product[];
-  required: boolean;
+  newGroups: ComplementoGrupo[];
+  legacyOptions: Product[];
+  legacyRequired: boolean;
 }
 
 const ALL_CAT_ID = '__all__';
@@ -47,19 +50,75 @@ function buildComplementMaps(categories: Category[], products: Product[]) {
   return { complementsByCatId, requiredByCatId };
 }
 
+interface NormalizedGroup {
+  id: string;
+  name: string;
+  tipo: 'radio' | 'checkbox';
+  obligatorio: boolean;
+  opciones: Array<{ id: string; name: string; precio: number }>;
+}
+
+function normalizeGroups(state: ComplementDialogState): NormalizedGroup[] {
+  if (state.newGroups.length > 0) {
+    return state.newGroups.map(g => ({
+      id: g.id,
+      name: g.nombre_es,
+      tipo: g.tipo,
+      obligatorio: g.obligatorio,
+      opciones: g.opciones.map(o => ({ id: o.id, name: o.nombre_es, precio: o.precioAdicional })),
+    }));
+  }
+  if (state.legacyOptions.length > 0) {
+    return [{
+      id: '__legacy__',
+      name: 'Complementos',
+      tipo: 'radio' as const,
+      obligatorio: state.legacyRequired,
+      opciones: state.legacyOptions.map(p => ({ id: p.titulo_es, name: p.titulo_es, precio: p.precio })),
+    }];
+  }
+  return [];
+}
+
 interface ComplementDialogProps {
   state: ComplementDialogState;
-  onConfirm: (complementos: string[]) => void;
+  onConfirm: (complementos: { nombre: string; precio: number }[], precioTotal: number) => void;
   onClose: () => void;
 }
 
 function ComplementDialog({ state, onConfirm, onClose }: Readonly<ComplementDialogProps>) {
-  const [selected, setSelected] = useState<string | null>(null);
-  const canConfirm = !state.required || selected !== null;
+  const [selectedByGroup, setSelectedByGroup] = useState<Record<string, Set<string>>>({});
+
+  const groups = normalizeGroups(state);
+  const isValid = groups
+    .filter(g => g.obligatorio)
+    .every(g => (selectedByGroup[g.id]?.size ?? 0) > 0);
+
+  const selectedOpciones = groups.flatMap(g =>
+    g.opciones.filter(o => selectedByGroup[g.id]?.has(o.id))
+  );
+  const complementosExtra = selectedOpciones.reduce((s, o) => s + o.precio, 0);
+  const precioTotal = state.product.precio + complementosExtra;
+
+  function toggleRadio(grupoId: string, opcionId: string) {
+    setSelectedByGroup(prev => {
+      const already = prev[grupoId]?.has(opcionId) ?? false;
+      return { ...prev, [grupoId]: already ? new Set() : new Set([opcionId]) };
+    });
+  }
+
+  function toggleCheckbox(grupoId: string, opcionId: string) {
+    setSelectedByGroup(prev => {
+      const current = new Set(prev[grupoId] ?? []);
+      if (current.has(opcionId)) { current.delete(opcionId); } else { current.add(opcionId); }
+      return { ...prev, [grupoId]: current };
+    });
+  }
 
   function handleConfirm() {
-    if (!canConfirm) return;
-    onConfirm(selected !== null ? [selected] : []);
+    if (!isValid) return;
+    const complementos = selectedOpciones.map(o => ({ nombre: o.name, precio: o.precio }));
+    onConfirm(complementos, precioTotal);
   }
 
   function fmt(euros: number): string {
@@ -67,66 +126,112 @@ function ComplementDialog({ state, onConfirm, onClose }: Readonly<ComplementDial
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/60"
-        aria-label="Cerrar"
-        onClick={onClose}
-      />
-      <div className="relative bg-[#1a1d27] border border-[#2e3347] rounded-2xl p-5 w-80 flex flex-col gap-4 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex flex-col bg-[#1a1d27]">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[#2e3347] shrink-0">
         <div>
           <p className="text-[10px] font-bold text-[#6b7280] uppercase tracking-wider mb-0.5">Complementos</p>
           <p className="text-base font-bold text-[#e8eaf0]">{state.product.titulo_es}</p>
-          {state.required && (
-            <p className="text-[11px] text-[#f59e0b] mt-0.5">Selección obligatoria</p>
-          )}
         </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Cerrar"
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-[#6b7280] hover:text-[#e8eaf0] hover:bg-[#2e3347] transition-colors"
+        >
+          ✕
+        </button>
+      </div>
 
-        <div className="flex flex-col gap-2">
-          {state.options.map(opt => {
-            const isSelected = selected === opt.titulo_es;
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => setSelected(isSelected ? null : opt.titulo_es)}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all text-left"
-                style={{
-                  background: isSelected ? 'oklch(28% 0.10 260 / 0.5)' : 'oklch(20% 0.03 252 / 0.5)',
-                  borderColor: isSelected ? 'oklch(60% 0.18 260)' : 'oklch(35% 0.04 252)',
-                }}
-              >
-                <span
-                  className="w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center"
-                  style={{ borderColor: isSelected ? 'oklch(60% 0.18 260)' : '#4b5563' }}
-                >
-                  {isSelected && (
-                    <span className="w-2 h-2 rounded-full bg-[#4f72ff]" />
-                  )}
-                </span>
-                <span className="flex-1 text-sm text-[#c8cad4] font-medium">{opt.titulo_es}</span>
-                {opt.precio > 0 && (
-                  <span className="text-xs text-[#4f72ff] shrink-0">+{fmt(opt.precio)}</span>
+      {/* Scrollable complement groups */}
+      <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-5">
+        {groups.map(grupo => {
+          const selectedCount = selectedByGroup[grupo.id]?.size ?? 0;
+          const isRequired = grupo.obligatorio;
+          const isComplete = isRequired ? selectedCount > 0 : true;
+          return (
+            <div key={grupo.id}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-semibold text-[#9ca3af]">{grupo.name}</span>
+                {isRequired && !isComplete && (
+                  <span className="text-[10px] text-[#f59e0b]">Obligatorio</span>
                 )}
-              </button>
-            );
-          })}
-        </div>
+              </div>
+              <div className="h-0.5 rounded-full mb-2 overflow-hidden bg-[#2e3347]">
+                <div
+                  className="h-full rounded-full transition-all duration-300"
+                  style={{
+                    width: isComplete ? '100%' : '0%',
+                    background: isRequired ? (isComplete ? '#22c55e' : '#ef4444') : '#4f72ff',
+                  }}
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                {grupo.opciones.map(opt => {
+                  const isSelected = selectedByGroup[grupo.id]?.has(opt.id) ?? false;
+                  const toggle = grupo.tipo === 'radio'
+                    ? () => toggleRadio(grupo.id, opt.id)
+                    : () => toggleCheckbox(grupo.id, opt.id);
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      role={grupo.tipo === 'radio' ? 'radio' : 'checkbox'}
+                      aria-checked={isSelected}
+                      onClick={toggle}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all text-left"
+                      style={{
+                        background: isSelected ? 'oklch(28% 0.10 260 / 0.5)' : 'oklch(20% 0.03 252 / 0.5)',
+                        borderColor: isSelected ? 'oklch(60% 0.18 260)' : 'oklch(35% 0.04 252)',
+                      }}
+                    >
+                      <span
+                        className="w-4 h-4 shrink-0 flex items-center justify-center border-2"
+                        style={{
+                          borderRadius: grupo.tipo === 'radio' ? '50%' : '4px',
+                          borderColor: isSelected ? 'oklch(60% 0.18 260)' : '#4b5563',
+                        }}
+                      >
+                        {isSelected && grupo.tipo === 'radio' && (
+                          <span className="w-2 h-2 rounded-full bg-[#4f72ff]" />
+                        )}
+                        {isSelected && grupo.tipo === 'checkbox' && (
+                          <span className="text-[10px] font-bold leading-none text-[#4f72ff]">✓</span>
+                        )}
+                      </span>
+                      <span className="flex-1 text-sm text-[#c8cad4] font-medium">{opt.name}</span>
+                      {opt.precio > 0 && (
+                        <span className="text-xs text-[#4f72ff] shrink-0">+{fmt(opt.precio)}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
-        <div className="flex gap-2 pt-1">
+      {/* Footer */}
+      <div className="px-5 py-4 border-t border-[#2e3347] shrink-0 flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-[#9ca3af]">Total</span>
+          <span className="text-base font-bold text-[#e8eaf0]">{fmt(precioTotal)}</span>
+        </div>
+        <div className="flex gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl border border-[#2e3347] text-sm text-[#6b7280] hover:text-white transition-colors"
+            className="flex-1 py-3 rounded-xl border border-[#2e3347] text-sm text-[#9ca3af] hover:border-[#4b5563] transition-colors"
           >
             Cancelar
           </button>
           <button
             type="button"
             onClick={handleConfirm}
-            disabled={!canConfirm}
-            className="flex-1 py-2.5 rounded-xl bg-[#4f72ff] text-white text-sm font-bold hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            disabled={!isValid}
+            className="flex-1 py-3 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-40"
+            style={{ background: isValid ? 'oklch(60% 0.18 260)' : '#374151' }}
           >
             Añadir
           </button>
@@ -141,6 +246,7 @@ export function MenuPanel({ products, categories, onAddItem, mesaSeleccionada }:
   const [search, setSearch] = useState('');
   const [complementDialog, setComplementDialog] = useState<ComplementDialogState | null>(null);
 
+  const { complementoGruposByProductId } = useTpvCatalog();
   const { complementsByCatId, requiredByCatId } = buildComplementMaps(categories, products);
 
   const mainCategories = categories.filter(c => !c.categoriaComplementoDe);
@@ -154,24 +260,22 @@ export function MenuPanel({ products, categories, onAddItem, mesaSeleccionada }:
     return matchesSearch(p, search);
   });
 
-  function handleAdd(p: Product) {
-    const options = p.categoriaId ? (complementsByCatId.get(p.categoriaId) ?? []) : [];
-    if (options.length > 0) {
-      setComplementDialog({
-        product: p,
-        options,
-        required: p.categoriaId ? (requiredByCatId.get(p.categoriaId) ?? false) : false,
-      });
-    } else {
-      onAddItem({ productId: p.id, nombre: p.titulo_es, precio: p.precio, complementos: [] });
-    }
-  }
+  function handleProductClick(product: Product) {
+    const newGroups = complementoGruposByProductId.get(product.id) ?? [];
+    const legacyOpts = complementsByCatId.get(product.categoriaId ?? '') ?? [];
+    const legacyRequired = requiredByCatId.get(product.categoriaId ?? '') ?? false;
 
-  function handleComplementConfirm(complementos: string[]) {
-    if (!complementDialog) return;
-    const p = complementDialog.product;
-    onAddItem({ productId: p.id, nombre: p.titulo_es, precio: p.precio, complementos });
-    setComplementDialog(null);
+    if (newGroups.length > 0 || legacyOpts.length > 0) {
+      setComplementDialog({ product, newGroups, legacyOptions: legacyOpts, legacyRequired });
+    } else {
+      onAddItem({
+        productId: product.id,
+        nombre: product.titulo_es,
+        precio: product.precio,
+        precioTotal: product.precio,
+        complementos: [],
+      });
+    }
   }
 
   return (
@@ -179,8 +283,17 @@ export function MenuPanel({ products, categories, onAddItem, mesaSeleccionada }:
     {complementDialog !== null && (
       <ComplementDialog
         state={complementDialog}
-        onConfirm={handleComplementConfirm}
         onClose={() => setComplementDialog(null)}
+        onConfirm={(complementos, precioTotal) => {
+          onAddItem({
+            productId: complementDialog.product.id,
+            nombre: complementDialog.product.titulo_es,
+            precio: complementDialog.product.precio,
+            precioTotal,
+            complementos,
+          });
+          setComplementDialog(null);
+        }}
       />
     )}
     <section className="flex-1 flex flex-col overflow-hidden bg-[#0f1117]">
@@ -243,7 +356,7 @@ export function MenuPanel({ products, categories, onAddItem, mesaSeleccionada }:
             <button
               key={p.id}
               type="button"
-              onClick={() => handleAdd(p)}
+              onClick={() => handleProductClick(p)}
               className="bg-[#1a1d27] border border-[#2e3347] rounded-xl overflow-hidden flex flex-col hover:border-[#4f72ff] hover:bg-[#22263a] transition-all text-left active:scale-95"
             >
               <div className="w-full aspect-square bg-[#0f1117] relative">

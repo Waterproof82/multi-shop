@@ -18,6 +18,7 @@ interface OrderItem {
   };
   cantidad: number;
   precio: number;
+  complementos?: { nombre: string; precio: number }[];
 }
 
 interface OrderStatus {
@@ -119,14 +120,23 @@ function ItemsList({ items, language, deliveryFeeCents }: Readonly<{ items: Orde
       </p>
       <ul className="flex flex-col gap-1.5">
         {items.map((item, i) => (
-          <li key={`${item.nombre}-${i}`} className="flex items-center justify-between gap-2 text-sm">
-            <span className="flex items-center gap-1.5">
-              <span className="font-medium text-foreground">{item.cantidad}×</span>
-              <span className="text-foreground">{resolveItemName(item, language)}</span>
-            </span>
-            <span className="text-muted-foreground shrink-0">
-              {formatPrice(item.precio * item.cantidad, 'EUR', lang)}
-            </span>
+          <li key={`${item.nombre}-${i}`} className="flex flex-col gap-0.5">
+            <div className="flex items-center justify-between gap-2 text-sm">
+              <span className="flex items-center gap-1.5">
+                <span className="font-medium text-foreground">{item.cantidad}×</span>
+                <span className="text-foreground">{resolveItemName(item, language)}</span>
+              </span>
+              <span className="text-muted-foreground shrink-0">
+                {formatPrice(item.precio * item.cantidad, 'EUR', lang)}
+              </span>
+            </div>
+            {item.complementos && item.complementos.length > 0 && (
+              <ul className="pl-5 flex flex-col gap-0.5">
+                {item.complementos.map((c, ci) => (
+                  <li key={ci} className="text-xs text-muted-foreground">↳ {c.nombre}</li>
+                ))}
+              </ul>
+            )}
           </li>
         ))}
         {deliveryFee > 0 && (

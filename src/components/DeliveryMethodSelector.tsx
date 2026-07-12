@@ -50,6 +50,13 @@ export function DeliveryMethodSelector({
   const [feeError, setFeeError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Auto-select recogida when it's the only available method
+  useEffect(() => {
+    if (!deliveryHabilitado && value === null) {
+      onChange('recogida');
+    }
+  }, [deliveryHabilitado, value, onChange]);
+
   // Clear state when method changes away from delivery
   useEffect(() => {
     if (value !== 'delivery') {

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, Tags, LogOut, Menu, X, ShoppingCart, BarChart3, Users, Megaphone, Settings, ExternalLink, ShoppingBag, UtensilsCrossed, MapPin, Star, Archive, BookOpen, History, ClipboardList, MonitorCheck } from 'lucide-react';
+import { LayoutDashboard, Package, Tags, LogOut, Menu, X, ShoppingCart, BarChart3, Users, Megaphone, Settings, ExternalLink, ShoppingBag, UtensilsCrossed, MapPin, Star, Archive, BookOpen, History, ClipboardList, MonitorCheck, Layers } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useAdmin } from '@/lib/admin-context';
 import { useLanguage } from '@/lib/language-context';
@@ -22,6 +22,7 @@ const BASE_NAV_ITEMS: (NavItem & { requiresPromo?: boolean; requiresTgtg?: boole
   { href: '/admin', labelKey: 'sidebarDashboard', icon: LayoutDashboard },
   { href: '/admin/categorias', labelKey: 'sidebarCategories', icon: Tags },
   { href: '/admin/productos', labelKey: 'sidebarProducts', icon: Package },
+  { href: '/admin/complementos', labelKey: 'sidebarComplementos', icon: Layers, requiresRestaurant: true },
   { href: '/admin/pedidos', labelKey: 'sidebarOrders', icon: ShoppingCart },
   { href: '/admin/clientes', labelKey: 'sidebarClients', icon: Users },
   { href: '/admin/promociones', labelKey: 'sidebarPromotions', icon: Megaphone, requiresPromo: true },

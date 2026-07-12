@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useEffect } from "react"
 import { Plus, Minus, Check, Pause, MessageSquarePlus, ChevronUp } from "lucide-react"
 import { getWaiterMesa } from "@/components/waiter-login-form"
 import {
@@ -19,7 +19,7 @@ import { useLanguage } from "@/lib/language-context"
 import { useCart } from "@/lib/cart-context"
 import { t } from "@/lib/translations"
 import { formatPrice } from "@/lib/format-price"
-import type { MenuItemVM, ComplementVM } from "@/core/application/dtos/menu-view-model"
+import type { MenuItemVM, ComplementGroupVM, ComplementVM } from "@/core/application/dtos/menu-view-model"
 
 interface QuantitySelectorDialogProps {
   item: MenuItemVM | null
@@ -27,10 +27,47 @@ interface QuantitySelectorDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
+function getEffectiveGroups(item: MenuItemVM): ComplementGroupVM[] {
+  if (item.complementGroups && item.complementGroups.length > 0) {
+    return item.complementGroups;
+  }
+  if (item.complements && item.complements.length > 0) {
+    return [{
+      id: '__legacy__',
+      name: item.complements[0]?.name ?? 'Opciones',
+      tipo: 'radio',
+      obligatorio: item.requiresComplement ?? false,
+      opciones: item.complements,
+    }];
+  }
+  return [];
+}
+
+function isGroupsValid(groups: ComplementGroupVM[], selectedByGroup: Record<string, Set<string>>): boolean {
+  return groups
+    .filter(g => g.obligatorio)
+    .every(g => (selectedByGroup[g.id]?.size ?? 0) > 0);
+}
+
+function getBadgeText(grupo: ComplementGroupVM): string {
+  if (!grupo.obligatorio) {
+    return grupo.tipo === 'radio' ? 'Opcional · elige 1' : 'Opcional';
+  }
+  return grupo.tipo === 'radio' ? 'Obligatorio · elige 1' : 'Obligatorio · elige al menos 1';
+}
+
+function resolveOpcionName(opcion: ComplementVM, language: string): string {
+  const lang = (['en', 'fr', 'it', 'de'].includes(language) ? language : undefined) as 'en' | 'fr' | 'it' | 'de' | undefined;
+  if (lang && opcion.translations?.[lang]?.name) {
+    return opcion.translations[lang].name;
+  }
+  return opcion.name;
+}
+
 export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogProps>) {
   const { item, open, onOpenChange } = props;
   const [quantity, setQuantity] = useState(1)
-  const [selectedComplement, setSelectedComplement] = useState<ComplementVM | null>(null)
+  const [selectedByGroup, setSelectedByGroup] = useState<Record<string, Set<string>>>({})
   const [addedAnimation, setAddedAnimation] = useState(false)
   const [isDeferred, setIsDeferred] = useState(false)
   const [note, setNote] = useState('')
@@ -40,7 +77,42 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
 
   const isWaiterMode = !!getWaiterMesa()
 
-  const complements = item?.complements || [];
+  useEffect(() => {
+    if (open && item) {
+      setQuantity(1);
+      setSelectedByGroup({});
+      setIsDeferred(false);
+      setNote('');
+      setShowNote(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, item?.id]);
+
+  const effectiveGroups = item ? getEffectiveGroups(item) : [];
+
+  const complementsExtra = effectiveGroups
+    .flatMap(g => g.opciones.filter(o => selectedByGroup[g.id]?.has(o.id)))
+    .reduce((s, o) => s + o.price, 0);
+  const totalPrice = ((item?.price ?? 0) + complementsExtra) * quantity;
+
+  function toggleRadio(grupoId: string, opcionId: string) {
+    setSelectedByGroup(prev => {
+      const already = prev[grupoId]?.has(opcionId) ?? false;
+      return { ...prev, [grupoId]: already ? new Set() : new Set([opcionId]) };
+    });
+  }
+
+  function toggleCheckbox(grupoId: string, opcionId: string) {
+    setSelectedByGroup(prev => {
+      const current = new Set(prev[grupoId] ?? []);
+      if (current.has(opcionId)) {
+        current.delete(opcionId);
+      } else {
+        current.add(opcionId);
+      }
+      return { ...prev, [grupoId]: current };
+    });
+  }
 
   const handleIncrement = () => {
     setQuantity((prev) => prev + 1)
@@ -50,121 +122,119 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
     setQuantity((prev) => Math.max(1, prev - 1))
   }
 
-  const toggleComplement = (complement: ComplementVM) => {
-    if (selectedComplement?.id === complement.id) {
-      setSelectedComplement(null);
-    } else {
-      setSelectedComplement(complement);
-    }
-  }
-
   const handleConfirmAddToCart = () => {
-    if (item && quantity > 0) {
-      if (item.requiresComplement && !selectedComplement) {
-        return;
-      }
-      addItem(item, quantity, selectedComplement ? [selectedComplement] : undefined, isDeferred || undefined, note.trim() || undefined);
-      setAddedAnimation(true);
-      setTimeout(() => {
-        onOpenChange(false);
-        setQuantity(1);
-        setSelectedComplement(null);
-        setIsDeferred(false);
-        setNote('');
-        setShowNote(false);
-        setAddedAnimation(false);
-      }, 300);
-    }
-  }
+    if (!item || quantity < 1) return;
+    if (!isGroupsValid(effectiveGroups, selectedByGroup)) return;
 
-  // Reset quantity when dialog opens with a new item or closes
-  const previousOpenRef = useRef(open);
-  const previousItemIdRef = useRef(item?.id);
-  
-  useEffect(() => {
-    if (open && item && (!previousOpenRef.current || previousItemIdRef.current !== item.id)) {
+    const selectedOpciones = effectiveGroups.flatMap(g =>
+      g.opciones.filter(o => selectedByGroup[g.id]?.has(o.id))
+    );
+    const complementos = selectedOpciones.length > 0 ? selectedOpciones : undefined;
+    addItem(item, quantity, complementos, isDeferred || undefined, note.trim() || undefined);
+    setAddedAnimation(true);
+    setTimeout(() => {
+      onOpenChange(false);
       setQuantity(1);
-      setSelectedComplement(null);
+      setSelectedByGroup({});
       setIsDeferred(false);
       setNote('');
       setShowNote(false);
-    }
-
-    previousOpenRef.current = open;
-    previousItemIdRef.current = item?.id;
-  }, [open, item]);
-
-  const totalComplementsPrice = selectedComplement ? selectedComplement.price : 0;
-  const totalPrice = (item ? item.price + totalComplementsPrice : 0) * quantity;
+      setAddedAnimation(false);
+    }, 300);
+  }
 
   if (!item) return null
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[min(calc(100vw-2rem),425px)] flex flex-col max-h-[80vh]" onOpenAutoFocus={(e) => e.preventDefault()}>
-        <DialogHeader>
+      <DialogContent className="w-screen h-[100dvh] max-w-none rounded-none flex flex-col p-0 gap-0" onOpenAutoFocus={(e) => e.preventDefault()}>
+        <DialogHeader className="px-5 pt-5 pb-4 shrink-0 border-b">
           <DialogTitle>{t("selectQuantity", language)}</DialogTitle>
           <DialogDescription>
             {t("quantityFor", language)} {(language !== "es" && item.translations?.[language]?.name) || item.name}
           </DialogDescription>
         </DialogHeader>
-        
-        <div className="flex-1 overflow-y-auto min-h-0">
-          {complements.length > 0 && (
-            <div className="space-y-2 pb-4">
-              <Label className="text-sm font-medium">
-                {item.requiresComplement ? t("complementsRequired", language) : t("complementsOptional", language)}
-              </Label>
-              <div className="space-y-2" role="radiogroup" aria-label={item.requiresComplement ? t("complementsRequired", language) : t("complementsOptional", language)}>
-                {complements.map((complement) => {
-                  const isSelected = selectedComplement?.id === complement.id;
-                  const lang = (['en', 'fr', 'it', 'de'].includes(language) ? language : undefined) as 'en' | 'fr' | 'it' | 'de' | undefined;
-                  const compName = lang && complement.translations?.[lang]?.name
-                    ? complement.translations[lang].name
-                    : complement.name;
-                  const compDesc = lang && complement.translations?.[lang]?.description
-                    ? complement.translations[lang].description
-                    : complement.description;
-                  return (
-                    <button
-                      key={complement.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={isSelected}
-                      onClick={() => toggleComplement(complement)}
-                      className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-                        isSelected
-                          ? 'border-primary bg-primary/10 animate-complement-select'
-                          : 'border-border hover:border-border/80 hover:bg-muted/50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all duration-200 ${
-                          isSelected
-                            ? 'bg-primary border-primary'
-                            : 'border-muted-foreground/30'
-                        }`}>
-                          {isSelected && <Check className="w-2.5 h-2.5 text-primary-foreground animate-quantity-pulse" />}
-                        </div>
-                        <div className="text-left">
-                          <p className="font-medium text-sm">{compName}</p>
-                          {compDesc && (
-                            <p className="text-xs text-muted-foreground">{compDesc}</p>
-                          )}
-                        </div>
-                      </div>
-                      <span className="font-semibold text-sm">
-                        +{formatPrice(complement.price, 'EUR', language)}
+
+        <div className="flex-1 overflow-y-auto min-h-0 px-5 py-4 space-y-4">
+          {effectiveGroups.length > 0 && (
+            <div style={{ scrollbarWidth: 'thin' }}>
+              {effectiveGroups.map(grupo => {
+                const selectedCount = selectedByGroup[grupo.id]?.size ?? 0;
+                const isComplete = grupo.obligatorio ? selectedCount > 0 : true;
+                const progressMax = grupo.tipo === 'radio' ? 1 : Math.max(1, grupo.opciones.length);
+                const progressPct = isComplete ? 100 : Math.min(100, (selectedCount / progressMax) * 100);
+                return (
+                  <div key={grupo.id} className="mb-4">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-sm font-medium">{grupo.name}</span>
+                      <span
+                        className="text-xs px-2 py-0.5 rounded-full"
+                        style={{
+                          background: grupo.obligatorio ? 'oklch(95% 0.05 0)' : 'oklch(95% 0.02 250)',
+                          color: grupo.obligatorio ? 'oklch(45% 0.15 25)' : 'oklch(45% 0.08 250)',
+                        }}
+                      >
+                        {getBadgeText(grupo)}
                       </span>
-                    </button>
-                  );
-                })}
-              </div>
+                    </div>
+                    <div className="h-1 rounded-full mb-2 overflow-hidden bg-muted">
+                      <div
+                        className="h-full rounded-full transition-all duration-300"
+                        style={{
+                          width: `${progressPct}%`,
+                          background: isComplete
+                            ? (grupo.obligatorio ? 'oklch(60% 0.15 145)' : 'oklch(60% 0.15 250)')
+                            : 'oklch(60% 0.18 25)',
+                        }}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      {grupo.opciones.map(opcion => {
+                        const isSelected = selectedByGroup[grupo.id]?.has(opcion.id) ?? false;
+                        const toggle = grupo.tipo === 'radio'
+                          ? () => toggleRadio(grupo.id, opcion.id)
+                          : () => toggleCheckbox(grupo.id, opcion.id);
+                        return (
+                          <button
+                            key={opcion.id}
+                            type="button"
+                            role={grupo.tipo === 'radio' ? 'radio' : 'checkbox'}
+                            aria-checked={isSelected}
+                            onClick={toggle}
+                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-all w-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            style={{
+                              background: isSelected ? 'color-mix(in oklch, var(--color-primary) 15%, transparent)' : 'transparent',
+                              borderColor: isSelected ? 'var(--color-primary)' : undefined,
+                            }}
+                          >
+                            <span
+                              className={`w-4 h-4 shrink-0 flex items-center justify-center border-2 transition-colors ${isSelected ? 'border-primary' : 'border-muted-foreground/40'}`}
+                              style={{ borderRadius: grupo.tipo === 'radio' ? '50%' : '4px' }}
+                            >
+                              {isSelected && grupo.tipo === 'radio' && (
+                                <span className="w-2 h-2 rounded-full bg-primary" />
+                              )}
+                              {isSelected && grupo.tipo === 'checkbox' && (
+                                <span className="text-[10px] font-bold leading-none text-primary">✓</span>
+                              )}
+                            </span>
+                            <span className="flex-1 text-sm">{resolveOpcionName(opcion, language)}</span>
+                            {opcion.price > 0 && (
+                              <span className="text-xs font-medium shrink-0 text-primary">
+                                +{formatPrice(opcion.price, 'EUR', language)}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
-        </div>
 
-        <div className="border-t pt-4 space-y-3 shrink-0">
+          <div className="space-y-3">
           <div className="space-y-2">
             <button
               type="button"
@@ -226,9 +296,8 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
             <span>{t("total", language)}:</span>
             <span className="animate-price-update" key={totalPrice}>{formatPrice(totalPrice, 'EUR', language)}</span>
           </div>
-        </div>
-        
-        {isWaiterMode && item.tipoProducto !== 'bebida' && (
+
+          {isWaiterMode && item.tipoProducto !== 'bebida' && (
           <button
             type="button"
             onClick={() => setIsDeferred(prev => !prev)}
@@ -248,13 +317,15 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
               Añadir como retenido
             </span>
           </button>
-        )}
+          )}
+          </div>
+        </div>
 
-        <DialogFooter className="shrink-0">
+        <DialogFooter className="px-5 py-4 shrink-0 border-t">
           <RippleButton
             type="button"
             onClick={handleConfirmAddToCart}
-            disabled={quantity < 1 || (item.requiresComplement && !selectedComplement)}
+            disabled={!isGroupsValid(effectiveGroups, selectedByGroup) || addedAnimation}
             className={addedAnimation ? 'animate-complement-select' : ''}
           >
             {addedAnimation ? (
