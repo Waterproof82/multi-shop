@@ -82,5 +82,25 @@ Single branch, single PR. The change is purely mechanical — no logic changes. 
 
 ## Risks
 
-- **Missed call sites**: any file that destructures the import at call time (e.g., `const { productUseCase } = await import(...)`) won't be caught by a simple string search. Mitigated by: full CI build + TypeScript compile errors on renamed exports.
+- **Missed call sites**: mitigated by using TypeScript as the rename tool. After renaming exports in `index.ts`, run `pnpm typecheck` — the compiler reports every broken import site exactly. No regex needed. Any exotic dynamic import pattern (`await import(...)`) will surface as a compile error.
 - **`empresaRepository`, `pedidoRepository`, `mesaRepository`, `mesaSesionRepository`, `valoracionRepository`, `empleadoTpvRepository`, `complementoGrupoRepository`, `empresaPublicRepository`**: these are currently exported as `const` (not use cases). They follow the same lazy pattern.
+- **Sync-only**: the `??=` pattern requires synchronous initialization. `getSupabaseClient()` reads `process.env` and calls `createClient()` synchronously — no async secrets manager involved. If that ever changes, this pattern needs revisiting.
+
+## Testing patterns enabled
+
+**Integration test (API route):** mock the entire module
+```typescript
+jest.mock('@/core/infrastructure/database', () => ({
+  getProductUseCase: jest.fn(() => ({ getAll: jest.fn().mockResolvedValue({ success: true, data: [] }) }))
+}));
+```
+
+**Unit test (Use Case with fake repo):** mock only the repository getter
+```typescript
+jest.mock('@/core/infrastructure/database', () => ({
+  getProductRepository: jest.fn(() => ({ findAll: jest.fn().mockResolvedValue([]) }))
+}));
+// Then test the real ProductUseCase with the mocked repo
+```
+
+This granularity was impossible before — the module threw on import before any mock could take effect.
