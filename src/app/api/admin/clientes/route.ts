@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { clienteUseCase } from '@/core/infrastructure/database';
+import { getClienteUseCase } from '@/core/infrastructure/database';
 import { createClienteSchema, updateClienteSchema, clienteIdSchema } from '@/core/application/dtos/cliente.dto';
 import { requireAuth, requireRole, handleResult, handleResultWithStatus, validationErrorResponse, type AuthResult } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   const queryEmpresaId = searchParams.get('empresaId');
   const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
 
-  const result = await clienteUseCase.getAll(empresaId!);
+  const result = await getClienteUseCase().getAll(empresaId!);
   
   if (!result.success) {
     return handleResult(result);
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     return validationErrorResponse('Al menos un campo es requerido');
   }
 
-  const result = await clienteUseCase.createOrUpdate(parsed.data);
+  const result = await getClienteUseCase().createOrUpdate(parsed.data);
 
   if (!result.success) {
     return handleResult(result);
@@ -89,7 +89,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   const { id, ...updateData } = parsed.data;
-  const result = await clienteUseCase.update(id, empresaId!, updateData);
+  const result = await getClienteUseCase().update(id, empresaId!, updateData);
   
   if (!result.success) {
     return handleResult(result);
@@ -123,7 +123,7 @@ export async function DELETE(request: NextRequest) {
     return validationErrorResponse('ID inválido');
   }
 
-  const result = await clienteUseCase.delete(parsed.data.id, empresaId!);
+  const result = await getClienteUseCase().delete(parsed.data.id, empresaId!);
   
   if (!result.success) {
     return handleResult(result);

@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { superAdminUseCase } from '@/core/infrastructure/database';
+import { getSuperAdminUseCase } from '@/core/infrastructure/database';
 import { handleResult, errorResponse } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     return errorResponse('Acceso denegado', 403);
   }
 
-  const result = await superAdminUseCase.getAllEmpresas();
+  const result = await getSuperAdminUseCase().getAllEmpresas();
 
   if (!result.success) {
     return handleResult(result);

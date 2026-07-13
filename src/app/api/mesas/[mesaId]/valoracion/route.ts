@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { mesaSesionRepository, valoracionUseCase } from '@/core/infrastructure/database';
+import { getMesaSesionRepository, getValoracionUseCase } from '@/core/infrastructure/database';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 
 const mesaIdSchema = z.string().uuid();
@@ -35,7 +35,7 @@ export async function POST(
     return NextResponse.json({ error: bodyParsed.error.errors[0].message }, { status: 400 });
   }
 
-  const sesionResult = await mesaSesionRepository.findActiveSesionByMesa(mesaParsed.data);
+  const sesionResult = await getMesaSesionRepository().findActiveSesionByMesa(mesaParsed.data);
   if (!sesionResult.success) {
     return NextResponse.json({ error: 'Error al buscar sesión' }, { status: 500 });
   }
@@ -43,7 +43,7 @@ export async function POST(
     return NextResponse.json({ error: 'No hay sesión activa para esta mesa' }, { status: 404 });
   }
 
-  const result = await valoracionUseCase.create({
+  const result = await getValoracionUseCase().create({
     empresaId: sesionResult.data.empresaId,
     mesaId: mesaParsed.data,
     mesaSesionId: bodyParsed.data.sesion_id,

@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { productUseCase, categoryUseCase, complementoGrupoRepository } from '@/core/infrastructure/database';
+import { getProductUseCase, getCategoryUseCase, getComplementoGrupoRepository } from '@/core/infrastructure/database';
 import { requireAuth, requireRole, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 
@@ -12,21 +12,21 @@ export async function GET(req: NextRequest) {
 
   const supabase = getSupabaseClient();
   const [productsResult, categoriesResult, empresaRes, gruposResult] = await Promise.all([
-    productUseCase.getAll(empresaId),
-    categoryUseCase.getAll(empresaId),
+    getProductUseCase().getAll(empresaId),
+    getCategoryUseCase().getAll(empresaId),
     supabase
       .from('empresas')
       .select('tipo_impuesto, porcentaje_impuesto')
       .eq('id', empresaId)
       .maybeSingle(),
-    complementoGrupoRepository.findAllByTenant(empresaId),
+    getComplementoGrupoRepository().findAllByTenant(empresaId),
   ]);
 
   const activeIds = (productsResult.success ? productsResult.data : [])
     .filter((p: { activo: boolean }) => p.activo)
     .map((p: { id: string }) => p.id);
 
-  const assignmentsResult = await complementoGrupoRepository.findAssignmentsByProductos(activeIds, empresaId);
+  const assignmentsResult = await getComplementoGrupoRepository().findAssignmentsByProductos(activeIds, empresaId);
 
   const empresaRow = empresaRes.data as { tipo_impuesto: string | null; porcentaje_impuesto: number | null } | null;
 

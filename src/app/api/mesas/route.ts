@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { mesaUseCase, mesaSesionUseCase } from '@/core/infrastructure/database';
+import { getMesaUseCase, getMesaSesionUseCase } from '@/core/infrastructure/database';
 import { rateLimitMesaPolling } from '@/core/infrastructure/api/rate-limit';
 
 const getMesaSchema = z.object({
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   const rateLimited = await rateLimitMesaPolling(parsed.data.token);
   if (rateLimited) return rateLimited;
 
-  const mesaResult = await mesaUseCase.getMesa(parsed.data.token);
+  const mesaResult = await getMesaUseCase().getMesa(parsed.data.token);
 
   if (!mesaResult.success) {
     return NextResponse.json({ error: 'Error al obtener la mesa' }, { status: 500 });
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
   const mesa = mesaResult.data;
 
   // Open a session the moment a customer accesses the table (idempotent via DB function)
-  await mesaSesionUseCase.openSesion(mesa.id, mesa.empresaId);
+  await getMesaSesionUseCase().openSesion(mesa.id, mesa.empresaId);
 
   return NextResponse.json({
     id: mesa.id,

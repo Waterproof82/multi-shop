@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { pedidoRepository } from '@/core/infrastructure/database';
+import { getPedidoRepository } from '@/core/infrastructure/database';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,8 +10,8 @@ export async function GET(request: NextRequest) {
   }
 
   const [ordersResult, retenidosResult] = await Promise.all([
-    pedidoRepository.findKitchenOrders(empresaId),
-    pedidoRepository.findAllRetenidos(empresaId, 'comida'),
+    getPedidoRepository().findKitchenOrders(empresaId),
+    getPedidoRepository().findAllRetenidos(empresaId, 'comida'),
   ]);
 
   if (!ordersResult.success) {

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { empresaPublicRepository, descuentoUseCase } from '@/core/infrastructure/database';
+import { getEmpresaPublicRepository, getDescuentoUseCase } from '@/core/infrastructure/database';
 import { parseMainDomain, getDomainFromHeaders } from '@/lib/domain-utils';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 import { subscribeWelcomeDiscountSchema } from '@/core/application/dtos/descuento.dto';
@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   const domain = await getDomainFromHeaders();
   const mainDomain = parseMainDomain(domain);
 
-  const empresaResult = await empresaPublicRepository.findByDomainPublic(mainDomain);
+  const empresaResult = await getEmpresaPublicRepository().findByDomainPublic(mainDomain);
   if (!empresaResult.success) {
     return NextResponse.json({ error: 'Error al buscar empresa' }, { status: 500 });
   }
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
   const validIdiomas = ['es', 'en', 'fr', 'it', 'de'];
   const resolvedIdioma = validIdiomas.includes(idioma) ? idioma : 'es';
 
-  const result = await descuentoUseCase.subscribe(empresa.id, email, empresa.nombre, resolvedIdioma, duracion);
+  const result = await getDescuentoUseCase().subscribe(empresa.id, email, empresa.nombre, resolvedIdioma, duracion);
 
   if (!result.success) {
     if (result.error.code === 'ALREADY_SUBSCRIBED') {

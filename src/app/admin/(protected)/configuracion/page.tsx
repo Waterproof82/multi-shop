@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { authAdminUseCase, empresaUseCase } from '@/core/infrastructure/database';
+import { getAuthAdminUseCase, getEmpresaUseCase } from '@/core/infrastructure/database';
 import { SUPERADMIN_ROLE } from '@/core/domain/repositories/IAdminRepository';
 import { ConfiguracionPageClient } from '@/components/admin/configuracion-page-client';
 
@@ -14,7 +14,7 @@ export default async function ConfiguracionPage() {
     redirect('/admin/login');
   }
 
-  const admin = await authAdminUseCase.verifyToken(token);
+  const admin = await getAuthAdminUseCase().verifyToken(token);
 
   if (!admin) {
     redirect('/admin/login');
@@ -37,7 +37,7 @@ export default async function ConfiguracionPage() {
   if (!empresaId) {
     redirect('/admin/login');
   }
-  const empresaResult = await empresaUseCase.getById(empresaId);
+  const empresaResult = await getEmpresaUseCase().getById(empresaId);
   
   const empresaData = empresaResult.success ? empresaResult.data : null;
   

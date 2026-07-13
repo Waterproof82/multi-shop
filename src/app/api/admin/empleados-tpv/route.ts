@@ -5,7 +5,7 @@ import {
   handleResult,
   type AuthResult,
 } from '@/core/infrastructure/api/helpers';
-import { empleadoTpvRepository } from '@/core/infrastructure/database';
+import { getEmpleadoTpvRepository } from '@/core/infrastructure/database';
 import { hashPin } from '@/lib/waiter-auth';
 import { z } from 'zod';
 
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   if (forbidden) return forbidden;
   if (!empresaId) return NextResponse.json({ error: 'empresaId requerido' }, { status: 400 });
 
-  const result = await empleadoTpvRepository.findAllByEmpresa(empresaId);
+  const result = await getEmpleadoTpvRepository().findAllByEmpresa(empresaId);
   if (!result.success) return handleResult(result);
   const safeList = result.data.map(({ pinHash: _, ...rest }) => rest);
   return NextResponse.json(safeList);
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
 
   const pinHash = await hashPin(parsed.data.pin, empresaId);
 
-  const result = await empleadoTpvRepository.create({
+  const result = await getEmpleadoTpvRepository().create({
     empresaId,
     nombre: parsed.data.nombre,
     rol: parsed.data.rol,

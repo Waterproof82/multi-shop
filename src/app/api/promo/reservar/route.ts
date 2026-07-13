@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { tgtgUseCase } from '@/core/infrastructure/database';
+import { getTgtgUseCase } from '@/core/infrastructure/database';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
 import { verifyReservaToken } from '@/lib/reserva-token';
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
 
   try {
     // Check if pickup window has passed
-    const promoResult = await tgtgUseCase.getPublicPromo(tgtgPromoId);
+    const promoResult = await getTgtgUseCase().getPublicPromo(tgtgPromoId);
     if (!promoResult.success || !promoResult.data) {
       return NextResponse.json({ error: 'not_found' }, { status: 404 });
     }
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ result: 'expired' }, { status: 200 });
     }
 
-    const result = await tgtgUseCase.claimCupon({ itemId, tgtgPromoId, email, token });
+    const result = await getTgtgUseCase().claimCupon({ itemId, tgtgPromoId, email, token });
 
     if (!result.success) {
       return NextResponse.json({ error: result.error.message }, { status: 500 });

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { authAdminUseCase } from '@/core/infrastructure/database';
+import { getAuthAdminUseCase } from '@/core/infrastructure/database';
 import { rateLimitLogin } from '@/core/infrastructure/api/rate-limit';
 import { validationErrorResponse } from '@/core/infrastructure/api/helpers';
 
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     return validationErrorResponse(parsed.error.errors[0].message);
   }
 
-  const result = await authAdminUseCase.login(parsed.data);
+  const result = await getAuthAdminUseCase().login(parsed.data);
 
   if (!result.success) {
     if (

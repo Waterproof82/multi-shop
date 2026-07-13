@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { authAdminUseCase } from '@/core/infrastructure/database';
+import { getAuthAdminUseCase } from '@/core/infrastructure/database';
 import { loginSchema } from '@/core/application/dtos/auth.dto';
 import { successResponse, validationErrorResponse, handleResult } from '@/core/infrastructure/api/helpers';
 import { rateLimitLogin, rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     return validationErrorResponse(parsed.error.errors[0].message);
   }
 
-  const result = await authAdminUseCase.login(parsed.data);
+  const result = await getAuthAdminUseCase().login(parsed.data);
   
   if (!result.success) {
     if (result.error.code === 'AUTH_LOGIN_ERROR' ||

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { sendEmail } from '@/lib/brevo-email';
-import { tgtgUseCase, empresaUseCase } from '@/core/infrastructure/database';
+import { getTgtgUseCase, getEmpresaUseCase } from '@/core/infrastructure/database';
 import { requireAuth, requireRole } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
@@ -213,14 +213,14 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const empresaResult = await empresaUseCase.getById(empresaId!);
+    const empresaResult = await getEmpresaUseCase().getById(empresaId!);
     if (!empresaResult.success || !empresaResult.data) {
       return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 });
     }
     const empresa = empresaResult.data;
 
     // Fetch all recent campaigns once and index by id
-    const allRecentResult = await tgtgUseCase.getAllRecent(empresaId!);
+    const allRecentResult = await getTgtgUseCase().getAllRecent(empresaId!);
     if (!allRecentResult.success) {
       return NextResponse.json({ error: 'Error al obtener campañas' }, { status: 500 });
     }
@@ -231,7 +231,7 @@ export async function POST(request: NextRequest) {
     const campaignsToSend: Array<{ promoId: string; horaInicio: string; horaFin: string; fechaActivacion: string; items: TgtgItem[] }> = [];
 
     for (const promoId of promoIds) {
-      const sendResult = await tgtgUseCase.sendCampaignEmails(empresaId!, promoId);
+      const sendResult = await getTgtgUseCase().sendCampaignEmails(empresaId!, promoId);
       if (!sendResult.success) {
         const status = sendResult.error.code === 'NOT_FOUND' ? 404 : sendResult.error.code === 'ALREADY_SENT' ? 409 : 400;
         return NextResponse.json({ error: sendResult.error.message }, { status });
@@ -342,7 +342,7 @@ export async function POST(request: NextRequest) {
     const updatedPromos: Array<{ id: string; emailEnviado: boolean; numeroEnvios: number }> = [];
     if (emailsSent > 0) {
       for (const c of campaignsToSend) {
-        const markResult = await tgtgUseCase.markEmailSent(empresaId!, c.promoId, emailsSent);
+        const markResult = await getTgtgUseCase().markEmailSent(empresaId!, c.promoId, emailsSent);
         if (markResult.success) {
           updatedPromos.push({ id: markResult.data.id, emailEnviado: markResult.data.emailEnviado, numeroEnvios: markResult.data.numeroEnvios });
         }

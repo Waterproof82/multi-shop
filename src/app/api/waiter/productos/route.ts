@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { productUseCase } from '@/core/infrastructure/database';
+import { getProductUseCase } from '@/core/infrastructure/database';
 
 export async function GET(request: NextRequest) {
   const empresaId = request.headers.get('x-empresa-id');
@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 
-  const result = await productUseCase.getAll(empresaId);
+  const result = await getProductUseCase().getAll(empresaId);
   if (!result.success) {
     return NextResponse.json({ error: 'Error al obtener los productos' }, { status: 500 });
   }

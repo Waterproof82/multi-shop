@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { sendEmail } from '@/lib/brevo-email';
-import { empresaUseCase } from '@/core/infrastructure/database';
+import { getEmpresaUseCase } from '@/core/infrastructure/database';
 import { requireAuth, requireRole } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
     const roleError = requireRole(request, ['admin', 'superadmin']);
     if (roleError) return roleError;
 
-    const empresaResult = await empresaUseCase.getById(empresaId!);
+    const empresaResult = await getEmpresaUseCase().getById(empresaId!);
 
     if (!empresaResult.success) {
       return NextResponse.json({ error: empresaResult.error.message }, { status: 500 });

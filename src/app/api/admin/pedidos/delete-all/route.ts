@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { pedidoUseCase } from '@/core/infrastructure/database';
+import { getPedidoUseCase } from '@/core/infrastructure/database';
 import { requireAuth, requireRole, successResponse, validationErrorResponse, handleResult, type AuthResult } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 
@@ -23,7 +23,7 @@ export async function DELETE(request: NextRequest) {
 
   const empresaId = queryEmpresaId;
 
-  const result = await pedidoUseCase.deleteAll(empresaId);
+  const result = await getPedidoUseCase().deleteAll(empresaId);
   if (!result.success) {
     return handleResult(result);
   }

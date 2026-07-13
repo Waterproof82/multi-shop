@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { revalidateTag } from 'next/cache';
-import { categoryUseCase } from '@/core/infrastructure/database';
+import { getCategoryUseCase } from '@/core/infrastructure/database';
 import { createCategorySchema, updateCategorySchema, categoryIdSchema } from '@/core/application/dtos/category.dto';
 import { requireAuth, requireRole, handleResult, handleResultWithStatus, validationErrorResponse, type AuthResult } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
   
   const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
 
-  const result = await categoryUseCase.getAll(empresaId!);
+  const result = await getCategoryUseCase().getAll(empresaId!);
   
   if (!result.success) {
     return handleResult(result);
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     return validationErrorResponse(parsed.error.errors[0].message);
   }
 
-  const result = await categoryUseCase.create(parsed.data);
+  const result = await getCategoryUseCase().create(parsed.data);
 
   if (!result.success) {
     return handleResult(result);
@@ -120,7 +120,7 @@ export async function PUT(request: NextRequest) {
     return validationErrorResponse(parsed.error.errors[0].message);
   }
 
-  const result = await categoryUseCase.update(idParsed.data.id, empresaId!, parsed.data);
+  const result = await getCategoryUseCase().update(idParsed.data.id, empresaId!, parsed.data);
 
   if (!result.success) {
     return handleResult(result);
@@ -149,7 +149,7 @@ export async function DELETE(request: NextRequest) {
     return validationErrorResponse('ID inválido');
   }
 
-  const result = await categoryUseCase.delete(idParsed.data.id, empresaId!);
+  const result = await getCategoryUseCase().delete(idParsed.data.id, empresaId!);
 
   if (!result.success) {
     return handleResult(result);

@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { authAdminUseCase, pedidoUseCase, empresaUseCase, tgtgUseCase, promocionUseCase } from '@/core/infrastructure/database';
+import { getAuthAdminUseCase, getPedidoUseCase, getEmpresaUseCase, getTgtgUseCase, getPromocionUseCase } from '@/core/infrastructure/database';
 import { getMenuUseCase } from '@/lib/server-services';
 import { AdminDashboardClient } from '@/components/admin/admin-dashboard-client';
 import { SUPERADMIN_ROLE } from '@/core/domain/repositories/IAdminRepository';
@@ -19,7 +19,7 @@ export default async function AdminDashboard() {
     redirect('/admin/login');
   }
 
-  const admin = await authAdminUseCase.verifyToken(token);
+  const admin = await getAuthAdminUseCase().verifyToken(token);
 
   if (!admin) {
     redirect('/admin/login');
@@ -44,7 +44,7 @@ export default async function AdminDashboard() {
   let mostrarTgtg = admin.empresa?.mostrarTgtg ?? true;
 
   if (admin.rol === SUPERADMIN_ROLE || !admin.empresa) {
-    const empresaResult = await empresaUseCase.getById(empresaId);
+    const empresaResult = await getEmpresaUseCase().getById(empresaId);
     if (empresaResult.success && empresaResult.data) {
       empresaNombre = empresaResult.data.nombre || 'default';
       mostrarPromociones = empresaResult.data.mostrarPromociones ?? true;
@@ -57,10 +57,10 @@ export default async function AdminDashboard() {
 
   const [menuResult, pedidosResult, statsResult, promosResult, tgtgResult] = await Promise.all([
     getMenuUseCase.execute(empresaId),
-    pedidoUseCase.getAll(empresaId),
-    pedidoUseCase.getStats(empresaId, new Date().getMonth(), new Date().getFullYear()),
-    mostrarPromociones ? promocionUseCase.getAll(empresaId) : Promise.resolve(emptyPromos),
-    mostrarTgtg ? tgtgUseCase.getAllRecent(empresaId) : Promise.resolve(emptyTgtg),
+    getPedidoUseCase().getAll(empresaId),
+    getPedidoUseCase().getStats(empresaId, new Date().getMonth(), new Date().getFullYear()),
+    mostrarPromociones ? getPromocionUseCase().getAll(empresaId) : Promise.resolve(emptyPromos),
+    mostrarTgtg ? getTgtgUseCase().getAllRecent(empresaId) : Promise.resolve(emptyTgtg),
   ]);
 
   const menu: MenuCategoryVM[] = menuResult.data || [];

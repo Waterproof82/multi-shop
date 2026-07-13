@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { mesaSesionUseCase } from '@/core/infrastructure/database';
+import { getMesaSesionUseCase } from '@/core/infrastructure/database';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 
-  const result = await mesaSesionUseCase.getMesasWithSessions(empresaId);
+  const result = await getMesaSesionUseCase().getMesasWithSessions(empresaId);
   if (!result.success) {
     return NextResponse.json({ error: 'Error al obtener las mesas' }, { status: 500 });
   }

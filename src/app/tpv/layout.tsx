@@ -1,11 +1,11 @@
 import { redirect } from 'next/navigation';
 import { cookies, headers } from 'next/headers';
 import {
-  authAdminUseCase,
-  productUseCase,
-  categoryUseCase,
-  mesaSesionUseCase,
-  complementoGrupoRepository,
+  getAuthAdminUseCase,
+  getProductUseCase,
+  getCategoryUseCase,
+  getMesaSesionUseCase,
+  getComplementoGrupoRepository,
 } from '@/core/infrastructure/database';
 import { verifyTpvEmployeeToken } from '@/lib/tpv-employee-auth';
 import { SupabaseTpvRepository } from '@/core/infrastructure/repositories/supabase-tpv.repository';
@@ -45,7 +45,7 @@ export default async function TpvLayout({ children }: { readonly children: React
   // 1. Try admin_token first
   const adminToken = cookieStore.get('admin_token')?.value;
   if (adminToken) {
-    const admin = await authAdminUseCase.verifyToken(adminToken);
+    const admin = await getAuthAdminUseCase().verifyToken(adminToken);
     if (admin && VALID_ROLES.has(admin.rol)) {
       rol = admin.rol;
       empresaNombre = admin.empresa?.nombre ?? '';
@@ -80,16 +80,16 @@ export default async function TpvLayout({ children }: { readonly children: React
   const supabase = getSupabaseClient();
 
   const [productsResult, categoriesResult, mesasResult, turnoResult, empresaRes, gruposResult] = await Promise.all([
-    productUseCase.getAll(empresaId),
-    categoryUseCase.getAll(empresaId),
-    mesaSesionUseCase.getMesasWithSessions(empresaId),
+    getProductUseCase().getAll(empresaId),
+    getCategoryUseCase().getAll(empresaId),
+    getMesaSesionUseCase().getMesasWithSessions(empresaId),
     repo.findTurnoActivo(empresaId),
     supabase
       .from('empresas')
       .select('tipo_impuesto, porcentaje_impuesto')
       .eq('id', empresaId)
       .maybeSingle(),
-    complementoGrupoRepository.findAllByTenant(empresaId),
+    getComplementoGrupoRepository().findAllByTenant(empresaId),
   ]);
 
   // Redirect to turno/abrir if no active turno — skip for pages that don't need one
@@ -105,7 +105,7 @@ export default async function TpvLayout({ children }: { readonly children: React
   const complementoGrupos = gruposResult.success ? gruposResult.data : [];
 
   const activeProductIds = products.filter(p => p.activo).map(p => p.id);
-  const assignmentsResult = await complementoGrupoRepository.findAssignmentsByProductos(activeProductIds, empresaId);
+  const assignmentsResult = await getComplementoGrupoRepository().findAssignmentsByProductos(activeProductIds, empresaId);
   const productoGrupos = assignmentsResult.success ? assignmentsResult.data : [];
 
   const empresaRow = empresaRes.data as { tipo_impuesto: string | null; porcentaje_impuesto: number | null } | null;
