@@ -56,7 +56,7 @@ export default async function AdminDashboard() {
   const emptyTgtg: { success: true; data: TgtgWithItems[] } = { success: true, data: [] };
 
   const [menuResult, pedidosResult, statsResult, promosResult, tgtgResult] = await Promise.all([
-    getMenuUseCase.execute(empresaId),
+    getMenuUseCase().execute(empresaId),
     getPedidoUseCase().getAll(empresaId),
     getPedidoUseCase().getStats(empresaId, new Date().getMonth(), new Date().getFullYear()),
     mostrarPromociones ? getPromocionUseCase().getAll(empresaId) : Promise.resolve(emptyPromos),
