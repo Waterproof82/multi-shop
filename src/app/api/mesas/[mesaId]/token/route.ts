@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { mesaClientTokenUseCase } from '@/core/infrastructure/database';
+import { getMesaClientTokenUseCase } from '@/core/infrastructure/database';
 import { rateLimitMesaTokenIssuance } from '@/core/infrastructure/api/rate-limit';
 
 const mesaIdSchema = z.string().uuid('El mesaId debe ser un UUID válido');
@@ -18,7 +18,7 @@ export async function POST(
   const rateLimited = await rateLimitMesaTokenIssuance(parsed.data);
   if (rateLimited) return rateLimited;
 
-  const result = await mesaClientTokenUseCase.issueToken(parsed.data);
+  const result = await getMesaClientTokenUseCase().issueToken(parsed.data);
 
   if (!result.success) {
     if (result.error.code === 'SESSION_NOT_ACTIVE') {

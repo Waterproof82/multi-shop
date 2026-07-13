@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { tgtgUseCase } from '@/core/infrastructure/database';
+import { getTgtgUseCase } from '@/core/infrastructure/database';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
 
@@ -17,7 +17,7 @@ export async function GET(
     const promoIdParam = searchParams.get('promoId');
     const tokenParam = searchParams.get('token');
 
-    const itemResult = await tgtgUseCase.getPublicItem(itemId);
+    const itemResult = await getTgtgUseCase().getPublicItem(itemId);
 
     if (!itemResult.success) {
       return NextResponse.json({ error: 'Error al obtener oferta' }, { status: 500 });
@@ -31,8 +31,8 @@ export async function GET(
     // Check token usage and pickup time in parallel
     const promoId = promoIdParam ?? item.tgtgPromoId;
     const [promoResult, tokenUsedResult] = await Promise.all([
-      promoId ? tgtgUseCase.getPublicPromo(promoId) : Promise.resolve(null),
-      tokenParam ? tgtgUseCase.isTokenUsed(tokenParam) : Promise.resolve(null),
+      promoId ? getTgtgUseCase().getPublicPromo(promoId) : Promise.resolve(null),
+      tokenParam ? getTgtgUseCase().isTokenUsed(tokenParam) : Promise.resolve(null),
     ]);
 
     const horaRecogidaInicio = promoResult?.success && promoResult.data ? promoResult.data.horaRecogidaInicio : null;

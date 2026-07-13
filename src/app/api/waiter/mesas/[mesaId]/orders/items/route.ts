@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { mesaSesionRepository } from '@/core/infrastructure/database';
+import { getMesaSesionRepository } from '@/core/infrastructure/database';
 import { removeSessionItemUseCase } from '@/core/application/use-cases/mesa/removeSessionItemUseCase';
 
 const mesaIdSchema = z.string().uuid();
@@ -37,7 +37,7 @@ export async function DELETE(
     return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
   }
 
-  const sesionResult = await mesaSesionRepository.findActiveSesionByMesa(mesaParsed.data);
+  const sesionResult = await getMesaSesionRepository().findActiveSesionByMesa(mesaParsed.data);
   if (!sesionResult.success) {
     return NextResponse.json({ error: 'Error al buscar sesión activa' }, { status: 500 });
   }

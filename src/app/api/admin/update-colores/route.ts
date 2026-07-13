@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { empresaUseCase } from '@/core/infrastructure/database';
+import { getEmpresaUseCase } from '@/core/infrastructure/database';
 import { requireAuth, requireRole, handleResult, validationErrorResponse, type AuthResult } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import type { EmpresaColores } from '@/core/domain/entities/types';
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     return validationErrorResponse(parsed.error.errors[0].message);
   }
 
-  const result = await empresaUseCase.updateColores(empresaId!, parsed.data.colores as EmpresaColores);
+  const result = await getEmpresaUseCase().updateColores(empresaId!, parsed.data.colores as EmpresaColores);
   
   if (!result.success) {
     return handleResult(result);

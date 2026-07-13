@@ -1,5 +1,5 @@
 import { type NextRequest } from 'next/server';
-import { complementoGrupoUseCase } from '@/core/infrastructure/database';
+import { getComplementoGrupoUseCase } from '@/core/infrastructure/database';
 import { updateComplementoGrupoSchema } from '@/core/application/dtos/complemento.dto';
 import { requireAuth, requireRole, handleResultWithStatus, validationErrorResponse, type AuthResult } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
@@ -37,7 +37,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
     return validationErrorResponse(parsed.error.errors[0].message);
   }
 
-  const result = await complementoGrupoUseCase.update(grupoId, empresaId!, parsed.data);
+  const result = await getComplementoGrupoUseCase().update(grupoId, empresaId!, parsed.data);
   return handleResultWithStatus(result);
 }
 
@@ -56,6 +56,6 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   const queryEmpresaId = searchParams.get('empresaId');
   const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
 
-  const result = await complementoGrupoUseCase.delete(grupoId, empresaId!);
+  const result = await getComplementoGrupoUseCase().delete(grupoId, empresaId!);
   return handleResultWithStatus(result);
 }

@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { mesaSesionUseCase } from '@/core/infrastructure/database';
+import { getMesaSesionUseCase } from '@/core/infrastructure/database';
 import { requireAuth, requireRole, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 
 export async function GET(req: NextRequest) {
@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   if (forbidden) return forbidden;
   if (!empresaId) return validationErrorResponse('empresaId requerido');
 
-  const result = await mesaSesionUseCase.getMesasWithSessions(empresaId);
+  const result = await getMesaSesionUseCase().getMesasWithSessions(empresaId);
   return NextResponse.json({
     mesas: result.success ? result.data : [],
   });

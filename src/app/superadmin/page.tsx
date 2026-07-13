@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import { Building2, Users, ShoppingCart, Package, AlertCircle, TrendingUp, Calendar, Trophy } from 'lucide-react';
-import { superAdminUseCase } from '@/core/infrastructure/database';
+import { getSuperAdminUseCase } from '@/core/infrastructure/database';
 import { EmpresasTable } from './empresas-table';
 
 interface EmpresaStats {
@@ -72,12 +72,12 @@ function getPositionClasses(posicion: number): string {
 
 async function getData(): Promise<{ empresas: Empresa[]; globalStats: GlobalStats | null; error: string | null }> {
   try {
-    const empresasResult = await superAdminUseCase.getAllEmpresas();
+    const empresasResult = await getSuperAdminUseCase().getAllEmpresas();
     if (!empresasResult.success) {
       return { empresas: [], globalStats: null, error: empresasResult.error.message };
     }
 
-    const globalStatsResult = await superAdminUseCase.getGlobalStats();
+    const globalStatsResult = await getSuperAdminUseCase().getGlobalStats();
     if (!globalStatsResult.success) {
       return { empresas: empresasResult.data, globalStats: null, error: globalStatsResult.error.message };
     }

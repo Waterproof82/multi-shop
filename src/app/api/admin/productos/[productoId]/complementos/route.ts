@@ -1,6 +1,6 @@
 import { type NextRequest } from 'next/server';
 import { revalidateTag } from 'next/cache';
-import { complementoGrupoUseCase } from '@/core/infrastructure/database';
+import { getComplementoGrupoUseCase } from '@/core/infrastructure/database';
 import { setProductoGruposSchema } from '@/core/application/dtos/complemento.dto';
 import { requireAuth, requireRole, handleResultWithStatus, validationErrorResponse, type AuthResult } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 
   if (!authEmpresaId) return validationErrorResponse('empresaId requerido');
 
-  const result = await complementoGrupoUseCase.getByProducto(productoId, authEmpresaId);
+  const result = await getComplementoGrupoUseCase().getByProducto(productoId, authEmpresaId);
   return handleResultWithStatus(result);
 }
 
@@ -50,7 +50,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
     return validationErrorResponse(parsed.error.errors[0]?.message ?? 'Datos inválidos');
   }
 
-  const result = await complementoGrupoUseCase.setProductoGrupos(productoId, parsed.data.grupoIds, authEmpresaId);
+  const result = await getComplementoGrupoUseCase().setProductoGrupos(productoId, parsed.data.grupoIds, authEmpresaId);
   if (result.success) revalidateTag(catalogTag(authEmpresaId!), {});
   return handleResultWithStatus(result);
 }

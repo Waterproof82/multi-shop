@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { sendEmail } from '@/lib/brevo-email';
 import { deleteImageFromR2 } from '@/core/infrastructure/storage/s3-client';
-import { promocionUseCase, empresaUseCase } from '@/core/infrastructure/database';
+import { getPromocionUseCase, getEmpresaUseCase } from '@/core/infrastructure/database';
 import { requireAuth, requireRole, errorResponse, handleResult, type AuthResult } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
@@ -204,7 +204,7 @@ export async function GET(request: NextRequest) {
   const queryEmpresaId = searchParams.get('empresaId');
   const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
 
-  const result = await promocionUseCase.getAll(empresaId!);
+  const result = await getPromocionUseCase().getAll(empresaId!);
   if (!result.success) {
     return handleResult(result);
   }
@@ -225,7 +225,7 @@ export async function POST(request: NextRequest) {
   const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
 
   try {
-    const empresaResult = await empresaUseCase.getById(empresaId!);
+    const empresaResult = await getEmpresaUseCase().getById(empresaId!);
     if (!empresaResult.success) {
       return NextResponse.json({ error: empresaResult.error.message }, { status: 500 });
     }
@@ -244,7 +244,7 @@ export async function POST(request: NextRequest) {
 
     const { texto_promocion, imagen_url, fecha_fin } = parsed.data;
 
-    const createResult = await promocionUseCase.create(
+    const createResult = await getPromocionUseCase().create(
       empresaId!,
       texto_promocion,
       imagen_url,

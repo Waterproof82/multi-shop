@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, handleResult } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
-import { valoracionUseCase } from '@/core/infrastructure/database';
+import { getValoracionUseCase } from '@/core/infrastructure/database';
 import { z } from 'zod';
 
 const pageSchema = z.coerce.number().int().min(0).default(0);
@@ -18,8 +18,8 @@ export async function GET(request: NextRequest) {
     const page = pageSchema.parse(request.nextUrl.searchParams.get('page') ?? '0');
 
     const [statsResult, listResult] = await Promise.all([
-      valoracionUseCase.getStats(empresaId!),
-      valoracionUseCase.list(empresaId!, page),
+      getValoracionUseCase().getStats(empresaId!),
+      getValoracionUseCase().list(empresaId!, page),
     ]);
 
     if (!statsResult.success) return handleResult(statsResult);

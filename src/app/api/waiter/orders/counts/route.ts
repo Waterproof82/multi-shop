@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { pedidoRepository } from '@/core/infrastructure/database';
+import { getPedidoRepository } from '@/core/infrastructure/database';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 
 export const dynamic = 'force-dynamic';
@@ -13,8 +13,8 @@ export async function GET(request: NextRequest) {
   const supabase = getSupabaseClient();
 
   const [result, pendientesResult, llamadasResult] = await Promise.all([
-    pedidoRepository.countKitchenBarOrders(empresaId),
-    pedidoRepository.findPendientesValidacion(empresaId),
+    getPedidoRepository().countKitchenBarOrders(empresaId),
+    getPedidoRepository().findPendientesValidacion(empresaId),
     supabase
       .from('mesa_sesiones')
       .select('id', { count: 'exact', head: true })

@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
-import { authAdminUseCase } from '@/core/infrastructure/database';
+import { getAuthAdminUseCase } from '@/core/infrastructure/database';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { LegalChainVerify } from '@/components/tpv/LegalChainVerify';
 
@@ -59,7 +59,7 @@ export default async function TpvLegalPage() {
   const token = cookieStore.get('admin_token')?.value;
   if (!token) redirect('/admin/login');
 
-  const admin = await authAdminUseCase.verifyToken(token);
+  const admin = await getAuthAdminUseCase().verifyToken(token);
   if (!admin) redirect('/admin/login');
   if (!admin.empresaId) redirect('/admin/login');
 

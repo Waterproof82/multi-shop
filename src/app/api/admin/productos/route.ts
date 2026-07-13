@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { revalidateTag } from 'next/cache';
-import { productUseCase } from '@/core/infrastructure/database';
+import { getProductUseCase } from '@/core/infrastructure/database';
 import { createProductSchema, updateProductSchema, productIdSchema } from '@/core/application/dtos/product.dto';
 import { requireAuth, requireRole, handleResult, handleResultWithStatus, validationErrorResponse, type AuthResult } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
     return validationErrorResponse('Empresa ID required');
   }
 
-  const result = await productUseCase.getAll(empresaId);
+  const result = await getProductUseCase().getAll(empresaId);
   
   if (!result.success) {
     return handleResult(result);
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
     return validationErrorResponse(parsed.error.errors[0].message);
   }
 
-  const result = await productUseCase.create(parsed.data);
+  const result = await getProductUseCase().create(parsed.data);
 
   if (!result.success) {
     return handleResult(result);
@@ -153,7 +153,7 @@ export async function PUT(request: NextRequest) {
     return validationErrorResponse(parsed.error.errors[0].message);
   }
 
-  const result = await productUseCase.update(idParsed.data.id, empresaId!, parsed.data);
+  const result = await getProductUseCase().update(idParsed.data.id, empresaId!, parsed.data);
 
   if (!result.success) {
     return handleResult(result);
@@ -191,7 +191,7 @@ export async function DELETE(request: NextRequest) {
     return validationErrorResponse('Empresa ID required');
   }
   
-  const result = await productUseCase.delete(idParsed.data.id, empresaId);
+  const result = await getProductUseCase().delete(idParsed.data.id, empresaId);
 
   if (!result.success) {
     return handleResult(result);

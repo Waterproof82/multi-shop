@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { mesaSesionRepository } from '@/core/infrastructure/database';
+import { getMesaSesionRepository } from '@/core/infrastructure/database';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 
@@ -34,7 +34,7 @@ export async function POST(
     return NextResponse.json({ error: bodyParsed.error.errors[0].message }, { status: 400 });
   }
 
-  const sesionResult = await mesaSesionRepository.findActiveSesionByMesa(mesaParsed.data);
+  const sesionResult = await getMesaSesionRepository().findActiveSesionByMesa(mesaParsed.data);
   if (!sesionResult.success) {
     return NextResponse.json({ error: 'Error al buscar sesión' }, { status: 500 });
   }
@@ -88,7 +88,7 @@ export async function DELETE(
   const rateLimited = await rateLimitPublic(request as Parameters<typeof rateLimitPublic>[0]);
   if (rateLimited) return rateLimited;
 
-  const sesionResult = await mesaSesionRepository.findActiveSesionByMesa(mesaParsed.data);
+  const sesionResult = await getMesaSesionRepository().findActiveSesionByMesa(mesaParsed.data);
   if (!sesionResult.success) {
     return NextResponse.json({ error: 'Error al buscar sesión' }, { status: 500 });
   }

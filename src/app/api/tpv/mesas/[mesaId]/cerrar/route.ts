@@ -5,7 +5,7 @@ import {
   handleResult,
   type AuthResult,
 } from '@/core/infrastructure/api/helpers';
-import { mesaSesionRepository } from '@/core/infrastructure/database';
+import { getMesaSesionRepository } from '@/core/infrastructure/database';
 
 export async function POST(
   req: NextRequest,
@@ -21,7 +21,7 @@ export async function POST(
 
   const { mesaId } = await params;
 
-  const sesionResult = await mesaSesionRepository.findActiveSesionByMesa(mesaId);
+  const sesionResult = await getMesaSesionRepository().findActiveSesionByMesa(mesaId);
   if (!sesionResult.success) return handleResult(sesionResult);
   if (!sesionResult.data) {
     return NextResponse.json({ error: 'Sin sesión activa' }, { status: 404 });
@@ -32,7 +32,7 @@ export async function POST(
     return NextResponse.json({ error: 'La sesión no está pagada' }, { status: 422 });
   }
 
-  const closeResult = await mesaSesionRepository.closeSesion(sesion.id);
+  const closeResult = await getMesaSesionRepository().closeSesion(sesion.id);
   if (!closeResult.success) {
     return NextResponse.json({ error: closeResult.error.message }, { status: 500 });
   }

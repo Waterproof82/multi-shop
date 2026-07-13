@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { pedidoUseCase, mesaUseCase } from '@/core/infrastructure/database';
+import { getPedidoUseCase, getMesaUseCase } from '@/core/infrastructure/database';
 import { requireAuth, requireRole, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 
@@ -150,14 +150,14 @@ export async function POST(req: NextRequest) {
 
   const { mesaId, items, nota, pase } = parsed.data;
 
-  const mesaResult = await mesaUseCase.getMesa(mesaId);
+  const mesaResult = await getMesaUseCase().getMesa(mesaId);
   if (!mesaResult.success || !mesaResult.data) {
     return NextResponse.json({ error: 'Mesa no encontrada' }, { status: 404 });
   }
 
   const mesa = mesaResult.data;
 
-  const pedidoResult = await pedidoUseCase.createMesaOrder(
+  const pedidoResult = await getPedidoUseCase().createMesaOrder(
     empresaId,
     {
       mesa_id: mesaId,

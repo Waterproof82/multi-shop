@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { requireAuth, requireRole, successResponse, errorResponse } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import { getR2Config, uploadToR2 } from '@/core/infrastructure/storage/s3-client';
-import { empresaUseCase } from '@/core/infrastructure/database';
+import { getEmpresaUseCase } from '@/core/infrastructure/database';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
 import { VALIDATION_ERRORS, SERVER_ERRORS, AUTH_ERRORS, createErrorResponse } from '@/core/domain/constants/api-errors';
 
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Derive slug from DB - never from client (OWASP: trust server-side data)
-  const empresaResult = await empresaUseCase.getById(empresaId);
+  const empresaResult = await getEmpresaUseCase().getById(empresaId);
   if (!empresaResult.success) {
     return errorResponse(SERVER_ERRORS.DATABASE_ERROR.message);
   }

@@ -5,23 +5,25 @@ import { getSupabaseAnonClient } from "@/core/infrastructure/database/supabase-c
 import { SupabaseProductRepository } from "@/core/infrastructure/database/SupabaseProductRepository";
 import { SupabaseCategoryRepository } from "@/core/infrastructure/database/SupabaseCategoryRepository";
 import { GetMenuUseCase } from "@/core/application/use-cases/get-menu.use-case";
-import { empresaPublicRepository, complementoGrupoRepository } from "@/core/infrastructure/database";
+import { getEmpresaPublicRepository, getComplementoGrupoRepository } from "@/core/infrastructure/database";
 import { parseMainDomain } from "@/lib/domain-utils";
 import { logger } from "@/core/infrastructure/logging/logger";
 import type { EmpresaPublic } from "@/core/domain/entities/types";
 
-// Repository instantiation (anon key for public read)
-const supabase = getSupabaseAnonClient();
-const productRepo = new SupabaseProductRepository(supabase);
-const categoryRepo = new SupabaseCategoryRepository(supabase);
-
-// Use Case instantiation
-export const getMenuUseCase = new GetMenuUseCase(productRepo, categoryRepo, complementoGrupoRepository);
+// Lazy Use Case instantiation
+let _menuUseCase: GetMenuUseCase | undefined;
+export function getMenuUseCase(): GetMenuUseCase {
+  return _menuUseCase ??= new GetMenuUseCase(
+    new SupabaseProductRepository(getSupabaseAnonClient()),
+    new SupabaseCategoryRepository(getSupabaseAnonClient()),
+    getComplementoGrupoRepository()
+  );
+}
 
 // DO NOT cache empresa - changes must be visible immediately
 export async function getEmpresaByDomain(domain: string): Promise<EmpresaPublic | null> {
   const mainDomain = parseMainDomain(domain);
-  const result = await empresaPublicRepository.findByDomainPublic(mainDomain);
+  const result = await getEmpresaPublicRepository().findByDomainPublic(mainDomain);
   if (!result.success) {
     await logger.logError({
       codigo: result.error.code,
@@ -55,7 +57,7 @@ export function extractMainDomain(fullDomain: string, subdomainConfig: string | 
  */
 export function getCachedMenu(empresaId: string) {
   return unstable_cache(
-    async () => getMenuUseCase.execute(empresaId),
+    async () => getMenuUseCase().execute(empresaId),
     [catalogTag(empresaId)],
     { tags: [catalogTag(empresaId)], revalidate: 3600 }
   )();

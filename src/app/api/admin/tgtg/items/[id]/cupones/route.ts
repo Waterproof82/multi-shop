@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { tgtgUseCase } from '@/core/infrastructure/database';
+import { getTgtgUseCase } from '@/core/infrastructure/database';
 import { requireAuth, requireRole } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
@@ -36,7 +36,7 @@ export async function PATCH(
   }
 
   try {
-    const result = await tgtgUseCase.adjustCupones(empresaId!, itemId, parsed.data.delta);
+    const result = await getTgtgUseCase().adjustCupones(empresaId!, itemId, parsed.data.delta);
     if (!result.success) {
       return NextResponse.json({ error: result.error.message }, { status: result.error.code === 'NOT_FOUND' ? 404 : 500 });
     }
