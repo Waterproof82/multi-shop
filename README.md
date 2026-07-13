@@ -925,6 +925,25 @@ pnpm lint     # Linting
 npx tsx scripts/setup-r2-cors.ts
 ```
 
+### Graphify — grafo de conocimiento del proyecto
+
+El proyecto usa [Graphify](https://graphify.net) para generar un grafo de conocimiento basado en AST. Claude Code lo consulta automáticamente antes de hacer búsquedas en el código.
+
+Los artefactos generados viven en `graphify-out/` (`graph.json` y `GRAPH_REPORT.md` están versionados).
+
+```bash
+# Prerequisito (una sola vez)
+pip install "graphifyy[sql]"
+
+# Regenerar el grafo tras cambios significativos en el código
+graphify . --code-only
+
+# Ver el estado actual del grafo (nodos, comunidades)
+graphify cluster-only .
+```
+
+> El ejecutable queda en `~/.local/bin/graphify` (Linux/Mac) o `%APPDATA%\Python\Python3xx\Scripts\graphify.exe` (Windows). Si no está en el PATH, usar la ruta completa.
+
 ---
 
 ## Crear Super Admin

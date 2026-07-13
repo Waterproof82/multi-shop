@@ -80,6 +80,13 @@ electron/dist/
 # Misc project files
 productos-table.yml
 
+# Graphify — keep only the useful artifacts
+graphify-out/cache/
+graphify-out/graph.html
+graphify-out/2*/
+graphify-out/.graphify_*
+graphify-out/manifest.json
+
 # Capacitor Android — commit only config files
 # Note: git won't descend into ignored dirs, so intermediate paths must be un-ignored explicitly
 android/
