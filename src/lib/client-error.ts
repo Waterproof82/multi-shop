@@ -1,4 +1,5 @@
 import { AppError, ErrorModule } from '@/core/domain/entities/types';
+import * as Sentry from '@sentry/nextjs';
 
 /**
  * Client-safe error handler for React components
@@ -36,6 +37,16 @@ export function logClientError(
   const message = error instanceof Error ? error.message : 'Unknown error';
   const appError = createClientError('CLIENT_ERROR', message, method, module);
   safeLogError(appError);
+
+  // Forward to Sentry — captures client errors in production (previously silent)
+  Sentry.captureException(error instanceof Error ? error : new Error(message), {
+    tags: {
+      codigo: 'CLIENT_ERROR',
+      modulo: module,
+      metodo: method,
+    },
+  });
+
   return appError;
 }
 

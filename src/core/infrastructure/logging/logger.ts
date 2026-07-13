@@ -71,6 +71,21 @@ export class ErrorLogger {
         metadata: data.metadata,
       });
     }
+
+    // Forward to Sentry (server-side only — client errors go via logClientError)
+    if (globalThis.window === undefined) {
+      const { captureException } = await import('@sentry/nextjs');
+      captureException(new Error(data.mensaje), {
+        tags: {
+          codigo: data.codigo,
+          modulo: data.modulo,
+          metodo: data.metodo ?? 'unknown',
+          severity: data.severity ?? 'error',
+          ...(data.empresaId ? { empresa_id: data.empresaId } : {}),
+        },
+        extra: (data.metadata ?? {}) as Record<string, unknown>,
+      });
+    }
   }
 
   /**

@@ -2,6 +2,7 @@
 
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
+import { withSentryConfig } from '@sentry/nextjs';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Bundle analyzer - only run when ANALYZE=true
@@ -31,7 +32,7 @@ const cspFallback = [
   `media-src ${mediaSrc}`,
   "font-src 'self'",
   "worker-src 'self'",
-  "connect-src 'self' https://*.supabase.co https://api.brevo.com https://*.upstash.io",
+  "connect-src 'self' https://*.supabase.co https://api.brevo.com https://*.upstash.io https://*.sentry.io",
   "frame-src 'self' https://www.google.com https://maps.google.com",
   "object-src 'none'",
   "base-uri 'self'",
@@ -94,4 +95,15 @@ const nextConfig = withBundleAnalyzer({
   },
 });
 
-export default nextConfig
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  // Silent during local builds; verbose in CI
+  silent: !process.env.CI,
+  // Upload all source files for better stack traces
+  widenClientFileUpload: true,
+  // Do NOT serve source maps publicly
+  hideSourceMaps: true,
+  // Suppress Sentry SDK bundle size logs
+  disableLogger: true,
+});

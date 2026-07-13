@@ -15,6 +15,8 @@ import { SwRegistrar } from "@/components/sw-registrar";
 import { getEmpresaByDomain } from "@/lib/server-services";
 import { getDomainFromHeaders } from "@/lib/domain-utils";
 import type { EmpresaPublic } from "@/core/domain/entities/types";
+import * as Sentry from '@sentry/nextjs';
+import { SentryProvider } from '@/components/sentry-provider';
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 const playfair = Playfair_Display({
@@ -155,6 +157,11 @@ export default async function RootLayout({
   const nonce = (await headers()).get('x-nonce') ?? undefined;
   const domain = await getDomainFromHeaders();
   const empresa = domain ? await getEmpresaByDomain(domain) : null;
+  // Set tenant tag on the Sentry server scope for this request.
+  // AsyncLocalStorage propagates this tag to all errors thrown in this render tree.
+  if (empresa?.id) {
+    Sentry.setTag('empresa_id', empresa.id);
+  }
   const lang = getPrimaryLang(empresa);
   return (
     <html lang={lang} suppressHydrationWarning>
@@ -191,6 +198,7 @@ export default async function RootLayout({
           </ErrorBoundary>
         </ThemeProvider>
         <SwRegistrar />
+        <SentryProvider empresaId={empresa?.id ?? null} />
       </body>
     </html>
   );

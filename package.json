@@ -32,6 +32,7 @@
     "@radix-ui/react-select": "^2.2.6",
     "@radix-ui/react-slot": "1.1.1",
     "@radix-ui/react-toast": "1.2.4",
+    "@sentry/nextjs": "^10.65.0",
     "@smithy/node-http-handler": "^4.4.14",
     "@supabase/supabase-js": "^2.95.3",
     "@upstash/ratelimit": "^2.0.8",
