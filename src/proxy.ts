@@ -230,7 +230,7 @@ function buildCsp(nonce: string, path: string): string {
     `media-src ${mediaSources}`,
     "font-src 'self'",
     "worker-src 'self'",
-    `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.brevo.com https://*.upstash.io https://api.mapbox.com https://events.mapbox.com${connectR2}${devConnectSrc}`,
+    `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.brevo.com https://*.upstash.io https://api.mapbox.com https://events.mapbox.com https://*.sentry.io${connectR2}${devConnectSrc}`,
     "frame-src 'self' https://www.google.com https://maps.google.com",
     "object-src 'none'",
     "base-uri 'self'",
