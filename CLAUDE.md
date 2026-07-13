@@ -320,3 +320,15 @@ Solución: `WaiterLoginForm.handlePinSubmit` dispara `window.dispatchEvent(new C
 - **NO llamar `revalidateTag`** en `/api/admin/productos/[productoId]/complementos` — no tiene `unstable_cache`. Fue la causa del TypeError en MostradorClient al cargar el TPV.
 - **`selectedComplements` en `PendingItem`**: `{ id, name, price }[]`. Se serializa como `{ nombre, precio }` en `detalle_pedido[i].complementos` al crear pedido.
 - **Admin gestión**: `/admin/complementos` — crear/editar grupos globales del tenant. Asignación por producto en el tab "Complementos" de `ProductFormDialog`.
+
+## 🔭 Sentry — Monitoring y Observabilidad
+
+> Ver doc completo: `docs/context/sentry-monitoring.md`
+
+- **Dos capas coexisten**: Supabase `log_errors` (errores de negocio con contexto de tenant) + Sentry (errores técnicos, client-side, performance). No eliminar ninguna.
+- **`instrumentation.ts` NO es per-request** — `register()` corre una sola vez al arrancar el servidor. El contexto de tenant (`empresa_id`) se inyecta en `layout.tsx` (server) + `SentryProvider` (client).
+- **NO agregar `Sentry.captureException()` en `error.tsx` / `global-error.tsx` / `tpv/error.tsx`** — `withSentryConfig` los instrumenta automáticamente. Agregarlo manualmente duplica eventos en el dashboard.
+- **`maskAllText: true` + `blockAllMedia: true` obligatorios** en Session Replay — el TPV y la carta manejan datos de clientes de los tenants.
+- **Double-channel**: `ErrorLogger.logError()` escribe en Supabase Y llama `Sentry.captureException()` (server-side, con guard `globalThis.window === undefined`). `logClientError()` llama Sentry directamente (client-side).
+- **CSP**: `https://*.sentry.io` está en `connect-src` en `next.config.mjs` (fallback) Y en `src/proxy.ts` (nonce-based). Si se agrega un dominio CSP nuevo, revisar ambos archivos.
+- **Quota free tier**: errores 5k/mes, transacciones 10k/mes. Si se alcanza, reducir `tracesSampleRate` de `1.0` a `0.1` en `sentry.client.config.ts`, `sentry.server.config.ts` y `sentry.edge.config.ts`.
