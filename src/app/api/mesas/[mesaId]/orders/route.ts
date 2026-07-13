@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { mesaSesionRepository, pedidoRepository } from '@/core/infrastructure/database';
+import { getMesaSesionRepository, getPedidoRepository } from '@/core/infrastructure/database';
 import { rateLimitMesaPolling } from '@/core/infrastructure/api/rate-limit';
 import { getSupabaseAnonClient, getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 
@@ -19,7 +19,7 @@ export async function GET(
   const rateLimited = await rateLimitMesaPolling(parsed.data);
   if (rateLimited) return rateLimited;
 
-  const sesionResult = await mesaSesionRepository.findActiveSesionByMesa(parsed.data);
+  const sesionResult = await getMesaSesionRepository().findActiveSesionByMesa(parsed.data);
   if (!sesionResult.success) {
     return NextResponse.json({ error: 'Error al buscar la sesión activa' }, { status: 500 });
   }
@@ -29,7 +29,7 @@ export async function GET(
 
   const sesion = sesionResult.data;
 
-  const ordersResult = await pedidoRepository.findBySesionId(sesion.id);
+  const ordersResult = await getPedidoRepository().findBySesionId(sesion.id);
   if (!ordersResult.success) {
     return NextResponse.json({ error: 'Error al obtener los pedidos' }, { status: 500 });
   }

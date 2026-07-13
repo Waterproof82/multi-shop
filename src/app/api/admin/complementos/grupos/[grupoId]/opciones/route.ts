@@ -1,5 +1,5 @@
 import { type NextRequest } from 'next/server';
-import { complementoGrupoUseCase } from '@/core/infrastructure/database';
+import { getComplementoGrupoUseCase } from '@/core/infrastructure/database';
 import { createComplementoOpcionSchema } from '@/core/application/dtos/complemento.dto';
 import { requireAuth, requireRole, handleResultWithStatus, validationErrorResponse, type AuthResult } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     return validationErrorResponse(parsed.error.errors[0]?.message ?? 'Datos inválidos');
   }
 
-  const result = await complementoGrupoUseCase.createOpcion({
+  const result = await getComplementoGrupoUseCase().createOpcion({
     grupoId,
     empresaId: authEmpresaId,
     nombre_es: parsed.data.nombre_es,

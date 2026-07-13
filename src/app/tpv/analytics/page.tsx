@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
-import { authAdminUseCase } from '@/core/infrastructure/database';
+import { getAuthAdminUseCase } from '@/core/infrastructure/database';
 import { verifyTpvEmployeeToken } from '@/lib/tpv-employee-auth';
 import { SupabaseTpvRepository } from '@/core/infrastructure/repositories/supabase-tpv.repository';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
@@ -17,7 +17,7 @@ export default async function TpvAnalyticsPage() {
 
   const adminToken = cookieStore.get('admin_token')?.value;
   if (adminToken) {
-    const admin = await authAdminUseCase.verifyToken(adminToken);
+    const admin = await getAuthAdminUseCase().verifyToken(adminToken);
     if (admin?.empresa) {
       empresaId = admin.empresa.id;
       userRol = admin.rol;

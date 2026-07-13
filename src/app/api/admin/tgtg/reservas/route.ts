@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { tgtgUseCase } from '@/core/infrastructure/database';
+import { getTgtgUseCase } from '@/core/infrastructure/database';
 import { requireAuth } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const result = await tgtgUseCase.getReservas(empresaId!, parsed.data.tgtgPromoId);
+    const result = await getTgtgUseCase().getReservas(empresaId!, parsed.data.tgtgPromoId);
     if (!result.success) {
       return NextResponse.json({ error: result.error.message }, { status: 500 });
     }

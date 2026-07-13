@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { superAdminUseCase } from '@/core/infrastructure/database';
+import { getSuperAdminUseCase } from '@/core/infrastructure/database';
 import { requireRole, handleResult, errorResponse, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import { updateEmpresaSchema } from '@/core/application/dtos/empresa.dto';
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   if (roleError) return roleError;
 
   const { id } = await params;
-  const result = await superAdminUseCase.getEmpresaById(id);
+  const result = await getSuperAdminUseCase().getEmpresaById(id);
 
   if (!result.success) {
     return handleResult(result);
@@ -50,7 +50,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     return validationErrorResponse(parsed.error.errors[0].message);
   }
 
-  const result = await superAdminUseCase.updateEmpresa(id, parsed.data);
+  const result = await getSuperAdminUseCase().updateEmpresa(id, parsed.data);
 
   if (!result.success) {
     return handleResult(result);

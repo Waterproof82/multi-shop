@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { mesaRepository, mesaSesionUseCase, pedidoRepository } from '@/core/infrastructure/database';
+import { getMesaRepository, getMesaSesionUseCase, getPedidoRepository } from '@/core/infrastructure/database';
 import { requireAuth, requireRole, successResponse, validationErrorResponse, handleResult, type AuthResult } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   const queryEmpresaId = searchParams.get('empresaId');
   const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
 
-  const result = await mesaSesionUseCase.getMesasWithSessions(empresaId!);
+  const result = await getMesaSesionUseCase().getMesasWithSessions(empresaId!);
   if (!result.success) return handleResult(result);
 
   return successResponse({ mesas: result.data });
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
   const parsed = createMesaSchema.safeParse(body);
   if (!parsed.success) return validationErrorResponse(parsed.error.errors[0].message);
 
-  const result = await mesaRepository.create(
+  const result = await getMesaRepository().create(
     empresaId!,
     parsed.data.numero,
     parsed.data.nombre ?? undefined
@@ -89,9 +89,9 @@ export async function PATCH(request: NextRequest) {
   const { sesionId } = parsed.data;
 
   // Consolidate individual orders into a single closed ticket
-  await pedidoRepository.consolidateSesionOrders(sesionId);
+  await getPedidoRepository().consolidateSesionOrders(sesionId);
 
-  const result = await mesaSesionUseCase.closeSesion(sesionId);
+  const result = await getMesaSesionUseCase().closeSesion(sesionId);
   if (!result.success) return handleResult(result);
 
   return successResponse({ success: true });
@@ -120,7 +120,7 @@ export async function DELETE(request: NextRequest) {
   const parsed = deleteMesaSchema.safeParse({ id: (body as Record<string, unknown>).id });
   if (!parsed.success) return validationErrorResponse('ID inválido');
 
-  const result = await mesaRepository.delete(parsed.data.id, empresaId!);
+  const result = await getMesaRepository().delete(parsed.data.id, empresaId!);
   if (!result.success) return handleResult(result);
 
   return successResponse({ success: true });

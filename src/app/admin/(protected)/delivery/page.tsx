@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { authAdminUseCase } from '@/core/infrastructure/database';
+import { getAuthAdminUseCase } from '@/core/infrastructure/database';
 import { SUPERADMIN_ROLE } from '@/core/domain/repositories/IAdminRepository';
 import { getDeliverySettingsUseCase } from '@/core/application/use-cases/delivery/getDeliverySettingsUseCase';
 import { DeliveryCredentialsForm } from '@/components/admin/delivery/DeliveryCredentialsForm';
@@ -14,7 +14,7 @@ export default async function DeliveryPage() {
 
   if (!token) redirect('/admin/login');
 
-  const admin = await authAdminUseCase.verifyToken(token);
+  const admin = await getAuthAdminUseCase().verifyToken(token);
   if (!admin) redirect('/admin/login');
 
   const isSuperAdmin = admin.rol === SUPERADMIN_ROLE;

@@ -1,6 +1,6 @@
 import { Result, AppError } from '@/core/domain/entities/types';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
-import { pedidoRepository } from '@/core/infrastructure/database';
+import { getPedidoRepository } from '@/core/infrastructure/database';
 import { logger } from '@/core/infrastructure/logging/logger';
 
 export interface RemoveSessionItemInput {
@@ -21,7 +21,7 @@ export async function removeSessionItemUseCase(
   try {
     const supabase = getSupabaseClient();
 
-    const ordersResult = await pedidoRepository.findBySesionId(input.sesionId);
+    const ordersResult = await getPedidoRepository().findBySesionId(input.sesionId);
     if (!ordersResult.success) return { success: false, error: ordersResult.error };
 
     let cantidadRestante = input.cantidadAEliminar;
@@ -77,7 +77,7 @@ export async function removeSessionItemUseCase(
           return sum + (Number(i.precio) + compExtra) * Number(i.cantidad);
         }, 0);
 
-        const updateResult = await pedidoRepository.updateOrderItems(
+        const updateResult = await getPedidoRepository().updateOrderItems(
           pedido.id,
           newItems as { nombre: string; cantidad: number; precio: number; complementos?: { nombre?: string; name?: string }[] }[],
           newTotal

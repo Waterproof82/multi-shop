@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { empresaUseCase } from '@/core/infrastructure/database';
+import { getEmpresaUseCase } from '@/core/infrastructure/database';
 import { updateEmpresaSchema } from '@/core/application/dtos/empresa.dto';
 import { requireAuth, requireRole, handleResult, errorResponse, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     return errorResponse('Empresa ID required', 400);
   }
 
-  const result = await empresaUseCase.getById(empresaId);
+  const result = await getEmpresaUseCase().getById(empresaId);
   
   if (!result.success) {
     return handleResult(result);
@@ -117,7 +117,7 @@ export async function PUT(request: NextRequest) {
     return validationErrorResponse(parsed.error.errors[0].message);
   }
 
-  const result = await empresaUseCase.update(empresaId, parsed.data);
+  const result = await getEmpresaUseCase().update(empresaId, parsed.data);
   
   if (!result.success) {
     return handleResult(result);

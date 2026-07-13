@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { AdminSidebar } from './admin-sidebar';
 import { AdminProvider } from '@/lib/admin-context';
-import { authAdminUseCase, empresaUseCase } from '@/core/infrastructure/database';
+import { getAuthAdminUseCase, getEmpresaUseCase } from '@/core/infrastructure/database';
 import { AdminThemeProvider } from '@/components/admin-theme-provider';
 import { SUPERADMIN_ROLE } from '@/core/domain/repositories/IAdminRepository';
 import { SuperadminBanner } from '@/components/superadmin-banner';
@@ -30,7 +30,7 @@ export default async function AdminProtectedLayout({
     redirect('/admin/login');
   }
 
-  const admin = await authAdminUseCase.verifyToken(token);
+  const admin = await getAuthAdminUseCase().verifyToken(token);
 
   if (!admin) {
     redirect('/admin/login');
@@ -58,7 +58,7 @@ export default async function AdminProtectedLayout({
     }
     empresaId = superadminEmpresaId;
     isSuperAdminView = true;
-    const empresaResult = await empresaUseCase.getById(empresaId);
+    const empresaResult = await getEmpresaUseCase().getById(empresaId);
     if (empresaResult.success && empresaResult.data) {
       empresa = empresaResult.data as unknown as typeof empresa;
       mostrarPromociones = empresaResult.data.mostrarPromociones ?? true;

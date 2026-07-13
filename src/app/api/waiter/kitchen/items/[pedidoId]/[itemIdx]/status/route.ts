@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { pedidoRepository } from '@/core/infrastructure/database';
+import { getPedidoRepository } from '@/core/infrastructure/database';
 import type { ItemEstado } from '@/core/domain/repositories/IPedidoRepository';
 
 export const dynamic = 'force-dynamic';
@@ -32,7 +32,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Estado inválido', details: parsed.error.flatten() }, { status: 400 });
   }
 
-  const result = await pedidoRepository.upsertItemEstado(empresaId, pedidoId, itemIdx, parsed.data.estado as ItemEstado);
+  const result = await getPedidoRepository().upsertItemEstado(empresaId, pedidoId, itemIdx, parsed.data.estado as ItemEstado);
 
   if (!result.success) {
     return NextResponse.json({ error: 'Error al actualizar estado' }, { status: 500 });

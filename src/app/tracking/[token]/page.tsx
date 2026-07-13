@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { TrackingPageClient } from "@/components/tracking-page-client";
-import { pedidoRepository } from "@/core/infrastructure/database";
+import { getPedidoRepository } from "@/core/infrastructure/database";
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
@@ -18,7 +18,7 @@ export default async function TrackingPage({ params }: Props) {
   // UUID format check before DB query
   const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token);
   if (isUUID) {
-    const result = await pedidoRepository.findByTrackingToken(token);
+    const result = await getPedidoRepository().findByTrackingToken(token);
     if (result.success && result.data) {
       initialStatus = result.data;
     }

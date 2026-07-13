@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { validationErrorResponse } from '@/core/infrastructure/api/helpers';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 import { parseMainDomain, getDomainFromHeaders } from '@/lib/domain-utils';
-import { empresaPublicRepository } from '@/core/infrastructure/database';
+import { getEmpresaPublicRepository } from '@/core/infrastructure/database';
 import { getDeliveryQuoteUseCase } from '@/core/application/use-cases/glovo/getDeliveryQuoteUseCase';
 
 const GetDeliveryQuoteSchema = z.object({
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
 
   const domain = await getDomainFromHeaders();
   const mainDomain = parseMainDomain(domain);
-  const empresaResult = await empresaPublicRepository.findByDomain(mainDomain);
+  const empresaResult = await getEmpresaPublicRepository().findByDomain(mainDomain);
   if (!empresaResult.success || !empresaResult.data) {
     return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 });
   }

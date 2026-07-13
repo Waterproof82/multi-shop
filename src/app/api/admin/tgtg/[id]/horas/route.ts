@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { tgtgUseCase } from '@/core/infrastructure/database';
+import { getTgtgUseCase } from '@/core/infrastructure/database';
 import { requireAuth, requireRole } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
@@ -41,7 +41,7 @@ export async function PATCH(
   }
 
   try {
-    const result = await tgtgUseCase.updateHoras(
+    const result = await getTgtgUseCase().updateHoras(
       empresaId!,
       tgtgPromoId,
       parsed.data.hora_recogida_inicio,

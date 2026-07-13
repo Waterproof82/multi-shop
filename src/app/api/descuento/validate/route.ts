@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { empresaPublicRepository, descuentoUseCase } from '@/core/infrastructure/database';
+import { getEmpresaPublicRepository, getDescuentoUseCase } from '@/core/infrastructure/database';
 import { parseMainDomain, getDomainFromHeaders } from '@/lib/domain-utils';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 import { validateDiscountCodeSchema } from '@/core/application/dtos/descuento.dto';
@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   const domain = await getDomainFromHeaders();
   const mainDomain = parseMainDomain(domain);
 
-  const empresaResult = await empresaPublicRepository.findByDomainPublic(mainDomain);
+  const empresaResult = await getEmpresaPublicRepository().findByDomainPublic(mainDomain);
   if (!empresaResult.success) {
     return NextResponse.json({ error: 'Error al buscar empresa' }, { status: 500 });
   }
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
   }
 
   const { codigo, email } = parsed.data;
-  const result = await descuentoUseCase.validateCode(codigo, empresa.id, email);
+  const result = await getDescuentoUseCase().validateCode(codigo, empresa.id, email);
 
   if (!result.success) {
     const errorMap: Record<string, { message: string; status: number }> = {
