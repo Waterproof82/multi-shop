@@ -443,6 +443,34 @@ src/
 
 ---
 
+## Monitorización y Observabilidad — Sentry
+
+Documentación completa en [`docs/context/sentry-monitoring.md`](docs/context/sentry-monitoring.md).
+
+El sistema usa **dos capas de observabilidad complementarias**:
+
+| Capa | Qué captura | Dónde |
+|---|---|---|
+| Supabase `log_errors` | Errores de negocio con contexto de tenant (`empresa_id`, `modulo`) | DB propia |
+| Sentry | Crashes técnicos, client-side errors, stack traces desminificados, performance, session replay | Sentry.io |
+
+### Qué cubre Sentry
+
+- **Errores client-side en producción** — antes eran silenciosos (solo `console.error` en dev)
+- **React error boundaries** — `error.tsx`, `global-error.tsx`, `tpv/error.tsx`
+- **Stack traces legibles** — source maps subidos en cada build, las líneas apuntan al TypeScript original
+- **Contexto multi-tenant** — todos los eventos llevan el tag `empresa_id` del tenant
+- **Session Replay on error** — graba la sesión justo antes del crash con `maskAllText` y `blockAllMedia` (obligatorio — el sistema maneja datos de clientes)
+- **Performance monitoring** — Web Vitals, transacciones
+
+### Trampas críticas
+
+- `instrumentation.ts` / `register()` corre **una sola vez al arrancar** — NO por request. El tag `empresa_id` se inyecta en `layout.tsx` (server) y `SentryProvider` (client).
+- **No agregar `Sentry.captureException()` en `error.tsx`** — `withSentryConfig` los instrumenta automáticamente. Hacerlo duplica eventos.
+- `https://*.sentry.io` está en `connect-src` en **dos sitios**: `next.config.mjs` y `src/proxy.ts`. Si añadís un dominio a la CSP, revisá ambos.
+
+---
+
 ## Seguridad
 
 Documentación completa en [`docs/context/security.md`](docs/context/security.md).
@@ -837,6 +865,12 @@ R2_ENDPOINT=https://{account_id}.r2.cloudflarestorage.com
 
 # Backup del sistema
 BACKUP_SECRET=hex64chars                           # openssl rand -hex 32 — auth del Edge Function
+
+# Sentry — Error monitoring y observabilidad
+NEXT_PUBLIC_SENTRY_DSN=https://<key>@o<org>.ingest.sentry.io/<project>  # runtime (client + server)
+SENTRY_AUTH_TOKEN=xxx                              # build only — sube source maps
+SENTRY_ORG=tu-org-slug                             # build only
+SENTRY_PROJECT=tu-project-slug                     # build only
 
 # Email (Brevo)
 BREVO_API_KEY=xxx
