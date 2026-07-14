@@ -154,6 +154,18 @@ export function CobroConfirmado({
             </>
           )}
 
+          {/* Item lines — shown when detalleItems is available */}
+          {cobro?.detalleItems && cobro.detalleItems.length > 0 && (
+            <div className="border-t border-[#2e3347] pt-3">
+              {cobro.detalleItems.map((item, i) => (
+                <div key={i} className="flex justify-between text-xs text-[#9ca3af]">
+                  <span>{item.cantidad}x {item.nombre}</span>
+                  <span>{((item.precioUnitarioCents * item.cantidad) / 100).toFixed(2).replace('.', ',')} €</span>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* IVA breakdown — shown when cobro is available */}
           {cobro !== null && (
             <>
