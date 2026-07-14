@@ -6,6 +6,7 @@ import { getPromocionUseCase, getEmpresaUseCase } from '@/core/infrastructure/da
 import { resolveAdminContextWithEmpresa, errorResponse, handleResult } from '@/core/infrastructure/api/helpers';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
 import { buildEmailHtml, PROMO_EMAIL_TEXTS, getLocaleForLang } from '@/core/infrastructure/services/promo-email.builder';
+import { escapeHtml } from '@/lib/html-utils';
 
 const createPromocionSchema = z.object({
   texto_promocion: z.string().min(1, 'El texto de promoción es requerido').max(1000),
