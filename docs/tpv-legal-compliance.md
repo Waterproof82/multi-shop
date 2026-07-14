@@ -148,6 +148,16 @@
 
 ---
 
+## 10. Backup Fiscal Local (Electron)
+
+- [x] **Snapshot fiscal en disco al cerrar turno** — Handler `fiscal:save-snapshot` en `electron/main.ts`. Guarda `InformeZData` completo en `{userData}/fiscal/{empresa-slug}/{fecha}-Z{numeroZ}.json` (20260714).
+- [x] **Escritura asíncrona** — `fs.promises.writeFile` para no bloquear el main thread de Electron (sin tirón visual en TPV táctil) (20260714).
+- [x] **HMAC-SHA256 de integridad** — Firma calculada sobre el JSON completo con clave de dispositivo (32 bytes aleatorios) generada en primer arranque y persistida en `electron-store`. Cualquier edición externa del archivo rompe la firma. `sialti_metadata.integrity_hash` almacenado en el propio JSON (20260714).
+- [x] **Clave de firma por dispositivo** — No hardcodeada. Generada con `crypto.randomBytes(32)` y almacenada en `electron-store` bajo `signingKey`. Si se pierde el store, los archivos previos pierden verificabilidad local pero la fuente de verdad (Supabase + `hashEncadenado` de la cadena de turnos) sigue siendo auditab (20260714).
+- [x] **Trazabilidad de errores** — Fallo en guardado local reportado vía `logClientError` → Sentry. No bloquea el flujo visual del cajero (20260714).
+
+---
+
 ## Historial de versiones de este documento
 
 | Versión | Fecha      | Cambios                        |
@@ -158,3 +168,4 @@
 | 1.3     | 2026-07-03 | Fase 3: URL AEAT con fecha DD-MM-AAAA corregida; rectificativo cross-turno documentado y visualizado en historial; fix bug guardado tipo_impuesto en panel admin (camelCase→snake_case) |
 | 1.4     | 2026-07-14 | Sección 9: SIALTI turnos — hash chaining, no-delete, inmutabilidad campos apertura, audit trail atómico vía DB triggers (sin silent failure), movimientos de caja, teórico de cierre corregido |
 | 1.5     | 2026-07-14 | Fase 4: desglose de ítems en ticket (detalle_items JSONB), Informe Z con numero_z secuencial por trigger, InformeZModal con auto-print |
+| 1.6     | 2026-07-14 | Sección 10: backup fiscal local en Electron — snapshot JSON + HMAC-SHA256 con clave por dispositivo, escritura async, trazabilidad Sentry |
