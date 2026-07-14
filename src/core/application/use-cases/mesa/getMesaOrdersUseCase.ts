@@ -80,6 +80,14 @@ async function resolveStillRetenidoIds(
   return stillRetenidoIds;
 }
 
+// ---- Helper: add an item index into a pedido → Set map ----
+
+function addToIndexMap(map: Map<string, Set<number>>, pedidoId: string, idx: number): void {
+  let set = map.get(pedidoId);
+  if (!set) { set = new Set(); map.set(pedidoId, set); }
+  set.add(idx);
+}
+
 // ---- Helper: fetch cancelled / listo / servido item estados ----
 
 interface ItemEstadoMaps {
@@ -104,19 +112,12 @@ async function fetchItemEstados(pedidoIds: string[]): Promise<ItemEstadoMaps> {
       .in('estado', ['cancelado', 'listo', 'servido']);
 
     for (const row of (itemRows ?? []) as { pedido_id: string; item_idx: number; estado: string }[]) {
-      if (row.estado === 'cancelado') {
-        if (!cancelledByPedido.has(row.pedido_id)) cancelledByPedido.set(row.pedido_id, new Set());
-        cancelledByPedido.get(row.pedido_id)!.add(row.item_idx);
-      } else if (row.estado === 'listo') {
-        if (!listoByPedido.has(row.pedido_id)) listoByPedido.set(row.pedido_id, new Set());
-        listoByPedido.get(row.pedido_id)!.add(row.item_idx);
-      } else if (row.estado === 'servido') {
-        if (!servidoByPedido.has(row.pedido_id)) servidoByPedido.set(row.pedido_id, new Set());
-        servidoByPedido.get(row.pedido_id)!.add(row.item_idx);
-      }
+      if (row.estado === 'cancelado') addToIndexMap(cancelledByPedido, row.pedido_id, row.item_idx);
+      else if (row.estado === 'listo') addToIndexMap(listoByPedido, row.pedido_id, row.item_idx);
+      else if (row.estado === 'servido') addToIndexMap(servidoByPedido, row.pedido_id, row.item_idx);
     }
   } catch (e) {
-    void logger.logFromCatch(e, 'use-case', 'fetchItemEstados');
+    await logger.logFromCatch(e, 'use-case', 'fetchItemEstados');
   }
 
   return { cancelledByPedido, listoByPedido, servidoByPedido };
@@ -141,8 +142,7 @@ function mapOrders(
     );
 
     const activeIndices = detalle.map((_, idx) => idx).filter(idx => !cancelledIndices.has(idx));
-    const allItemsDone =
-      activeIndices.length === 0 || activeIndices.every(idx => servidoIndices.has(idx));
+    const allItemsDone = activeIndices.every(idx => servidoIndices.has(idx));
     const allItemsListo =
       activeIndices.length > 0 &&
       activeIndices.every(idx => listoIndices.has(idx) || servidoIndices.has(idx));
@@ -203,6 +203,59 @@ async function fetchEmpresaSettings(
   } catch {
     return { pagosHabilitados: false, googleReviewsUrl: null };
   }
+}
+
+// ---- Helper: fetch custom turno row and evaluate its status ----
+
+async function resolveCustomTurno(customTurnoId: string): Promise<MesaCustomTurno | null> {
+  const { data: turnoRow } = await getSupabaseClient()
+    .from('mesa_pagos_personalizados')
+    .select('id, status, importe_cents, expires_at')
+    .eq('id', customTurnoId)
+    .maybeSingle();
+  if (!turnoRow) return null;
+  const tr = turnoRow as { id: string; status: string; importe_cents: number | null; expires_at: string | null };
+  const isExpired = tr.expires_at ? new Date(tr.expires_at) < new Date() : false;
+  if (!isExpired || (tr.status !== 'en_seleccion' && tr.status !== 'en_pago')) {
+    return { id: tr.id, status: tr.status, importeCents: tr.importe_cents };
+  }
+  return null;
+}
+
+// ---- Helper: determine if session is paid from payment rows / division ----
+
+function resolveSesionPagada(
+  sesionPagadaFlag: boolean,
+  division: MesaDivision | null,
+  paymentRows: { payment_status: string }[],
+): boolean {
+  if (sesionPagadaFlag) return true;
+  if (division) return division.pagosRealizados >= division.personas;
+  return paymentRows.length > 0 && paymentRows.every(r => r.payment_status === 'paid');
+}
+
+// ---- Helper: check if all items have been paid in a personalizado flow ----
+
+function isPersonalizedPaymentComplete(
+  rawOrders: { id: unknown; detalle_pedido: unknown }[],
+  itemsPagados: { pedido_id: string; item_idx: number; unidades_pagadas: number }[],
+): boolean {
+  const currentItems = rawOrders.flatMap(o =>
+    (o.detalle_pedido as { cantidad: number }[]).map((it, idx) => ({
+      pedido_id: o.id as string,
+      item_idx: idx,
+      cantidad: it.cantidad,
+    })),
+  );
+  return (
+    currentItems.length > 0 &&
+    currentItems.every(({ pedido_id, item_idx, cantidad }) => {
+      const paidUnits = itemsPagados
+        .filter(ip => ip.pedido_id === pedido_id && ip.item_idx === item_idx)
+        .reduce((s, ip) => s + ip.unidades_pagadas, 0);
+      return paidUnits >= cantidad;
+    })
+  );
 }
 
 // ---- Helper: fetch all payment state for the session ----
@@ -274,23 +327,7 @@ async function fetchPaymentState(
     propinaCents = (row?.propina_cents as number | null) ?? 0;
 
     if (customTurnoId) {
-      const { data: turnoRow } = await supabaseAdmin
-        .from('mesa_pagos_personalizados')
-        .select('id, status, importe_cents, expires_at')
-        .eq('id', customTurnoId)
-        .maybeSingle();
-      if (turnoRow) {
-        const tr = turnoRow as {
-          id: string;
-          status: string;
-          importe_cents: number | null;
-          expires_at: string | null;
-        };
-        const isExpired = tr.expires_at ? new Date(tr.expires_at) < new Date() : false;
-        if (!isExpired || (tr.status !== 'en_seleccion' && tr.status !== 'en_pago')) {
-          customTurno = { id: tr.id, status: tr.status, importeCents: tr.importe_cents };
-        }
-      }
+      customTurno = await resolveCustomTurno(customTurnoId);
     }
 
     const pagadoTurnos = (pagadoTurnosResult.data ?? []) as {
@@ -319,36 +356,13 @@ async function fetchPaymentState(
       division = { personas, pagosRealizados, importePorPersona };
     }
 
-    if (!sesionPagada) {
-      if (division) {
-        sesionPagada = division.pagosRealizados >= division.personas;
-      } else {
-        const paymentRows = (paymentRowsResult.data ?? []) as { payment_status: string }[];
-        if (paymentRows.length > 0) {
-          sesionPagada = paymentRows.every(r => r.payment_status === 'paid');
-        }
-      }
-    }
+    const paymentRows = (paymentRowsResult.data ?? []) as { payment_status: string }[];
+    sesionPagada = resolveSesionPagada(sesionPagada, division, paymentRows);
 
     if (!sesionPagada && divisionTipo === 'personalizado' && itemsPagados.length > 0) {
-      const currentItems = rawOrders.flatMap(o =>
-        (o.detalle_pedido as { cantidad: number }[]).map((it, idx) => ({
-          pedido_id: o.id as string,
-          item_idx: idx,
-          cantidad: it.cantidad,
-        })),
-      );
-      const allItemsPaid =
-        currentItems.length > 0 &&
-        currentItems.every(({ pedido_id, item_idx, cantidad }) => {
-          const paidUnits = itemsPagados
-            .filter(ip => ip.pedido_id === pedido_id && ip.item_idx === item_idx)
-            .reduce((s, ip) => s + ip.unidades_pagadas, 0);
-          return paidUnits >= cantidad;
-        });
-      if (allItemsPaid) {
+      if (isPersonalizedPaymentComplete(rawOrders, itemsPagados)) {
         sesionPagada = true;
-        void supabaseAdmin
+        await supabaseAdmin
           .from('mesa_sesiones')
           .update({ sesion_pagada: true, pago_en_curso: false, pago_iniciado_en: null })
           .eq('id', sesionId);
@@ -360,7 +374,7 @@ async function fetchPaymentState(
       : false;
     pagoEnCurso = !!(row?.pago_en_curso && lockFresh);
   } catch (e) {
-    void logger.logFromCatch(e, 'use-case', 'fetchPaymentState', { sesionId });
+    await logger.logFromCatch(e, 'use-case', 'fetchPaymentState', { sesionId });
   }
 
   return {
