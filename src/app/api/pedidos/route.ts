@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { getEmpresaPublicRepository, getPedidoUseCase, getMesaUseCase } from '@/core/infrastructure/database';
 import { parseMainDomain, isPedidosDomain, getDomainFromHeaders } from '@/lib/domain-utils';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
+import { PAYMENT_LOCK_EXPIRY_MS } from '@/core/domain/constants/pedido';
 import { validateMesaClientToken } from '@/core/infrastructure/api/validate-mesa-client-token';
 import { verifyWaiterToken } from '@/lib/waiter-auth';
 
@@ -79,7 +80,7 @@ async function checkMesaPaymentLock(mesaId: string): Promise<NextResponse | null
     return NextResponse.json({ error: 'Error al verificar el estado de la mesa.' }, { status: 500 });
   }
   const lock = sesionLock as { pago_en_curso: boolean; pago_iniciado_en: string | null } | null;
-  const LOCK_EXPIRY_MS = 15 * 60 * 1000;
+  const LOCK_EXPIRY_MS = PAYMENT_LOCK_EXPIRY_MS;
   const lockFresh = lock?.pago_iniciado_en
     ? Date.now() - new Date(lock.pago_iniciado_en).getTime() < LOCK_EXPIRY_MS
     : false;
