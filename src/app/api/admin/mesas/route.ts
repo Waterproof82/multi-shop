@@ -1,8 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getMesaRepository, getMesaSesionUseCase, getPedidoRepository } from '@/core/infrastructure/database';
-import { requireAuth, requireRole, successResponse, validationErrorResponse, handleResult, type AuthResult } from '@/core/infrastructure/api/helpers';
-import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
+import { resolveAdminContext, successResponse, validationErrorResponse, handleResult } from '@/core/infrastructure/api/helpers';
 
 const createMesaSchema = z.object({
   numero: z.number().int().min(1).max(999),
@@ -14,15 +13,9 @@ const deleteMesaSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  const rateLimited = await rateLimitAdmin(request);
-  if (rateLimited) return rateLimited;
-
-  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request) as AuthResult;
-  if (authError) return authError;
-
-  const { searchParams } = new URL(request.url);
-  const queryEmpresaId = searchParams.get('empresaId');
-  const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
+  const ctx = await resolveAdminContext(request);
+  if (ctx.error) return ctx.error;
+  const { empresaId } = ctx;
 
   const result = await getMesaSesionUseCase().getMesasWithSessions(empresaId!);
   if (!result.success) return handleResult(result);
@@ -31,17 +24,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const rateLimited = await rateLimitAdmin(request);
-  if (rateLimited) return rateLimited;
-
-  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request) as AuthResult;
-  if (authError) return authError;
-  const roleError = requireRole(request, ['admin', 'superadmin']);
-  if (roleError) return roleError;
-
-  const { searchParams } = new URL(request.url);
-  const queryEmpresaId = searchParams.get('empresaId');
-  const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
+  const ctx = await resolveAdminContext(request);
+  if (ctx.error) return ctx.error;
+  const { empresaId } = ctx;
 
   let body: unknown;
   try {
@@ -68,13 +53,8 @@ const closeSesionSchema = z.object({
 });
 
 export async function PATCH(request: NextRequest) {
-  const rateLimited = await rateLimitAdmin(request);
-  if (rateLimited) return rateLimited;
-
-  const { error: authError } = await requireAuth(request) as AuthResult;
-  if (authError) return authError;
-  const roleError = requireRole(request, ['admin', 'superadmin']);
-  if (roleError) return roleError;
+  const ctx = await resolveAdminContext(request);
+  if (ctx.error) return ctx.error;
 
   let body: unknown;
   try {
@@ -98,17 +78,9 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const rateLimited = await rateLimitAdmin(request);
-  if (rateLimited) return rateLimited;
-
-  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request) as AuthResult;
-  if (authError) return authError;
-  const roleError = requireRole(request, ['admin', 'superadmin']);
-  if (roleError) return roleError;
-
-  const { searchParams } = new URL(request.url);
-  const queryEmpresaId = searchParams.get('empresaId');
-  const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
+  const ctx = await resolveAdminContext(request);
+  if (ctx.error) return ctx.error;
+  const { empresaId } = ctx;
 
   let body: unknown;
   try {

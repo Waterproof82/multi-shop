@@ -1,18 +1,15 @@
 import { NextRequest } from 'next/server';
 import {
-  requireAuth,
-  requireRole,
+  resolveAdminContext,
   handleResult,
   validationErrorResponse,
-  type AuthResult,
 } from '@/core/infrastructure/api/helpers';
 import { SupabaseStockRepository } from '@/core/infrastructure/repositories/supabase-stock.repository';
 
 export async function GET(req: NextRequest) {
-  const { empresaId, error: authError } = (await requireAuth(req)) as AuthResult;
-  if (authError) return authError;
-  const roleError = requireRole(req, ['admin', 'superadmin']);
-  if (roleError) return roleError;
+  const ctx = await resolveAdminContext(req);
+  if (ctx.error) return ctx.error;
+  const { empresaId } = ctx;
   if (!empresaId) return validationErrorResponse('empresaId requerido');
 
   const { searchParams } = new URL(req.url);

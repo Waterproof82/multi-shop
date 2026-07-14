@@ -1,11 +1,9 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import {
-  requireAuth,
-  requireRole,
+  resolveAdminContext,
   handleResult,
   validationErrorResponse,
-  type AuthResult,
 } from '@/core/infrastructure/api/helpers';
 import { SupabaseStockRepository } from '@/core/infrastructure/repositories/supabase-stock.repository';
 
@@ -21,10 +19,9 @@ const replaceRecetaSchema = z.object({
 type RouteContext = { params: Promise<{ productoId: string }> };
 
 export async function GET(req: NextRequest, ctx: RouteContext) {
-  const { empresaId, error: authError } = (await requireAuth(req)) as AuthResult;
-  if (authError) return authError;
-  const roleError = requireRole(req, ['admin', 'superadmin']);
-  if (roleError) return roleError;
+  const authCtx = await resolveAdminContext(req);
+  if (authCtx.error) return authCtx.error;
+  const { empresaId } = authCtx;
   if (!empresaId) return validationErrorResponse('empresaId requerido');
 
   const { productoId } = await ctx.params;
@@ -34,10 +31,9 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
 }
 
 export async function PUT(req: NextRequest, ctx: RouteContext) {
-  const { empresaId, error: authError } = (await requireAuth(req)) as AuthResult;
-  if (authError) return authError;
-  const roleError = requireRole(req, ['admin', 'superadmin']);
-  if (roleError) return roleError;
+  const authCtx = await resolveAdminContext(req);
+  if (authCtx.error) return authCtx.error;
+  const { empresaId } = authCtx;
   if (!empresaId) return validationErrorResponse('empresaId requerido');
 
   const { productoId } = await ctx.params;

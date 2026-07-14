@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
-  requireAuth,
-  requireRole,
+  resolveAdminContext,
   validationErrorResponse,
-  type AuthResult,
 } from '@/core/infrastructure/api/helpers';
 import { SupabaseStockRepository } from '@/core/infrastructure/repositories/supabase-stock.repository';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
@@ -51,10 +49,9 @@ async function countMovimientos(
 }
 
 export async function GET(req: NextRequest) {
-  const { empresaId, error: authError } = (await requireAuth(req)) as AuthResult;
-  if (authError) return authError;
-  const roleError = requireRole(req, ['admin', 'superadmin']);
-  if (roleError) return roleError;
+  const ctx = await resolveAdminContext(req);
+  if (ctx.error) return ctx.error;
+  const { empresaId } = ctx;
   if (!empresaId) return validationErrorResponse('empresaId requerido');
 
   const { searchParams } = new URL(req.url);

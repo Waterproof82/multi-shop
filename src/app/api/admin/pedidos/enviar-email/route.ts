@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { sendEmail } from '@/lib/brevo-email';
 import { getEmpresaUseCase } from '@/core/infrastructure/database';
-import { requireAuth, requireRole } from '@/core/infrastructure/api/helpers';
-import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
+import { resolveAdminContext } from '@/core/infrastructure/api/helpers';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
 import { escapeHtml } from '@/lib/html-utils';
 
@@ -126,13 +125,9 @@ function generateOrderEmail(items: OrderItem[], total: number, empresaNombre: st
 
 export async function POST(request: NextRequest) {
   try {
-    const rateLimited = await rateLimitAdmin(request);
-    if (rateLimited) return rateLimited;
-
-    const { empresaId, error: authError } = await requireAuth(request);
-    if (authError) return authError;
-    const roleError = requireRole(request, ['admin', 'superadmin']);
-    if (roleError) return roleError;
+    const ctx = await resolveAdminContext(request);
+    if (ctx.error) return ctx.error;
+    const { empresaId } = ctx;
 
     const empresaResult = await getEmpresaUseCase().getById(empresaId!);
 

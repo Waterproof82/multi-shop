@@ -1,43 +1,26 @@
 import { NextRequest } from 'next/server';
 import {
-  requireAuth,
-  requireRole,
+  resolveAdminContext,
   validationErrorResponse,
   handleResult,
-  type AuthResult,
 } from '@/core/infrastructure/api/helpers';
-import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import { UpdateDeliverySettingsDtoSchema } from '@/core/application/dtos/delivery-settings.dto';
 import { getDeliverySettingsUseCase } from '@/core/application/use-cases/delivery/getDeliverySettingsUseCase';
 import { updateDeliverySettingsUseCase } from '@/core/application/use-cases/delivery/updateDeliverySettingsUseCase';
 
 export async function GET(request: NextRequest) {
-  const rateLimited = await rateLimitAdmin(request);
-  if (rateLimited) return rateLimited;
-
-  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request) as AuthResult;
-  if (authError) return authError;
-
-  const { searchParams } = new URL(request.url);
-  const queryEmpresaId = searchParams.get('empresaId');
-  const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
+  const ctx = await resolveAdminContext(request);
+  if (ctx.error) return ctx.error;
+  const { empresaId } = ctx;
 
   const result = await getDeliverySettingsUseCase(empresaId!);
   return handleResult(result);
 }
 
 export async function PUT(request: NextRequest) {
-  const rateLimited = await rateLimitAdmin(request);
-  if (rateLimited) return rateLimited;
-
-  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request) as AuthResult;
-  if (authError) return authError;
-  const roleError = requireRole(request, ['admin', 'superadmin']);
-  if (roleError) return roleError;
-
-  const { searchParams } = new URL(request.url);
-  const queryEmpresaId = searchParams.get('empresaId');
-  const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
+  const ctx = await resolveAdminContext(request);
+  if (ctx.error) return ctx.error;
+  const { empresaId } = ctx;
 
   let body: unknown;
   try {

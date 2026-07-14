@@ -1,27 +1,18 @@
 import { type NextRequest } from 'next/server';
 import { getComplementoGrupoUseCase } from '@/core/infrastructure/database';
 import { updateComplementoGrupoSchema } from '@/core/application/dtos/complemento.dto';
-import { requireAuth, requireRole, handleResultWithStatus, validationErrorResponse, type AuthResult } from '@/core/infrastructure/api/helpers';
-import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
+import { resolveAdminContext, handleResultWithStatus, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 
 interface Params {
   params: Promise<{ grupoId: string }>;
 }
 
 export async function PUT(request: NextRequest, { params }: Params) {
-  const rateLimited = await rateLimitAdmin(request);
-  if (rateLimited) return rateLimited;
+  const ctx = await resolveAdminContext(request);
+  if (ctx.error) return ctx.error;
+  const { empresaId } = ctx;
 
   const { grupoId } = await params;
-
-  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request) as AuthResult;
-  if (authError) return authError;
-  const roleError = requireRole(request, ['admin', 'superadmin']);
-  if (roleError) return roleError;
-
-  const { searchParams } = new URL(request.url);
-  const queryEmpresaId = searchParams.get('empresaId');
-  const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
 
   let body: unknown;
   try {
@@ -42,19 +33,11 @@ export async function PUT(request: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(request: NextRequest, { params }: Params) {
-  const rateLimited = await rateLimitAdmin(request);
-  if (rateLimited) return rateLimited;
+  const ctx = await resolveAdminContext(request);
+  if (ctx.error) return ctx.error;
+  const { empresaId } = ctx;
 
   const { grupoId } = await params;
-
-  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request) as AuthResult;
-  if (authError) return authError;
-  const roleError = requireRole(request, ['admin', 'superadmin']);
-  if (roleError) return roleError;
-
-  const { searchParams } = new URL(request.url);
-  const queryEmpresaId = searchParams.get('empresaId');
-  const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
 
   const result = await getComplementoGrupoUseCase().delete(grupoId, empresaId!);
   return handleResultWithStatus(result);

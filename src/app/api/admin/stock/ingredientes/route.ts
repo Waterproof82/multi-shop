@@ -1,12 +1,10 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import {
-  requireAuth,
-  requireRole,
+  resolveAdminContext,
   handleResult,
   handleResultWithStatus,
   validationErrorResponse,
-  type AuthResult,
 } from '@/core/infrastructure/api/helpers';
 import { SupabaseStockRepository } from '@/core/infrastructure/repositories/supabase-stock.repository';
 
@@ -18,10 +16,9 @@ const createIngredienteSchema = z.object({
 });
 
 export async function GET(req: NextRequest) {
-  const { empresaId, error: authError } = (await requireAuth(req)) as AuthResult;
-  if (authError) return authError;
-  const roleError = requireRole(req, ['admin', 'superadmin']);
-  if (roleError) return roleError;
+  const ctx = await resolveAdminContext(req);
+  if (ctx.error) return ctx.error;
+  const { empresaId } = ctx;
   if (!empresaId) return validationErrorResponse('empresaId requerido');
 
   const repo = new SupabaseStockRepository();
@@ -30,10 +27,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { empresaId, error: authError } = (await requireAuth(req)) as AuthResult;
-  if (authError) return authError;
-  const roleError = requireRole(req, ['admin', 'superadmin']);
-  if (roleError) return roleError;
+  const ctx = await resolveAdminContext(req);
+  if (ctx.error) return ctx.error;
+  const { empresaId } = ctx;
   if (!empresaId) return validationErrorResponse('empresaId requerido');
 
   let body: unknown;

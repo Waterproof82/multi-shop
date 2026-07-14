@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-import { requireAuth, requireRole, successResponse, errorResponse } from '@/core/infrastructure/api/helpers';
-import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
+import { resolveAdminContext, successResponse, errorResponse } from '@/core/infrastructure/api/helpers';
 import { getR2Config, uploadToR2 } from '@/core/infrastructure/storage/s3-client';
 import { getEmpresaUseCase } from '@/core/infrastructure/database';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
@@ -35,29 +34,14 @@ const MIME_TO_EXT: Record<string, string> = {
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 export async function POST(request: NextRequest) {
-  const rateLimited = await rateLimitAdmin(request);
-  if (rateLimited) return rateLimited;
+  const ctx = await resolveAdminContext(request);
+  if (ctx.error) return ctx.error;
+  const { empresaId, isSuperAdmin } = ctx;
 
-  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request);
-  if (authError) return authError;
-  
-  const roleError = requireRole(request, ['admin', 'superadmin']);
-  if (roleError) return roleError;
-
-  const url = new URL(request.url);
-  const queryEmpresaId = url.searchParams.get('empresaId');
-  
-  // For superadmin, require empresaId from query param
-  let empresaId: string | null;
-  if (isSuperAdmin) {
-    if (!queryEmpresaId) {
-      return NextResponse.json(createErrorResponse(AUTH_ERRORS.UNAUTHORIZED), { status: 401 });
-    }
-    empresaId = queryEmpresaId;
-  } else {
-    empresaId = authEmpresaId;
+  if (isSuperAdmin && !empresaId) {
+    return NextResponse.json(createErrorResponse(AUTH_ERRORS.UNAUTHORIZED), { status: 401 });
   }
-  
+
   if (!empresaId) {
     return NextResponse.json(createErrorResponse(AUTH_ERRORS.UNAUTHORIZED), { status: 401 });
   }

@@ -1,11 +1,9 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import {
-  requireAuth,
-  requireRole,
+  resolveAdminContext,
   handleResult,
   validationErrorResponse,
-  type AuthResult,
 } from '@/core/infrastructure/api/helpers';
 import { SupabaseStockRepository } from '@/core/infrastructure/repositories/supabase-stock.repository';
 import { ajustarStockUseCase } from '@/core/application/use-cases/stock/ajustar-stock.use-case';
@@ -19,10 +17,9 @@ const ajusteSchema = z.object({
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, ctx: RouteContext) {
-  const { empresaId, error: authError } = (await requireAuth(req)) as AuthResult;
-  if (authError) return authError;
-  const roleError = requireRole(req, ['admin', 'superadmin']);
-  if (roleError) return roleError;
+  const authCtx = await resolveAdminContext(req);
+  if (authCtx.error) return authCtx.error;
+  const { empresaId } = authCtx;
   if (!empresaId) return validationErrorResponse('empresaId requerido');
 
   const { id: ingredienteId } = await ctx.params;
