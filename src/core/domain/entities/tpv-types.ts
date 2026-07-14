@@ -131,6 +131,8 @@ export interface TpvAnalytics {
   splitEfectivoCents: number;
   splitTarjetaCents: number;
   ventasPorHora: number[]; // 24 posiciones, índice = hora del día (0-23), zona Europe/Madrid
+  /** Heatmap 7×24: DOW 0=domingo…6=sábado (PostgreSQL), hora 0-23, zona Europe/Madrid */
+  heatmap: { dow: number; hora: number; totalCents: number }[];
   topProductos: { nombre: string; cantidad: number }[];
   historialTurnos: TpvTurnoResumen[];
   numTurnos: number;

@@ -1,10 +1,23 @@
+import QRCode from 'qrcode';
 import type { PrintTicket, ThermalPrinter } from './types';
 
 function fmt(cents: number): string {
   return (cents / 100).toLocaleString('es-ES', { minimumFractionDigits: 2 }) + ' \u20ac';
 }
 
-function buildReceiptHtml(ticket: PrintTicket): string {
+function buildAeatUrl(ticket: PrintTicket, serieNum: string): string | null {
+  if (!ticket.empresaNif) return null;
+  const dt = new Date(ticket.cobradoAt);
+  const dd = String(dt.getDate()).padStart(2, '0');
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
+  const yyyy = dt.getFullYear();
+  const fecha = `${dd}-${mm}-${yyyy}`;
+  const importe = (ticket.importeCobradoCents / 100).toFixed(2);
+  const params = new URLSearchParams({ nif: ticket.empresaNif, numserie: serieNum, fecha, importe });
+  return `https://www2.agenciatributaria.gob.es/wlpl/TIKE-CONT/ValidarQR?${params.toString()}`;
+}
+
+async function buildReceiptHtml(ticket: PrintTicket): Promise<string> {
   const dt = new Date(ticket.cobradoAt);
   const fecha = dt.toLocaleDateString('es-ES');
   const hora = dt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
@@ -14,11 +27,18 @@ function buildReceiptHtml(ticket: PrintTicket): string {
     : 0;
   const labelImpuesto = ticket.tipoImpuesto.toUpperCase();
 
-  const aeatBlock = ticket.empresaNif
-    ? `<tr><td colspan="2" style="padding-top:8px;word-break:break-all;font-size:9px;color:#555">
-        AEAT: https://www2.agenciatributaria.gob.es/wlpl/TIKE-CONT/ValidarQR?nif=${ticket.empresaNif}&amp;numserie=${serieNum}&amp;fecha=${fecha.split('/').reverse().join('-')}&amp;importe=${(ticket.importeCobradoCents / 100).toFixed(2)}
-       </td></tr>`
-    : '';
+  const aeatUrl = buildAeatUrl(ticket, serieNum);
+  let aeatBlock = '';
+  if (aeatUrl) {
+    const qrDataUrl = await QRCode.toDataURL(aeatUrl, { width: 160, margin: 1 });
+    aeatBlock = `
+      <tr><td colspan="2" style="padding-top:8px;text-align:center">
+        <img src="${qrDataUrl}" width="120" height="120" alt="QR AEAT"/>
+      </td></tr>
+      <tr><td colspan="2" style="padding-top:2px;word-break:break-all;font-size:8px;color:#555;text-align:center">
+        Verificar en AEAT
+      </td></tr>`;
+  }
 
   const propinaRow = ticket.propinaCents > 0
     ? `<tr><td>Propina</td><td style="text-align:right">${fmt(ticket.propinaCents)}</td></tr>`
@@ -81,7 +101,7 @@ export class BrowserPrinter implements ThermalPrinter {
   async print(ticket: PrintTicket): Promise<void> {
     const win = window.open('', '_blank', 'width=420,height=650');
     if (win === null) throw new Error('El navegador bloqueó la ventana de impresión');
-    win.document.write(buildReceiptHtml(ticket));
+    win.document.write(await buildReceiptHtml(ticket));
     win.document.close();
     win.focus();
     win.print();

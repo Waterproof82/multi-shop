@@ -35,7 +35,7 @@
 ### 1.4 Código QR / URL de verificación AEAT
 
 - [x] **URL de verificación AEAT** mostrada en `CobroConfirmado` con formato correcto: `DD-MM-AAAA` (no ISO 8601). Parámetros: `nif`, `numserie` (serie+ticket 6 dígitos), `fecha`, `importe` (20260703).
-- [ ] Generar QR visual con esa URL en cada ticket impreso/digital (Fase impresión térmica).
+- [x] **QR visual AEAT en ticket impreso** — `browser-printer.ts` genera imagen QR base64 con la librería `qrcode` y la incrusta en el HTML de impresión. `buildAeatUrl()` calcula la fecha con `DD-MM-YYYY` correcto (bug previo en `fecha.split('/').reverse()` generaba `YYYY-MM-DD`) (20260714).
 - [ ] Verificar con la AEAT que el formato de `numserie` y `fecha` pasan la validación del servicio web.
 
 ### 1.5 Declaración de Responsabilidad del fabricante
@@ -169,3 +169,4 @@
 | 1.4     | 2026-07-14 | Sección 9: SIALTI turnos — hash chaining, no-delete, inmutabilidad campos apertura, audit trail atómico vía DB triggers (sin silent failure), movimientos de caja, teórico de cierre corregido |
 | 1.5     | 2026-07-14 | Fase 4: desglose de ítems en ticket (detalle_items JSONB), Informe Z con numero_z secuencial por trigger, InformeZModal con auto-print |
 | 1.6     | 2026-07-14 | Sección 10: backup fiscal local en Electron — snapshot JSON + HMAC-SHA256 con clave por dispositivo, escritura async, trazabilidad Sentry |
+| 1.7     | 2026-07-14 | Sección 1.4: QR visual AEAT en ticket impreso (`browser-printer.ts`); fix bug fecha DD-MM-YYYY en URL AEAT |

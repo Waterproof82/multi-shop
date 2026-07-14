@@ -477,14 +477,20 @@ export class SupabaseTpvRepository implements ITpvRepository {
       }));
 
       // Query 4: top productos (JSONB expansion via RPC)
-      const { data: topData, error: topErr } = await supabase.rpc('tpv_analytics_top_productos', {
-        p_empresa_id: empresaId,
-        p_desde: desde,
-        p_hasta: hasta,
-      });
+      // Query 5: heatmap (parallel with top productos)
+      const [
+        { data: topData, error: topErr },
+        { data: heatmapData, error: heatmapErr },
+      ] = await Promise.all([
+        supabase.rpc('tpv_analytics_top_productos', { p_empresa_id: empresaId, p_desde: desde, p_hasta: hasta }),
+        supabase.rpc('tpv_analytics_heatmap',       { p_empresa_id: empresaId, p_desde: desde, p_hasta: hasta }),
+      ]);
 
       if (topErr) {
         return { success: false, error: await logger.logFromCatch(topErr, 'repository', 'getAnalytics/top') };
+      }
+      if (heatmapErr) {
+        return { success: false, error: await logger.logFromCatch(heatmapErr, 'repository', 'getAnalytics/heatmap') };
       }
 
       const numCobros = Number(kpi.num_cobros ?? 0);
@@ -512,6 +518,8 @@ export class SupabaseTpvRepository implements ITpvRepository {
           splitEfectivoCents: Number(kpi.efectivo ?? 0),
           splitTarjetaCents: Number(kpi.tarjeta ?? 0),
           ventasPorHora,
+          heatmap: ((heatmapData as { dow: number; hora: number; total_cents: number }[] | null) ?? [])
+            .map(r => ({ dow: r.dow, hora: r.hora, totalCents: Number(r.total_cents) })),
           topProductos: ((topData as { nombre: string; cantidad: number }[] | null) ?? []),
           historialTurnos,
           numTurnos: historialTurnos.length,
