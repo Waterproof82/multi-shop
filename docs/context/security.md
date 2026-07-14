@@ -879,6 +879,8 @@ Real Decreto que regula los sistemas informáticos de facturación para garantiz
   - Numeración correlativa atómica por empresa
   - Ticket rectificativo con referencia al original (no modifica registros)
   - IVA/IGIC calculado server-side en trigger (no en cliente)
+  - **Desglose de ítems en ticket** (`detalle_items JSONB`) — nombre, cantidad y precio unitario por producto. Inmutable post-inserción (trigger `tpv_cobro_block_update` extendido con `IS DISTINCT FROM`). Auto-construido server-side para cobros de mesa; enviado por cliente para mostrador. Rectificativa hereda ítems del original. (20260714)
+  - **Informe Z** — `numero_z BIGINT` en `tpv_turnos`, asignado en trigger BEFORE UPDATE con `pg_advisory_xact_lock` por `empresa_id` (serialización concurrente, cero race conditions). Modal `InformeZModal` con auto-print al cerrar turno. API `GET /api/tpv/turno/[id]/informe-z` con tenant isolation. (20260714)
   - Endpoint de auditoría `GET /api/tpv/audit/chain` y exportación `GET /api/tpv/audit/export`
   - Pantalla de declaración de conformidad `/tpv/legal`
 - **Referencia**: RD 1619/2012 (facturación) + RD 1007/2023 (sistemas informáticos)
