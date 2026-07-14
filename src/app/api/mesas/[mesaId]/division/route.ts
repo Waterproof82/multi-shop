@@ -66,7 +66,7 @@ export async function POST(
     .single();
 
   const lockFresh = sesionRow?.pago_iniciado_en
-    ? Date.now() - new Date(sesionRow.pago_iniciado_en as string).getTime() < LOCK_EXPIRY_MS
+    ? Date.now() - new Date(sesionRow.pago_iniciado_en as string).getTime() < PAYMENT_LOCK_EXPIRY_MS
     : false;
   if (sesionRow?.pago_en_curso && lockFresh) {
     return NextResponse.json({ error: 'PAGO_EN_CURSO' }, { status: 409 });
