@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Download } from 'lucide-react';
 import type { TpvAnalytics, TipoImpuesto } from '@/core/domain/entities/tpv-types';
 
 // DOW 0=domingo…6=sábado (PostgreSQL). Reordenamos a lun-dom para la UI.
@@ -76,6 +76,62 @@ function periodoLabel(p: Periodo): string {
   return p.charAt(0).toUpperCase() + p.slice(1);
 }
 
+function buildDailySummaryHtml(data: TpvAnalytics, tipoImpuesto: TipoImpuesto, periodoLabel: string): string {
+  const imp = tipoImpuesto.toUpperCase();
+  const now = new Date().toLocaleString('es-ES', { dateStyle: 'full', timeStyle: 'short' });
+  const topRows = data.topProductos.slice(0, 10).map((p, i) =>
+    `<tr><td>${i + 1}</td><td>${p.nombre}</td><td style="text-align:right">${p.cantidad}</td></tr>`
+  ).join('');
+  const turnoRows = data.historialTurnos.map(t => {
+    const apertura = new Date(t.aperturaAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    const cierre = t.cierreAt ? new Date(t.cierreAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : 'En curso';
+    return `<tr><td>${t.operadorNombre}</td><td>${apertura} → ${cierre}</td><td style="text-align:right">${t.numCobros}</td><td style="text-align:right">${fmt(t.totalCents)}</td></tr>`;
+  }).join('');
+  const horaRows = data.ventasPorHora
+    .map((v, h) => ({ h, v }))
+    .filter(x => x.v > 0)
+    .map(x => `<tr><td>${x.h}:00</td><td style="text-align:right">${fmt(x.v)}</td></tr>`)
+    .join('');
+
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"/>
+<title>Informe ${periodoLabel}</title>
+<style>
+  @page { size: A4; margin: 20mm; }
+  body { font-family: Arial, sans-serif; font-size: 11px; color: #111; }
+  h1 { font-size: 16px; margin: 0 0 4px; }
+  h2 { font-size: 13px; margin: 16px 0 6px; border-bottom: 1px solid #ccc; padding-bottom: 3px; }
+  .meta { color: #666; font-size: 10px; margin-bottom: 16px; }
+  .kpis { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 16px; }
+  .kpi { border: 1px solid #ddd; border-radius: 6px; padding: 8px 10px; }
+  .kpi-label { font-size: 9px; text-transform: uppercase; color: #888; }
+  .kpi-value { font-size: 18px; font-weight: bold; margin: 2px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 10px; }
+  th { background: #f4f4f4; text-align: left; padding: 4px 6px; }
+  td { padding: 3px 6px; border-bottom: 1px solid #eee; }
+  .footer { margin-top: 20px; font-size: 9px; color: #aaa; text-align: center; }
+</style></head><body>
+<h1>Informe de actividad — ${periodoLabel}</h1>
+<p class="meta">Generado el ${now}</p>
+
+<div class="kpis">
+  <div class="kpi"><div class="kpi-label">Facturado</div><div class="kpi-value">${fmt(data.totalFacturadoCents)}</div><div class="kpi-label">${data.numCobros} cobros · ticket ∅ ${fmt(data.ticketMedioCents)}</div></div>
+  <div class="kpi"><div class="kpi-label">${imp} total</div><div class="kpi-value">${fmt(data.totalIvaCents)}</div><div class="kpi-label">Base imponible: ${fmt(data.baseImponibleCents)}</div></div>
+  <div class="kpi"><div class="kpi-label">Propinas</div><div class="kpi-value">${fmt(data.totalPropinaCents)}</div><div class="kpi-label">Efectivo: ${fmt(data.splitEfectivoCents)} · Tarjeta: ${fmt(data.splitTarjetaCents)}</div></div>
+</div>
+
+<h2>Turnos</h2>
+<table><thead><tr><th>Operador</th><th>Horario</th><th style="text-align:right">Cobros</th><th style="text-align:right">Total</th></tr></thead><tbody>${turnoRows || '<tr><td colspan="4">Sin turnos</td></tr>'}</tbody></table>
+
+<h2>Ventas por hora</h2>
+<table><thead><tr><th>Hora</th><th style="text-align:right">Importe</th></tr></thead><tbody>${horaRows || '<tr><td colspan="2">Sin datos</td></tr>'}</tbody></table>
+
+<h2>Productos más vendidos</h2>
+<table><thead><tr><th>#</th><th>Producto</th><th style="text-align:right">Uds.</th></tr></thead><tbody>${topRows || '<tr><td colspan="3">Sin datos</td></tr>'}</tbody></table>
+
+<p class="footer">Documento generado automáticamente por el TPV · No válido como factura</p>
+</body></html>`;
+}
+
 interface Props {
   readonly initialData: TpvAnalytics;
   readonly tipoImpuesto: TipoImpuesto;
@@ -117,6 +173,15 @@ export function AnalyticsClient({ initialData, tipoImpuesto }: Props) {
     void fetchData('custom', customDesde, customHasta);
   }
 
+  function exportPdf() {
+    const win = window.open('', '_blank', 'width=800,height=900');
+    if (!win) return;
+    win.document.write(buildDailySummaryHtml(data, tipoImpuesto, periodoLabel(periodo)));
+    win.document.close();
+    win.focus();
+    win.print();
+  }
+
   const totalBruto = data.splitEfectivoCents + data.splitTarjetaCents;
   const pctEfectivo = totalBruto > 0 ? Math.round((data.splitEfectivoCents / totalBruto) * 100) : 0;
 
@@ -148,6 +213,15 @@ export function AnalyticsClient({ initialData, tipoImpuesto }: Props) {
           </div>
           <div className="flex items-center gap-2">
             {loading && <Loader2 className="h-4 w-4 animate-spin text-[#6b7280]" />}
+            <button
+              type="button"
+              onClick={exportPdf}
+              title="Exportar informe PDF"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1a1d27] border border-[#2e3347] text-xs text-[#6b7280] hover:text-white hover:border-[#4f72ff] transition-colors"
+            >
+              <Download className="h-3.5 w-3.5" />
+              PDF
+            </button>
             <div className="flex gap-1 bg-[#1a1d27] border border-[#2e3347] rounded-xl p-1">
               {(['hoy', 'semana', 'mes', 'custom'] as Periodo[]).map(p => (
                 <button
