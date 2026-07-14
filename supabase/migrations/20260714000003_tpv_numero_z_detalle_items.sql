@@ -19,11 +19,12 @@ DECLARE
 BEGIN
   -- Solo asignar al cerrar (cierre_at pasa de NULL a NOT NULL) y si aún no tiene Z
   IF OLD.cierre_at IS NULL AND NEW.cierre_at IS NOT NULL AND NEW.numero_z IS NULL THEN
+    -- Advisory lock serializes Z-number assignment per empresa, even with zero existing rows
+    PERFORM pg_advisory_xact_lock(hashtext('numero_z:' || NEW.empresa_id::text));
     SELECT COALESCE(MAX(numero_z), 0) + 1
       INTO next_z
       FROM public.tpv_turnos
-     WHERE empresa_id = NEW.empresa_id
-       FOR UPDATE;
+     WHERE empresa_id = NEW.empresa_id;
     NEW.numero_z := next_z;
   END IF;
   RETURN NEW;
