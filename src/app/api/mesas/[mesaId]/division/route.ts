@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { getMesaSesionRepository } from '@/core/infrastructure/database';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
+import { PAYMENT_LOCK_EXPIRY_MS } from '@/core/domain/constants/pedido';
 
 const mesaIdSchema = z.string().uuid();
 const bodySchema = z.object({
@@ -34,6 +35,21 @@ export async function POST(
     return NextResponse.json({ error: bodyParsed.error.errors[0].message }, { status: 400 });
   }
 
+  // Tenant isolation: verify the mesa belongs to the empresa derived from the request domain
+  const empresaId = request.headers.get('x-empresa-id');
+  if (!empresaId) return NextResponse.json({ error: 'Tenant no identificado' }, { status: 400 });
+
+  const supabase = getSupabaseClient();
+
+  const { data: mesa } = await supabase
+    .from('mesas')
+    .select('id')
+    .eq('id', mesaParsed.data)
+    .eq('empresa_id', empresaId)
+    .single();
+
+  if (!mesa) return NextResponse.json({ error: 'Mesa no encontrada' }, { status: 404 });
+
   const sesionResult = await getMesaSesionRepository().findActiveSesionByMesa(mesaParsed.data);
   if (!sesionResult.success) {
     return NextResponse.json({ error: 'Error al buscar sesión' }, { status: 500 });
@@ -42,10 +58,7 @@ export async function POST(
     return NextResponse.json({ error: 'No hay sesión activa para esta mesa' }, { status: 404 });
   }
 
-  const supabase = getSupabaseClient();
-
   // Block if a payment is currently in progress (someone is at Redsys)
-  const LOCK_EXPIRY_MS = 15 * 60 * 1000;
   const { data: sesionRow } = await supabase
     .from('mesa_sesiones')
     .select('pago_en_curso, pago_iniciado_en')
@@ -88,6 +101,21 @@ export async function DELETE(
   const rateLimited = await rateLimitPublic(request as Parameters<typeof rateLimitPublic>[0]);
   if (rateLimited) return rateLimited;
 
+  // Tenant isolation: verify the mesa belongs to the empresa derived from the request domain
+  const empresaId = request.headers.get('x-empresa-id');
+  if (!empresaId) return NextResponse.json({ error: 'Tenant no identificado' }, { status: 400 });
+
+  const supabase = getSupabaseClient();
+
+  const { data: mesa } = await supabase
+    .from('mesas')
+    .select('id')
+    .eq('id', mesaParsed.data)
+    .eq('empresa_id', empresaId)
+    .single();
+
+  if (!mesa) return NextResponse.json({ error: 'Mesa no encontrada' }, { status: 404 });
+
   const sesionResult = await getMesaSesionRepository().findActiveSesionByMesa(mesaParsed.data);
   if (!sesionResult.success) {
     return NextResponse.json({ error: 'Error al buscar sesión' }, { status: 500 });
@@ -96,7 +124,6 @@ export async function DELETE(
     return NextResponse.json({ error: 'No hay sesión activa para esta mesa' }, { status: 404 });
   }
 
-  const supabase = getSupabaseClient();
   // Only cancel if no payments have been made yet
   const { error } = await supabase
     .from('mesa_sesiones')

@@ -34,6 +34,21 @@ export async function PATCH(
     return NextResponse.json({ error: bodyParsed.error.errors[0].message }, { status: 400 });
   }
 
+  // Tenant isolation: verify the mesa belongs to the empresa derived from the request domain
+  const empresaId = request.headers.get('x-empresa-id');
+  if (!empresaId) return NextResponse.json({ error: 'Tenant no identificado' }, { status: 400 });
+
+  const supabase = getSupabaseClient();
+
+  const { data: mesa } = await supabase
+    .from('mesas')
+    .select('id')
+    .eq('id', mesaParsed.data)
+    .eq('empresa_id', empresaId)
+    .single();
+
+  if (!mesa) return NextResponse.json({ error: 'Mesa no encontrada' }, { status: 404 });
+
   const sesionResult = await getMesaSesionRepository().findActiveSesionByMesa(mesaParsed.data);
   if (!sesionResult.success) {
     return NextResponse.json({ error: 'Error al buscar sesión' }, { status: 500 });
@@ -41,8 +56,6 @@ export async function PATCH(
   if (!sesionResult.data) {
     return NextResponse.json({ error: 'No hay sesión activa para esta mesa' }, { status: 404 });
   }
-
-  const supabase = getSupabaseClient();
   const { error } = await supabase
     .from('mesa_sesiones')
     .update({ propina_cents: bodyParsed.data.propinaCents })
