@@ -5,7 +5,7 @@ import {
   validationErrorResponse,
   type AuthResult,
 } from '@/core/infrastructure/api/helpers';
-import { SupabaseTpvRepository } from '@/core/infrastructure/repositories/supabase-tpv.repository';
+import { getTpvRepository } from '@/core/infrastructure/database';
 import { registrarCobroUseCase } from '@/core/application/use-cases/tpv/registrar-cobro.use-case';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { z } from 'zod';
@@ -53,7 +53,7 @@ async function processEntry(
 
   const isOpen = sesion !== null && sesion.cierre_at === null;
 
-  const repo = new SupabaseTpvRepository();
+  const repo = getTpvRepository();
   const cobroResult = await registrarCobroUseCase(repo, {
     empresaId: entry.empresaId,
     sesionId: entry.sesionId,

@@ -231,7 +231,7 @@ function buildCsp(nonce: string, path: string): string {
     "font-src 'self'",
     "worker-src 'self'",
     `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.brevo.com https://*.upstash.io https://api.mapbox.com https://events.mapbox.com https://*.sentry.io${connectR2}${devConnectSrc}`,
-    "frame-src 'self' https://www.google.com https://maps.google.com",
+    `frame-src 'self' https://www.google.com https://maps.google.com${process.env.VERCEL_ENV !== 'production' ? ' https://vercel.live https://*.vercel.live' : ''}`,
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self' https://sis-t.redsys.es:25443 https://sis.redsys.es",

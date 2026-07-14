@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  requireAuth,
-  requireRole,
+  resolveAdminContext,
   handleResult,
-  type AuthResult,
 } from '@/core/infrastructure/api/helpers';
 import { getEmpleadoTpvRepository } from '@/core/infrastructure/database';
 import { hashPin } from '@/lib/waiter-auth';
@@ -16,10 +14,9 @@ const CreateSchema = z.object({
 });
 
 export async function GET(req: NextRequest) {
-  const { empresaId, error: authError } = (await requireAuth(req)) as AuthResult;
-  if (authError) return authError;
-  const forbidden = requireRole(req, ['admin', 'superadmin']);
-  if (forbidden) return forbidden;
+  const ctx = await resolveAdminContext(req);
+  if (ctx.error) return ctx.error;
+  const { empresaId } = ctx;
   if (!empresaId) return NextResponse.json({ error: 'empresaId requerido' }, { status: 400 });
 
   const result = await getEmpleadoTpvRepository().findAllByEmpresa(empresaId);
@@ -29,10 +26,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { empresaId, error: authError } = (await requireAuth(req)) as AuthResult;
-  if (authError) return authError;
-  const forbidden = requireRole(req, ['admin', 'superadmin']);
-  if (forbidden) return forbidden;
+  const ctx = await resolveAdminContext(req);
+  if (ctx.error) return ctx.error;
+  const { empresaId } = ctx;
   if (!empresaId) return NextResponse.json({ error: 'empresaId requerido' }, { status: 400 });
 
   let body: unknown;

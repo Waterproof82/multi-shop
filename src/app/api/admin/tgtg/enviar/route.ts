@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { sendEmail } from '@/lib/brevo-email';
 import { getTgtgUseCase, getEmpresaUseCase } from '@/core/infrastructure/database';
-import { requireAuth, requireRole } from '@/core/infrastructure/api/helpers';
-import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
+import { resolveAdminContextWithEmpresa } from '@/core/infrastructure/api/helpers';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
 import { escapeHtml } from '@/lib/html-utils';
 import { generateUnsubscribeToken } from '@/lib/unsubscribe-token';
@@ -181,17 +180,9 @@ function buildTgtgEmailHtml(params: {
 }
 
 export async function POST(request: NextRequest) {
-  const rateLimited = await rateLimitAdmin(request);
-  if (rateLimited) return rateLimited;
-
-  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request) as { empresaId: string | null; error: NextResponse | null; isSuperAdmin: boolean };
-  if (authError) return authError;
-  const roleError = requireRole(request, ['admin', 'superadmin']);
-  if (roleError) return roleError;
-
-  const { searchParams } = new URL(request.url);
-  const queryEmpresaId = searchParams.get('empresaId');
-  const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
+  const ctx = await resolveAdminContextWithEmpresa(request);
+  if (ctx.error) return ctx.error;
+  const { empresaId } = ctx;
 
   let body: unknown;
   try {
@@ -213,14 +204,14 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const empresaResult = await getEmpresaUseCase().getById(empresaId!);
+    const empresaResult = await getEmpresaUseCase().getById(empresaId);
     if (!empresaResult.success || !empresaResult.data) {
       return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 });
     }
     const empresa = empresaResult.data;
 
     // Fetch all recent campaigns once and index by id
-    const allRecentResult = await getTgtgUseCase().getAllRecent(empresaId!);
+    const allRecentResult = await getTgtgUseCase().getAllRecent(empresaId);
     if (!allRecentResult.success) {
       return NextResponse.json({ error: 'Error al obtener campañas' }, { status: 500 });
     }
@@ -231,7 +222,7 @@ export async function POST(request: NextRequest) {
     const campaignsToSend: Array<{ promoId: string; horaInicio: string; horaFin: string; fechaActivacion: string; items: TgtgItem[] }> = [];
 
     for (const promoId of promoIds) {
-      const sendResult = await getTgtgUseCase().sendCampaignEmails(empresaId!, promoId);
+      const sendResult = await getTgtgUseCase().sendCampaignEmails(empresaId, promoId);
       if (!sendResult.success) {
         const status = sendResult.error.code === 'NOT_FOUND' ? 404 : sendResult.error.code === 'ALREADY_SENT' ? 409 : 400;
         return NextResponse.json({ error: sendResult.error.message }, { status });
@@ -321,7 +312,7 @@ export async function POST(request: NextRequest) {
             empresaNombre: empresa.nombre || 'Empresa',
             campaigns,
             baseUrl,
-            empresaId: empresaId!,
+            empresaId: empresaId,
             recipientEmail: target.email,
             lang,
           }),
@@ -342,7 +333,7 @@ export async function POST(request: NextRequest) {
     const updatedPromos: Array<{ id: string; emailEnviado: boolean; numeroEnvios: number }> = [];
     if (emailsSent > 0) {
       for (const c of campaignsToSend) {
-        const markResult = await getTgtgUseCase().markEmailSent(empresaId!, c.promoId, emailsSent);
+        const markResult = await getTgtgUseCase().markEmailSent(empresaId, c.promoId, emailsSent);
         if (markResult.success) {
           updatedPromos.push({ id: markResult.data.id, emailEnviado: markResult.data.emailEnviado, numeroEnvios: markResult.data.numeroEnvios });
         }

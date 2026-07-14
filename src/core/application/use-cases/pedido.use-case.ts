@@ -79,7 +79,7 @@ export class PedidoUseCase {
     private readonly clienteRepo: IClienteRepository,
     private readonly productRepo: IProductRepository,
     private readonly descuentoRepo: ICodigoDescuentoRepository,
-    private readonly mesaSesionRepo: IMesaSesionRepository | null = null
+    private readonly mesaSesionRepo: IMesaSesionRepository
   ) {}
 
   /**
@@ -489,12 +489,10 @@ export class PedidoUseCase {
 
       // Step 3: Ensure an active session exists (idempotent), then attach it to the order.
       let sesionId: string | null = null;
-      if (this.mesaSesionRepo) {
-        await this.mesaSesionRepo.openSesion(data.mesa_id, empresaId);
-        const sesionResult = await this.mesaSesionRepo.findActiveSesionByMesa(data.mesa_id);
-        if (sesionResult.success && sesionResult.data) {
-          sesionId = sesionResult.data.id;
-        }
+      await this.mesaSesionRepo.openSesion(data.mesa_id, empresaId);
+      const sesionResult = await this.mesaSesionRepo.findActiveSesionByMesa(data.mesa_id);
+      if (sesionResult.success && sesionResult.data) {
+        sesionId = sesionResult.data.id;
       }
 
       // Step 4: Create the order

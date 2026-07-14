@@ -706,10 +706,205 @@ Session rotation on waiter close (`POST /api/waiter/mesas/{mesaId}/close`) immed
 
 ---
 
+## resolveAdminContext() — helper unificado de admin auth
+
+Ver doc completo: [`admin-api-patterns.md`](./admin-api-patterns.md).
+
+`resolveAdminContext()` en `src/core/infrastructure/api/helpers.ts` consolida los 4 pasos de auth que todas las rutas `/api/admin/*` comparten:
+
+1. Rate limit (antes de JWT verify)
+2. JWT verification + extracción de claims
+3. RBAC: `requireRole(['admin', 'superadmin'])`
+4. Resolución de tenant: `empresaId` del JWT para admins normales; `?empresaId=` validado por UUID para superadmins
+
+```typescript
+const ctx = await resolveAdminContext(request);
+if (ctx.error) return ctx.error;
+const { empresaId } = ctx;
+```
+
+**33 rutas admin migradas** a este helper. Antes de esta refactorización, la validación de `?empresaId` para superadmin no incluía validación de formato UUID — ahora sí (fix SEC-03).
+
+---
+
+## Seguridad en webhooks externos
+
+### Glovo webhook — HMAC-SHA256
+
+`POST /api/glovo/webhook` verifica la firma del body usando HMAC-SHA256 con `GLOVO_WEBHOOK_SECRET`:
+
+```typescript
+async function verifyGlovoSignature(rawBody: string, signatureHeader: string | null): Promise<boolean>
+```
+
+- Comparación timing-safe (`|=` bitwise XOR — evita timing attacks)
+- Fail-closed: si `GLOVO_WEBHOOK_SECRET` no está configurado, retorna 503
+- El body se lee como texto (`request.text()`) antes de parsear JSON — necesario para que la firma sea válida
+
+> `GLOVO_WEBHOOK_SECRET` debe configurarse en `.env` y Vercel cuando la integración Glovo entre en producción.
+
+### Telegram webhook — fail-closed
+
+`POST /api/telegram/webhook` verifica el header `X-Telegram-Bot-Api-Secret-Token`:
+
+- Comparación directa con `TELEGRAM_WEBHOOK_SECRET` del entorno
+- Si `TELEGRAM_WEBHOOK_SECRET` está vacío o no configurado → retorna **503** (no procesa el webhook)
+- Antes retornaba 200 si el secret faltaba — comportamiento fail-open corregido
+
+### WAITER_PIN_PEPPER — fail-closed
+
+`src/lib/waiter-auth.ts` obtiene el pepper de PIN vía función lazy que lanza si no está configurado:
+
+```typescript
+function getPinPepper(): string {
+  const pepper = process.env.WAITER_PIN_PEPPER;
+  if (!pepper) throw new Error('WAITER_PIN_PEPPER is not configured');
+  return pepper;
+}
+```
+
+Antes existía un fallback hardcodeado (`'default-pepper'`). El fallback se eliminó: un pepper hardcodeado invalida la protección PBKDF2 scoped por empresa.
+
+---
+
+## Aislamiento de tenant en endpoints de mesa pública
+
+Las rutas `/api/mesas/[mesaId]/*` no tienen JWT de admin. El proxy inyecta `x-empresa-id` desde el dominio del tenant. Todas las mutaciones verifican que la mesa pertenece al tenant **antes de operar**:
+
+```typescript
+const { data: mesa } = await supabase
+  .from('mesas')
+  .select('id')
+  .eq('id', mesaId)
+  .eq('empresa_id', empresaId)
+  .single();
+if (!mesa) return NextResponse.json({ error: 'Mesa no encontrada' }, { status: 404 });
+```
+
+Rutas que aplican este patrón: `activate`, `call-waiter`, `division`, `lock`, `propina`.
+
+Sin este check, conocer el UUID de una mesa de otro tenant permitiría mutarla vía petición directa.
+
+---
+
+## Protección de logs de pago
+
+`console.log` con datos de pago eliminados de:
+
+- `src/core/application/use-cases/payment/initiateRedsysPaymentUseCase.ts` — `pedidoId`, importes, parámetros Redsys decodificados
+- `src/core/application/use-cases/payment/initiateRedsysMesaPaymentUseCase.ts` — ídem para pagos de mesa
+- `src/components/cart-drawer.tsx` — `decoded params` del formulario Redsys client-side
+
+Los logs de depuración de flujos de pago no deben aparecer en producción — exponen importes, referencias de pedido y parámetros que podrían ser explotados para análisis de tráfico.
+
+---
+
+## Validación FK en restauración de backup
+
+`POST /api/admin/backup/restore` (restauración de snapshot desde R2) valida las claves foráneas de `receta_items` antes del upsert:
+
+```typescript
+const validProductoIds   = new Set((snapshot.productos    ?? []).map(r => r['id'] as string));
+const validIngredienteIds = new Set((snapshot.ingredientes ?? []).map(r => r['id'] as string));
+const recetaItemsSanitized = (snapshot.receta_items ?? []).filter(r =>
+  validProductoIds.has(r['producto_id'] as string) &&
+  (r['ingrediente_id'] === null || validIngredienteIds.has(r['ingrediente_id'] as string))
+);
+```
+
+Un snapshot corrupto o malicioso no puede insertar `receta_items` que referencien productos o ingredientes de otros tenants. El campo `empresa_id` se fuerza a `empresaId` del JWT en todas las tablas con esa columna.
+
+---
+
+## CSP — Vercel preview toolbar
+
+La directiva `frame-src` incluye `https://vercel.live https://*.vercel.live` en entornos no-producción (`VERCEL_ENV !== 'production'`):
+
+```typescript
+`frame-src 'self' https://www.google.com https://maps.google.com${
+  process.env.VERCEL_ENV !== 'production' ? ' https://vercel.live https://*.vercel.live' : ''
+}`
+```
+
+Vercel inyecta su toolbar de feedback como `<iframe>` en deployments de preview. Sin este permiso, el browser reportaba violaciones CSP como eventos de Sentry aunque no hubiera problema de seguridad real. En producción `VERCEL_ENV==='production'`, el toolbar no aparece y el dominio no se agrega.
+
+---
+
+## Estándares y certificaciones de seguridad — referencia
+
+Guía rápida de los estándares más comunes en software. Ninguno es obligatorio por defecto — su necesidad depende del sector y del tipo de cliente.
+
+### ISO 27001
+
+Estándar internacional de gestión de seguridad de la información (Information Security Management System — ISMS). Publicado por ISO/IEC.
+
+- **Qué cubre**: gestión de riesgos, controles organizativos, físicos y tecnológicos (114 controles en el Anexo A: cifrado, control de acceso, gestión de incidentes, continuidad de negocio…)
+- **Cómo se obtiene**: auditoría externa por organismo certificador acreditado (AENOR, Bureau Veritas, etc.)
+- **Validez**: certificado con revisión anual y recertificación cada 3 años
+- **¿Cuándo aplica?**: cuando clientes enterprise o institucionales la exigen como requisito de proveedor, o para diferenciar en mercados donde la seguridad es argumento de venta
+- **Coste**: auditoría + mantenimiento — viable para empresas medianas/grandes, oneroso para startups
+- **Aplicabilidad a multi_shop**: no aplica en el estado actual. Podría ser relevante si se vende a cadenas hospitalarias, administración pública o grandes retailers
+
+### SOC 2 (Service Organization Control 2)
+
+Marco de auditoría americano definido por la AICPA. Evalúa controles relacionados con los Trust Service Criteria: seguridad, disponibilidad, integridad del procesamiento, confidencialidad y privacidad.
+
+- **Tipos**:
+  - **Type I**: fotografía puntual de los controles en una fecha
+  - **Type II**: auditoría del funcionamiento real de los controles durante 6–12 meses (el estándar gold del mercado SaaS)
+- **¿Cuándo aplica?**: empresas SaaS B2B que venden a corporaciones americanas o internacionales que procesan datos sensibles de terceros
+- **Coste**: significativo (auditores especializados, tiempo interno de preparación)
+- **Aplicabilidad a multi_shop**: no aplica. La piden cuando el SaaS maneja datos de salud, financieros o de RRHH de otras empresas
+
+### GDPR / LOPDGDD ✅ (aplica)
+
+**Reglamento General de Protección de Datos** (EU 2016/679) + **Ley Orgánica de Protección de Datos y Garantía de los Derechos Digitales** (española).
+
+- **Obligatorio**: sí, para cualquier empresa que procese datos personales de ciudadanos de la UE
+- **Datos afectados en multi_shop**: emails y teléfonos de clientes (`clientes` table), emails de suscriptores de promociones
+- **Cumplimiento implementado**:
+  - Anonimización de PII en logs (`anonymizeEmail()` — `"us***@ejemplo.com"`)
+  - Baja de newsletter con token HMAC TTL 1 año (`UNSUBSCRIBE_HMAC_SECRET`)
+  - Sin logging de emails/teléfonos en `log_errors`
+  - RLS con denegación explícita a `anon` en tabla `clientes`
+- **Pendiente a nivel negocio** (fuera del scope de código): política de privacidad publicada, registro de actividades de tratamiento, DPA con Supabase y Brevo, nombrar DPO si aplica
+
+### Ley Antifraude — RD 1007/2023 ✅ (aplica al TPV)
+
+Real Decreto que regula los sistemas informáticos de facturación para garantizar la integridad e inalterabilidad de los registros.
+
+- **Obligatorio**: sí, para software de gestión de ventas que emite tickets fiscales en España
+- **Cumplimiento implementado**:
+  - Cadena de hashes SHA-256 por cobro (pgcrypto) — inmutable a nivel DB (triggers bloquean DELETE/UPDATE)
+  - Numeración correlativa atómica por empresa
+  - Ticket rectificativo con referencia al original (no modifica registros)
+  - IVA/IGIC calculado server-side en trigger (no en cliente)
+  - Endpoint de auditoría `GET /api/tpv/audit/chain` y exportación `GET /api/tpv/audit/export`
+  - Pantalla de declaración de conformidad `/tpv/legal`
+- **Referencia**: RD 1619/2012 (facturación) + RD 1007/2023 (sistemas informáticos)
+
+### PCI DSS (Payment Card Industry Data Security Standard)
+
+Estándar de seguridad para empresas que procesan pagos con tarjeta.
+
+- **¿Cuándo aplica?**: cuando la aplicación almacena, procesa o transmite datos de tarjeta (PAN, CVV, PIN)
+- **Aplicabilidad a multi_shop**: **no aplica directamente** — los pagos van a Redsys TPV Virtual (Redsys está certificado PCI DSS). multi_shop nunca ve ni almacena datos de tarjeta; solo genera el formulario firmado y recibe el webhook de confirmación. Este modelo (redirect a TPV externo) se llama SAQ A-EP y la responsabilidad PCI recae en Redsys, no en el comercio.
+
+### OWASP Top 10
+
+Lista de las 10 vulnerabilidades web más críticas publicada por la Open Web Application Security Foundation. No es una certificación — es una referencia técnica de buenas prácticas.
+
+- **No es obligatorio**, pero es el estándar de facto para auditorías de seguridad de aplicaciones web
+- **Auditoría realizada**: julio 2026 (ver commits en rama `security/owasp-audit-july-2026`). Todos los hallazgos críticos resueltos.
+- **Categorías cubiertas**: A01 Broken Access Control, A02 Cryptographic Failures, A03 Injection, A05 Security Misconfiguration, A06 Vulnerable Components (webhooks), A09 Security Logging
+
+---
+
 ## Pendientes conocidos
 
 | Item | Severidad | Notas |
 |------|-----------|-------|
+| `GLOVO_WEBHOOK_SECRET` en entorno | High | El scaffold HMAC-SHA256 está implementado. Requiere configurar la variable en `.env` y Vercel cuando Glovo entre en producción. |
 | Cart token generación con `jti` | Low | El proxy valida `aud: 'cart-access'` y llama `isTokenRevoked(jti)` si el claim está presente. Cuando se implemente la generación, incluir `jti` para habilitar revocación completa. |
 | `unsafe-inline` en `style-src` | Low | Estándar para la mayoría de aplicaciones Next.js. Mejorable con style nonces si el framework lo soporta en el futuro. |
 | Order number gaps | Low | Si el INSERT falla tras `get_next_pedido_number`, el número se pierde. Operacionalmente menor, no es riesgo de seguridad. |

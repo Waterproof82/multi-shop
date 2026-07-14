@@ -31,6 +31,8 @@ import { ValoracionUseCase } from '@/core/application/use-cases/valoracion.use-c
 import { EmpleadoTpvLoginUseCase } from '@/core/application/use-cases/tpv/empleado-tpv-login.use-case';
 import { SupabaseComplementoGrupoRepository } from './supabase-complemento-grupo.repository';
 import { ComplementoGrupoUseCase } from '@/core/application/use-cases/complemento-grupo.use-case';
+import { SupabaseStockRepository } from '../repositories/supabase-stock.repository';
+import { SupabaseTpvRepository } from '../repositories/supabase-tpv.repository';
 
 // ---------------------------------------------------------------------------
 // Private lazy repository getters (shared between use cases, not exported)
@@ -204,4 +206,14 @@ export function getEmpleadoTpvLoginUseCase(): EmpleadoTpvLoginUseCase {
 let _complementoGrupoUseCase: ComplementoGrupoUseCase | undefined;
 export function getComplementoGrupoUseCase(): ComplementoGrupoUseCase {
   return _complementoGrupoUseCase ??= new ComplementoGrupoUseCase(getComplementoGrupoRepository());
+}
+
+let _stockRepository: SupabaseStockRepository | undefined;
+export function getStockRepository(): SupabaseStockRepository {
+  return _stockRepository ??= new SupabaseStockRepository();
+}
+
+let _tpvRepository: SupabaseTpvRepository | undefined;
+export function getTpvRepository(): SupabaseTpvRepository {
+  return _tpvRepository ??= new SupabaseTpvRepository();
 }

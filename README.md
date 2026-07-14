@@ -479,19 +479,23 @@ Documentación completa en [`docs/context/security.md`](docs/context/security.md
 |------|----------------|
 | **Autenticación** | JWT HS256 en cookie HttpOnly + SameSite strict, jti claim, 24h expiry, runtime guard en secret |
 | **JWT Revocation** | Verificada en proxy (API) y `verifyToken` (pages SSR). Fail-closed en producción |
-| **Autorización** | `proxy.ts` verifica JWT e inyecta `x-empresa-id` por tenant |
+| **Autorización** | `proxy.ts` verifica JWT e inyecta `x-empresa-id` por tenant. `resolveAdminContext()` unifica rate-limit + JWT + RBAC + tenant en 1 llamada (33 rutas admin) |
 | **CSRF** | Token HMAC-SHA256 verificado con `timingSafeEqual`, Cache-Control no-store |
-| **CSP** | Nonce criptográfico por request en `proxy.ts`, sin `unsafe-inline` en scripts |
+| **CSP** | Nonce criptográfico por request en `proxy.ts`, sin `unsafe-inline` en scripts. `frame-src` incluye `vercel.live` solo en preview (VERCEL_ENV ≠ production) |
 | **Rate limiting** | Upstash Redis — 5/15min login (fail-closed en prod), 20/min público, 60/min admin |
 | **Env validation** | `instrumentation.ts` → `validateEnv()` al startup, falla fatal en producción |
 | **Validación** | Zod `safeParse` + try/catch en `request.json()` + max-length en todos los DTOs |
 | **Uploads** | Validación MIME + magic bytes + tamaño + path seguro (slug desde DB) |
-| **Multi-tenant** | Aislamiento por `empresaId` en cada query, RLS + service_role |
+| **Multi-tenant** | Aislamiento por `empresaId` en cada query, RLS + service_role. Endpoints de mesa pública verifican `empresa_id` en DB antes de mutaciones |
+| **Webhooks** | Glovo: HMAC-SHA256 timing-safe + fail-closed. Telegram: comparación de secret + fail-closed (503 si no configurado) |
 | **Mínimo privilegio** | Endpoints públicos usan `empresaPublicRepository` (anon key) para lecturas |
 | **XSS emails** | `escapeHtml()` en todos los templates HTML, logging centralizado sin PII |
 | **Price tampering** | Total recalculado server-side + rechazo de productos desconocidos (`PRODUCT_NOT_FOUND`) |
 | **Anti-enumeración** | Login devuelve mensaje genérico para todos los tipos de fallo auth |
 | **RBAC** | `RolAdmin` union type + CHECK constraint en DB. `requireRole(request, roles[])` en todos los handlers de `/api/admin/*` y `/api/tpv/*`. Cuatro roles: `superadmin`, `admin`, `encargado`, `cajero`. Guards en layouts y páginas (redirect SSR). |
+| **Secrets fail-closed** | Waiter PIN pepper: lanza si `WAITER_PIN_PEPPER` falta (sin fallback hardcodeado). Telegram: 503 si `TELEGRAM_WEBHOOK_SECRET` falta |
+| **Logs de pago** | `console.log` con datos de pago eliminados de Redsys use cases y cart-drawer |
+| **Backup restore** | `receta_items` validados por FK antes del upsert — solo se restauran filas cuyo `producto_id` e `ingrediente_id` pertenecen al tenant |
 | **Unsubscribe** | HMAC-SHA256 con `UNSUBSCRIBE_HMAC_SECRET` dedicado, TTL 1 año (GDPR/CAN-SPAM), acción explícita `'baja'` |
 | **CORS** | Whitelist de dominios, `Vary: Origin`, preflight 204, headers en rutas públicas |
 | **Cart tokens** | Validación con audience claim `'cart-access'` para prevenir token confusion |
@@ -535,9 +539,10 @@ export class ProductUseCase {
 ## Helpers de API
 
 ```typescript
-// Autenticación — obligatorio en todas las rutas /api/admin/*
-const { empresaId, error: authError } = await requireAuth(request);
-if (authError) return authError;
+// Auth unificada para /api/admin/* — reemplaza requireAuth + requireRole + tenant + rate-limit
+const ctx = await resolveAdminContext(request);
+if (ctx.error) return ctx.error;
+const { empresaId } = ctx; // string | null (null para superadmin sin ?empresaId)
 
 // Respuestas consistentes
 return successResponse(data);             // 200 OK
@@ -549,6 +554,8 @@ return handleResult(result);             // automático desde Result<T> (mapea e
 
 `handleResult` mapea automáticamente códigos de error a HTTP status:
 - `VALIDATION_ERROR` → 400, `AUTH_*` → 401, `*_NOT_FOUND` → 404, otros → 500
+
+Ver patrón completo: [`docs/context/admin-api-patterns.md`](docs/context/admin-api-patterns.md).
 
 ## Códigos de Error Centralizados
 

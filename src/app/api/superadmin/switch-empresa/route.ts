@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getAuthAdminUseCase } from '@/core/infrastructure/database';
 import { cookies } from 'next/headers';
 
@@ -17,11 +18,14 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url);
-  const empresaId = searchParams.get('empresaId');
+  const rawEmpresaId = searchParams.get('empresaId');
+  const parsed = z.string().uuid().safeParse(rawEmpresaId);
 
-  if (!empresaId) {
+  if (!parsed.success) {
     return NextResponse.redirect(new URL('/superadmin', request.url));
   }
+
+  const empresaId = parsed.data;
 
   const response = NextResponse.redirect(new URL('/admin', request.url));
   

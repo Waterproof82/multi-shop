@@ -1,8 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getEmpresaRepository } from '@/core/infrastructure/database';
-import { requireAuth, requireRole, successResponse, validationErrorResponse, handleResult, type AuthResult } from '@/core/infrastructure/api/helpers';
-import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
+import { resolveAdminContextWithEmpresa, successResponse, validationErrorResponse, handleResult } from '@/core/infrastructure/api/helpers';
 import { hashPin } from '@/lib/waiter-auth';
 
 const pinSchema = z.object({
@@ -10,17 +9,9 @@ const pinSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const rateLimited = await rateLimitAdmin(request);
-  if (rateLimited) return rateLimited;
-
-  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request) as AuthResult;
-  if (authError) return authError;
-  const roleError = requireRole(request, ['admin', 'superadmin']);
-  if (roleError) return roleError;
-
-  const { searchParams } = new URL(request.url);
-  const queryEmpresaId = searchParams.get('empresaId');
-  const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
+  const ctx = await resolveAdminContextWithEmpresa(request);
+  if (ctx.error) return ctx.error;
+  const { empresaId } = ctx;
 
   let body: unknown;
   try {
@@ -32,8 +23,8 @@ export async function POST(request: NextRequest) {
   const parsed = pinSchema.safeParse(body);
   if (!parsed.success) return validationErrorResponse(parsed.error.errors[0].message);
 
-  const pinHash = await hashPin(parsed.data.pin, empresaId!);
-  const result = await getEmpresaRepository().updateWaiterPin(empresaId!, pinHash);
+  const pinHash = await hashPin(parsed.data.pin, empresaId);
+  const result = await getEmpresaRepository().updateWaiterPin(empresaId, pinHash);
   if (!result.success) return handleResult(result);
 
   return successResponse({ success: true });

@@ -1,3 +1,6 @@
+/** 15 minutes — after this, a payment lock is considered stale and can be overridden */
+export const PAYMENT_LOCK_EXPIRY_MS = 15 * 60 * 1000;
+
 export const PEDIDO_ESTADOS = ['pendiente', 'anotado', 'servido', 'cerrado', 'aceptado', 'preparando', 'listo', 'en_camino', 'enviado', 'entregado', 'cancelado'] as const;
 export type PedidoEstado = typeof PEDIDO_ESTADOS[number];
 

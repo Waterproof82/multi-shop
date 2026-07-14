@@ -6,7 +6,7 @@ import {
   validationErrorResponse,
   type AuthResult,
 } from '@/core/infrastructure/api/helpers';
-import { SupabaseTpvRepository } from '@/core/infrastructure/repositories/supabase-tpv.repository';
+import { getTpvRepository } from '@/core/infrastructure/database';
 import { z } from 'zod';
 
 const querySchema = z.object({
@@ -22,7 +22,7 @@ const querySchema = z.object({
   { message: 'El rango no puede superar 365 días ni ser negativo' }
 );
 
-const repo = new SupabaseTpvRepository();
+const repo = getTpvRepository();
 
 export async function GET(req: NextRequest) {
   const { empresaId, error: authError } = (await requireAuth(req)) as AuthResult;

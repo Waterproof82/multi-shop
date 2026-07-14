@@ -6,7 +6,7 @@ import {
   validationErrorResponse,
   type AuthResult,
 } from '@/core/infrastructure/api/helpers';
-import { SupabaseTpvRepository } from '@/core/infrastructure/repositories/supabase-tpv.repository';
+import { getTpvRepository } from '@/core/infrastructure/database';
 import { registrarCobroUseCase } from '@/core/application/use-cases/tpv/registrar-cobro.use-case';
 import { z } from 'zod';
 
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const repo = new SupabaseTpvRepository();
+  const repo = getTpvRepository();
   const result = await registrarCobroUseCase(repo, { ...parsed.data, empresaId, cerrarSesion: parsed.data.cerrarSesion });
   return handleResult(result);
 }

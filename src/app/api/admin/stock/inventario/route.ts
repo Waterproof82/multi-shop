@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireAuth, requireRole, validationErrorResponse } from '@/core/infrastructure/api/helpers';
+import { resolveAdminContext, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 
 const itemSchema = z.object({
@@ -14,10 +14,9 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const { empresaId, error: authError } = await requireAuth(req);
-  if (authError) return authError;
-  const forbidden = requireRole(req, ['admin', 'superadmin']);
-  if (forbidden) return forbidden;
+  const ctx = await resolveAdminContext(req);
+  if (ctx.error) return ctx.error;
+  const { empresaId } = ctx;
   if (!empresaId) return validationErrorResponse('empresaId requerido');
 
   let body: unknown;

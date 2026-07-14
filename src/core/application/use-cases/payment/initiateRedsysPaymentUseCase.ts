@@ -98,8 +98,6 @@ export async function initiateRedsysPaymentUseCase(
     // Generate order reference — must start with 4 numeric digits (Redsys spec)
     const paymentOrderRef = generatePaymentOrderRef(numeroPedido);
 
-    console.log('[Redsys] pedidoId:', input.pedidoId, '| total_raw:', rawTotal, '| total:', total, '| amountCents:', amountCents, '| numeroPedido:', numeroPedido, '| paymentOrderRef:', paymentOrderRef);
-
     // Update pedido with payment state
     const { error: updateError } = await supabase
       .from('pedidos')
@@ -147,9 +145,6 @@ export async function initiateRedsysPaymentUseCase(
         webhookUrl: input.webhookUrl,
       }
     );
-
-    const decodedCheck = JSON.parse(Buffer.from(formData.DS_MERCHANT_PARAMETERS, 'base64').toString('utf8')) as Record<string, unknown>;
-    console.log('[Redsys params]', decodedCheck);
 
     return { success: true, data: formData };
   } catch (e) {

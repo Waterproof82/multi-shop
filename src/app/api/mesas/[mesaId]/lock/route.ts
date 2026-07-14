@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
+import { PAYMENT_LOCK_EXPIRY_MS } from '@/core/domain/constants/pedido';
 
 const mesaIdSchema = z.string().uuid();
-const LOCK_EXPIRY_MS = 15 * 60 * 1000;
+const LOCK_EXPIRY_MS = PAYMENT_LOCK_EXPIRY_MS;
 
 type LockRow = { pago_en_curso: boolean; pago_iniciado_en: string | null } | null;
 

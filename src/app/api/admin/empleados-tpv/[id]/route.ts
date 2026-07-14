@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  requireAuth,
-  requireRole,
-  type AuthResult,
+  resolveAdminContext,
 } from '@/core/infrastructure/api/helpers';
 import { getEmpleadoTpvRepository } from '@/core/infrastructure/database';
 import { hashPin } from '@/lib/waiter-auth';
@@ -17,10 +15,9 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { empresaId, error: authError } = (await requireAuth(req)) as AuthResult;
-  if (authError) return authError;
-  const forbidden = requireRole(req, ['admin', 'superadmin']);
-  if (forbidden) return forbidden;
+  const ctx = await resolveAdminContext(req);
+  if (ctx.error) return ctx.error;
+  const { empresaId } = ctx;
   if (!empresaId) return NextResponse.json({ error: 'empresaId requerido' }, { status: 400 });
 
   const { id } = await params;
@@ -57,10 +54,9 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { empresaId, error: authError } = (await requireAuth(req)) as AuthResult;
-  if (authError) return authError;
-  const forbidden = requireRole(req, ['admin', 'superadmin']);
-  if (forbidden) return forbidden;
+  const ctx = await resolveAdminContext(req);
+  if (ctx.error) return ctx.error;
+  const { empresaId } = ctx;
   if (!empresaId) return NextResponse.json({ error: 'empresaId requerido' }, { status: 400 });
 
   const { id } = await params;

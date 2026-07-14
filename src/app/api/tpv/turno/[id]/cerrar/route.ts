@@ -6,12 +6,12 @@ import {
   validationErrorResponse,
   type AuthResult,
 } from '@/core/infrastructure/api/helpers';
-import { SupabaseTpvRepository } from '@/core/infrastructure/repositories/supabase-tpv.repository';
+import { getTpvRepository } from '@/core/infrastructure/database';
 import { cerrarTurnoUseCase } from '@/core/application/use-cases/tpv/cerrar-turno.use-case';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { z } from 'zod';
 
-const repo = new SupabaseTpvRepository();
+const repo = getTpvRepository();
 
 const CerrarSchema = z.object({
   efectivoCierreCents: z.number().int().min(0),
