@@ -406,10 +406,6 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                 input.value = value;
                 form.appendChild(input);
               }
-              try {
-                const decoded = JSON.parse(atob(fields['Ds_MerchantParameters'] ?? '')) as Record<string, unknown>;
-                console.log('[Redsys form] decoded params:', decoded);
-              } catch (e) { console.error('[Redsys form] decode error', e); }
               document.body.appendChild(form);
               form.submit();
               return;
