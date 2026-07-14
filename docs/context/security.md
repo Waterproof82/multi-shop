@@ -830,6 +830,76 @@ Vercel inyecta su toolbar de feedback como `<iframe>` en deployments de preview.
 
 ---
 
+## Estándares y certificaciones de seguridad — referencia
+
+Guía rápida de los estándares más comunes en software. Ninguno es obligatorio por defecto — su necesidad depende del sector y del tipo de cliente.
+
+### ISO 27001
+
+Estándar internacional de gestión de seguridad de la información (Information Security Management System — ISMS). Publicado por ISO/IEC.
+
+- **Qué cubre**: gestión de riesgos, controles organizativos, físicos y tecnológicos (114 controles en el Anexo A: cifrado, control de acceso, gestión de incidentes, continuidad de negocio…)
+- **Cómo se obtiene**: auditoría externa por organismo certificador acreditado (AENOR, Bureau Veritas, etc.)
+- **Validez**: certificado con revisión anual y recertificación cada 3 años
+- **¿Cuándo aplica?**: cuando clientes enterprise o institucionales la exigen como requisito de proveedor, o para diferenciar en mercados donde la seguridad es argumento de venta
+- **Coste**: auditoría + mantenimiento — viable para empresas medianas/grandes, oneroso para startups
+- **Aplicabilidad a multi_shop**: no aplica en el estado actual. Podría ser relevante si se vende a cadenas hospitalarias, administración pública o grandes retailers
+
+### SOC 2 (Service Organization Control 2)
+
+Marco de auditoría americano definido por la AICPA. Evalúa controles relacionados con los Trust Service Criteria: seguridad, disponibilidad, integridad del procesamiento, confidencialidad y privacidad.
+
+- **Tipos**:
+  - **Type I**: fotografía puntual de los controles en una fecha
+  - **Type II**: auditoría del funcionamiento real de los controles durante 6–12 meses (el estándar gold del mercado SaaS)
+- **¿Cuándo aplica?**: empresas SaaS B2B que venden a corporaciones americanas o internacionales que procesan datos sensibles de terceros
+- **Coste**: significativo (auditores especializados, tiempo interno de preparación)
+- **Aplicabilidad a multi_shop**: no aplica. La piden cuando el SaaS maneja datos de salud, financieros o de RRHH de otras empresas
+
+### GDPR / LOPDGDD ✅ (aplica)
+
+**Reglamento General de Protección de Datos** (EU 2016/679) + **Ley Orgánica de Protección de Datos y Garantía de los Derechos Digitales** (española).
+
+- **Obligatorio**: sí, para cualquier empresa que procese datos personales de ciudadanos de la UE
+- **Datos afectados en multi_shop**: emails y teléfonos de clientes (`clientes` table), emails de suscriptores de promociones
+- **Cumplimiento implementado**:
+  - Anonimización de PII en logs (`anonymizeEmail()` — `"us***@ejemplo.com"`)
+  - Baja de newsletter con token HMAC TTL 1 año (`UNSUBSCRIBE_HMAC_SECRET`)
+  - Sin logging de emails/teléfonos en `log_errors`
+  - RLS con denegación explícita a `anon` en tabla `clientes`
+- **Pendiente a nivel negocio** (fuera del scope de código): política de privacidad publicada, registro de actividades de tratamiento, DPA con Supabase y Brevo, nombrar DPO si aplica
+
+### Ley Antifraude — RD 1007/2023 ✅ (aplica al TPV)
+
+Real Decreto que regula los sistemas informáticos de facturación para garantizar la integridad e inalterabilidad de los registros.
+
+- **Obligatorio**: sí, para software de gestión de ventas que emite tickets fiscales en España
+- **Cumplimiento implementado**:
+  - Cadena de hashes SHA-256 por cobro (pgcrypto) — inmutable a nivel DB (triggers bloquean DELETE/UPDATE)
+  - Numeración correlativa atómica por empresa
+  - Ticket rectificativo con referencia al original (no modifica registros)
+  - IVA/IGIC calculado server-side en trigger (no en cliente)
+  - Endpoint de auditoría `GET /api/tpv/audit/chain` y exportación `GET /api/tpv/audit/export`
+  - Pantalla de declaración de conformidad `/tpv/legal`
+- **Referencia**: RD 1619/2012 (facturación) + RD 1007/2023 (sistemas informáticos)
+
+### PCI DSS (Payment Card Industry Data Security Standard)
+
+Estándar de seguridad para empresas que procesan pagos con tarjeta.
+
+- **¿Cuándo aplica?**: cuando la aplicación almacena, procesa o transmite datos de tarjeta (PAN, CVV, PIN)
+- **Aplicabilidad a multi_shop**: **no aplica directamente** — los pagos van a Redsys TPV Virtual (Redsys está certificado PCI DSS). multi_shop nunca ve ni almacena datos de tarjeta; solo genera el formulario firmado y recibe el webhook de confirmación. Este modelo (redirect a TPV externo) se llama SAQ A-EP y la responsabilidad PCI recae en Redsys, no en el comercio.
+
+### OWASP Top 10
+
+Lista de las 10 vulnerabilidades web más críticas publicada por la Open Web Application Security Foundation. No es una certificación — es una referencia técnica de buenas prácticas.
+
+- **No es obligatorio**, pero es el estándar de facto para auditorías de seguridad de aplicaciones web
+- **Auditoría realizada**: julio 2026 (ver commits en rama `security/owasp-audit-july-2026`). Todos los hallazgos críticos resueltos.
+- **Categorías cubiertas**: A01 Broken Access Control, A02 Cryptographic Failures, A03 Injection, A05 Security Misconfiguration, A06 Vulnerable Components (webhooks), A09 Security Logging
+
+---
+
 ## Pendientes conocidos
 
 | Item | Severidad | Notas |
