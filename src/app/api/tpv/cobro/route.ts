@@ -23,18 +23,17 @@ interface RawPedido {
 }
 
 function buildDetalleItems(pedidos: RawPedido[]): TpvDetalleItem[] {
-  const map = new Map<string, { cantidad: number; precioUnitarioCents: number }>();
+  const map = new Map<string, { nombre: string; cantidad: number; precioUnitarioCents: number }>();
   for (const pedido of pedidos) {
     for (const item of pedido.detalle_pedido ?? []) {
-      const key = item.nombre ?? '';
-      const prev = map.get(key) ?? {
-        cantidad: 0,
-        precioUnitarioCents: Math.round((item.precio ?? 0) * 100),
-      };
+      const nombre = item.nombre ?? '';
+      const precioUnitarioCents = Math.round((item.precio ?? 0) * 100);
+      const key = `${nombre}|${precioUnitarioCents}`;
+      const prev = map.get(key) ?? { nombre, cantidad: 0, precioUnitarioCents };
       map.set(key, { ...prev, cantidad: prev.cantidad + (item.cantidad ?? 1) });
     }
   }
-  return Array.from(map.entries()).map(([nombre, v]) => ({ nombre, ...v }));
+  return Array.from(map.values());
 }
 
 const CobroSchema = z.object({

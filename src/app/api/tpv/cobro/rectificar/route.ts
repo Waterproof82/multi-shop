@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAuth, validationErrorResponse, type AuthResult } from '@/core/infrastructure/api/helpers';
 import { getTpvRepository } from '@/core/infrastructure/database';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
+import { type TpvDetalleItem } from '@/core/domain/entities/tpv-types';
 
 const schema = z.object({
   cobroId: z.string().uuid(),
@@ -17,7 +18,7 @@ type CobrosRow = {
   propina_cents: number;
   iva_porcentaje: string;
   rectifica_cobro_id: string | null;
-  detalle_items: unknown;
+  detalle_items: TpvDetalleItem[] | null;
 };
 
 export async function POST(req: NextRequest) {
