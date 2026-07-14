@@ -19,7 +19,11 @@ function getWaiterTokenSecret(): Uint8Array {
 }
 
 function getPinPepper(): string {
-  return process.env.WAITER_PIN_PEPPER ?? 'waiter-panel-pepper-v1';
+  const pepper = process.env.WAITER_PIN_PEPPER;
+  if (!pepper) {
+    throw new Error('WAITER_PIN_PEPPER is not configured');
+  }
+  return pepper;
 }
 
 /**

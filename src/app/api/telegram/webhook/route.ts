@@ -2,7 +2,7 @@ import { NextResponse, after } from 'next/server';
 import { z } from 'zod';
 import { answerCallbackQuery, editMessageText, editMessageReplyMarkup, buildTimeButtons, deleteMessage } from '@/core/infrastructure/services/telegram.service';
 
-const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
+const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET ?? '';
 
 const sanitizeMarkdown = (text: string): string =>
   text.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
@@ -20,12 +20,13 @@ const callbackQuerySchema = z.object({
 });
 
 export async function POST(request: Request) {
-  // Validate secret token from Telegram header
-  if (WEBHOOK_SECRET) {
-    const secretHeader = request.headers.get('X-Telegram-Bot-Api-Secret-Token');
-    if (secretHeader !== WEBHOOK_SECRET) {
-      return NextResponse.json({ ok: false }, { status: 401 });
-    }
+  // Validate secret token from Telegram header — fail-closed if secret is not configured
+  if (!WEBHOOK_SECRET) {
+    return NextResponse.json({ ok: false }, { status: 503 });
+  }
+  const secretHeader = request.headers.get('X-Telegram-Bot-Api-Secret-Token');
+  if (secretHeader !== WEBHOOK_SECRET) {
+    return NextResponse.json({ ok: false }, { status: 401 });
   }
 
   let body: unknown;
