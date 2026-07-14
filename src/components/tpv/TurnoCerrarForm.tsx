@@ -6,6 +6,7 @@ import type { TpvTurno, TpvTurnoStats, InformeZData } from '@/core/domain/entiti
 import { getCsrfToken } from '@/lib/csrf-client';
 import { useTpvCatalog } from '@/lib/tpv-catalog-ctx';
 import { InformeZModal } from '@/components/tpv/InformeZModal';
+import { logClientError } from '@/lib/client-error';
 
 interface MesaAbierta {
   mesaNumero: number | null;
@@ -85,6 +86,16 @@ export function TurnoCerrarForm({ turno, stats, mesasAbiertas, isBlindClose }: R
         const zRes = await fetch(`/api/tpv/turno/${turno.id}/informe-z`);
         if (zRes.ok) {
           const data = (await zRes.json()) as InformeZData;
+          const snapshotPromise = window.electronAPI?.saveFiscalSnapshot(data);
+          if (snapshotPromise !== undefined) {
+            snapshotPromise
+              .then(result => {
+                if (!result.success) {
+                  logClientError(new Error(result.error ?? 'Backup fiscal local fallido'), 'saveFiscalSnapshot');
+                }
+              })
+              .catch(err => { logClientError(err, 'saveFiscalSnapshot'); });
+          }
           setInformeZ(data);
         } else {
           router.push('/tpv/turno/abrir');

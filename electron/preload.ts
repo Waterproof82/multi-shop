@@ -9,4 +9,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('printer:print', data),
   saveConfig: (data: { domain: string; printerName: string }): Promise<void> =>
     ipcRenderer.invoke('store:set', data),
+  saveFiscalSnapshot: (data: unknown): Promise<{ success: boolean; path?: string; error?: string }> =>
+    ipcRenderer.invoke('fiscal:save-snapshot', data),
 });
