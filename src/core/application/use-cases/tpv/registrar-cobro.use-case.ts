@@ -71,5 +71,6 @@ export async function registrarCobroUseCase(
     propinaCents: payload.propinaCents,
     descuentoCents: payload.descuentoCents,
     ivaPorcentaje: payload.ivaPorcentaje,
+    detalleItems: payload.detalleItems,
   });
 }
