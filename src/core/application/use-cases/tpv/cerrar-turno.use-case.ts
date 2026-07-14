@@ -5,6 +5,7 @@ interface CerrarTurnoInput {
   turnoId: string;
   efectivoCierreCents: number;
   totalEfectivoTeoricoCents: number;
+  empleadoCierreId?: string;
 }
 
 export async function cerrarTurnoUseCase(
@@ -16,6 +17,8 @@ export async function cerrarTurnoUseCase(
   return repo.cerrarTurno({
     turnoId: input.turnoId,
     efectivoCierreCents: input.efectivoCierreCents,
+    efectivoCierreTeoricoCents: input.totalEfectivoTeoricoCents,
     diferenciaCents,
+    empleadoCierreId: input.empleadoCierreId,
   });
 }

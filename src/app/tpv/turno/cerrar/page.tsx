@@ -7,7 +7,13 @@ import { getSupabaseClient } from '@/core/infrastructure/database/supabase-clien
 import { TurnoCerrarForm } from '@/components/tpv/TurnoCerrarForm';
 import type { RolAdmin } from '@/core/domain/repositories/IAdminRepository';
 
-const EMPTY_STATS = { totalEfectivoCents: 0, totalTarjetaCents: 0, numOperaciones: 0 };
+const EMPTY_STATS = {
+  totalEfectivoCents: 0,
+  totalTarjetaCents: 0,
+  numOperaciones: 0,
+  efectivoAperturaCents: 0,
+  movimientosNetoCents: 0,
+};
 
 export default async function TurnoCerrarPage() {
   const cookieStore = await cookies();
