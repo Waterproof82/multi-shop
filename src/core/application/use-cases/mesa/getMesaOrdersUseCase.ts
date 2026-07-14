@@ -374,7 +374,7 @@ async function fetchPaymentState(
       : false;
     pagoEnCurso = !!(row?.pago_en_curso && lockFresh);
   } catch (e) {
-    await logger.logFromCatch(e, 'use-case', 'fetchPaymentState', { sesionId });
+    await logger.logFromCatch(e, 'use-case', 'fetchPaymentState', { details: { sesionId } });
   }
 
   return {
