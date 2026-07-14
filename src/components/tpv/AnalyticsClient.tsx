@@ -5,6 +5,11 @@ import dynamic from 'next/dynamic';
 import { Loader2 } from 'lucide-react';
 import type { TpvAnalytics, TipoImpuesto } from '@/core/domain/entities/tpv-types';
 
+// DOW 0=domingo…6=sábado (PostgreSQL). Reordenamos a lun-dom para la UI.
+const DOW_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+// Mapeo de índice UI (0=lun) → DOW PostgreSQL
+function uiToDow(ui: number): number { return ui === 6 ? 0 : ui + 1; }
+
 const TpvBarChart = dynamic(
   () => import('@/components/tpv/TpvBarChart').then(m => m.TpvBarChart),
   {
@@ -50,6 +55,21 @@ function calcDesdeHasta(periodo: Periodo, customDesde: string, customHasta: stri
   return [customDesde, customHasta];
 }
 
+function calcPrevDesdeHasta(periodo: Periodo, desde: string, hasta: string): [string, string] | null {
+  if (periodo === 'custom') return null;
+  const d = new Date(desde);
+  const h = new Date(hasta);
+  const diffMs = h.getTime() - d.getTime();
+  const prev = new Date(d.getTime() - diffMs - 86_400_000);
+  const prevH = new Date(d.getTime() - 86_400_000);
+  return [toDateStr(prev), toDateStr(prevH)];
+}
+
+function delta(curr: number, prev: number): number | null {
+  if (prev === 0) return null;
+  return Math.round(((curr - prev) / prev) * 100);
+}
+
 function periodoLabel(p: Periodo): string {
   if (p === 'semana') return 'Semana';
   if (p === 'custom') return 'Custom';
@@ -67,15 +87,22 @@ export function AnalyticsClient({ initialData, tipoImpuesto }: Props) {
   const [customDesde, setCustomDesde] = useState(today);
   const [customHasta, setCustomHasta] = useState(today);
   const [data, setData] = useState<TpvAnalytics>(initialData);
+  const [prevData, setPrevData] = useState<TpvAnalytics | null>(null);
   const [loading, setLoading] = useState(false);
   const impLabel = tipoImpuesto.toUpperCase();
 
   async function fetchData(p: Periodo, cd: string, ch: string) {
     const [desde, hasta] = calcDesdeHasta(p, cd, ch);
+    const prevRange = calcPrevDesdeHasta(p, desde, hasta);
     setLoading(true);
     try {
-      const res = await fetch(`/api/tpv/analytics?desde=${desde}&hasta=${hasta}`);
+      const [res, prevRes] = await Promise.all([
+        fetch(`/api/tpv/analytics?desde=${desde}&hasta=${hasta}`),
+        prevRange ? fetch(`/api/tpv/analytics?desde=${prevRange[0]}&hasta=${prevRange[1]}`) : Promise.resolve(null),
+      ]);
       if (res.ok) setData(await res.json() as TpvAnalytics);
+      if (prevRes?.ok) setPrevData(await prevRes.json() as TpvAnalytics);
+      else setPrevData(null);
     } finally {
       setLoading(false);
     }
@@ -92,6 +119,13 @@ export function AnalyticsClient({ initialData, tipoImpuesto }: Props) {
 
   const totalBruto = data.splitEfectivoCents + data.splitTarjetaCents;
   const pctEfectivo = totalBruto > 0 ? Math.round((data.splitEfectivoCents / totalBruto) * 100) : 0;
+
+  // Heatmap: máximo valor para escala de color
+  const heatmapMax = data.heatmap.reduce((m, r) => Math.max(m, r.totalCents), 1);
+  const heatmapMap = new Map(data.heatmap.map(r => [`${r.dow}-${r.hora}`, r.totalCents]));
+  const activeHoursHeatmap = data.heatmap.length > 0
+    ? { min: Math.min(...data.heatmap.map(r => r.hora)), max: Math.max(...data.heatmap.map(r => r.hora)) }
+    : { min: 8, max: 22 };
 
   const activeHours = data.ventasPorHora
     .map((v, i) => ({ hora: i, total: v }))
@@ -160,18 +194,34 @@ export function AnalyticsClient({ initialData, tipoImpuesto }: Props) {
         {/* KPIs */}
         <div className="grid grid-cols-5 gap-3 mb-6">
           {[
-            { label: 'Facturado', value: fmt(data.totalFacturadoCents), sub: `${data.numCobros} cobros`, color: 'text-[#e8eaf0]' },
-            { label: 'Ticket ∅', value: fmt(data.ticketMedioCents), sub: 'por cobro', color: 'text-[#4f72ff]' },
-            { label: `${impLabel} total`, value: fmt(data.totalIvaCents), sub: `Base: ${fmt(data.baseImponibleCents)}`, color: 'text-[#f59e0b]' },
-            { label: 'Propinas', value: fmt(data.totalPropinaCents), sub: `exento ${impLabel}`, color: 'text-[#e8eaf0]' },
-            { label: 'Turnos', value: String(data.numTurnos), sub: data.duracionMediaMinutos !== null ? `∅ ${Math.floor(data.duracionMediaMinutos / 60)}h ${data.duracionMediaMinutos % 60}m` : '—', color: 'text-[#e8eaf0]' },
-          ].map(kpi => (
-            <div key={kpi.label} className="bg-[#1a1d27] border border-[#2e3347] rounded-xl px-4 py-3">
-              <p className="text-[10px] text-[#6b7280] uppercase tracking-wider mb-1">{kpi.label}</p>
-              <p className={`text-xl font-bold ${kpi.color}`}>{kpi.value}</p>
-              <p className="text-[10px] text-[#6b7280] mt-1">{kpi.sub}</p>
-            </div>
-          ))}
+            { label: 'Facturado', value: fmt(data.totalFacturadoCents), prev: prevData?.totalFacturadoCents, sub: `${data.numCobros} cobros`, color: 'text-[#e8eaf0]' },
+            { label: 'Ticket ∅', value: fmt(data.ticketMedioCents), prev: prevData?.ticketMedioCents, sub: 'por cobro', color: 'text-[#4f72ff]' },
+            { label: `${impLabel} total`, value: fmt(data.totalIvaCents), prev: prevData?.totalIvaCents, sub: `Base: ${fmt(data.baseImponibleCents)}`, color: 'text-[#f59e0b]' },
+            { label: 'Propinas', value: fmt(data.totalPropinaCents), prev: prevData?.totalPropinaCents, sub: `exento ${impLabel}`, color: 'text-[#e8eaf0]' },
+            { label: 'Turnos', value: String(data.numTurnos), prev: prevData?.numTurnos, sub: data.duracionMediaMinutos !== null ? `∅ ${Math.floor(data.duracionMediaMinutos / 60)}h ${data.duracionMediaMinutos % 60}m` : '—', color: 'text-[#e8eaf0]' },
+          ].map(kpi => {
+            // Para los que son cents, necesitamos el valor numérico
+            const currNum = kpi.label === 'Facturado' ? data.totalFacturadoCents
+              : kpi.label === 'Ticket ∅' ? data.ticketMedioCents
+              : kpi.label.includes(impLabel) ? data.totalIvaCents
+              : kpi.label === 'Propinas' ? data.totalPropinaCents
+              : data.numTurnos;
+            const d2 = kpi.prev !== undefined ? delta(currNum, kpi.prev) : null;
+            return (
+              <div key={kpi.label} className="bg-[#1a1d27] border border-[#2e3347] rounded-xl px-4 py-3">
+                <p className="text-[10px] text-[#6b7280] uppercase tracking-wider mb-1">{kpi.label}</p>
+                <p className={`text-xl font-bold ${kpi.color}`}>{kpi.value}</p>
+                <div className="flex items-center gap-1 mt-1">
+                  <p className="text-[10px] text-[#6b7280]">{kpi.sub}</p>
+                  {d2 !== null && (
+                    <span className={`text-[10px] font-semibold ${d2 >= 0 ? 'text-[#22c55e]' : 'text-[#ef4444]'}`}>
+                      {d2 >= 0 ? '↑' : '↓'}{Math.abs(d2)}%
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         {/* Gráfico por hora + Split pago */}
@@ -206,6 +256,50 @@ export function AnalyticsClient({ initialData, tipoImpuesto }: Props) {
             </div>
           </div>
         </div>
+
+        {/* Heatmap ventas por día × hora */}
+        {data.heatmap.length > 0 && (
+          <div className="bg-[#1a1d27] border border-[#2e3347] rounded-xl p-4 mb-6">
+            <p className="text-sm font-semibold text-[#e8eaf0] mb-4">Mapa de calor · día × hora</p>
+            <div className="overflow-x-auto">
+              <table className="border-separate" style={{ borderSpacing: 2 }}>
+                <thead>
+                  <tr>
+                    <th className="w-6" />
+                    {Array.from({ length: activeHoursHeatmap.max - activeHoursHeatmap.min + 1 }, (_, i) => (
+                      <th key={i} className="text-[9px] text-[#6b7280] font-normal w-6 text-center">
+                        {activeHoursHeatmap.min + i}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {DOW_LABELS.map((label, uiIdx) => {
+                    const dow = uiToDow(uiIdx);
+                    return (
+                      <tr key={label}>
+                        <td className="text-[9px] text-[#6b7280] pr-1 text-right">{label}</td>
+                        {Array.from({ length: activeHoursHeatmap.max - activeHoursHeatmap.min + 1 }, (_, i) => {
+                          const hora = activeHoursHeatmap.min + i;
+                          const val = heatmapMap.get(`${dow}-${hora}`) ?? 0;
+                          const intensity = val / heatmapMax;
+                          return (
+                            <td
+                              key={hora}
+                              title={val > 0 ? fmt(val) : '—'}
+                              className="w-6 h-6 rounded-sm"
+                              style={{ background: val === 0 ? '#1e2235' : `rgba(79,114,255,${0.15 + intensity * 0.85})` }}
+                            />
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Top productos + Historial turnos */}
         <div className="grid grid-cols-2 gap-3">
