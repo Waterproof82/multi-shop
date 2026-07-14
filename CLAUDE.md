@@ -204,7 +204,7 @@ Solución: `WaiterLoginForm.handlePinSubmit` dispara `window.dispatchEvent(new C
 - Crear un producto con `categoria_id` → el repositorio hereda el tipo de la categoría automáticamente.
 - El toggle Comida/Bebidas del menú público (`getCategoryTab`) lee `cat.tipoProducto` directamente; ya no infiere desde los items.
 - Subcategorías sin productos no se renderizan (`menu-section.tsx`).
-- Ver `docs/tipo-producto-menu-toggle.md`.
+- Ver `docs/context/tipo-producto-menu-toggle.md`.
 
 ## 🏢 Panel Superadmin — Trampas Críticas
 
