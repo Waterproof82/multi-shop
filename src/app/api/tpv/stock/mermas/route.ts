@@ -6,7 +6,7 @@ import {
   validationErrorResponse,
   type AuthResult,
 } from '@/core/infrastructure/api/helpers';
-import { SupabaseStockRepository } from '@/core/infrastructure/repositories/supabase-stock.repository';
+import { getStockRepository } from '@/core/infrastructure/database';
 import { registrarMermaUseCase } from '@/core/application/use-cases/stock/registrar-merma.use-case';
 import { z } from 'zod';
 
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const repo = new SupabaseStockRepository();
+  const repo = getStockRepository();
   const result = await registrarMermaUseCase(repo, { ...parsed.data, empresaId });
   return handleResultWithStatus(result, 201);
 }

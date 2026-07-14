@@ -4,7 +4,7 @@ import {
   handleResult,
   validationErrorResponse,
 } from '@/core/infrastructure/api/helpers';
-import { SupabaseStockRepository } from '@/core/infrastructure/repositories/supabase-stock.repository';
+import { getStockRepository } from '@/core/infrastructure/database';
 
 export async function GET(req: NextRequest) {
   const ctx = await resolveAdminContext(req);
@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const turnoId = searchParams.get('turnoId') ?? undefined;
 
-  const repo = new SupabaseStockRepository();
+  const repo = getStockRepository();
   const result = await repo.findMermas(empresaId, turnoId);
   return handleResult(result);
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth, validationErrorResponse, type AuthResult } from '@/core/infrastructure/api/helpers';
-import { SupabaseTpvRepository } from '@/core/infrastructure/repositories/supabase-tpv.repository';
+import { getTpvRepository } from '@/core/infrastructure/database';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 
 const schema = z.object({
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 3. Get active turno for this empresa
-  const repo = new SupabaseTpvRepository();
+  const repo = getTpvRepository();
   const turnoResult = await repo.findTurnoActivo(empresaId);
   if (!turnoResult.success || !turnoResult.data) {
     return NextResponse.json({ error: 'No hay turno activo' }, { status: 422 });

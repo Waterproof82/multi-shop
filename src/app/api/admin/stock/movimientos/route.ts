@@ -4,7 +4,7 @@ import {
   resolveAdminContext,
   validationErrorResponse,
 } from '@/core/infrastructure/api/helpers';
-import { SupabaseStockRepository } from '@/core/infrastructure/repositories/supabase-stock.repository';
+import { getStockRepository } from '@/core/infrastructure/database';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import type { TipoMovimiento } from '@/core/domain/entities/stock-types';
 
@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
   const { page, limit, ingredienteId, startDate, endDate } = parsed.data;
   const tipo = parseTipo(searchParams.get('tipo'));
 
-  const repo = new SupabaseStockRepository();
+  const repo = getStockRepository();
   const [itemsResult, total] = await Promise.all([
     repo.findMovimientos(empresaId, { page, limit, ingredienteId, tipo, startDate, endDate }),
     countMovimientos(empresaId, { ingredienteId, tipo, startDate, endDate }),

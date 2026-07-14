@@ -5,7 +5,7 @@ import {
   handleResult,
   validationErrorResponse,
 } from '@/core/infrastructure/api/helpers';
-import { SupabaseStockRepository } from '@/core/infrastructure/repositories/supabase-stock.repository';
+import { getStockRepository } from '@/core/infrastructure/database';
 
 const updateIngredienteSchema = z.object({
   nombre: z.string().min(1).max(120).optional(),
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
   if (!empresaId) return validationErrorResponse('empresaId requerido');
 
   const { id } = await ctx.params;
-  const repo = new SupabaseStockRepository();
+  const repo = getStockRepository();
   const result = await repo.findIngredienteById(id);
 
   if (!result.success) {
@@ -53,7 +53,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
     return validationErrorResponse(parsed.error.errors[0].message);
   }
 
-  const repo = new SupabaseStockRepository();
+  const repo = getStockRepository();
   const result = await repo.updateIngrediente(id, parsed.data);
   return handleResult(result);
 }
@@ -65,7 +65,7 @@ export async function DELETE(req: NextRequest, ctx: RouteContext) {
   if (!empresaId) return validationErrorResponse('empresaId requerido');
 
   const { id } = await ctx.params;
-  const repo = new SupabaseStockRepository();
+  const repo = getStockRepository();
   const result = await repo.deleteIngrediente(id);
 
   if (!result.success) {

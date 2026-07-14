@@ -5,7 +5,7 @@ import {
   handleResult,
   validationErrorResponse,
 } from '@/core/infrastructure/api/helpers';
-import { SupabaseStockRepository } from '@/core/infrastructure/repositories/supabase-stock.repository';
+import { getStockRepository } from '@/core/infrastructure/database';
 import { ajustarStockUseCase } from '@/core/application/use-cases/stock/ajustar-stock.use-case';
 
 const ajusteSchema = z.object({
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
     return validationErrorResponse(parsed.error.errors[0].message);
   }
 
-  const repo = new SupabaseStockRepository();
+  const repo = getStockRepository();
   const result = await ajustarStockUseCase(repo, {
     empresaId,
     ingredienteId,

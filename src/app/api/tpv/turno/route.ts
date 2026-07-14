@@ -7,11 +7,11 @@ import {
   validationErrorResponse,
   type AuthResult,
 } from '@/core/infrastructure/api/helpers';
-import { SupabaseTpvRepository } from '@/core/infrastructure/repositories/supabase-tpv.repository';
+import { getTpvRepository } from '@/core/infrastructure/database';
 import { abrirTurnoUseCase } from '@/core/application/use-cases/tpv/abrir-turno.use-case';
 import { z } from 'zod';
 
-const repo = new SupabaseTpvRepository();
+const repo = getTpvRepository();
 
 export async function GET(req: NextRequest) {
   const { empresaId, error: authError } = (await requireAuth(req)) as AuthResult;
