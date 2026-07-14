@@ -3,6 +3,7 @@ import { DEFAULT_PEDIDOS_SUBDOMAIN } from "@/core/domain/constants/empresa-defau
 import { IEmpresaRepository, UpdateEmpresaData } from "@/core/domain/repositories/IEmpresaRepository";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "../logging/logger";
+import { extractSlugFromBaseDomain, isBaseDomain } from "@/lib/domain-utils";
 
 export class SupabaseEmpresaRepository implements IEmpresaRepository {
   constructor(private readonly supabase: SupabaseClient) {}
@@ -169,6 +170,27 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
         } : null };
       }
 
+      const slug = isBaseDomain(dominio) ? extractSlugFromBaseDomain(dominio) : null;
+      if (slug) {
+        const { data: slugEmpresa } = await this.supabase
+          .from('empresas')
+          .select('id, nombre, email_notification, telefono_whatsapp, tipo, telegram_chat_id, mesas_habilitadas, pagos_pickup_habilitados, validacion_pedidos_habilitada')
+          .eq('slug', slug)
+          .maybeSingle();
+
+        return { success: true, data: slugEmpresa ? {
+          id: slugEmpresa.id as string,
+          nombre: slugEmpresa.nombre as string,
+          email_notification: slugEmpresa.email_notification as string | null,
+          telefono_whatsapp: slugEmpresa.telefono_whatsapp as string | null,
+          tipo: (slugEmpresa.tipo as string) ?? 'tienda',
+          telegram_chat_id: slugEmpresa.telegram_chat_id as string | null,
+          mesas_habilitadas: (slugEmpresa.mesas_habilitadas as boolean) ?? true,
+          pagos_pickup_habilitados: (slugEmpresa.pagos_pickup_habilitados as boolean) ?? false,
+          validacion_pedidos_habilitada: (slugEmpresa.validacion_pedidos_habilitada as boolean) ?? false,
+        } : null };
+      }
+
       return { success: true, data: null };
     } catch (e) {
       // PGRST116 = no rows returned
@@ -273,6 +295,17 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
           .maybeSingle();
 
         if (subdomainData) return { success: true, data: SupabaseEmpresaRepository.mapToEmpresaPublic(subdomainData as Record<string, unknown>) };
+      }
+
+      const slug = isBaseDomain(domain) ? extractSlugFromBaseDomain(domain) : null;
+      if (slug) {
+        const { data: slugData } = await this.supabase
+          .from('empresas')
+          .select(SupabaseEmpresaRepository.PUBLIC_SELECT)
+          .eq('slug', slug)
+          .maybeSingle();
+
+        if (slugData) return { success: true, data: SupabaseEmpresaRepository.mapToEmpresaPublic(slugData as Record<string, unknown>) };
       }
 
       return { success: true, data: null };

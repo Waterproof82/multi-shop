@@ -94,26 +94,24 @@
 
 ## Bloque 4 — RBAC Completo
 
-**Estado:** Solo `admin` y `superadmin` implementados
+**Estado:** Diferido — ver decisión abajo
 **Dependencias:** `perfiles_admin.rol`
 **Complejidad:** Media
 
-### Sub-features
+### Decisión (julio 2026)
 
-#### 4.1 Rol `cajero`
-- Acceso solo al TPV (`/tpv/*`)
-- Sin acceso a `/admin/*` (productos, stock, analytics)
-- Sin acceso al cierre de turno completo (solo puede ver su turno activo)
-- Útil para restaurantes con personal de caja sin acceso al backoffice
+Los sub-features 4.1 y 4.2 se descartan por ahora. Motivos:
 
-#### 4.2 Rol `encargado`
-- Acceso a analytics y stock pero no a configuración de empresa
-- Puede cerrar turnos y ver informes
-- No puede crear/editar empleados ni cambiar configuración de impuestos
+- El sistema ya tiene **dos capas de acceso bien separadas**: panel admin (email+contraseña, dueño) y TPV empleados (PIN, cajero/encargado). No hay ambigüedad real.
+- El "acceso admin parcial" (encargado con login de admin restringido) solo tiene sentido en organizaciones medianas/grandes donde el encargado necesita ver analytics sin que el dueño le dé su contraseña. Para restaurantes pequeños y medianos es sobre-ingeniería.
+- Si en el futuro aparece un cliente con ese requisito concreto, la infraestructura ya está lista: `requireRole()` existe, el proxy inyecta `x-admin-rol`, y las rutas TPV ya aceptan `cajero`/`encargado`. Solo faltaría agregar esos roles a `perfiles_admin` y poner guards en el sidebar.
 
-#### 4.3 Auditoría de Acciones
+**Lo que SÍ tiene valor independiente:**
+
+#### 4.3 Auditoría de Acciones ← pendiente de implementar
 - Log de quién hizo qué: abre turno, cierra sesión de mesa, ajusta stock
 - Tabla `audit_log` con `admin_id`, `action`, `payload`, `created_at`
+- Útil en cualquier tamaño de negocio para resolver disputas y detectar errores operativos
 
 ---
 

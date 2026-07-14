@@ -16,31 +16,35 @@
 - No afecta en absoluto a la web principal de la empresa
 - Estado: **ya funciona**
 
-### 3. Empresa sin dominio propio (pendiente)
+### 3. Empresa sin dominio propio
 - URL: `<slug>.digitalizatenerife.es`
 - La empresa no necesita contratar hosting ni configurar nada
-- Se usa el dominio base propio `digitalizatenerife.es` con un wildcard DNS
-- Estado: **pendiente de implementar**
+- Se usa el dominio base propio con un wildcard DNS
+- Estado: **implementado**
 
-## Plan de implementación (caso 3)
+## Implementación (caso 3)
 
-### Infraestructura
-1. Añadir registro DNS wildcard: `*.digitalizatenerife.es → cname.vercel-dns.com`
-2. Añadir `*.digitalizatenerife.es` como dominio wildcard en Vercel
+### Código implementado
+- `src/lib/domain-utils.ts` — `isBaseDomain(domain)` y `extractSlugFromBaseDomain(domain)`
+- `src/core/infrastructure/database/supabase-empresa.repository.ts` — fallback por `slug` en `findByDomainPublic` y `findByDomain`
 
-### Código
-Cambio mínimo en `src/core/infrastructure/database/supabase-empresa.repository.ts`:
-- En `findByDomainPublic` y `findByDomain`, detectar si el host entrante es `*.digitalizatenerife.es`
-- Extraer el slug del subdominio
-- Hacer `WHERE slug = <slug>` en lugar de `WHERE dominio = <domain>`
+### Variable de entorno
+El dominio base se configura con `BASE_DOMAIN` (sin prefijo `NEXT_PUBLIC_`, solo server-side).
+Si no está definida, usa `digitalizatenerife.es` como fallback.
 
-Cambio de soporte en `src/lib/domain-utils.ts`:
-- Añadir `isBaseDomain(domain)` para detectar `*.digitalizatenerife.es`
-- Añadir `extractSlugFromBaseDomain(domain)` para extraer el slug
+### Para cambiar el dominio base (futuro)
+1. Cambiar `BASE_DOMAIN=tunuevodominio.com` en Vercel (Settings → Environment Variables) y en `.env.local`
+2. Actualizar el registro DNS wildcard: `*.tunuevodominio.com → cname.vercel-dns.com`
+3. Actualizar el dominio wildcard en Vercel (Settings → Domains): reemplazar `*.digitalizatenerife.es` por `*.tunuevodominio.com`
+4. No se toca ningún archivo de código
 
 ### Configuración por empresa
 - Solo requiere que `empresas.slug` esté relleno en Supabase
 - No requiere `empresas.dominio`
+
+### Infraestructura pendiente (fuera del código)
+1. Añadir registro DNS wildcard: `*.digitalizatenerife.es → cname.vercel-dns.com`
+2. Añadir `*.digitalizatenerife.es` como dominio wildcard en Vercel
 
 ## Notas
 - Los tres casos son completamente compatibles entre sí y no interfieren
