@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getEmpresaUseCase } from '@/core/infrastructure/database';
-import { resolveAdminContext, handleResult, validationErrorResponse } from '@/core/infrastructure/api/helpers';
+import { resolveAdminContextWithEmpresa, handleResult, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 import type { EmpresaColores } from '@/core/domain/entities/types';
 
 const hexColor = z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Color debe ser hexadecimal (#RRGGBB)');
@@ -20,7 +20,7 @@ const updateColoresSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId } = ctx;
 
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     return validationErrorResponse(parsed.error.errors[0].message);
   }
 
-  const result = await getEmpresaUseCase().updateColores(empresaId!, parsed.data.colores as EmpresaColores);
+  const result = await getEmpresaUseCase().updateColores(empresaId, parsed.data.colores as EmpresaColores);
   
   if (!result.success) {
     return handleResult(result);

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getTgtgUseCase } from '@/core/infrastructure/database';
-import { resolveAdminContext } from '@/core/infrastructure/api/helpers';
+import { resolveAdminContextWithEmpresa } from '@/core/infrastructure/api/helpers';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
 
 const updateHorasSchema = z.object({
@@ -13,7 +13,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId } = ctx;
 
@@ -33,7 +33,7 @@ export async function PATCH(
 
   try {
     const result = await getTgtgUseCase().updateHoras(
-      empresaId!,
+      empresaId,
       tgtgPromoId,
       parsed.data.hora_recogida_inicio,
       parsed.data.hora_recogida_fin,

@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { revalidateTag } from 'next/cache';
 import { getCategoryUseCase } from '@/core/infrastructure/database';
 import { createCategorySchema, updateCategorySchema, categoryIdSchema } from '@/core/application/dtos/category.dto';
-import { resolveAdminContext, handleResult, handleResultWithStatus, validationErrorResponse } from '@/core/infrastructure/api/helpers';
+import { resolveAdminContextWithEmpresa, handleResult, handleResultWithStatus, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 import { catalogTag } from '@/lib/cache-tags';
 import type { Category } from '@/core/domain/entities/types';
 
@@ -30,11 +30,11 @@ function toAdminCategory(cat: Category) {
 }
 
 export async function GET(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId } = ctx;
 
-  const result = await getCategoryUseCase().getAll(empresaId!);
+  const result = await getCategoryUseCase().getAll(empresaId);
   
   if (!result.success) {
     return handleResult(result);
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId } = ctx;
 
@@ -68,12 +68,12 @@ export async function POST(request: NextRequest) {
     return handleResult(result);
   }
 
-  revalidateTag(catalogTag(empresaId!), {});
+  revalidateTag(catalogTag(empresaId), {});
   return handleResultWithStatus({ success: true, data: toAdminCategory(result.data) }, 201);
 }
 
 export async function PUT(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId } = ctx;
 
@@ -98,18 +98,18 @@ export async function PUT(request: NextRequest) {
     return validationErrorResponse(parsed.error.errors[0].message);
   }
 
-  const result = await getCategoryUseCase().update(idParsed.data.id, empresaId!, parsed.data);
+  const result = await getCategoryUseCase().update(idParsed.data.id, empresaId, parsed.data);
 
   if (!result.success) {
     return handleResult(result);
   }
 
-  revalidateTag(catalogTag(empresaId!), {});
+  revalidateTag(catalogTag(empresaId), {});
   return handleResult({ success: true, data: toAdminCategory(result.data) });
 }
 
 export async function DELETE(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId } = ctx;
 
@@ -121,12 +121,12 @@ export async function DELETE(request: NextRequest) {
     return validationErrorResponse('ID inválido');
   }
 
-  const result = await getCategoryUseCase().delete(idParsed.data.id, empresaId!);
+  const result = await getCategoryUseCase().delete(idParsed.data.id, empresaId);
 
   if (!result.success) {
     return handleResult(result);
   }
 
-  revalidateTag(catalogTag(empresaId!), {});
+  revalidateTag(catalogTag(empresaId), {});
   return handleResult({ success: true, data: { success: true } });
 }

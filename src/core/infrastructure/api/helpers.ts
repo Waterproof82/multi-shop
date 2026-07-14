@@ -117,6 +117,36 @@ export async function resolveAdminContext(request: NextRequest): Promise<AdminCo
 }
 
 /**
+ * Variant of resolveAdminContext that additionally requires a non-null empresaId.
+ * Use this on tenant-scoped admin routes where acting without a specific empresa makes no sense.
+ * Returns 400 if the caller is a superadmin who did not provide ?empresaId=.
+ *
+ * On success: returns { empresaId: string (never null), isSuperAdmin, error: null }
+ * On failure: returns { error: NextResponse } — the caller must `return ctx.error`.
+ *
+ * Usage:
+ *   const ctx = await resolveAdminContextWithEmpresa(request);
+ *   if (ctx.error) return ctx.error;
+ *   const { empresaId } = ctx; // empresaId is string, never null
+ */
+export type AdminContextWithEmpresa =
+  | { empresaId: string; isSuperAdmin: boolean; error: null }
+  | { empresaId: null; isSuperAdmin: boolean; error: NextResponse };
+
+export async function resolveAdminContextWithEmpresa(request: NextRequest): Promise<AdminContextWithEmpresa> {
+  const ctx = await resolveAdminContext(request);
+  if (ctx.error) return ctx;
+  if (!ctx.empresaId) {
+    return {
+      empresaId: null,
+      isSuperAdmin: ctx.isSuperAdmin,
+      error: NextResponse.json({ error: 'Se requiere empresaId' }, { status: 400 }),
+    };
+  }
+  return { empresaId: ctx.empresaId, isSuperAdmin: ctx.isSuperAdmin, error: null };
+}
+
+/**
  * RBAC guard — verifies that the authenticated admin has one of the allowed roles.
  * Reads the `x-admin-rol` header injected by the proxy after JWT verification.
  * Returns a 403 response if the role check fails, or null if the request may proceed.

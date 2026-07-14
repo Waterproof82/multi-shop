@@ -1,6 +1,7 @@
 import { getMesaSesionRepository, getPedidoRepository } from '@/core/infrastructure/database';
 import { getSupabaseAnonClient, getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { PAYMENT_LOCK_EXPIRY_MS } from '@/core/domain/constants/pedido';
+import { logger } from '@/core/infrastructure/logging/logger';
 
 // ---- Types ----
 
@@ -114,7 +115,9 @@ async function fetchItemEstados(pedidoIds: string[]): Promise<ItemEstadoMaps> {
         servidoByPedido.get(row.pedido_id)!.add(row.item_idx);
       }
     }
-  } catch { /* best-effort */ }
+  } catch (e) {
+    void logger.logFromCatch(e, 'use-case', 'fetchItemEstados');
+  }
 
   return { cancelledByPedido, listoByPedido, servidoByPedido };
 }
@@ -356,7 +359,9 @@ async function fetchPaymentState(
       ? Date.now() - new Date(row.pago_iniciado_en).getTime() < PAYMENT_LOCK_EXPIRY_MS
       : false;
     pagoEnCurso = !!(row?.pago_en_curso && lockFresh);
-  } catch { /* best-effort */ }
+  } catch (e) {
+    void logger.logFromCatch(e, 'use-case', 'fetchPaymentState', { sesionId });
+  }
 
   return {
     division,

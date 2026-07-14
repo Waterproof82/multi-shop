@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { sendEmail } from '@/lib/brevo-email';
 import { getEmpresaUseCase } from '@/core/infrastructure/database';
-import { resolveAdminContext } from '@/core/infrastructure/api/helpers';
+import { resolveAdminContextWithEmpresa } from '@/core/infrastructure/api/helpers';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
 import { escapeHtml } from '@/lib/html-utils';
 
@@ -125,11 +125,11 @@ function generateOrderEmail(items: OrderItem[], total: number, empresaNombre: st
 
 export async function POST(request: NextRequest) {
   try {
-    const ctx = await resolveAdminContext(request);
+    const ctx = await resolveAdminContextWithEmpresa(request);
     if (ctx.error) return ctx.error;
     const { empresaId } = ctx;
 
-    const empresaResult = await getEmpresaUseCase().getById(empresaId!);
+    const empresaResult = await getEmpresaUseCase().getById(empresaId);
 
     if (!empresaResult.success) {
       return NextResponse.json({ error: empresaResult.error.message }, { status: 500 });

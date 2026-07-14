@@ -1,14 +1,14 @@
 import { NextRequest } from 'next/server';
 import { getClienteUseCase } from '@/core/infrastructure/database';
 import { createClienteSchema, updateClienteSchema, clienteIdSchema } from '@/core/application/dtos/cliente.dto';
-import { resolveAdminContext, handleResult, handleResultWithStatus, validationErrorResponse } from '@/core/infrastructure/api/helpers';
+import { resolveAdminContextWithEmpresa, handleResult, handleResultWithStatus, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 
 export async function GET(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId } = ctx;
 
-  const result = await getClienteUseCase().getAll(empresaId!);
+  const result = await getClienteUseCase().getAll(empresaId);
   
   if (!result.success) {
     return handleResult(result);
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId } = ctx;
 
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId } = ctx;
 
@@ -66,7 +66,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   const { id, ...updateData } = parsed.data;
-  const result = await getClienteUseCase().update(id, empresaId!, updateData);
+  const result = await getClienteUseCase().update(id, empresaId, updateData);
   
   if (!result.success) {
     return handleResult(result);
@@ -76,7 +76,7 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId } = ctx;
 
@@ -92,7 +92,7 @@ export async function DELETE(request: NextRequest) {
     return validationErrorResponse('ID inválido');
   }
 
-  const result = await getClienteUseCase().delete(parsed.data.id, empresaId!);
+  const result = await getClienteUseCase().delete(parsed.data.id, empresaId);
   
   if (!result.success) {
     return handleResult(result);

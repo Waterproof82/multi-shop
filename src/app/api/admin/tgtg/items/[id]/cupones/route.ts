@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTgtgUseCase } from '@/core/infrastructure/database';
-import { resolveAdminContext } from '@/core/infrastructure/api/helpers';
+import { resolveAdminContextWithEmpresa } from '@/core/infrastructure/api/helpers';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
 import { adjustCuponesSchema } from '@/core/application/dtos/tgtg.dto';
 
@@ -8,7 +8,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId } = ctx;
 
@@ -27,7 +27,7 @@ export async function PATCH(
   }
 
   try {
-    const result = await getTgtgUseCase().adjustCupones(empresaId!, itemId, parsed.data.delta);
+    const result = await getTgtgUseCase().adjustCupones(empresaId, itemId, parsed.data.delta);
     if (!result.success) {
       return NextResponse.json({ error: result.error.message }, { status: result.error.code === 'NOT_FOUND' ? 404 : 500 });
     }

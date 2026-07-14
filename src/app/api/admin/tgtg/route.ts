@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTgtgUseCase } from '@/core/infrastructure/database';
-import { resolveAdminContext, errorResponse } from '@/core/infrastructure/api/helpers';
+import { resolveAdminContextWithEmpresa, errorResponse } from '@/core/infrastructure/api/helpers';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
 import { createTgtgSchema } from '@/core/application/dtos/tgtg.dto';
 
 
 export async function GET(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId } = ctx;
 
-  const allResult = await getTgtgUseCase().getAllRecent(empresaId!);
+  const allResult = await getTgtgUseCase().getAllRecent(empresaId);
   if (!allResult.success) {
     return NextResponse.json({ error: allResult.error.message }, { status: 500 });
   }
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   // For each campaign fetch reservas counts
   const campaigns = await Promise.all(
     allResult.data.map(async ({ promo, items }) => {
-      const reservasResult = await getTgtgUseCase().getReservas(empresaId!, promo.id);
+      const reservasResult = await getTgtgUseCase().getReservas(empresaId, promo.id);
       const reservasByItem: Record<string, number> = {};
       if (reservasResult.success) {
         for (const r of reservasResult.data) {
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId } = ctx;
 
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const createResult = await getTgtgUseCase().create(
-      empresaId!,
+      empresaId,
       hora_recogida_inicio,
       hora_recogida_fin,
       fecha_activacion ?? today,

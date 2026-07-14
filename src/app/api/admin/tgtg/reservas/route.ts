@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getTgtgUseCase } from '@/core/infrastructure/database';
-import { resolveAdminContext } from '@/core/infrastructure/api/helpers';
+import { resolveAdminContextWithEmpresa } from '@/core/infrastructure/api/helpers';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
 
 const querySchema = z.object({
@@ -9,7 +9,7 @@ const querySchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId } = ctx;
 
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const result = await getTgtgUseCase().getReservas(empresaId!, parsed.data.tgtgPromoId);
+    const result = await getTgtgUseCase().getReservas(empresaId, parsed.data.tgtgPromoId);
     if (!result.success) {
       return NextResponse.json({ error: result.error.message }, { status: 500 });
     }

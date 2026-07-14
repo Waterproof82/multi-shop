@@ -1,19 +1,19 @@
 import { type NextRequest } from 'next/server';
 import { getComplementoGrupoUseCase } from '@/core/infrastructure/database';
 import { createComplementoGrupoSchema } from '@/core/application/dtos/complemento.dto';
-import { resolveAdminContext, handleResultWithStatus, validationErrorResponse } from '@/core/infrastructure/api/helpers';
+import { resolveAdminContextWithEmpresa, handleResultWithStatus, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 
 export async function GET(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId } = ctx;
 
-  const result = await getComplementoGrupoUseCase().getAll(empresaId!);
+  const result = await getComplementoGrupoUseCase().getAll(empresaId);
   return handleResultWithStatus(result);
 }
 
 export async function POST(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId } = ctx;
 

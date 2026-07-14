@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getEmpresaRepository } from '@/core/infrastructure/database';
-import { resolveAdminContext, successResponse, validationErrorResponse, handleResult } from '@/core/infrastructure/api/helpers';
+import { resolveAdminContextWithEmpresa, successResponse, validationErrorResponse, handleResult } from '@/core/infrastructure/api/helpers';
 import { hashPin } from '@/lib/waiter-auth';
 
 const pinSchema = z.object({
@@ -9,7 +9,7 @@ const pinSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId } = ctx;
 
@@ -23,8 +23,8 @@ export async function POST(request: NextRequest) {
   const parsed = pinSchema.safeParse(body);
   if (!parsed.success) return validationErrorResponse(parsed.error.errors[0].message);
 
-  const pinHash = await hashPin(parsed.data.pin, empresaId!);
-  const result = await getEmpresaRepository().updateWaiterPin(empresaId!, pinHash);
+  const pinHash = await hashPin(parsed.data.pin, empresaId);
+  const result = await getEmpresaRepository().updateWaiterPin(empresaId, pinHash);
   if (!result.success) return handleResult(result);
 
   return successResponse({ success: true });

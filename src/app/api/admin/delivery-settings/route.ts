@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import {
-  resolveAdminContext,
+  resolveAdminContextWithEmpresa,
   validationErrorResponse,
   handleResult,
 } from '@/core/infrastructure/api/helpers';
@@ -9,16 +9,16 @@ import { getDeliverySettingsUseCase } from '@/core/application/use-cases/deliver
 import { updateDeliverySettingsUseCase } from '@/core/application/use-cases/delivery/updateDeliverySettingsUseCase';
 
 export async function GET(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId } = ctx;
 
-  const result = await getDeliverySettingsUseCase(empresaId!);
+  const result = await getDeliverySettingsUseCase(empresaId);
   return handleResult(result);
 }
 
 export async function PUT(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId } = ctx;
 
@@ -32,6 +32,6 @@ export async function PUT(request: NextRequest) {
   const parsed = UpdateDeliverySettingsDtoSchema.safeParse(body);
   if (!parsed.success) return validationErrorResponse(parsed.error.errors[0].message);
 
-  const result = await updateDeliverySettingsUseCase(empresaId!, parsed.data);
+  const result = await updateDeliverySettingsUseCase(empresaId, parsed.data);
   return handleResult(result);
 }

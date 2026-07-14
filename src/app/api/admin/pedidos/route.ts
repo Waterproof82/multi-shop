@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getPedidoUseCase } from '@/core/infrastructure/database';
-import { resolveAdminContext, successResponse, validationErrorResponse, handleResult } from '@/core/infrastructure/api/helpers';
+import { resolveAdminContextWithEmpresa, successResponse, validationErrorResponse, handleResult } from '@/core/infrastructure/api/helpers';
 import { PEDIDO_ESTADOS } from '@/core/domain/constants/pedido';
 
 const pedidoIdSchema = z.object({
@@ -14,7 +14,7 @@ const updatePedidoSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId } = ctx;
 
@@ -29,9 +29,9 @@ export async function GET(request: NextRequest) {
     const añoSchema = z.coerce.number().int().min(2020).max(2100);
     const selectedMonth = mesSchema.safeParse(mesParam).data ?? now.getMonth();
     const selectedYear = añoSchema.safeParse(añoParam).data ?? now.getFullYear();
-    result = await getPedidoUseCase().getAllByMonth(empresaId!, selectedMonth, selectedYear);
+    result = await getPedidoUseCase().getAllByMonth(empresaId, selectedMonth, selectedYear);
   } else {
-    result = await getPedidoUseCase().getAll(empresaId!);
+    result = await getPedidoUseCase().getAll(empresaId);
   }
 
   if (!result.success) {
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId } = ctx;
 
@@ -57,7 +57,7 @@ export async function PATCH(request: NextRequest) {
     return validationErrorResponse(parsed.error.errors[0].message);
   }
 
-  const result = await getPedidoUseCase().updateStatus(parsed.data.id, empresaId!, parsed.data.estado);
+  const result = await getPedidoUseCase().updateStatus(parsed.data.id, empresaId, parsed.data.estado);
   if (!result.success) {
     return handleResult(result);
   }
@@ -65,7 +65,7 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId } = ctx;
 
@@ -81,7 +81,7 @@ export async function DELETE(request: NextRequest) {
     return validationErrorResponse('ID inválido');
   }
 
-  const result = await getPedidoUseCase().delete(parsed.data.id, empresaId!);
+  const result = await getPedidoUseCase().delete(parsed.data.id, empresaId);
   if (!result.success) {
     return handleResult(result);
   }
@@ -89,7 +89,7 @@ export async function DELETE(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId } = ctx;
 
@@ -104,7 +104,7 @@ export async function PUT(request: NextRequest) {
   const selectedMonth = mesParam ? (mesSchema.safeParse(mesParam).data ?? now.getMonth()) : now.getMonth();
   const selectedYear = añoParam ? (añoSchema.safeParse(añoParam).data ?? now.getFullYear()) : now.getFullYear();
 
-  const result = await getPedidoUseCase().getStats(empresaId!, selectedMonth, selectedYear);
+  const result = await getPedidoUseCase().getStats(empresaId, selectedMonth, selectedYear);
   if (!result.success) {
     return handleResult(result);
   }

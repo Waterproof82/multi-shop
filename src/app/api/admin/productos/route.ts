@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { revalidateTag } from 'next/cache';
 import { getProductUseCase } from '@/core/infrastructure/database';
 import { createProductSchema, updateProductSchema, productIdSchema } from '@/core/application/dtos/product.dto';
-import { resolveAdminContext, handleResult, handleResultWithStatus, validationErrorResponse } from '@/core/infrastructure/api/helpers';
+import { resolveAdminContextWithEmpresa, handleResult, handleResultWithStatus, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 import { catalogTag } from '@/lib/cache-tags';
 import type { Product } from '@/core/domain/entities/types';
 
@@ -32,7 +32,7 @@ function toAdminProduct(prod: Product) {
 }
 
 export async function GET(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId, isSuperAdmin } = ctx;
 
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId, isSuperAdmin } = ctx;
 
@@ -86,12 +86,12 @@ export async function POST(request: NextRequest) {
     return handleResult(result);
   }
 
-  revalidateTag(catalogTag(empresaId!), {});
+  revalidateTag(catalogTag(empresaId), {});
   return handleResultWithStatus({ success: true, data: toAdminProduct(result.data) }, 201);
 }
 
 export async function PUT(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId, isSuperAdmin } = ctx;
 
@@ -127,18 +127,18 @@ export async function PUT(request: NextRequest) {
     return validationErrorResponse(parsed.error.errors[0].message);
   }
 
-  const result = await getProductUseCase().update(idParsed.data.id, empresaId!, parsed.data);
+  const result = await getProductUseCase().update(idParsed.data.id, empresaId, parsed.data);
 
   if (!result.success) {
     return handleResult(result);
   }
 
-  revalidateTag(catalogTag(empresaId!), {});
+  revalidateTag(catalogTag(empresaId), {});
   return handleResult({ success: true, data: toAdminProduct(result.data) });
 }
 
 export async function DELETE(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId, isSuperAdmin } = ctx;
 
@@ -164,6 +164,6 @@ export async function DELETE(request: NextRequest) {
     return handleResult(result);
   }
 
-  revalidateTag(catalogTag(empresaId!), {});
+  revalidateTag(catalogTag(empresaId), {});
   return handleResult({ success: true, data: { success: true } });
 }

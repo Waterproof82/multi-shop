@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getMesaRepository, getMesaSesionUseCase, getPedidoRepository } from '@/core/infrastructure/database';
-import { resolveAdminContext, successResponse, validationErrorResponse, handleResult } from '@/core/infrastructure/api/helpers';
+import { resolveAdminContextWithEmpresa, successResponse, validationErrorResponse, handleResult } from '@/core/infrastructure/api/helpers';
 
 const createMesaSchema = z.object({
   numero: z.number().int().min(1).max(999),
@@ -13,18 +13,18 @@ const deleteMesaSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId } = ctx;
 
-  const result = await getMesaSesionUseCase().getMesasWithSessions(empresaId!);
+  const result = await getMesaSesionUseCase().getMesasWithSessions(empresaId);
   if (!result.success) return handleResult(result);
 
   return successResponse({ mesas: result.data });
 }
 
 export async function POST(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId } = ctx;
 
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return validationErrorResponse(parsed.error.errors[0].message);
 
   const result = await getMesaRepository().create(
-    empresaId!,
+    empresaId,
     parsed.data.numero,
     parsed.data.nombre ?? undefined
   );
@@ -53,7 +53,7 @@ const closeSesionSchema = z.object({
 });
 
 export async function PATCH(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
 
   let body: unknown;
@@ -78,7 +78,7 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const ctx = await resolveAdminContext(request);
+  const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId } = ctx;
 
@@ -92,7 +92,7 @@ export async function DELETE(request: NextRequest) {
   const parsed = deleteMesaSchema.safeParse({ id: (body as Record<string, unknown>).id });
   if (!parsed.success) return validationErrorResponse('ID inválido');
 
-  const result = await getMesaRepository().delete(parsed.data.id, empresaId!);
+  const result = await getMesaRepository().delete(parsed.data.id, empresaId);
   if (!result.success) return handleResult(result);
 
   return successResponse({ success: true });
