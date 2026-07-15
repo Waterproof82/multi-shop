@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { clienteUseCase } from '@/core/infrastructure/database';
+import { getClienteUseCase } from '@/core/infrastructure/database';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 import { verifyUnsubscribeToken } from '@/lib/unsubscribe-token';
 
@@ -48,7 +48,7 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${baseUrl}/?error=invalid`);
     }
 
-    const nuevoValor = await clienteUseCase.togglePromoSubscription(normalizedEmail, empresaId, action ?? undefined);
+    const nuevoValor = await getClienteUseCase().togglePromoSubscription(normalizedEmail, empresaId, action ?? undefined);
 
     if (!nuevoValor.success) {
       return NextResponse.redirect(`${baseUrl}/?error=internal`);

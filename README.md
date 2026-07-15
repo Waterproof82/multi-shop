@@ -56,6 +56,8 @@ Software de caja para restaurantes y tiendas integrado en la misma plataforma. C
 - **Ticket rectificativo**: anula un cobro previo emitiendo un cobro de signo negativo con referencia al original — sin modificar registros inmutables (RD 1619/2012). Queda excluido automáticamente de las estadísticas de analítica (`rectifica_cobro_id IS NULL`).
 - **Numeración correlativa**: `serie-NNNNNN` sin saltos por empresa, atómica a nivel de base de datos.
 - **IVA/IGIC calculado en DB**: `iva_cents` y `base_imponible_cents` computados en el trigger de inserción — nunca en el cliente. El porcentaje queda grabado por cobro para que cambiar la config de la empresa no afecte al histórico.
+- **Desglose de ítems en ticket** (`detalle_items JSONB` en `tpv_cobros`): cada cobro almacena nombre, cantidad y precio unitario de cada producto. Para cobros de mesa el servidor lo construye automáticamente desde `pedidos.detalle_pedido`; para mostrador lo envía el cliente desde el carrito. Inmutable una vez grabado (trigger extendido). El ticket rectificativo hereda los ítems del original. RD 1619/2012.
+- **Informe Z de cierre de turno**: al cerrar un turno se asigna automáticamente un `numero_z` secuencial por empresa (trigger BEFORE UPDATE con `pg_advisory_xact_lock` — sin race conditions ni saltos). Se abre un modal `InformeZModal` con el informe completo (totales, IVA, arqueo de caja, huella digital) y auto-print vía `window.print()`. Electron intercepta la llamada y la envía a la impresora configurada. El operador confirma antes de que la app redirija a la pantalla de apertura.
 - **Auditoría para inspectores**: `GET /api/tpv/audit/chain` verifica la cadena de hashes recomputando SHA-256 en Node.js; `GET /api/tpv/audit/export` descarga todos los cobros del período como JSON con cabecera `Content-Disposition: attachment`.
 - **Pantalla de conformidad legal** `/tpv/legal`: Declaración de Responsabilidad del fabricante (RD 1007/2023), versión del software, fecha de firma, serie del sistema, checklist de cumplimiento, y acceso a verificación de cadena y exportación.
 - **NIF/CIF de la empresa**: campo configurable desde el panel admin, incluido en el ticket de cobro y en el enlace de verificación AEAT.
@@ -479,19 +481,23 @@ Documentación completa en [`docs/context/security.md`](docs/context/security.md
 |------|----------------|
 | **Autenticación** | JWT HS256 en cookie HttpOnly + SameSite strict, jti claim, 24h expiry, runtime guard en secret |
 | **JWT Revocation** | Verificada en proxy (API) y `verifyToken` (pages SSR). Fail-closed en producción |
-| **Autorización** | `proxy.ts` verifica JWT e inyecta `x-empresa-id` por tenant |
+| **Autorización** | `proxy.ts` verifica JWT e inyecta `x-empresa-id` por tenant. `resolveAdminContext()` unifica rate-limit + JWT + RBAC + tenant en 1 llamada (33 rutas admin) |
 | **CSRF** | Token HMAC-SHA256 verificado con `timingSafeEqual`, Cache-Control no-store |
-| **CSP** | Nonce criptográfico por request en `proxy.ts`, sin `unsafe-inline` en scripts |
+| **CSP** | Nonce criptográfico por request en `proxy.ts`, sin `unsafe-inline` en scripts. `frame-src` incluye `vercel.live` solo en preview (VERCEL_ENV ≠ production) |
 | **Rate limiting** | Upstash Redis — 5/15min login (fail-closed en prod), 20/min público, 60/min admin |
 | **Env validation** | `instrumentation.ts` → `validateEnv()` al startup, falla fatal en producción |
 | **Validación** | Zod `safeParse` + try/catch en `request.json()` + max-length en todos los DTOs |
 | **Uploads** | Validación MIME + magic bytes + tamaño + path seguro (slug desde DB) |
-| **Multi-tenant** | Aislamiento por `empresaId` en cada query, RLS + service_role |
+| **Multi-tenant** | Aislamiento por `empresaId` en cada query, RLS + service_role. Endpoints de mesa pública verifican `empresa_id` en DB antes de mutaciones |
+| **Webhooks** | Glovo: HMAC-SHA256 timing-safe + fail-closed. Telegram: comparación de secret + fail-closed (503 si no configurado) |
 | **Mínimo privilegio** | Endpoints públicos usan `empresaPublicRepository` (anon key) para lecturas |
 | **XSS emails** | `escapeHtml()` en todos los templates HTML, logging centralizado sin PII |
 | **Price tampering** | Total recalculado server-side + rechazo de productos desconocidos (`PRODUCT_NOT_FOUND`) |
 | **Anti-enumeración** | Login devuelve mensaje genérico para todos los tipos de fallo auth |
 | **RBAC** | `RolAdmin` union type + CHECK constraint en DB. `requireRole(request, roles[])` en todos los handlers de `/api/admin/*` y `/api/tpv/*`. Cuatro roles: `superadmin`, `admin`, `encargado`, `cajero`. Guards en layouts y páginas (redirect SSR). |
+| **Secrets fail-closed** | Waiter PIN pepper: lanza si `WAITER_PIN_PEPPER` falta (sin fallback hardcodeado). Telegram: 503 si `TELEGRAM_WEBHOOK_SECRET` falta |
+| **Logs de pago** | `console.log` con datos de pago eliminados de Redsys use cases y cart-drawer |
+| **Backup restore** | `receta_items` validados por FK antes del upsert — solo se restauran filas cuyo `producto_id` e `ingrediente_id` pertenecen al tenant |
 | **Unsubscribe** | HMAC-SHA256 con `UNSUBSCRIBE_HMAC_SECRET` dedicado, TTL 1 año (GDPR/CAN-SPAM), acción explícita `'baja'` |
 | **CORS** | Whitelist de dominios, `Vary: Origin`, preflight 204, headers en rutas públicas |
 | **Cart tokens** | Validación con audience claim `'cart-access'` para prevenir token confusion |
@@ -535,9 +541,10 @@ export class ProductUseCase {
 ## Helpers de API
 
 ```typescript
-// Autenticación — obligatorio en todas las rutas /api/admin/*
-const { empresaId, error: authError } = await requireAuth(request);
-if (authError) return authError;
+// Auth unificada para /api/admin/* — reemplaza requireAuth + requireRole + tenant + rate-limit
+const ctx = await resolveAdminContext(request);
+if (ctx.error) return ctx.error;
+const { empresaId } = ctx; // string | null (null para superadmin sin ?empresaId)
 
 // Respuestas consistentes
 return successResponse(data);             // 200 OK
@@ -549,6 +556,8 @@ return handleResult(result);             // automático desde Result<T> (mapea e
 
 `handleResult` mapea automáticamente códigos de error a HTTP status:
 - `VALIDATION_ERROR` → 400, `AUTH_*` → 401, `*_NOT_FOUND` → 404, otros → 500
+
+Ver patrón completo: [`docs/context/admin-api-patterns.md`](docs/context/admin-api-patterns.md).
 
 ## Códigos de Error Centralizados
 
@@ -924,6 +933,25 @@ pnpm lint     # Linting
 # Solo una vez: configurar CORS en R2
 npx tsx scripts/setup-r2-cors.ts
 ```
+
+### Graphify — grafo de conocimiento del proyecto
+
+El proyecto usa [Graphify](https://graphify.net) para generar un grafo de conocimiento basado en AST. Claude Code lo consulta automáticamente antes de hacer búsquedas en el código.
+
+Los artefactos generados viven en `graphify-out/` (`graph.json` y `GRAPH_REPORT.md` están versionados).
+
+```bash
+# Prerequisito (una sola vez)
+pip install "graphifyy[sql]"
+
+# Regenerar el grafo tras cambios significativos en el código
+graphify . --code-only
+
+# Ver el estado actual del grafo (nodos, comunidades)
+graphify cluster-only .
+```
+
+> El ejecutable queda en `~/.local/bin/graphify` (Linux/Mac) o `%APPDATA%\Python\Python3xx\Scripts\graphify.exe` (Windows). Si no está en el PATH, usar la ruta completa.
 
 ---
 
@@ -1350,6 +1378,7 @@ El warning de VS Code es un falso positivo del plugin de GitHub Actions (no cono
 | **Electron TPV Windows** | Shell Electron para TPV en Windows. Carga la URL remota de producción (`https://{domain}/tpv`). IPC para impresión térmica ESC/POS (node-thermal-printer). Auto-update vía electron-updater (endpoint `/api/app/version/latest.yml`). Atajos de teclado globales. Bundling con esbuild. |
 | **TPV — Terminal Punto de Venta** | Software de caja con cumplimiento legal completo (Ley Antifraude RD 1007/2023 + RD 1619/2012). **Arqueo ciego**: el teórico queda oculto hasta que el operador introduce su conteo. Mostrador táctil 3 columnas con selector de pase/marcha (1er/2º/Postre/Bebida). Cobro efectivo/tarjeta/propina con tasa IVA/IGIC configurable por empresa. Cadena de hashes SHA-256 inmutable por trigger PostgreSQL: bloqueo de DELETE y UPDATE con EXCEPTION. Ticket rectificativo = cobro negativo con `rectifica_cobro_id` (excluido de estadísticas). Numeración correlativa atómica (`serie-NNNNNN`). IVA/IGIC calculado en DB trigger (no en cliente). Endpoints de auditoría para inspectores (`/api/tpv/audit/chain`, `/api/tpv/audit/export`). Pantalla `/tpv/legal` con Declaración de Responsabilidad RD 1007/2023. Dashboard `/tpv/analytics` con selector de período (Hoy/Semana/Mes/Custom), 5 KPIs, gráfico por hora (Recharts lazy), top productos (JSONB) e historial de turnos. Endpoint `GET /api/tpv/analytics` con 3 RPCs `SECURITY DEFINER`. Configuración IVA/IGIC por empresa con propagación SSR de label. **Stock & Mermas**: trigger `deducir_stock_on_servido` descuenta ingredientes al servir (atómico, mismo tx). Auto-disable/re-enable de productos por umbral. Registro de mermas por turno. Audit log inmutable (`movimientos_stock`). Badge `LowStockBadge` en pantalla de cobro. **Inventario físico** (`/admin/stock/inventario`): conteo a ciegas, revisión de desviaciones, confirmación con movimientos tipo `inventario`. |
 | **KDS Pases/Marchas** | Campo `pase` opcional en `pedidos` (CHECK: primer/segundo/postre/bebida). Selector en TicketPanel antes de enviar a cocina. KDS de cocina agrupa ítems por pase con cabeceras de sección cuando hay múltiples pases activos. Propagado en cadena: `pedidos.pase` → `KitchenItemRecord.pase` → `KitchenItem.pase` → render KDS. |
+| **Compras y Proveedores (SIALTI)** | Módulo completo de compras multi-tenant (Bloque 1). Maestro de proveedores con catálogo por proveedor. Pedidos de compra (borrador → enviado → recibido). Albaranes de recepción con trazabilidad sanitaria obligatoria para ingredientes perecederos: `numero_lote` + `fecha_caducidad >= hoy` (Reg. CE 178/2002). Albaranes inmutables al recibir: triggers DB bloquean UPDATE/DELETE (Ley Antifraude 11/2021). Recepción atómica via RPC `recibir_albaran_transaccional`: genera `movimientos_stock` y actualiza `cantidad_actual` en una transacción. Facturas con desglose de IVA soportado al 0/4/10/21% y validación matemática ±2 céntimos (RD 1619/2012). Pago integrado con turno de caja activo: inserta `tpv_turno_eventos` tipo `compra_proveedor`. Panel admin en `/admin/compras/` (4 tabs). Disponible para tienda y restaurante. |
 | **Telegram Multi-modo** | tienda → quick-reply buttons. restaurante takeaway → time-selector + tracking en vivo. mesa → gestionado in-app (sin Telegram). |
 | **Delivery + Pago online** | Zona de cobertura por CP configurable. Cotización Glovo en tiempo real. Pago Redsys TPV Virtual obligatorio para delivery. Auto-despacho de rider al confirmar pago. Tracking page post-pago. |
 
@@ -1376,6 +1405,8 @@ El warning de VS Code es un falso positivo del plugin de GitHub Actions (no cono
 - [`docs/superpowers/specs/2026-07-02-tpv-design.md`](docs/superpowers/specs/2026-07-02-tpv-design.md) — Spec técnica del TPV Fase 1
 - [`docs/superpowers/specs/2026-07-03-tpv-analytics-design.md`](docs/superpowers/specs/2026-07-03-tpv-analytics-design.md) — Spec técnica del TPV Fase 2 (Analytics + IVA/IGIC)
 - [`docs/context/tpv-empleados-pin.md`](docs/context/tpv-empleados-pin.md) — TPV empleados PIN: arquitectura dual-auth, permisos por rol, arqueo ciego, trampas críticas
+- [`docs/context/compras-system.md`](docs/context/compras-system.md) — Compras y Proveedores (SIALTI): tablas, compliance CE 178/2002 / Ley Antifraude / RD 1619/2012, RPC transaccional, códigos de error, trampas críticas
+- [`docs/context/legal-compliance.md`](docs/context/legal-compliance.md) — Registro de leyes y normativas referenciadas en el proyecto
 - [`docs/superpowers/specs/2026-07-08-empleados-tpv-permisos-design.md`](docs/superpowers/specs/2026-07-08-empleados-tpv-permisos-design.md) — Spec de diseño del sistema de empleados TPV con PIN
 
 ---

@@ -31,44 +31,197 @@ import { ValoracionUseCase } from '@/core/application/use-cases/valoracion.use-c
 import { EmpleadoTpvLoginUseCase } from '@/core/application/use-cases/tpv/empleado-tpv-login.use-case';
 import { SupabaseComplementoGrupoRepository } from './supabase-complemento-grupo.repository';
 import { ComplementoGrupoUseCase } from '@/core/application/use-cases/complemento-grupo.use-case';
+import { SupabaseStockRepository } from '../repositories/supabase-stock.repository';
+import { SupabaseTpvRepository } from '../repositories/supabase-tpv.repository';
 
-const supabase = getSupabaseClient();
-const supabaseAnon = getSupabaseAnonClient();
+// ---------------------------------------------------------------------------
+// Private lazy repository getters (shared between use cases, not exported)
+// ---------------------------------------------------------------------------
 
-const productRepository = new SupabaseProductRepository(supabase);
-const categoryRepository = new SupabaseCategoryRepository(supabase);
-const adminRepository = new SupabaseAdminRepository(supabase, supabaseAnon);
-const clienteRepository = new SupabaseClienteRepository(supabase);
-export const empresaRepository = new SupabaseEmpresaRepository(supabase);
-const promocionRepository = new SupabasePromocionRepository(supabase);
-export const pedidoRepository = new SupabasePedidoRepository(supabase);
-export const mesaRepository = new SupabaseMesaRepository(supabase);
-export const mesaSesionRepository = new SupabaseMesaSesionRepository(supabase);
-const superAdminRepository = new SupabaseSuperAdminRepository(supabase);
-const tgtgRepository = new SupabaseTgtgRepository(supabase);
-const descuentoRepository = new SupabaseDescuentoRepository(supabase);
-const mesaClientTokenRepository = new SupabaseMesaClientTokenRepository(supabase);
-export const valoracionRepository = new SupabaseValoracionRepository(supabase);
-export const empleadoTpvRepository = new SupabaseEmpleadoTpvRepository();
-export const complementoGrupoRepository = new SupabaseComplementoGrupoRepository(supabase);
+let _clienteRepository: SupabaseClienteRepository | undefined;
+function getClienteRepository(): SupabaseClienteRepository {
+  return _clienteRepository ??= new SupabaseClienteRepository(getSupabaseClient());
+}
 
-// Public repository (anon key) for public-facing pages
-export const empresaPublicRepository = new SupabaseEmpresaRepository(supabaseAnon);
+let _productRepository: SupabaseProductRepository | undefined;
+function getProductRepository(): SupabaseProductRepository {
+  return _productRepository ??= new SupabaseProductRepository(getSupabaseClient());
+}
 
-// Use Cases (Clean Architecture - Application Layer)
-export const productUseCase = new ProductUseCase(productRepository);
-export const categoryUseCase = new CategoryUseCase(categoryRepository);
-export const clienteUseCase = new ClienteUseCase(clienteRepository);
-export const empresaUseCase = new EmpresaUseCase(empresaRepository);
-export const pedidoUseCase = new PedidoUseCase(pedidoRepository, clienteRepository, productRepository, descuentoRepository, mesaSesionRepository);
-export const mesaUseCase = new MesaUseCase(mesaRepository);
-export const mesaSesionUseCase = new MesaSesionUseCase(mesaSesionRepository, mesaRepository);
-export const promocionUseCase = new PromocionUseCase(promocionRepository, clienteRepository);
-export const tgtgUseCase = new TgtgUseCase(tgtgRepository, clienteRepository);
-export const authAdminUseCase = new AuthAdminUseCase(adminRepository);
-export const superAdminUseCase = new SuperAdminUseCase(superAdminRepository);
-export const descuentoUseCase = new DescuentoUseCase(descuentoRepository, empresaRepository);
-export const mesaClientTokenUseCase = new MesaClientTokenUseCase(mesaClientTokenRepository, mesaSesionRepository);
-export const valoracionUseCase = new ValoracionUseCase(valoracionRepository);
-export const empleadoTpvLoginUseCase = new EmpleadoTpvLoginUseCase(empleadoTpvRepository);
-export const complementoGrupoUseCase = new ComplementoGrupoUseCase(complementoGrupoRepository);
+let _descuentoRepository: SupabaseDescuentoRepository | undefined;
+function getDescuentoRepository(): SupabaseDescuentoRepository {
+  return _descuentoRepository ??= new SupabaseDescuentoRepository(getSupabaseClient());
+}
+
+// ---------------------------------------------------------------------------
+// Public lazy repository getters (used directly by some routes/use-cases)
+// ---------------------------------------------------------------------------
+
+let _empresaRepository: SupabaseEmpresaRepository | undefined;
+export function getEmpresaRepository(): SupabaseEmpresaRepository {
+  return _empresaRepository ??= new SupabaseEmpresaRepository(getSupabaseClient());
+}
+
+let _pedidoRepository: SupabasePedidoRepository | undefined;
+export function getPedidoRepository(): SupabasePedidoRepository {
+  return _pedidoRepository ??= new SupabasePedidoRepository(getSupabaseClient());
+}
+
+let _mesaRepository: SupabaseMesaRepository | undefined;
+export function getMesaRepository(): SupabaseMesaRepository {
+  return _mesaRepository ??= new SupabaseMesaRepository(getSupabaseClient());
+}
+
+let _mesaSesionRepository: SupabaseMesaSesionRepository | undefined;
+export function getMesaSesionRepository(): SupabaseMesaSesionRepository {
+  return _mesaSesionRepository ??= new SupabaseMesaSesionRepository(getSupabaseClient());
+}
+
+let _valoracionRepository: SupabaseValoracionRepository | undefined;
+export function getValoracionRepository(): SupabaseValoracionRepository {
+  return _valoracionRepository ??= new SupabaseValoracionRepository(getSupabaseClient());
+}
+
+let _empleadoTpvRepository: SupabaseEmpleadoTpvRepository | undefined;
+export function getEmpleadoTpvRepository(): SupabaseEmpleadoTpvRepository {
+  return _empleadoTpvRepository ??= new SupabaseEmpleadoTpvRepository();
+}
+
+let _complementoGrupoRepository: SupabaseComplementoGrupoRepository | undefined;
+export function getComplementoGrupoRepository(): SupabaseComplementoGrupoRepository {
+  return _complementoGrupoRepository ??= new SupabaseComplementoGrupoRepository(getSupabaseClient());
+}
+
+let _empresaPublicRepository: SupabaseEmpresaRepository | undefined;
+export function getEmpresaPublicRepository(): SupabaseEmpresaRepository {
+  return _empresaPublicRepository ??= new SupabaseEmpresaRepository(getSupabaseAnonClient());
+}
+
+// ---------------------------------------------------------------------------
+// Public lazy use case getters
+// ---------------------------------------------------------------------------
+
+let _productUseCase: ProductUseCase | undefined;
+export function getProductUseCase(): ProductUseCase {
+  return _productUseCase ??= new ProductUseCase(getProductRepository());
+}
+
+let _categoryUseCase: CategoryUseCase | undefined;
+export function getCategoryUseCase(): CategoryUseCase {
+  return _categoryUseCase ??= new CategoryUseCase(
+    new SupabaseCategoryRepository(getSupabaseClient())
+  );
+}
+
+let _clienteUseCase: ClienteUseCase | undefined;
+export function getClienteUseCase(): ClienteUseCase {
+  return _clienteUseCase ??= new ClienteUseCase(getClienteRepository());
+}
+
+let _empresaUseCase: EmpresaUseCase | undefined;
+export function getEmpresaUseCase(): EmpresaUseCase {
+  return _empresaUseCase ??= new EmpresaUseCase(getEmpresaRepository());
+}
+
+let _pedidoUseCase: PedidoUseCase | undefined;
+export function getPedidoUseCase(): PedidoUseCase {
+  return _pedidoUseCase ??= new PedidoUseCase(
+    getPedidoRepository(),
+    getClienteRepository(),
+    getProductRepository(),
+    getDescuentoRepository(),
+    getMesaSesionRepository()
+  );
+}
+
+let _mesaUseCase: MesaUseCase | undefined;
+export function getMesaUseCase(): MesaUseCase {
+  return _mesaUseCase ??= new MesaUseCase(getMesaRepository());
+}
+
+let _mesaSesionUseCase: MesaSesionUseCase | undefined;
+export function getMesaSesionUseCase(): MesaSesionUseCase {
+  return _mesaSesionUseCase ??= new MesaSesionUseCase(
+    getMesaSesionRepository(),
+    getMesaRepository()
+  );
+}
+
+let _promocionUseCase: PromocionUseCase | undefined;
+export function getPromocionUseCase(): PromocionUseCase {
+  return _promocionUseCase ??= new PromocionUseCase(
+    new SupabasePromocionRepository(getSupabaseClient()),
+    getClienteRepository()
+  );
+}
+
+let _tgtgUseCase: TgtgUseCase | undefined;
+export function getTgtgUseCase(): TgtgUseCase {
+  return _tgtgUseCase ??= new TgtgUseCase(
+    new SupabaseTgtgRepository(getSupabaseClient()),
+    getClienteRepository()
+  );
+}
+
+let _authAdminUseCase: AuthAdminUseCase | undefined;
+export function getAuthAdminUseCase(): AuthAdminUseCase {
+  return _authAdminUseCase ??= new AuthAdminUseCase(
+    new SupabaseAdminRepository(getSupabaseClient(), getSupabaseAnonClient())
+  );
+}
+
+let _superAdminUseCase: SuperAdminUseCase | undefined;
+export function getSuperAdminUseCase(): SuperAdminUseCase {
+  return _superAdminUseCase ??= new SuperAdminUseCase(
+    new SupabaseSuperAdminRepository(getSupabaseClient())
+  );
+}
+
+let _descuentoUseCase: DescuentoUseCase | undefined;
+export function getDescuentoUseCase(): DescuentoUseCase {
+  return _descuentoUseCase ??= new DescuentoUseCase(
+    getDescuentoRepository(),
+    getEmpresaRepository()
+  );
+}
+
+let _mesaClientTokenUseCase: MesaClientTokenUseCase | undefined;
+export function getMesaClientTokenUseCase(): MesaClientTokenUseCase {
+  return _mesaClientTokenUseCase ??= new MesaClientTokenUseCase(
+    new SupabaseMesaClientTokenRepository(getSupabaseClient()),
+    getMesaSesionRepository()
+  );
+}
+
+let _valoracionUseCase: ValoracionUseCase | undefined;
+export function getValoracionUseCase(): ValoracionUseCase {
+  return _valoracionUseCase ??= new ValoracionUseCase(getValoracionRepository());
+}
+
+let _empleadoTpvLoginUseCase: EmpleadoTpvLoginUseCase | undefined;
+export function getEmpleadoTpvLoginUseCase(): EmpleadoTpvLoginUseCase {
+  return _empleadoTpvLoginUseCase ??= new EmpleadoTpvLoginUseCase(getEmpleadoTpvRepository());
+}
+
+let _complementoGrupoUseCase: ComplementoGrupoUseCase | undefined;
+export function getComplementoGrupoUseCase(): ComplementoGrupoUseCase {
+  return _complementoGrupoUseCase ??= new ComplementoGrupoUseCase(getComplementoGrupoRepository());
+}
+
+let _stockRepository: SupabaseStockRepository | undefined;
+export function getStockRepository(): SupabaseStockRepository {
+  return _stockRepository ??= new SupabaseStockRepository();
+}
+
+let _tpvRepository: SupabaseTpvRepository | undefined;
+export function getTpvRepository(): SupabaseTpvRepository {
+  return _tpvRepository ??= new SupabaseTpvRepository();
+}
+
+import type { IComprasRepository } from '@/core/domain/repositories/IComprasRepository';
+import { SupabaseComprasRepository } from './supabase-compras.repository';
+
+let _comprasRepository: IComprasRepository | undefined;
+export function getComprasRepository(): IComprasRepository {
+  return _comprasRepository ??= new SupabaseComprasRepository();
+}

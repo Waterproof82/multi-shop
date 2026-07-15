@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
-import { authAdminUseCase } from '@/core/infrastructure/database';
+import { getAuthAdminUseCase } from '@/core/infrastructure/database';
 import { verifyTpvEmployeeToken } from '@/lib/tpv-employee-auth';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { getDomainFromHeaders, parseMainDomain } from '@/lib/domain-utils';
@@ -14,7 +14,7 @@ export default async function TpvLoginPage() {
   // Already authenticated? Forward to turno/abrir
   const adminToken = cookieStore.get('admin_token')?.value;
   if (adminToken) {
-    const admin = await authAdminUseCase.verifyToken(adminToken);
+    const admin = await getAuthAdminUseCase().verifyToken(adminToken);
     if (admin) redirect('/tpv/turno/abrir');
   }
 

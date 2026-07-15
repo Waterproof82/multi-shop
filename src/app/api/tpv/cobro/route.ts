@@ -6,9 +6,35 @@ import {
   validationErrorResponse,
   type AuthResult,
 } from '@/core/infrastructure/api/helpers';
-import { SupabaseTpvRepository } from '@/core/infrastructure/repositories/supabase-tpv.repository';
+import { getTpvRepository } from '@/core/infrastructure/database';
 import { registrarCobroUseCase } from '@/core/application/use-cases/tpv/registrar-cobro.use-case';
+import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
+import { type TpvDetalleItem } from '@/core/domain/entities/tpv-types';
 import { z } from 'zod';
+
+interface RawPedidoItem {
+  nombre?: string | null;
+  precio?: number | null;
+  cantidad?: number | null;
+}
+
+interface RawPedido {
+  detalle_pedido?: RawPedidoItem[] | null;
+}
+
+function buildDetalleItems(pedidos: RawPedido[]): TpvDetalleItem[] {
+  const map = new Map<string, { nombre: string; cantidad: number; precioUnitarioCents: number }>();
+  for (const pedido of pedidos) {
+    for (const item of pedido.detalle_pedido ?? []) {
+      const nombre = item.nombre ?? '';
+      const precioUnitarioCents = Math.round((item.precio ?? 0) * 100);
+      const key = `${nombre}|${precioUnitarioCents}`;
+      const prev = map.get(key) ?? { nombre, cantidad: 0, precioUnitarioCents };
+      map.set(key, { ...prev, cantidad: prev.cantidad + (item.cantidad ?? 1) });
+    }
+  }
+  return Array.from(map.values());
+}
 
 const CobroSchema = z.object({
   sesionId: z.string().uuid(),
@@ -19,6 +45,11 @@ const CobroSchema = z.object({
   turnoId: z.string().uuid(),
   ivaPorcentaje: z.number().min(0).max(30).optional().default(10),
   cerrarSesion: z.boolean().optional().default(true),
+  detalleItems: z.array(z.object({
+    nombre: z.string().max(200),
+    cantidad: z.number().int().positive(),
+    precioUnitarioCents: z.number().int().min(0),
+  })).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -42,7 +73,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const repo = new SupabaseTpvRepository();
-  const result = await registrarCobroUseCase(repo, { ...parsed.data, empresaId, cerrarSesion: parsed.data.cerrarSesion });
+  let detalleItems = parsed.data.detalleItems;
+  if (!detalleItems && parsed.data.sesionId) {
+    const supabase = getSupabaseClient();
+    const { data: pedidos } = await supabase
+      .from('pedidos')
+      .select('detalle_pedido')
+      .eq('sesion_id', parsed.data.sesionId)
+      .neq('estado', 'cancelado');
+    if (pedidos && pedidos.length > 0) {
+      detalleItems = buildDetalleItems(pedidos as RawPedido[]);
+    }
+  }
+
+  const repo = getTpvRepository();
+  const result = await registrarCobroUseCase(repo, {
+    ...parsed.data,
+    empresaId,
+    cerrarSesion: parsed.data.cerrarSesion,
+    detalleItems,
+  });
   return handleResult(result);
 }

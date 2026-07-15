@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { empresaPublicRepository, pedidoUseCase, mesaUseCase } from '@/core/infrastructure/database';
+import { getEmpresaPublicRepository, getPedidoUseCase, getMesaUseCase } from '@/core/infrastructure/database';
 import { parseMainDomain, isPedidosDomain, getDomainFromHeaders } from '@/lib/domain-utils';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
+import { PAYMENT_LOCK_EXPIRY_MS } from '@/core/domain/constants/pedido';
 import { validateMesaClientToken } from '@/core/infrastructure/api/validate-mesa-client-token';
 import { verifyWaiterToken } from '@/lib/waiter-auth';
 
@@ -64,7 +65,7 @@ const createPedidoSchema = z.union([
 
 type MesaData = z.infer<typeof mesaPedidoSchema>;
 type DefaultData = z.infer<typeof defaultPedidoSchema>;
-type EmpresaOrderData = NonNullable<Extract<Awaited<ReturnType<typeof empresaPublicRepository.findByDomain>>, { success: true }>['data']>;
+type EmpresaOrderData = NonNullable<Extract<Awaited<ReturnType<ReturnType<typeof getEmpresaPublicRepository>['findByDomain']>>, { success: true }>['data']>;
 
 async function checkMesaPaymentLock(mesaId: string): Promise<NextResponse | null> {
   const { getSupabaseClient } = await import('@/core/infrastructure/database/supabase-client');
@@ -79,7 +80,7 @@ async function checkMesaPaymentLock(mesaId: string): Promise<NextResponse | null
     return NextResponse.json({ error: 'Error al verificar el estado de la mesa.' }, { status: 500 });
   }
   const lock = sesionLock as { pago_en_curso: boolean; pago_iniciado_en: string | null } | null;
-  const LOCK_EXPIRY_MS = 15 * 60 * 1000;
+  const LOCK_EXPIRY_MS = PAYMENT_LOCK_EXPIRY_MS;
   const lockFresh = lock?.pago_iniciado_en
     ? Date.now() - new Date(lock.pago_iniciado_en).getTime() < LOCK_EXPIRY_MS
     : false;
@@ -110,7 +111,7 @@ async function handleMesaOrder(empresa: EmpresaOrderData, data: MesaData, reques
   const tokenError = isWaiter ? null : await validateMesaClientToken(request);
   if (tokenError) return tokenError;
 
-  const mesaResult = await mesaUseCase.getMesa(data.mesa_id);
+  const mesaResult = await getMesaUseCase().getMesa(data.mesa_id);
   if (!mesaResult.success) {
     return NextResponse.json({ error: 'Error al verificar la mesa' }, { status: 500 });
   }
@@ -129,7 +130,7 @@ async function handleMesaOrder(empresa: EmpresaOrderData, data: MesaData, reques
     initialEstado = 'pendiente_validacion';
   }
 
-  const pedidoResult = await pedidoUseCase.createMesaOrder(
+  const pedidoResult = await getPedidoUseCase().createMesaOrder(
     empresa.id,
     { items: data.items, mesa_id: data.mesa_id, idioma: data.idioma },
     mesaResult.data.numero,
@@ -155,7 +156,7 @@ async function handleMesaOrder(empresa: EmpresaOrderData, data: MesaData, reques
 }
 
 async function handleDefaultOrder(empresa: EmpresaOrderData, data: DefaultData, isPedidos: boolean): Promise<NextResponse> {
-  const pedidoResult = await pedidoUseCase.create(
+  const pedidoResult = await getPedidoUseCase().create(
     empresa.id,
     data,
     empresa.tipo ?? 'tienda',
@@ -190,7 +191,7 @@ export async function POST(request: Request) {
   const isPedidos = isPedidosDomain(domain);
   const mainDomain = parseMainDomain(domain);
 
-  const empresaResult = await empresaPublicRepository.findByDomain(mainDomain);
+  const empresaResult = await getEmpresaPublicRepository().findByDomain(mainDomain);
   if (!empresaResult.success || !empresaResult.data) {
     return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 });
   }

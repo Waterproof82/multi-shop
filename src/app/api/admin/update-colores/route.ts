@@ -1,8 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { empresaUseCase } from '@/core/infrastructure/database';
-import { requireAuth, requireRole, handleResult, validationErrorResponse, type AuthResult } from '@/core/infrastructure/api/helpers';
-import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
+import { getEmpresaUseCase } from '@/core/infrastructure/database';
+import { resolveAdminContextWithEmpresa, handleResult, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 import type { EmpresaColores } from '@/core/domain/entities/types';
 
 const hexColor = z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Color debe ser hexadecimal (#RRGGBB)');
@@ -21,17 +20,9 @@ const updateColoresSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const rateLimited = await rateLimitAdmin(request);
-  if (rateLimited) return rateLimited;
-
-  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request) as AuthResult;
-  if (authError) return authError;
-  const roleError = requireRole(request, ['admin', 'superadmin']);
-  if (roleError) return roleError;
-
-  const { searchParams } = new URL(request.url);
-  const queryEmpresaId = searchParams.get('empresaId');
-  const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
+  const ctx = await resolveAdminContextWithEmpresa(request);
+  if (ctx.error) return ctx.error;
+  const { empresaId } = ctx;
 
   let body: unknown;
   try {
@@ -45,7 +36,7 @@ export async function POST(request: NextRequest) {
     return validationErrorResponse(parsed.error.errors[0].message);
   }
 
-  const result = await empresaUseCase.updateColores(empresaId!, parsed.data.colores as EmpresaColores);
+  const result = await getEmpresaUseCase().updateColores(empresaId, parsed.data.colores as EmpresaColores);
   
   if (!result.success) {
     return handleResult(result);

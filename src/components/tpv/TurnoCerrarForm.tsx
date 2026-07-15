@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { TpvTurno, TpvTurnoStats } from '@/core/domain/entities/tpv-types';
+import type { TpvTurno, TpvTurnoStats, InformeZData } from '@/core/domain/entities/tpv-types';
 import { getCsrfToken } from '@/lib/csrf-client';
 import { useTpvCatalog } from '@/lib/tpv-catalog-ctx';
+import { InformeZModal } from '@/components/tpv/InformeZModal';
+import { logClientError } from '@/lib/client-error';
 
 interface MesaAbierta {
   mesaNumero: number | null;
@@ -46,6 +48,7 @@ export function TurnoCerrarForm({ turno, stats, mesasAbiertas, isBlindClose }: R
   const [efectivoContado, setEfectivoContado] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [informeZ, setInformeZ] = useState<InformeZData | null>(null);
 
   const contadoCents = Math.round(parseFloat(efectivoContado || '0') * 100);
   const teoricoCents = turno.efectivoAperturaCents + stats.totalEfectivoCents;
@@ -80,7 +83,23 @@ export function TurnoCerrarForm({ turno, stats, mesasAbiertas, isBlindClose }: R
 
       if (res.ok) {
         setTurno(null);
-        router.push('/tpv/turno/abrir');
+        const zRes = await fetch(`/api/tpv/turno/${turno.id}/informe-z`);
+        if (zRes.ok) {
+          const data = (await zRes.json()) as InformeZData;
+          const snapshotPromise = window.electronAPI?.saveFiscalSnapshot(data);
+          if (snapshotPromise !== undefined) {
+            snapshotPromise
+              .then(result => {
+                if (!result.success) {
+                  logClientError(new Error(result.error ?? 'Backup fiscal local fallido'), 'saveFiscalSnapshot');
+                }
+              })
+              .catch(err => { logClientError(err, 'saveFiscalSnapshot'); });
+          }
+          setInformeZ(data);
+        } else {
+          router.push('/tpv/turno/abrir');
+        }
       } else {
         let msg = 'Error al cerrar el turno. Inténtalo de nuevo.';
         try {
@@ -94,6 +113,14 @@ export function TurnoCerrarForm({ turno, stats, mesasAbiertas, isBlindClose }: R
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleInformeZClose() {
+    router.push('/tpv/turno/abrir');
+  }
+
+  if (informeZ !== null) {
+    return <InformeZModal informe={informeZ} onClose={handleInformeZClose} />;
   }
 
   return (

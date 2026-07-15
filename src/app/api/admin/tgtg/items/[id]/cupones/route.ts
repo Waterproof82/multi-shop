@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { tgtgUseCase } from '@/core/infrastructure/database';
-import { requireAuth, requireRole } from '@/core/infrastructure/api/helpers';
-import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
+import { getTgtgUseCase } from '@/core/infrastructure/database';
+import { resolveAdminContextWithEmpresa } from '@/core/infrastructure/api/helpers';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
 import { adjustCuponesSchema } from '@/core/application/dtos/tgtg.dto';
 
@@ -9,17 +8,9 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const rateLimited = await rateLimitAdmin(request);
-  if (rateLimited) return rateLimited;
-
-  const { empresaId: authEmpresaId, error: authError, isSuperAdmin } = await requireAuth(request) as { empresaId: string | null; error: NextResponse | null; isSuperAdmin: boolean };
-  if (authError) return authError;
-  const roleError = requireRole(request, ['admin', 'superadmin']);
-  if (roleError) return roleError;
-
-  const { searchParams } = new URL(request.url);
-  const queryEmpresaId = searchParams.get('empresaId');
-  const empresaId = (isSuperAdmin && queryEmpresaId) ? queryEmpresaId : authEmpresaId;
+  const ctx = await resolveAdminContextWithEmpresa(request);
+  if (ctx.error) return ctx.error;
+  const { empresaId } = ctx;
 
   const { id: itemId } = await params;
 
@@ -36,7 +27,7 @@ export async function PATCH(
   }
 
   try {
-    const result = await tgtgUseCase.adjustCupones(empresaId!, itemId, parsed.data.delta);
+    const result = await getTgtgUseCase().adjustCupones(empresaId, itemId, parsed.data.delta);
     if (!result.success) {
       return NextResponse.json({ error: result.error.message }, { status: result.error.code === 'NOT_FOUND' ? 404 : 500 });
     }

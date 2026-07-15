@@ -23,7 +23,20 @@ export async function POST(
   const parsed = mesaIdSchema.safeParse(mesaId);
   if (!parsed.success) return NextResponse.json({ error: 'Invalid mesaId' }, { status: 400 });
 
+  // Tenant isolation: verify the mesa belongs to the empresa derived from the request domain
+  const empresaId = request.headers.get('x-empresa-id');
+  if (!empresaId) return NextResponse.json({ error: 'Tenant no identificado' }, { status: 400 });
+
   const supabase = getSupabaseClient();
+
+  const { data: mesa } = await supabase
+    .from('mesas')
+    .select('id')
+    .eq('id', parsed.data)
+    .eq('empresa_id', empresaId)
+    .single();
+
+  if (!mesa) return NextResponse.json({ error: 'Mesa no encontrada' }, { status: 404 });
 
   await supabase
     .from('mesa_sesiones')

@@ -1,22 +1,17 @@
 import { type NextRequest } from 'next/server';
-import { complementoGrupoUseCase } from '@/core/infrastructure/database';
+import { getComplementoGrupoUseCase } from '@/core/infrastructure/database';
 import { updateComplementoOpcionSchema } from '@/core/application/dtos/complemento.dto';
-import { requireAuth, requireRole, handleResultWithStatus, validationErrorResponse, type AuthResult } from '@/core/infrastructure/api/helpers';
-import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
+import { resolveAdminContext, handleResultWithStatus, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 
 interface Params {
   params: Promise<{ grupoId: string; opcionId: string }>;
 }
 
 export async function PUT(request: NextRequest, { params }: Params) {
-  const rateLimited = await rateLimitAdmin(request);
-  if (rateLimited) return rateLimited;
+  const ctx = await resolveAdminContext(request);
+  if (ctx.error) return ctx.error;
 
   const { grupoId, opcionId } = await params;
-  const { error: authError } = await requireAuth(request) as AuthResult;
-  if (authError) return authError;
-  const roleError = requireRole(request, ['admin', 'superadmin']);
-  if (roleError) return roleError;
 
   let body: unknown;
   try {
@@ -30,7 +25,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
     return validationErrorResponse(parsed.error.errors[0]?.message ?? 'Datos inválidos');
   }
 
-  const result = await complementoGrupoUseCase.updateOpcion(opcionId, grupoId, {
+  const result = await getComplementoGrupoUseCase().updateOpcion(opcionId, grupoId, {
     nombre_es: parsed.data.nombre_es,
     precioAdicional: parsed.data.precio_adicional,
     orden: parsed.data.orden,
@@ -39,15 +34,11 @@ export async function PUT(request: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(request: NextRequest, { params }: Params) {
-  const rateLimited = await rateLimitAdmin(request);
-  if (rateLimited) return rateLimited;
+  const ctx = await resolveAdminContext(request);
+  if (ctx.error) return ctx.error;
 
   const { grupoId, opcionId } = await params;
-  const { error: authError } = await requireAuth(request) as AuthResult;
-  if (authError) return authError;
-  const roleError = requireRole(request, ['admin', 'superadmin']);
-  if (roleError) return roleError;
 
-  const result = await complementoGrupoUseCase.deleteOpcion(opcionId, grupoId);
+  const result = await getComplementoGrupoUseCase().deleteOpcion(opcionId, grupoId);
   return handleResultWithStatus(result);
 }

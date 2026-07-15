@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { mesaClientTokenUseCase } from '@/core/infrastructure/database';
+import { getMesaClientTokenUseCase } from '@/core/infrastructure/database';
 
 /**
  * Validates the mesa client token from the Authorization header.
@@ -15,7 +15,7 @@ export async function validateMesaClientToken(request: Request): Promise<NextRes
     return NextResponse.json({ error: 'Token requerido', code: 'NOT_FOUND' }, { status: 401 });
   }
 
-  const result = await mesaClientTokenUseCase.validateToken(token);
+  const result = await getMesaClientTokenUseCase().validateToken(token);
 
   if (!result.success) {
     return NextResponse.json({ error: 'Error al validar token' }, { status: 500 });

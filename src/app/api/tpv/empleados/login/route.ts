@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { getDomainFromHeaders, parseMainDomain } from '@/lib/domain-utils';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
-import { empleadoTpvLoginUseCase } from '@/core/infrastructure/database';
+import { getEmpleadoTpvLoginUseCase } from '@/core/infrastructure/database';
 import { signTpvEmployeeToken } from '@/lib/tpv-employee-auth';
 
 const LoginSchema = z.object({
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'PIN inválido' }, { status: 400 });
   }
 
-  const result = await empleadoTpvLoginUseCase.execute(parsed.data.pin, empresa.id as string);
+  const result = await getEmpleadoTpvLoginUseCase().execute(parsed.data.pin, empresa.id as string);
   if (!result.success) {
     return NextResponse.json({ error: 'PIN incorrecto' }, { status: 401 });
   }

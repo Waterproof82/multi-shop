@@ -1,13 +1,19 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
-import { authAdminUseCase } from '@/core/infrastructure/database';
+import { getAuthAdminUseCase } from '@/core/infrastructure/database';
 import { verifyTpvEmployeeToken } from '@/lib/tpv-employee-auth';
 import { SupabaseTpvRepository } from '@/core/infrastructure/repositories/supabase-tpv.repository';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { TurnoCerrarForm } from '@/components/tpv/TurnoCerrarForm';
 import type { RolAdmin } from '@/core/domain/repositories/IAdminRepository';
 
-const EMPTY_STATS = { totalEfectivoCents: 0, totalTarjetaCents: 0, numOperaciones: 0 };
+const EMPTY_STATS = {
+  totalEfectivoCents: 0,
+  totalTarjetaCents: 0,
+  numOperaciones: 0,
+  efectivoAperturaCents: 0,
+  movimientosNetoCents: 0,
+};
 
 export default async function TurnoCerrarPage() {
   const cookieStore = await cookies();
@@ -16,7 +22,7 @@ export default async function TurnoCerrarPage() {
 
   const adminToken = cookieStore.get('admin_token')?.value;
   if (adminToken) {
-    const admin = await authAdminUseCase.verifyToken(adminToken);
+    const admin = await getAuthAdminUseCase().verifyToken(adminToken);
     if (admin?.empresaId) {
       rol = admin.rol;
       empresaId = admin.empresaId;

@@ -6,12 +6,12 @@ import {
   validationErrorResponse,
   type AuthResult,
 } from '@/core/infrastructure/api/helpers';
-import { SupabaseTpvRepository } from '@/core/infrastructure/repositories/supabase-tpv.repository';
+import { getTpvRepository } from '@/core/infrastructure/database';
 import { cerrarTurnoUseCase } from '@/core/application/use-cases/tpv/cerrar-turno.use-case';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { z } from 'zod';
 
-const repo = new SupabaseTpvRepository();
+const repo = getTpvRepository();
 
 const CerrarSchema = z.object({
   efectivoCierreCents: z.number().int().min(0),
@@ -64,13 +64,20 @@ export async function POST(
     );
   }
 
+  const empleadoCierreId =
+    req.headers.get('x-admin-id') ?? req.headers.get('x-employee-id') ?? undefined;
+
   let totalEfectivoTeoricoCents = parsed.data.totalEfectivoTeoricoCents ?? 0;
 
-  // For cajero (blind close): fetch the theoretical total server-side
+  // Para cajero (arqueo ciego) o cuando no se envía el teórico: calcularlo server-side.
+  // Teórico = fondo apertura + ventas en efectivo + Σ entradas - Σ salidas del turno.
   if (rol === 'cajero' || parsed.data.totalEfectivoTeoricoCents === undefined) {
     const statsResult = await repo.getTurnoStats(id);
     if (statsResult.success) {
-      totalEfectivoTeoricoCents = statsResult.data.totalEfectivoCents;
+      totalEfectivoTeoricoCents =
+        statsResult.data.efectivoAperturaCents +
+        statsResult.data.totalEfectivoCents +
+        statsResult.data.movimientosNetoCents;
     }
   }
 
@@ -78,6 +85,7 @@ export async function POST(
     turnoId: id,
     efectivoCierreCents: parsed.data.efectivoCierreCents,
     totalEfectivoTeoricoCents,
+    empleadoCierreId,
   });
 
   if (!result.success) return errorResponse(result.error.message);

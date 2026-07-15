@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { requireAuth, requireRole } from '@/core/infrastructure/api/helpers';
+import { resolveAdminContext } from '@/core/infrastructure/api/helpers';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { S3Client, GetObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 
@@ -32,10 +32,9 @@ type Snapshot = {
 
 // GET — list available backup dates for an empresa
 export async function GET(request: NextRequest) {
-  const { empresaId, error: authError } = await requireAuth(request);
-  if (authError) return authError;
-  const roleError = requireRole(request, ['admin', 'superadmin']);
-  if (roleError) return roleError;
+  const ctx = await resolveAdminContext(request);
+  if (ctx.error) return ctx.error;
+  const { empresaId } = ctx;
 
   const s3 = getS3Client();
   const { Contents } = await s3.send(new ListObjectsV2Command({
@@ -54,10 +53,9 @@ export async function GET(request: NextRequest) {
 
 // POST — restore from a specific date's backup
 export async function POST(request: NextRequest) {
-  const { empresaId, error: authError } = await requireAuth(request);
-  if (authError) return authError;
-  const roleError = requireRole(request, ['admin', 'superadmin']);
-  if (roleError) return roleError;
+  const ctx = await resolveAdminContext(request);
+  if (ctx.error) return ctx.error;
+  const { empresaId } = ctx;
 
   let body: unknown;
   try {
@@ -117,8 +115,16 @@ export async function POST(request: NextRequest) {
   const { error: tpvErr } = await supabase.from('empleados_tpv').upsert(sanitize(snapshot.empleados_tpv ?? []), { onConflict: 'id' });
   if (tpvErr) return NextResponse.json({ error: 'Failed to restore empleados_tpv', details: tpvErr.message }, { status: 500 });
 
-  // receta_items: last — depends on productos + ingredientes (no empresa_id to sanitize)
-  const { error: recetaErr } = await supabase.from('receta_items').upsert(snapshot.receta_items ?? [], { onConflict: 'id' });
+  // receta_items: last — depends on productos + ingredientes.
+  // No empresa_id column, so validate by FK: only allow rows whose producto_id and
+  // ingrediente_id belong to the productos/ingredientes we just restored for this tenant.
+  const validProductoIds = new Set((snapshot.productos ?? []).map(r => r['id'] as string));
+  const validIngredienteIds = new Set((snapshot.ingredientes ?? []).map(r => r['id'] as string));
+  const recetaItemsSanitized = (snapshot.receta_items ?? []).filter(r =>
+    validProductoIds.has(r['producto_id'] as string) &&
+    (r['ingrediente_id'] === null || r['ingrediente_id'] === undefined || validIngredienteIds.has(r['ingrediente_id'] as string))
+  );
+  const { error: recetaErr } = await supabase.from('receta_items').upsert(recetaItemsSanitized, { onConflict: 'id' });
   if (recetaErr) return NextResponse.json({ error: 'Failed to restore receta_items', details: recetaErr.message }, { status: 500 });
 
   return NextResponse.json({
@@ -129,7 +135,7 @@ export async function POST(request: NextRequest) {
       categorias: (snapshot.categorias ?? []).length,
       productos: (snapshot.productos ?? []).length,
       empleados_tpv: (snapshot.empleados_tpv ?? []).length,
-      receta_items: (snapshot.receta_items ?? []).length,
+      receta_items: recetaItemsSanitized.length,
     },
   });
 }

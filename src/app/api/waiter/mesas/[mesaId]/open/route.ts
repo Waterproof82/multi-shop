@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { mesaSesionUseCase } from '@/core/infrastructure/database';
+import { getMesaSesionUseCase } from '@/core/infrastructure/database';
 
 const mesaIdSchema = z.string().uuid('El mesaId debe ser un UUID válido');
 
@@ -19,7 +19,7 @@ export async function POST(
     return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
   }
 
-  const result = await mesaSesionUseCase.openSesion(parsed.data, empresaId);
+  const result = await getMesaSesionUseCase().openSesion(parsed.data, empresaId);
   if (!result.success) {
     return NextResponse.json({ error: 'Error al abrir la sesión de mesa' }, { status: 500 });
   }

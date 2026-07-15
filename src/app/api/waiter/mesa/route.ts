@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
-import { mesaSesionUseCase } from '@/core/infrastructure/database';
+import { getMesaSesionUseCase } from '@/core/infrastructure/database';
 
 const mesaSchema = z.object({
   mesaNumero: z.number().int().positive(),
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Open (or reuse) the mesa session — idempotent RPC
-  await mesaSesionUseCase.openSesion(mesa.id as string, empresaId);
+  await getMesaSesionUseCase().openSesion(mesa.id as string, empresaId);
 
   return NextResponse.json({ ok: true, mesaId: mesa.id, mesaNumero: mesa.numero, mesaNombre: mesa.nombre });
 }

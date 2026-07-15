@@ -1,5 +1,7 @@
 import { app, BrowserWindow, ipcMain, globalShortcut } from 'electron';
 import * as path from 'path';
+import { promises as fsPromises } from 'fs';
+import * as crypto from 'crypto';
 import Store from 'electron-store';
 import { autoUpdater } from 'electron-updater';
 import { listPrinters, printReceipt } from './printer/index';
@@ -8,6 +10,14 @@ import type { ReceiptData } from './printer/receipt';
 interface StoreSchema {
   domain: string;
   printerName: string;
+  signingKey: string;
+}
+
+interface FiscalSnapshotPayload {
+  empresaNombre: string;
+  aperturaAt: string;
+  numeroZ: number;
+  [key: string]: unknown;
 }
 
 const store = new Store<StoreSchema>();
@@ -91,6 +101,37 @@ function setupIpc(): void {
     }
     return printReceipt(printerName, data);
   });
+
+  ipcMain.handle('fiscal:save-snapshot', async (_event, data: FiscalSnapshotPayload) => {
+    try {
+      const slug = data.empresaNombre.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const date = data.aperturaAt.slice(0, 10);
+      const dir = path.join(app.getPath('userData'), 'fiscal', slug);
+      await fsPromises.mkdir(dir, { recursive: true });
+      const file = path.join(dir, `${date}-Z${data.numeroZ}.json`);
+
+      // Hash the full payload with a device-specific key (generated once on first launch)
+      // This detects local tampering: any edit to the JSON will break the signature
+      const signingKey = store.get('signingKey') as string;
+      const serialized = JSON.stringify(data, null, 2);
+      const integrityHash = crypto.createHmac('sha256', signingKey).update(serialized).digest('hex');
+
+      const securePayload = {
+        ...data,
+        sialti_metadata: {
+          secured_at: new Date().toISOString(),
+          integrity_hash: integrityHash,
+          verification_standard: 'RD 1007/2023',
+        },
+      };
+
+      await fsPromises.writeFile(file, JSON.stringify(securePayload, null, 2), 'utf-8');
+      return { success: true, path: file };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { success: false, error: msg };
+    }
+  });
 }
 
 function setupAutoUpdater(): void {
@@ -108,6 +149,9 @@ function setupAutoUpdater(): void {
 }
 
 app.whenReady().then(() => {
+  if (!store.get('signingKey')) {
+    store.set('signingKey', crypto.randomBytes(32).toString('hex'));
+  }
   createWindow();
   registerGlobalShortcuts();
   setupIpc();

@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  requireAuth,
-  requireRole,
-  type AuthResult,
+  resolveAdminContext,
 } from '@/core/infrastructure/api/helpers';
-import { empleadoTpvRepository } from '@/core/infrastructure/database';
+import { getEmpleadoTpvRepository } from '@/core/infrastructure/database';
 import { hashPin } from '@/lib/waiter-auth';
 import { z } from 'zod';
 
@@ -17,10 +15,9 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { empresaId, error: authError } = (await requireAuth(req)) as AuthResult;
-  if (authError) return authError;
-  const forbidden = requireRole(req, ['admin', 'superadmin']);
-  if (forbidden) return forbidden;
+  const ctx = await resolveAdminContext(req);
+  if (ctx.error) return ctx.error;
+  const { empresaId } = ctx;
   if (!empresaId) return NextResponse.json({ error: 'empresaId requerido' }, { status: 400 });
 
   const { id } = await params;
@@ -38,9 +35,9 @@ export async function PATCH(
   let result;
   if ('pin' in parsed.data) {
     const pinHash = await hashPin(parsed.data.pin, empresaId);
-    result = await empleadoTpvRepository.updatePin(id, empresaId, pinHash);
+    result = await getEmpleadoTpvRepository().updatePin(id, empresaId, pinHash);
   } else {
-    result = await empleadoTpvRepository.setActivo(id, empresaId, parsed.data.activo);
+    result = await getEmpleadoTpvRepository().setActivo(id, empresaId, parsed.data.activo);
   }
 
   if (!result.success) {
@@ -57,14 +54,13 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { empresaId, error: authError } = (await requireAuth(req)) as AuthResult;
-  if (authError) return authError;
-  const forbidden = requireRole(req, ['admin', 'superadmin']);
-  if (forbidden) return forbidden;
+  const ctx = await resolveAdminContext(req);
+  if (ctx.error) return ctx.error;
+  const { empresaId } = ctx;
   if (!empresaId) return NextResponse.json({ error: 'empresaId requerido' }, { status: 400 });
 
   const { id } = await params;
-  const result = await empleadoTpvRepository.delete(id, empresaId);
+  const result = await getEmpleadoTpvRepository().delete(id, empresaId);
 
   if (!result.success) {
     return NextResponse.json({ error: result.error.message }, { status: 500 });

@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  requireAuth,
-  requireRole,
+  resolveAdminContext,
   handleResult,
-  type AuthResult,
 } from '@/core/infrastructure/api/helpers';
-import { empleadoTpvRepository } from '@/core/infrastructure/database';
+import { getEmpleadoTpvRepository } from '@/core/infrastructure/database';
 import { hashPin } from '@/lib/waiter-auth';
 import { z } from 'zod';
 
@@ -16,23 +14,21 @@ const CreateSchema = z.object({
 });
 
 export async function GET(req: NextRequest) {
-  const { empresaId, error: authError } = (await requireAuth(req)) as AuthResult;
-  if (authError) return authError;
-  const forbidden = requireRole(req, ['admin', 'superadmin']);
-  if (forbidden) return forbidden;
+  const ctx = await resolveAdminContext(req);
+  if (ctx.error) return ctx.error;
+  const { empresaId } = ctx;
   if (!empresaId) return NextResponse.json({ error: 'empresaId requerido' }, { status: 400 });
 
-  const result = await empleadoTpvRepository.findAllByEmpresa(empresaId);
+  const result = await getEmpleadoTpvRepository().findAllByEmpresa(empresaId);
   if (!result.success) return handleResult(result);
   const safeList = result.data.map(({ pinHash: _, ...rest }) => rest);
   return NextResponse.json(safeList);
 }
 
 export async function POST(req: NextRequest) {
-  const { empresaId, error: authError } = (await requireAuth(req)) as AuthResult;
-  if (authError) return authError;
-  const forbidden = requireRole(req, ['admin', 'superadmin']);
-  if (forbidden) return forbidden;
+  const ctx = await resolveAdminContext(req);
+  if (ctx.error) return ctx.error;
+  const { empresaId } = ctx;
   if (!empresaId) return NextResponse.json({ error: 'empresaId requerido' }, { status: 400 });
 
   let body: unknown;
@@ -47,7 +43,7 @@ export async function POST(req: NextRequest) {
 
   const pinHash = await hashPin(parsed.data.pin, empresaId);
 
-  const result = await empleadoTpvRepository.create({
+  const result = await getEmpleadoTpvRepository().create({
     empresaId,
     nombre: parsed.data.nombre,
     rol: parsed.data.rol,

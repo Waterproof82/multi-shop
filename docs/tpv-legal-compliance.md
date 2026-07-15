@@ -35,7 +35,7 @@
 ### 1.4 Código QR / URL de verificación AEAT
 
 - [x] **URL de verificación AEAT** mostrada en `CobroConfirmado` con formato correcto: `DD-MM-AAAA` (no ISO 8601). Parámetros: `nif`, `numserie` (serie+ticket 6 dígitos), `fecha`, `importe` (20260703).
-- [ ] Generar QR visual con esa URL en cada ticket impreso/digital (Fase impresión térmica).
+- [x] **QR visual AEAT en ticket impreso** — `browser-printer.ts` genera imagen QR base64 con la librería `qrcode` y la incrusta en el HTML de impresión. `buildAeatUrl()` calcula la fecha con `DD-MM-YYYY` correcto (bug previo en `fecha.split('/').reverse()` generaba `YYYY-MM-DD`) (20260714).
 - [ ] Verificar con la AEAT que el formato de `numserie` y `fecha` pasan la validación del servicio web.
 
 ### 1.5 Declaración de Responsabilidad del fabricante
@@ -65,12 +65,12 @@
 > Aplica a cada ticket impreso o digital que emita el TPV.
 
 - [x] **Número correlativo de ticket** sin saltos (`serie-NNNNNN`), atómico en DB con `SELECT nextval()` (20260703).
-- [ ] **Fecha y hora** de expedición (ISO 8601, zona horaria Europe/Madrid).
+- [x] **Fecha y hora** de expedición (ISO 8601, zona horaria Europe/Madrid) (20260714).
 - [x] **NIF, nombre y razón social** del emisor — `empresas.nif` configurable desde el panel admin; incluido en el ticket y en el enlace de verificación AEAT (20260703).
-- [ ] **Desglose de ítems**: nombre del producto, cantidad, precio unitario.
+- [x] **Desglose de ítems**: nombre del producto, cantidad, precio unitario (20260714).
 - [x] **Tipo impositivo configurable por empresa** — `empresas.tipo_impuesto` (`'iva'|'igic'`) y `empresas.porcentaje_impuesto`. Auto-relleno al cambiar tipo (IVA → 10%, IGIC → 7%). Propagado como prop SSR a todos los componentes del TPV. `tpv_cobros.iva_porcentaje` graba la tasa en el momento del cobro para preservar el histórico (20260703).
 - [x] **Importe IVA/IGIC y base imponible** calculados en trigger PostgreSQL — `iva_cents` y `base_imponible_cents` en `tpv_cobros`. No delegados al cliente (20260703).
-- [ ] **Importe total** con y sin IVA mostrado en ticket impreso/digital.
+- [x] **Importe total** con y sin IVA mostrado en ticket impreso/digital (20260714).
 - [x] Si es **ticket rectificativo**: referencia explícita al número de ticket original — `rectifica_cobro_id UUID REFERENCES tpv_cobros(id)` en DB; mostrado en pantalla de confirmación y en el historial del turno como "Rectificativo · anula SERIE-NNNNNN" (20260703).
 - [x] **Cross-turno**: el rectificativo puede emitirse en un turno distinto al del cobro original (legal). El historial resuelve esto server-side mostrando "Rectificado" en el original y la referencia cruzada en el negativo (20260703).
 - [ ] Implementar tipos de IVA diferenciados por categoría de producto (IVA 10% restauración, 21% alcohol, 0% exentos) — pendiente Fase 3.
@@ -118,6 +118,46 @@
 
 ---
 
+---
+
+## 9. SIALTI — Trazabilidad e Inalterabilidad de Turnos (RD 1007/2023)
+
+### 9.1 Inalterabilidad de `tpv_turnos`
+
+- [x] **No-DELETE en `tpv_turnos`** — Trigger `tpv_turno_no_delete` raises EXCEPTION (20260714).
+- [x] **Inmutabilidad de campos de apertura durante turno abierto** — Trigger `tpv_turno_no_update_fields`: protege `efectivo_apertura_cents`, `hash_encadenado`, `apertura_at`, `empresa_id`, `user_id`, `operador_id`, `operador_nombre` aunque el turno siga abierto. Bloquea TODO si ya está cerrado (20260714).
+- [x] **Hash chaining en `tpv_turnos`** — Columna `hash_encadenado TEXT`. Trigger BEFORE INSERT `tpv_turno_hash_insert`: SHA-256 de `empresa_id|id|efectivo_apertura|apertura_at|prev_hash`. El primer turno arranca con `INICIO` (20260714).
+- [x] **`efectivo_cierre_teorico_cents`** persistido explícitamente. No solo la diferencia — el teórico también es inalterable en el registro (20260714).
+- [x] **`empleado_cierre_id`** en `tpv_turnos` — queda grabado el UUID de quien cerró para que el trigger AFTER UPDATE lo use en el evento de auditoría (20260714).
+
+### 9.2 Audit Trail atómico (`tpv_turno_eventos`)
+
+- [x] **Tabla `tpv_turno_eventos`** — Append-only: triggers BEFORE DELETE y BEFORE UPDATE lanzan EXCEPTION (20260714).
+- [x] **Atomicidad garantizada por la DB** — Trigger AFTER INSERT OR UPDATE en `tpv_turnos` inserta los eventos en la misma transacción. Si el evento falla, el cambio de estado del turno se revierte. Sin posibilidad de silent failure legal (20260714).
+- [x] **Evento 'apertura'** — auto-insertado por AFTER INSERT trigger en `tpv_turnos` (20260714).
+- [x] **Evento 'cierre'** — auto-insertado por AFTER UPDATE trigger cuando `cierre_at` pasa de NULL a NOT NULL (20260714).
+- [x] **Evento 'descuadre'** — auto-insertado en la misma transacción que 'cierre' si `diferencia_cents <> 0` (20260714).
+- [x] **Tipos de evento** validados via CHECK constraint: `apertura`, `cierre`, `entrada_caja`, `salida_caja`, `apertura_cajon_sin_venta`, `arqueo_parcial`, `descuadre` (20260714).
+
+### 9.3 Movimientos de Caja Intermedios
+
+- [x] **Endpoint `POST /api/tpv/turno/[id]/movimiento-caja`** — `entrada_caja` / `salida_caja`. Solo encargado/admin. Descripción obligatoria min 3 chars (20260714).
+- [x] **Endpoint `GET /api/tpv/turno/[id]/movimiento-caja`** — historial de todos los eventos del turno (20260714).
+- [x] **Teórico de cierre correcto** — incluye `fondo_apertura + ventas_efectivo + Σentradas - Σsalidas`. Antes ignoraba el fondo de apertura y los movimientos intermedios (20260714).
+- [x] **`registrarMovimientoCajaUseCase`** — valida `montoCents > 0` y `descripcion` no vacía antes de persistir (20260714).
+
+---
+
+## 10. Backup Fiscal Local (Electron)
+
+- [x] **Snapshot fiscal en disco al cerrar turno** — Handler `fiscal:save-snapshot` en `electron/main.ts`. Guarda `InformeZData` completo en `{userData}/fiscal/{empresa-slug}/{fecha}-Z{numeroZ}.json` (20260714).
+- [x] **Escritura asíncrona** — `fs.promises.writeFile` para no bloquear el main thread de Electron (sin tirón visual en TPV táctil) (20260714).
+- [x] **HMAC-SHA256 de integridad** — Firma calculada sobre el JSON completo con clave de dispositivo (32 bytes aleatorios) generada en primer arranque y persistida en `electron-store`. Cualquier edición externa del archivo rompe la firma. `sialti_metadata.integrity_hash` almacenado en el propio JSON (20260714).
+- [x] **Clave de firma por dispositivo** — No hardcodeada. Generada con `crypto.randomBytes(32)` y almacenada en `electron-store` bajo `signingKey`. Si se pierde el store, los archivos previos pierden verificabilidad local pero la fuente de verdad (Supabase + `hashEncadenado` de la cadena de turnos) sigue siendo auditab (20260714).
+- [x] **Trazabilidad de errores** — Fallo en guardado local reportado vía `logClientError` → Sentry. No bloquea el flujo visual del cajero (20260714).
+
+---
+
 ## Historial de versiones de este documento
 
 | Versión | Fecha      | Cambios                        |
@@ -126,3 +166,7 @@
 | 1.1     | 2026-07-03 | Marcados como completados: bloqueo DELETE/UPDATE, ticket rectificativo, cadena de hashes, endpoints de auditoría, pantalla `/tpv/legal`, Declaración de Responsabilidad |
 | 1.2     | 2026-07-03 | Fase 2: tipo impuesto IVA/IGIC configurable por empresa, porcentaje grabado por cobro, numeración correlativa atómica, NIF en ticket, sección 3 actualizada |
 | 1.3     | 2026-07-03 | Fase 3: URL AEAT con fecha DD-MM-AAAA corregida; rectificativo cross-turno documentado y visualizado en historial; fix bug guardado tipo_impuesto en panel admin (camelCase→snake_case) |
+| 1.4     | 2026-07-14 | Sección 9: SIALTI turnos — hash chaining, no-delete, inmutabilidad campos apertura, audit trail atómico vía DB triggers (sin silent failure), movimientos de caja, teórico de cierre corregido |
+| 1.5     | 2026-07-14 | Fase 4: desglose de ítems en ticket (detalle_items JSONB), Informe Z con numero_z secuencial por trigger, InformeZModal con auto-print |
+| 1.6     | 2026-07-14 | Sección 10: backup fiscal local en Electron — snapshot JSON + HMAC-SHA256 con clave por dispositivo, escritura async, trazabilidad Sentry |
+| 1.7     | 2026-07-14 | Sección 1.4: QR visual AEAT en ticket impreso (`browser-printer.ts`); fix bug fecha DD-MM-YYYY en URL AEAT |

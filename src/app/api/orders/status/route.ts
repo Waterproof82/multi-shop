@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { pedidoRepository } from '@/core/infrastructure/database';
+import { getPedidoRepository } from '@/core/infrastructure/database';
 import { rateLimitTracking } from '@/core/infrastructure/api/rate-limit';
 import { editMessageReplyMarkup } from '@/core/infrastructure/services/telegram.service';
 
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   const rateLimited = await rateLimitTracking(parsed.data);
   if (rateLimited) return rateLimited;
 
-  const result = await pedidoRepository.findByTrackingToken(parsed.data);
+  const result = await getPedidoRepository().findByTrackingToken(parsed.data);
   if (!result.success) {
     return NextResponse.json({ error: 'Error al buscar pedido' }, { status: 500 });
   }
@@ -39,7 +39,7 @@ export async function GET(request: Request) {
   if (isReady && telegram_message_id && telegram_chat_id) {
     void Promise.all([
       editMessageReplyMarkup(telegram_chat_id, Number(telegram_message_id), [[{ text: '✅ Pedido listo para recoger', callback_data: 'noop' }]]),
-      pedidoRepository.clearTelegramMessageId(id),
+      getPedidoRepository().clearTelegramMessageId(id),
     ]);
   }
 

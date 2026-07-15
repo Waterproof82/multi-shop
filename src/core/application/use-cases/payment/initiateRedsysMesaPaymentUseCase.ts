@@ -1,5 +1,6 @@
 import { Result, AppError } from '@/core/domain/entities/types';
 import { DELIVERY_ERRORS } from '@/core/domain/constants/api-errors';
+import { PAYMENT_LOCK_EXPIRY_MS } from '@/core/domain/constants/pedido';
 import {
   buildRedsysFormData,
   generatePaymentOrderRef,
@@ -145,7 +146,7 @@ export async function initiateRedsysMesaPaymentUseCase(
     if (!input.esDivision) {
       const pagoEnCurso = s['pago_en_curso'] as boolean;
       const pagoIniciadoEn = s['pago_iniciado_en'] as string | null;
-      const LOCK_EXPIRY_MS = 15 * 60 * 1000;
+      const LOCK_EXPIRY_MS = PAYMENT_LOCK_EXPIRY_MS;
       // Grace period: the UI pre-locks when the user clicks "Pagar", then calls this
       // use case after total verification. A fresh lock (< 5 min) = same client, let through.
       const GRACE_PERIOD_MS = 5 * 60 * 1000;

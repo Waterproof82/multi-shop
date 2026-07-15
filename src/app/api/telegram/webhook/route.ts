@@ -2,7 +2,7 @@ import { NextResponse, after } from 'next/server';
 import { z } from 'zod';
 import { answerCallbackQuery, editMessageText, editMessageReplyMarkup, buildTimeButtons, deleteMessage } from '@/core/infrastructure/services/telegram.service';
 
-const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
+const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET ?? '';
 
 const sanitizeMarkdown = (text: string): string =>
   text.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
@@ -20,12 +20,13 @@ const callbackQuerySchema = z.object({
 });
 
 export async function POST(request: Request) {
-  // Validate secret token from Telegram header
-  if (WEBHOOK_SECRET) {
-    const secretHeader = request.headers.get('X-Telegram-Bot-Api-Secret-Token');
-    if (secretHeader !== WEBHOOK_SECRET) {
-      return NextResponse.json({ ok: false }, { status: 401 });
-    }
+  // Validate secret token from Telegram header — fail-closed if secret is not configured
+  if (!WEBHOOK_SECRET) {
+    return NextResponse.json({ ok: false }, { status: 503 });
+  }
+  const secretHeader = request.headers.get('X-Telegram-Bot-Api-Secret-Token');
+  if (secretHeader !== WEBHOOK_SECRET) {
+    return NextResponse.json({ ok: false }, { status: 401 });
   }
 
   let body: unknown;
@@ -46,8 +47,8 @@ export async function POST(request: Request) {
   const modifyMatch = callbackData.match(/^modify:([0-9a-f-]{36})$/);
   if (modifyMatch) {
     const [, pedidoId] = modifyMatch;
-    const { pedidoRepository } = await import('@/core/infrastructure/database');
-    const readyAtResult = await pedidoRepository.findEstimatedReadyAtById(pedidoId);
+    const { getPedidoRepository } = await import('@/core/infrastructure/database');
+    const readyAtResult = await getPedidoRepository().findEstimatedReadyAtById(pedidoId);
     const estimatedReadyAt = readyAtResult.success ? readyAtResult.data : null;
     const isReady = estimatedReadyAt && new Date(estimatedReadyAt) <= new Date();
 
@@ -70,8 +71,8 @@ export async function POST(request: Request) {
   const modifyReplyMatch = callbackData.match(/^modify_reply:([0-9a-f-]{36})$/);
   if (modifyReplyMatch) {
     const [, pedidoId] = modifyReplyMatch;
-    const { pedidoRepository } = await import('@/core/infrastructure/database');
-    await pedidoRepository.updateStatusById(pedidoId, 'pendiente');
+    const { getPedidoRepository } = await import('@/core/infrastructure/database');
+    await getPedidoRepository().updateStatusById(pedidoId, 'pendiente');
     await answerCallbackQuery(callbackQueryId, 'Selecciona una respuesta');
     if (message) {
       const baseText = (message.text ?? '').replace(/\n\n[💬📞].+$/s, '');
@@ -106,8 +107,8 @@ export async function POST(request: Request) {
     const selectedText = action === 'soon'
       ? '💬 Te contestaremos lo más pronto posible'
       : '📞 Te llamamos ahora en cuanto tengamos un momento';
-    const { pedidoRepository } = await import('@/core/infrastructure/database');
-    await pedidoRepository.updateStatusById(pedidoId, action);
+    const { getPedidoRepository } = await import('@/core/infrastructure/database');
+    await getPedidoRepository().updateStatusById(pedidoId, action);
     await answerCallbackQuery(callbackQueryId, selectedText);
     if (message) {
       const baseText = (message.text ?? '').replace(/\n\n[💬📞].+$/s, '');
@@ -124,8 +125,8 @@ export async function POST(request: Request) {
   const entregadoMatch = callbackData.match(/^entregado:([0-9a-f-]{36}):(\d+)$/);
   if (entregadoMatch) {
     const [, pedidoId, minutesStr] = entregadoMatch;
-    const { pedidoRepository } = await import('@/core/infrastructure/database');
-    await pedidoRepository.updateStatusById(pedidoId, 'entregado');
+    const { getPedidoRepository } = await import('@/core/infrastructure/database');
+    await getPedidoRepository().updateStatusById(pedidoId, 'entregado');
     await answerCallbackQuery(callbackQueryId, '✅ Pedido entregado — eliminando en 5s');
     if (message) {
       const chatId = String(message.chat.id);
@@ -138,8 +139,8 @@ export async function POST(request: Request) {
       ]);
       after(async () => {
         await new Promise(resolve => setTimeout(resolve, 5000));
-        const { pedidoRepository: repo } = await import('@/core/infrastructure/database');
-        const statusResult = await repo.findStatusById(pedidoId);
+        const { getPedidoRepository: repo } = await import('@/core/infrastructure/database');
+        const statusResult = await repo().findStatusById(pedidoId);
         if (statusResult.success && statusResult.data === 'entregado') {
           await deleteMessage(chatId, messageId);
         }
@@ -153,8 +154,8 @@ export async function POST(request: Request) {
   if (cancelarEntregadoMatch) {
     const [, pedidoId, minutesStr] = cancelarEntregadoMatch;
     const minutes = parseInt(minutesStr, 10);
-    const { pedidoRepository } = await import('@/core/infrastructure/database');
-    await pedidoRepository.updateStatusById(pedidoId, 'pendiente');
+    const { getPedidoRepository } = await import('@/core/infrastructure/database');
+    await getPedidoRepository().updateStatusById(pedidoId, 'pendiente');
     await answerCallbackQuery(callbackQueryId, '↩️ Eliminación cancelada');
     if (message) {
       await editMessageReplyMarkup(String(message.chat.id), message.message_id, [
@@ -181,8 +182,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  const { pedidoRepository } = await import('@/core/infrastructure/database');
-  await pedidoRepository.updateEstimatedTime(pedidoId, minutes);
+  const { getPedidoRepository } = await import('@/core/infrastructure/database');
+  await getPedidoRepository().updateEstimatedTime(pedidoId, minutes);
   await answerCallbackQuery(callbackQueryId, `⏱ Tiempo fijado: ${minutes} minutos`);
 
   if (message) {

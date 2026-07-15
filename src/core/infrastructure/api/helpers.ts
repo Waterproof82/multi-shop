@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { Result } from '@/core/domain/entities/types';
 import { AUTH_ERRORS, createErrorResponse } from '@/core/domain/constants/api-errors';
+import { rateLimitAdmin } from './rate-limit';
 
 /**
  * Result type for requireAuth - returned from authentication middleware.
@@ -54,6 +56,10 @@ function errorCodeToStatus(code: string): number {
   if (code.startsWith('DEL_')) return 400;
   if (code.startsWith('GLV_') || code.startsWith('PAY_')) return 503;
   if (code.startsWith('DLV_')) return 422;
+  if (code.endsWith('_NOT_FOUND')) return 404;
+  if (code === 'COMPRAS_PROVEEDOR_HAS_TRANSACTIONS') return 409;
+  if (code === 'COMPRAS_FACTURA_YA_PAGADA' || code === 'COMPRAS_ALBARAN_YA_RECIBIDO') return 409;
+  if (code.startsWith('COMPRAS_') || code === 'SANIDAD_TRAZABILIDAD_REQUERIDA') return 422;
   return 500;
 }
 
@@ -75,6 +81,73 @@ export function handleResultWithStatus<T>(result: Result<T>, successStatus = 200
 // Helper to get empresaId from request headers
 export function getEmpresaIdFromRequest(request: NextRequest): string | null {
   return request.headers.get('x-empresa-id');
+}
+
+const empresaIdSchema = z.string().uuid();
+
+/**
+ * Unified admin context resolver — call this at the top of every admin route handler.
+ * Handles: rate limiting, authentication, role check (admin|superadmin), and
+ * empresaId resolution (including superadmin empresa override via query param).
+ *
+ * On success: returns { empresaId, isSuperAdmin, error: null }
+ * On failure: returns { error: NextResponse } — the caller must `return ctx.error`.
+ *
+ * Usage:
+ *   const ctx = await resolveAdminContext(request);
+ *   if (ctx.error) return ctx.error;
+ *   const { empresaId, isSuperAdmin } = ctx;
+ */
+export type AdminContext =
+  | { empresaId: string | null; isSuperAdmin: boolean; error: null }
+  | { empresaId: null; isSuperAdmin: boolean; error: NextResponse };
+
+export async function resolveAdminContext(request: NextRequest): Promise<AdminContext> {
+  const rateLimited = await rateLimitAdmin(request);
+  if (rateLimited) return { empresaId: null, isSuperAdmin: false, error: rateLimited };
+
+  const { empresaId: authEmpresaId, error: authError, isSuperAdmin = false } = await requireAuth(request);
+  if (authError) return { empresaId: null, isSuperAdmin, error: authError };
+
+  const roleError = requireRole(request, ['admin', 'superadmin']);
+  if (roleError) return { empresaId: null, isSuperAdmin, error: roleError };
+
+  const queryEmpresaId = new URL(request.url).searchParams.get('empresaId');
+  const resolvedEmpresaId = isSuperAdmin && queryEmpresaId
+    ? (empresaIdSchema.safeParse(queryEmpresaId).data ?? authEmpresaId)
+    : authEmpresaId;
+
+  return { empresaId: resolvedEmpresaId, isSuperAdmin, error: null };
+}
+
+/**
+ * Variant of resolveAdminContext that additionally requires a non-null empresaId.
+ * Use this on tenant-scoped admin routes where acting without a specific empresa makes no sense.
+ * Returns 400 if the caller is a superadmin who did not provide ?empresaId=.
+ *
+ * On success: returns { empresaId: string (never null), isSuperAdmin, error: null }
+ * On failure: returns { error: NextResponse } — the caller must `return ctx.error`.
+ *
+ * Usage:
+ *   const ctx = await resolveAdminContextWithEmpresa(request);
+ *   if (ctx.error) return ctx.error;
+ *   const { empresaId } = ctx; // empresaId is string, never null
+ */
+export type AdminContextWithEmpresa =
+  | { empresaId: string; isSuperAdmin: boolean; error: null }
+  | { empresaId: null; isSuperAdmin: boolean; error: NextResponse };
+
+export async function resolveAdminContextWithEmpresa(request: NextRequest): Promise<AdminContextWithEmpresa> {
+  const ctx = await resolveAdminContext(request);
+  if (ctx.error) return ctx;
+  if (!ctx.empresaId) {
+    return {
+      empresaId: null,
+      isSuperAdmin: ctx.isSuperAdmin,
+      error: NextResponse.json({ error: 'Se requiere empresaId' }, { status: 400 }),
+    };
+  }
+  return { empresaId: ctx.empresaId, isSuperAdmin: ctx.isSuperAdmin, error: null };
 }
 
 /**

@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { sendEmail } from '@/lib/brevo-email';
-import { empresaUseCase } from '@/core/infrastructure/database';
-import { requireAuth, requireRole } from '@/core/infrastructure/api/helpers';
-import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
+import { getEmpresaUseCase } from '@/core/infrastructure/database';
+import { resolveAdminContextWithEmpresa } from '@/core/infrastructure/api/helpers';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
 import { escapeHtml } from '@/lib/html-utils';
 
@@ -126,15 +125,11 @@ function generateOrderEmail(items: OrderItem[], total: number, empresaNombre: st
 
 export async function POST(request: NextRequest) {
   try {
-    const rateLimited = await rateLimitAdmin(request);
-    if (rateLimited) return rateLimited;
+    const ctx = await resolveAdminContextWithEmpresa(request);
+    if (ctx.error) return ctx.error;
+    const { empresaId } = ctx;
 
-    const { empresaId, error: authError } = await requireAuth(request);
-    if (authError) return authError;
-    const roleError = requireRole(request, ['admin', 'superadmin']);
-    if (roleError) return roleError;
-
-    const empresaResult = await empresaUseCase.getById(empresaId!);
+    const empresaResult = await getEmpresaUseCase().getById(empresaId);
 
     if (!empresaResult.success) {
       return NextResponse.json({ error: empresaResult.error.message }, { status: 500 });

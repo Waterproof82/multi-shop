@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authAdminUseCase } from '@/core/infrastructure/database';
+import { z } from 'zod';
+import { getAuthAdminUseCase } from '@/core/infrastructure/database';
 import { cookies } from 'next/headers';
 
 export async function GET(request: NextRequest) {
@@ -10,18 +11,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/admin/login', request.url));
   }
 
-  const admin = await authAdminUseCase.verifyToken(token);
+  const admin = await getAuthAdminUseCase().verifyToken(token);
 
   if (!admin || admin.rol !== 'superadmin') {
     return NextResponse.redirect(new URL('/superadmin', request.url));
   }
 
   const { searchParams } = new URL(request.url);
-  const empresaId = searchParams.get('empresaId');
+  const rawEmpresaId = searchParams.get('empresaId');
+  const parsed = z.string().uuid().safeParse(rawEmpresaId);
 
-  if (!empresaId) {
+  if (!parsed.success) {
     return NextResponse.redirect(new URL('/superadmin', request.url));
   }
+
+  const empresaId = parsed.data;
 
   const response = NextResponse.redirect(new URL('/admin', request.url));
   

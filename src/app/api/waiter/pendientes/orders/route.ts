@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { pedidoRepository } from '@/core/infrastructure/database';
+import { getPedidoRepository } from '@/core/infrastructure/database';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 
-  const result = await pedidoRepository.findPendientesValidacion(empresaId);
+  const result = await getPedidoRepository().findPendientesValidacion(empresaId);
   if (!result.success) {
     return NextResponse.json({ error: 'Error al obtener pedidos pendientes' }, { status: 500 });
   }

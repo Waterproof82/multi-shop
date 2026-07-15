@@ -9,6 +9,13 @@ import {
   TpvAnalytics,
   GetAnalyticsParams,
   TpvTurnoResumen,
+  TipoEventoTurno,
+  TpvTurnoEvento,
+  TpvMovimientoCajaPayload,
+  InformeZData,
+  InformeZDesglosePago,
+  MetodoPago,
+  TipoImpuesto,
 } from '@/core/domain/entities/tpv-types';
 import { Result } from '@/core/domain/entities/types';
 import { logger } from '../logging/logger';
@@ -23,10 +30,26 @@ function mapRow(row: Record<string, unknown>): TpvTurno {
     cierreAt: row.cierre_at as string | null,
     efectivoAperturaCents: row.efectivo_apertura_cents as number,
     efectivoCierreCents: row.efectivo_cierre_cents as number | null,
+    efectivoCierreTeoricoCents: row.efectivo_cierre_teorico_cents as number | null,
     totalEfectivoCents: row.total_efectivo_cents as number,
     totalTarjetaCents: row.total_tarjeta_cents as number,
     diferenciaCents: row.diferencia_cents as number | null,
     requiereRevision: row.requiere_revision as boolean,
+    hashEncadenado: row.hash_encadenado as string | null,
+    empleadoCierreId: row.empleado_cierre_id as string | null,
+    createdAt: row.created_at as string,
+  };
+}
+
+function mapEvento(row: Record<string, unknown>): TpvTurnoEvento {
+  return {
+    id: row.id as string,
+    turnoId: row.turno_id as string,
+    empresaId: row.empresa_id as string,
+    tipoEvento: row.tipo_evento as TipoEventoTurno,
+    empleadoId: row.empleado_id as string | null,
+    montoCents: row.monto_cents as number | null,
+    descripcion: row.descripcion as string | null,
     createdAt: row.created_at as string,
   };
 }
@@ -76,6 +99,8 @@ export class SupabaseTpvRepository implements ITpvRepository {
   }): Promise<Result<TpvTurno>> {
     try {
       const supabase = getSupabaseClient();
+      // El trigger BEFORE INSERT calcula hash_encadenado.
+      // El trigger AFTER INSERT inserta el evento 'apertura' en la misma transacción.
       const { data, error } = await supabase
         .from('tpv_turnos')
         .insert({
@@ -99,11 +124,7 @@ export class SupabaseTpvRepository implements ITpvRepository {
     } catch (e) {
       return {
         success: false,
-        error: await logger.logFromCatch(
-          e,
-          'repository',
-          'abrirTurno'
-        ),
+        error: await logger.logFromCatch(e, 'repository', 'abrirTurno'),
       };
     }
   }
@@ -111,16 +132,23 @@ export class SupabaseTpvRepository implements ITpvRepository {
   async cerrarTurno(params: {
     turnoId: string;
     efectivoCierreCents: number;
+    efectivoCierreTeoricoCents: number;
     diferenciaCents: number;
+    empleadoCierreId?: string;
   }): Promise<Result<void>> {
     try {
       const supabase = getSupabaseClient();
+      // El trigger AFTER UPDATE inserta los eventos 'cierre' y 'descuadre' (si aplica)
+      // en la misma transacción. Si falla la inserción del evento, el UPDATE se revierte.
+      // empleado_cierre_id queda grabado en la fila del turno y lo lee el trigger.
       const { error } = await supabase
         .from('tpv_turnos')
         .update({
           cierre_at: new Date().toISOString(),
           efectivo_cierre_cents: params.efectivoCierreCents,
+          efectivo_cierre_teorico_cents: params.efectivoCierreTeoricoCents,
           diferencia_cents: params.diferenciaCents,
+          empleado_cierre_id: params.empleadoCierreId ?? null,
         })
         .eq('id', params.turnoId)
         .is('cierre_at', null);
@@ -136,11 +164,7 @@ export class SupabaseTpvRepository implements ITpvRepository {
     } catch (e) {
       return {
         success: false,
-        error: await logger.logFromCatch(
-          e,
-          'repository',
-          'cerrarTurno'
-        ),
+        error: await logger.logFromCatch(e, 'repository', 'cerrarTurno'),
       };
     }
   }
@@ -215,6 +239,7 @@ export class SupabaseTpvRepository implements ITpvRepository {
           descuento_cents: payload.descuentoCents ?? 0,
           iva_porcentaje: payload.ivaPorcentaje ?? 10,
           rectifica_cobro_id: payload.rectificaCobroId ?? null,
+          detalle_items: payload.detalleItems ?? null,
         })
         .select()
         .single();
@@ -258,6 +283,7 @@ export class SupabaseTpvRepository implements ITpvRepository {
           hash: row.hash as string,
           cobradoAt: row.cobrado_at as string,
           rectificaCobroId: row.rectifica_cobro_id as string | null ?? null,
+          detalleItems: (row.detalle_items as TpvCobro['detalleItems']) ?? null,
         },
       };
     } catch (e) {
@@ -268,24 +294,36 @@ export class SupabaseTpvRepository implements ITpvRepository {
   async getTurnoStats(turnoId: string): Promise<Result<TpvTurnoStats>> {
     try {
       const supabase = getSupabaseClient();
+
       const { data, error } = await supabase
         .from('tpv_turnos')
-        .select('total_efectivo_cents, total_tarjeta_cents')
+        .select('total_efectivo_cents, total_tarjeta_cents, efectivo_apertura_cents')
         .eq('id', turnoId)
         .single();
 
       if (error) {
         return {
           success: false,
-          error: await logger.logFromCatch(
-            error,
-            'repository',
-            'getTurnoStats'
-          ),
+          error: await logger.logFromCatch(error, 'repository', 'getTurnoStats'),
         };
       }
 
       const row = data as Record<string, unknown>;
+
+      // Sumar movimientos de caja del turno para calcular el teórico correcto al cierre.
+      // Teórico = fondo apertura + ventas efectivo + Σ entradas - Σ salidas
+      const { data: movs } = await supabase
+        .from('tpv_turno_eventos')
+        .select('tipo_evento, monto_cents')
+        .eq('turno_id', turnoId)
+        .in('tipo_evento', ['entrada_caja', 'salida_caja']);
+
+      let movimientosNetoCents = 0;
+      for (const m of (movs ?? []) as { tipo_evento: string; monto_cents: number | null }[]) {
+        movimientosNetoCents += m.tipo_evento === 'entrada_caja'
+          ? (m.monto_cents ?? 0)
+          : -(m.monto_cents ?? 0);
+      }
 
       return {
         success: true,
@@ -293,16 +331,74 @@ export class SupabaseTpvRepository implements ITpvRepository {
           totalEfectivoCents: row.total_efectivo_cents as number,
           totalTarjetaCents: row.total_tarjeta_cents as number,
           numOperaciones: 0,
+          efectivoAperturaCents: row.efectivo_apertura_cents as number,
+          movimientosNetoCents,
         },
       };
     } catch (e) {
       return {
         success: false,
-        error: await logger.logFromCatch(
-          e,
-          'repository',
-          'getTurnoStats'
-        ),
+        error: await logger.logFromCatch(e, 'repository', 'getTurnoStats'),
+      };
+    }
+  }
+
+  async registrarMovimientoCaja(payload: TpvMovimientoCajaPayload): Promise<Result<TpvTurnoEvento>> {
+    try {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase
+        .from('tpv_turno_eventos')
+        .insert({
+          turno_id: payload.turnoId,
+          empresa_id: payload.empresaId,
+          tipo_evento: payload.tipoEvento,
+          empleado_id: payload.empleadoId ?? null,
+          monto_cents: payload.montoCents,
+          descripcion: payload.descripcion,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        return {
+          success: false,
+          error: await logger.logFromCatch(error, 'repository', 'registrarMovimientoCaja'),
+        };
+      }
+
+      return { success: true, data: mapEvento(data as Record<string, unknown>) };
+    } catch (e) {
+      return {
+        success: false,
+        error: await logger.logFromCatch(e, 'repository', 'registrarMovimientoCaja'),
+      };
+    }
+  }
+
+  async getMovimientosCaja(turnoId: string): Promise<Result<TpvTurnoEvento[]>> {
+    try {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase
+        .from('tpv_turno_eventos')
+        .select('*')
+        .eq('turno_id', turnoId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        return {
+          success: false,
+          error: await logger.logFromCatch(error, 'repository', 'getMovimientosCaja'),
+        };
+      }
+
+      return {
+        success: true,
+        data: ((data ?? []) as Record<string, unknown>[]).map(mapEvento),
+      };
+    } catch (e) {
+      return {
+        success: false,
+        error: await logger.logFromCatch(e, 'repository', 'getMovimientosCaja'),
       };
     }
   }
@@ -381,14 +477,20 @@ export class SupabaseTpvRepository implements ITpvRepository {
       }));
 
       // Query 4: top productos (JSONB expansion via RPC)
-      const { data: topData, error: topErr } = await supabase.rpc('tpv_analytics_top_productos', {
-        p_empresa_id: empresaId,
-        p_desde: desde,
-        p_hasta: hasta,
-      });
+      // Query 5: heatmap (parallel with top productos)
+      const [
+        { data: topData, error: topErr },
+        { data: heatmapData, error: heatmapErr },
+      ] = await Promise.all([
+        supabase.rpc('tpv_analytics_top_productos', { p_empresa_id: empresaId, p_desde: desde, p_hasta: hasta }),
+        supabase.rpc('tpv_analytics_heatmap',       { p_empresa_id: empresaId, p_desde: desde, p_hasta: hasta }),
+      ]);
 
       if (topErr) {
         return { success: false, error: await logger.logFromCatch(topErr, 'repository', 'getAnalytics/top') };
+      }
+      if (heatmapErr) {
+        return { success: false, error: await logger.logFromCatch(heatmapErr, 'repository', 'getAnalytics/heatmap') };
       }
 
       const numCobros = Number(kpi.num_cobros ?? 0);
@@ -416,6 +518,8 @@ export class SupabaseTpvRepository implements ITpvRepository {
           splitEfectivoCents: Number(kpi.efectivo ?? 0),
           splitTarjetaCents: Number(kpi.tarjeta ?? 0),
           ventasPorHora,
+          heatmap: ((heatmapData as { dow: number; hora: number; total_cents: number }[] | null) ?? [])
+            .map(r => ({ dow: r.dow, hora: r.hora, totalCents: Number(r.total_cents) })),
           topProductos: ((topData as { nombre: string; cantidad: number }[] | null) ?? []),
           historialTurnos,
           numTurnos: historialTurnos.length,
@@ -424,6 +528,120 @@ export class SupabaseTpvRepository implements ITpvRepository {
       };
     } catch (e) {
       return { success: false, error: await logger.logFromCatch(e, 'repository', 'getAnalytics') };
+    }
+  }
+
+  async getInformeZ(turnoId: string, empresaId: string): Promise<Result<InformeZData>> {
+    try {
+      const supabase = getSupabaseClient();
+
+      const [turnoRes, cobrosRes, eventosRes] = await Promise.all([
+        supabase
+          .from('tpv_turnos')
+          .select(`
+            id,
+            numero_z,
+            operador_nombre,
+            apertura_at,
+            cierre_at,
+            hash_encadenado,
+            efectivo_apertura_cents,
+            efectivo_cierre_cents,
+            efectivo_cierre_teorico_cents,
+            diferencia_cents,
+            empresas!tpv_turnos_empresa_id_fkey (
+              nombre,
+              nif,
+              tipo_impuesto
+            )
+          `)
+          .eq('id', turnoId)
+          .eq('empresa_id', empresaId)
+          .single(),
+
+        supabase
+          .from('tpv_cobros')
+          .select('base_imponible_cents, iva_cents, propina_cents, importe_cobrado_cents, metodo_pago')
+          .eq('turno_id', turnoId)
+          .eq('empresa_id', empresaId)
+          .is('rectifica_cobro_id', null),
+
+        supabase
+          .from('tpv_turno_eventos')
+          .select('*')
+          .eq('turno_id', turnoId)
+          .order('created_at', { ascending: true }),
+      ]);
+
+      if (turnoRes.error) {
+        return { success: false, error: await logger.logFromCatch(turnoRes.error, 'repository', 'getInformeZ/turno') };
+      }
+      if (!turnoRes.data) {
+        return { success: false, error: await logger.logFromCatch(new Error('Turno not found'), 'repository', 'getInformeZ') };
+      }
+      if (cobrosRes.error) {
+        return { success: false, error: await logger.logFromCatch(cobrosRes.error, 'repository', 'getInformeZ/cobros') };
+      }
+      if (eventosRes.error) {
+        return { success: false, error: await logger.logFromCatch(eventosRes.error, 'repository', 'getInformeZ/eventos') };
+      }
+
+      const turno = turnoRes.data as Record<string, unknown>;
+      const empresaRaw = turno.empresas;
+      const empresa = (Array.isArray(empresaRaw) ? empresaRaw[0] : empresaRaw) as Record<string, unknown> | null;
+      const cobros = (cobrosRes.data ?? []) as { base_imponible_cents: number | null; iva_cents: number | null; propina_cents: number | null; importe_cobrado_cents: number | null; metodo_pago: string }[];
+      const eventos = (eventosRes.data ?? []) as Record<string, unknown>[];
+
+      let totalFacturadoCents = 0;
+      let baseImponibleCents = 0;
+      let ivaCents = 0;
+      let propinaCents = 0;
+      const pagoMap = new Map<string, { totalCents: number; numOperaciones: number }>();
+
+      for (const c of cobros) {
+        totalFacturadoCents += c.importe_cobrado_cents ?? 0;
+        baseImponibleCents += c.base_imponible_cents ?? 0;
+        ivaCents += c.iva_cents ?? 0;
+        propinaCents += c.propina_cents ?? 0;
+        const prev = pagoMap.get(c.metodo_pago) ?? { totalCents: 0, numOperaciones: 0 };
+        pagoMap.set(c.metodo_pago, {
+          totalCents: prev.totalCents + (c.importe_cobrado_cents ?? 0),
+          numOperaciones: prev.numOperaciones + 1,
+        });
+      }
+
+      const desglosePagos: InformeZDesglosePago[] = Array.from(pagoMap.entries()).map(([metodoPago, v]) => ({
+        metodoPago: metodoPago as MetodoPago,
+        totalCents: v.totalCents,
+        numOperaciones: v.numOperaciones,
+      }));
+
+      const informeZ: InformeZData = {
+        turnoId: turno.id as string,
+        numeroZ: (turno.numero_z as number) ?? 0,
+        operadorNombre: (turno.operador_nombre as string) ?? '',
+        aperturaAt: turno.apertura_at as string,
+        cierreAt: (turno.cierre_at as string) ?? '',
+        hashEncadenado: (turno.hash_encadenado as string) ?? '',
+        empresaNombre: (empresa?.nombre as string) ?? '',
+        empresaNif: (empresa?.nif as string | null) ?? null,
+        tipoImpuesto: ((empresa?.tipo_impuesto as string) ?? 'iva') as TipoImpuesto,
+        efectivoAperturaCents: (turno.efectivo_apertura_cents as number) ?? 0,
+        efectivoCierreCents: (turno.efectivo_cierre_cents as number) ?? 0,
+        efectivoCierreTeoricoCents: (turno.efectivo_cierre_teorico_cents as number) ?? 0,
+        diferenciaCents: (turno.diferencia_cents as number) ?? 0,
+        totalFacturadoCents,
+        baseImponibleCents,
+        ivaCents,
+        propinaCents,
+        numCobros: cobros.length,
+        desglosePagos,
+        movimientos: eventos.map(mapEvento),
+      };
+
+      return { success: true, data: informeZ };
+    } catch (err) {
+      return { success: false, error: await logger.logFromCatch(err, 'repository', 'getInformeZ', { details: { sesionId: turnoId } }) };
     }
   }
 }

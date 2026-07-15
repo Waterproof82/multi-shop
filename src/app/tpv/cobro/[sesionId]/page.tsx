@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
-import { authAdminUseCase } from '@/core/infrastructure/database';
+import { getAuthAdminUseCase } from '@/core/infrastructure/database';
 import { verifyTpvEmployeeToken } from '@/lib/tpv-employee-auth';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { CobroFlow } from '@/components/tpv/cobro/CobroFlow';
@@ -19,7 +19,7 @@ export default async function CobroPage({ params, searchParams }: Readonly<Props
 
   const adminToken = cookieStore.get('admin_token')?.value;
   if (adminToken) {
-    const admin = await authAdminUseCase.verifyToken(adminToken);
+    const admin = await getAuthAdminUseCase().verifyToken(adminToken);
     if (admin?.empresaId) {
       empresaId = admin.empresaId;
       operadorNombre = admin.nombreCompleto ?? 'Operador';

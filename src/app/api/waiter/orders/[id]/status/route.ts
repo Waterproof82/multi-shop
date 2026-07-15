@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { pedidoRepository } from '@/core/infrastructure/database';
+import { getPedidoRepository } from '@/core/infrastructure/database';
 
 const bodySchema = z.object({
   estado: z.enum(['pendiente', 'anotado', 'preparado', 'servido']),
@@ -29,7 +29,7 @@ export async function PATCH(
     return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
   }
 
-  const result = await pedidoRepository.updateStatusById(id, parsed.data.estado);
+  const result = await getPedidoRepository().updateStatusById(id, parsed.data.estado);
   if (!result.success) {
     return NextResponse.json({ error: 'Error al actualizar estado' }, { status: 500 });
   }

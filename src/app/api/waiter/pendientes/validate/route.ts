@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { pedidoRepository } from '@/core/infrastructure/database';
+import { getPedidoRepository } from '@/core/infrastructure/database';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { pedidoId, retainIndices, pausedIndices } = parsed.data;
-  const result = await pedidoRepository.validatePedido(empresaId, pedidoId, retainIndices, pausedIndices);
+  const result = await getPedidoRepository().validatePedido(empresaId, pedidoId, retainIndices, pausedIndices);
 
   if (!result.success) {
     if (result.error.code === 'NOT_FOUND') {

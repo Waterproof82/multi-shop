@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { tgtgUseCase } from '@/core/infrastructure/database';
+import { getTgtgUseCase } from '@/core/infrastructure/database';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 import { logApiError } from '@/core/infrastructure/api/api-logger';
 import { generateReservaToken } from '@/lib/reserva-token';
@@ -32,7 +32,7 @@ export async function GET(
   const { email, promoId } = parsed.data;
 
   try {
-    const itemResult = await tgtgUseCase.getPublicItem(itemId);
+    const itemResult = await getTgtgUseCase().getPublicItem(itemId);
     if (!itemResult.success) {
       return NextResponse.json({ error: 'Error al obtener oferta' }, { status: 500 });
     }
@@ -51,7 +51,7 @@ export async function GET(
     }
 
     // Verify pickup window hasn't passed
-    const promoResult = await tgtgUseCase.getPublicPromo(promoId);
+    const promoResult = await getTgtgUseCase().getPublicPromo(promoId);
     if (promoResult.success && promoResult.data) {
       const promo = promoResult.data;
       const promoDate = promo.fechaActivacion || new Date(promo.createdAt).toISOString().split('T')[0];
