@@ -1,0 +1,118 @@
+name: Claude Agent
+
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  claude-developer:
+    name: Claude Agent Run
+    # Se activa si etiquetas una issue con "claude" o si comentas escribiendo "@claude ..."
+    if: |
+      (github.event_name == 'issues' && github.event.label.name == 'claude') ||
+      (github.event_name == 'issue_comment' && startsWith(github.event.comment.body, '@claude'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Requerido para que el MCP de Playwright pueda levantar navegadores reales en el servidor
+      - name: Install Playwright Browsers and Deps
+        run: npx playwright install --with-deps
+
+      - name: Configure Git Bot
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Run Claude Agent with MCPs
+        env:
+          # Clave de IA (Solo Anthropic)
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Entorno para el MCP de Supabase
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          # Token de GitHub para abrir el PR
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 1. Extraer el texto de la Issue o del comentario
+          if [ "${{ github.event_name }}" = "issues" ]; then
+            INSTRUCTION="${{ github.event.issue.body }}"
+            ISSUE_NUMBER="${{ github.event.issue.number }}"
+            ISSUE_TITLE="${{ github.event.issue.title }}"
+          else
+            INSTRUCTION="${{ github.event.comment.body }}"
+            ISSUE_NUMBER="${{ github.event.issue.number }}"
+            ISSUE_TITLE="${{ github.event.issue.title }}"
+          fi
+
+          CLEAN_INSTRUCTION=$(echo "$INSTRUCTION" | sed 's/^@claude //i')
+
+          # 2. Crear una rama dedicada
+          BRANCH_NAME="claude/issue-${ISSUE_NUMBER}"
+          git checkout -b "$BRANCH_NAME"
+
+          # 3. Ejecutar la tarea usando Claude Code y los MCPs activos del proyecto
+          echo "Iniciando ciclo de desarrollo autónomo con Claude..."
+          
+          PROMPT="Instrucciones: $CLEAN_INSTRUCTION. 
+          
+          Reglas de ejecución:
+          1. Modifica el código necesario para cumplir con la tarea.
+          2. Usa el MCP de Supabase si necesitas validar esquemas o datos de prueba.
+          3. Levanta Playwright para ejecutar los tests de interfaz y asegurar que la vista compila y funciona visualmente.
+          4. Si algo falla, corrígelo antes de terminar."
+
+          npx -y @anthropic-ai/claude-code --non-interactive "$PROMPT"
+
+          # 4. Si hay cambios físicos en el código, subimos la rama y abrimos PR
+          if [ -n "$(git status --porcelain)" ]; then
+            git add .
+            git commit -m "claude: resuelve #${ISSUE_NUMBER} - ${ISSUE_TITLE}"
+            git push origin "$BRANCH_NAME" --force
+
+            # Generamos el reporte de herramientas en la descripción del PR
+            PR_BODY="### 🤖 PR generado por Claude Agent
+            
+            Este Pull Request soluciona la issue #${ISSUE_NUMBER} de forma autónoma.
+            
+            **Herramientas utilizadas en este ciclo:**
+            *   **Claude Code**: Planificación y desarrollo autónomo.
+            *   **Playwright MCP**: Pruebas de integración visual de la interfaz de usuario.
+            *   **Supabase MCP**: Validación de base de datos e integración backend.
+            
+            _Revisado y listo para mergear desde tu móvil. 🟢_"
+
+            gh pr create \
+              --title "claude: resuelve #${ISSUE_NUMBER}" \
+              --body "$PR_BODY" \
+              --head "$BRANCH_NAME" \
+              --base main
+          else
+            echo "No se generaron cambios físicos en el código."
+          fi
