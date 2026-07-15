@@ -10,6 +10,7 @@ import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import type { AlbaranCompra, CatalogoCompraItem, PorcentajeIva } from '@/core/domain/entities/compras-types';
+import { albaranEstadoClass } from '../../compras-utils';
 
 const IVA_OPTIONS: PorcentajeIva[] = [0, 4, 10, 21];
 
@@ -120,7 +121,7 @@ export default function AlbaranDetailPage({ params }: Readonly<{ params: Promise
   };
 
   const handleRecibir = async () => {
-    if (!confirm('¿Marcar este albarán como recibido? Esta acción es irreversible.')) return;
+    if (!confirm(t('comprasConfirmarRecibirAlbaran', language))) return;
     setSaving(true);
     setError('');
     try {
@@ -150,8 +151,8 @@ export default function AlbaranDetailPage({ params }: Readonly<{ params: Promise
 
   if (!albaran) {
     return (
-      <div className="text-center text-slate-400 py-16">
-        {error || 'Albarán no encontrado'}
+      <div className="text-center text-muted-foreground py-16">
+        {error || t('comprasAlbaranNoEncontrado', language)}
       </div>
     );
   }
@@ -165,19 +166,19 @@ export default function AlbaranDetailPage({ params }: Readonly<{ params: Promise
       <div className="flex items-center gap-4 flex-wrap">
         <Link
           href="/admin/compras/albaranes"
-          className="p-2 text-slate-400 hover:text-white rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 min-h-[44px] min-w-[44px] inline-flex items-center justify-center transition-colors"
-          aria-label="Volver a albaranes"
+          className="p-2 text-muted-foreground hover:text-foreground rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px] min-w-[44px] inline-flex items-center justify-center transition-colors"
+          aria-label={t('comprasVolverAAlbaranes', language)}
         >
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-bold text-white font-mono">{albaran.numeroAlbaran}</h1>
-            <span className={`inline-flex px-2 py-0.5 rounded-full border text-xs font-medium ${isDraft ? 'bg-yellow-500/20 border-yellow-400/30 text-yellow-300' : 'bg-emerald-500/20 border-emerald-400/30 text-emerald-300'}`}>
+            <h1 className="text-2xl font-bold text-foreground font-mono">{albaran.numeroAlbaran}</h1>
+            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${albaranEstadoClass(albaran.estado)}`}>
               {isDraft ? t('comprasEstadoBorrador', language) : t('comprasEstadoRecibido', language)}
             </span>
           </div>
-          <p className="text-slate-400 text-sm mt-1">{albaran.proveedorNombre}</p>
+          <p className="text-muted-foreground text-sm mt-1">{albaran.proveedorNombre}</p>
         </div>
         {isDraft && (
           <Button onClick={handleRecibir} disabled={saving}>
@@ -200,9 +201,9 @@ export default function AlbaranDetailPage({ params }: Readonly<{ params: Promise
         </div>
       )}
 
-      <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
-          <h2 className="text-sm font-medium text-slate-300 uppercase">Ítems del albarán</h2>
+      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+          <h2 className="text-sm font-medium text-muted-foreground uppercase">{t('comprasItemsAlbaran', language)}</h2>
           {isDraft && (
             <Button variant="outline" onClick={() => setShowAddItem(!showAddItem)}>
               <Plus className="h-4 w-4" />
@@ -212,11 +213,11 @@ export default function AlbaranDetailPage({ params }: Readonly<{ params: Promise
         </div>
 
         {isDraft && showAddItem && (
-          <form onSubmit={handleAddItem} className="px-4 py-4 border-b border-white/10 bg-white/5 space-y-3">
+          <form onSubmit={handleAddItem} className="px-4 py-4 border-b border-border bg-muted/30 space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="sm:col-span-2">
-                <label htmlFor="item-catalogo" className="block text-xs font-medium text-slate-300 mb-1">
-                  Artículo <span className="text-destructive" aria-hidden="true">*</span>
+                <label htmlFor="item-catalogo" className="block text-xs font-medium text-muted-foreground mb-1">
+                  {t('comprasArticulo', language)} <span className="text-destructive" aria-hidden="true">*</span>
                 </label>
                 <select
                   id="item-catalogo"
@@ -226,18 +227,18 @@ export default function AlbaranDetailPage({ params }: Readonly<{ params: Promise
                   aria-label="Seleccionar artículo del catálogo"
                   className="w-full px-3 py-2 rounded-md border border-border bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                 >
-                  <option value="">Seleccionar artículo...</option>
+                  <option value="">{t('comprasSeleccionarArticulo', language)}</option>
                   {catalogo.map((item) => (
                     <option key={item.id} value={item.id}>
-                      {item.ingredienteNombre} {item.esPerecedero ? '⚠ perecedero' : ''}
+                      {item.ingredienteNombre} {item.esPerecedero ? t('comprasPerecedero', language) : ''}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label htmlFor="item-cantidad" className="block text-xs font-medium text-slate-300 mb-1">
-                  Cantidad recibida <span className="text-destructive" aria-hidden="true">*</span>
+                <label htmlFor="item-cantidad" className="block text-xs font-medium text-muted-foreground mb-1">
+                  {t('comprasCantRecibida', language)} <span className="text-destructive" aria-hidden="true">*</span>
                 </label>
                 <Input
                   id="item-cantidad"
@@ -251,8 +252,8 @@ export default function AlbaranDetailPage({ params }: Readonly<{ params: Promise
               </div>
 
               <div>
-                <label htmlFor="item-precio" className="block text-xs font-medium text-slate-300 mb-1">
-                  Precio (€) <span className="text-destructive" aria-hidden="true">*</span>
+                <label htmlFor="item-precio" className="block text-xs font-medium text-muted-foreground mb-1">
+                  {t('price', language)} (€) <span className="text-destructive" aria-hidden="true">*</span>
                 </label>
                 <Input
                   id="item-precio"
@@ -266,8 +267,8 @@ export default function AlbaranDetailPage({ params }: Readonly<{ params: Promise
               </div>
 
               <div>
-                <label htmlFor="item-iva" className="block text-xs font-medium text-slate-300 mb-1">
-                  IVA (%) <span className="text-destructive" aria-hidden="true">*</span>
+                <label htmlFor="item-iva" className="block text-xs font-medium text-muted-foreground mb-1">
+                  {t('comprasIva', language)} (%) <span className="text-destructive" aria-hidden="true">*</span>
                 </label>
                 <select
                   id="item-iva"
@@ -286,7 +287,7 @@ export default function AlbaranDetailPage({ params }: Readonly<{ params: Promise
               {isPerecedero && (
                 <>
                   <div>
-                    <label htmlFor="item-lote" className="block text-xs font-medium text-slate-300 mb-1">
+                    <label htmlFor="item-lote" className="block text-xs font-medium text-muted-foreground mb-1">
                       {t('comprasNumeroLote', language)} <span className="text-destructive" aria-hidden="true">*</span>
                     </label>
                     <Input
@@ -299,7 +300,7 @@ export default function AlbaranDetailPage({ params }: Readonly<{ params: Promise
                     />
                   </div>
                   <div>
-                    <label htmlFor="item-caducidad" className="block text-xs font-medium text-slate-300 mb-1">
+                    <label htmlFor="item-caducidad" className="block text-xs font-medium text-muted-foreground mb-1">
                       {t('comprasFechaCaducidad', language)} <span className="text-destructive" aria-hidden="true">*</span>
                     </label>
                     <input
@@ -335,33 +336,33 @@ export default function AlbaranDetailPage({ params }: Readonly<{ params: Promise
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-white/5 border-b border-border">
+            <thead className="bg-muted/50 border-b border-border">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">Ingrediente</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">Cant. recibida</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">Precio</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">IVA</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">Lote</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">Caducidad</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t('comprasIngrediente', language)}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t('comprasCantRecibida', language)}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t('price', language)}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t('comprasIva', language)}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t('comprasLote', language)}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t('comprasCaducidad', language)}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/10">
+            <tbody className="divide-y divide-border">
               {(albaran.items ?? []).map((item) => (
-                <tr key={item.id} className="hover:bg-white/5 transition-colors">
-                  <td className="px-4 py-3 text-white">{item.ingredienteNombre ?? '—'}</td>
-                  <td className="px-4 py-3 text-slate-300">{item.cantidadRecibida} {item.unidadCompra}</td>
-                  <td className="px-4 py-3 text-slate-300">{formatEuros(item.precioCompraCents)}</td>
-                  <td className="px-4 py-3 text-slate-300">{item.porcentajeIva}%</td>
-                  <td className="px-4 py-3 text-slate-300">{item.numeroLote ?? '—'}</td>
-                  <td className="px-4 py-3 text-slate-300">
+                <tr key={item.id} className="hover:bg-muted/50 transition-colors">
+                  <td className="px-4 py-3 text-foreground">{item.ingredienteNombre ?? '—'}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{item.cantidadRecibida} {item.unidadCompra}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{formatEuros(item.precioCompraCents)}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{item.porcentajeIva}%</td>
+                  <td className="px-4 py-3 text-muted-foreground">{item.numeroLote ?? '—'}</td>
+                  <td className="px-4 py-3 text-muted-foreground">
                     {item.fechaCaducidad ? new Date(item.fechaCaducidad).toLocaleDateString() : '—'}
                   </td>
                 </tr>
               ))}
               {(albaran.items ?? []).length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-slate-400">
-                    Sin ítems todavía
+                  <td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">
+                    {t('comprasSinItems', language)}
                   </td>
                 </tr>
               )}

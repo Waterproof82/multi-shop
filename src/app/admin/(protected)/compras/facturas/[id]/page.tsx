@@ -9,6 +9,7 @@ import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import type { FacturaProveedor, EstadoPago } from '@/core/domain/entities/compras-types';
+import { estadoPagoClass } from '../../compras-utils';
 
 type Lang = Parameters<typeof t>[1];
 
@@ -18,15 +19,9 @@ function estadoPagoLabel(estado: EstadoPago, language: Lang): string {
   return t('comprasEstadoPagadoBanco', language);
 }
 
-function estadoPagoClass(estado: EstadoPago): string {
-  if (estado === 'pendiente') return 'bg-yellow-500/20 border-yellow-400/30 text-yellow-300';
-  if (estado === 'pagado_caja') return 'bg-emerald-500/20 border-emerald-400/30 text-emerald-300';
-  return 'bg-blue-500/20 border-blue-400/30 text-blue-300';
-}
-
 function EstadoPagoBadge({ estado, language }: Readonly<{ estado: EstadoPago; language: Lang }>) {
   return (
-    <span className={`inline-flex px-2 py-0.5 rounded-full border text-xs font-medium ${estadoPagoClass(estado)}`}>
+    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${estadoPagoClass(estado)}`}>
       {estadoPagoLabel(estado, language)}
     </span>
   );
@@ -109,8 +104,8 @@ export default function FacturaDetailPage({ params }: Readonly<{ params: Promise
 
   if (!factura) {
     return (
-      <div className="text-center text-slate-400 py-16">
-        {error || 'Factura no encontrada'}
+      <div className="text-center text-muted-foreground py-16">
+        {error || t('comprasFacturaNoEncontrada', language)}
       </div>
     );
   }
@@ -131,17 +126,17 @@ export default function FacturaDetailPage({ params }: Readonly<{ params: Promise
       <div className="flex items-center gap-4 flex-wrap">
         <Link
           href="/admin/compras/facturas"
-          className="p-2 text-slate-400 hover:text-white rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 min-h-[44px] min-w-[44px] inline-flex items-center justify-center transition-colors"
-          aria-label="Volver a facturas"
+          className="p-2 text-muted-foreground hover:text-foreground rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px] min-w-[44px] inline-flex items-center justify-center transition-colors"
+          aria-label={t('comprasVolverAFacturas', language)}
         >
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-bold text-white font-mono">{factura.numeroFactura}</h1>
+            <h1 className="text-2xl font-bold text-foreground font-mono">{factura.numeroFactura}</h1>
             <EstadoPagoBadge estado={factura.estadoPago} language={language} />
           </div>
-          <p className="text-slate-400 text-sm mt-1">
+          <p className="text-muted-foreground text-sm mt-1">
             {factura.proveedorNombre} · {new Date(factura.fechaFactura).toLocaleDateString()} · {formatEuros(factura.totalFacturaCents)}
           </p>
         </div>
@@ -159,12 +154,12 @@ export default function FacturaDetailPage({ params }: Readonly<{ params: Promise
       )}
 
       {isPendiente && showPago && (
-        <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl p-6">
-          <h2 className="text-sm font-medium text-slate-300 uppercase mb-4">{t('comprasRegistrarPago', language)}</h2>
+        <div className="bg-card border border-border rounded-2xl shadow-sm p-6">
+          <h2 className="text-sm font-medium text-muted-foreground uppercase mb-4">{t('comprasRegistrarPago', language)}</h2>
           <form onSubmit={handlePago} className="space-y-4">
             <div>
               <label htmlFor="pago-metodo" className="block text-sm font-medium text-foreground mb-1">
-                Método de pago <span className="text-destructive" aria-hidden="true">*</span>
+                {t('comprasMetodoPago', language)} <span className="text-destructive" aria-hidden="true">*</span>
               </label>
               <select
                 id="pago-metodo"
@@ -182,13 +177,13 @@ export default function FacturaDetailPage({ params }: Readonly<{ params: Promise
             {pagoForm.metodoPago === 'pagado_caja' && (
               <div>
                 <label htmlFor="pago-turno" className="block text-sm font-medium text-foreground mb-1">
-                  ID de turno (opcional)
+                  {t('comprasIdTurnoLabel', language)}
                 </label>
                 <input
                   id="pago-turno"
                   type="text"
                   maxLength={36}
-                  placeholder="UUID del turno..."
+                  placeholder={t('comprasTurnoIdPlaceholder', language)}
                   value={pagoForm.turnoId}
                   onChange={updatePagoForm('turnoId')}
                   className="w-full sm:w-64 px-3 py-2 rounded-md border border-border bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
@@ -210,16 +205,16 @@ export default function FacturaDetailPage({ params }: Readonly<{ params: Promise
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-white/10">
-            <h2 className="text-sm font-medium text-slate-300 uppercase">Desglose IVA</h2>
+        <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-border">
+            <h2 className="text-sm font-medium text-muted-foreground uppercase">{t('comprasDesgloseIva', language)}</h2>
           </div>
           <table className="w-full text-sm">
-            <tbody className="divide-y divide-white/10">
+            <tbody className="divide-y divide-border">
               {ivaRows.map((row) => (
-                <tr key={row.label} className="hover:bg-white/5 transition-colors">
-                  <td className={`px-4 py-3 ${row.bold ? 'text-white font-semibold' : 'text-slate-300'}`}>{row.label}</td>
-                  <td className={`px-4 py-3 text-right ${row.bold ? 'text-white font-semibold' : 'text-slate-300'}`}>
+                <tr key={row.label} className="hover:bg-muted/50 transition-colors">
+                  <td className={`px-4 py-3 ${row.bold ? 'text-foreground font-semibold' : 'text-muted-foreground'}`}>{row.label}</td>
+                  <td className={`px-4 py-3 text-right ${row.bold ? 'text-foreground font-semibold' : 'text-muted-foreground'}`}>
                     {formatEuros(row.value)}
                   </td>
                 </tr>
@@ -229,20 +224,20 @@ export default function FacturaDetailPage({ params }: Readonly<{ params: Promise
         </div>
 
         {(factura.albaranes ?? []).length > 0 && (
-          <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-white/10">
-              <h2 className="text-sm font-medium text-slate-300 uppercase">Albaranes vinculados</h2>
+          <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-border">
+              <h2 className="text-sm font-medium text-muted-foreground uppercase">{t('comprasAlbaranesVinculados', language)}</h2>
             </div>
-            <div className="divide-y divide-white/10">
+            <div className="divide-y divide-border">
               {(factura.albaranes ?? []).map((alb) => (
-                <div key={alb.id} className="px-4 py-3 flex items-center justify-between hover:bg-white/5 transition-colors">
-                  <span className="text-white font-mono">{alb.numeroAlbaran}</span>
-                  <span className="text-slate-400 text-sm">{alb.proveedorNombre}</span>
+                <div key={alb.id} className="px-4 py-3 flex items-center justify-between hover:bg-muted/50 transition-colors">
+                  <span className="text-foreground font-mono">{alb.numeroAlbaran}</span>
+                  <span className="text-muted-foreground text-sm">{alb.proveedorNombre}</span>
                   <Link
                     href={`/admin/compras/albaranes/${alb.id}`}
                     className="text-cyan-400 hover:text-cyan-300 text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 rounded-sm"
                   >
-                    Ver
+                    {t('comprasVer', language)}
                   </Link>
                 </div>
               ))}

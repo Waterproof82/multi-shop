@@ -48,17 +48,19 @@ function buildDto(form: ProveedorFormData): CreateProveedorDTO {
   };
 }
 
-function ActivoBadge({ activo }: Readonly<{ activo: boolean }>) {
+type Lang = Parameters<typeof t>[1];
+
+function ActivoBadge({ activo, language }: Readonly<{ activo: boolean; language: Lang }>) {
   if (activo) {
     return (
       <span className="inline-flex px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-medium">
-        Activo
+        {t('active', language)}
       </span>
     );
   }
   return (
-    <span className="inline-flex px-2 py-0.5 rounded-full bg-slate-500/20 border border-slate-400/30 text-slate-400 text-xs font-medium">
-      Inactivo
+    <span className="inline-flex px-2 py-0.5 rounded-full bg-gray-500/20 border border-gray-400/30 text-gray-400 text-xs font-medium">
+      {t('inactive', language)}
     </span>
   );
 }
@@ -120,8 +122,8 @@ export default function ProveedoresPage() {
     }
   };
 
-  const handleDelete = async (id: string, nombre: string) => {
-    if (!confirm(`¿Eliminar "${nombre}"?`)) return;
+  const handleDelete = async (id: string, _nombre: string) => {
+    if (!confirm(t('comprasConfirmarEliminar', language))) return;
 
     try {
       const res = await fetchWithCsrf(`/api/admin/compras/proveedores/${id}`, {
@@ -175,7 +177,7 @@ export default function ProveedoresPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">{t('comprasProveedores', language)}</h1>
+        <h1 className="text-2xl font-bold text-foreground">{t('comprasProveedores', language)}</h1>
         <Button onClick={openCreateModal}>
           <Plus className="h-4 w-4" />
           <span>{t('comprasNuevoProveedor', language)}</span>
@@ -188,27 +190,27 @@ export default function ProveedoresPage() {
         </div>
       )}
 
-      <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl overflow-hidden">
+      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-white/5 border-b border-border">
+            <thead className="bg-muted/50 border-b border-border">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">Nombre</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">CIF</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">Email</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">Teléfono</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">Estado</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-300 uppercase">{t('actions', language)}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t('name', language)}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t('comprasCif', language)}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t('email', language)}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t('phone', language)}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t('status', language)}</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">{t('actions', language)}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/10">
+            <tbody className="divide-y divide-border">
               {proveedores.map((prov) => (
-                <tr key={prov.id} className="hover:bg-white/5 transition-colors">
-                  <td className="px-4 py-3 font-medium text-white">{prov.nombre}</td>
-                  <td className="px-4 py-3 text-slate-300">{prov.cif ?? '—'}</td>
-                  <td className="px-4 py-3 text-slate-300">{prov.email ?? '—'}</td>
-                  <td className="px-4 py-3 text-slate-300">{prov.telefono ?? '—'}</td>
-                  <td className="px-4 py-3"><ActivoBadge activo={prov.activo} /></td>
+                <tr key={prov.id} className="hover:bg-muted/50 transition-colors">
+                  <td className="px-4 py-3 font-medium text-foreground">{prov.nombre}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{prov.cif ?? '—'}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{prov.email ?? '—'}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{prov.telefono ?? '—'}</td>
+                  <td className="px-4 py-3"><ActivoBadge activo={prov.activo} language={language} /></td>
                   <td className="px-4 py-3 text-right">
                     <button
                       type="button"
@@ -231,8 +233,8 @@ export default function ProveedoresPage() {
               ))}
               {proveedores.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-slate-400">
-                    Sin proveedores todavía
+                  <td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">
+                    {t('comprasSinProveedores', language)}
                   </td>
                 </tr>
               )}
@@ -248,7 +250,7 @@ export default function ProveedoresPage() {
               {editingId ? t('comprasEditarProveedor', language) : t('comprasNuevoProveedor', language)}
             </DialogTitle>
             <DialogDescription>
-              {editingId ? 'Modifica los datos del proveedor.' : 'Crea un nuevo proveedor.'}
+              {editingId ? t('comprasDescModificarProveedor', language) : t('comprasDescCrearProveedor', language)}
             </DialogDescription>
           </DialogHeader>
 
@@ -261,7 +263,7 @@ export default function ProveedoresPage() {
 
             <div>
               <label htmlFor="prov-nombre" className="block text-sm font-medium text-foreground mb-1">
-                Nombre <span className="text-destructive" aria-hidden="true">*</span>
+                {t('name', language)} <span className="text-destructive" aria-hidden="true">*</span>
               </label>
               <Input
                 id="prov-nombre"
@@ -275,32 +277,32 @@ export default function ProveedoresPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label htmlFor="prov-cif" className="block text-sm font-medium text-foreground mb-1">CIF</label>
+                <label htmlFor="prov-cif" className="block text-sm font-medium text-foreground mb-1">{t('comprasCif', language)}</label>
                 <Input id="prov-cif" type="text" maxLength={20} value={formData.cif} onChange={updateField('cif')} />
               </div>
               <div>
-                <label htmlFor="prov-telefono" className="block text-sm font-medium text-foreground mb-1">Teléfono</label>
+                <label htmlFor="prov-telefono" className="block text-sm font-medium text-foreground mb-1">{t('phone', language)}</label>
                 <Input id="prov-telefono" type="text" maxLength={30} value={formData.telefono} onChange={updateField('telefono')} />
               </div>
             </div>
 
             <div>
-              <label htmlFor="prov-email" className="block text-sm font-medium text-foreground mb-1">Email</label>
+              <label htmlFor="prov-email" className="block text-sm font-medium text-foreground mb-1">{t('email', language)}</label>
               <Input id="prov-email" type="email" maxLength={200} value={formData.email} onChange={updateField('email')} />
             </div>
 
             <div>
-              <label htmlFor="prov-condiciones" className="block text-sm font-medium text-foreground mb-1">Condiciones de pago</label>
+              <label htmlFor="prov-condiciones" className="block text-sm font-medium text-foreground mb-1">{t('comprasCondicionesPago', language)}</label>
               <Input id="prov-condiciones" type="text" maxLength={300} value={formData.condicionesPago} onChange={updateField('condicionesPago')} />
             </div>
 
             <div>
-              <label htmlFor="prov-direccion" className="block text-sm font-medium text-foreground mb-1">Dirección fiscal</label>
+              <label htmlFor="prov-direccion" className="block text-sm font-medium text-foreground mb-1">{t('comprasDireccionFiscal', language)}</label>
               <Input id="prov-direccion" type="text" maxLength={400} value={formData.direccionFiscal} onChange={updateField('direccionFiscal')} />
             </div>
 
             <div>
-              <label htmlFor="prov-observaciones" className="block text-sm font-medium text-foreground mb-1">Observaciones</label>
+              <label htmlFor="prov-observaciones" className="block text-sm font-medium text-foreground mb-1">{t('comprasObservaciones', language)}</label>
               <textarea
                 id="prov-observaciones"
                 maxLength={1000}

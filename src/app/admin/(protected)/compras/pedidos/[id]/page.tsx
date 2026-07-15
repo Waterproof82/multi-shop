@@ -9,6 +9,7 @@ import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import type { PedidoCompra, CatalogoCompraItem, PedidoCompraEstado } from '@/core/domain/entities/compras-types';
+import { pedidoEstadoClass } from '../../compras-utils';
 
 type Lang = Parameters<typeof t>[1];
 
@@ -19,16 +20,9 @@ function estadoLabel(estado: PedidoCompraEstado, language: Lang): string {
   return t('comprasEstadoCancelado', language);
 }
 
-function estadoClass(estado: PedidoCompraEstado): string {
-  if (estado === 'borrador') return 'bg-yellow-500/20 border-yellow-400/30 text-yellow-300';
-  if (estado === 'enviado') return 'bg-blue-500/20 border-blue-400/30 text-blue-300';
-  if (estado === 'recibido') return 'bg-emerald-500/20 border-emerald-400/30 text-emerald-300';
-  return 'bg-slate-500/20 border-slate-400/30 text-slate-400';
-}
-
 function EstadoBadge({ estado, language }: Readonly<{ estado: PedidoCompraEstado; language: Lang }>) {
   return (
-    <span className={`inline-flex px-2 py-0.5 rounded-full border text-xs font-medium ${estadoClass(estado)}`}>
+    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${pedidoEstadoClass(estado)}`}>
       {estadoLabel(estado, language)}
     </span>
   );
@@ -109,15 +103,15 @@ export default function PedidoDetailPage({ params }: Readonly<{ params: Promise<
     }
   };
 
-  const handleAction = async (endpoint: string, label: string) => {
-    if (!confirm(`¿${label}?`)) return;
+  const handleAction = async (endpoint: string, confirmMsg: string) => {
+    if (!confirm(confirmMsg)) return;
     setSaving(true);
     setError('');
     try {
       const res = await fetchWithCsrf(`/api/admin/compras/pedidos/${id}/${endpoint}`, { method: 'POST' });
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error ?? `Error al ${label.toLowerCase()}`);
+        throw new Error(data.error ?? 'Error');
       }
       await fetchPedido();
     } catch (err) {
@@ -140,8 +134,8 @@ export default function PedidoDetailPage({ params }: Readonly<{ params: Promise<
 
   if (!pedido) {
     return (
-      <div className="text-center text-slate-400 py-16">
-        {error || 'Pedido no encontrado'}
+      <div className="text-center text-muted-foreground py-16">
+        {error || t('comprasPedidoNoEncontrado', language)}
       </div>
     );
   }
@@ -153,29 +147,29 @@ export default function PedidoDetailPage({ params }: Readonly<{ params: Promise<
       <div className="flex items-center gap-4">
         <Link
           href="/admin/compras/pedidos"
-          className="p-2 text-slate-400 hover:text-white rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 min-h-[44px] min-w-[44px] inline-flex items-center justify-center transition-colors"
-          aria-label="Volver a pedidos"
+          className="p-2 text-muted-foreground hover:text-foreground rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px] min-w-[44px] inline-flex items-center justify-center transition-colors"
+          aria-label={t('comprasVolverAPedidos', language)}
         >
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-bold text-white font-mono">{pedido.numeroPedido}</h1>
+            <h1 className="text-2xl font-bold text-foreground font-mono">{pedido.numeroPedido}</h1>
             <EstadoBadge estado={pedido.estado} language={language} />
           </div>
-          <p className="text-slate-400 text-sm mt-1">{pedido.proveedorNombre} · {new Date(pedido.fechaPedido).toLocaleDateString()}</p>
+          <p className="text-muted-foreground text-sm mt-1">{pedido.proveedorNombre} · {new Date(pedido.fechaPedido).toLocaleDateString()}</p>
         </div>
         {isDraft && (
           <div className="flex gap-2">
             <Button
               variant="outline"
-              onClick={() => handleAction('cancelar', 'Cancelar pedido')}
+              onClick={() => handleAction('cancelar', t('comprasConfirmarCancelar', language))}
               disabled={saving}
             >
               {t('comprasCancelarPedido', language)}
             </Button>
             <Button
-              onClick={() => handleAction('enviar', 'Enviar pedido')}
+              onClick={() => handleAction('enviar', t('comprasConfirmarEnviar', language))}
               disabled={saving}
             >
               {t('comprasEnviarPedido', language)}
@@ -190,9 +184,9 @@ export default function PedidoDetailPage({ params }: Readonly<{ params: Promise<
         </div>
       )}
 
-      <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
-          <h2 className="text-sm font-medium text-slate-300 uppercase">Ítems del pedido</h2>
+      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+          <h2 className="text-sm font-medium text-muted-foreground uppercase">{t('comprasItemsPedido', language)}</h2>
           {isDraft && (
             <Button variant="outline" onClick={() => setShowAddItem(!showAddItem)}>
               <Plus className="h-4 w-4" />
@@ -202,11 +196,11 @@ export default function PedidoDetailPage({ params }: Readonly<{ params: Promise<
         </div>
 
         {isDraft && showAddItem && (
-          <form onSubmit={handleAddItem} className="px-4 py-4 border-b border-white/10 bg-white/5 space-y-3">
+          <form onSubmit={handleAddItem} className="px-4 py-4 border-b border-border bg-muted/30 space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="sm:col-span-2">
-                <label htmlFor="item-catalogo" className="block text-xs font-medium text-slate-300 mb-1">
-                  Artículo <span className="text-destructive" aria-hidden="true">*</span>
+                <label htmlFor="item-catalogo" className="block text-xs font-medium text-muted-foreground mb-1">
+                  {t('comprasArticulo', language)} <span className="text-destructive" aria-hidden="true">*</span>
                 </label>
                 <select
                   id="item-catalogo"
@@ -216,7 +210,7 @@ export default function PedidoDetailPage({ params }: Readonly<{ params: Promise<
                   aria-label="Seleccionar artículo del catálogo"
                   className="w-full px-3 py-2 rounded-md border border-border bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                 >
-                  <option value="">Seleccionar artículo...</option>
+                  <option value="">{t('comprasSeleccionarArticulo', language)}</option>
                   {catalogo.map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.ingredienteNombre} — {item.unidadCompra} ({formatEuros(item.precioCompraCents)})
@@ -225,8 +219,8 @@ export default function PedidoDetailPage({ params }: Readonly<{ params: Promise<
                 </select>
               </div>
               <div>
-                <label htmlFor="item-cantidad" className="block text-xs font-medium text-slate-300 mb-1">
-                  Cantidad <span className="text-destructive" aria-hidden="true">*</span>
+                <label htmlFor="item-cantidad" className="block text-xs font-medium text-muted-foreground mb-1">
+                  {t('comprasCantidad', language)} <span className="text-destructive" aria-hidden="true">*</span>
                 </label>
                 <input
                   id="item-cantidad"
@@ -254,27 +248,27 @@ export default function PedidoDetailPage({ params }: Readonly<{ params: Promise<
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-white/5 border-b border-border">
+            <thead className="bg-muted/50 border-b border-border">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">Ingrediente</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">Cantidad</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">Precio</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">IVA</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t('comprasIngrediente', language)}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t('comprasCantidad', language)}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t('price', language)}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t('comprasIva', language)}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/10">
+            <tbody className="divide-y divide-border">
               {(pedido.items ?? []).map((item) => (
-                <tr key={item.id} className="hover:bg-white/5 transition-colors">
-                  <td className="px-4 py-3 text-white">{item.ingredienteNombre ?? '—'}</td>
-                  <td className="px-4 py-3 text-slate-300">{item.cantidad} {item.unidadCompra}</td>
-                  <td className="px-4 py-3 text-slate-300">{formatEuros(item.precioCompraCents)}</td>
-                  <td className="px-4 py-3 text-slate-300">{item.porcentajeIva}%</td>
+                <tr key={item.id} className="hover:bg-muted/50 transition-colors">
+                  <td className="px-4 py-3 text-foreground">{item.ingredienteNombre ?? '—'}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{item.cantidad} {item.unidadCompra}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{formatEuros(item.precioCompraCents)}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{item.porcentajeIva}%</td>
                 </tr>
               ))}
               {(pedido.items ?? []).length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-slate-400">
-                    Sin ítems todavía
+                  <td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">
+                    {t('comprasSinItems', language)}
                   </td>
                 </tr>
               )}

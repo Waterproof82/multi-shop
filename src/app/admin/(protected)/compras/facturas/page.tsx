@@ -16,6 +16,7 @@ import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import type { FacturaProveedor, Proveedor, AlbaranCompra, EstadoPago } from '@/core/domain/entities/compras-types';
+import { estadoPagoClass } from '../compras-utils';
 
 type Lang = Parameters<typeof t>[1];
 
@@ -25,15 +26,9 @@ function estadoPagoLabel(estado: EstadoPago, language: Lang): string {
   return t('comprasEstadoPagadoBanco', language);
 }
 
-function estadoPagoClass(estado: EstadoPago): string {
-  if (estado === 'pendiente') return 'bg-yellow-500/20 border-yellow-400/30 text-yellow-300';
-  if (estado === 'pagado_caja') return 'bg-emerald-500/20 border-emerald-400/30 text-emerald-300';
-  return 'bg-blue-500/20 border-blue-400/30 text-blue-300';
-}
-
 function EstadoPagoBadge({ estado, language }: Readonly<{ estado: EstadoPago; language: Lang }>) {
   return (
-    <span className={`inline-flex px-2 py-0.5 rounded-full border text-xs font-medium ${estadoPagoClass(estado)}`}>
+    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${estadoPagoClass(estado)}`}>
       {estadoPagoLabel(estado, language)}
     </span>
   );
@@ -199,7 +194,7 @@ export default function FacturasPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <h1 className="text-2xl font-bold text-white">{t('comprasFacturas', language)}</h1>
+        <h1 className="text-2xl font-bold text-foreground">{t('comprasFacturas', language)}</h1>
         <div className="flex items-center gap-3">
           <select
             value={filtroEstado}
@@ -209,7 +204,7 @@ export default function FacturasPage() {
           >
             {ESTADOS_PAGO.map((s) => (
               <option key={s} value={s}>
-                {s === '' ? 'Todos los estados' : estadoPagoLabel(s, language)}
+                {s === '' ? t('comprasTodosEstados', language) : estadoPagoLabel(s, language)}
               </option>
             ))}
           </select>
@@ -226,31 +221,31 @@ export default function FacturasPage() {
         </div>
       )}
 
-      <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl overflow-hidden">
+      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-white/5 border-b border-border">
+            <thead className="bg-muted/50 border-b border-border">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">Número</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">Proveedor</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">Total</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">Estado pago</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">Fecha</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-300 uppercase">{t('actions', language)}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t('comprasNumero', language)}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t('comprasProveedor', language)}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t('comprasTotal', language)}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t('comprasEstadoPago', language)}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t('date', language)}</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">{t('actions', language)}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/10">
+            <tbody className="divide-y divide-border">
               {facturas.map((fac) => (
-                <tr key={fac.id} className="hover:bg-white/5 transition-colors">
-                  <td className="px-4 py-3 font-mono text-white">{fac.numeroFactura}</td>
-                  <td className="px-4 py-3 text-slate-300">{fac.proveedorNombre ?? '—'}</td>
-                  <td className="px-4 py-3 text-white font-medium">{formatEuros(fac.totalFacturaCents)}</td>
+                <tr key={fac.id} className="hover:bg-muted/50 transition-colors">
+                  <td className="px-4 py-3 font-mono text-foreground">{fac.numeroFactura}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{fac.proveedorNombre ?? '—'}</td>
+                  <td className="px-4 py-3 text-foreground font-medium">{formatEuros(fac.totalFacturaCents)}</td>
                   <td className="px-4 py-3"><EstadoPagoBadge estado={fac.estadoPago} language={language} /></td>
-                  <td className="px-4 py-3 text-slate-300">{new Date(fac.fechaFactura).toLocaleDateString()}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{new Date(fac.fechaFactura).toLocaleDateString()}</td>
                   <td className="px-4 py-3 text-right">
                     <Link
                       href={`/admin/compras/facturas/${fac.id}`}
-                      aria-label={`Ver factura ${fac.numeroFactura}`}
+                      aria-label={`${t('comprasVer', language)} ${fac.numeroFactura}`}
                       className="p-2 text-cyan-400 hover:text-cyan-300 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 min-h-[44px] min-w-[44px] inline-flex items-center justify-center transition-colors"
                     >
                       <Eye className="h-4 w-4" />
@@ -260,8 +255,8 @@ export default function FacturasPage() {
               ))}
               {facturas.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-slate-400">
-                    Sin facturas todavía
+                  <td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">
+                    {t('comprasSinFacturas', language)}
                   </td>
                 </tr>
               )}
@@ -274,7 +269,7 @@ export default function FacturasPage() {
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{t('comprasNuevaFactura', language)}</DialogTitle>
-            <DialogDescription>Registra una nueva factura de proveedor.</DialogDescription>
+            <DialogDescription>{t('comprasDescNuevaFactura', language)}</DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleCreate} className="space-y-4">
@@ -286,7 +281,7 @@ export default function FacturasPage() {
 
             <div>
               <label htmlFor="fac-proveedor" className="block text-sm font-medium text-foreground mb-1">
-                Proveedor <span className="text-destructive" aria-hidden="true">*</span>
+                {t('comprasProveedor', language)} <span className="text-destructive" aria-hidden="true">*</span>
               </label>
               <select
                 id="fac-proveedor"
@@ -296,7 +291,7 @@ export default function FacturasPage() {
                 aria-label="Seleccionar proveedor"
                 className="w-full px-3 py-2 rounded-md border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
               >
-                <option value="">Seleccionar proveedor...</option>
+                <option value="">{t('comprasSeleccionarProveedor', language)}</option>
                 {proveedores.map((prov) => (
                   <option key={prov.id} value={prov.id}>{prov.nombre}</option>
                 ))}
@@ -306,7 +301,7 @@ export default function FacturasPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label htmlFor="fac-numero" className="block text-sm font-medium text-foreground mb-1">
-                  Número de factura <span className="text-destructive" aria-hidden="true">*</span>
+                  {t('comprasNumeroPorcentaje', language)} <span className="text-destructive" aria-hidden="true">*</span>
                 </label>
                 <Input
                   id="fac-numero"
@@ -319,7 +314,7 @@ export default function FacturasPage() {
               </div>
               <div>
                 <label htmlFor="fac-fecha" className="block text-sm font-medium text-foreground mb-1">
-                  Fecha factura <span className="text-destructive" aria-hidden="true">*</span>
+                  {t('comprasFechaFactura', language)} <span className="text-destructive" aria-hidden="true">*</span>
                 </label>
                 <input
                   id="fac-fecha"
@@ -336,10 +331,15 @@ export default function FacturasPage() {
               <p className="text-sm font-medium text-foreground mb-2">{t('comprasBaseImponible', language)} (€)</p>
               <div className="grid grid-cols-2 gap-3">
                 {(['base0', 'base4', 'base10', 'base21'] as const).map((field, idx) => {
-                  const labels = ['Base 0%', 'Base 4%', 'Base 10%', 'Base 21%'];
+                  const baseLabels = [
+                    t('comprasBase0', language),
+                    t('comprasBase4', language),
+                    t('comprasBase10', language),
+                    t('comprasBase21', language),
+                  ];
                   return (
                     <div key={field}>
-                      <label htmlFor={`fac-${field}`} className="block text-xs font-medium text-slate-300 mb-1">{labels[idx]}</label>
+                      <label htmlFor={`fac-${field}`} className="block text-xs font-medium text-muted-foreground mb-1">{baseLabels[idx]}</label>
                       <Input
                         id={`fac-${field}`}
                         type="number"
@@ -368,23 +368,23 @@ export default function FacturasPage() {
                   value={form.ivaManual}
                   onChange={updateField('ivaManual')}
                 />
-                <p className="text-xs text-slate-400 mt-1">Calculado: {calculatedIva.toFixed(2)} €</p>
+                <p className="text-xs text-muted-foreground mt-1">{t('comprasCalculado', language)} {calculatedIva.toFixed(2)} €</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">{t('comprasTotalFactura', language)}</label>
-                <div className="px-3 py-2 rounded-md border border-border bg-white/5 text-white font-medium">
+                <div className="px-3 py-2 rounded-md border border-border bg-muted/50 text-foreground font-medium">
                   {displayTotal.toFixed(2)} €
                 </div>
-                <p className="text-xs text-slate-400 mt-1">IVA: {displayIva.toFixed(2)} €</p>
+                <p className="text-xs text-muted-foreground mt-1">{t('comprasIvaCalc', language)} {displayIva.toFixed(2)} €</p>
               </div>
             </div>
 
             {albaranesRecibidos.length > 0 && (
               <div>
-                <p className="text-sm font-medium text-foreground mb-2">Albaranes vinculados</p>
+                <p className="text-sm font-medium text-foreground mb-2">{t('comprasAlbaranesVinculados', language)}</p>
                 <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
                   {albaranesRecibidos.map((alb) => (
-                    <label key={alb.id} className="flex items-center gap-2 cursor-pointer text-sm text-slate-300 hover:text-white transition-colors">
+                    <label key={alb.id} className="flex items-center gap-2 cursor-pointer text-sm text-muted-foreground hover:text-foreground transition-colors">
                       <input
                         type="checkbox"
                         checked={form.albaranIds.includes(alb.id)}

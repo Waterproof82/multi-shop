@@ -17,8 +17,8 @@ export default function ComprasLayout({ children }: Readonly<{ children: React.R
   const { language } = useLanguage();
 
   return (
-    <div className="pt-16 lg:pt-0 min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      <nav className="px-6 pt-6 pb-0 border-b border-white/10">
+    <div className="pt-16 lg:pt-0 min-h-screen">
+      <nav className="px-6 pt-6 pb-0 border-b border-border">
         <div className="flex gap-1 overflow-x-auto">
           {TABS.map((tab) => {
             const isActive = pathname.startsWith(tab.href);
@@ -27,10 +27,10 @@ export default function ComprasLayout({ children }: Readonly<{ children: React.R
                 key={tab.href}
                 href={tab.href}
                 aria-current={isActive ? 'page' : undefined}
-                className={`inline-flex items-center px-4 py-2 rounded-t-lg text-sm font-medium whitespace-nowrap transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 ${
+                className={`inline-flex items-center px-4 py-2 rounded-t-lg text-sm font-medium whitespace-nowrap transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                   isActive
-                    ? 'bg-white/10 text-white border border-white/20 border-b-transparent'
-                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    ? 'bg-primary/10 text-primary border border-primary/30 border-b-transparent'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                 }`}
               >
                 {t(tab.labelKey, language)}
