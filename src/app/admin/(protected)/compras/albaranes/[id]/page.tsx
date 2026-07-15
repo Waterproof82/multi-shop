@@ -11,17 +11,7 @@ import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import type { AlbaranCompra, CatalogoCompraItem, PorcentajeIva } from '@/core/domain/entities/compras-types';
 import { albaranEstadoClass } from '../../compras-utils';
-
-const IVA_OPTIONS: { value: PorcentajeIva; labelKey: string }[] = [
-  { value: 0,    labelKey: 'comprasIvaExento' },
-  { value: 3,    labelKey: 'comprasIgic3' },
-  { value: 4,    labelKey: 'comprasIva4' },
-  { value: 7,    labelKey: 'comprasIgic7' },
-  { value: 9.5,  labelKey: 'comprasIgic95' },
-  { value: 10,   labelKey: 'comprasIva10' },
-  { value: 15,   labelKey: 'comprasIgic15' },
-  { value: 21,   labelKey: 'comprasIva21' },
-];
+import { useComprasTipoImpuesto, getRateOptions } from '../../compras-context';
 
 function formatEuros(cents: number): string {
   return (cents / 100).toFixed(2) + ' €';
@@ -52,6 +42,8 @@ function selectedCatalogoItem(catalogo: CatalogoCompraItem[], id: string): Catal
 export default function AlbaranDetailPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   const { id } = use(params);
   const { language } = useLanguage();
+  const tipoImpuesto = useComprasTipoImpuesto();
+  const rateOptions = getRateOptions(tipoImpuesto);
   const [albaran, setAlbaran] = useState<AlbaranCompra | null>(null);
   const [catalogo, setCatalogo] = useState<CatalogoCompraItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -287,8 +279,8 @@ export default function AlbaranDetailPage({ params }: Readonly<{ params: Promise
                   aria-label="Porcentaje de IVA"
                   className="w-full px-3 py-2 rounded-md border border-border bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                 >
-                  {IVA_OPTIONS.map(({ value, labelKey }) => (
-                    <option key={value} value={value}>{t(labelKey as Parameters<typeof t>[0], language)}</option>
+                  {rateOptions.map(({ value, labelKey }) => (
+                    <option key={value} value={value}>{t(labelKey, language)}</option>
                   ))}
                 </select>
               </div>

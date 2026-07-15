@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
+import { ComprasProvider } from './compras-context';
 
 const TABS = [
   { href: '/admin/compras/proveedores', labelKey: 'comprasProveedores' as const },
@@ -39,7 +40,9 @@ export default function ComprasLayout({ children }: Readonly<{ children: React.R
           })}
         </div>
       </nav>
-      <div className="px-6 py-8">{children}</div>
+      <div className="px-6 py-8">
+        <ComprasProvider>{children}</ComprasProvider>
+      </div>
     </div>
   );
 }

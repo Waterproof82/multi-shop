@@ -17,6 +17,7 @@ import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import type { FacturaProveedor, Proveedor, AlbaranCompra, EstadoPago } from '@/core/domain/entities/compras-types';
 import { estadoPagoClass } from '../compras-utils';
+import { useComprasTipoImpuesto } from '../compras-context';
 
 type Lang = Parameters<typeof t>[1];
 
@@ -94,6 +95,7 @@ const ESTADOS_PAGO: Array<EstadoPago | ''> = ['', 'pendiente', 'pagado_caja', 'p
 
 export default function FacturasPage() {
   const { language } = useLanguage();
+  const tipoImpuesto = useComprasTipoImpuesto();
   const [facturas, setFacturas] = useState<FacturaProveedor[]>([]);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [albaranesRecibidos, setAlbaranesRecibidos] = useState<AlbaranCompra[]>([]);
@@ -349,45 +351,60 @@ export default function FacturasPage() {
             <div>
               <p className="text-sm font-medium text-foreground mb-2">{t('comprasBaseImponible', language)} (€)</p>
               <div className="grid grid-cols-2 gap-3">
-                {([
-                  { field: 'base0',  labelKey: 'comprasBase0' },
-                  { field: 'base4',  labelKey: 'comprasBase4' },
-                  { field: 'base10', labelKey: 'comprasBase10' },
-                  { field: 'base21', labelKey: 'comprasBase21' },
-                ] as const).map(({ field, labelKey }) => (
-                  <div key={field}>
-                    <label htmlFor={`fac-${field}`} className="block text-xs font-medium text-muted-foreground mb-1">{t(labelKey, language)}</label>
-                    <Input
-                      id={`fac-${field}`}
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={form[field]}
-                      onChange={updateField(field)}
-                    />
-                  </div>
-                ))}
-              </div>
-              <p className="text-xs font-medium text-muted-foreground mt-3 mb-2">{t('comprasIgicLabel', language)}</p>
-              <div className="grid grid-cols-2 gap-3">
-                {([
-                  { field: 'base3',  labelKey: 'comprasBase3' },
-                  { field: 'base7',  labelKey: 'comprasBase7' },
-                  { field: 'base95', labelKey: 'comprasBase95' },
-                  { field: 'base15', labelKey: 'comprasBase15' },
-                ] as const).map(({ field, labelKey }) => (
-                  <div key={field}>
-                    <label htmlFor={`fac-${field}`} className="block text-xs font-medium text-muted-foreground mb-1">{t(labelKey, language)}</label>
-                    <Input
-                      id={`fac-${field}`}
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={form[field]}
-                      onChange={updateField(field)}
-                    />
-                  </div>
-                ))}
+                <div>
+                  <label htmlFor="fac-base0" className="block text-xs font-medium text-muted-foreground mb-1">{t('comprasBase0', language)}</label>
+                  <Input
+                    id="fac-base0"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.base0}
+                    onChange={updateField('base0')}
+                  />
+                </div>
+                {tipoImpuesto === 'iva' && (
+                  <>
+                    {([
+                      { field: 'base4',  labelKey: 'comprasBase4' },
+                      { field: 'base10', labelKey: 'comprasBase10' },
+                      { field: 'base21', labelKey: 'comprasBase21' },
+                    ] as const).map(({ field, labelKey }) => (
+                      <div key={field}>
+                        <label htmlFor={`fac-${field}`} className="block text-xs font-medium text-muted-foreground mb-1">{t(labelKey, language)}</label>
+                        <Input
+                          id={`fac-${field}`}
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={form[field]}
+                          onChange={updateField(field)}
+                        />
+                      </div>
+                    ))}
+                  </>
+                )}
+                {tipoImpuesto === 'igic' && (
+                  <>
+                    {([
+                      { field: 'base3',  labelKey: 'comprasBase3' },
+                      { field: 'base7',  labelKey: 'comprasBase7' },
+                      { field: 'base95', labelKey: 'comprasBase95' },
+                      { field: 'base15', labelKey: 'comprasBase15' },
+                    ] as const).map(({ field, labelKey }) => (
+                      <div key={field}>
+                        <label htmlFor={`fac-${field}`} className="block text-xs font-medium text-muted-foreground mb-1">{t(labelKey, language)}</label>
+                        <Input
+                          id={`fac-${field}`}
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={form[field]}
+                          onChange={updateField(field)}
+                        />
+                      </div>
+                    ))}
+                  </>
+                )}
               </div>
             </div>
 
