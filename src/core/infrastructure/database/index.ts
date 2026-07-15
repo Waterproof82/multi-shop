@@ -217,3 +217,11 @@ let _tpvRepository: SupabaseTpvRepository | undefined;
 export function getTpvRepository(): SupabaseTpvRepository {
   return _tpvRepository ??= new SupabaseTpvRepository();
 }
+
+import type { IComprasRepository } from '@/core/domain/repositories/IComprasRepository';
+import { SupabaseComprasRepository } from './supabase-compras.repository';
+
+let _comprasRepository: IComprasRepository | undefined;
+export function getComprasRepository(): IComprasRepository {
+  return _comprasRepository ??= new SupabaseComprasRepository();
+}

@@ -56,6 +56,10 @@ function errorCodeToStatus(code: string): number {
   if (code.startsWith('DEL_')) return 400;
   if (code.startsWith('GLV_') || code.startsWith('PAY_')) return 503;
   if (code.startsWith('DLV_')) return 422;
+  if (code.endsWith('_NOT_FOUND')) return 404;
+  if (code === 'COMPRAS_PROVEEDOR_HAS_TRANSACTIONS') return 409;
+  if (code === 'COMPRAS_FACTURA_YA_PAGADA' || code === 'COMPRAS_ALBARAN_YA_RECIBIDO') return 409;
+  if (code.startsWith('COMPRAS_') || code === 'SANIDAD_TRAZABILIDAD_REQUERIDA') return 422;
   return 500;
 }
 
