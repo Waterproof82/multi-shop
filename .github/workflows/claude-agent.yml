@@ -93,7 +93,8 @@ jobs:
           3. Levanta Playwright para ejecutar los tests de interfaz y asegurar que la vista compila y funciona visualmente.
           4. Si algo falla, corrígelo antes de terminar."
 
-          npx -y @anthropic-ai/claude-code --yes "$PROMPT"
+          # El comando limpio, sin flags conflictivos:
+          npx -y @anthropic-ai/claude-code "$PROMPT"
 
           if [ -n "$(git status --porcelain)" ]; then
             git add .
