@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS public.catalogo_compra (
 );
 CREATE INDEX IF NOT EXISTS idx_catalogo_compra_empresa_id ON public.catalogo_compra (empresa_id);
 CREATE INDEX IF NOT EXISTS idx_catalogo_compra_proveedor_id ON public.catalogo_compra (proveedor_id);
+CREATE INDEX IF NOT EXISTS idx_catalogo_compra_ingrediente_id ON public.catalogo_compra (ingrediente_id);
 
 ALTER TABLE public.catalogo_compra ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "anon no access catalogo_compra" ON public.catalogo_compra
@@ -104,6 +105,7 @@ CREATE TABLE IF NOT EXISTS public.pedidos_compra (
   CONSTRAINT unique_empresa_numero_pedido UNIQUE (empresa_id, numero_pedido)
 );
 CREATE INDEX IF NOT EXISTS idx_pedidos_compra_empresa_id ON public.pedidos_compra (empresa_id);
+CREATE INDEX IF NOT EXISTS idx_pedidos_compra_proveedor_id ON public.pedidos_compra (proveedor_id);
 
 ALTER TABLE public.pedidos_compra ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "anon no access pedidos_compra" ON public.pedidos_compra
@@ -134,6 +136,11 @@ CREATE POLICY "admin CRUD pedidos_compra_items" ON public.pedidos_compra_items
     pedido_compra_id IN (
       SELECT id FROM public.pedidos_compra WHERE empresa_id = get_mi_empresa_id()
     )
+  )
+  WITH CHECK (
+    pedido_compra_id IN (
+      SELECT id FROM public.pedidos_compra WHERE empresa_id = get_mi_empresa_id()
+    )
   );
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.pedidos_compra_items TO service_role, authenticated;
 
@@ -156,6 +163,7 @@ CREATE TABLE IF NOT EXISTS public.albaranes_compra (
   CONSTRAINT unique_empresa_proveedor_albaran UNIQUE (empresa_id, proveedor_id, numero_albaran)
 );
 CREATE INDEX IF NOT EXISTS idx_albaranes_compra_empresa_id ON public.albaranes_compra (empresa_id);
+CREATE INDEX IF NOT EXISTS idx_albaranes_compra_proveedor_id ON public.albaranes_compra (proveedor_id);
 
 ALTER TABLE public.albaranes_compra ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "anon no access albaranes_compra" ON public.albaranes_compra
@@ -189,6 +197,11 @@ CREATE POLICY "admin CRUD albaranes_compra_items" ON public.albaranes_compra_ite
     albaran_compra_id IN (
       SELECT id FROM public.albaranes_compra WHERE empresa_id = get_mi_empresa_id()
     )
+  )
+  WITH CHECK (
+    albaran_compra_id IN (
+      SELECT id FROM public.albaranes_compra WHERE empresa_id = get_mi_empresa_id()
+    )
   );
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.albaranes_compra_items TO service_role, authenticated;
 
@@ -217,6 +230,7 @@ CREATE TABLE IF NOT EXISTS public.facturas_proveedor (
   CONSTRAINT unique_proveedor_factura UNIQUE (empresa_id, proveedor_id, numero_factura)
 );
 CREATE INDEX IF NOT EXISTS idx_facturas_proveedor_empresa_id ON public.facturas_proveedor (empresa_id);
+CREATE INDEX IF NOT EXISTS idx_facturas_proveedor_proveedor_id ON public.facturas_proveedor (proveedor_id);
 
 ALTER TABLE public.facturas_proveedor ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "anon no access facturas_proveedor" ON public.facturas_proveedor
@@ -242,6 +256,11 @@ CREATE POLICY "admin CRUD facturas_albaranes" ON public.facturas_proveedor_albar
     factura_proveedor_id IN (
       SELECT id FROM public.facturas_proveedor WHERE empresa_id = get_mi_empresa_id()
     )
+  )
+  WITH CHECK (
+    factura_proveedor_id IN (
+      SELECT id FROM public.facturas_proveedor WHERE empresa_id = get_mi_empresa_id()
+    )
   );
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.facturas_proveedor_albaranes TO service_role, authenticated;
 
@@ -263,6 +282,21 @@ DROP TRIGGER IF EXISTS trigger_albaranes_immutable ON public.albaranes_compra;
 CREATE TRIGGER trigger_albaranes_immutable
   BEFORE UPDATE ON public.albaranes_compra
   FOR EACH ROW EXECUTE FUNCTION public.block_albaran_alteration();
+
+CREATE OR REPLACE FUNCTION public.block_albaran_deletion()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF OLD.estado = 'recibido' THEN
+    RAISE EXCEPTION 'SIALTI: Los albaranes en estado recibido no pueden eliminarse (Ley Antifraude 11/2021).';
+  END IF;
+  RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_albaranes_no_delete ON public.albaranes_compra;
+CREATE TRIGGER trigger_albaranes_no_delete
+  BEFORE DELETE ON public.albaranes_compra
+  FOR EACH ROW EXECUTE FUNCTION public.block_albaran_deletion();
 
 -- ============================================================
 -- 8. RPC: recibir_albaran_transaccional (atomicidad absoluta — R3)
@@ -311,19 +345,13 @@ BEGIN
     v_cantidad := v_item.cantidad_recibida * v_item.factor_conversion;
 
     INSERT INTO public.movimientos_stock (
-      empresa_id, ingrediente_id, tipo_movimiento, cantidad, motivo, metadata
+      empresa_id, ingrediente_id, tipo, cantidad, referencia_id
     ) VALUES (
       p_empresa_id,
       v_item.ingrediente_id,
       'entrada',
       v_cantidad,
-      'Recepcion albaran ' || p_albaran_id::TEXT,
-      jsonb_build_object(
-        'albaran_id',      p_albaran_id,
-        'numero_lote',     v_item.numero_lote,
-        'fecha_caducidad', v_item.fecha_caducidad,
-        'empleado_id',     p_empleado_id
-      )
+      p_albaran_id
     )
     RETURNING id INTO v_mov_id;
 
