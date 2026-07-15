@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { resolveAdminContextWithEmpresa, handleResult, validationErrorResponse } from '@/core/infrastructure/api/helpers';
 import { getComprasRepository } from '@/core/infrastructure/database';
 import { updatePedidoItemUseCase } from '@/core/application/use-cases/compras/pedido/updatePedidoItem.use-case';
+import { removePedidoItemUseCase } from '@/core/application/use-cases/compras/pedido/removePedidoItem.use-case';
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string; itemId: string }> }) {
   const ctx = await resolveAdminContextWithEmpresa(req);
@@ -20,6 +21,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   if (ctx.error) return ctx.error;
 
   const { id, itemId } = await params;
-  const result = await getComprasRepository().removePedidoItem(ctx.empresaId, id, itemId);
+  const result = await removePedidoItemUseCase(getComprasRepository(), ctx.empresaId, id, itemId);
   return handleResult(result);
 }

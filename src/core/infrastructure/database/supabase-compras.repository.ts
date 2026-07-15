@@ -773,7 +773,17 @@ export class SupabaseComprasRepository implements IComprasRepository {
       if (error) {
         return { success: false, error: await logger.logFromCatch(error, 'repository', 'marcarAlbaranRecibido') };
       }
-      return { success: true, data: mapAlbaran(data as Record<string, unknown>) };
+
+      const rpcResult = data as { success: boolean; error?: string };
+      if (!rpcResult.success) {
+        return {
+          success: false,
+          error: { code: 'COMPRAS_ALBARAN_RPC_ERROR', message: rpcResult.error ?? 'Error al recibir albarán', module: 'repository' },
+        };
+      }
+
+      // RPC returns { success: true } — re-fetch the full albaran row
+      return this.findAlbaranById(empresaId, albaranId);
     } catch (e) {
       return { success: false, error: await logger.logFromCatch(e, 'repository', 'marcarAlbaranRecibido') };
     }
