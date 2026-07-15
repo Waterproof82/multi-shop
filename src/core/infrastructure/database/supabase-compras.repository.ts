@@ -6,7 +6,7 @@ import type {
   PedidoCompra, PedidoCompraItem, CreatePedidoCompraDTO, AddItemToPedidoDTO,
   AlbaranCompra, AlbaranCompraItem, CreateAlbaranDTO, AddItemToAlbaranDTO,
   FacturaProveedor, CreateFacturaProveedorDTO, RegistrarPagoDTO,
-  PorcentajeIva,
+  PorcentajeIva, PedidoCompraEstado,
 } from '@/core/domain/entities/compras-types';
 import type { Result } from '@/core/domain/entities/types';
 import { logger } from '../logging/logger';
@@ -295,7 +295,7 @@ export class SupabaseComprasRepository implements IComprasRepository {
         .select('id', { count: 'exact', head: true })
         .eq('empresa_id', empresaId)
         .eq('proveedor_id', proveedorId)
-        .not('estado', 'in', '("cancelado","recibido")');
+        .not('estado', 'in', '(cancelado,recibido)');
 
       if (pedidoError) {
         return { success: false, error: await logger.logFromCatch(pedidoError, 'repository', 'hasActiveTransactions') };
@@ -309,7 +309,7 @@ export class SupabaseComprasRepository implements IComprasRepository {
         .select('id', { count: 'exact', head: true })
         .eq('empresa_id', empresaId)
         .eq('proveedor_id', proveedorId)
-        .not('estado', 'in', '("recibido")');
+        .not('estado', 'in', '(recibido)');
 
       if (albaranError) {
         return { success: false, error: await logger.logFromCatch(albaranError, 'repository', 'hasActiveTransactions') };
@@ -518,7 +518,7 @@ export class SupabaseComprasRepository implements IComprasRepository {
     }
   }
 
-  async updatePedidoEstado(empresaId: string, id: string, estado: string): Promise<Result<PedidoCompra>> {
+  async updatePedidoEstado(empresaId: string, id: string, estado: PedidoCompraEstado): Promise<Result<PedidoCompra>> {
     try {
       const supabase = getSupabaseClient();
       const { data: row, error } = await supabase
@@ -593,6 +593,8 @@ export class SupabaseComprasRepository implements IComprasRepository {
   async removePedidoItem(_empresaId: string, _pedidoId: string, itemId: string): Promise<Result<void>> {
     try {
       const supabase = getSupabaseClient();
+      // Item tables don't have empresa_id — tenant isolation enforced by RLS via parent FK
+      // and by the use case verifying parent ownership before calling this method
       const { error } = await supabase
         .from('pedidos_compra_items')
         .delete()
@@ -743,6 +745,8 @@ export class SupabaseComprasRepository implements IComprasRepository {
   async removeAlbaranItem(_empresaId: string, _albaranId: string, itemId: string): Promise<Result<void>> {
     try {
       const supabase = getSupabaseClient();
+      // Item tables don't have empresa_id — tenant isolation enforced by RLS via parent FK
+      // and by the use case verifying parent ownership before calling this method
       const { error } = await supabase
         .from('albaranes_compra_items')
         .delete()
@@ -885,6 +889,25 @@ export class SupabaseComprasRepository implements IComprasRepository {
       if (!facturaResult.success) return facturaResult;
       const { totalFacturaCents, numeroFactura } = facturaResult.data;
 
+      // For pagado_caja: INSERT the turno event FIRST so that if it fails,
+      // the factura remains pendiente (safe). If the UPDATE fails after, we get
+      // an orphan turno event — far less harmful than a paid factura with no event.
+      if (data.metodoPago === 'pagado_caja' && data.turnoId) {
+        const { error: eventoError } = await supabase
+          .from('tpv_turno_eventos')
+          .insert({
+            turno_id: data.turnoId,
+            empresa_id: empresaId,
+            tipo_evento: 'compra_proveedor',
+            monto_cents: totalFacturaCents,
+            descripcion: `Pago factura ${numeroFactura}`,
+          });
+
+        if (eventoError) {
+          return { success: false, error: await logger.logFromCatch(eventoError, 'repository', 'registrarPagoFactura') };
+        }
+      }
+
       const patch: Record<string, unknown> = {
         estado_pago: data.metodoPago,
         updated_at: new Date().toISOString(),
@@ -904,22 +927,6 @@ export class SupabaseComprasRepository implements IComprasRepository {
 
       if (updateError) {
         return { success: false, error: await logger.logFromCatch(updateError, 'repository', 'registrarPagoFactura') };
-      }
-
-      if (data.metodoPago === 'pagado_caja' && data.turnoId) {
-        const { error: eventoError } = await supabase
-          .from('tpv_turno_eventos')
-          .insert({
-            turno_id: data.turnoId,
-            empresa_id: empresaId,
-            tipo_evento: 'compra_proveedor',
-            monto_cents: totalFacturaCents,
-            descripcion: `Pago factura ${numeroFactura}`,
-          });
-
-        if (eventoError) {
-          return { success: false, error: await logger.logFromCatch(eventoError, 'repository', 'registrarPagoFactura') };
-        }
       }
 
       return { success: true, data: mapFactura(row as Record<string, unknown>) };
