@@ -14,7 +14,6 @@ permissions:
 jobs:
   claude-developer:
     name: Claude Agent Run
-    # Se activa si etiquetas una issue con "claude" o si comentas escribiendo "@claude ..."
     if: |
       (github.event_name == 'issues' && github.event.label.name == 'claude') ||
       (github.event_name == 'issue_comment' && startsWith(github.event.comment.body, '@claude'))
@@ -41,9 +40,21 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Requerido para que el MCP de Playwright pueda levantar navegadores reales en el servidor
-      - name: Install Playwright Browsers and Deps
-        run: npx playwright install --with-deps
+      - name: Cache Playwright Binaries
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright OS Dependencies
+        run: npx playwright install-deps
+
+      - name: Install Playwright Browsers (Only on Cache Miss)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install
 
       - name: Configure Git Bot
         run: |
@@ -52,15 +63,11 @@ jobs:
 
       - name: Run Claude Agent with MCPs
         env:
-          # Clave de IA (Solo Anthropic)
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          # Entorno para el MCP de Supabase
           NEXT_PUBLIC_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          # Token de GitHub para abrir el PR
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # 1. Extraer el texto de la Issue o del comentario
           if [ "${{ github.event_name }}" = "issues" ]; then
             INSTRUCTION="${{ github.event.issue.body }}"
             ISSUE_NUMBER="${{ github.event.issue.number }}"
@@ -73,11 +80,9 @@ jobs:
 
           CLEAN_INSTRUCTION=$(echo "$INSTRUCTION" | sed 's/^@claude //i')
 
-          # 2. Crear una rama dedicada
           BRANCH_NAME="claude/issue-${ISSUE_NUMBER}"
           git checkout -b "$BRANCH_NAME"
 
-          # 3. Ejecutar la tarea usando Claude Code y los MCPs activos del proyecto
           echo "Iniciando ciclo de desarrollo autónomo con Claude..."
           
           PROMPT="Instrucciones: $CLEAN_INSTRUCTION. 
@@ -88,15 +93,13 @@ jobs:
           3. Levanta Playwright para ejecutar los tests de interfaz y asegurar que la vista compila y funciona visualmente.
           4. Si algo falla, corrígelo antes de terminar."
 
-          npx -y @anthropic-ai/claude-code --non-interactive "$PROMPT"
+          npx -y @anthropic-ai/claude-code --yes "$PROMPT"
 
-          # 4. Si hay cambios físicos en el código, subimos la rama y abrimos PR
           if [ -n "$(git status --porcelain)" ]; then
             git add .
             git commit -m "claude: resuelve #${ISSUE_NUMBER} - ${ISSUE_TITLE}"
             git push origin "$BRANCH_NAME" --force
 
-            # Generamos el reporte de herramientas en la descripción del PR
             PR_BODY="### 🤖 PR generado por Claude Agent
             
             Este Pull Request soluciona la issue #${ISSUE_NUMBER} de forma autónoma.
