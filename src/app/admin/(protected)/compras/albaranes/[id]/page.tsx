@@ -26,14 +26,17 @@ interface AddItemForm {
   fechaCaducidad: string;
 }
 
-const emptyAddForm: AddItemForm = {
+const emptyAddFormBase = {
   catalogoCompraId: '',
   cantidadRecibida: '1',
   precioCompraEuros: '0',
-  porcentajeIva: '21',
   numeroLote: '',
   fechaCaducidad: '',
 };
+
+function defaultTaxRate(tipoImpuesto: 'iva' | 'igic'): string {
+  return tipoImpuesto === 'igic' ? '7' : '21';
+}
 
 function selectedCatalogoItem(catalogo: CatalogoCompraItem[], id: string): CatalogoCompraItem | undefined {
   return catalogo.find((c) => c.id === id);
@@ -49,8 +52,17 @@ export default function AlbaranDetailPage({ params }: Readonly<{ params: Promise
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showAddItem, setShowAddItem] = useState(false);
-  const [addForm, setAddForm] = useState<AddItemForm>(emptyAddForm);
+  const [addForm, setAddForm] = useState<AddItemForm>({ ...emptyAddFormBase, porcentajeIva: '21' });
   const [error, setError] = useState('');
+
+  // Sync default rate when empresa fetch resolves (iva→21% / igic→7%)
+  // Only resets if the user hasn't started filling the form yet
+  useEffect(() => {
+    setAddForm((prev) => {
+      if (prev.catalogoCompraId !== '') return prev;
+      return { ...prev, porcentajeIva: defaultTaxRate(tipoImpuesto) };
+    });
+  }, [tipoImpuesto]);
 
   const fetchAlbaran = useCallback(async () => {
     try {
@@ -112,7 +124,7 @@ export default function AlbaranDetailPage({ params }: Readonly<{ params: Promise
       }
 
       await fetchAlbaran();
-      setAddForm(emptyAddForm);
+      setAddForm({ ...emptyAddFormBase, porcentajeIva: defaultTaxRate(tipoImpuesto) });
       setShowAddItem(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
