@@ -43,9 +43,13 @@ interface FacturaForm {
   numeroFactura: string;
   fechaFactura: string;
   base0: string;
+  base3: string;
   base4: string;
+  base7: string;
   base10: string;
+  base15: string;
   base21: string;
+  base95: string;
   ivaManual: string;
   albaranIds: string[];
 }
@@ -55,22 +59,33 @@ const emptyFacturaForm: FacturaForm = {
   numeroFactura: '',
   fechaFactura: new Date().toISOString().slice(0, 10),
   base0: '0',
+  base3: '0',
   base4: '0',
+  base7: '0',
   base10: '0',
+  base15: '0',
   base21: '0',
+  base95: '0',
   ivaManual: '',
   albaranIds: [],
 };
 
 function calcIva(form: FacturaForm): number {
-  const base4 = Number(form.base4) * 0.04;
-  const base10 = Number(form.base10) * 0.10;
-  const base21 = Number(form.base21) * 0.21;
-  return Math.round((base4 + base10 + base21) * 100) / 100;
+  const total =
+    Number(form.base3) * 0.03 +
+    Number(form.base4) * 0.04 +
+    Number(form.base7) * 0.07 +
+    Number(form.base95) * 0.095 +
+    Number(form.base10) * 0.10 +
+    Number(form.base15) * 0.15 +
+    Number(form.base21) * 0.21;
+  return Math.round(total * 100) / 100;
 }
 
 function calcTotal(form: FacturaForm): number {
-  const base = Number(form.base0) + Number(form.base4) + Number(form.base10) + Number(form.base21);
+  const base =
+    Number(form.base0) + Number(form.base3) + Number(form.base4) + Number(form.base7) +
+    Number(form.base10) + Number(form.base15) + Number(form.base21) + Number(form.base95);
   const iva = form.ivaManual !== '' ? Number(form.ivaManual) : calcIva(form);
   return Math.round((base + iva) * 100) / 100;
 }
@@ -138,9 +153,13 @@ export default function FacturasPage() {
         numeroFactura: form.numeroFactura,
         fechaFactura: form.fechaFactura,
         baseImponible0Cents: Math.round(Number(form.base0) * 100),
+        baseImponible3Cents: Math.round(Number(form.base3) * 100),
         baseImponible4Cents: Math.round(Number(form.base4) * 100),
+        baseImponible7Cents: Math.round(Number(form.base7) * 100),
         baseImponible10Cents: Math.round(Number(form.base10) * 100),
+        baseImponible15Cents: Math.round(Number(form.base15) * 100),
         baseImponible21Cents: Math.round(Number(form.base21) * 100),
+        baseImponible95Cents: Math.round(Number(form.base95) * 100),
         ivaSoportadoCents: Math.round(ivaFinal * 100),
         totalFacturaCents: Math.round(totalFinal * 100),
         albaranIds: form.albaranIds,
@@ -330,27 +349,45 @@ export default function FacturasPage() {
             <div>
               <p className="text-sm font-medium text-foreground mb-2">{t('comprasBaseImponible', language)} (€)</p>
               <div className="grid grid-cols-2 gap-3">
-                {(['base0', 'base4', 'base10', 'base21'] as const).map((field, idx) => {
-                  const baseLabels = [
-                    t('comprasBase0', language),
-                    t('comprasBase4', language),
-                    t('comprasBase10', language),
-                    t('comprasBase21', language),
-                  ];
-                  return (
-                    <div key={field}>
-                      <label htmlFor={`fac-${field}`} className="block text-xs font-medium text-muted-foreground mb-1">{baseLabels[idx]}</label>
-                      <Input
-                        id={`fac-${field}`}
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={form[field]}
-                        onChange={updateField(field)}
-                      />
-                    </div>
-                  );
-                })}
+                {([
+                  { field: 'base0',  labelKey: 'comprasBase0' },
+                  { field: 'base4',  labelKey: 'comprasBase4' },
+                  { field: 'base10', labelKey: 'comprasBase10' },
+                  { field: 'base21', labelKey: 'comprasBase21' },
+                ] as const).map(({ field, labelKey }) => (
+                  <div key={field}>
+                    <label htmlFor={`fac-${field}`} className="block text-xs font-medium text-muted-foreground mb-1">{t(labelKey, language)}</label>
+                    <Input
+                      id={`fac-${field}`}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={form[field]}
+                      onChange={updateField(field)}
+                    />
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs font-medium text-muted-foreground mt-3 mb-2">{t('comprasIgicLabel', language)}</p>
+              <div className="grid grid-cols-2 gap-3">
+                {([
+                  { field: 'base3',  labelKey: 'comprasBase3' },
+                  { field: 'base7',  labelKey: 'comprasBase7' },
+                  { field: 'base95', labelKey: 'comprasBase95' },
+                  { field: 'base15', labelKey: 'comprasBase15' },
+                ] as const).map(({ field, labelKey }) => (
+                  <div key={field}>
+                    <label htmlFor={`fac-${field}`} className="block text-xs font-medium text-muted-foreground mb-1">{t(labelKey, language)}</label>
+                    <Input
+                      id={`fac-${field}`}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={form[field]}
+                      onChange={updateField(field)}
+                    />
+                  </div>
+                ))}
               </div>
             </div>
 

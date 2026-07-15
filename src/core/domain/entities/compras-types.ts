@@ -3,7 +3,8 @@
 export type PedidoCompraEstado = 'borrador' | 'enviado' | 'recibido' | 'cancelado';
 export type AlbaranEstado = 'borrador' | 'recibido';
 export type EstadoPago = 'pendiente' | 'pagado_caja' | 'pagado_banco';
-export type PorcentajeIva = 0 | 4 | 10 | 21; // 0 = exento/intracomunitario/no sujeto
+// IVA: 0, 4, 10, 21 | IGIC: 0, 3, 7, 9.5, 15
+export type PorcentajeIva = 0 | 3 | 4 | 7 | 9.5 | 10 | 15 | 21; // 0 = exento/intracomunitario/no sujeto
 
 // ---- Entidades ----
 
@@ -110,9 +111,13 @@ export interface FacturaProveedor {
   numeroFactura: string;
   fechaFactura: string;
   baseImponible0Cents: number;
+  baseImponible3Cents: number;
   baseImponible4Cents: number;
+  baseImponible7Cents: number;
   baseImponible10Cents: number;
+  baseImponible15Cents: number;
   baseImponible21Cents: number;
+  baseImponible95Cents: number;   // 9.5%
   ivaSoportadoCents: number;
   totalFacturaCents: number;
   estadoPago: EstadoPago;
@@ -184,9 +189,13 @@ export interface CreateFacturaProveedorDTO {
   numeroFactura: string;
   fechaFactura: string;
   baseImponible0Cents: number;
+  baseImponible3Cents?: number;
   baseImponible4Cents: number;
+  baseImponible7Cents?: number;
   baseImponible10Cents: number;
+  baseImponible15Cents?: number;
   baseImponible21Cents: number;
+  baseImponible95Cents?: number;  // 9.5%
   ivaSoportadoCents: number;
   totalFacturaCents: number;
   notas?: string;

@@ -12,7 +12,16 @@ import { t } from '@/lib/translations';
 import type { AlbaranCompra, CatalogoCompraItem, PorcentajeIva } from '@/core/domain/entities/compras-types';
 import { albaranEstadoClass } from '../../compras-utils';
 
-const IVA_OPTIONS: PorcentajeIva[] = [0, 4, 10, 21];
+const IVA_OPTIONS: { value: PorcentajeIva; labelKey: string }[] = [
+  { value: 0,    labelKey: 'comprasIvaExento' },
+  { value: 3,    labelKey: 'comprasIgic3' },
+  { value: 4,    labelKey: 'comprasIva4' },
+  { value: 7,    labelKey: 'comprasIgic7' },
+  { value: 9.5,  labelKey: 'comprasIgic95' },
+  { value: 10,   labelKey: 'comprasIva10' },
+  { value: 15,   labelKey: 'comprasIgic15' },
+  { value: 21,   labelKey: 'comprasIva21' },
+];
 
 function formatEuros(cents: number): string {
   return (cents / 100).toFixed(2) + ' €';
@@ -278,8 +287,8 @@ export default function AlbaranDetailPage({ params }: Readonly<{ params: Promise
                   aria-label="Porcentaje de IVA"
                   className="w-full px-3 py-2 rounded-md border border-border bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                 >
-                  {IVA_OPTIONS.map((v) => (
-                    <option key={v} value={v}>{v}%</option>
+                  {IVA_OPTIONS.map(({ value, labelKey }) => (
+                    <option key={value} value={value}>{t(labelKey as Parameters<typeof t>[0], language)}</option>
                   ))}
                 </select>
               </div>

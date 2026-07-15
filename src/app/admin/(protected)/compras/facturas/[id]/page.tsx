@@ -113,10 +113,14 @@ export default function FacturaDetailPage({ params }: Readonly<{ params: Promise
   const isPendiente = factura.estadoPago === 'pendiente';
 
   const ivaRows = [
-    { label: `${t('comprasBaseImponible', language)} 0%`, value: factura.baseImponible0Cents },
-    { label: `${t('comprasBaseImponible', language)} 4%`, value: factura.baseImponible4Cents },
-    { label: `${t('comprasBaseImponible', language)} 10%`, value: factura.baseImponible10Cents },
-    { label: `${t('comprasBaseImponible', language)} 21%`, value: factura.baseImponible21Cents },
+    { label: t('comprasBase0', language),  value: factura.baseImponible0Cents },
+    { label: t('comprasBase4', language),  value: factura.baseImponible4Cents },
+    { label: t('comprasBase10', language), value: factura.baseImponible10Cents },
+    { label: t('comprasBase21', language), value: factura.baseImponible21Cents },
+    ...(factura.baseImponible3Cents  > 0 ? [{ label: t('comprasBase3',  language), value: factura.baseImponible3Cents  }] : []),
+    ...(factura.baseImponible7Cents  > 0 ? [{ label: t('comprasBase7',  language), value: factura.baseImponible7Cents  }] : []),
+    ...(factura.baseImponible95Cents > 0 ? [{ label: t('comprasBase95', language), value: factura.baseImponible95Cents }] : []),
+    ...(factura.baseImponible15Cents > 0 ? [{ label: t('comprasBase15', language), value: factura.baseImponible15Cents }] : []),
     { label: t('comprasIvaSoportado', language), value: factura.ivaSoportadoCents },
     { label: t('comprasTotalFactura', language), value: factura.totalFacturaCents, bold: true },
   ];
