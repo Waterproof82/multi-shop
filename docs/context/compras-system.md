@@ -75,6 +75,23 @@ El orden INSERT-antes-UPDATE garantiza que si falla la escritura del evento, la 
 
 El catálogo y las facturas soportan `porcentaje_iva = 0` (exenciones, operaciones intracomunitarias, régimen especial agrícola). CHECK: `IN (0, 4, 10, 21)`.
 
+## IGIC (Canarias)
+
+Las empresas en las Islas Canarias tributan por IGIC en lugar de IVA. Migración `20260715000002_compras_igic.sql` extiende el soporte:
+
+- `catalogo_compra.porcentaje_iva` — CHECK ampliado a `IN (0, 3, 4, 7, 9.5, 10, 15, 21)` para admitir tipos IGIC
+- `facturas_proveedor` — columnas `base_imponible_3_cents`, `base_imponible_9_5_cents`, `base_imponible_15_cents` añadidas
+- El label del impuesto en UI se deriva de `empresa.tipo_impuesto` (`'iva'|'igic'`); no está hardcodeado
+
+Tipos IGIC en restauración:
+| Tipo | Aplica a |
+|------|----------|
+| 0% | Exenciones, operaciones intracomunitarias |
+| 3% | Productos de primera necesidad (pan, leche, frutas, verduras) |
+| 7% | Tipo general (alimentos procesados, bebidas no alcohólicas) |
+| 9.5% | Bebidas alcohólicas, refrescos |
+| 15% | Labores del tabaco, ciertos lujos |
+
 ## Rutas API (18 endpoints)
 
 Todas bajo `/api/admin/compras/`. Todas usan `resolveAdminContextWithEmpresa`.
