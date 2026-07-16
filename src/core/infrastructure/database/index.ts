@@ -225,3 +225,16 @@ let _comprasRepository: IComprasRepository | undefined;
 export function getComprasRepository(): IComprasRepository {
   return _comprasRepository ??= new SupabaseComprasRepository();
 }
+
+import { SupabaseAnalyticsRepository } from '../repositories/supabase-analytics.repository';
+import { AnalyticsUseCase } from '@/core/application/use-cases/analytics.use-case';
+
+let _analyticsRepository: SupabaseAnalyticsRepository | undefined;
+export function getAnalyticsRepository(): SupabaseAnalyticsRepository {
+  return _analyticsRepository ??= new SupabaseAnalyticsRepository();
+}
+
+let _analyticsUseCase: AnalyticsUseCase | undefined;
+export function getAnalyticsUseCase(): AnalyticsUseCase {
+  return _analyticsUseCase ??= new AnalyticsUseCase(getAnalyticsRepository());
+}

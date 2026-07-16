@@ -18,6 +18,7 @@ function mapIngrediente(row: Record<string, unknown>): Ingrediente {
     unidad: row.unidad as Ingrediente['unidad'],
     cantidadActual: Number(row.cantidad_actual),
     umbralAlerta: Number(row.umbral_alerta),
+    precioCmpCents: Number(row.precio_cmp_cents ?? 0),
     createdAt: row.created_at as string,
   };
 }
@@ -40,6 +41,9 @@ function mapMovimiento(row: Record<string, unknown>): MovimientoStock {
     cantidad: Number(row.cantidad),
     referenciaId: (row.referencia_id as string) ?? null,
     turnoId: (row.turno_id as string) ?? null,
+    precioUnitarioCmpCents: row.precio_unitario_cmp_cents != null
+      ? Number(row.precio_unitario_cmp_cents)
+      : null,
     createdAt: row.created_at as string,
   };
 }
