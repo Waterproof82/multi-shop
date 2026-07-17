@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { AdminSidebar } from './admin-sidebar';
 import { AdminProvider } from '@/lib/admin-context';
+import { LanguageProvider } from '@/lib/language-context';
 import { getAuthAdminUseCase, getEmpresaUseCase } from '@/core/infrastructure/database';
 import { AdminThemeProvider } from '@/components/admin-theme-provider';
 import { SUPERADMIN_ROLE } from '@/core/domain/repositories/IAdminRepository';
@@ -72,6 +73,7 @@ export default async function AdminProtectedLayout({
   }
 
   return (
+    <LanguageProvider>
     <AdminThemeProvider>
       <AdminProvider
         empresaId={empresaId}
@@ -102,5 +104,6 @@ export default async function AdminProtectedLayout({
         </div>
       </AdminProvider>
     </AdminThemeProvider>
+    </LanguageProvider>
   );
 }

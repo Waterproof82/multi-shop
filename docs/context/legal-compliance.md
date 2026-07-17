@@ -74,6 +74,27 @@ Registro de normativas aplicables al sistema. Actualizar cada vez que se identif
 
 ---
 
+## Módulo: Food Cost Analytics
+
+### CMP (Coste Medio Ponderado) — sin obligación legal directa
+- El CMP no está regulado por ley, pero es el método contable estándar para valoración de existencias (PGC / NIC 2).
+- La implementación es append-only: `movimientos_stock` no permite UPDATE/DELETE (`anon` ni `authenticated`). El CMP recalculado se guarda en `ingredientes.precio_cmp_cents` por trigger atómico.
+
+---
+
+## Módulo: Fiscal / Canarias (IGIC)
+
+### Decreto 182/1992 y sucesivos — Impuesto General Indirecto Canario (IGIC)
+- **Qué exige:** Las empresas domiciliadas en las Islas Canarias tributan por IGIC, no por IVA. Los tipos generales son 0%, 3%, 7%, 9.5% y 15%.
+- **Donde aplica en el sistema:**
+  - `empresa.tipo_impuesto` — `'igic'` activa la lógica IGIC en toda la plataforma
+  - `catalogo_compra.porcentaje_iva` — CHECK ampliado `IN (0, 3, 4, 7, 9.5, 10, 15, 21)` para cubrir ambos regímenes
+  - `facturas_proveedor` — columnas `base_imponible_3_cents`, `base_imponible_9_5_cents`, `base_imponible_15_cents`
+  - TPV cobros: `porcentaje_impuesto` grabado por cobro — no se recalcula si cambia la config
+- **Fichero clave:** `supabase/migrations/20260715000002_compras_igic.sql`
+
+---
+
 ## Protección de Datos
 
 ### RGPD / Ley Orgánica 3/2018 (LOPDGDD)

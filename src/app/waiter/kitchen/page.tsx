@@ -24,13 +24,22 @@ interface KitchenItem {
   pase: string | null;
 }
 
-const PASE_ORDER = ['primer', 'segundo', 'postre', 'bebida', null] as const;
+const PASE_ORDER = ['primer', 'segundo', 'postre', null] as const;
 const PASE_LABEL: Record<string, string> = {
   primer: '1er Pase',
   segundo: '2º Pase',
   postre: 'Postre',
-  bebida: 'Bebidas',
 };
+const PASE_COLOR: Record<string, { bg: string; text: string; border: string; header: string }> = {
+  primer:  { bg: 'oklch(24% 0.14 45)',  text: 'oklch(82% 0.20 45)',  border: 'oklch(52% 0.22 45 / 0.7)',  header: 'oklch(78% 0.22 45)'  },
+  segundo: { bg: 'oklch(22% 0.12 252)', text: 'oklch(78% 0.18 252)', border: 'oklch(50% 0.20 252 / 0.7)', header: 'oklch(74% 0.20 252)' },
+  postre:  { bg: 'oklch(22% 0.12 148)', text: 'oklch(76% 0.20 148)', border: 'oklch(48% 0.22 148 / 0.7)', header: 'oklch(72% 0.22 148)' },
+};
+
+function getPaseIndex(pase: string | null): number {
+  const idx = PASE_ORDER.indexOf(pase as typeof PASE_ORDER[number]);
+  return idx === -1 ? PASE_ORDER.length - 1 : idx;
+}
 
 const BG        = 'oklch(13% 0.02 252)';
 const TEXT_MAIN = 'oklch(92% 0.02 252)';
@@ -113,8 +122,8 @@ interface MergedKitchenItem {
 function groupKitchenMesaItems(items: KitchenItem[]): MergedKitchenItem[] {
   const map = new Map<string, MergedKitchenItem>();
   for (const item of items) {
-    // Include estado and nota in key: same name but different estado/nota stays separate
-    const key = `${item.nombre}|${item.complementos ?? ''}|${item.nota ?? ''}|${item.estado}`;
+    // Include estado, nota, and pase in key: same name but different pase/estado/nota stays separate
+    const key = `${item.nombre}|${item.complementos ?? ''}|${item.nota ?? ''}|${item.estado}|${item.pase ?? ''}`;
     if (!map.has(key)) {
       map.set(key, {
         mergeKey: key,
@@ -221,7 +230,7 @@ function getItemStatusText(estado: ItemEstado, lang: Language): string {
   if (estado === 'listo')          return t('kitchenItemListo', lang);
   if (estado === 'retenido')       return t('kitchenItemRetenido', lang);
   if (estado === 'en_preparacion') return t('orderStatusAnotado', lang);
-  return t('orderStatusPending', lang);
+  return t('kitchenEnCocina', lang);
 }
 
 function getItemActionColor(estado: ItemEstado): string {
@@ -693,9 +702,17 @@ export default function WaiterKitchenPage() {
         {/* Card content — this div translates during drag */}
         <div data-card-content="" className="relative flex items-center gap-3 px-3 py-3.5" style={{ background: cardColor.bg }}>
           <div className="flex-1 min-w-0">
-            <div className="flex items-baseline gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{item.cantidad}×</span>
-              <span className="text-xs truncate" style={{ color: TEXT_MAIN }}>{item.nombre || '—'}</span>
+              <span className="text-xs" style={{ color: TEXT_MAIN }}>{item.nombre || '—'}</span>
+              {item.pase && PASE_LABEL[item.pase] && (() => {
+                const pc = PASE_COLOR[item.pase];
+                return pc ? (
+                  <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded" style={{ background: pc.bg, color: pc.text, border: `1px solid ${pc.border}` }}>
+                    {PASE_LABEL[item.pase]}
+                  </span>
+                ) : null;
+              })()}
             </div>
             {item.complementos && (
               <div className="mt-0.5">
@@ -770,9 +787,18 @@ export default function WaiterKitchenPage() {
         </div>
         <div data-card-content="" className="relative flex items-center gap-3 px-3 py-3.5" style={{ background: cardColor.bg }}>
           <div className="flex-1 min-w-0">
-            <div className="flex items-baseline gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{merged.totalCantidad}×</span>
-              <span className="text-xs truncate" style={{ color: TEXT_MAIN }}>{merged.nombre}</span>
+              <span className="text-xs" style={{ color: TEXT_MAIN }}>{merged.nombre}</span>
+              {(() => {
+                const rp = merged.items[0]?.pase ?? null;
+                const pc = rp ? PASE_COLOR[rp] : null;
+                return rp && pc && PASE_LABEL[rp] ? (
+                  <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded" style={{ background: pc.bg, color: pc.text, border: `1px solid ${pc.border}` }}>
+                    {PASE_LABEL[rp]}
+                  </span>
+                ) : null;
+              })()}
             </div>
             {merged.complementos && (
               <div className="mt-0.5">
@@ -931,11 +957,13 @@ export default function WaiterKitchenPage() {
                     }))
                     .filter(g => g.items.length > 0);
                   const showPaseHeaders = nuevosByPase.length > 1 || (nuevosByPase.length === 1 && nuevosByPase[0]?.pase !== null);
-                  return nuevosByPase.map(grupo => (
+                  return nuevosByPase.map(grupo => {
+                    const pc = grupo.pase ? PASE_COLOR[grupo.pase] : null;
+                    return (
                     <div key={grupo.pase ?? 'null'}>
                       {showPaseHeaders && (
-                        <div className="px-1 py-1.5 mb-1 border-b" style={{ borderColor: 'oklch(35% 0.06 252 / 0.5)' }}>
-                          <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'oklch(65% 0.18 270)' }}>
+                        <div className="px-1 py-1.5 mb-1 border-b" style={{ borderColor: pc ? pc.border : 'oklch(35% 0.06 252 / 0.5)' }}>
+                          <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: pc ? pc.header : TEXT_DIM }}>
                             {grupo.label}
                           </span>
                         </div>
@@ -955,7 +983,8 @@ export default function WaiterKitchenPage() {
                         );
                       })}
                     </div>
-                  ));
+                  );
+                  });
                 })()}
               </div>
             </div>
@@ -1019,8 +1048,10 @@ export default function WaiterKitchenPage() {
           <div className="flex flex-col gap-5">
             {Array.from(groupByMesa(items).entries()).map(([mesaKey, group]) => {
               const sorted = [...group.items].sort((a, b) => {
-                const diff = getKitchenSortOrder(a.estado) - getKitchenSortOrder(b.estado);
-                if (diff !== 0) return diff;
+                const paseDiff = getPaseIndex(a.pase) - getPaseIndex(b.pase);
+                if (paseDiff !== 0) return paseDiff;
+                const estadoDiff = getKitchenSortOrder(a.estado) - getKitchenSortOrder(b.estado);
+                if (estadoDiff !== 0) return estadoDiff;
                 const nameComp = a.nombre.localeCompare(b.nombre);
                 return nameComp === 0 ? a.createdAt.localeCompare(b.createdAt) : nameComp;
               });

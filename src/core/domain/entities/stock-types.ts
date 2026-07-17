@@ -9,6 +9,7 @@ export interface Ingrediente {
   unidad: UnidadMedida;
   cantidadActual: number;
   umbralAlerta: number;
+  precioCmpCents: number; // Weighted average cost (CMP) in cents. 0 = never received.
   createdAt: string;
 }
 
@@ -27,6 +28,7 @@ export interface MovimientoStock {
   cantidad: number;
   referenciaId: string | null;
   turnoId: string | null;
+  precioUnitarioCmpCents: number | null; // CMP snapshot at insert time. null for pre-migration rows.
   createdAt: string;
 }
 

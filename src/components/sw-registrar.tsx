@@ -4,10 +4,20 @@ import { useEffect } from 'react';
 
 export function SwRegistrar() {
   useEffect(() => {
-    if (
-      process.env.NODE_ENV !== 'production' ||
-      !('serviceWorker' in navigator)
-    ) {
+    if (!('serviceWorker' in navigator)) return;
+
+    if (process.env.NODE_ENV !== 'production') {
+      void navigator.serviceWorker.getRegistrations()
+        .then((registrations) => {
+          return Promise.all(
+            registrations
+              .filter((registration) => registration.scope.includes('/waiter'))
+              .map((registration) => registration.unregister())
+          );
+        })
+        .catch(() => {
+          // Ignore cleanup failures in dev.
+        });
       return;
     }
 

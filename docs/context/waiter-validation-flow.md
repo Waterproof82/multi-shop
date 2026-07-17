@@ -154,13 +154,14 @@ Only **kitchen-retained** items (`from_validation = false`) appear in this count
 
 ---
 
-## Cart Deferred Items (Waiter Mode)
+## Waiter Orders — Always Through Pendientes
+All pedidos placed by a waiter impersonating a table (`isWaiter = true`) are created with `initialEstado = 'pendiente_validacion'`, regardless of pase assignment.
 
-In waiter mode, the cart's Pause button lets waiters mark **comida** items to send later as kitchen-retained pedidos. **Bebida items cannot be deferred** — they always go to bar immediately.
+The only exception is an explicit `initialEstado: 'retenido'` via the internal API (not reachable from the cart UI).
 
-- The Pause button is hidden for `tipoProducto === 'bebida'` in both the quantity dialog and the cart drawer.
-- If a cart contains **only** deferred items (all comida, all paused), "Enviar" creates a pedido directly with `initialEstado = 'retenido'`.
-- If a cart contains a mix of regular + deferred items, two pedidos are created: one normal, one with `initialEstado = 'retenido'`.
+The deferred/retenido cart flow (Pause button per item, `toDefer` split) was removed. Retaining items is now managed exclusively from `/waiter/pendientes` via the pause button per item.
+
+> See `docs/context/waiter-pases.md` for the full per-item pase system.
 
 ---
 

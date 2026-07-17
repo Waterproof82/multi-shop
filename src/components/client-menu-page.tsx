@@ -249,7 +249,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
         {t("skipToContent", language)}
       </a>
 
-      {/* Waiter sticky search bar — at flex-root level + z-[60] to cover site header strip */}
+      {/* Waiter sticky search bar — z-[60]; Dialog overlay is z-[70] so it always covers this */}
       {showWaiterSearch && (
         <div className="sticky top-12 z-[60] w-full bg-background border-b border-border">
           <div className="max-w-2xl mx-auto px-4 py-2 relative">

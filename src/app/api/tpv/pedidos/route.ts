@@ -17,7 +17,8 @@ const bodySchema = z.object({
   mesaId: z.string().uuid(),
   items: z.array(itemSchema).min(1).max(50),
   nota: z.string().max(500).optional(),
-  pase: z.enum(['primer', 'segundo', 'postre', 'bebida']).optional(),
+  pase: z.enum(['primer', 'segundo', 'postre']).optional(),
+  directoACocina: z.boolean().optional().default(false),
 });
 
 export async function GET(req: NextRequest) {
@@ -148,7 +149,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
   }
 
-  const { mesaId, items, nota, pase } = parsed.data;
+  const { mesaId, items, nota, pase, directoACocina } = parsed.data;
+  const initialEstado = directoACocina ? 'pendiente' : 'pendiente_validacion';
 
   const mesaResult = await getMesaUseCase().getMesa(mesaId);
   if (!mesaResult.success || !mesaResult.data) {
@@ -168,22 +170,15 @@ export async function POST(req: NextRequest) {
         ...(it.nota ? { note: it.nota } : {}),
       })),
       nota,
+      pase,
     },
     mesa.numero,
     mesa.nombre ?? null,
-    'pendiente'
+    initialEstado
   );
 
   if (!pedidoResult.success) {
     return NextResponse.json({ error: pedidoResult.error.message }, { status: 500 });
-  }
-
-  // Set pase if provided (best-effort — does not fail the request if update fails)
-  if (pase) {
-    await getSupabaseClient()
-      .from('pedidos')
-      .update({ pase })
-      .eq('id', pedidoResult.data.id);
   }
 
   // Fetch the active session created by the use case (needed when mesa was libre)
