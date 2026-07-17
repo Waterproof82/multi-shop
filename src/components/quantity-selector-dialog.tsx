@@ -178,6 +178,10 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
                 const isComplete = grupo.obligatorio ? selectedCount > 0 : true;
                 const progressMax = grupo.tipo === 'radio' ? 1 : Math.max(1, grupo.opciones.length);
                 const progressPct = isComplete ? 100 : Math.min(100, (selectedCount / progressMax) * 100);
+                let barBackground = 'oklch(60% 0.18 25)';
+                if (isComplete) {
+                  barBackground = grupo.obligatorio ? 'oklch(60% 0.15 145)' : 'oklch(60% 0.15 250)';
+                }
                 return (
                   <div key={grupo.id} className="mb-4">
                     <div className="flex items-center justify-between mb-1.5">
@@ -195,51 +199,40 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
                     <div className="h-1 rounded-full mb-2 overflow-hidden bg-muted">
                       <div
                         className="h-full rounded-full transition-all duration-300"
-                        style={{
-                          width: `${progressPct}%`,
-                          background: isComplete
-                            ? (grupo.obligatorio ? 'oklch(60% 0.15 145)' : 'oklch(60% 0.15 250)')
-                            : 'oklch(60% 0.18 25)',
-                        }}
+                        style={{ width: `${progressPct}%`, background: barBackground }}
                       />
                     </div>
                     <div className="flex flex-col gap-1.5">
                       {grupo.opciones.map(opcion => {
                         const isSelected = selectedByGroup[grupo.id]?.has(opcion.id) ?? false;
-                        const toggle = grupo.tipo === 'radio'
+                        const inputType = grupo.tipo === 'radio' ? 'radio' : 'checkbox';
+                        const toggle = inputType === 'radio'
                           ? () => toggleRadio(grupo.id, opcion.id)
                           : () => toggleCheckbox(grupo.id, opcion.id);
                         return (
-                          <button
+                          <label
                             key={opcion.id}
-                            type="button"
-                            role={grupo.tipo === 'radio' ? 'radio' : 'checkbox'}
-                            aria-checked={isSelected}
-                            onClick={toggle}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-all w-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-all w-full outline-none cursor-pointer [&:has(input:focus-visible)]:ring-2 [&:has(input:focus-visible)]:ring-ring [&:has(input:focus-visible)]:ring-offset-2"
                             style={{
                               background: isSelected ? 'color-mix(in oklch, var(--color-primary) 15%, transparent)' : 'transparent',
                               borderColor: isSelected ? 'var(--color-primary)' : undefined,
                             }}
                           >
-                            <span
-                              className={`w-4 h-4 shrink-0 flex items-center justify-center border-2 transition-colors ${isSelected ? 'border-primary' : 'border-muted-foreground/40'}`}
-                              style={{ borderRadius: grupo.tipo === 'radio' ? '50%' : '4px' }}
-                            >
-                              {isSelected && grupo.tipo === 'radio' && (
-                                <span className="w-2 h-2 rounded-full bg-primary" />
-                              )}
-                              {isSelected && grupo.tipo === 'checkbox' && (
-                                <span className="text-[10px] font-bold leading-none text-primary">✓</span>
-                              )}
-                            </span>
+                            <input
+                              type={inputType}
+                              checked={isSelected}
+                              onChange={toggle}
+                              className="w-4 h-4 accent-primary cursor-pointer"
+                              aria-label={resolveOpcionName(opcion, language)}
+                            />
+
                             <span className="flex-1 text-sm">{resolveOpcionName(opcion, language)}</span>
                             {opcion.price > 0 && (
                               <span className="text-xs font-medium shrink-0 text-primary">
                                 +{formatPrice(opcion.price, 'EUR', language)}
                               </span>
                             )}
-                          </button>
+                          </label>
                         );
                       })}
                     </div>

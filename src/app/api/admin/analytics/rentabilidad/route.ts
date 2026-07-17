@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     return validationErrorResponse('Missing required params: desde, hasta');
   }
 
-  if (isNaN(Date.parse(desde)) || isNaN(Date.parse(hasta))) {
+  if (Number.isNaN(Date.parse(desde)) || Number.isNaN(Date.parse(hasta))) {
     return validationErrorResponse('Invalid date format for desde or hasta');
   }
 

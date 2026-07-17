@@ -29,6 +29,18 @@ function fmt(euros: number): string {
   return euros.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
 }
 
+function paseShortLabel(p?: string): string {
+  if (p === 'primer') return '1er';
+  if (p === 'segundo') return '2º';
+  return 'Postre';
+}
+
+function paseLongLabel(p: 'primer' | 'segundo' | 'postre') {
+  if (p === 'primer') return '1er pase';
+  if (p === 'segundo') return '2º pase';
+  return 'Postre';
+}
+
 const ESTADO_LABEL: Record<string, string> = {
   pendiente: 'Pendiente',
   en_preparacion: 'En cocina',
@@ -52,6 +64,7 @@ export function TicketPanel({
   existingTotal, pendingTotal, yaCobradoCents, turnoId, tipoImpuesto, porcentajeImpuesto,
   sesionPagada, onRemovePending, onUpdatePendingNota, onPendingSent,
 }: Readonly<Props>) {
+  
   const router = useRouter();
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
@@ -73,9 +86,8 @@ export function TicketPanel({
     o => ['pendiente_validacion', 'pendiente', 'en_preparacion', 'preparado', 'retenido'].includes(o.estado)
   );
 
-  const mesaLabel = mesaNumero !== null
-    ? `Mesa ${mesaNumero}${mesaName ? ` · ${mesaName}` : ''}`
-    : null;
+  const mesaNamePart = mesaName ? ` · ${mesaName}` : '';
+  const mesaLabel = mesaNumero !== null ? `Mesa ${mesaNumero}${mesaNamePart}` : null;
 
   function saveNota(pedidoId: string, nota: string) {
     if (notaSaveRef.current) clearTimeout(notaSaveRef.current);
@@ -126,9 +138,7 @@ export function TicketPanel({
                 Pedido #{order.numeroPedido}
                 {getNota(order) && <span className="ml-1.5 text-[#4f72ff]">✎</span>}
                 {order.pase && (
-                  <span className="ml-2 text-[#4f72ff]">
-                    {order.pase === 'primer' ? '1er' : order.pase === 'segundo' ? '2º' : 'Postre'}
-                  </span>
+                  <span className="ml-2 text-[#4f72ff]">{paseShortLabel(order.pase)}</span>
                 )}
               </span>
               <span
@@ -139,7 +149,7 @@ export function TicketPanel({
               </span>
             </button>
             {order.items.map((item, idx) => (
-              <div key={idx} className="flex items-start gap-2.5 px-4 py-2 hover:bg-[#22263a]/50 transition-colors">
+              <div key={`${order.id}-${idx}`} className="flex items-start gap-2.5 px-4 py-2 hover:bg-[#22263a]/50 transition-colors">
                 <span className="w-5 h-5 rounded bg-[#22263a] text-[#6b7280] text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
                   {item.cantidad}
                 </span>
@@ -248,7 +258,7 @@ export function TicketPanel({
         )}
         {pendingItems.length > 0 && (
           <div className="flex gap-1 flex-wrap">
-            {(['primer', 'segundo', 'postre'] as const).map(p => (
+                {(['primer', 'segundo', 'postre'] as const).map(p => (
               <button
                 key={p}
                 type="button"
@@ -258,9 +268,9 @@ export function TicketPanel({
                     ? 'bg-[#4f72ff] border-[#4f72ff] text-white'
                     : 'border-[#2e3347] text-[#6b7280] hover:text-white hover:border-[#4f72ff]'
                 }`}
-              >
-                {p === 'primer' ? '1er pase' : p === 'segundo' ? '2º pase' : 'Postre'}
-              </button>
+                >
+                {paseLongLabel(p)}
+                </button>
             ))}
             <button
               type="button"

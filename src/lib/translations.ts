@@ -176,7 +176,7 @@ export const translations = {
     adminPanel: "Panel de Administración",
     loginSubtitle: "Inicia sesión con tu cuenta",
     email: "Email",
-    passwordLabel: "Contraseña",
+    passwordLabel: "Contraseña", // NOSONAR - UI label text, not a credential
     signingIn: "Iniciando sesión...",
     backToMenu: "Volver al catálogo",
     loginFormError: "Error al cargar el formulario. Por favor, recarga la página.",
