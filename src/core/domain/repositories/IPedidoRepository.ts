@@ -83,6 +83,7 @@ export interface PendienteValidacionItem {
   tipo: 'comida' | 'bebida';
   complementos?: string;
   nota?: string;
+  pase?: string | null;
 }
 
 export interface PendienteValidacionPedido {
@@ -110,13 +111,15 @@ export interface IPedidoRepository {
   createMesaOrder(params: {
     empresaId: string;
     mesaId: string;
-    items: { producto_id?: string; nombre: string; cantidad: number; precio: number; tipo_producto?: string; translations?: unknown; nota?: string; complementos?: { nombre: string; precio: number }[] }[];
+    items: { producto_id?: string; nombre: string; cantidad: number; precio: number; tipo_producto?: string; translations?: unknown; nota?: string; complementos?: { nombre: string; precio: number }[]; pase?: string | null }[];
     total: number;
     trackingToken: string;
     sesionId: string | null;
     initialEstado?: 'pendiente' | 'retenido' | 'pendiente_validacion';
     nota?: string;
+    pase?: string | null;
   }): Promise<Result<{ id: string; numero_pedido: number; tracking_token: string }>>;
+  updateItemPase(empresaId: string, pedidoId: string, itemIdx: number, pase: string | null): Promise<Result<void>>;
   findEstimatedReadyAtById(pedidoId: string): Promise<Result<string | null>>;
   findStatusById(pedidoId: string): Promise<Result<string | null>>;
   updateEstimatedTime(pedidoId: string, minutes: number): Promise<Result<void>>;

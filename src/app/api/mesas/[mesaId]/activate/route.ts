@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
+import { getEmpresaPublicRepository } from '@/core/infrastructure/database';
+import { getDomainFromHeaders, parseMainDomain } from '@/lib/domain-utils';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 
 const mesaIdSchema = z.string().uuid();
@@ -23,9 +25,16 @@ export async function POST(
   const parsed = mesaIdSchema.safeParse(mesaId);
   if (!parsed.success) return NextResponse.json({ error: 'Invalid mesaId' }, { status: 400 });
 
-  // Tenant isolation: verify the mesa belongs to the empresa derived from the request domain
-  const empresaId = request.headers.get('x-empresa-id');
-  if (!empresaId) return NextResponse.json({ error: 'Tenant no identificado' }, { status: 400 });
+  // Tenant isolation: derive empresa from domain (public route — proxy does not inject x-empresa-id)
+  let empresaId = request.headers.get('x-empresa-id');
+  if (!empresaId) {
+    const domain = await getDomainFromHeaders();
+    const empresaResult = await getEmpresaPublicRepository().findByDomain(parseMainDomain(domain));
+    if (!empresaResult.success || !empresaResult.data) {
+      return NextResponse.json({ error: 'Tenant no identificado' }, { status: 400 });
+    }
+    empresaId = empresaResult.data.id;
+  }
 
   const supabase = getSupabaseClient();
 

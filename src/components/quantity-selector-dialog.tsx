@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, Minus, Check, Pause, MessageSquarePlus, ChevronUp } from "lucide-react"
+import { Plus, Minus, Check, MessageSquarePlus, ChevronUp } from "lucide-react"
 import { getWaiterMesa } from "@/components/waiter-login-form"
 import {
   Dialog,
@@ -56,6 +56,19 @@ function getBadgeText(grupo: ComplementGroupVM): string {
   return grupo.tipo === 'radio' ? 'Obligatorio · elige 1' : 'Obligatorio · elige al menos 1';
 }
 
+type PaseKey = 'primer' | 'segundo' | 'postre';
+const PASE_LABELS: Record<PaseKey, string> = { primer: '1er pase', segundo: '2º pase', postre: 'Postre' };
+const PASE_COLORS: Record<PaseKey, { bg: string; text: string; border: string }> = {
+  primer:  { bg: 'oklch(24% 0.14 45)',  text: 'oklch(82% 0.20 45)',  border: 'oklch(52% 0.22 45 / 0.7)'  },
+  segundo: { bg: 'oklch(22% 0.12 252)', text: 'oklch(78% 0.18 252)', border: 'oklch(50% 0.20 252 / 0.7)' },
+  postre:  { bg: 'oklch(22% 0.12 148)', text: 'oklch(76% 0.20 148)', border: 'oklch(48% 0.22 148 / 0.7)' },
+};
+
+function notePreviewText(note: string, showNote: boolean): string {
+  if (!note || showNote) return '';
+  return ` · ${note.length > 30 ? note.slice(0, 30) + '…' : note}`;
+}
+
 function resolveOpcionName(opcion: ComplementVM, language: string): string {
   const lang = (['en', 'fr', 'it', 'de'].includes(language) ? language : undefined) as 'en' | 'fr' | 'it' | 'de' | undefined;
   if (lang && opcion.translations?.[lang]?.name) {
@@ -69,7 +82,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
   const [quantity, setQuantity] = useState(1)
   const [selectedByGroup, setSelectedByGroup] = useState<Record<string, Set<string>>>({})
   const [addedAnimation, setAddedAnimation] = useState(false)
-  const [isDeferred, setIsDeferred] = useState(false)
+  const [selectedPase, setSelectedPase] = useState<PaseKey | null>(null)
   const [note, setNote] = useState('')
   const [showNote, setShowNote] = useState(false)
   const { language } = useLanguage()
@@ -81,7 +94,8 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
     if (open && item) {
       setQuantity(1);
       setSelectedByGroup({});
-      setIsDeferred(false);
+
+      setSelectedPase(null);
       setNote('');
       setShowNote(false);
     }
@@ -130,13 +144,14 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
       g.opciones.filter(o => selectedByGroup[g.id]?.has(o.id))
     );
     const complementos = selectedOpciones.length > 0 ? selectedOpciones : undefined;
-    addItem(item, quantity, complementos, isDeferred || undefined, note.trim() || undefined);
+    addItem(item, quantity, complementos, undefined, note.trim() || undefined, selectedPase ?? undefined);
     setAddedAnimation(true);
     setTimeout(() => {
       onOpenChange(false);
       setQuantity(1);
       setSelectedByGroup({});
-      setIsDeferred(false);
+
+      setSelectedPase(null);
       setNote('');
       setShowNote(false);
       setAddedAnimation(false);
@@ -147,7 +162,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-screen h-[100dvh] max-w-none rounded-none flex flex-col p-0 gap-0" onOpenAutoFocus={(e) => e.preventDefault()}>
+      <DialogContent className="w-screen h-dvh overflow-hidden max-w-none sm:max-w-none rounded-none border-0 shadow-none flex flex-col p-0 gap-0 top-0 left-0 translate-x-0 translate-y-0" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader className="px-5 pt-5 pb-4 shrink-0 border-b">
           <DialogTitle>{t("selectQuantity", language)}</DialogTitle>
           <DialogDescription>
@@ -163,6 +178,10 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
                 const isComplete = grupo.obligatorio ? selectedCount > 0 : true;
                 const progressMax = grupo.tipo === 'radio' ? 1 : Math.max(1, grupo.opciones.length);
                 const progressPct = isComplete ? 100 : Math.min(100, (selectedCount / progressMax) * 100);
+                let barBackground = 'oklch(60% 0.18 25)';
+                if (isComplete) {
+                  barBackground = grupo.obligatorio ? 'oklch(60% 0.15 145)' : 'oklch(60% 0.15 250)';
+                }
                 return (
                   <div key={grupo.id} className="mb-4">
                     <div className="flex items-center justify-between mb-1.5">
@@ -180,51 +199,40 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
                     <div className="h-1 rounded-full mb-2 overflow-hidden bg-muted">
                       <div
                         className="h-full rounded-full transition-all duration-300"
-                        style={{
-                          width: `${progressPct}%`,
-                          background: isComplete
-                            ? (grupo.obligatorio ? 'oklch(60% 0.15 145)' : 'oklch(60% 0.15 250)')
-                            : 'oklch(60% 0.18 25)',
-                        }}
+                        style={{ width: `${progressPct}%`, background: barBackground }}
                       />
                     </div>
                     <div className="flex flex-col gap-1.5">
                       {grupo.opciones.map(opcion => {
                         const isSelected = selectedByGroup[grupo.id]?.has(opcion.id) ?? false;
-                        const toggle = grupo.tipo === 'radio'
+                        const inputType = grupo.tipo === 'radio' ? 'radio' : 'checkbox';
+                        const toggle = inputType === 'radio'
                           ? () => toggleRadio(grupo.id, opcion.id)
                           : () => toggleCheckbox(grupo.id, opcion.id);
                         return (
-                          <button
+                          <label
                             key={opcion.id}
-                            type="button"
-                            role={grupo.tipo === 'radio' ? 'radio' : 'checkbox'}
-                            aria-checked={isSelected}
-                            onClick={toggle}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-all w-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-all w-full outline-none cursor-pointer [&:has(input:focus-visible)]:ring-2 [&:has(input:focus-visible)]:ring-ring [&:has(input:focus-visible)]:ring-offset-2"
                             style={{
                               background: isSelected ? 'color-mix(in oklch, var(--color-primary) 15%, transparent)' : 'transparent',
                               borderColor: isSelected ? 'var(--color-primary)' : undefined,
                             }}
                           >
-                            <span
-                              className={`w-4 h-4 shrink-0 flex items-center justify-center border-2 transition-colors ${isSelected ? 'border-primary' : 'border-muted-foreground/40'}`}
-                              style={{ borderRadius: grupo.tipo === 'radio' ? '50%' : '4px' }}
-                            >
-                              {isSelected && grupo.tipo === 'radio' && (
-                                <span className="w-2 h-2 rounded-full bg-primary" />
-                              )}
-                              {isSelected && grupo.tipo === 'checkbox' && (
-                                <span className="text-[10px] font-bold leading-none text-primary">✓</span>
-                              )}
-                            </span>
+                            <input
+                              type={inputType}
+                              checked={isSelected}
+                              onChange={toggle}
+                              className="w-4 h-4 accent-primary cursor-pointer"
+                              aria-label={resolveOpcionName(opcion, language)}
+                            />
+
                             <span className="flex-1 text-sm">{resolveOpcionName(opcion, language)}</span>
                             {opcion.price > 0 && (
                               <span className="text-xs font-medium shrink-0 text-primary">
                                 +{formatPrice(opcion.price, 'EUR', language)}
                               </span>
                             )}
-                          </button>
+                          </label>
                         );
                       })}
                     </div>
@@ -246,7 +254,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
               }`}
             >
               <MessageSquarePlus className={`w-3.5 h-3.5 shrink-0 transition-colors ${showNote ? 'text-primary' : ''}`} />
-              <span className="flex-1 text-left">{t("itemNote", language)}{note && !showNote ? ` · ${note.length > 30 ? note.slice(0, 30) + '…' : note}` : ''}</span>
+              <span className="flex-1 text-left">{t("itemNote", language)}{notePreviewText(note, showNote)}</span>
               <ChevronUp className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${showNote ? 'rotate-0' : 'rotate-180'}`} />
             </button>
             {showNote && (
@@ -298,25 +306,32 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
           </div>
 
           {isWaiterMode && item.tipoProducto !== 'bebida' && (
-          <button
-            type="button"
-            onClick={() => setIsDeferred(prev => !prev)}
-            className={`w-full flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm transition-all ${
-              isDeferred
-                ? 'border-orange-400/60 bg-orange-50 dark:bg-orange-950/30'
-                : 'border-border bg-muted/40 hover:bg-muted/70'
-            }`}
-          >
-            <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors ${
-              isDeferred ? 'border-orange-500 bg-orange-500' : 'border-muted-foreground/40'
-            }`}>
-              {isDeferred && <Check className="w-3 h-3 text-white" />}
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">
+              Pase <span className="text-destructive">*</span>
+            </p>
+            <div className="flex gap-2">
+              {(['primer', 'segundo', 'postre'] as PaseKey[]).map(p => {
+                const pc = PASE_COLORS[p];
+                const isSelected = selectedPase === p;
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setSelectedPase(prev => prev === p ? null : p)}
+                    className="flex-1 rounded-lg border px-2 py-2 text-xs font-medium transition-all"
+                    style={{
+                      background: isSelected ? pc.bg : `color-mix(in oklch, ${pc.bg} 35%, transparent)`,
+                      color: isSelected ? pc.text : `color-mix(in oklch, ${pc.text} 70%, var(--color-muted-foreground))`,
+                      borderColor: isSelected ? pc.border : `color-mix(in oklch, ${pc.border} 50%, transparent)`,
+                    }}
+                  >
+                    {PASE_LABELS[p]}
+                  </button>
+                );
+              })}
             </div>
-            <Pause className={`w-4 h-4 shrink-0 ${isDeferred ? 'text-orange-500' : 'text-muted-foreground'}`} />
-            <span className={isDeferred ? 'font-semibold text-orange-700 dark:text-orange-300' : 'text-muted-foreground'}>
-              Añadir como retenido
-            </span>
-          </button>
+          </div>
           )}
           </div>
         </div>
@@ -325,7 +340,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
           <RippleButton
             type="button"
             onClick={handleConfirmAddToCart}
-            disabled={!isGroupsValid(effectiveGroups, selectedByGroup) || addedAnimation}
+            disabled={!isGroupsValid(effectiveGroups, selectedByGroup) || addedAnimation || (isWaiterMode && item.tipoProducto !== 'bebida' && !selectedPase)}
             className={addedAnimation ? 'animate-complement-select' : ''}
           >
             {addedAnimation ? (

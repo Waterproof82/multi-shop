@@ -45,6 +45,7 @@ export async function ajustarStockUseCase(
     cantidad: Math.abs(payload.delta),
     referenciaId: null,
     turnoId: payload.turnoId ?? null,
+    precioUnitarioCmpCents: null,
   });
 
   if (!movResult.success) {

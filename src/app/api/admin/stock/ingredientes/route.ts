@@ -45,6 +45,6 @@ export async function POST(req: NextRequest) {
   }
 
   const repo = getStockRepository();
-  const result = await repo.createIngrediente({ ...parsed.data, empresaId });
+  const result = await repo.createIngrediente({ ...parsed.data, empresaId, precioCmpCents: 0 });
   return handleResultWithStatus(result, 201);
 }

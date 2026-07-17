@@ -4,6 +4,8 @@ import { createContext, useContext, useState, useCallback, useMemo, useEffect, t
 import type { MenuItemVM } from "@/core/application/dtos/menu-view-model"
 import { getItemKey } from "./cart-utils"
 
+type PaseKey = 'primer' | 'segundo' | 'postre';
+
 export interface Complement {
   id: string;
   name: string;
@@ -20,15 +22,25 @@ export interface CartItem {
   justAdded?: boolean
   justRemoved?: boolean
   deferred?: boolean      // waiter marked this item to send later (comida only)
+  pase?: PaseKey  // waiter: course assignment for this item
 }
 
 function newCartId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2);
+  // Use timestamp + cryptographic random for unique cart IDs
+  const bytes = new Uint8Array(6);
+  globalThis.crypto.getRandomValues(bytes);
+  const randomPart = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+  return Date.now().toString(36) + randomPart;
+}
+
+// Extract predicate to reduce nesting depth (S2004)
+function isNotTargetItem(targetCartId: string) {
+  return (ci: CartItem) => ci.cartId !== targetCartId;
 }
 
 export interface AddedItemInfo {
   name: string;
-  translations?: MenuItemVM['translations'];
+  translations: MenuItemVM['translations'];
   quantity: number;
   price: number;
   totalPrice: number;
@@ -36,7 +48,7 @@ export interface AddedItemInfo {
 
 interface CartContextType {
   items: CartItem[]
-  addItem: (item: MenuItemVM, quantity?: number, selectedComplements?: Complement[], deferred?: boolean, note?: string) => void
+  addItem: (item: MenuItemVM, quantity?: number, selectedComplements?: Complement[], deferred?: boolean, note?: string, pase?: 'primer' | 'segundo' | 'postre') => void
   removeItem: (cartId: string) => void
   updateQuantity: (cartId: string, quantity: number) => void
   clearCart: () => void
@@ -92,11 +104,11 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
     }
   }, [])
 
-  const addItem = useCallback((item: MenuItemVM, quantity = 1, selectedComplements?: Complement[], deferred?: boolean, note?: string) => {
-    const itemKey = getItemKey(item, selectedComplements, note);
+  const addItem = useCallback((item: MenuItemVM, quantity = 1, selectedComplements?: Complement[], deferred?: boolean, note?: string, pase?: 'primer' | 'segundo' | 'postre') => {
+    const itemKey = getItemKey(item, selectedComplements, note, pase);
     const complementPrice = selectedComplements?.reduce((s, c) => s + c.price, 0) || 0;
     const totalItemPrice = (item.price + complementPrice) * quantity;
-    
+
     setLastAddedItem({
       name: item.name,
       translations: item.translations,
@@ -104,47 +116,49 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
       price: item.price + complementPrice,
       totalPrice: totalItemPrice,
     });
-    
+
     setItems((prev) => {
-      // Only merge with a non-deferred entry of the same product.
+      // Only merge with a non-deferred entry of the same product + same pase.
       // If the existing entry is deferred, add a separate non-deferred entry instead.
       const existingIndex = prev.findIndex((ci) =>
-        getItemKey(ci.item, ci.selectedComplements, ci.note) === itemKey && !ci.deferred
+        getItemKey(ci.item, ci.selectedComplements, ci.note, ci.pase) === itemKey && !ci.deferred
       );
       if (existingIndex >= 0) {
         return prev.map((ci, index) =>
           index === existingIndex ? { ...ci, quantity: ci.quantity + quantity } : ci
         )
       }
-      return [...prev, { cartId: newCartId(), item, quantity, selectedComplements, note: note || undefined, justAdded: true, deferred: deferred ?? undefined }]
+      return [...prev, { cartId: newCartId(), item, quantity, selectedComplements, note: note || undefined, justAdded: true, deferred: deferred ?? undefined, pase }]
     })
   }, [])
+
+  const removeItemDelayed = useCallback((targetCartId: string) => {
+    setTimeout(() => {
+      setItems(prev => prev.filter(isNotTargetItem(targetCartId)));
+    }, 200);
+  }, []);
 
   const removeItem = useCallback((cartId: string) => {
     setLastAddedItem(null);
     setItems((prev) => {
       const next = prev.map(ci => ci.cartId === cartId ? { ...ci, justRemoved: true } : ci);
-      setTimeout(() => {
-        setItems(prev => prev.filter(ci => ci.cartId !== cartId));
-      }, 200);
+      removeItemDelayed(cartId);
       return next;
     })
-  }, [])
+  }, [removeItemDelayed])
 
   const updateQuantity = useCallback((cartId: string, quantity: number) => {
     setLastAddedItem(null);
     if (quantity <= 0) {
       setItems((prev) => {
         const next = prev.map(ci => ci.cartId === cartId ? { ...ci, justRemoved: true } : ci);
-        setTimeout(() => {
-          setItems(prev => prev.filter(ci => ci.cartId !== cartId));
-        }, 200);
+        removeItemDelayed(cartId);
         return next;
       })
     } else {
       setItems((prev) => prev.map(ci => ci.cartId === cartId ? { ...ci, quantity, justAdded: false } : ci))
     }
-  }, [])
+  }, [removeItemDelayed])
 
   const clearCart = useCallback(() => { setItems([]); setLastAddedItem(null); }, [])
 

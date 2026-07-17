@@ -14,6 +14,7 @@ interface PendienteItem {
   tipo: 'comida' | 'bebida';
   complementos?: string;
   nota?: string;
+  pase?: string | null;
 }
 
 interface PendientePedido {
@@ -39,6 +40,22 @@ interface MergedItem extends PendienteItem {
   mesaId: string;
 }
 
+type PaseKey = 'primer' | 'segundo' | 'postre';
+
+const PASE_LABEL: Record<PaseKey, string> = {
+  primer: '1er pase',
+  segundo: '2º pase',
+  postre: 'Postre',
+};
+
+const PASE_COLOR: Record<PaseKey, { bg: string; text: string; border: string }> = {
+  primer:  { bg: 'oklch(24% 0.14 45)',  text: 'oklch(82% 0.20 45)',  border: 'oklch(52% 0.22 45 / 0.7)' },
+  segundo: { bg: 'oklch(22% 0.12 252)', text: 'oklch(78% 0.18 252)', border: 'oklch(50% 0.20 252 / 0.7)' },
+  postre:  { bg: 'oklch(22% 0.12 148)', text: 'oklch(76% 0.20 148)', border: 'oklch(48% 0.22 148 / 0.7)' },
+};
+
+const PASE_KEYS: PaseKey[] = ['primer', 'segundo', 'postre'];
+
 const BG        = 'oklch(13% 0.02 252)';
 const TEXT_MAIN = 'oklch(92% 0.02 252)';
 const TEXT_DIM  = 'oklch(55% 0.04 252)';
@@ -54,11 +71,20 @@ function formatTimer(minutes: number): string {
 
 function getMergedItems(mesa: PendienteMesa): MergedItem[] {
   return mesa.pedidos
-    .flatMap(p => p.items.map(i => ({ ...i, pedidoId: p.id, globalKey: `${p.id}:${i.idx}`, mesaId: mesa.mesaId })))
+    .flatMap(p => p.items.map(i => ({ ...i, pedidoId: p.id, globalKey: `${p.id}:${i.idx}`, mesaId: mesa.mesaId, pase: i.pase ?? null })))
     .sort((a, b) => {
       if (a.tipo !== b.tipo) return a.tipo === 'comida' ? -1 : 1;
       return a.nombre.localeCompare(b.nombre);
     });
+}
+
+async function updateItemPase(pedidoId: string, itemIdx: number, pase: string | null): Promise<boolean> {
+  const r = await fetch(`/api/waiter/kitchen/items/${pedidoId}/${itemIdx}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pase }),
+  });
+  return r.ok;
 }
 
 
@@ -234,58 +260,85 @@ interface PedidoItemButtonProps {
   readonly isPaused: boolean;
   readonly onToggleSelect: () => void;
   readonly onTogglePause: () => void;
+  readonly onPaseChange: (pase: string | null) => void;
 }
 
-function PedidoItemButton({ item, isSelected, isPaused, onToggleSelect, onTogglePause }: PedidoItemButtonProps) {
+function PedidoItemButton({ item, isSelected, isPaused, onToggleSelect, onTogglePause, onPaseChange }: Readonly<PedidoItemButtonProps>) {
   return (
     <div
-      className="flex items-center rounded-lg overflow-hidden"
+      className="rounded-lg overflow-hidden"
       style={{ background: 'oklch(15% 0.03 252)', border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
     >
-      <button
-        type="button"
-        className="flex flex-1 items-center gap-2 px-3 py-3 text-left"
-        onClick={onToggleSelect}
-      >
-        <span
-          className="shrink-0 flex items-center justify-center rounded"
-          style={{
-            width: 20, height: 20,
-            background: isSelected ? 'oklch(50% 0.22 148)' : 'transparent',
-            border: `2px solid ${isSelected ? 'oklch(50% 0.22 148)' : 'oklch(45% 0.06 252)'}`,
-          }}
-        >
-          {isSelected && <span style={{ color: '#fff', fontSize: 9, fontWeight: 'bold', lineHeight: 1 }}>✓</span>}
-        </span>
-        <div className="flex-1 min-w-0">
-          <span className="text-xs" style={{ color: TEXT_MAIN }}>{item.cantidad}× {item.nombre}</span>
-          {item.complementos && (
-            <div className="text-[10px] truncate" style={{ color: TEXT_DIM }}>({item.complementos})</div>
-          )}
-          {item.nota && (
-            <div className="text-[10px] italic truncate" style={{ color: 'oklch(72% 0.12 85)' }}>✎ {item.nota}</div>
-          )}
-        </div>
-        {item.tipo === 'comida'
-          ? <UtensilsCrossed className="w-3 h-3 shrink-0" style={{ color: 'oklch(62% 0.14 62)' }} />
-          : <Wine className="w-3 h-3 shrink-0" style={{ color: 'oklch(62% 0.14 252)' }} />
-        }
-      </button>
-      {item.tipo === 'comida' && (
+      <div className="flex items-center">
         <button
           type="button"
-          onClick={onTogglePause}
-          className="shrink-0 flex items-center justify-center rounded"
-          style={{
-            width: 36, height: 36, margin: '0 4px',
-            background: isPaused ? 'oklch(28% 0.14 65)' : 'oklch(20% 0.04 252)',
-            color: isPaused ? 'oklch(78% 0.20 65)' : 'oklch(42% 0.06 252)',
-            border: `1px solid ${isPaused ? 'oklch(50% 0.22 65 / 0.6)' : 'oklch(35% 0.06 252 / 0.4)'}`,
-          }}
+          className="flex flex-1 items-center gap-2 px-3 py-3 text-left"
+          onClick={onToggleSelect}
         >
-          <Pause className="w-3 h-3" />
+          <span
+            className="shrink-0 flex items-center justify-center rounded"
+            style={{
+              width: 20, height: 20,
+              background: isSelected ? 'oklch(50% 0.22 148)' : 'transparent',
+              border: `2px solid ${isSelected ? 'oklch(50% 0.22 148)' : 'oklch(45% 0.06 252)'}`,
+            }}
+          >
+            {isSelected && <span style={{ color: '#fff', fontSize: 9, fontWeight: 'bold', lineHeight: 1 }}>✓</span>}
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs" style={{ color: TEXT_MAIN }}>{item.cantidad}× {item.nombre}</span>
+            </div>
+            {item.complementos && (
+              <div className="text-[10px] truncate" style={{ color: TEXT_DIM }}>({item.complementos})</div>
+            )}
+            {item.nota && (
+              <div className="text-[10px] italic truncate" style={{ color: 'oklch(72% 0.12 85)' }}>✎ {item.nota}</div>
+            )}
+          </div>
+          {item.tipo === 'comida'
+            ? <UtensilsCrossed className="w-3 h-3 shrink-0" style={{ color: 'oklch(62% 0.14 62)' }} />
+            : <Wine className="w-3 h-3 shrink-0" style={{ color: 'oklch(62% 0.14 252)' }} />
+          }
         </button>
-      )}
+        {item.tipo === 'comida' && (
+          <button
+            type="button"
+            onClick={onTogglePause}
+            className="shrink-0 flex items-center justify-center rounded"
+            style={{
+              width: 36, height: 36, margin: '0 4px',
+              background: isPaused ? 'oklch(28% 0.14 65)' : 'oklch(20% 0.04 252)',
+              color: isPaused ? 'oklch(78% 0.20 65)' : 'oklch(42% 0.06 252)',
+              border: `1px solid ${isPaused ? 'oklch(50% 0.22 65 / 0.6)' : 'oklch(35% 0.06 252 / 0.4)'}`,
+            }}
+          >
+            <Pause className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+      {/* Pase selector row */}
+      <div className="flex items-center gap-1 px-3 pb-2">
+        {PASE_KEYS.map(pk => {
+          const col = PASE_COLOR[pk];
+          const active = item.pase === pk;
+          return (
+            <button
+              key={pk}
+              type="button"
+              onClick={() => onPaseChange(active ? null : pk)}
+              className="text-[11px] font-semibold px-2 py-1 rounded"
+              style={{
+                background: active ? col.bg : 'oklch(18% 0.03 252)',
+                color: active ? col.text : TEXT_DIM,
+                border: `1px solid ${active ? col.border : 'oklch(35% 0.06 252 / 0.4)'}`,
+              }}
+            >
+              {PASE_LABEL[pk]}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -303,10 +356,13 @@ export default function WaiterPendientesPage() {
   // pausedMap: ítems con pausa activa (se confirmarán como retenidos)
   const [pausedMap, setPausedMap] = useState<Record<string, Set<string>>>({});
   const [confirming, setConfirming] = useState<Set<string>>(new Set());
+  // Local pase overrides: { [globalKey]: pase | null }  — optimistic UI before server confirms
+  const [paseOverrides, setPaseOverrides] = useState<Record<string, string | null>>({});
   // Ref mirror of confirming — used in bannerRelay to avoid premature fetches
   // while the validate loop is still processing multiple pedidos.
   const confirmingRef = useRef<Set<string>>(new Set());
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [pendingLanzarPase, setPendingLanzarPase] = useState<{ mesaId: string; pase: PaseKey } | null>(null);
   const [groupedMesas, setGroupedMesas] = useState<Set<string>>(new Set());
   const [collapsedMesas, setCollapsedMesas] = useState<Set<string>>(new Set());
   const [mesaFilter, setMesaFilter] = useState('');
@@ -484,6 +540,15 @@ export default function WaiterPendientesPage() {
       const cleanupMap = makeCleanupMap(mesaId, removedItemsMap);
       setPausedMap(cleanupMap);
       setSelectedMap(cleanupMap);
+      // Clean up pase overrides for removed items
+      const removedKeys = new Set([...removedItemsMap.entries()].flatMap(([pid, idxs]) => idxs.map(idx => `${pid}:${idx}`)));
+      if (removedKeys.size > 0) {
+        setPaseOverrides(prev => {
+          const n = { ...prev };
+          for (const k of removedKeys) delete n[k];
+          return n;
+        });
+      }
     } finally {
       confirmingRef.current = new Set([...confirmingRef.current].filter(id => id !== mesaId));
       setConfirming(prev => { const n = new Set(prev); n.delete(mesaId); return n; });
@@ -527,6 +592,14 @@ export default function WaiterPendientesPage() {
       const cleanupMap = makeCleanupMap(mesaId, removedItemsMap);
       setPausedMap(cleanupMap);
       setSelectedMap(cleanupMap);
+      const removedKeysB = new Set([...removedItemsMap.entries()].flatMap(([pid, idxs]) => idxs.map(idx => `${pid}:${idx}`)));
+      if (removedKeysB.size > 0) {
+        setPaseOverrides(prev => {
+          const n = { ...prev };
+          for (const k of removedKeysB) delete n[k];
+          return n;
+        });
+      }
     } finally {
       confirmingRef.current = new Set([...confirmingRef.current].filter(id => id !== mesaId));
       setConfirming(prev => { const n = new Set(prev); n.delete(mesaId); return n; });
@@ -576,6 +649,91 @@ export default function WaiterPendientesPage() {
     }
   }, [mesas, selectedMap, fetchPendientes]);
 
+  const handlePaseChange = useCallback(async (item: MergedItem, pase: string | null) => {
+    // Optimistic update
+    setPaseOverrides(prev => ({ ...prev, [item.globalKey]: pase }));
+    const ok = await updateItemPase(item.pedidoId, item.idx, pase);
+    if (!ok) {
+      // Revert on failure
+      setPaseOverrides(prev => {
+        const n = { ...prev };
+        delete n[item.globalKey];
+        return n;
+      });
+    }
+  }, []);
+
+  // Helper: process a single pedido's items for a given pase
+  const processPaseItemsForPedido = useCallback(
+    async (
+      pedido: PendientePedido,
+      paseItemsForPedido: MergedItem[],
+      mesaPaused: Set<string>
+    ): Promise<number[]> => {
+      const selectedForPedido = new Set(paseItemsForPedido.map((i: MergedItem) => i.globalKey));
+      const tiposInPase = [...new Set(paseItemsForPedido.map((i: MergedItem) => i.tipo))] as Array<'comida' | 'bebida'>;
+      const removedIdxs: number[] = [];
+
+      for (const tipo of tiposInPase) {
+        if (pedido.validated) {
+          const released = await releaseRetainedPedidoItems(pedido.id, pedido.items, tipo, selectedForPedido, mesaPaused, 'selected');
+          removedIdxs.push(...released);
+        } else {
+          const ok = await validateNewPedido(pedido.id, pedido.items, tipo, selectedForPedido, mesaPaused, 'selected');
+          if (ok) removedIdxs.push(...pedido.items.filter((i: PendienteItem) => i.tipo === tipo).map((i: PendienteItem) => i.idx));
+        }
+      }
+      return removedIdxs;
+    },
+    []
+  );
+
+  // Lanzar todos los ítems de un pase concreto para una mesa (self-contained, no stale-state risk)
+  const handleLanzarPase = useCallback(async (mesaId:string, pase: PaseKey) => {
+    const mesa = mesas.find(m => m.mesaId === mesaId);
+    if (!mesa) return;
+
+    confirmingRef.current = new Set(confirmingRef.current).add(mesaId);
+    setConfirming(prev => new Set(prev).add(mesaId));
+
+    try {
+      const allMerged = getMergedItems(mesa).map(i => ({
+        ...i,
+        pase: paseOverrides[i.globalKey] ?? i.pase,
+      }));
+      const paseGlobalKeys = new Set(allMerged.filter(i => i.pase === pase).map(i => i.globalKey));
+      if (paseGlobalKeys.size === 0) return;
+
+      const mesaPaused = pausedMap[mesaId] ?? new Set<string>();
+      const removedItemsMap = new Map<string, number[]>();
+
+      for (const pedido of mesa.pedidos) {
+        const paseItemsForPedido = allMerged.filter(i => i.pedidoId === pedido.id && paseGlobalKeys.has(i.globalKey));
+        if (paseItemsForPedido.length === 0) continue;
+        const removedIdxs = await processPaseItemsForPedido(pedido, paseItemsForPedido, mesaPaused);
+        if (removedIdxs.length > 0) removedItemsMap.set(pedido.id, removedIdxs);
+      }
+
+      if (removedItemsMap.size === 0) return;
+      setMesas(prev => removePedidoItems(prev, mesaId, removedItemsMap));
+      const cleanupMap = makeCleanupMap(mesaId, removedItemsMap);
+      setPausedMap(cleanupMap);
+      setSelectedMap(cleanupMap);
+      const removedKeys = new Set([...removedItemsMap.entries()].flatMap(([pid, idxs]) => idxs.map(idx => `${pid}:${idx}`)));
+      if (removedKeys.size > 0) {
+        setPaseOverrides(prev => {
+          const n = { ...prev };
+          for (const k of removedKeys) delete n[k];
+          return n;
+        });
+      }
+    } finally {
+      confirmingRef.current = new Set([...confirmingRef.current].filter(id => id !== mesaId));
+      setConfirming(prev => { const n = new Set(prev); n.delete(mesaId); return n; });
+      void fetchPendientes();
+    }
+  }, [mesas, paseOverrides, pausedMap, processPaseItemsForPedido, fetchPendientes]);
+
   const totalItems = mesas.reduce((s, m) => s + m.pedidos.reduce((sp, p) => sp + p.items.length, 0), 0);
 
   return (
@@ -624,7 +782,10 @@ export default function WaiterPendientesPage() {
               return label.includes(mesaFilter.trim().toLowerCase());
             })
             .map(mesa => {
-            const mergedItems  = getMergedItems(mesa);
+            const mergedItems  = getMergedItems(mesa).map(i => ({
+              ...i,
+              pase: paseOverrides[i.globalKey] !== undefined ? paseOverrides[i.globalKey] : i.pase,
+            }));
             const selected     = selectedMap[mesa.mesaId] ?? new Set<string>();
             const paused       = pausedMap[mesa.mesaId]   ?? new Set<string>();
             const isConfirming = confirming.has(mesa.mesaId);
@@ -637,6 +798,8 @@ export default function WaiterPendientesPage() {
             const hasSelCocina = cocinaItems.some(i => selected.has(i.globalKey));
             const hasSelBar    = barItems.some(i => selected.has(i.globalKey));
             const displayLabel = mesa.mesaNombre ?? String(mesa.mesaNumero ?? '—');
+            // Which pase groups have items in this mesa?
+            const pasesConItems = PASE_KEYS.filter(pk => mergedItems.some(i => i.pase === pk));
 
             return (
               <div key={mesa.mesaId}>
@@ -648,6 +811,21 @@ export default function WaiterPendientesPage() {
                     <Table2 className="w-4 h-4 shrink-0" style={{ color: 'oklch(62% 0.14 62)' }} />
                     <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{displayLabel}</span>
                     <div className="flex items-center gap-2 ml-auto">
+                      {pasesConItems.map(pk => {
+                        const col = PASE_COLOR[pk];
+                        return (
+                          <button
+                            key={pk}
+                            type="button"
+                            disabled={isConfirming}
+                            onClick={() => setPendingLanzarPase({ mesaId: mesa.mesaId, pase: pk })}
+                            className="flex items-center gap-1 rounded-lg px-3 py-2.5 text-xs font-semibold disabled:opacity-50"
+                            style={{ background: col.bg, color: col.text, border: `1px solid ${col.border}` }}
+                          >
+                            {PASE_LABEL[pk]}
+                          </button>
+                        );
+                      })}
                       {allSelected && cocinaItems.length > 0 && barItems.length > 0 && (
                         <button
                           onClick={() => void handleConfirmBoth(mesa.mesaId)}
@@ -829,6 +1007,7 @@ export default function WaiterPendientesPage() {
                         isPaused={paused.has(item.globalKey)}
                         onToggleSelect={() => toggleSelect(mesa.mesaId, item.globalKey)}
                         onTogglePause={() => togglePause(mesa.mesaId, item.globalKey)}
+                        onPaseChange={(pase) => void handlePaseChange(item, pase)}
                       />
                     ))}
                   </div>
@@ -839,6 +1018,67 @@ export default function WaiterPendientesPage() {
           })}
         </div>
       </div>
+
+      {/* Lanzar pase confirmation dialog */}
+      {pendingLanzarPase && (() => {
+        const { mesaId, pase } = pendingLanzarPase;
+        const mesa = mesas.find(m => m.mesaId === mesaId);
+        const mergedItems = mesa ? getMergedItems(mesa) : [];
+        const count = mergedItems.filter(i => i.pase === pase).length;
+        const col = PASE_COLOR[pase];
+        const displayLabel = mesa?.mesaNombre ?? String(mesa?.mesaNumero ?? '—');
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
+            <button
+              type="button"
+              className="absolute inset-0"
+              style={{ background: 'oklch(0% 0 0 / 0.75)' }}
+              onClick={() => setPendingLanzarPase(null)}
+              aria-label="Cerrar"
+            />
+            <dialog
+              open
+              className="relative w-full max-w-xs rounded-2xl p-5 flex flex-col gap-4"
+              style={{ background: 'oklch(15% 0.04 252)', border: `2px solid ${col.border}` }}
+            >
+              <div className="flex items-start gap-3">
+                <div className="shrink-0 flex items-center justify-center w-10 h-10 rounded-full"
+                  style={{ background: col.bg, border: `2px solid ${col.border}` }}>
+                  <UtensilsCrossed className="w-5 h-5" style={{ color: col.text }} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>
+                    Lanzar {PASE_LABEL[pase]}
+                  </span>
+                  <span className="text-xs font-semibold" style={{ color: 'oklch(72% 0.14 62)' }}>
+                    {displayLabel}
+                  </span>
+                  <span className="text-xs leading-relaxed mt-0.5" style={{ color: TEXT_DIM }}>
+                    Se van a enviar a cocina {count} {count === 1 ? 'ítem' : 'ítems'} del {PASE_LABEL[pase]}. ¿Confirmar?
+                  </span>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPendingLanzarPase(null)}
+                  className="flex-1 rounded-lg px-3 py-2.5 text-xs font-semibold"
+                  style={{ background: 'oklch(20% 0.04 252)', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => { setPendingLanzarPase(null); void handleLanzarPase(mesaId, pase); }}
+                  className="flex-1 rounded-lg px-3 py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5"
+                  style={{ background: col.bg, color: col.text, border: `2px solid ${col.border}` }}
+                >
+                  <UtensilsCrossed className="w-3.5 h-3.5" />
+                  Lanzar
+                </button>
+              </div>
+            </dialog>
+          </div>
+        );
+      })()}
 
       {/* Delete confirmation dialog */}
       {pendingDelete && (() => {

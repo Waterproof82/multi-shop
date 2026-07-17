@@ -23,7 +23,7 @@ function applyDeliveryFields(payload: Record<string, unknown>, d: DeliveryData):
 
 // ── findPendientesValidacion helpers ──────────────────────────────────────────
 
-function mapPendienteItem(item: Record<string, unknown>, idx: number): PendienteValidacionItem {
+function mapPendienteItem(item: Record<string, unknown>, idx: number, pedidoPase?: string | null): PendienteValidacionItem {
   return {
     idx,
     nombre: item['nombre'] as string,
@@ -33,7 +33,32 @@ function mapPendienteItem(item: Record<string, unknown>, idx: number): Pendiente
     complementos: (item['complementos'] as Array<{ nombre?: string }> | undefined)
       ?.map(c => c.nombre ?? '').filter(Boolean).join(', '),
     nota: (item['nota'] as string | undefined) || undefined,
+    // item-level pase in JSONB takes priority; fall back to order-level pase
+    pase: (item['pase'] as string | null) ?? pedidoPase ?? null,
   };
+}
+
+function buildPaseItemMap(rows: Array<Record<string, unknown>>): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const r of rows) {
+    map.set(`${r['pedido_id'] as string}:${r['item_idx'] as number}`, r['pase'] as string);
+  }
+  return map;
+}
+
+function applyPaseItemOverrides(
+  mesaMap: Map<string, PendienteValidacionMesa>,
+  paseItemMap: Map<string, string>
+): void {
+  if (paseItemMap.size === 0) return;
+  for (const mesa of mesaMap.values()) {
+    for (const pedido of mesa.pedidos) {
+      for (const item of pedido.items) {
+        const pase = paseItemMap.get(`${pedido.id}:${item.idx}`);
+        if (pase !== undefined) item.pase = pase;
+      }
+    }
+  }
 }
 
 function buildIndexSetMap(rows: Array<Record<string, unknown>>): Map<string, Set<number>> {
@@ -61,10 +86,11 @@ function buildPendientesMesaMap(pedidos: Array<Record<string, unknown>>): Map<st
         pedidos: [],
       });
     }
+    const pedidoPase = (row['pase'] as string | null) ?? null;
     mesaMap.get(mesaId)!.pedidos.push({
       id: row['id'] as string,
       createdAt: row['created_at'] as string,
-      items: detalle.map((item, idx) => mapPendienteItem(item, idx)),
+      items: detalle.map((item, idx) => mapPendienteItem(item, idx, pedidoPase)),
     });
   }
   return mesaMap;
@@ -95,8 +121,9 @@ function addValidatedRetenidos(
     const pedidoId = row['id'] as string;
     const detalle = (row['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
     const retenidoIndices = retenidoMap.get(pedidoId) ?? new Set<number>();
+    const pedidoPase = (row['pase'] as string | null) ?? null;
     const items = detalle
-      .map((item, idx) => mapPendienteItem(item, idx))
+      .map((item, idx) => mapPendienteItem(item, idx, pedidoPase))
       .filter(item => retenidoIndices.has(item.idx));
     if (items.length === 0) continue;
     if (!mesaMap.has(mesaId)) {
@@ -700,12 +727,13 @@ export class SupabasePedidoRepository implements IPedidoRepository {
   async createMesaOrder(params: {
     empresaId: string;
     mesaId: string;
-    items: { producto_id?: string; nombre: string; cantidad: number; precio: number; tipo_producto?: string; translations?: unknown; complementos?: { nombre: string; precio: number }[]; nota?: string }[];
+    items: { producto_id?: string; nombre: string; cantidad: number; precio: number; tipo_producto?: string; translations?: unknown; complementos?: { nombre: string; precio: number }[]; nota?: string; pase?: string | null }[];
     total: number;
     trackingToken: string;
     sesionId: string | null;
     initialEstado?: 'pendiente' | 'retenido' | 'pendiente_validacion';
     nota?: string;
+    pase?: string | null;
   }): Promise<Result<{ id: string; numero_pedido: number; tracking_token: string }>> {
     try {
       const { data: nextNum, error: rpcError } = await this.supabase
@@ -738,12 +766,14 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           translations: item.translations ?? null,
           complementos: item.complementos ?? [],
           ...(item.nota ? { nota: item.nota } : {}),
+          ...(item.pase ? { pase: item.pase } : {}),
         })),
         total: params.total,
         estado: params.initialEstado ?? 'pendiente',
         tracking_token: params.trackingToken,
         sesion_id: params.sesionId,
         ...(params.nota ? { nota: params.nota } : {}),
+        ...(params.pase ? { pase: params.pase } : {}),
       };
 
       const { data: pedido, error } = await this.supabase
@@ -1409,7 +1439,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
             mesaNumero: (mesaData['numero'] as number) ?? null,
             mesaNombre: (mesaData['nombre'] as string | null) ?? null,
             createdAt: row['created_at'] as string,
-            pase: (row['pase'] as string | null) ?? null,
+            pase: (item['pase'] as string | null) ?? (row['pase'] as string | null) ?? null,
           });
         });
       }
@@ -1455,7 +1485,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       // 1. Pedidos en cola de validación
       const { data: pedidos, error } = await this.supabase
         .from('pedidos')
-        .select(`id, created_at, detalle_pedido, mesa_id, mesas!inner(numero, nombre)`)
+        .select(`id, created_at, detalle_pedido, pase, mesa_id, mesas!inner(numero, nombre)`)
         .eq('empresa_id', empresaId)
         .eq('estado', 'pendiente_validacion')
         .order('created_at', { ascending: true });
@@ -1492,12 +1522,25 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       if (retenidoMap.size > 0) {
         const { data: validatedPedidos } = await this.supabase
           .from('pedidos')
-          .select(`id, created_at, detalle_pedido, mesa_id, mesas!inner(numero, nombre)`)
+          .select(`id, created_at, detalle_pedido, pase, mesa_id, mesas!inner(numero, nombre)`)
           .eq('empresa_id', empresaId)
           .eq('estado', 'pendiente')
           .in('id', [...retenidoMap.keys()])
           .order('created_at', { ascending: true });
         addValidatedRetenidos(mesaMap, (validatedPedidos ?? []) as Array<Record<string, unknown>>, retenidoMap);
+      }
+
+      // 3. Per-item pase overrides from pedido_item_estados (waiter set them via the pase selector)
+      const finalPedidoIds = [...mesaMap.values()].flatMap(m => m.pedidos.map(p => p.id));
+      if (finalPedidoIds.length > 0) {
+        const { data: paseItems } = await this.supabase
+          .from('pedido_item_estados')
+          .select('pedido_id, item_idx, pase')
+          .eq('empresa_id', empresaId)
+          .not('pase', 'is', null)
+          .in('pedido_id', finalPedidoIds);
+        const paseItemMap = buildPaseItemMap((paseItems ?? []) as Array<Record<string, unknown>>);
+        applyPaseItemOverrides(mesaMap, paseItemMap);
       }
 
       return { success: true, data: Array.from(mesaMap.values()) };
@@ -1582,6 +1625,60 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       return { success: true, data: undefined };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.validatePedido', { details: { pedidoId } });
+      return { success: false, error: appError };
+    }
+  }
+
+  async updateItemPase(empresaId: string, pedidoId: string, itemIdx: number, pase: string | null): Promise<Result<void>> {
+    try {
+      const { data, error: fetchError } = await this.supabase
+        .from('pedidos')
+        .select('detalle_pedido')
+        .eq('id', pedidoId)
+        .eq('empresa_id', empresaId)
+        .single();
+
+      if (fetchError || !data) {
+        return { success: false, error: { code: 'NOT_FOUND', message: 'Pedido no encontrado', module: 'repository', method: 'updateItemPase' } };
+      }
+
+      const detalle = ((data as Record<string, unknown>)['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
+      if (itemIdx < 0 || itemIdx >= detalle.length) {
+        return { success: false, error: { code: 'NOT_FOUND', message: 'Ítem no encontrado', module: 'repository', method: 'updateItemPase' } };
+      }
+
+      const updatedDetalle = detalle.map((item, idx) => {
+        if (idx !== itemIdx) return item;
+        if (pase === null) {
+          const { pase: _removed, ...rest } = item as Record<string, unknown> & { pase?: string };
+          return rest;
+        }
+        return { ...item, pase };
+      });
+
+      const { error: updateError } = await this.supabase
+        .from('pedidos')
+        .update({ detalle_pedido: updatedDetalle })
+        .eq('id', pedidoId)
+        .eq('empresa_id', empresaId);
+
+      if (updateError) {
+        await logger.logAndReturnError('DB_UPDATE_ERROR', updateError.message, 'repository', 'SupabasePedidoRepository.updateItemPase', { details: { code: updateError.code, pedidoId, itemIdx } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al actualizar pase del ítem', module: 'repository', method: 'updateItemPase' } };
+      }
+
+      // Sync pase to pedido_item_estados if a row already exists (kitchen visibility).
+      // Best-effort: if no row exists yet the pase is already in detalle_pedido JSONB.
+      await this.supabase
+        .from('pedido_item_estados')
+        .update({ pase, updated_at: new Date().toISOString() })
+        .eq('pedido_id', pedidoId)
+        .eq('item_idx', itemIdx)
+        .eq('empresa_id', empresaId);
+
+      return { success: true, data: undefined };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.updateItemPase', { details: { pedidoId, itemIdx } });
       return { success: false, error: appError };
     }
   }

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, Tags, LogOut, Menu, X, ShoppingCart, BarChart3, Users, Megaphone, Settings, ExternalLink, ShoppingBag, UtensilsCrossed, MapPin, Star, Archive, BookOpen, History, ClipboardList, MonitorCheck, Layers, Truck, PackageCheck, Receipt, FileText } from 'lucide-react';
+import { LayoutDashboard, Package, Tags, LogOut, Menu, X, ShoppingCart, BarChart3, Users, Megaphone, Settings, ExternalLink, ShoppingBag, UtensilsCrossed, MapPin, Star, Archive, BookOpen, History, ClipboardList, MonitorCheck, Layers, Truck, PackageCheck, Receipt, FileText, TrendingUp, DollarSign } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useAdmin } from '@/lib/admin-context';
 import { useLanguage } from '@/lib/language-context';
@@ -39,6 +39,8 @@ const BASE_NAV_ITEMS: (NavItem & { requiresPromo?: boolean; requiresTgtg?: boole
   { href: '/admin/compras/pedidos', labelKey: 'sidebarComprasPedidos', icon: FileText },
   { href: '/admin/compras/albaranes', labelKey: 'sidebarComprasAlbaranes', icon: PackageCheck },
   { href: '/admin/compras/facturas', labelKey: 'sidebarComprasFacturas', icon: Receipt },
+  { href: '/admin/analytics/food-cost', labelKey: 'sidebarAnalyticsFoodCost', icon: TrendingUp, requiresRestaurant: true },
+  { href: '/admin/analytics/rentabilidad', labelKey: 'sidebarAnalyticsRentabilidad', icon: DollarSign, requiresRestaurant: true },
   { href: '/admin/configuracion', labelKey: 'sidebarSettings', icon: Settings },
 ];
 

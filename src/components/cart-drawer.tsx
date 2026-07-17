@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, Check, Gift, UtensilsCrossed, Pause } from "lucide-react"
+import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, Check, Gift, UtensilsCrossed } from "lucide-react"
 import { useReducedMotion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -34,11 +34,28 @@ import { t } from "@/lib/translations"
 import { DeliveryMethodSelector } from "@/components/DeliveryMethodSelector"
 import { formatPrice } from "@/lib/format-price"
 import { COUNTRY_CODES, DEFAULT_COUNTRY_CODE } from "@/core/domain/constants/country-codes"
-import { getItemKey } from "@/lib/cart-utils";
 import { getTrackingTokens, addTrackingToken } from "@/lib/order-tracking";
 import { QRScannerGate, type QRGateState } from '@/components/qr-scanner-gate';
 
 const MESA_CLIENT_TOKEN_KEY = (mesaId: string) => `mesa_token_${mesaId}`;
+
+type PaseKey = 'primer' | 'segundo' | 'postre';
+const PASE_BADGE: Record<PaseKey, { bg: string; text: string }> = {
+  primer:  { bg: 'oklch(24% 0.14 45)',  text: 'oklch(82% 0.20 45)'  },
+  segundo: { bg: 'oklch(22% 0.12 252)', text: 'oklch(78% 0.18 252)' },
+  postre:  { bg: 'oklch(22% 0.12 148)', text: 'oklch(76% 0.20 148)' },
+};
+const PASE_LABEL: Record<PaseKey, string> = { primer: '1er', segundo: '2º', postre: 'Postre' };
+
+function groupItemsByPase<T extends { pase?: PaseKey }>(cartItems: T[]): Map<PaseKey | undefined, T[]> {
+  const groups = new Map<PaseKey | undefined, T[]>();
+  for (const ci of cartItems) {
+    const key = ci.pase;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(ci);
+  }
+  return groups;
+}
 
 function getMesaClientToken(mesaId: string): { token: string; expiresAt: string } | null {
   if (typeof window === 'undefined') return null;
@@ -49,6 +66,19 @@ function getMesaClientToken(mesaId: string): { token: string; expiresAt: string 
   } catch {
     return null;
   }
+}
+
+type DeliveryMethod = 'recogida' | 'delivery' | null;
+
+// Helper: send standard (non-mesa) order and return response data
+async function sendStandardOrderFlow(payload: Record<string, unknown>) {
+  const res = await fetch('/api/pedidos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, data };
 }
 
 function isMesaClientTokenExpired(expiresAt: string): boolean {
@@ -69,6 +99,18 @@ interface MesaInfo {
 type TranslationKey = keyof typeof import('@/lib/translations').translations.es;
 type TranslateFn = (key: TranslationKey, language: Language) => string;
 
+function discountBorderClass(error: string | null, valid: { valid: boolean; porcentaje: number } | null): string {
+  if (error) return 'border-destructive';
+  if (valid?.valid) return 'border-green-500';
+  return '';
+}
+
+function discountDescribedBy(error: string | null, valid: { valid: boolean; porcentaje: number } | null): string | undefined {
+  if (error) return 'discount-error';
+  if (valid?.valid) return 'discount-valid';
+  return undefined;
+}
+
 function validateNameInput(name: string, translate: TranslateFn, language: Language): string | undefined {
   const trimmed = name.trim();
   if (!trimmed) return translate("validationNameRequired", language);
@@ -87,6 +129,478 @@ function validatePhoneInput(phone: string, translate: TranslateFn, language: Lan
   return undefined;
 }
 
+function resolveDeliveryError(
+  isRestaurant: boolean,
+  deliveryMethod: DeliveryMethod,
+  deliveryLatitude: number | null,
+  deliveryLongitude: number | null,
+  translate: TranslateFn,
+  language: Language
+): string | undefined {
+  if (isRestaurant && deliveryMethod === null) {
+    return translate('deliveryMethodTitle', language);
+  }
+  if (isRestaurant && deliveryMethod === 'delivery' && (deliveryLatitude === null || deliveryLongitude === null)) {
+    return translate('deliverySelectValidAddress', language);
+  }
+  return undefined;
+}
+
+function mesaBadgeLabel(mesaInfo: MesaInfo | null, mesaError: boolean, label: string): string {
+  if (mesaInfo) {
+    const mesaNamePart = mesaInfo.nombre ? ` — ${mesaInfo.nombre}` : '';
+    return `${label} ${mesaInfo.numero}${mesaNamePart}`;
+  }
+  if (mesaError) {
+    return `${label} —`;
+  }
+  return `${label}…`;
+}
+
+function orderButtonLabel(sending: boolean, mesaToken: string | null, translate: TranslateFn, language: Language): string {
+  if (sending) { return translate('sending', language); }
+  if (mesaToken) { return translate('mesaPlaceOrder', language); }
+  return translate('sendOrder', language);
+}
+
+function getItemAnimationClass(justAdded: boolean | undefined, justRemoved: boolean | undefined, reduceMotion: boolean): string {
+  if (reduceMotion) return '';
+  if (justAdded) return 'animate-cart-item-add';
+  if (justRemoved) return 'animate-cart-item-remove';
+  return '';
+}
+
+function mapCartItemPayload(ci: CartItem) {
+  return {
+    item: { id: ci.item.id, name: ci.item.name, price: ci.item.price, translations: ci.item.translations },
+    quantity: ci.quantity,
+    selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
+    note: ci.note,
+  };
+}
+
+function applySessionStorageWaiter(
+  setMesaToken: (id: string) => void,
+  setMesaInfo: (info: MesaInfo) => void,
+  setIsWaiterMode: (b: boolean) => void,
+): boolean {
+  try {
+    const raw = sessionStorage.getItem('waiter_mesa');
+    if (!raw) return false;
+    const stored = JSON.parse(raw) as { mesaId: string; mesaNumero: number; mesaNombre: string | null };
+    setMesaToken(stored.mesaId);
+    setMesaInfo({ id: stored.mesaId, numero: stored.mesaNumero, nombre: stored.mesaNombre, empresa_id: '' });
+    setIsWaiterMode(true);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function sendMesaOrderFlow(
+  mesaId: string,
+  clientToken: string | null,
+  items: CartItem[],
+  language: Language,
+): Promise<{ ok: boolean; trackingToken?: string; pedidoId?: string; error?: string | null; code?: string | null }> {
+  if (items.length === 0) return { ok: false };
+
+  const orderHeaders: HeadersInit = { 'Content-Type': 'application/json', ...(clientToken ? { 'Authorization': `Bearer ${clientToken}` } : {}) };
+  const orderGroups = Array.from(groupItemsByPase(items).entries());
+  const [firstGroup, ...restGroups] = orderGroups;
+  const [firstPase, firstGroupItems] = firstGroup!;
+
+  const res = await fetch('/api/pedidos', {
+    method: 'POST',
+    headers: orderHeaders,
+    body: JSON.stringify({
+      tipo: 'mesa',
+      mesa_id: mesaId,
+      ...(firstPase ? { pase: firstPase } : {}),
+      items: firstGroupItems.map(mapCartItemPayload),
+      idioma: language,
+    }),
+  });
+
+  if (res.status === 401) {
+    const body = await res.json().catch(() => ({}));
+    return { ok: false, code: body.code ?? null };
+  }
+
+  const data = await res.json().catch(() => ({}));
+
+  if (res.ok && data.trackingToken) {
+    try {
+      const storageKey = `mesa_orders_${mesaId}`;
+      const existing = JSON.parse(localStorage.getItem(storageKey) ?? '[]');
+      existing.push({
+        pedidoId: data.pedidoId ?? data.id,
+        trackingToken: data.trackingToken,
+        items: items.map((ci: CartItem) => ({ name: ci.item.name, quantity: ci.quantity, price: ci.item.price })),
+        total: items.reduce((s: number, ci: CartItem) => {
+          const compPrice = ci.selectedComplements?.reduce((sc: number, c: { price: number }) => sc + c.price, 0) ?? 0;
+          return s + (ci.item.price + compPrice) * ci.quantity;
+        }, 0),
+        timestamp: Date.now(),
+      });
+      localStorage.setItem(storageKey, JSON.stringify(existing));
+    } catch {
+      // ignore storage errors
+    }
+
+    const extraFetches = restGroups.map(([pase, groupItems]) =>
+      fetch('/api/pedidos', {
+        method: 'POST',
+        headers: orderHeaders,
+        body: JSON.stringify({ tipo: 'mesa', mesa_id: mesaId, ...(pase ? { pase } : {}), items: groupItems.map(mapCartItemPayload), idioma: language }),
+      }).catch(() => null)
+    );
+
+    await Promise.all(extraFetches);
+
+    return { ok: true, trackingToken: data.trackingToken, pedidoId: data.pedidoId ?? data.id };
+  }
+
+  return { ok: false, error: data.error || null };
+}
+
+// Helper: attach delivery fields to order payload (extracted for complexity reduction)
+function attachDeliveryFields(
+  payload: Record<string, unknown>,
+  opts: {
+    isRestaurant: boolean;
+    deliveryMethod: DeliveryMethod;
+    deliveryAddress: string;
+    deliveryPostalCode: string;
+    deliveryLatitude: number | null;
+    deliveryLongitude: number | null;
+    estimatedFeeCents: number | null;
+  }
+) {
+  const { isRestaurant, deliveryMethod, deliveryAddress, deliveryPostalCode, deliveryLatitude, deliveryLongitude, estimatedFeeCents } = opts;
+  if (isRestaurant && deliveryMethod) {
+    Object.assign(payload, {
+      origen: deliveryMethod,
+      direccion_entrega: deliveryMethod === 'delivery' ? deliveryAddress : undefined,
+      codigo_postal: deliveryMethod === 'delivery' ? deliveryPostalCode : undefined,
+      latitude_entrega: deliveryMethod === 'delivery' ? deliveryLatitude : undefined,
+      longitude_entrega: deliveryMethod === 'delivery' ? deliveryLongitude : undefined,
+      estimated_delivery_fee_cents: deliveryMethod === 'delivery' ? estimatedFeeCents : undefined,
+    });
+  }
+}
+
+// Helper: determine if order requires redirect to Redsys payment gateway
+function requiresRedsysRedirect(
+  pagosPickupHabilitados: boolean,
+  deliveryMethod: DeliveryMethod,
+  isRestaurant: boolean
+): boolean {
+  if (deliveryMethod === 'delivery') return true;
+  return pagosPickupHabilitados && (deliveryMethod === 'recogida' || !isRestaurant);
+}
+
+// Helper: submit to Redsys and handle payment form
+async function submitRedsysPayment(
+  pedidoId: any,
+  language: string,
+  trackingToken: string,
+  router: any,
+  addTrackingTokenFn: (token: string) => void
+): Promise<void> {
+  try {
+    const redsysRes = await fetch('/api/redsys/initiate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pedidoId, lang: language }),
+    });
+    if (redsysRes.ok) {
+      const formData = await redsysRes.json();
+      const redsysUrl = process.env.NEXT_PUBLIC_REDSYS_URL ?? 'https://sis-t.redsys.es:25443/sis/realizarPago';
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = redsysUrl;
+      const fields: Record<string, string> = {
+        Ds_SignatureVersion: formData.DS_SIGNATURE_VERSION,
+        Ds_MerchantParameters: formData.DS_MERCHANT_PARAMETERS,
+        Ds_Signature: formData.DS_SIGNATURE,
+      };
+      for (const [name, value] of Object.entries(fields)) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = name;
+        input.value = value;
+        form.appendChild(input);
+      }
+      document.body.appendChild(form);
+      form.submit();
+      return;
+    }
+  } catch (redsysError) {
+    // Log silently and fall back to tracking page
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('Redsys payment initiation failed:', redsysError);
+    }
+  }
+  addTrackingTokenFn(trackingToken);
+  router.push(`/tracking/${trackingToken}`);
+}
+
+// Helper: redirect to tracking page and reset form state
+function redirectToTracking(
+  trackingToken: string,
+  opts: {
+    setNombre: (s: string) => void;
+    setTelefono: (s: string) => void;
+    setEmail: (s: string) => void;
+    addTrackingTokenFn: (token: string) => void;
+  }
+): void {
+  const { setNombre, setTelefono, setEmail, addTrackingTokenFn } = opts;
+  addTrackingTokenFn(trackingToken);
+  setNombre('');
+  setTelefono('');
+  setEmail('');
+  if (window.history.state?.cartOpen) {
+    window.history.replaceState({}, '', window.location.href);
+  }
+  const trackingUrl = `/tracking/${trackingToken}`;
+  setTimeout(() => { window.location.href = trackingUrl; }, 0);
+}
+
+// Helper: process standard (non-mesa) order response and side-effects
+async function processStandardOrderResponse(
+  payload: Record<string, unknown>,
+  opts: {
+    t: any;
+    language: string;
+    isRestaurant: boolean;
+    pagosPickupHabilitados: boolean;
+    deliveryMethod: DeliveryMethod;
+    deliveryAddress: string;
+    deliveryPostalCode: string;
+    deliveryLatitude: number | null;
+    deliveryLongitude: number | null;
+    estimatedFeeCents: number | null;
+    clearCart: () => void;
+    closeCart: () => void;
+    addTrackingToken: (token: string) => void;
+    setOrderSuccess: (v: { numeroPedido: number } | null) => void;
+    setErrors: (e: any) => void;
+    setNombre: (s: string) => void;
+    setTelefono: (s: string) => void;
+    setEmail: (s: string) => void;
+    router: any;
+    sendStandardOrderFlow: (payload: Record<string, unknown>) => Promise<{ ok: boolean; data: any }>;
+    setSending: (b: boolean) => void;
+  }
+): Promise<void> {
+  const {
+    t,
+    language,
+    isRestaurant,
+    pagosPickupHabilitados,
+    deliveryMethod,
+    deliveryAddress,
+    deliveryPostalCode,
+    deliveryLatitude,
+    deliveryLongitude,
+    estimatedFeeCents,
+    clearCart,
+    closeCart,
+    addTrackingToken,
+    setOrderSuccess,
+    setErrors,
+    setNombre,
+    setTelefono,
+    setEmail,
+    router,
+    sendStandardOrderFlow,
+    setSending,
+  } = opts;
+
+  setSending(true);
+  try {
+    attachDeliveryFields(payload, {
+      isRestaurant,
+      deliveryMethod,
+      deliveryAddress,
+      deliveryPostalCode,
+      deliveryLatitude,
+      deliveryLongitude,
+      estimatedFeeCents,
+    });
+
+    const { ok, data } = await sendStandardOrderFlow(payload);
+
+    if (!ok) {
+      setErrors({ general: data.error || t('validationOrderError', language) });
+      return;
+    }
+
+    // Requires payment redirect
+    if (data.trackingToken && data.pedidoId && requiresRedsysRedirect(pagosPickupHabilitados, deliveryMethod, isRestaurant)) {
+      addTrackingToken(data.trackingToken);
+      clearCart();
+      closeCart();
+      await submitRedsysPayment(data.pedidoId, language, data.trackingToken, router, addTrackingToken);
+      return;
+    }
+
+    // Restaurante-specific tracking behavior
+    if (data.trackingToken && data.tipo === 'restaurante') {
+      addTrackingToken(data.trackingToken);
+      clearCart();
+      if (window.history.state?.cartOpen) {
+        window.history.replaceState({}, '', window.location.href);
+      }
+      closeCart();
+      const restauranteTrackingUrl = `/tracking/${data.trackingToken}`;
+      setTimeout(() => { window.location.href = restauranteTrackingUrl; }, 0);
+      return;
+    }
+
+    // Generic tracking redirect
+    if (data.trackingToken) {
+      redirectToTracking(data.trackingToken, {
+        setNombre,
+        setTelefono,
+        setEmail,
+        addTrackingTokenFn: addTrackingToken,
+      });
+      clearCart();
+      closeCart();
+      return;
+    }
+
+    // No tracking token: show success with order number
+    setOrderSuccess({ numeroPedido: data.numeroPedido });
+  } catch (e) {
+    const errorMsg = e instanceof Error ? e.message : t('connectionError', language);
+    setErrors({ general: errorMsg || t('connectionError', language) });
+  } finally {
+    setSending(false);
+  }
+}
+
+function computeIsDeliveryIncomplete(
+  isRestaurant: boolean | undefined,
+  mesaToken: string | null,
+  deliveryMethod: DeliveryMethod,
+  deliveryLatitude: number | null,
+  estimatedFeeCents: number | null,
+): boolean {
+  return !!(isRestaurant && !mesaToken && deliveryMethod === 'delivery' && (deliveryLatitude === null || estimatedFeeCents === null));
+}
+
+function computeCartTotals(
+  deliveryMethod: DeliveryMethod,
+  estimatedFeeCents: number | null,
+  discountValid: { valid: boolean; porcentaje: number } | null,
+  totalPrice: number,
+): { deliveryFee: number; discountedPrice: number; grandTotal: number } {
+  const isDelivery = deliveryMethod === 'delivery';
+  const deliveryFee = (isDelivery && estimatedFeeCents ? estimatedFeeCents : 0) / 100;
+  const discountedPrice = discountValid?.valid
+    ? Math.round(totalPrice * (1 - discountValid.porcentaje / 100) * 100) / 100
+    : totalPrice;
+  return { deliveryFee, discountedPrice, grandTotal: discountedPrice + deliveryFee };
+}
+
+function showNoPaymentBanner(
+  items: CartItem[],
+  isWaiterMode: boolean,
+  deliveryMethod: DeliveryMethod,
+  pagosPickupHabilitados: boolean | undefined,
+  isRestaurant: boolean | undefined,
+): boolean {
+  if (items.length === 0 || isWaiterMode) return false;
+  if (deliveryMethod === 'delivery') return false;
+  if (pagosPickupHabilitados && (deliveryMethod === 'recogida' || !isRestaurant)) return false;
+  return true;
+}
+
+function getActiveOrdersBodyText(count: number, lang: Language): string {
+  if (count === 1) return t('activeOrdersDialogBodySingular', lang);
+  return t('activeOrdersDialogBodyPlural', lang).replace('{count}', String(count));
+}
+
+function resolveActiveMesaId(mesaInfo: MesaInfo | null, mesaToken: string): string {
+  return mesaInfo?.id ?? mesaToken;
+}
+
+function showDeliverySelector(mesaToken: string | null, isRestaurant: boolean | undefined): boolean {
+  return !mesaToken && !!isRestaurant;
+}
+
+function showDiscountSection(mesaToken: string | null): boolean {
+  return !mesaToken;
+}
+
+function showDeliveryCostRow(isDelivery: boolean, deliveryFee: number): boolean {
+  return isDelivery && deliveryFee > 0;
+}
+
+function grandTotalColorClass(discountValid: { valid: boolean } | null): string {
+  return discountValid?.valid ? 'text-green-600 dark:text-green-400' : 'text-foreground';
+}
+
+function isSubmitDisabled(sending: boolean, mesaToken: string | null, mesaError: boolean, isDeliveryIncomplete: boolean): boolean {
+  return sending || (mesaToken !== null && mesaError) || isDeliveryIncomplete;
+}
+
+function shouldShowQrGate(
+  qrGateState: QRGateState | null,
+  mesaToken: string | null,
+  isWaiterMode: boolean,
+): boolean {
+  return qrGateState !== null && mesaToken !== null && !isWaiterMode;
+}
+
+function OrderToast({ show, language }: Readonly<{ show: boolean; language: Language }>) {
+  if (!show) return null;
+  return (
+    <div className="fixed inset-0 z-[400] flex items-center justify-center pointer-events-none">
+      <div className="bg-card/95 backdrop-blur-md border border-border shadow-2xl rounded-3xl px-10 py-8 flex flex-col items-center gap-4 animate-in fade-in zoom-in-90 duration-300">
+        <div className="w-16 h-16 rounded-full bg-primary/10 border-2 border-primary/25 flex items-center justify-center">
+          <Check className="size-8 text-primary" strokeWidth={2.5} />
+        </div>
+        <p className="text-base font-bold text-foreground text-center leading-snug">
+          {t('mesaOrderConfirmed', language)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function EmptyCartContent({ language, shouldReduceMotion, closeCart }: Readonly<{
+  language: Language;
+  shouldReduceMotion: boolean;
+  closeCart: () => void;
+}>) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-4 text-muted-foreground px-4">
+      <div className={`relative ${shouldReduceMotion ? '' : 'animate-empty-float'}`}>
+        <ShoppingBag className="size-12 opacity-20" />
+        <span className="absolute inset-0 flex items-center justify-center text-2xl opacity-30">+</span>
+      </div>
+      <div className="text-center">
+        <p className="text-base font-medium text-foreground">{t("emptyCart", language)}</p>
+        <p className="text-sm text-muted-foreground mt-1 max-w-[240px]">{t("addDishesToStart", language)}</p>
+      </div>
+      <button
+        onClick={() => {
+          closeCart();
+          document.getElementById('menu')?.scrollIntoView({ behavior: shouldReduceMotion ? 'auto' : 'smooth' });
+        }}
+        className="mt-2 px-6 py-3 bg-primary text-primary-foreground rounded-full font-medium hover:bg-primary/90 active:scale-[0.98] transition-all duration-150 min-h-[44px]"
+      >
+        {t("viewMenu", language)}
+      </button>
+    </div>
+  );
+}
+
 interface CartDrawerProps {
   isRestaurant?: boolean;
   pagosPickupHabilitados?: boolean;
@@ -99,7 +613,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     updateQuantity,
     removeItem,
     clearCart,
-    toggleDeferred,
+
     totalPrice,
     isCartOpen,
     openCart,
@@ -118,9 +632,8 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
   const [isWaiterMode, setIsWaiterMode] = useState(false);
   const [qrGateState, setQrGateState] = useState<QRGateState | null>(null);
   const [showOrderToast, setShowOrderToast] = useState(false);
-  const [showClearWithDeferredWarning, setShowClearWithDeferredWarning] = useState(false);
 
-  const hasDeferredItems = items.some(ci => ci.deferred);
+
 
   // Detect ?mesa= param (client-side only, SSR safe)
   // Falls back to sessionStorage so waiter mode survives navigation without ?mesa= in the URL
@@ -129,30 +642,16 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     const token = params.get('mesa');
     const shouldOpenCart = params.get('cart') === 'open';
 
-    function applySessionStorage(): boolean {
-      try {
-        const raw = sessionStorage.getItem('waiter_mesa');
-        if (!raw) return false;
-        const stored = JSON.parse(raw) as { mesaId: string; mesaNumero: number; mesaNombre: string | null };
-        setMesaToken(stored.mesaId);
-        setMesaInfo({ id: stored.mesaId, numero: stored.mesaNumero, nombre: stored.mesaNombre, empresa_id: '' });
-        setIsWaiterMode(true);
-        return true;
-      } catch {
-        return false;
-      }
-    }
-
     if (token) {
       setMesaToken(token);
       // Always check waiter mode from sessionStorage before the async fetch.
       // /api/mesas searches by id (not token column), so it succeeds for waiter
       // navigations and would never reach the old fallback path.
-      const isWaiter = applySessionStorage();
+      const isWaiter = applySessionStorageWaiter(setMesaToken, setMesaInfo, setIsWaiterMode);
       if (shouldOpenCart) openCart();
       fetch(`/api/mesas?token=${encodeURIComponent(token)}`)
         .then(async (res) => {
-          if (!res.ok) { if (!isWaiter) setMesaError(true); return; }
+          if (!res.ok) { if (!isWaiter) { setMesaError(true); } return; }
           const data = await res.json() as MesaInfo;
           setMesaInfo(data);
         })
@@ -160,7 +659,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
       return;
     }
 
-    applySessionStorage();
+    applySessionStorageWaiter(setMesaToken, setMesaInfo, setIsWaiterMode);
   // openCart is stable (useCallback with no deps) — safe to include
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -179,7 +678,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
   const [telefono, setTelefono] = useState('');
   const [countryCode, setCountryCode] = useState(DEFAULT_COUNTRY_CODE);
   const [email, setEmail] = useState('');
-  const [deliveryMethod, setDeliveryMethod] = useState<'recogida' | 'delivery' | null>(null);
+  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>(null);
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [deliveryPostalCode, setDeliveryPostalCode] = useState('');
   const [deliveryLatitude, setDeliveryLatitude] = useState<number | null>(null);
@@ -192,7 +691,6 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
 
     // Mesa mode: skip PII validation, use mesa submit path
     if (mesaToken) {
-      // Waiters bypass QR token validation — authenticated via waiter_token cookie
       const mesaId = mesaInfo?.id ?? mesaToken;
       let clientToken: string | null = null;
       if (!isWaiterMode) {
@@ -205,114 +703,24 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
         clientToken = storedClientToken.token;
       }
 
-      const toOrder = items.filter(ci => !ci.deferred);
-      const toDefer = items.filter(ci => ci.deferred);
-
-      if (toOrder.length === 0 && toDefer.length === 0) return;
-
       setSending(true);
       try {
-        // Deferred-only: send as retenido pedido and done
-        if (toOrder.length === 0) {
-          await fetch('/api/pedidos', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              tipo: 'mesa',
-              mesa_id: mesaId,
-              initialEstado: 'retenido',
-              items: toDefer.map((ci: CartItem) => ({
-                item: { id: ci.item.id, name: ci.item.name, price: ci.item.price, translations: ci.item.translations },
-                quantity: ci.quantity,
-                selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
-                note: ci.note,
-              })),
-              idioma: language,
-            }),
-          }).catch(() => null);
-          clearCart();
-          closeCart();
-          setShowOrderToast(true);
-          setTimeout(() => setShowOrderToast(false), 2000);
-          return;
-        }
-
-        const res = await fetch('/api/pedidos', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...(clientToken ? { 'Authorization': `Bearer ${clientToken}` } : {}) },
-          body: JSON.stringify({
-            tipo: 'mesa',
-            mesa_id: mesaId,
-            items: toOrder.map((ci: CartItem) => ({
-              item: { id: ci.item.id, name: ci.item.name, price: ci.item.price, translations: ci.item.translations },
-              quantity: ci.quantity,
-              selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
-              note: ci.note,
-            })),
-            idioma: language,
-          }),
-        });
-        if (res.status === 401) {
-          const body = await res.json() as { code?: string };
-          closeCart();
-          if (body.code === 'SESSION_CLOSED') {
-            setQrGateState('SESSION_CLOSED');
-          } else {
-            setQrGateState('TOKEN_EXPIRED');
-          }
-          return;
-        }
-        const data = await res.json();
-        if (res.ok && data.trackingToken) {
-          addTrackingToken(data.trackingToken);
-          try {
-            const storageKey = `mesa_orders_${mesaId}`;
-            const existing = JSON.parse(localStorage.getItem(storageKey) ?? '[]') as unknown[];
-            existing.push({
-              pedidoId: data.pedidoId ?? data.id,
-              trackingToken: data.trackingToken,
-              items: toOrder.map((ci: CartItem) => ({
-                name: ci.item.name,
-                quantity: ci.quantity,
-                price: ci.item.price,
-              })),
-              total: toOrder.reduce((s, ci) => {
-                const compPrice = ci.selectedComplements?.reduce((sc, c) => sc + c.price, 0) ?? 0;
-                return s + (ci.item.price + compPrice) * ci.quantity;
-              }, 0),
-              timestamp: Date.now(),
-            });
-            localStorage.setItem(storageKey, JSON.stringify(existing));
-          } catch {
-            // localStorage may be unavailable
-          }
-
-          if (toDefer.length > 0) {
-            await fetch('/api/pedidos', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                tipo: 'mesa',
-                mesa_id: mesaId,
-                initialEstado: 'retenido',
-                items: toDefer.map((ci: CartItem) => ({
-                  item: { id: ci.item.id, name: ci.item.name, price: ci.item.price, translations: ci.item.translations },
-                  quantity: ci.quantity,
-                  selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
-                  note: ci.note,
-                })),
-                idioma: language,
-              }),
-            }).catch(() => null); // fire-and-forget — failure is non-critical
-          }
-
+        const result = await sendMesaOrderFlow(mesaId, clientToken, items, language);
+        if (result.ok && result.trackingToken) {
+          addTrackingToken(result.trackingToken);
           clearCart();
           closeCart();
           setShowOrderToast(true);
           setTimeout(() => setShowOrderToast(false), 2000);
           window.dispatchEvent(new CustomEvent('mesa-order-placed'));
+        } else if (result.code === 'SESSION_CLOSED') {
+          closeCart();
+          setQrGateState('SESSION_CLOSED');
+        } else if (result.code === 'TOKEN_EXPIRED') {
+          closeCart();
+          setQrGateState('TOKEN_EXPIRED');
         } else {
-          setErrors({ general: data.error || t('validationOrderError', language) });
+          setErrors({ general: result.error || t('validationOrderError', language) });
         }
       } catch {
         setErrors({ general: t('connectionError', language) });
@@ -325,131 +733,48 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     // Standard (non-mesa) flow: validate PII
     const nombreError = validateNameInput(nombre, t, language);
     const telefonoError = validatePhoneInput(telefono, t, language);
-    const deliveryError = isRestaurant && deliveryMethod === null
-      ? t('deliveryMethodTitle', language)
-      : isRestaurant && deliveryMethod === 'delivery' && (deliveryLatitude === null || deliveryLongitude === null)
-        ? t('deliverySelectValidAddress', language)
-        : undefined;
+    const deliveryError = resolveDeliveryError(isRestaurant, deliveryMethod, deliveryLatitude, deliveryLongitude, t, language);
     if (nombreError || telefonoError || deliveryError) {
       setErrors({ nombre: nombreError, telefono: telefonoError, delivery: deliveryError });
       return;
     }
 
-    setSending(true);
-
     const selectedCountry = COUNTRY_CODES.find(c => c.code === countryCode);
     const dialCode = selectedCountry?.dialCode || '34';
 
-    try {
-      const res = await fetch('/api/pedidos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: items.map((ci: CartItem) => ({
-            item: { id: ci.item.id, name: ci.item.name, price: ci.item.price, translations: ci.item.translations },
-            quantity: ci.quantity,
-            selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
-            note: ci.note,
-          })),
-          nombre,
-          telefono: dialCode + telefono.replaceAll(/\D/g, ''),
-          email,
-          idioma: language,
-          codigoDescuento: discountCode || undefined,
-          ...(isRestaurant && deliveryMethod ? {
-            origen: deliveryMethod,
-            direccion_entrega: deliveryMethod === 'delivery' ? deliveryAddress : undefined,
-            codigo_postal: deliveryMethod === 'delivery' ? deliveryPostalCode : undefined,
-            latitude_entrega: deliveryMethod === 'delivery' ? deliveryLatitude : undefined,
-            longitude_entrega: deliveryMethod === 'delivery' ? deliveryLongitude : undefined,
-            estimated_delivery_fee_cents: deliveryMethod === 'delivery' ? estimatedFeeCents : undefined,
-          } : {}),
-        }),
-      });
+    const payload: Record<string, unknown> = {
+      items: items.map(mapCartItemPayload),
+      nombre,
+      telefono: dialCode + telefono.replaceAll(/\D/g, ''),
+      email,
+      idioma: language,
+      codigoDescuento: discountCode || undefined,
+    };
 
-      const data = await res.json();
-
-      if (res.ok) {
-        if (data.trackingToken && data.pedidoId && (
-          deliveryMethod === 'delivery' ||
-          (pagosPickupHabilitados && (deliveryMethod === 'recogida' || !isRestaurant))
-        )) {
-          // Delivery always, recogida/tienda only when pagosPickupHabilitados: initiate Redsys payment
-          if (data.trackingToken) addTrackingToken(data.trackingToken);
-          clearCart();
-          closeCart();
-          try {
-            const redsysRes = await fetch('/api/redsys/initiate', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ pedidoId: data.pedidoId, lang: language }),
-            });
-            if (redsysRes.ok) {
-              const formData = await redsysRes.json() as {
-                DS_MERCHANT_PARAMETERS: string;
-                DS_SIGNATURE: string;
-                DS_SIGNATURE_VERSION: string;
-              };
-              const redsysUrl = process.env.NEXT_PUBLIC_REDSYS_URL ?? 'https://sis-t.redsys.es:25443/sis/realizarPago';
-              const form = document.createElement('form');
-              form.method = 'POST';
-              form.action = redsysUrl;
-              const fields: Record<string, string> = {
-                Ds_SignatureVersion: formData.DS_SIGNATURE_VERSION,
-                Ds_MerchantParameters: formData.DS_MERCHANT_PARAMETERS,
-                Ds_Signature: formData.DS_SIGNATURE,
-              };
-              for (const [name, value] of Object.entries(fields)) {
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = name;
-                input.value = value;
-                form.appendChild(input);
-              }
-              document.body.appendChild(form);
-              form.submit();
-              return;
-            }
-            // Redsys not configured — fall through to tracking page
-          } catch {
-            // Network error — fall through to tracking page
-          }
-          router.push(`/tracking/${data.trackingToken}`);
-        } else if (data.trackingToken && data.tipo === 'restaurante') {
-          // Restaurant pickup: redirect to tracking page
-          addTrackingToken(data.trackingToken);
-          clearCart();
-          if (window.history.state?.cartOpen) {
-            window.history.replaceState({}, '', window.location.href);
-          }
-          closeCart();
-          const restauranteTrackingUrl = `/tracking/${data.trackingToken}`;
-          setTimeout(() => { window.location.href = restauranteTrackingUrl; }, 0);
-        } else if (data.trackingToken) {
-          // Tienda: redirect to tracking page
-          addTrackingToken(data.trackingToken);
-          clearCart();
-          setNombre('');
-          setTelefono('');
-          setEmail('');
-          if (window.history.state?.cartOpen) {
-            window.history.replaceState({}, '', window.location.href);
-          }
-          closeCart();
-          const trackingUrl = `/tracking/${data.trackingToken}`;
-          setTimeout(() => { window.location.href = trackingUrl; }, 0);
-        } else {
-          // Fallback: show success dialog only
-          setOrderSuccess({ numeroPedido: data.numeroPedido });
-        }
-      } else {
-        setErrors({ general: data.error || t('validationOrderError', language) });
-      }
-    } catch {
-      setErrors({ general: t('connectionError', language) });
-    } finally {
-      setSending(false);
-    }
+    // Delegate the heavy response handling to a module-level helper
+    await processStandardOrderResponse(payload, {
+      t,
+      language,
+      isRestaurant,
+      pagosPickupHabilitados,
+      deliveryMethod,
+      deliveryAddress,
+      deliveryPostalCode,
+      deliveryLatitude,
+      deliveryLongitude,
+      estimatedFeeCents,
+      clearCart,
+      closeCart,
+      addTrackingToken,
+      setOrderSuccess,
+      setErrors,
+      setNombre,
+      setTelefono,
+      setEmail,
+      router,
+      sendStandardOrderFlow,
+      setSending,
+    });
   }, [mesaToken, mesaInfo, isWaiterMode, nombre, telefono, countryCode, email, deliveryMethod, deliveryAddress, deliveryPostalCode, deliveryLatitude, deliveryLongitude, isRestaurant, pagosPickupHabilitados, items, language, discountCode, estimatedFeeCents, clearCart, closeCart, router]);
 
 // Signal "Activa" state: when a real customer (non-waiter) adds their first item
@@ -460,7 +785,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items.length]);
 
-  const isDeliveryIncomplete = isRestaurant && !mesaToken && deliveryMethod === 'delivery' && (deliveryLatitude === null || estimatedFeeCents === null);
+  const isDeliveryIncomplete = computeIsDeliveryIncomplete(isRestaurant, mesaToken, deliveryMethod, deliveryLatitude, estimatedFeeCents);
 
   const handleDialogClose = useCallback((open: boolean) => {
     if (!open) {
@@ -483,26 +808,84 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     }
   }, [clearCart, closeCart]);
 
+  const handleValidateDiscount = useCallback(async () => {
+    if (!discountCode.trim()) return;
+    if (!email.trim()) {
+      setDiscountError(t("discountCodeEmailRequired", language));
+      return;
+    }
+    setValidatingDiscount(true);
+    setDiscountError(null);
+    try {
+      const res = await fetch('/api/descuento/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ codigo: discountCode, email }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const errorTranslations: Record<string, string> = {
+          CODE_NOT_FOUND: t("discountCodeInvalid", language),
+          CODE_EXPIRED: t("discountCodeExpired", language),
+          CODE_ALREADY_USED: t("discountCodeUsed", language),
+          EMAIL_MISMATCH: t("discountCodeEmailMismatch", language),
+        };
+        setDiscountError(data.error && data.code
+          ? (errorTranslations[data.code] ?? t("discountCodeInvalid", language))
+          : (data.error ?? t("discountCodeInvalid", language)));
+        setDiscountValid(null);
+      } else {
+        setDiscountValid({ valid: true, porcentaje: data.porcentaje });
+        setDiscountError(null);
+      }
+    } catch {
+      setDiscountError(t("connectionError", language));
+    } finally {
+      setValidatingDiscount(false);
+    }
+  }, [discountCode, email, language]);
+
+  const handleSendOrder = useCallback(() => {
+    if (!mesaToken && activeOrderTokens.length > 0) {
+      setShowActiveOrdersDialog(true);
+    } else {
+      void handleConfirmOrder();
+    }
+  }, [mesaToken, activeOrderTokens, handleConfirmOrder]);
+
+  const handleDeliveryChange = useCallback((
+    v: 'recogida' | 'delivery',
+    deliveryData?: { address: string; postalCode: string; latitude: number; longitude: number; estimatedFeeCents: number },
+  ) => {
+    setDeliveryMethod(v);
+    setErrors(prev => ({ ...prev, delivery: undefined }));
+    if (deliveryData) {
+      setDeliveryAddress(deliveryData.address);
+      setDeliveryPostalCode(deliveryData.postalCode);
+      setDeliveryLatitude(deliveryData.latitude);
+      setDeliveryLongitude(deliveryData.longitude);
+      setEstimatedFeeCents(deliveryData.estimatedFeeCents);
+    } else if (v !== deliveryMethod) {
+      setDeliveryAddress('');
+      setDeliveryPostalCode('');
+      setDeliveryLatitude(null);
+      setDeliveryLongitude(null);
+      setEstimatedFeeCents(null);
+    }
+  }, [deliveryMethod]);
+
+  const isDelivery = deliveryMethod === 'delivery';
+  const { deliveryFee, grandTotal } = computeCartTotals(deliveryMethod, estimatedFeeCents, discountValid, totalPrice);
+
   return (
     <>
-      {showOrderToast && (
-        <div className="fixed inset-0 z-[400] flex items-center justify-center pointer-events-none">
-          <div className="bg-card/95 backdrop-blur-md border border-border shadow-2xl rounded-3xl px-10 py-8 flex flex-col items-center gap-4 animate-in fade-in zoom-in-90 duration-300">
-            <div className="w-16 h-16 rounded-full bg-primary/10 border-2 border-primary/25 flex items-center justify-center">
-              <Check className="size-8 text-primary" strokeWidth={2.5} />
-            </div>
-            <p className="text-base font-bold text-foreground text-center leading-snug">
-              {t('mesaOrderConfirmed', language)}
-            </p>
-          </div>
-        </div>
-      )}
-      {qrGateState && mesaToken && !isWaiterMode && (
+      <OrderToast show={showOrderToast} language={language} />
+      {shouldShowQrGate(qrGateState, mesaToken, isWaiterMode) && (
         <QRScannerGate
-          mesaId={mesaInfo?.id ?? mesaToken}
-          state={qrGateState}
+          mesaId={resolveActiveMesaId(mesaInfo, mesaToken!)}
+          state={qrGateState!}
           onTokenIssued={(token, expiresAt) => {
-            storeMesaClientToken(mesaInfo?.id ?? mesaToken, token, expiresAt);
+            storeMesaClientToken(resolveActiveMesaId(mesaInfo, mesaToken!), token, expiresAt);
             setQrGateState(null);
             void handleConfirmOrder();
           }}
@@ -511,42 +894,13 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
           }}
         />
       )}
-      {/* Clear cart with deferred items warning */}
-      <Dialog open={showClearWithDeferredWarning} onOpenChange={setShowClearWithDeferredWarning}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Hay ítems retenidos</DialogTitle>
-            <DialogDescription className="pt-2">
-              Hay ítems marcados como retenidos en el carrito. Si lo vacías, se perderán también. ¿Quieres continuar?
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex gap-2 mt-2">
-            <Button variant="outline" className="flex-1" onClick={() => setShowClearWithDeferredWarning(false)}>
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              className="flex-1"
-              onClick={() => {
-                setShowClearWithDeferredWarning(false);
-                clearCart();
-              }}
-            >
-              Vaciar igual
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={showActiveOrdersDialog} onOpenChange={setShowActiveOrdersDialog}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>{t('activeOrdersDialogTitle', language)}</DialogTitle>
             <DialogDescription className="pt-2">
-              {activeOrderTokens.length === 1
-                ? t('activeOrdersDialogBodySingular', language)
-                : t('activeOrdersDialogBodyPlural', language).replace('{count}', String(activeOrderTokens.length))
-              }
+              {getActiveOrdersBodyText(activeOrderTokens.length, language)}
             </DialogDescription>
           </DialogHeader>
           <div className="flex gap-2 mt-2">
@@ -603,7 +957,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
           </SheetDescription>
         </SheetHeader>
 
-        {items.length > 0 && !isWaiterMode && deliveryMethod !== 'delivery' && !(pagosPickupHabilitados && (deliveryMethod === 'recogida' || !isRestaurant)) && (
+        {showNoPaymentBanner(items, isWaiterMode, deliveryMethod, pagosPickupHabilitados, isRestaurant) && (
           <div className="shrink-0 mx-4 mb-1.5 rounded-md bg-secondary border border-border px-2 py-1.5">
             <p className="text-xs text-secondary-foreground font-medium">
               {t("noPaymentRequired", language)}
@@ -635,27 +989,25 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
           <div className="flex-1 flex flex-col min-h-0 overflow-y-auto px-4 py-2">
             <ul className="flex flex-col gap-2 cv-auto" style={{ contentVisibility: 'auto' }}>
               {items.map((ci) => {
-                const itemKey = getItemKey(ci.item, ci.selectedComplements);
                 const complementPrice = ci.selectedComplements?.reduce((sum, c) => sum + c.price, 0) || 0;
                 const totalItemPrice = ci.item.price + complementPrice;
-                let itemAnimationClass = '';
-                if (!shouldReduceMotion) {
-                  if (ci.justAdded) {
-                    itemAnimationClass = 'animate-cart-item-add';
-                  } else if (ci.justRemoved) {
-                    itemAnimationClass = 'animate-cart-item-remove';
-                  }
-                }
+                const itemAnimationClass = getItemAnimationClass(ci.justAdded, ci.justRemoved, shouldReduceMotion);
                 return (
 <li
                       key={ci.cartId}
                       className={`flex items-center gap-3 rounded-lg p-3 transition-all duration-200 group ${itemAnimationClass}`}
-                      style={{ backgroundColor: ci.deferred ? 'oklch(22% 0.06 62 / 0.5)' : undefined }}
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-card-foreground text-base truncate group-hover:text-primary transition-colors duration-200 flex items-center gap-1.5">
+                        <p className="font-semibold text-card-foreground text-base group-hover:text-primary transition-colors duration-200 flex items-center gap-1.5 flex-wrap">
                           <span className="truncate">{(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}</span>
-
+                          {ci.pase && (
+                            <span
+                              className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                              style={{ background: PASE_BADGE[ci.pase].bg, color: PASE_BADGE[ci.pase].text }}
+                            >
+                              {PASE_LABEL[ci.pase]}
+                            </span>
+                          )}
                         </p>
                         {ci.selectedComplements && ci.selectedComplements.length > 0 && (
                           <p className="text-xs text-muted-foreground truncate group-hover:text-muted-foreground/80 transition-colors duration-200">
@@ -711,23 +1063,6 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                         >
                           <Trash2 className="size-4" />
                         </RippleButton>
-                        {mesaToken && isWaiterMode && ci.item.tipoProducto !== 'bebida' && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              toggleDeferred(ci.cartId);
-                            }}
-                            className="flex items-center justify-center rounded-md p-1.5 transition-colors duration-150 min-h-[44px] min-w-[44px]"
-                            style={{
-                              backgroundColor: ci.deferred ? 'oklch(28% 0.08 62 / 0.8)' : 'transparent',
-                              color: ci.deferred ? 'oklch(75% 0.18 62)' : 'oklch(45% 0.04 252)',
-                            }}
-                            aria-label={ci.deferred ? 'Quitar retención' : 'Retener'}
-                            title={ci.deferred ? 'Quitar retención' : 'Retener para más tarde'}
-                          >
-                            <Pause className="w-3.5 h-3.5" />
-                          </button>
-                        )}
                       </div>
                     </li>
                 );
@@ -741,11 +1076,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                   <div className="flex items-center gap-2 rounded-lg bg-primary/10 border border-primary/20 px-3 py-2.5 min-h-[44px]">
                     <UtensilsCrossed className="size-4 text-primary shrink-0" aria-hidden="true" />
                     <span className="font-semibold text-primary text-sm">
-                      {mesaInfo
-                        ? `${t('mesaLabel', language)} ${mesaInfo.numero}${mesaInfo.nombre ? ` — ${mesaInfo.nombre}` : ''}`
-                        : mesaError
-                          ? `${t('mesaLabel', language)} —`
-                          : `${t('mesaLabel', language)}…`}
+                      {mesaBadgeLabel(mesaInfo, mesaError, t('mesaLabel', language))}
                     </span>
                   </div>
                   {mesaError && (
@@ -836,35 +1167,18 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
               )}
 
               {/* Delivery method selector — only for restaurants in non-mesa mode */}
-              {!mesaToken && isRestaurant && (
+              {showDeliverySelector(mesaToken, isRestaurant) && (
                 <DeliveryMethodSelector
                   value={deliveryMethod}
                   deliveryHabilitado={deliveryHabilitado}
-                  onChange={(v, deliveryData) => {
-                    setDeliveryMethod(v);
-                    setErrors(prev => ({ ...prev, delivery: undefined }));
-                    if (deliveryData) {
-                      setDeliveryAddress(deliveryData.address);
-                      setDeliveryPostalCode(deliveryData.postalCode);
-                      setDeliveryLatitude(deliveryData.latitude);
-                      setDeliveryLongitude(deliveryData.longitude);
-                      setEstimatedFeeCents(deliveryData.estimatedFeeCents);
-                    } else if (v !== deliveryMethod) {
-                      // Method changed without deliveryData — clear address state
-                      setDeliveryAddress('');
-                      setDeliveryPostalCode('');
-                      setDeliveryLatitude(null);
-                      setDeliveryLongitude(null);
-                      setEstimatedFeeCents(null);
-                    }
-                  }}
+                  onChange={handleDeliveryChange}
                   orderTotalCents={Math.round(totalPrice * 100)}
                   disabled={sending}
                 />
               )}
 
               {/* Discount Code Section — hidden in mesa mode */}
-              {!mesaToken && <div className="mb-3">
+              {showDiscountSection(mesaToken) && <div className="mb-3">
                 <label htmlFor="discount-code" className="text-xs font-medium text-muted-foreground ml-1 mb-1 block">
                   {t("discountCodeLabel", language)}
                 </label>
@@ -879,49 +1193,16 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                       setDiscountValid(null);
                       setDiscountError(null);
                     }}
-                     className={`h-9 ${discountError ? 'border-destructive' : (discountValid ? 'border-green-500' : '')}`}
+                     className={`h-9 ${discountBorderClass(discountError, discountValid)}`}
                      disabled={validatingDiscount || items.length === 0}
-                     aria-describedby={discountError ? "discount-error" : (discountValid ? "discount-valid" : undefined)}
+                     aria-describedby={discountDescribedBy(discountError, discountValid)}
                      aria-invalid={!!discountError}
                   />
                   <Button
                     variant="outline"
                     size="sm"
                     className="h-9 min-h-[44px] px-4"
-                    onClick={async () => {
-                      if (!discountCode.trim()) return;
-                      if (!email.trim()) {
-                        setDiscountError(t("discountCodeEmailRequired", language));
-                        return;
-                      }
-                      setValidatingDiscount(true);
-                      setDiscountError(null);
-                      try {
-                        const res = await fetch('/api/descuento/validate', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ codigo: discountCode, email }),
-                        });
-                        const data = await res.json();
-                        if (!res.ok) {
-                          const errorTranslations: Record<string, string> = {
-                            CODE_NOT_FOUND: t("discountCodeInvalid", language),
-                            CODE_EXPIRED: t("discountCodeExpired", language),
-                            CODE_ALREADY_USED: t("discountCodeUsed", language),
-                            EMAIL_MISMATCH: t("discountCodeEmailMismatch", language),
-                          };
-                          setDiscountError(data.error && data.code ? (errorTranslations[data.code] || t("discountCodeInvalid", language)) : (data.error || t("discountCodeInvalid", language)));
-                          setDiscountValid(null);
-                        } else {
-                          setDiscountValid({ valid: true, porcentaje: data.porcentaje });
-                          setDiscountError(null);
-                        }
-                      } catch {
-                        setDiscountError(t("connectionError", language));
-                      } finally {
-                        setValidatingDiscount(false);
-                      }
-                    }}
+                    onClick={handleValidateDiscount}
                     disabled={validatingDiscount || items.length === 0}
                   >
                     {validatingDiscount ? '...' : t("discountCodeApply", language)}
@@ -933,46 +1214,34 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                   </p>
                 )}
                 {discountValid && discountValid.valid && (
-                  <p id="discount-valid" role="status" className="text-xs text-green-600 dark:text-green-400 mt-1 ml-1 flex items-center gap-1">
+                  <output id="discount-valid" className="text-xs text-green-600 dark:text-green-400 mt-1 ml-1 flex items-center gap-1">
                     <Check className="size-3" />
                     {t("discountCodeValid", language)} ({discountValid.porcentaje}%)
-                  </p>
+                  </output>
                 )}
               </div>}
 
               {/* Total Section */}
-              {(() => {
-                const isDelivery = deliveryMethod === 'delivery';
-                const deliveryFeeCents = isDelivery && estimatedFeeCents ? estimatedFeeCents : 0;
-                const deliveryFee = deliveryFeeCents / 100;
-                const discountedItems = discountValid?.valid
-                  ? Math.round(totalPrice * (1 - discountValid.porcentaje / 100) * 100) / 100
-                  : totalPrice;
-                const grandTotal = discountedItems + deliveryFee;
-
-                return (
-                  <div className="mb-4 space-y-1">
-                    {discountValid?.valid && (
-                      <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <span>{t("subtotal", language)}</span>
-                        <span className="line-through">{formatPrice(totalPrice, 'EUR', language)}</span>
-                      </div>
-                    )}
-                    {isDelivery && deliveryFee > 0 && (
-                      <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <span>{t("deliveryCost", language)}</span>
-                        <span>{formatPrice(deliveryFee, 'EUR', language)}</span>
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <span className="text-lg font-semibold text-foreground">{t("total", language)}</span>
-                      <span className={`text-2xl font-bold tabular-nums animate-price-update ${discountValid?.valid ? 'text-green-600 dark:text-green-400' : 'text-foreground'}`} key={grandTotal}>
-                        {formatPrice(grandTotal, 'EUR', language)}
-                      </span>
-                    </div>
+              <div className="mb-4 space-y-1">
+                {discountValid?.valid && (
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>{t("subtotal", language)}</span>
+                    <span className="line-through">{formatPrice(totalPrice, 'EUR', language)}</span>
                   </div>
-                );
-              })()}
+                )}
+                {showDeliveryCostRow(isDelivery, deliveryFee) && (
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>{t("deliveryCost", language)}</span>
+                    <span>{formatPrice(deliveryFee, 'EUR', language)}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <span className="text-lg font-semibold text-foreground">{t("total", language)}</span>
+                  <span className={`text-2xl font-bold tabular-nums animate-price-update ${grandTotalColorClass(discountValid)}`} key={grandTotal}>
+                    {formatPrice(grandTotal, 'EUR', language)}
+                  </span>
+                </div>
+              </div>
 
               {errors.general && (
                 <p role="alert" className="text-sm text-destructive text-center mb-2">
@@ -980,36 +1249,24 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                 </p>
               )}
               {isDeliveryIncomplete && (
-                <p role="status" className="text-xs text-muted-foreground text-center mb-2">
+                <output className="block text-xs text-muted-foreground text-center mb-2">
                   {t('deliverySelectValidAddress', language)}
-                </p>
+                </output>
               )}
               <div className="flex flex-col gap-2">
                  <Button
                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full py-3 text-lg font-semibold shadow-elegant transition-colors duration-150 min-h-[44px]"
                    size="lg"
-                   onClick={() => {
-                     if (!mesaToken && activeOrderTokens.length > 0) {
-                       setShowActiveOrdersDialog(true);
-                     } else {
-                       handleConfirmOrder();
-                     }
-                   }}
-                   disabled={sending || (mesaToken !== null && mesaError) || isDeliveryIncomplete}
+                   onClick={handleSendOrder}
+                   disabled={isSubmitDisabled(sending, mesaToken, mesaError, isDeliveryIncomplete)}
                  >
-                   {sending ? t("sending", language) : mesaToken ? t("mesaPlaceOrder", language) : t("sendOrder", language)}
+                   {orderButtonLabel(sending, mesaToken, t, language)}
                  </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   className="text-muted-foreground rounded-full py-2 font-medium hover:bg-muted/40 transition-colors duration-200"
-                  onClick={() => {
-                    if (isWaiterMode && hasDeferredItems) {
-                      setShowClearWithDeferredWarning(true);
-                    } else {
-                      clearCart();
-                    }
-                  }}
+                  onClick={() => { clearCart(); }}
                 >
                   {t("clearCart", language)}
                 </Button>

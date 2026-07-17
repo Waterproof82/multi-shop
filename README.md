@@ -79,6 +79,30 @@ Software de caja para restaurantes y tiendas integrado en la misma plataforma. C
 - **Inventario físico a ciegas** (`/admin/stock/inventario`): flujo de 3 pasos para el conteo periódico del almacén. (1) El operador introduce la cantidad real de cada ingrediente sin ver el teórico. (2) El sistema calcula y muestra las desviaciones (verde = sobrante, rojo = faltante). (3) Al confirmar, se insertan movimientos de tipo `inventario` y se actualiza `cantidad_actual`. El tipo `inventario` se añadió como nuevo valor al enum `tipo_movimiento`.
 - **Alerta de stock bajo en cobro**: badge `LowStockBadge` (ámbar, clicable) en el header del TPV y en la pantalla de cobro. Refresco cada 3 minutos. Informativo, nunca bloquea el pago.
 
+#### Compras y Proveedores — SIALTI (Bloque 1)
+
+Módulo de gestión de la cadena de suministro para restaurantes. Cumple con el Reglamento CE 178/2002 (trazabilidad sanitaria), la Ley Antifraude 11/2021 y el RD 1619/2012 (IVA soportado).
+
+- **Maestro de proveedores** (`/admin/compras/proveedores`): CRUD con validación de CIF único por tenant. Cada proveedor tiene su catálogo de artículos con precio, unidad, factor de conversión e IVA/IGIC.
+- **Pedidos de compra** (`/admin/compras/pedidos`): ciclo `borrador → enviado → recibido / cancelado`. Una vez enviado, precios e IVA son inmutables.
+- **Albaranes de recepción** (`/admin/compras/albaranes`): captura `numero_lote` y `fecha_caducidad` para ingredientes perecederos. Una vez marcado como recibido, el albarán es inmutable (trigger PostgreSQL). La recepción descuenta stock de forma atómica via RPC `recibir_albaran_transaccional`.
+- **Facturas de proveedor** (`/admin/compras/facturas`): desglose de base imponible por tipo de IVA (0/4/10/21%) y por tipo IGIC (0/3/7/9.5/15%). Validación matemática con tolerancia ±2 céntimos. Pago por caja registrado como evento en `tpv_turno_eventos`.
+- **Soporte IGIC**: empresas en Canarias usan IGIC en lugar de IVA. El régimen se detecta desde `empresa.tipo_impuesto`; el CHECK constraint de BD admite ambos conjuntos de tipos.
+
+Ver `docs/context/compras-system.md` para tablas, RPCs, errores y trampas críticas.
+
+#### Food Cost Analytics — CMP y Rentabilidad (Bloque 2)
+
+Módulo de analítica de costes para restaurantes. Accesible desde `/admin/analytics/`.
+
+- **CMP automático**: trigger `trigger_fn_recalcular_cmp` recalcula el Coste Medio Ponderado de cada ingrediente en cada entrada de stock (compras). Fórmula ponderada con guardia de división por cero (stock negativo).
+- **Food Cost Teórico vs Real** (`/admin/analytics/food-cost`): compara el coste teórico (escandallo × CMP) frente al coste real de compras en el período seleccionado. Aviso si hay productos sin receta asignada o ingredientes con CMP = 0.
+- **Rentabilidad por Producto** (`/admin/analytics/rentabilidad`): tabla ordenable de todos los productos del tenant con precio de venta, coste de receta, margen bruto, margen %, unidades vendidas y contribución total. Incluye productos sin receta (botellas, latas) con coste 0 — nunca los oculta.
+- **Selector de período**: Semana actual / Mes actual / Custom con fechas libres.
+- **GIN index**: `idx_pedidos_detalle_pedido_gin` sobre `pedidos.detalle_pedido` (JSONB) para evitar full table scan en los RPCs de analítica.
+
+Ver `docs/context/food-cost-analytics.md` para arquitectura, RPCs y trampas críticas.
+
 #### Empleados TPV — autenticación por PIN
 
 Sistema de cajeros y encargados que acceden al TPV con PIN numérico, sin necesidad de email/password ni cuenta en `auth.users`. Los empleados se gestionan desde `/admin/configuracion` → tab "Empleados".

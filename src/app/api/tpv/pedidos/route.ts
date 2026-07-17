@@ -17,8 +17,70 @@ const bodySchema = z.object({
   mesaId: z.string().uuid(),
   items: z.array(itemSchema).min(1).max(50),
   nota: z.string().max(500).optional(),
-  pase: z.enum(['primer', 'segundo', 'postre', 'bebida']).optional(),
+  pase: z.enum(['primer', 'segundo', 'postre']).optional(),
+  directoACocina: z.boolean().optional().default(false),
 });
+
+function resolveSynthesizedEstado(allCancelled: boolean, allDone: boolean, anyListo: boolean, anyEnPreparacion: boolean): string {
+  if (allCancelled) { return 'cancelado'; }
+  if (allDone) { return 'servido'; }
+  if (anyListo) { return 'preparado'; }
+  if (anyEnPreparacion) { return 'en_preparacion'; }
+  return 'pendiente';
+}
+
+function isRetenidoReadyToSynthesize(p: RawPedido, detalle: unknown[], overrides: Map<number, string>): boolean {
+  if (p.estado !== 'retenido') return true;
+  return detalle.length > 0 && detalle.every((_, idx) => {
+    const ov = overrides.get(idx);
+    return ov !== undefined && ov !== 'retenido';
+  });
+}
+
+type RawComplement = string | { nombre?: string; name?: string };
+type RawItem = { nombre?: string; precio?: number; cantidad?: number; complementos?: RawComplement[] };
+type RawPedido = { id: string; numero_pedido: number; detalle_pedido: RawItem[]; total: number; estado: string; nota?: string | null; pase?: string | null };
+
+async function buildSynthesizedEstado(
+  supabase: ReturnType<typeof getSupabaseClient>,
+  rawPedidos: RawPedido[]
+): Promise<Map<string, string>> {
+  const resultado = new Map<string, string>();
+  const allIds = rawPedidos.map(p => p.id);
+
+  if (allIds.length === 0) return resultado;
+
+  try {
+    const { data: itemEstados } = await supabase
+      .from('pedido_item_estados')
+      .select('pedido_id, item_idx, estado')
+      .in('pedido_id', allIds);
+
+    const overridesByPedido = new Map<string, Map<number, string>>();
+    for (const row of (itemEstados ?? []) as { pedido_id: string; item_idx: number; estado: string }[]) {
+      if (!overridesByPedido.has(row.pedido_id)) overridesByPedido.set(row.pedido_id, new Map());
+      overridesByPedido.get(row.pedido_id)!.set(row.item_idx, row.estado);
+    }
+
+    for (const p of rawPedidos) {
+      const detalle = (p.detalle_pedido as unknown[]) ?? [];
+      const overrides = overridesByPedido.get(p.id) ?? new Map<number, string>();
+
+      if (overrides.size === 0) continue; // No kitchen activity yet, keep original estado
+      if (!isRetenidoReadyToSynthesize(p, detalle, overrides)) continue;
+
+      const itemStates = detalle.map((_, idx) => overrides.get(idx) ?? 'pendiente');
+      const allCancelled     = itemStates.length > 0 && itemStates.every(s => s === 'cancelado');
+      const allDone          = itemStates.every(s => s === 'servido' || s === 'cancelado');
+      const anyListo         = itemStates.includes('listo');
+      const anyEnPreparacion = itemStates.includes('en_preparacion');
+
+      resultado.set(p.id, resolveSynthesizedEstado(allCancelled, allDone, anyListo, anyEnPreparacion));
+    }
+  } catch { /* best-effort */ }
+
+  return resultado;
+}
 
 export async function GET(req: NextRequest) {
   const { empresaId, error: authError } = await requireAuth(req);
@@ -52,66 +114,26 @@ export async function GET(req: NextRequest) {
   const yaCobradoCents = ((cobrosRes.data ?? []) as { importe_cobrado_cents: number }[])
     .reduce((sum, c) => sum + Number(c.importe_cobrado_cents), 0);
 
-  type RawComplement = string | { nombre?: string; name?: string };
-  type RawItem = { nombre?: string; precio?: number; cantidad?: number; complementos?: RawComplement[] };
-  type RawPedido = { id: string; numero_pedido: number; detalle_pedido: RawItem[]; total: number; estado: string; nota?: string | null; pase?: string | null };
-
   const rawPedidos = (pedidosRes.data ?? []) as RawPedido[];
 
   // Synthesize effective estado from pedido_item_estados for ALL pedidos.
   // pedidos.estado is never updated by kitchen — the source of truth is pedido_item_estados.
-  const synthesizedEstado = new Map<string, string>();
-  const allIds = rawPedidos.map(p => p.id);
-
-  if (allIds.length > 0) {
-    try {
-      const { data: itemEstados } = await supabase
-        .from('pedido_item_estados')
-        .select('pedido_id, item_idx, estado')
-        .in('pedido_id', allIds);
-
-      const overridesByPedido = new Map<string, Map<number, string>>();
-      for (const row of (itemEstados ?? []) as { pedido_id: string; item_idx: number; estado: string }[]) {
-        if (!overridesByPedido.has(row.pedido_id)) overridesByPedido.set(row.pedido_id, new Map());
-        overridesByPedido.get(row.pedido_id)!.set(row.item_idx, row.estado);
-      }
-
-      for (const p of rawPedidos) {
-        const detalle = (p.detalle_pedido as unknown[]) ?? [];
-        const overrides = overridesByPedido.get(p.id) ?? new Map<number, string>();
-
-        if (overrides.size === 0) continue; // No kitchen activity yet, keep original estado
-
-        if (p.estado === 'retenido') {
-          // Only synthesize retenido pedidos once ALL items have been released
-          const allReleased = detalle.length > 0 && detalle.every((_, idx) => {
-            const ov = overrides.get(idx);
-            return ov !== undefined && ov !== 'retenido';
-          });
-          if (!allReleased) continue;
-        }
-
-        const itemStates = detalle.map((_, idx) => overrides.get(idx) ?? 'pendiente');
-        const allCancelled     = itemStates.length > 0 && itemStates.every(s => s === 'cancelado');
-        const allDone          = itemStates.every(s => s === 'servido' || s === 'cancelado');
-        const anyListo         = itemStates.some(s => s === 'listo');
-        const anyEnPreparacion = itemStates.some(s => s === 'en_preparacion');
-
-        synthesizedEstado.set(p.id,
-          allCancelled ? 'cancelado' : allDone ? 'servido' : anyListo ? 'preparado' : anyEnPreparacion ? 'en_preparacion' : 'pendiente'
-        );
-      }
-    } catch { /* best-effort */ }
-  }
-
-  function normComplement(c: RawComplement): string {
-    if (typeof c === 'string') return c;
-    return c.nombre ?? c.name ?? '';
-  }
+  const synthesizedEstado = await buildSynthesizedEstado(supabase, rawPedidos);
 
   const orders = rawPedidos
     .filter(p => synthesizedEstado.get(p.id) !== 'cancelado')
-    .map(p => ({
+    .map(p => normalizePedidoOrder(p, synthesizedEstado));
+
+  return NextResponse.json({ orders, yaCobradoCents });
+}
+
+function normComplement(c: RawComplement): string {
+  if (typeof c === 'string') return c;
+  return c.nombre ?? c.name ?? '';
+}
+
+function normalizePedidoOrder(p: RawPedido, synthesizedEstado: Map<string, string>) {
+  return ({
       id: p.id,
       numeroPedido: p.numero_pedido,
       estado: synthesizedEstado.get(p.id) ?? p.estado,
@@ -124,9 +146,7 @@ export async function GET(req: NextRequest) {
       total: Number(p.total),
       nota: p.nota ?? null,
       pase: p.pase ?? null,
-    }));
-
-  return NextResponse.json({ orders, yaCobradoCents });
+    });
 }
 
 export async function POST(req: NextRequest) {
@@ -148,7 +168,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
   }
 
-  const { mesaId, items, nota, pase } = parsed.data;
+  const { mesaId, items, nota, pase, directoACocina } = parsed.data;
+  const initialEstado = directoACocina ? 'pendiente' : 'pendiente_validacion';
 
   const mesaResult = await getMesaUseCase().getMesa(mesaId);
   if (!mesaResult.success || !mesaResult.data) {
@@ -168,22 +189,15 @@ export async function POST(req: NextRequest) {
         ...(it.nota ? { note: it.nota } : {}),
       })),
       nota,
+      pase,
     },
     mesa.numero,
     mesa.nombre ?? null,
-    'pendiente'
+    initialEstado
   );
 
   if (!pedidoResult.success) {
     return NextResponse.json({ error: pedidoResult.error.message }, { status: 500 });
-  }
-
-  // Set pase if provided (best-effort — does not fail the request if update fails)
-  if (pase) {
-    await getSupabaseClient()
-      .from('pedidos')
-      .update({ pase })
-      .eq('id', pedidoResult.data.id);
   }
 
   // Fetch the active session created by the use case (needed when mesa was libre)
