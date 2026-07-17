@@ -169,6 +169,8 @@ Solución: `WaiterLoginForm.handlePinSubmit` dispara `window.dispatchEvent(new C
 
 ## 🧑‍🍳 Sistema de Camarero — Trampas Críticas
 
+- **Rutas públicas `/api/mesas/*` NO reciben `x-empresa-id` del proxy** — el proxy solo lo inyecta en rutas autenticadas (admin/waiter/TPV). Todas las rutas de mesa que el cliente llama directamente (`call-waiter`, `orders`, `activate`, `division`, `propina`) deben derivar `empresaId` por dominio: `getDomainFromHeaders()` → `parseMainDomain()` → `findByDomain()`. Usar siempre el patrón de `pedidos/route.ts`.
+- **`call-waiter` muestra éxito visual aunque falle** — `setCalled(true)` en `site-header-client.tsx` corre sin comprobar el status HTTP. Si la ruta devuelve 400, el cliente ve "Camarero avisado" pero la DB no se actualiza y en `/waiter` no aparece nada.
 - Pedidos en `estado='pendiente_validacion'` EXCLUIDOS de cocina/bar hasta validar. `isWaiterRequest()` bypasea esta cola.
 - `from_validation` en `pedido_item_estados`: `false` = retenido en cocina; `true` = devuelto a pendientes. Nunca mezclar.
 - `findAllRetenidos` en `supabase-pedido.repository.ts` NO es código huérfano — lo usa `/api/waiter/kitchen/orders`.

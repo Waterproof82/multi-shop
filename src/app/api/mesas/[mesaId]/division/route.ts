@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getMesaSesionRepository } from '@/core/infrastructure/database';
+import { getMesaSesionRepository, getEmpresaPublicRepository } from '@/core/infrastructure/database';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
+import { getDomainFromHeaders, parseMainDomain } from '@/lib/domain-utils';
 import { PAYMENT_LOCK_EXPIRY_MS } from '@/core/domain/constants/pedido';
 
 const mesaIdSchema = z.string().uuid();
@@ -35,9 +36,16 @@ export async function POST(
     return NextResponse.json({ error: bodyParsed.error.errors[0].message }, { status: 400 });
   }
 
-  // Tenant isolation: verify the mesa belongs to the empresa derived from the request domain
-  const empresaId = request.headers.get('x-empresa-id');
-  if (!empresaId) return NextResponse.json({ error: 'Tenant no identificado' }, { status: 400 });
+  // Tenant isolation: derive empresa from domain (public route — proxy does not inject x-empresa-id)
+  let empresaId = request.headers.get('x-empresa-id');
+  if (!empresaId) {
+    const domain = await getDomainFromHeaders();
+    const empresaResult = await getEmpresaPublicRepository().findByDomain(parseMainDomain(domain));
+    if (!empresaResult.success || !empresaResult.data) {
+      return NextResponse.json({ error: 'Tenant no identificado' }, { status: 400 });
+    }
+    empresaId = empresaResult.data.id;
+  }
 
   const supabase = getSupabaseClient();
 
@@ -101,9 +109,16 @@ export async function DELETE(
   const rateLimited = await rateLimitPublic(request as Parameters<typeof rateLimitPublic>[0]);
   if (rateLimited) return rateLimited;
 
-  // Tenant isolation: verify the mesa belongs to the empresa derived from the request domain
-  const empresaId = request.headers.get('x-empresa-id');
-  if (!empresaId) return NextResponse.json({ error: 'Tenant no identificado' }, { status: 400 });
+  // Tenant isolation: derive empresa from domain (public route — proxy does not inject x-empresa-id)
+  let empresaId = request.headers.get('x-empresa-id');
+  if (!empresaId) {
+    const domain = await getDomainFromHeaders();
+    const empresaResult = await getEmpresaPublicRepository().findByDomain(parseMainDomain(domain));
+    if (!empresaResult.success || !empresaResult.data) {
+      return NextResponse.json({ error: 'Tenant no identificado' }, { status: 400 });
+    }
+    empresaId = empresaResult.data.id;
+  }
 
   const supabase = getSupabaseClient();
 

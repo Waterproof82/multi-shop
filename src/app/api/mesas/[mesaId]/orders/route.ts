@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { rateLimitMesaPolling } from '@/core/infrastructure/api/rate-limit';
 import { getMesaOrdersUseCase, MESA_TENANT_MISMATCH } from '@/core/application/use-cases/mesa/getMesaOrdersUseCase';
+import { getEmpresaPublicRepository } from '@/core/infrastructure/database';
+import { getDomainFromHeaders, parseMainDomain } from '@/lib/domain-utils';
 
 const mesaIdSchema = z.string().uuid('El mesaId debe ser un UUID válido');
 
@@ -18,8 +20,15 @@ export async function GET(
   const rateLimited = await rateLimitMesaPolling(parsed.data);
   if (rateLimited) return rateLimited;
 
-  const empresaId = request.headers.get('x-empresa-id');
-  if (!empresaId) return NextResponse.json({ error: 'Tenant no identificado' }, { status: 400 });
+  let empresaId = request.headers.get('x-empresa-id');
+  if (!empresaId) {
+    const domain = await getDomainFromHeaders();
+    const empresaResult = await getEmpresaPublicRepository().findByDomain(parseMainDomain(domain));
+    if (!empresaResult.success || !empresaResult.data) {
+      return NextResponse.json({ error: 'Tenant no identificado' }, { status: 400 });
+    }
+    empresaId = empresaResult.data.id;
+  }
 
   const result = await getMesaOrdersUseCase(parsed.data, empresaId);
   if (result === MESA_TENANT_MISMATCH) {
