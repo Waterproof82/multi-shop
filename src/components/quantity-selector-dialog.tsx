@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, Minus, Check, Pause, MessageSquarePlus, ChevronUp } from "lucide-react"
+import { Plus, Minus, Check, MessageSquarePlus, ChevronUp } from "lucide-react"
 import { getWaiterMesa } from "@/components/waiter-login-form"
 import {
   Dialog,
@@ -56,6 +56,14 @@ function getBadgeText(grupo: ComplementGroupVM): string {
   return grupo.tipo === 'radio' ? 'Obligatorio · elige 1' : 'Obligatorio · elige al menos 1';
 }
 
+type PaseKey = 'primer' | 'segundo' | 'postre';
+const PASE_LABELS: Record<PaseKey, string> = { primer: '1er pase', segundo: '2º pase', postre: 'Postre' };
+const PASE_COLORS: Record<PaseKey, { bg: string; text: string; border: string }> = {
+  primer:  { bg: 'oklch(24% 0.14 45)',  text: 'oklch(82% 0.20 45)',  border: 'oklch(52% 0.22 45 / 0.7)'  },
+  segundo: { bg: 'oklch(22% 0.12 252)', text: 'oklch(78% 0.18 252)', border: 'oklch(50% 0.20 252 / 0.7)' },
+  postre:  { bg: 'oklch(22% 0.12 148)', text: 'oklch(76% 0.20 148)', border: 'oklch(48% 0.22 148 / 0.7)' },
+};
+
 function resolveOpcionName(opcion: ComplementVM, language: string): string {
   const lang = (['en', 'fr', 'it', 'de'].includes(language) ? language : undefined) as 'en' | 'fr' | 'it' | 'de' | undefined;
   if (lang && opcion.translations?.[lang]?.name) {
@@ -69,7 +77,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
   const [quantity, setQuantity] = useState(1)
   const [selectedByGroup, setSelectedByGroup] = useState<Record<string, Set<string>>>({})
   const [addedAnimation, setAddedAnimation] = useState(false)
-  const [isDeferred, setIsDeferred] = useState(false)
+  const [selectedPase, setSelectedPase] = useState<PaseKey | null>(null)
   const [note, setNote] = useState('')
   const [showNote, setShowNote] = useState(false)
   const { language } = useLanguage()
@@ -81,7 +89,8 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
     if (open && item) {
       setQuantity(1);
       setSelectedByGroup({});
-      setIsDeferred(false);
+
+      setSelectedPase(null);
       setNote('');
       setShowNote(false);
     }
@@ -130,13 +139,14 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
       g.opciones.filter(o => selectedByGroup[g.id]?.has(o.id))
     );
     const complementos = selectedOpciones.length > 0 ? selectedOpciones : undefined;
-    addItem(item, quantity, complementos, isDeferred || undefined, note.trim() || undefined);
+    addItem(item, quantity, complementos, undefined, note.trim() || undefined, selectedPase ?? undefined);
     setAddedAnimation(true);
     setTimeout(() => {
       onOpenChange(false);
       setQuantity(1);
       setSelectedByGroup({});
-      setIsDeferred(false);
+
+      setSelectedPase(null);
       setNote('');
       setShowNote(false);
       setAddedAnimation(false);
@@ -147,7 +157,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-screen h-[100dvh] max-w-none rounded-none flex flex-col p-0 gap-0" onOpenAutoFocus={(e) => e.preventDefault()}>
+      <DialogContent className="w-screen h-dvh overflow-hidden max-w-none sm:max-w-none rounded-none border-0 shadow-none flex flex-col p-0 gap-0 top-0 left-0 translate-x-0 translate-y-0" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader className="px-5 pt-5 pb-4 shrink-0 border-b">
           <DialogTitle>{t("selectQuantity", language)}</DialogTitle>
           <DialogDescription>
@@ -298,25 +308,32 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
           </div>
 
           {isWaiterMode && item.tipoProducto !== 'bebida' && (
-          <button
-            type="button"
-            onClick={() => setIsDeferred(prev => !prev)}
-            className={`w-full flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm transition-all ${
-              isDeferred
-                ? 'border-orange-400/60 bg-orange-50 dark:bg-orange-950/30'
-                : 'border-border bg-muted/40 hover:bg-muted/70'
-            }`}
-          >
-            <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors ${
-              isDeferred ? 'border-orange-500 bg-orange-500' : 'border-muted-foreground/40'
-            }`}>
-              {isDeferred && <Check className="w-3 h-3 text-white" />}
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">
+              Pase <span className="text-destructive">*</span>
+            </p>
+            <div className="flex gap-2">
+              {(['primer', 'segundo', 'postre'] as PaseKey[]).map(p => {
+                const pc = PASE_COLORS[p];
+                const isSelected = selectedPase === p;
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setSelectedPase(prev => prev === p ? null : p)}
+                    className="flex-1 rounded-lg border px-2 py-2 text-xs font-medium transition-all"
+                    style={{
+                      background: isSelected ? pc.bg : `color-mix(in oklch, ${pc.bg} 35%, transparent)`,
+                      color: isSelected ? pc.text : `color-mix(in oklch, ${pc.text} 70%, var(--color-muted-foreground))`,
+                      borderColor: isSelected ? pc.border : `color-mix(in oklch, ${pc.border} 50%, transparent)`,
+                    }}
+                  >
+                    {PASE_LABELS[p]}
+                  </button>
+                );
+              })}
             </div>
-            <Pause className={`w-4 h-4 shrink-0 ${isDeferred ? 'text-orange-500' : 'text-muted-foreground'}`} />
-            <span className={isDeferred ? 'font-semibold text-orange-700 dark:text-orange-300' : 'text-muted-foreground'}>
-              Añadir como retenido
-            </span>
-          </button>
+          </div>
           )}
           </div>
         </div>
@@ -325,7 +342,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
           <RippleButton
             type="button"
             onClick={handleConfirmAddToCart}
-            disabled={!isGroupsValid(effectiveGroups, selectedByGroup) || addedAnimation}
+            disabled={!isGroupsValid(effectiveGroups, selectedByGroup) || addedAnimation || (isWaiterMode && item.tipoProducto !== 'bebida' && !selectedPase)}
             className={addedAnimation ? 'animate-complement-select' : ''}
           >
             {addedAnimation ? (

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, Check, Gift, UtensilsCrossed, Pause } from "lucide-react"
+import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, Check, Gift, UtensilsCrossed } from "lucide-react"
 import { useReducedMotion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -39,6 +39,24 @@ import { getTrackingTokens, addTrackingToken } from "@/lib/order-tracking";
 import { QRScannerGate, type QRGateState } from '@/components/qr-scanner-gate';
 
 const MESA_CLIENT_TOKEN_KEY = (mesaId: string) => `mesa_token_${mesaId}`;
+
+type PaseKey = 'primer' | 'segundo' | 'postre';
+const PASE_BADGE: Record<PaseKey, { bg: string; text: string }> = {
+  primer:  { bg: 'oklch(24% 0.14 45)',  text: 'oklch(82% 0.20 45)'  },
+  segundo: { bg: 'oklch(22% 0.12 252)', text: 'oklch(78% 0.18 252)' },
+  postre:  { bg: 'oklch(22% 0.12 148)', text: 'oklch(76% 0.20 148)' },
+};
+const PASE_LABEL: Record<PaseKey, string> = { primer: '1er', segundo: '2º', postre: 'Postre' };
+
+function groupItemsByPase<T extends { pase?: PaseKey }>(cartItems: T[]): Map<PaseKey | undefined, T[]> {
+  const groups = new Map<PaseKey | undefined, T[]>();
+  for (const ci of cartItems) {
+    const key = ci.pase;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(ci);
+  }
+  return groups;
+}
 
 function getMesaClientToken(mesaId: string): { token: string; expiresAt: string } | null {
   if (typeof window === 'undefined') return null;
@@ -99,7 +117,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     updateQuantity,
     removeItem,
     clearCart,
-    toggleDeferred,
+
     totalPrice,
     isCartOpen,
     openCart,
@@ -118,9 +136,8 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
   const [isWaiterMode, setIsWaiterMode] = useState(false);
   const [qrGateState, setQrGateState] = useState<QRGateState | null>(null);
   const [showOrderToast, setShowOrderToast] = useState(false);
-  const [showClearWithDeferredWarning, setShowClearWithDeferredWarning] = useState(false);
 
-  const hasDeferredItems = items.some(ci => ci.deferred);
+
 
   // Detect ?mesa= param (client-side only, SSR safe)
   // Falls back to sessionStorage so waiter mode survives navigation without ?mesa= in the URL
@@ -205,45 +222,25 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
         clientToken = storedClientToken.token;
       }
 
-      const toOrder = items.filter(ci => !ci.deferred);
-      const toDefer = items.filter(ci => ci.deferred);
-
-      if (toOrder.length === 0 && toDefer.length === 0) return;
+      if (items.length === 0) return;
 
       setSending(true);
       try {
-        // Deferred-only: send as retenido pedido and done
-        if (toOrder.length === 0) {
-          await fetch('/api/pedidos', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              tipo: 'mesa',
-              mesa_id: mesaId,
-              initialEstado: 'retenido',
-              items: toDefer.map((ci: CartItem) => ({
-                item: { id: ci.item.id, name: ci.item.name, price: ci.item.price, translations: ci.item.translations },
-                quantity: ci.quantity,
-                selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
-                note: ci.note,
-              })),
-              idioma: language,
-            }),
-          }).catch(() => null);
-          clearCart();
-          closeCart();
-          setShowOrderToast(true);
-          setTimeout(() => setShowOrderToast(false), 2000);
-          return;
-        }
-
+        // Group items by pase — each pase group becomes its own pedido
+        const orderHeaders: HeadersInit = { 'Content-Type': 'application/json', ...(clientToken ? { 'Authorization': `Bearer ${clientToken}` } : {}) };
+        const orderGroups = Array.from(groupItemsByPase(items).entries());
+        // Send first group (need its response for 401 handling + tracking token)
+        // toOrder.length > 0 here so orderGroups always has ≥1 entry
+        const [firstGroup, ...restGroups] = orderGroups;
+        const [firstPase, firstGroupItems] = firstGroup!;
         const res = await fetch('/api/pedidos', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...(clientToken ? { 'Authorization': `Bearer ${clientToken}` } : {}) },
+          headers: orderHeaders,
           body: JSON.stringify({
             tipo: 'mesa',
             mesa_id: mesaId,
-            items: toOrder.map((ci: CartItem) => ({
+            ...(firstPase ? { pase: firstPase } : {}),
+            items: firstGroupItems.map((ci: CartItem) => ({
               item: { id: ci.item.id, name: ci.item.name, price: ci.item.price, translations: ci.item.translations },
               quantity: ci.quantity,
               selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
@@ -271,13 +268,13 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
             existing.push({
               pedidoId: data.pedidoId ?? data.id,
               trackingToken: data.trackingToken,
-              items: toOrder.map((ci: CartItem) => ({
+              items: items.map((ci: CartItem) => ({
                 name: ci.item.name,
                 quantity: ci.quantity,
                 price: ci.item.price,
               })),
-              total: toOrder.reduce((s, ci) => {
-                const compPrice = ci.selectedComplements?.reduce((sc, c) => sc + c.price, 0) ?? 0;
+              total: items.reduce((s: number, ci: CartItem) => {
+                const compPrice = ci.selectedComplements?.reduce((sc: number, c: { price: number }) => sc + c.price, 0) ?? 0;
                 return s + (ci.item.price + compPrice) * ci.quantity;
               }, 0),
               timestamp: Date.now(),
@@ -287,15 +284,16 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
             // localStorage may be unavailable
           }
 
-          if (toDefer.length > 0) {
-            await fetch('/api/pedidos', {
+          // Send remaining pase groups (fire-and-forget)
+          const extraFetches: Promise<unknown>[] = restGroups.map(([pase, groupItems]) =>
+            fetch('/api/pedidos', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: orderHeaders,
               body: JSON.stringify({
                 tipo: 'mesa',
                 mesa_id: mesaId,
-                initialEstado: 'retenido',
-                items: toDefer.map((ci: CartItem) => ({
+                ...(pase ? { pase } : {}),
+                items: groupItems.map((ci: CartItem) => ({
                   item: { id: ci.item.id, name: ci.item.name, price: ci.item.price, translations: ci.item.translations },
                   quantity: ci.quantity,
                   selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
@@ -303,8 +301,10 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                 })),
                 idioma: language,
               }),
-            }).catch(() => null); // fire-and-forget — failure is non-critical
-          }
+            }).catch(() => null)
+          );
+
+          await Promise.all(extraFetches);
 
           clearCart();
           closeCart();
@@ -511,32 +511,6 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
           }}
         />
       )}
-      {/* Clear cart with deferred items warning */}
-      <Dialog open={showClearWithDeferredWarning} onOpenChange={setShowClearWithDeferredWarning}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Hay ítems retenidos</DialogTitle>
-            <DialogDescription className="pt-2">
-              Hay ítems marcados como retenidos en el carrito. Si lo vacías, se perderán también. ¿Quieres continuar?
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex gap-2 mt-2">
-            <Button variant="outline" className="flex-1" onClick={() => setShowClearWithDeferredWarning(false)}>
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              className="flex-1"
-              onClick={() => {
-                setShowClearWithDeferredWarning(false);
-                clearCart();
-              }}
-            >
-              Vaciar igual
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={showActiveOrdersDialog} onOpenChange={setShowActiveOrdersDialog}>
         <DialogContent className="sm:max-w-sm">
@@ -650,12 +624,18 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
 <li
                       key={ci.cartId}
                       className={`flex items-center gap-3 rounded-lg p-3 transition-all duration-200 group ${itemAnimationClass}`}
-                      style={{ backgroundColor: ci.deferred ? 'oklch(22% 0.06 62 / 0.5)' : undefined }}
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-card-foreground text-base truncate group-hover:text-primary transition-colors duration-200 flex items-center gap-1.5">
+                        <p className="font-semibold text-card-foreground text-base group-hover:text-primary transition-colors duration-200 flex items-center gap-1.5 flex-wrap">
                           <span className="truncate">{(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}</span>
-
+                          {ci.pase && (
+                            <span
+                              className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                              style={{ background: PASE_BADGE[ci.pase].bg, color: PASE_BADGE[ci.pase].text }}
+                            >
+                              {PASE_LABEL[ci.pase]}
+                            </span>
+                          )}
                         </p>
                         {ci.selectedComplements && ci.selectedComplements.length > 0 && (
                           <p className="text-xs text-muted-foreground truncate group-hover:text-muted-foreground/80 transition-colors duration-200">
@@ -711,23 +691,6 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                         >
                           <Trash2 className="size-4" />
                         </RippleButton>
-                        {mesaToken && isWaiterMode && ci.item.tipoProducto !== 'bebida' && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              toggleDeferred(ci.cartId);
-                            }}
-                            className="flex items-center justify-center rounded-md p-1.5 transition-colors duration-150 min-h-[44px] min-w-[44px]"
-                            style={{
-                              backgroundColor: ci.deferred ? 'oklch(28% 0.08 62 / 0.8)' : 'transparent',
-                              color: ci.deferred ? 'oklch(75% 0.18 62)' : 'oklch(45% 0.04 252)',
-                            }}
-                            aria-label={ci.deferred ? 'Quitar retención' : 'Retener'}
-                            title={ci.deferred ? 'Quitar retención' : 'Retener para más tarde'}
-                          >
-                            <Pause className="w-3.5 h-3.5" />
-                          </button>
-                        )}
                       </div>
                     </li>
                 );
@@ -1003,13 +966,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                   variant="ghost"
                   size="sm"
                   className="text-muted-foreground rounded-full py-2 font-medium hover:bg-muted/40 transition-colors duration-200"
-                  onClick={() => {
-                    if (isWaiterMode && hasDeferredItems) {
-                      setShowClearWithDeferredWarning(true);
-                    } else {
-                      clearCart();
-                    }
-                  }}
+                  onClick={() => { clearCart(); }}
                 >
                   {t("clearCart", language)}
                 </Button>
