@@ -33,6 +33,10 @@ import { SupabaseComplementoGrupoRepository } from './supabase-complemento-grupo
 import { ComplementoGrupoUseCase } from '@/core/application/use-cases/complemento-grupo.use-case';
 import { SupabaseStockRepository } from '../repositories/supabase-stock.repository';
 import { SupabaseTpvRepository } from '../repositories/supabase-tpv.repository';
+import type { IComprasRepository } from '@/core/domain/repositories/IComprasRepository';
+import { SupabaseComprasRepository } from './supabase-compras.repository';
+import { SupabaseAnalyticsRepository } from '../repositories/supabase-analytics.repository';
+import { AnalyticsUseCase } from '@/core/application/use-cases/analytics.use-case';
 
 // ---------------------------------------------------------------------------
 // Private lazy repository getters (shared between use cases, not exported)
@@ -40,17 +44,20 @@ import { SupabaseTpvRepository } from '../repositories/supabase-tpv.repository';
 
 let _clienteRepository: SupabaseClienteRepository | undefined;
 function getClienteRepository(): SupabaseClienteRepository {
-  return _clienteRepository ??= new SupabaseClienteRepository(getSupabaseClient());
+  if (!_clienteRepository) _clienteRepository = new SupabaseClienteRepository(getSupabaseClient());
+  return _clienteRepository;
 }
 
 let _productRepository: SupabaseProductRepository | undefined;
 function getProductRepository(): SupabaseProductRepository {
-  return _productRepository ??= new SupabaseProductRepository(getSupabaseClient());
+  if (!_productRepository) _productRepository = new SupabaseProductRepository(getSupabaseClient());
+  return _productRepository;
 }
 
 let _descuentoRepository: SupabaseDescuentoRepository | undefined;
 function getDescuentoRepository(): SupabaseDescuentoRepository {
-  return _descuentoRepository ??= new SupabaseDescuentoRepository(getSupabaseClient());
+  if (!_descuentoRepository) _descuentoRepository = new SupabaseDescuentoRepository(getSupabaseClient());
+  return _descuentoRepository;
 }
 
 // ---------------------------------------------------------------------------
@@ -59,42 +66,50 @@ function getDescuentoRepository(): SupabaseDescuentoRepository {
 
 let _empresaRepository: SupabaseEmpresaRepository | undefined;
 export function getEmpresaRepository(): SupabaseEmpresaRepository {
-  return _empresaRepository ??= new SupabaseEmpresaRepository(getSupabaseClient());
+  if (!_empresaRepository) _empresaRepository = new SupabaseEmpresaRepository(getSupabaseClient());
+  return _empresaRepository;
 }
 
 let _pedidoRepository: SupabasePedidoRepository | undefined;
 export function getPedidoRepository(): SupabasePedidoRepository {
-  return _pedidoRepository ??= new SupabasePedidoRepository(getSupabaseClient());
+  if (!_pedidoRepository) _pedidoRepository = new SupabasePedidoRepository(getSupabaseClient());
+  return _pedidoRepository;
 }
 
 let _mesaRepository: SupabaseMesaRepository | undefined;
 export function getMesaRepository(): SupabaseMesaRepository {
-  return _mesaRepository ??= new SupabaseMesaRepository(getSupabaseClient());
+  if (!_mesaRepository) _mesaRepository = new SupabaseMesaRepository(getSupabaseClient());
+  return _mesaRepository;
 }
 
 let _mesaSesionRepository: SupabaseMesaSesionRepository | undefined;
 export function getMesaSesionRepository(): SupabaseMesaSesionRepository {
-  return _mesaSesionRepository ??= new SupabaseMesaSesionRepository(getSupabaseClient());
+  if (!_mesaSesionRepository) _mesaSesionRepository = new SupabaseMesaSesionRepository(getSupabaseClient());
+  return _mesaSesionRepository;
 }
 
 let _valoracionRepository: SupabaseValoracionRepository | undefined;
 export function getValoracionRepository(): SupabaseValoracionRepository {
-  return _valoracionRepository ??= new SupabaseValoracionRepository(getSupabaseClient());
+  if (!_valoracionRepository) _valoracionRepository = new SupabaseValoracionRepository(getSupabaseClient());
+  return _valoracionRepository;
 }
 
 let _empleadoTpvRepository: SupabaseEmpleadoTpvRepository | undefined;
 export function getEmpleadoTpvRepository(): SupabaseEmpleadoTpvRepository {
-  return _empleadoTpvRepository ??= new SupabaseEmpleadoTpvRepository();
+  if (!_empleadoTpvRepository) _empleadoTpvRepository = new SupabaseEmpleadoTpvRepository();
+  return _empleadoTpvRepository;
 }
 
 let _complementoGrupoRepository: SupabaseComplementoGrupoRepository | undefined;
 export function getComplementoGrupoRepository(): SupabaseComplementoGrupoRepository {
-  return _complementoGrupoRepository ??= new SupabaseComplementoGrupoRepository(getSupabaseClient());
+  if (!_complementoGrupoRepository) _complementoGrupoRepository = new SupabaseComplementoGrupoRepository(getSupabaseClient());
+  return _complementoGrupoRepository;
 }
 
 let _empresaPublicRepository: SupabaseEmpresaRepository | undefined;
 export function getEmpresaPublicRepository(): SupabaseEmpresaRepository {
-  return _empresaPublicRepository ??= new SupabaseEmpresaRepository(getSupabaseAnonClient());
+  if (!_empresaPublicRepository) _empresaPublicRepository = new SupabaseEmpresaRepository(getSupabaseAnonClient());
+  return _empresaPublicRepository;
 }
 
 // ---------------------------------------------------------------------------
@@ -103,138 +118,159 @@ export function getEmpresaPublicRepository(): SupabaseEmpresaRepository {
 
 let _productUseCase: ProductUseCase | undefined;
 export function getProductUseCase(): ProductUseCase {
-  return _productUseCase ??= new ProductUseCase(getProductRepository());
+  if (!_productUseCase) _productUseCase = new ProductUseCase(getProductRepository());
+  return _productUseCase;
 }
 
 let _categoryUseCase: CategoryUseCase | undefined;
 export function getCategoryUseCase(): CategoryUseCase {
-  return _categoryUseCase ??= new CategoryUseCase(
-    new SupabaseCategoryRepository(getSupabaseClient())
-  );
+  if (!_categoryUseCase) _categoryUseCase = new CategoryUseCase(new SupabaseCategoryRepository(getSupabaseClient()));
+  return _categoryUseCase;
 }
 
 let _clienteUseCase: ClienteUseCase | undefined;
 export function getClienteUseCase(): ClienteUseCase {
-  return _clienteUseCase ??= new ClienteUseCase(getClienteRepository());
+  if (!_clienteUseCase) _clienteUseCase = new ClienteUseCase(getClienteRepository());
+  return _clienteUseCase;
 }
 
 let _empresaUseCase: EmpresaUseCase | undefined;
 export function getEmpresaUseCase(): EmpresaUseCase {
-  return _empresaUseCase ??= new EmpresaUseCase(getEmpresaRepository());
+  if (!_empresaUseCase) _empresaUseCase = new EmpresaUseCase(getEmpresaRepository());
+  return _empresaUseCase;
 }
 
 let _pedidoUseCase: PedidoUseCase | undefined;
 export function getPedidoUseCase(): PedidoUseCase {
-  return _pedidoUseCase ??= new PedidoUseCase(
-    getPedidoRepository(),
-    getClienteRepository(),
-    getProductRepository(),
-    getDescuentoRepository(),
-    getMesaSesionRepository()
-  );
+  if (!_pedidoUseCase) {
+    _pedidoUseCase = new PedidoUseCase(
+      getPedidoRepository(),
+      getClienteRepository(),
+      getProductRepository(),
+      getDescuentoRepository(),
+      getMesaSesionRepository()
+    );
+  }
+  return _pedidoUseCase;
 }
 
 let _mesaUseCase: MesaUseCase | undefined;
 export function getMesaUseCase(): MesaUseCase {
-  return _mesaUseCase ??= new MesaUseCase(getMesaRepository());
+  if (!_mesaUseCase) _mesaUseCase = new MesaUseCase(getMesaRepository());
+  return _mesaUseCase;
 }
 
 let _mesaSesionUseCase: MesaSesionUseCase | undefined;
 export function getMesaSesionUseCase(): MesaSesionUseCase {
-  return _mesaSesionUseCase ??= new MesaSesionUseCase(
-    getMesaSesionRepository(),
-    getMesaRepository()
-  );
+  if (!_mesaSesionUseCase) {
+    _mesaSesionUseCase = new MesaSesionUseCase(getMesaSesionRepository(), getMesaRepository());
+  }
+  return _mesaSesionUseCase;
 }
 
 let _promocionUseCase: PromocionUseCase | undefined;
 export function getPromocionUseCase(): PromocionUseCase {
-  return _promocionUseCase ??= new PromocionUseCase(
-    new SupabasePromocionRepository(getSupabaseClient()),
-    getClienteRepository()
-  );
+  if (!_promocionUseCase) {
+    _promocionUseCase = new PromocionUseCase(
+      new SupabasePromocionRepository(getSupabaseClient()),
+      getClienteRepository()
+    );
+  }
+  return _promocionUseCase;
 }
 
 let _tgtgUseCase: TgtgUseCase | undefined;
 export function getTgtgUseCase(): TgtgUseCase {
-  return _tgtgUseCase ??= new TgtgUseCase(
-    new SupabaseTgtgRepository(getSupabaseClient()),
-    getClienteRepository()
-  );
+  if (!_tgtgUseCase) {
+    _tgtgUseCase = new TgtgUseCase(
+      new SupabaseTgtgRepository(getSupabaseClient()),
+      getClienteRepository()
+    );
+  }
+  return _tgtgUseCase;
 }
 
 let _authAdminUseCase: AuthAdminUseCase | undefined;
 export function getAuthAdminUseCase(): AuthAdminUseCase {
-  return _authAdminUseCase ??= new AuthAdminUseCase(
-    new SupabaseAdminRepository(getSupabaseClient(), getSupabaseAnonClient())
-  );
+  if (!_authAdminUseCase) {
+    _authAdminUseCase = new AuthAdminUseCase(
+      new SupabaseAdminRepository(getSupabaseClient(), getSupabaseAnonClient())
+    );
+  }
+  return _authAdminUseCase;
 }
 
 let _superAdminUseCase: SuperAdminUseCase | undefined;
 export function getSuperAdminUseCase(): SuperAdminUseCase {
-  return _superAdminUseCase ??= new SuperAdminUseCase(
-    new SupabaseSuperAdminRepository(getSupabaseClient())
-  );
+  if (!_superAdminUseCase) {
+    _superAdminUseCase = new SuperAdminUseCase(new SupabaseSuperAdminRepository(getSupabaseClient()));
+  }
+  return _superAdminUseCase;
 }
 
 let _descuentoUseCase: DescuentoUseCase | undefined;
 export function getDescuentoUseCase(): DescuentoUseCase {
-  return _descuentoUseCase ??= new DescuentoUseCase(
-    getDescuentoRepository(),
-    getEmpresaRepository()
-  );
+  if (!_descuentoUseCase) {
+    _descuentoUseCase = new DescuentoUseCase(getDescuentoRepository(), getEmpresaRepository());
+  }
+  return _descuentoUseCase;
 }
 
 let _mesaClientTokenUseCase: MesaClientTokenUseCase | undefined;
 export function getMesaClientTokenUseCase(): MesaClientTokenUseCase {
-  return _mesaClientTokenUseCase ??= new MesaClientTokenUseCase(
-    new SupabaseMesaClientTokenRepository(getSupabaseClient()),
-    getMesaSesionRepository()
-  );
+  if (!_mesaClientTokenUseCase) {
+    _mesaClientTokenUseCase = new MesaClientTokenUseCase(
+      new SupabaseMesaClientTokenRepository(getSupabaseClient()),
+      getMesaSesionRepository()
+    );
+  }
+  return _mesaClientTokenUseCase;
 }
 
 let _valoracionUseCase: ValoracionUseCase | undefined;
 export function getValoracionUseCase(): ValoracionUseCase {
-  return _valoracionUseCase ??= new ValoracionUseCase(getValoracionRepository());
+  if (!_valoracionUseCase) _valoracionUseCase = new ValoracionUseCase(getValoracionRepository());
+  return _valoracionUseCase;
 }
 
 let _empleadoTpvLoginUseCase: EmpleadoTpvLoginUseCase | undefined;
 export function getEmpleadoTpvLoginUseCase(): EmpleadoTpvLoginUseCase {
-  return _empleadoTpvLoginUseCase ??= new EmpleadoTpvLoginUseCase(getEmpleadoTpvRepository());
+  if (!_empleadoTpvLoginUseCase) _empleadoTpvLoginUseCase = new EmpleadoTpvLoginUseCase(getEmpleadoTpvRepository());
+  return _empleadoTpvLoginUseCase;
 }
 
 let _complementoGrupoUseCase: ComplementoGrupoUseCase | undefined;
 export function getComplementoGrupoUseCase(): ComplementoGrupoUseCase {
-  return _complementoGrupoUseCase ??= new ComplementoGrupoUseCase(getComplementoGrupoRepository());
+  if (!_complementoGrupoUseCase) _complementoGrupoUseCase = new ComplementoGrupoUseCase(getComplementoGrupoRepository());
+  return _complementoGrupoUseCase;
 }
 
 let _stockRepository: SupabaseStockRepository | undefined;
 export function getStockRepository(): SupabaseStockRepository {
-  return _stockRepository ??= new SupabaseStockRepository();
+  if (!_stockRepository) _stockRepository = new SupabaseStockRepository();
+  return _stockRepository;
 }
 
 let _tpvRepository: SupabaseTpvRepository | undefined;
 export function getTpvRepository(): SupabaseTpvRepository {
-  return _tpvRepository ??= new SupabaseTpvRepository();
+  if (!_tpvRepository) _tpvRepository = new SupabaseTpvRepository();
+  return _tpvRepository;
 }
-
-import type { IComprasRepository } from '@/core/domain/repositories/IComprasRepository';
-import { SupabaseComprasRepository } from './supabase-compras.repository';
 
 let _comprasRepository: IComprasRepository | undefined;
 export function getComprasRepository(): IComprasRepository {
-  return _comprasRepository ??= new SupabaseComprasRepository();
+  if (!_comprasRepository) _comprasRepository = new SupabaseComprasRepository();
+  return _comprasRepository;
 }
-
-import { SupabaseAnalyticsRepository } from '../repositories/supabase-analytics.repository';
-import { AnalyticsUseCase } from '@/core/application/use-cases/analytics.use-case';
 
 let _analyticsRepository: SupabaseAnalyticsRepository | undefined;
 export function getAnalyticsRepository(): SupabaseAnalyticsRepository {
-  return _analyticsRepository ??= new SupabaseAnalyticsRepository();
+  if (!_analyticsRepository) _analyticsRepository = new SupabaseAnalyticsRepository();
+  return _analyticsRepository;
 }
 
 let _analyticsUseCase: AnalyticsUseCase | undefined;
 export function getAnalyticsUseCase(): AnalyticsUseCase {
-  return _analyticsUseCase ??= new AnalyticsUseCase(getAnalyticsRepository());
+  if (!_analyticsUseCase) _analyticsUseCase = new AnalyticsUseCase(getAnalyticsRepository());
+  return _analyticsUseCase;
 }
