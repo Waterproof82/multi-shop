@@ -64,6 +64,11 @@ const PASE_COLORS: Record<PaseKey, { bg: string; text: string; border: string }>
   postre:  { bg: 'oklch(22% 0.12 148)', text: 'oklch(76% 0.20 148)', border: 'oklch(48% 0.22 148 / 0.7)' },
 };
 
+function notePreviewText(note: string, showNote: boolean): string {
+  if (!note || showNote) return '';
+  return ` · ${note.length > 30 ? note.slice(0, 30) + '…' : note}`;
+}
+
 function resolveOpcionName(opcion: ComplementVM, language: string): string {
   const lang = (['en', 'fr', 'it', 'de'].includes(language) ? language : undefined) as 'en' | 'fr' | 'it' | 'de' | undefined;
   if (lang && opcion.translations?.[lang]?.name) {
@@ -256,7 +261,7 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
               }`}
             >
               <MessageSquarePlus className={`w-3.5 h-3.5 shrink-0 transition-colors ${showNote ? 'text-primary' : ''}`} />
-              <span className="flex-1 text-left">{t("itemNote", language)}{note && !showNote ? ` · ${note.length > 30 ? note.slice(0, 30) + '…' : note}` : ''}</span>
+              <span className="flex-1 text-left">{t("itemNote", language)}{notePreviewText(note, showNote)}</span>
               <ChevronUp className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${showNote ? 'rotate-0' : 'rotate-180'}`} />
             </button>
             {showNote && (

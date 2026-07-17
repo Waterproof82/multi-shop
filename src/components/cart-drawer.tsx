@@ -87,6 +87,18 @@ interface MesaInfo {
 type TranslationKey = keyof typeof import('@/lib/translations').translations.es;
 type TranslateFn = (key: TranslationKey, language: Language) => string;
 
+function discountBorderClass(error: string | null, valid: boolean | null): string {
+  if (error) return 'border-destructive';
+  if (valid) return 'border-green-500';
+  return '';
+}
+
+function discountDescribedBy(error: string | null, valid: boolean | null): string | undefined {
+  if (error) return 'discount-error';
+  if (valid) return 'discount-valid';
+  return undefined;
+}
+
 function validateNameInput(name: string, translate: TranslateFn, language: Language): string | undefined {
   const trimmed = name.trim();
   if (!trimmed) return translate("validationNameRequired", language);
@@ -842,9 +854,9 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                       setDiscountValid(null);
                       setDiscountError(null);
                     }}
-                     className={`h-9 ${discountError ? 'border-destructive' : (discountValid ? 'border-green-500' : '')}`}
+                     className={`h-9 ${discountBorderClass(discountError, discountValid)}`}
                      disabled={validatingDiscount || items.length === 0}
-                     aria-describedby={discountError ? "discount-error" : (discountValid ? "discount-valid" : undefined)}
+                     aria-describedby={discountDescribedBy(discountError, discountValid)}
                      aria-invalid={!!discountError}
                   />
                   <Button
