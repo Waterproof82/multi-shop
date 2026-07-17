@@ -20,8 +20,8 @@ export async function PATCH(
   }
 
   const { pedidoId, itemIdx: itemIdxStr } = await params;
-  const itemIdx = parseInt(itemIdxStr, 10);
-  if (isNaN(itemIdx) || itemIdx < 0) {
+  const itemIdx = Number.parseInt(itemIdxStr, 10);
+  if (Number.isNaN(itemIdx) || itemIdx < 0) {
     return NextResponse.json({ error: 'itemIdx inválido' }, { status: 400 });
   }
 

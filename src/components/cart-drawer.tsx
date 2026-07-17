@@ -68,6 +68,19 @@ function getMesaClientToken(mesaId: string): { token: string; expiresAt: string 
   }
 }
 
+type DeliveryMethod = 'recogida' | 'delivery' | null;
+
+// Helper: send standard (non-mesa) order and return response data
+async function sendStandardOrderFlow(payload: Record<string, unknown>) {
+  const res = await fetch('/api/pedidos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, data };
+}
+
 function isMesaClientTokenExpired(expiresAt: string): boolean {
   return new Date(expiresAt) <= new Date();
 }
@@ -118,7 +131,7 @@ function validatePhoneInput(phone: string, translate: TranslateFn, language: Lan
 
 function resolveDeliveryError(
   isRestaurant: boolean,
-  deliveryMethod: 'recogida' | 'delivery' | null,
+  deliveryMethod: DeliveryMethod,
   deliveryLatitude: number | null,
   deliveryLongitude: number | null,
   translate: TranslateFn,
@@ -135,7 +148,8 @@ function resolveDeliveryError(
 
 function mesaBadgeLabel(mesaInfo: MesaInfo | null, mesaError: boolean, label: string): string {
   if (mesaInfo) {
-    return `${label} ${mesaInfo.numero}${mesaInfo.nombre ? ` — ${mesaInfo.nombre}` : ''}`;
+    const mesaNamePart = mesaInfo.nombre ? ` — ${mesaInfo.nombre}` : '';
+    return `${label} ${mesaInfo.numero}${mesaNamePart}`;
   }
   if (mesaError) {
     return `${label} —`;
@@ -149,6 +163,13 @@ function orderButtonLabel(sending: boolean, mesaToken: string | null, translate:
   return translate('sendOrder', language);
 }
 
+function getItemAnimationClass(justAdded: boolean | undefined, justRemoved: boolean | undefined, reduceMotion: boolean): string {
+  if (reduceMotion) return '';
+  if (justAdded) return 'animate-cart-item-add';
+  if (justRemoved) return 'animate-cart-item-remove';
+  return '';
+}
+
 function mapCartItemPayload(ci: CartItem) {
   return {
     item: { id: ci.item.id, name: ci.item.name, price: ci.item.price, translations: ci.item.translations },
@@ -156,6 +177,428 @@ function mapCartItemPayload(ci: CartItem) {
     selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
     note: ci.note,
   };
+}
+
+function applySessionStorageWaiter(
+  setMesaToken: (id: string) => void,
+  setMesaInfo: (info: MesaInfo) => void,
+  setIsWaiterMode: (b: boolean) => void,
+): boolean {
+  try {
+    const raw = sessionStorage.getItem('waiter_mesa');
+    if (!raw) return false;
+    const stored = JSON.parse(raw) as { mesaId: string; mesaNumero: number; mesaNombre: string | null };
+    setMesaToken(stored.mesaId);
+    setMesaInfo({ id: stored.mesaId, numero: stored.mesaNumero, nombre: stored.mesaNombre, empresa_id: '' });
+    setIsWaiterMode(true);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function sendMesaOrderFlow(
+  mesaId: string,
+  clientToken: string | null,
+  items: CartItem[],
+  language: Language,
+): Promise<{ ok: boolean; trackingToken?: string; pedidoId?: string; error?: string | null; code?: string | null }> {
+  if (items.length === 0) return { ok: false };
+
+  const orderHeaders: HeadersInit = { 'Content-Type': 'application/json', ...(clientToken ? { 'Authorization': `Bearer ${clientToken}` } : {}) };
+  const orderGroups = Array.from(groupItemsByPase(items).entries());
+  const [firstGroup, ...restGroups] = orderGroups;
+  const [firstPase, firstGroupItems] = firstGroup!;
+
+  const res = await fetch('/api/pedidos', {
+    method: 'POST',
+    headers: orderHeaders,
+    body: JSON.stringify({
+      tipo: 'mesa',
+      mesa_id: mesaId,
+      ...(firstPase ? { pase: firstPase } : {}),
+      items: firstGroupItems.map(mapCartItemPayload),
+      idioma: language,
+    }),
+  });
+
+  if (res.status === 401) {
+    const body = await res.json().catch(() => ({}));
+    return { ok: false, code: body.code ?? null };
+  }
+
+  const data = await res.json().catch(() => ({}));
+
+  if (res.ok && data.trackingToken) {
+    try {
+      const storageKey = `mesa_orders_${mesaId}`;
+      const existing = JSON.parse(localStorage.getItem(storageKey) ?? '[]');
+      existing.push({
+        pedidoId: data.pedidoId ?? data.id,
+        trackingToken: data.trackingToken,
+        items: items.map((ci: CartItem) => ({ name: ci.item.name, quantity: ci.quantity, price: ci.item.price })),
+        total: items.reduce((s: number, ci: CartItem) => {
+          const compPrice = ci.selectedComplements?.reduce((sc: number, c: { price: number }) => sc + c.price, 0) ?? 0;
+          return s + (ci.item.price + compPrice) * ci.quantity;
+        }, 0),
+        timestamp: Date.now(),
+      });
+      localStorage.setItem(storageKey, JSON.stringify(existing));
+    } catch {
+      // ignore storage errors
+    }
+
+    const extraFetches = restGroups.map(([pase, groupItems]) =>
+      fetch('/api/pedidos', {
+        method: 'POST',
+        headers: orderHeaders,
+        body: JSON.stringify({ tipo: 'mesa', mesa_id: mesaId, ...(pase ? { pase } : {}), items: groupItems.map(mapCartItemPayload), idioma: language }),
+      }).catch(() => null)
+    );
+
+    await Promise.all(extraFetches);
+
+    return { ok: true, trackingToken: data.trackingToken, pedidoId: data.pedidoId ?? data.id };
+  }
+
+  return { ok: false, error: data.error || null };
+}
+
+// Helper: attach delivery fields to order payload (extracted for complexity reduction)
+function attachDeliveryFields(
+  payload: Record<string, unknown>,
+  opts: {
+    isRestaurant: boolean;
+    deliveryMethod: DeliveryMethod;
+    deliveryAddress: string;
+    deliveryPostalCode: string;
+    deliveryLatitude: number | null;
+    deliveryLongitude: number | null;
+    estimatedFeeCents: number | null;
+  }
+) {
+  const { isRestaurant, deliveryMethod, deliveryAddress, deliveryPostalCode, deliveryLatitude, deliveryLongitude, estimatedFeeCents } = opts;
+  if (isRestaurant && deliveryMethod) {
+    Object.assign(payload, {
+      origen: deliveryMethod,
+      direccion_entrega: deliveryMethod === 'delivery' ? deliveryAddress : undefined,
+      codigo_postal: deliveryMethod === 'delivery' ? deliveryPostalCode : undefined,
+      latitude_entrega: deliveryMethod === 'delivery' ? deliveryLatitude : undefined,
+      longitude_entrega: deliveryMethod === 'delivery' ? deliveryLongitude : undefined,
+      estimated_delivery_fee_cents: deliveryMethod === 'delivery' ? estimatedFeeCents : undefined,
+    });
+  }
+}
+
+// Helper: determine if order requires redirect to Redsys payment gateway
+function requiresRedsysRedirect(
+  pagosPickupHabilitados: boolean,
+  deliveryMethod: DeliveryMethod,
+  isRestaurant: boolean
+): boolean {
+  if (deliveryMethod === 'delivery') return true;
+  return pagosPickupHabilitados && (deliveryMethod === 'recogida' || !isRestaurant);
+}
+
+// Helper: submit to Redsys and handle payment form
+async function submitRedsysPayment(
+  pedidoId: any,
+  language: string,
+  trackingToken: string,
+  router: any,
+  addTrackingTokenFn: (token: string) => void
+): Promise<void> {
+  try {
+    const redsysRes = await fetch('/api/redsys/initiate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pedidoId, lang: language }),
+    });
+    if (redsysRes.ok) {
+      const formData = await redsysRes.json();
+      const redsysUrl = process.env.NEXT_PUBLIC_REDSYS_URL ?? 'https://sis-t.redsys.es:25443/sis/realizarPago';
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = redsysUrl;
+      const fields: Record<string, string> = {
+        Ds_SignatureVersion: formData.DS_SIGNATURE_VERSION,
+        Ds_MerchantParameters: formData.DS_MERCHANT_PARAMETERS,
+        Ds_Signature: formData.DS_SIGNATURE,
+      };
+      for (const [name, value] of Object.entries(fields)) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = name;
+        input.value = value;
+        form.appendChild(input);
+      }
+      document.body.appendChild(form);
+      form.submit();
+      return;
+    }
+  } catch (redsysError) {
+    // Log silently and fall back to tracking page
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('Redsys payment initiation failed:', redsysError);
+    }
+  }
+  addTrackingTokenFn(trackingToken);
+  router.push(`/tracking/${trackingToken}`);
+}
+
+// Helper: redirect to tracking page and reset form state
+function redirectToTracking(
+  trackingToken: string,
+  opts: {
+    setNombre: (s: string) => void;
+    setTelefono: (s: string) => void;
+    setEmail: (s: string) => void;
+    addTrackingTokenFn: (token: string) => void;
+  }
+): void {
+  const { setNombre, setTelefono, setEmail, addTrackingTokenFn } = opts;
+  addTrackingTokenFn(trackingToken);
+  setNombre('');
+  setTelefono('');
+  setEmail('');
+  if (window.history.state?.cartOpen) {
+    window.history.replaceState({}, '', window.location.href);
+  }
+  const trackingUrl = `/tracking/${trackingToken}`;
+  setTimeout(() => { window.location.href = trackingUrl; }, 0);
+}
+
+// Helper: process standard (non-mesa) order response and side-effects
+async function processStandardOrderResponse(
+  payload: Record<string, unknown>,
+  opts: {
+    t: any;
+    language: string;
+    isRestaurant: boolean;
+    pagosPickupHabilitados: boolean;
+    deliveryMethod: DeliveryMethod;
+    deliveryAddress: string;
+    deliveryPostalCode: string;
+    deliveryLatitude: number | null;
+    deliveryLongitude: number | null;
+    estimatedFeeCents: number | null;
+    clearCart: () => void;
+    closeCart: () => void;
+    addTrackingToken: (token: string) => void;
+    setOrderSuccess: (v: { numeroPedido: number } | null) => void;
+    setErrors: (e: any) => void;
+    setNombre: (s: string) => void;
+    setTelefono: (s: string) => void;
+    setEmail: (s: string) => void;
+    router: any;
+    sendStandardOrderFlow: (payload: Record<string, unknown>) => Promise<{ ok: boolean; data: any }>;
+    setSending: (b: boolean) => void;
+  }
+): Promise<void> {
+  const {
+    t,
+    language,
+    isRestaurant,
+    pagosPickupHabilitados,
+    deliveryMethod,
+    deliveryAddress,
+    deliveryPostalCode,
+    deliveryLatitude,
+    deliveryLongitude,
+    estimatedFeeCents,
+    clearCart,
+    closeCart,
+    addTrackingToken,
+    setOrderSuccess,
+    setErrors,
+    setNombre,
+    setTelefono,
+    setEmail,
+    router,
+    sendStandardOrderFlow,
+    setSending,
+  } = opts;
+
+  setSending(true);
+  try {
+    attachDeliveryFields(payload, {
+      isRestaurant,
+      deliveryMethod,
+      deliveryAddress,
+      deliveryPostalCode,
+      deliveryLatitude,
+      deliveryLongitude,
+      estimatedFeeCents,
+    });
+
+    const { ok, data } = await sendStandardOrderFlow(payload);
+
+    if (!ok) {
+      setErrors({ general: data.error || t('validationOrderError', language) });
+      return;
+    }
+
+    // Requires payment redirect
+    if (data.trackingToken && data.pedidoId && requiresRedsysRedirect(pagosPickupHabilitados, deliveryMethod, isRestaurant)) {
+      addTrackingToken(data.trackingToken);
+      clearCart();
+      closeCart();
+      await submitRedsysPayment(data.pedidoId, language, data.trackingToken, router, addTrackingToken);
+      return;
+    }
+
+    // Restaurante-specific tracking behavior
+    if (data.trackingToken && data.tipo === 'restaurante') {
+      addTrackingToken(data.trackingToken);
+      clearCart();
+      if (window.history.state?.cartOpen) {
+        window.history.replaceState({}, '', window.location.href);
+      }
+      closeCart();
+      const restauranteTrackingUrl = `/tracking/${data.trackingToken}`;
+      setTimeout(() => { window.location.href = restauranteTrackingUrl; }, 0);
+      return;
+    }
+
+    // Generic tracking redirect
+    if (data.trackingToken) {
+      redirectToTracking(data.trackingToken, {
+        setNombre,
+        setTelefono,
+        setEmail,
+        addTrackingTokenFn: addTrackingToken,
+      });
+      clearCart();
+      closeCart();
+      return;
+    }
+
+    // No tracking token: show success with order number
+    setOrderSuccess({ numeroPedido: data.numeroPedido });
+  } catch (e) {
+    const errorMsg = e instanceof Error ? e.message : t('connectionError', language);
+    setErrors({ general: errorMsg || t('connectionError', language) });
+  } finally {
+    setSending(false);
+  }
+}
+
+function computeIsDeliveryIncomplete(
+  isRestaurant: boolean | undefined,
+  mesaToken: string | null,
+  deliveryMethod: DeliveryMethod,
+  deliveryLatitude: number | null,
+  estimatedFeeCents: number | null,
+): boolean {
+  return !!(isRestaurant && !mesaToken && deliveryMethod === 'delivery' && (deliveryLatitude === null || estimatedFeeCents === null));
+}
+
+function computeCartTotals(
+  deliveryMethod: DeliveryMethod,
+  estimatedFeeCents: number | null,
+  discountValid: { valid: boolean; porcentaje: number } | null,
+  totalPrice: number,
+): { deliveryFee: number; discountedPrice: number; grandTotal: number } {
+  const isDelivery = deliveryMethod === 'delivery';
+  const deliveryFee = (isDelivery && estimatedFeeCents ? estimatedFeeCents : 0) / 100;
+  const discountedPrice = discountValid?.valid
+    ? Math.round(totalPrice * (1 - discountValid.porcentaje / 100) * 100) / 100
+    : totalPrice;
+  return { deliveryFee, discountedPrice, grandTotal: discountedPrice + deliveryFee };
+}
+
+function showNoPaymentBanner(
+  items: CartItem[],
+  isWaiterMode: boolean,
+  deliveryMethod: DeliveryMethod,
+  pagosPickupHabilitados: boolean | undefined,
+  isRestaurant: boolean | undefined,
+): boolean {
+  if (items.length === 0 || isWaiterMode) return false;
+  if (deliveryMethod === 'delivery') return false;
+  if (pagosPickupHabilitados && (deliveryMethod === 'recogida' || !isRestaurant)) return false;
+  return true;
+}
+
+function getActiveOrdersBodyText(count: number, lang: Language): string {
+  if (count === 1) return t('activeOrdersDialogBodySingular', lang);
+  return t('activeOrdersDialogBodyPlural', lang).replace('{count}', String(count));
+}
+
+function resolveActiveMesaId(mesaInfo: MesaInfo | null, mesaToken: string): string {
+  return mesaInfo?.id ?? mesaToken;
+}
+
+function showDeliverySelector(mesaToken: string | null, isRestaurant: boolean | undefined): boolean {
+  return !mesaToken && !!isRestaurant;
+}
+
+function showDiscountSection(mesaToken: string | null): boolean {
+  return !mesaToken;
+}
+
+function showDeliveryCostRow(isDelivery: boolean, deliveryFee: number): boolean {
+  return isDelivery && deliveryFee > 0;
+}
+
+function grandTotalColorClass(discountValid: { valid: boolean } | null): string {
+  return discountValid?.valid ? 'text-green-600 dark:text-green-400' : 'text-foreground';
+}
+
+function isSubmitDisabled(sending: boolean, mesaToken: string | null, mesaError: boolean, isDeliveryIncomplete: boolean): boolean {
+  return sending || (mesaToken !== null && mesaError) || isDeliveryIncomplete;
+}
+
+function shouldShowQrGate(
+  qrGateState: QRGateState | null,
+  mesaToken: string | null,
+  isWaiterMode: boolean,
+): boolean {
+  return qrGateState !== null && mesaToken !== null && !isWaiterMode;
+}
+
+function OrderToast({ show, language }: Readonly<{ show: boolean; language: Language }>) {
+  if (!show) return null;
+  return (
+    <div className="fixed inset-0 z-[400] flex items-center justify-center pointer-events-none">
+      <div className="bg-card/95 backdrop-blur-md border border-border shadow-2xl rounded-3xl px-10 py-8 flex flex-col items-center gap-4 animate-in fade-in zoom-in-90 duration-300">
+        <div className="w-16 h-16 rounded-full bg-primary/10 border-2 border-primary/25 flex items-center justify-center">
+          <Check className="size-8 text-primary" strokeWidth={2.5} />
+        </div>
+        <p className="text-base font-bold text-foreground text-center leading-snug">
+          {t('mesaOrderConfirmed', language)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function EmptyCartContent({ language, shouldReduceMotion, closeCart }: Readonly<{
+  language: Language;
+  shouldReduceMotion: boolean;
+  closeCart: () => void;
+}>) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-4 text-muted-foreground px-4">
+      <div className={`relative ${shouldReduceMotion ? '' : 'animate-empty-float'}`}>
+        <ShoppingBag className="size-12 opacity-20" />
+        <span className="absolute inset-0 flex items-center justify-center text-2xl opacity-30">+</span>
+      </div>
+      <div className="text-center">
+        <p className="text-base font-medium text-foreground">{t("emptyCart", language)}</p>
+        <p className="text-sm text-muted-foreground mt-1 max-w-[240px]">{t("addDishesToStart", language)}</p>
+      </div>
+      <button
+        onClick={() => {
+          closeCart();
+          document.getElementById('menu')?.scrollIntoView({ behavior: shouldReduceMotion ? 'auto' : 'smooth' });
+        }}
+        className="mt-2 px-6 py-3 bg-primary text-primary-foreground rounded-full font-medium hover:bg-primary/90 active:scale-[0.98] transition-all duration-150 min-h-[44px]"
+      >
+        {t("viewMenu", language)}
+      </button>
+    </div>
+  );
 }
 
 interface CartDrawerProps {
@@ -199,26 +642,12 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     const token = params.get('mesa');
     const shouldOpenCart = params.get('cart') === 'open';
 
-    function applySessionStorage(): boolean {
-      try {
-        const raw = sessionStorage.getItem('waiter_mesa');
-        if (!raw) return false;
-        const stored = JSON.parse(raw) as { mesaId: string; mesaNumero: number; mesaNombre: string | null };
-        setMesaToken(stored.mesaId);
-        setMesaInfo({ id: stored.mesaId, numero: stored.mesaNumero, nombre: stored.mesaNombre, empresa_id: '' });
-        setIsWaiterMode(true);
-        return true;
-      } catch {
-        return false;
-      }
-    }
-
     if (token) {
       setMesaToken(token);
       // Always check waiter mode from sessionStorage before the async fetch.
       // /api/mesas searches by id (not token column), so it succeeds for waiter
       // navigations and would never reach the old fallback path.
-      const isWaiter = applySessionStorage();
+      const isWaiter = applySessionStorageWaiter(setMesaToken, setMesaInfo, setIsWaiterMode);
       if (shouldOpenCart) openCart();
       fetch(`/api/mesas?token=${encodeURIComponent(token)}`)
         .then(async (res) => {
@@ -230,7 +659,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
       return;
     }
 
-    applySessionStorage();
+    applySessionStorageWaiter(setMesaToken, setMesaInfo, setIsWaiterMode);
   // openCart is stable (useCallback with no deps) — safe to include
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -249,7 +678,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
   const [telefono, setTelefono] = useState('');
   const [countryCode, setCountryCode] = useState(DEFAULT_COUNTRY_CODE);
   const [email, setEmail] = useState('');
-  const [deliveryMethod, setDeliveryMethod] = useState<'recogida' | 'delivery' | null>(null);
+  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>(null);
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [deliveryPostalCode, setDeliveryPostalCode] = useState('');
   const [deliveryLatitude, setDeliveryLatitude] = useState<number | null>(null);
@@ -262,7 +691,6 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
 
     // Mesa mode: skip PII validation, use mesa submit path
     if (mesaToken) {
-      // Waiters bypass QR token validation — authenticated via waiter_token cookie
       const mesaId = mesaInfo?.id ?? mesaToken;
       let clientToken: string | null = null;
       if (!isWaiterMode) {
@@ -275,87 +703,24 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
         clientToken = storedClientToken.token;
       }
 
-      if (items.length === 0) return;
-
       setSending(true);
       try {
-        // Group items by pase — each pase group becomes its own pedido
-        const orderHeaders: HeadersInit = { 'Content-Type': 'application/json', ...(clientToken ? { 'Authorization': `Bearer ${clientToken}` } : {}) };
-        const orderGroups = Array.from(groupItemsByPase(items).entries());
-        // Send first group (need its response for 401 handling + tracking token)
-        // toOrder.length > 0 here so orderGroups always has ≥1 entry
-        const [firstGroup, ...restGroups] = orderGroups;
-        const [firstPase, firstGroupItems] = firstGroup!;
-        const res = await fetch('/api/pedidos', {
-          method: 'POST',
-          headers: orderHeaders,
-          body: JSON.stringify({
-            tipo: 'mesa',
-            mesa_id: mesaId,
-            ...(firstPase ? { pase: firstPase } : {}),
-            items: firstGroupItems.map(mapCartItemPayload),
-            idioma: language,
-          }),
-        });
-        if (res.status === 401) {
-          const body = await res.json() as { code?: string };
-          closeCart();
-          if (body.code === 'SESSION_CLOSED') {
-            setQrGateState('SESSION_CLOSED');
-          } else {
-            setQrGateState('TOKEN_EXPIRED');
-          }
-          return;
-        }
-        const data = await res.json();
-        if (res.ok && data.trackingToken) {
-          addTrackingToken(data.trackingToken);
-          try {
-            const storageKey = `mesa_orders_${mesaId}`;
-            const existing = JSON.parse(localStorage.getItem(storageKey) ?? '[]') as unknown[];
-            existing.push({
-              pedidoId: data.pedidoId ?? data.id,
-              trackingToken: data.trackingToken,
-              items: items.map((ci: CartItem) => ({
-                name: ci.item.name,
-                quantity: ci.quantity,
-                price: ci.item.price,
-              })),
-              total: items.reduce((s: number, ci: CartItem) => {
-                const compPrice = ci.selectedComplements?.reduce((sc: number, c: { price: number }) => sc + c.price, 0) ?? 0;
-                return s + (ci.item.price + compPrice) * ci.quantity;
-              }, 0),
-              timestamp: Date.now(),
-            });
-            localStorage.setItem(storageKey, JSON.stringify(existing));
-          } catch {
-            // localStorage may be unavailable
-          }
-
-          // Send remaining pase groups (fire-and-forget)
-          const extraFetches: Promise<unknown>[] = restGroups.map(([pase, groupItems]) =>
-            fetch('/api/pedidos', {
-              method: 'POST',
-              headers: orderHeaders,
-              body: JSON.stringify({
-                tipo: 'mesa',
-                mesa_id: mesaId,
-                ...(pase ? { pase } : {}),
-                items: groupItems.map(mapCartItemPayload),
-                idioma: language,
-              }),
-            }).catch(() => null)
-          );
-
-          await Promise.all(extraFetches);
-
+        const result = await sendMesaOrderFlow(mesaId, clientToken, items, language);
+        if (result.ok && result.trackingToken) {
+          addTrackingToken(result.trackingToken);
           clearCart();
           closeCart();
           setShowOrderToast(true);
           setTimeout(() => setShowOrderToast(false), 2000);
           window.dispatchEvent(new CustomEvent('mesa-order-placed'));
+        } else if (result.code === 'SESSION_CLOSED') {
+          closeCart();
+          setQrGateState('SESSION_CLOSED');
+        } else if (result.code === 'TOKEN_EXPIRED') {
+          closeCart();
+          setQrGateState('TOKEN_EXPIRED');
         } else {
-          setErrors({ general: data.error || t('validationOrderError', language) });
+          setErrors({ general: result.error || t('validationOrderError', language) });
         }
       } catch {
         setErrors({ general: t('connectionError', language) });
@@ -374,116 +739,42 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
       return;
     }
 
-    setSending(true);
-
     const selectedCountry = COUNTRY_CODES.find(c => c.code === countryCode);
     const dialCode = selectedCountry?.dialCode || '34';
 
-    try {
-      const res = await fetch('/api/pedidos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: items.map(mapCartItemPayload),
-          nombre,
-          telefono: dialCode + telefono.replaceAll(/\D/g, ''),
-          email,
-          idioma: language,
-          codigoDescuento: discountCode || undefined,
-          ...(isRestaurant && deliveryMethod ? {
-            origen: deliveryMethod,
-            direccion_entrega: deliveryMethod === 'delivery' ? deliveryAddress : undefined,
-            codigo_postal: deliveryMethod === 'delivery' ? deliveryPostalCode : undefined,
-            latitude_entrega: deliveryMethod === 'delivery' ? deliveryLatitude : undefined,
-            longitude_entrega: deliveryMethod === 'delivery' ? deliveryLongitude : undefined,
-            estimated_delivery_fee_cents: deliveryMethod === 'delivery' ? estimatedFeeCents : undefined,
-          } : {}),
-        }),
-      });
+    const payload: Record<string, unknown> = {
+      items: items.map(mapCartItemPayload),
+      nombre,
+      telefono: dialCode + telefono.replaceAll(/\D/g, ''),
+      email,
+      idioma: language,
+      codigoDescuento: discountCode || undefined,
+    };
 
-      const data = await res.json();
-
-      if (res.ok) {
-        if (data.trackingToken && data.pedidoId && (
-          deliveryMethod === 'delivery' ||
-          (pagosPickupHabilitados && (deliveryMethod === 'recogida' || !isRestaurant))
-        )) {
-          // Delivery always, recogida/tienda only when pagosPickupHabilitados: initiate Redsys payment
-          if (data.trackingToken) addTrackingToken(data.trackingToken);
-          clearCart();
-          closeCart();
-          try {
-            const redsysRes = await fetch('/api/redsys/initiate', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ pedidoId: data.pedidoId, lang: language }),
-            });
-            if (redsysRes.ok) {
-              const formData = await redsysRes.json() as {
-                DS_MERCHANT_PARAMETERS: string;
-                DS_SIGNATURE: string;
-                DS_SIGNATURE_VERSION: string;
-              };
-              const redsysUrl = process.env.NEXT_PUBLIC_REDSYS_URL ?? 'https://sis-t.redsys.es:25443/sis/realizarPago';
-              const form = document.createElement('form');
-              form.method = 'POST';
-              form.action = redsysUrl;
-              const fields: Record<string, string> = {
-                Ds_SignatureVersion: formData.DS_SIGNATURE_VERSION,
-                Ds_MerchantParameters: formData.DS_MERCHANT_PARAMETERS,
-                Ds_Signature: formData.DS_SIGNATURE,
-              };
-              for (const [name, value] of Object.entries(fields)) {
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = name;
-                input.value = value;
-                form.appendChild(input);
-              }
-              document.body.appendChild(form);
-              form.submit();
-              return;
-            }
-            // Redsys not configured — fall through to tracking page
-          } catch {
-            // Network error — fall through to tracking page
-          }
-          router.push(`/tracking/${data.trackingToken}`);
-        } else if (data.trackingToken && data.tipo === 'restaurante') {
-          // Restaurant pickup: redirect to tracking page
-          addTrackingToken(data.trackingToken);
-          clearCart();
-          if (window.history.state?.cartOpen) {
-            window.history.replaceState({}, '', window.location.href);
-          }
-          closeCart();
-          const restauranteTrackingUrl = `/tracking/${data.trackingToken}`;
-          setTimeout(() => { window.location.href = restauranteTrackingUrl; }, 0);
-        } else if (data.trackingToken) {
-          // Tienda: redirect to tracking page
-          addTrackingToken(data.trackingToken);
-          clearCart();
-          setNombre('');
-          setTelefono('');
-          setEmail('');
-          if (window.history.state?.cartOpen) {
-            window.history.replaceState({}, '', window.location.href);
-          }
-          closeCart();
-          const trackingUrl = `/tracking/${data.trackingToken}`;
-          setTimeout(() => { window.location.href = trackingUrl; }, 0);
-        } else {
-          // Fallback: show success dialog only
-          setOrderSuccess({ numeroPedido: data.numeroPedido });
-        }
-      } else {
-        setErrors({ general: data.error || t('validationOrderError', language) });
-      }
-    } catch {
-      setErrors({ general: t('connectionError', language) });
-    } finally {
-      setSending(false);
-    }
+    // Delegate the heavy response handling to a module-level helper
+    await processStandardOrderResponse(payload, {
+      t,
+      language,
+      isRestaurant,
+      pagosPickupHabilitados,
+      deliveryMethod,
+      deliveryAddress,
+      deliveryPostalCode,
+      deliveryLatitude,
+      deliveryLongitude,
+      estimatedFeeCents,
+      clearCart,
+      closeCart,
+      addTrackingToken,
+      setOrderSuccess,
+      setErrors,
+      setNombre,
+      setTelefono,
+      setEmail,
+      router,
+      sendStandardOrderFlow,
+      setSending,
+    });
   }, [mesaToken, mesaInfo, isWaiterMode, nombre, telefono, countryCode, email, deliveryMethod, deliveryAddress, deliveryPostalCode, deliveryLatitude, deliveryLongitude, isRestaurant, pagosPickupHabilitados, items, language, discountCode, estimatedFeeCents, clearCart, closeCart, router]);
 
 // Signal "Activa" state: when a real customer (non-waiter) adds their first item
@@ -494,7 +785,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items.length]);
 
-  const isDeliveryIncomplete = isRestaurant && !mesaToken && deliveryMethod === 'delivery' && (deliveryLatitude === null || estimatedFeeCents === null);
+  const isDeliveryIncomplete = computeIsDeliveryIncomplete(isRestaurant, mesaToken, deliveryMethod, deliveryLatitude, estimatedFeeCents);
 
   const handleDialogClose = useCallback((open: boolean) => {
     if (!open) {
@@ -517,26 +808,84 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     }
   }, [clearCart, closeCart]);
 
+  const handleValidateDiscount = useCallback(async () => {
+    if (!discountCode.trim()) return;
+    if (!email.trim()) {
+      setDiscountError(t("discountCodeEmailRequired", language));
+      return;
+    }
+    setValidatingDiscount(true);
+    setDiscountError(null);
+    try {
+      const res = await fetch('/api/descuento/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ codigo: discountCode, email }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const errorTranslations: Record<string, string> = {
+          CODE_NOT_FOUND: t("discountCodeInvalid", language),
+          CODE_EXPIRED: t("discountCodeExpired", language),
+          CODE_ALREADY_USED: t("discountCodeUsed", language),
+          EMAIL_MISMATCH: t("discountCodeEmailMismatch", language),
+        };
+        setDiscountError(data.error && data.code
+          ? (errorTranslations[data.code] ?? t("discountCodeInvalid", language))
+          : (data.error ?? t("discountCodeInvalid", language)));
+        setDiscountValid(null);
+      } else {
+        setDiscountValid({ valid: true, porcentaje: data.porcentaje });
+        setDiscountError(null);
+      }
+    } catch {
+      setDiscountError(t("connectionError", language));
+    } finally {
+      setValidatingDiscount(false);
+    }
+  }, [discountCode, email, language]);
+
+  const handleSendOrder = useCallback(() => {
+    if (!mesaToken && activeOrderTokens.length > 0) {
+      setShowActiveOrdersDialog(true);
+    } else {
+      void handleConfirmOrder();
+    }
+  }, [mesaToken, activeOrderTokens, handleConfirmOrder]);
+
+  const handleDeliveryChange = useCallback((
+    v: 'recogida' | 'delivery',
+    deliveryData?: { address: string; postalCode: string; latitude: number; longitude: number; estimatedFeeCents: number },
+  ) => {
+    setDeliveryMethod(v);
+    setErrors(prev => ({ ...prev, delivery: undefined }));
+    if (deliveryData) {
+      setDeliveryAddress(deliveryData.address);
+      setDeliveryPostalCode(deliveryData.postalCode);
+      setDeliveryLatitude(deliveryData.latitude);
+      setDeliveryLongitude(deliveryData.longitude);
+      setEstimatedFeeCents(deliveryData.estimatedFeeCents);
+    } else if (v !== deliveryMethod) {
+      setDeliveryAddress('');
+      setDeliveryPostalCode('');
+      setDeliveryLatitude(null);
+      setDeliveryLongitude(null);
+      setEstimatedFeeCents(null);
+    }
+  }, [deliveryMethod]);
+
+  const isDelivery = deliveryMethod === 'delivery';
+  const { deliveryFee, grandTotal } = computeCartTotals(deliveryMethod, estimatedFeeCents, discountValid, totalPrice);
+
   return (
     <>
-      {showOrderToast && (
-        <div className="fixed inset-0 z-[400] flex items-center justify-center pointer-events-none">
-          <div className="bg-card/95 backdrop-blur-md border border-border shadow-2xl rounded-3xl px-10 py-8 flex flex-col items-center gap-4 animate-in fade-in zoom-in-90 duration-300">
-            <div className="w-16 h-16 rounded-full bg-primary/10 border-2 border-primary/25 flex items-center justify-center">
-              <Check className="size-8 text-primary" strokeWidth={2.5} />
-            </div>
-            <p className="text-base font-bold text-foreground text-center leading-snug">
-              {t('mesaOrderConfirmed', language)}
-            </p>
-          </div>
-        </div>
-      )}
-      {qrGateState && mesaToken && !isWaiterMode && (
+      <OrderToast show={showOrderToast} language={language} />
+      {shouldShowQrGate(qrGateState, mesaToken, isWaiterMode) && (
         <QRScannerGate
-          mesaId={mesaInfo?.id ?? mesaToken}
-          state={qrGateState}
+          mesaId={resolveActiveMesaId(mesaInfo, mesaToken!)}
+          state={qrGateState!}
           onTokenIssued={(token, expiresAt) => {
-            storeMesaClientToken(mesaInfo?.id ?? mesaToken, token, expiresAt);
+            storeMesaClientToken(resolveActiveMesaId(mesaInfo, mesaToken!), token, expiresAt);
             setQrGateState(null);
             void handleConfirmOrder();
           }}
@@ -551,10 +900,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
           <DialogHeader>
             <DialogTitle>{t('activeOrdersDialogTitle', language)}</DialogTitle>
             <DialogDescription className="pt-2">
-              {activeOrderTokens.length === 1
-                ? t('activeOrdersDialogBodySingular', language)
-                : t('activeOrdersDialogBodyPlural', language).replace('{count}', String(activeOrderTokens.length))
-              }
+              {getActiveOrdersBodyText(activeOrderTokens.length, language)}
             </DialogDescription>
           </DialogHeader>
           <div className="flex gap-2 mt-2">
@@ -611,7 +957,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
           </SheetDescription>
         </SheetHeader>
 
-        {items.length > 0 && !isWaiterMode && deliveryMethod !== 'delivery' && !(pagosPickupHabilitados && (deliveryMethod === 'recogida' || !isRestaurant)) && (
+        {showNoPaymentBanner(items, isWaiterMode, deliveryMethod, pagosPickupHabilitados, isRestaurant) && (
           <div className="shrink-0 mx-4 mb-1.5 rounded-md bg-secondary border border-border px-2 py-1.5">
             <p className="text-xs text-secondary-foreground font-medium">
               {t("noPaymentRequired", language)}
@@ -645,14 +991,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
               {items.map((ci) => {
                 const complementPrice = ci.selectedComplements?.reduce((sum, c) => sum + c.price, 0) || 0;
                 const totalItemPrice = ci.item.price + complementPrice;
-                let itemAnimationClass = '';
-                if (!shouldReduceMotion) {
-                  if (ci.justAdded) {
-                    itemAnimationClass = 'animate-cart-item-add';
-                  } else if (ci.justRemoved) {
-                    itemAnimationClass = 'animate-cart-item-remove';
-                  }
-                }
+                const itemAnimationClass = getItemAnimationClass(ci.justAdded, ci.justRemoved, shouldReduceMotion);
                 return (
 <li
                       key={ci.cartId}
@@ -828,35 +1167,18 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
               )}
 
               {/* Delivery method selector — only for restaurants in non-mesa mode */}
-              {!mesaToken && isRestaurant && (
+              {showDeliverySelector(mesaToken, isRestaurant) && (
                 <DeliveryMethodSelector
                   value={deliveryMethod}
                   deliveryHabilitado={deliveryHabilitado}
-                  onChange={(v, deliveryData) => {
-                    setDeliveryMethod(v);
-                    setErrors(prev => ({ ...prev, delivery: undefined }));
-                    if (deliveryData) {
-                      setDeliveryAddress(deliveryData.address);
-                      setDeliveryPostalCode(deliveryData.postalCode);
-                      setDeliveryLatitude(deliveryData.latitude);
-                      setDeliveryLongitude(deliveryData.longitude);
-                      setEstimatedFeeCents(deliveryData.estimatedFeeCents);
-                    } else if (v !== deliveryMethod) {
-                      // Method changed without deliveryData — clear address state
-                      setDeliveryAddress('');
-                      setDeliveryPostalCode('');
-                      setDeliveryLatitude(null);
-                      setDeliveryLongitude(null);
-                      setEstimatedFeeCents(null);
-                    }
-                  }}
+                  onChange={handleDeliveryChange}
                   orderTotalCents={Math.round(totalPrice * 100)}
                   disabled={sending}
                 />
               )}
 
               {/* Discount Code Section — hidden in mesa mode */}
-              {!mesaToken && <div className="mb-3">
+              {showDiscountSection(mesaToken) && <div className="mb-3">
                 <label htmlFor="discount-code" className="text-xs font-medium text-muted-foreground ml-1 mb-1 block">
                   {t("discountCodeLabel", language)}
                 </label>
@@ -880,40 +1202,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                     variant="outline"
                     size="sm"
                     className="h-9 min-h-[44px] px-4"
-                    onClick={async () => {
-                      if (!discountCode.trim()) return;
-                      if (!email.trim()) {
-                        setDiscountError(t("discountCodeEmailRequired", language));
-                        return;
-                      }
-                      setValidatingDiscount(true);
-                      setDiscountError(null);
-                      try {
-                        const res = await fetch('/api/descuento/validate', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ codigo: discountCode, email }),
-                        });
-                        const data = await res.json();
-                        if (!res.ok) {
-                          const errorTranslations: Record<string, string> = {
-                            CODE_NOT_FOUND: t("discountCodeInvalid", language),
-                            CODE_EXPIRED: t("discountCodeExpired", language),
-                            CODE_ALREADY_USED: t("discountCodeUsed", language),
-                            EMAIL_MISMATCH: t("discountCodeEmailMismatch", language),
-                          };
-                          setDiscountError(data.error && data.code ? (errorTranslations[data.code] || t("discountCodeInvalid", language)) : (data.error || t("discountCodeInvalid", language)));
-                          setDiscountValid(null);
-                        } else {
-                          setDiscountValid({ valid: true, porcentaje: data.porcentaje });
-                          setDiscountError(null);
-                        }
-                      } catch {
-                        setDiscountError(t("connectionError", language));
-                      } finally {
-                        setValidatingDiscount(false);
-                      }
-                    }}
+                    onClick={handleValidateDiscount}
                     disabled={validatingDiscount || items.length === 0}
                   >
                     {validatingDiscount ? '...' : t("discountCodeApply", language)}
@@ -933,38 +1222,26 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
               </div>}
 
               {/* Total Section */}
-              {(() => {
-                const isDelivery = deliveryMethod === 'delivery';
-                const deliveryFeeCents = isDelivery && estimatedFeeCents ? estimatedFeeCents : 0;
-                const deliveryFee = deliveryFeeCents / 100;
-                const discountedItems = discountValid?.valid
-                  ? Math.round(totalPrice * (1 - discountValid.porcentaje / 100) * 100) / 100
-                  : totalPrice;
-                const grandTotal = discountedItems + deliveryFee;
-
-                return (
-                  <div className="mb-4 space-y-1">
-                    {discountValid?.valid && (
-                      <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <span>{t("subtotal", language)}</span>
-                        <span className="line-through">{formatPrice(totalPrice, 'EUR', language)}</span>
-                      </div>
-                    )}
-                    {isDelivery && deliveryFee > 0 && (
-                      <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <span>{t("deliveryCost", language)}</span>
-                        <span>{formatPrice(deliveryFee, 'EUR', language)}</span>
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <span className="text-lg font-semibold text-foreground">{t("total", language)}</span>
-                      <span className={`text-2xl font-bold tabular-nums animate-price-update ${discountValid?.valid ? 'text-green-600 dark:text-green-400' : 'text-foreground'}`} key={grandTotal}>
-                        {formatPrice(grandTotal, 'EUR', language)}
-                      </span>
-                    </div>
+              <div className="mb-4 space-y-1">
+                {discountValid?.valid && (
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>{t("subtotal", language)}</span>
+                    <span className="line-through">{formatPrice(totalPrice, 'EUR', language)}</span>
                   </div>
-                );
-              })()}
+                )}
+                {showDeliveryCostRow(isDelivery, deliveryFee) && (
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>{t("deliveryCost", language)}</span>
+                    <span>{formatPrice(deliveryFee, 'EUR', language)}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <span className="text-lg font-semibold text-foreground">{t("total", language)}</span>
+                  <span className={`text-2xl font-bold tabular-nums animate-price-update ${grandTotalColorClass(discountValid)}`} key={grandTotal}>
+                    {formatPrice(grandTotal, 'EUR', language)}
+                  </span>
+                </div>
+              </div>
 
               {errors.general && (
                 <p role="alert" className="text-sm text-destructive text-center mb-2">
@@ -980,14 +1257,8 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                  <Button
                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full py-3 text-lg font-semibold shadow-elegant transition-colors duration-150 min-h-[44px]"
                    size="lg"
-                   onClick={() => {
-                     if (!mesaToken && activeOrderTokens.length > 0) {
-                       setShowActiveOrdersDialog(true);
-                     } else {
-                       handleConfirmOrder();
-                     }
-                   }}
-                   disabled={sending || (mesaToken !== null && mesaError) || isDeliveryIncomplete}
+                   onClick={handleSendOrder}
+                   disabled={isSubmitDisabled(sending, mesaToken, mesaError, isDeliveryIncomplete)}
                  >
                    {orderButtonLabel(sending, mesaToken, t, language)}
                  </Button>

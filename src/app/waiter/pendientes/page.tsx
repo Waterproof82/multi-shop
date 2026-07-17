@@ -264,9 +264,6 @@ interface PedidoItemButtonProps {
 }
 
 function PedidoItemButton({ item, isSelected, isPaused, onToggleSelect, onTogglePause, onPaseChange }: Readonly<PedidoItemButtonProps>) {
-  const paseKey = (item.pase ?? null) as PaseKey | null;
-  const paseColors = paseKey ? PASE_COLOR[paseKey] : null;
-
   return (
     <div
       className="rounded-lg overflow-hidden"
@@ -666,8 +663,33 @@ export default function WaiterPendientesPage() {
     }
   }, []);
 
+  // Helper: process a single pedido's items for a given pase
+  const processPaseItemsForPedido = useCallback(
+    async (
+      pedido: PendientePedido,
+      paseItemsForPedido: MergedItem[],
+      mesaPaused: Set<string>
+    ): Promise<number[]> => {
+      const selectedForPedido = new Set(paseItemsForPedido.map((i: MergedItem) => i.globalKey));
+      const tiposInPase = [...new Set(paseItemsForPedido.map((i: MergedItem) => i.tipo))] as Array<'comida' | 'bebida'>;
+      const removedIdxs: number[] = [];
+
+      for (const tipo of tiposInPase) {
+        if (pedido.validated) {
+          const released = await releaseRetainedPedidoItems(pedido.id, pedido.items, tipo, selectedForPedido, mesaPaused, 'selected');
+          removedIdxs.push(...released);
+        } else {
+          const ok = await validateNewPedido(pedido.id, pedido.items, tipo, selectedForPedido, mesaPaused, 'selected');
+          if (ok) removedIdxs.push(...pedido.items.filter((i: PendienteItem) => i.tipo === tipo).map((i: PendienteItem) => i.idx));
+        }
+      }
+      return removedIdxs;
+    },
+    []
+  );
+
   // Lanzar todos los ítems de un pase concreto para una mesa (self-contained, no stale-state risk)
-  const handleLanzarPase = useCallback(async (mesaId: string, pase: PaseKey) => {
+  const handleLanzarPase = useCallback(async (mesaId:string, pase: PaseKey) => {
     const mesa = mesas.find(m => m.mesaId === mesaId);
     if (!mesa) return;
 
@@ -677,7 +699,7 @@ export default function WaiterPendientesPage() {
     try {
       const allMerged = getMergedItems(mesa).map(i => ({
         ...i,
-        pase: paseOverrides[i.globalKey] !== undefined ? paseOverrides[i.globalKey] : i.pase,
+        pase: paseOverrides[i.globalKey] ?? i.pase,
       }));
       const paseGlobalKeys = new Set(allMerged.filter(i => i.pase === pase).map(i => i.globalKey));
       if (paseGlobalKeys.size === 0) return;
@@ -688,20 +710,7 @@ export default function WaiterPendientesPage() {
       for (const pedido of mesa.pedidos) {
         const paseItemsForPedido = allMerged.filter(i => i.pedidoId === pedido.id && paseGlobalKeys.has(i.globalKey));
         if (paseItemsForPedido.length === 0) continue;
-
-        const selectedForPedido = new Set(paseItemsForPedido.map(i => i.globalKey));
-        const tiposInPase = [...new Set(paseItemsForPedido.map(i => i.tipo))] as Array<'comida' | 'bebida'>;
-        const removedIdxs: number[] = [];
-
-        for (const tipo of tiposInPase) {
-          if (pedido.validated) {
-            const released = await releaseRetainedPedidoItems(pedido.id, pedido.items, tipo, selectedForPedido, mesaPaused, 'selected');
-            removedIdxs.push(...released);
-          } else {
-            const ok = await validateNewPedido(pedido.id, pedido.items, tipo, selectedForPedido, mesaPaused, 'selected');
-            if (ok) removedIdxs.push(...pedido.items.filter(i => i.tipo === tipo).map(i => i.idx));
-          }
-        }
+        const removedIdxs = await processPaseItemsForPedido(pedido, paseItemsForPedido, mesaPaused);
         if (removedIdxs.length > 0) removedItemsMap.set(pedido.id, removedIdxs);
       }
 
@@ -723,7 +732,7 @@ export default function WaiterPendientesPage() {
       setConfirming(prev => { const n = new Set(prev); n.delete(mesaId); return n; });
       void fetchPendientes();
     }
-  }, [mesas, paseOverrides, pausedMap, fetchPendientes]);
+  }, [mesas, paseOverrides, pausedMap, processPaseItemsForPedido, fetchPendientes]);
 
   const totalItems = mesas.reduce((s, m) => s + m.pedidos.reduce((sp, p) => sp + p.items.length, 0), 0);
 

@@ -129,7 +129,7 @@ export function InformeZModal({ informe, onClose }: Readonly<Props>) {
         <div className="font-bold text-xs mb-1">HUELLA DIGITAL</div>
         <div className="text-xs break-all text-gray-600">
           {splitHash(informe.hashEncadenado).map((chunk, i) => (
-            // eslint-disable-next-line react/no-array-index-key
+             
             <div key={i}>{chunk}</div>
           ))}
         </div>

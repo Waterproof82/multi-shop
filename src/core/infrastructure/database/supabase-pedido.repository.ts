@@ -1651,7 +1651,6 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         if (idx !== itemIdx) return item;
         if (pase === null) {
           const { pase: _removed, ...rest } = item as Record<string, unknown> & { pase?: string };
-          void _removed;
           return rest;
         }
         return { ...item, pase };

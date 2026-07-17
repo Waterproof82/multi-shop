@@ -311,6 +311,115 @@ export class PedidoUseCase {
   }
 
   /**
+   * Determine if order requires tracking token based on type and origin
+   */
+  private shouldGenerateTrackingToken(
+    empresaTipo: string,
+    esPedidos: boolean,
+    isDelivery: boolean
+  ): boolean {
+    return (empresaTipo === 'restaurante' && esPedidos) || empresaTipo === 'tienda' || isDelivery;
+  }
+
+  /**
+   * Calculate final total including delivery fee and discount
+   */
+  private calculateFinalTotal(
+    serverTotal: number,
+    isDelivery: boolean,
+    deliveryFeeCents: number | undefined,
+    discountData?: { applied: true; finalTotal: number } | { applied: false }
+  ): number {
+    let total = serverTotal;
+    
+    // Apply discount first
+    if (discountData?.applied) {
+      total = discountData.finalTotal;
+    }
+    
+    // Add delivery fee
+    if (isDelivery && deliveryFeeCents) {
+      total = Math.round((total * 100 + deliveryFeeCents)) / 100;
+    }
+    
+    return total;
+  }
+
+  private buildTelegramPedido(
+    pedidoId: string,
+    empresaId: string,
+    clienteId: string,
+    numeroPedido: number,
+    total: number,
+    data: CreatePedidoDTO,
+    trackingToken: string | undefined
+  ): Pedido {
+    return {
+      id: pedidoId,
+      empresa_id: empresaId,
+      cliente_id: clienteId,
+      numero_pedido: numeroPedido,
+      detalle_pedido: data.items.map(ci => ({
+        producto_id: ci.item?.id,
+        nombre: ci.item?.name ?? '',
+        precio: ci.item?.price ?? 0,
+        cantidad: ci.quantity,
+        complementos: (ci.selectedComplements ?? []).map(c => ({ nombre: c.name, precio: c.price })),
+      })),
+      total,
+      moneda: null,
+      estado: 'pendiente',
+      created_at: new Date().toISOString(),
+      tracking_token: trackingToken ?? null,
+      estimated_minutes: null,
+      estimated_ready_at: null,
+      clientes: { nombre: data.nombre, email: data.email ?? '', telefono: data.telefono },
+    };
+  }
+
+  private async sendTelegramButtons(chatId: string, pedidoId: string, pedido: Pedido): Promise<void> {
+    const r = await sendTelegramWithInlineButtons(pedido, chatId);
+    if (r.success) await this.pedidoRepo.saveTelegramMessageId(pedidoId, r.data.messageId);
+  }
+
+  private async sendTelegramReplies(chatId: string, pedidoId: string, pedido: Pedido): Promise<void> {
+    const r = await sendTelegramWithQuickReplies(pedido, chatId);
+    if (r.success) await this.pedidoRepo.saveTelegramMessageId(pedidoId, r.data.messageId);
+  }
+
+  private async notifyTelegramForCreate(
+    telegramChatId: string | null,
+    pedido: Pedido,
+    empresaTipo: string,
+    esPedidos: boolean,
+    isDelivery: boolean,
+    pagosPickupHabilitados: boolean,
+    origen: string | undefined,
+  ): Promise<void> {
+    const isPickupWithPayment = pagosPickupHabilitados && (origen === 'recogida' || empresaTipo !== 'restaurante');
+    if (!telegramChatId || isDelivery || isPickupWithPayment) return;
+    if (empresaTipo === 'restaurante' && esPedidos) {
+      await this.sendTelegramButtons(telegramChatId, pedido.id, pedido);
+    } else {
+      await this.sendTelegramReplies(telegramChatId, pedido.id, pedido);
+    }
+  }
+
+  private buildOrigenPayload(data: CreatePedidoDTO, isDelivery: boolean) {
+    if (!data.origen) return undefined;
+    return {
+      origen: data.origen,
+      ...(isDelivery ? {
+        direccion_entrega: data.direccion_entrega,
+        codigo_postal: data.codigo_postal,
+        latitude_entrega: data.latitude_entrega,
+        longitude_entrega: data.longitude_entrega,
+        estimated_delivery_fee_cents: data.estimated_delivery_fee_cents,
+      } : {}),
+    };
+  }
+
+  /**
    * Create new order - uses helper methods to reduce complexity
    */
   async create(
@@ -364,13 +473,15 @@ export class PedidoUseCase {
         }
       }
 
-      // Step 3.5: Add delivery fee to total for delivery orders
+      // Step 3.5: Calculate delivery fee and tracking token
       const isDelivery = data.origen === 'delivery';
-      if (isDelivery && data.estimated_delivery_fee_cents) {
-        const feeCents = data.estimated_delivery_fee_cents;
-        finalTotal = Math.round((finalTotal * 100 + feeCents)) / 100;
-      }
-      const trackingToken = (empresaTipo === 'restaurante' && esPedidos) || empresaTipo === 'tienda' || isDelivery
+      finalTotal = this.calculateFinalTotal(
+        priceResult.data.serverTotal,
+        isDelivery,
+        data.estimated_delivery_fee_cents,
+        discountData ? { applied: true, finalTotal } : { applied: false }
+      );
+      const trackingToken = this.shouldGenerateTrackingToken(empresaTipo, esPedidos, isDelivery)
         ? crypto.randomUUID()
         : undefined;
 
@@ -383,16 +494,7 @@ export class PedidoUseCase {
         finalTotal,
         discountData,
         trackingToken,
-        data.origen ? {
-          origen: data.origen,
-          ...(isDelivery ? {
-            direccion_entrega: data.direccion_entrega,
-            codigo_postal: data.codigo_postal,
-            latitude_entrega: data.latitude_entrega,
-            longitude_entrega: data.longitude_entrega,
-            estimated_delivery_fee_cents: data.estimated_delivery_fee_cents,
-          } : {})
-        } : undefined
+        this.buildOrigenPayload(data, isDelivery)
       );
       if (!pedidoResult.success) {
         return { success: false, error: pedidoResult.error };
@@ -404,49 +506,16 @@ export class PedidoUseCase {
       }
 
       // Step 6: Send Telegram notification
-      // Delivery orders: always skip — payment must be confirmed first via Redsys webhook
-      // Pickup/tienda orders with pagosPickupHabilitados: also skip until webhook confirms payment
-      const isDeliveryOrder = data.origen === 'delivery';
-      const isPickupWithPayment = pagosPickupHabilitados && (data.origen === 'recogida' || empresaTipo !== 'restaurante');
-      if (telegramChatId && pedidoResult.data && !isDeliveryOrder && !isPickupWithPayment) {
-        const pedidoParaNotificar: import('@/core/domain/entities/types').Pedido = {
-          id: pedidoResult.data.id,
-          empresa_id: empresaId,
-          cliente_id: clienteResult.data.clienteId,
-          numero_pedido: pedidoResult.data.numero_pedido,
-          detalle_pedido: data.items.map(ci => ({
-            producto_id: ci.item?.id,
-            nombre: ci.item?.name ?? '',
-            precio: ci.item?.price ?? 0,
-            cantidad: ci.quantity,
-            complementos: (ci.selectedComplements ?? []).map(c => ({ nombre: c.name, precio: c.price })),
-          })),
-          total: pedidoResult.data.total,
-          moneda: null,
-          estado: 'pendiente',
-          created_at: new Date().toISOString(),
-          tracking_token: trackingToken ?? null,
-          estimated_minutes: null,
-          estimated_ready_at: null,
-          clientes: {
-            nombre: data.nombre,
-            email: data.email ?? '',
-            telefono: data.telefono,
-          },
-        };
-
-        if (empresaTipo === 'restaurante' && esPedidos) {
-          const telegramResult = await sendTelegramWithInlineButtons(pedidoParaNotificar, telegramChatId);
-          if (telegramResult.success) {
-            await this.pedidoRepo.saveTelegramMessageId(pedidoResult.data.id, telegramResult.data.messageId);
-          }
-        } else {
-          const telegramResult = await sendTelegramWithQuickReplies(pedidoParaNotificar, telegramChatId);
-          if (telegramResult.success) {
-            await this.pedidoRepo.saveTelegramMessageId(pedidoResult.data.id, telegramResult.data.messageId);
-          }
-        }
-      }
+      // Delivery/pickup-with-payment orders skip — webhook confirms payment first
+      const pedidoParaNotificar = this.buildTelegramPedido(
+        pedidoResult.data.id, empresaId, clienteResult.data.clienteId,
+        pedidoResult.data.numero_pedido, pedidoResult.data.total,
+        data, trackingToken
+      );
+      await this.notifyTelegramForCreate(
+        telegramChatId, pedidoParaNotificar, empresaTipo, esPedidos,
+        isDelivery, pagosPickupHabilitados, data.origen
+      );
 
       return { success: true, data: { ...pedidoResult.data, trackingToken } };
     } catch (e) {
