@@ -55,7 +55,8 @@ export function TicketPanel({
   const router = useRouter();
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
-  const [pendingPase, setPendingPase] = useState<'primer' | 'segundo' | 'postre' | 'bebida' | ''>('');
+  const [pendingPase, setPendingPase] = useState<'primer' | 'segundo' | 'postre' | ''>('');
+  const [directoACocina, setDirectoACocina] = useState(false);
   const [notaExpandida, setNotaExpandida] = useState<string | null>(null); // pedido id expandido
   const [pendingNotaExpandida, setPendingNotaExpandida] = useState<string | null>(null); // pending item key expandido
   const [notasLocal, setNotasLocal] = useState<Record<string, string>>({});
@@ -126,7 +127,7 @@ export function TicketPanel({
                 {getNota(order) && <span className="ml-1.5 text-[#4f72ff]">✎</span>}
                 {order.pase && (
                   <span className="ml-2 text-[#4f72ff]">
-                    {order.pase === 'primer' ? '1er' : order.pase === 'segundo' ? '2º' : order.pase === 'postre' ? 'Postre' : 'Bebida'}
+                    {order.pase === 'primer' ? '1er' : order.pase === 'segundo' ? '2º' : 'Postre'}
                   </span>
                 )}
               </span>
@@ -247,20 +248,31 @@ export function TicketPanel({
         )}
         {pendingItems.length > 0 && (
           <div className="flex gap-1 flex-wrap">
-            {(['primer', 'segundo', 'postre', 'bebida'] as const).map(p => (
+            {(['primer', 'segundo', 'postre'] as const).map(p => (
               <button
                 key={p}
                 type="button"
-                onClick={() => setPendingPase(prev => prev === p ? '' : p)}
+                onClick={() => { setPendingPase(prev => prev === p ? '' : p); setDirectoACocina(false); }}
                 className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${
-                  pendingPase === p
+                  pendingPase === p && !directoACocina
                     ? 'bg-[#4f72ff] border-[#4f72ff] text-white'
                     : 'border-[#2e3347] text-[#6b7280] hover:text-white hover:border-[#4f72ff]'
                 }`}
               >
-                {p === 'primer' ? '1er pase' : p === 'segundo' ? '2º pase' : p === 'postre' ? 'Postre' : 'Bebida'}
+                {p === 'primer' ? '1er pase' : p === 'segundo' ? '2º pase' : 'Postre'}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={() => { setDirectoACocina(prev => !prev); setPendingPase(''); }}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                directoACocina
+                  ? 'bg-amber-600 border-amber-600 text-white'
+                  : 'border-[#2e3347] text-[#6b7280] hover:text-white hover:border-amber-600'
+              }`}
+            >
+              Envío directo
+            </button>
           </div>
         )}
         {pendingItems.length > 0 && (
@@ -297,11 +309,12 @@ export function TicketPanel({
                       nombre: i.nombre,
                       precio: i.precioTotal,
                       cantidad: i.cantidad,
-                      complementos: i.complementos,
+                      complementos: i.complementos.map(c => c.nombre),
                       ...(i.nota ? { nota: i.nota } : {}),
                     })),
                     nota: pendingNota || undefined,
-                    pase: pendingPase || undefined,
+                    pase: (!directoACocina && pendingPase) ? pendingPase : undefined,
+                    directoACocina,
                   }),
                 });
                 if (!res.ok) {
@@ -312,6 +325,7 @@ export function TicketPanel({
                   onPendingSent();
                   setPendingNota('');
                   setPendingPase('');
+                  setDirectoACocina(false);
                   // If the mesa had no session yet, navigate to include the new sesionId in the URL
                   if (!sesionId && json.sesionId && mesaId) {
                     const params = new URLSearchParams({ mesaId, mesaNumero: String(mesaNumero ?? ''), sesionId: json.sesionId });

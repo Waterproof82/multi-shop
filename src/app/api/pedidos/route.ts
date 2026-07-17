@@ -34,6 +34,7 @@ const mesaPedidoSchema = z.object({
   items: itemsSchema,
   idioma: z.enum(['es', 'en', 'fr', 'it', 'de']).optional(),
   initialEstado: z.enum(['pendiente', 'retenido']).optional(), // waiter-only field
+  pase: z.enum(['primer', 'segundo', 'postre']).optional(), // waiter-only field
 });
 
 const defaultPedidoSchema = z.object({
@@ -122,17 +123,20 @@ async function handleMesaOrder(empresa: EmpresaOrderData, data: MesaData, reques
   const lockResponse = await checkMesaPaymentLock(data.mesa_id);
   if (lockResponse) return lockResponse;
 
-  // Waiter: may set retenido. Customer: pendiente_validacion when toggle is active, else pendiente.
+  // Waiter: always goes through pendientes queue (pendiente_validacion), except explicit retenido.
+  // Customer: pendiente_validacion when toggle is active, else pendiente.
   let initialEstado: 'pendiente' | 'retenido' | 'pendiente_validacion' = 'pendiente';
   if (isWaiter && data.initialEstado === 'retenido') {
     initialEstado = 'retenido';
-  } else if (!isWaiter && empresa.validacion_pedidos_habilitada) {
+  } else if (isWaiter) {
+    initialEstado = 'pendiente_validacion';
+  } else if (empresa.validacion_pedidos_habilitada) {
     initialEstado = 'pendiente_validacion';
   }
 
   const pedidoResult = await getPedidoUseCase().createMesaOrder(
     empresa.id,
-    { items: data.items, mesa_id: data.mesa_id, idioma: data.idioma },
+    { items: data.items, mesa_id: data.mesa_id, idioma: data.idioma, pase: data.pase },
     mesaResult.data.numero,
     mesaResult.data.nombre,
     initialEstado

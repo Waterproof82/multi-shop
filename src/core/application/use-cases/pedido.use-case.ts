@@ -35,6 +35,7 @@ export interface CreateMesaPedidoDTO {
   mesa_id: string; // UUID
   idioma?: string;
   nota?: string;
+  pase?: string;
 }
 
 export interface PedidoStats {
@@ -485,6 +486,7 @@ export class PedidoUseCase {
         translations: ci.item?.translations,
         complementos: ci.selectedComplements?.map(c => ({ nombre: c.name, precio: c.price })) ?? [],
         nota: ci.note || undefined,
+        pase: data.pase ?? null,
       }));
 
       // Step 3: Ensure an active session exists (idempotent), then attach it to the order.
@@ -505,6 +507,7 @@ export class PedidoUseCase {
         sesionId,
         initialEstado,
         nota: data.nota,
+        pase: data.pase ?? null,
       });
       if (!pedidoResult.success) {
         return { success: false, error: pedidoResult.error };
