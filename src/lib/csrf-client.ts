@@ -22,7 +22,7 @@ export function getCsrfToken(): string | null {
   return null;
 }
 
-export function clearCsrfToken(): void {
+function clearCsrfToken(): void {
   if (globalThis.window !== undefined) {
     sessionStorage.removeItem(CSRF_STORAGE_KEY);
   }

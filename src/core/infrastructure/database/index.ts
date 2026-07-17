@@ -89,7 +89,7 @@ export function getMesaSesionRepository(): SupabaseMesaSesionRepository {
 }
 
 let _valoracionRepository: SupabaseValoracionRepository | undefined;
-export function getValoracionRepository(): SupabaseValoracionRepository {
+function getValoracionRepository(): SupabaseValoracionRepository {
   _valoracionRepository ??= new SupabaseValoracionRepository(getSupabaseClient());
   return _valoracionRepository;
 }
@@ -248,7 +248,7 @@ export function getComprasRepository(): IComprasRepository {
 }
 
 let _analyticsRepository: SupabaseAnalyticsRepository | undefined;
-export function getAnalyticsRepository(): SupabaseAnalyticsRepository {
+function getAnalyticsRepository(): SupabaseAnalyticsRepository {
   _analyticsRepository ??= new SupabaseAnalyticsRepository();
   return _analyticsRepository;
 }

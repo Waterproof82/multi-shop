@@ -78,11 +78,6 @@ export function handleResultWithStatus<T>(result: Result<T>, successStatus = 200
   return errorResponse(result.error.message, errorCodeToStatus(result.error.code));
 }
 
-// Helper to get empresaId from request headers
-export function getEmpresaIdFromRequest(request: NextRequest): string | null {
-  return request.headers.get('x-empresa-id');
-}
-
 const empresaIdSchema = z.string().uuid();
 
 /**
