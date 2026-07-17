@@ -21,6 +21,14 @@ const bodySchema = z.object({
   directoACocina: z.boolean().optional().default(false),
 });
 
+function resolveSynthesizedEstado(allCancelled: boolean, allDone: boolean, anyListo: boolean, anyEnPreparacion: boolean): string {
+  if (allCancelled) { return 'cancelado'; }
+  if (allDone) { return 'servido'; }
+  if (anyListo) { return 'preparado'; }
+  if (anyEnPreparacion) { return 'en_preparacion'; }
+  return 'pendiente';
+}
+
 export async function GET(req: NextRequest) {
   const { empresaId, error: authError } = await requireAuth(req);
   if (authError) return authError;
@@ -95,12 +103,10 @@ export async function GET(req: NextRequest) {
         const itemStates = detalle.map((_, idx) => overrides.get(idx) ?? 'pendiente');
         const allCancelled     = itemStates.length > 0 && itemStates.every(s => s === 'cancelado');
         const allDone          = itemStates.every(s => s === 'servido' || s === 'cancelado');
-        const anyListo         = itemStates.some(s => s === 'listo');
-        const anyEnPreparacion = itemStates.some(s => s === 'en_preparacion');
+        const anyListo         = itemStates.includes('listo');
+        const anyEnPreparacion = itemStates.includes('en_preparacion');
 
-        synthesizedEstado.set(p.id,
-          allCancelled ? 'cancelado' : allDone ? 'servido' : anyListo ? 'preparado' : anyEnPreparacion ? 'en_preparacion' : 'pendiente'
-        );
+        synthesizedEstado.set(p.id, resolveSynthesizedEstado(allCancelled, allDone, anyListo, anyEnPreparacion));
       }
     } catch { /* best-effort */ }
   }

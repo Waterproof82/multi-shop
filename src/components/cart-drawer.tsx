@@ -34,7 +34,6 @@ import { t } from "@/lib/translations"
 import { DeliveryMethodSelector } from "@/components/DeliveryMethodSelector"
 import { formatPrice } from "@/lib/format-price"
 import { COUNTRY_CODES, DEFAULT_COUNTRY_CODE } from "@/core/domain/constants/country-codes"
-import { getItemKey } from "@/lib/cart-utils";
 import { getTrackingTokens, addTrackingToken } from "@/lib/order-tracking";
 import { QRScannerGate, type QRGateState } from '@/components/qr-scanner-gate';
 
@@ -87,15 +86,15 @@ interface MesaInfo {
 type TranslationKey = keyof typeof import('@/lib/translations').translations.es;
 type TranslateFn = (key: TranslationKey, language: Language) => string;
 
-function discountBorderClass(error: string | null, valid: boolean | null): string {
+function discountBorderClass(error: string | null, valid: { valid: boolean; porcentaje: number } | null): string {
   if (error) return 'border-destructive';
-  if (valid) return 'border-green-500';
+  if (valid?.valid) return 'border-green-500';
   return '';
 }
 
-function discountDescribedBy(error: string | null, valid: boolean | null): string | undefined {
+function discountDescribedBy(error: string | null, valid: { valid: boolean; porcentaje: number } | null): string | undefined {
   if (error) return 'discount-error';
-  if (valid) return 'discount-valid';
+  if (valid?.valid) return 'discount-valid';
   return undefined;
 }
 
@@ -115,6 +114,48 @@ function validatePhoneInput(phone: string, translate: TranslateFn, language: Lan
   if (digitsOnly.length < 9) return translate("validationPhoneMin", language);
   if (digitsOnly.length > 15) return translate("validationPhoneMax", language);
   return undefined;
+}
+
+function resolveDeliveryError(
+  isRestaurant: boolean,
+  deliveryMethod: 'recogida' | 'delivery' | null,
+  deliveryLatitude: number | null,
+  deliveryLongitude: number | null,
+  translate: TranslateFn,
+  language: Language
+): string | undefined {
+  if (isRestaurant && deliveryMethod === null) {
+    return translate('deliveryMethodTitle', language);
+  }
+  if (isRestaurant && deliveryMethod === 'delivery' && (deliveryLatitude === null || deliveryLongitude === null)) {
+    return translate('deliverySelectValidAddress', language);
+  }
+  return undefined;
+}
+
+function mesaBadgeLabel(mesaInfo: MesaInfo | null, mesaError: boolean, label: string): string {
+  if (mesaInfo) {
+    return `${label} ${mesaInfo.numero}${mesaInfo.nombre ? ` — ${mesaInfo.nombre}` : ''}`;
+  }
+  if (mesaError) {
+    return `${label} —`;
+  }
+  return `${label}…`;
+}
+
+function orderButtonLabel(sending: boolean, mesaToken: string | null, translate: TranslateFn, language: Language): string {
+  if (sending) { return translate('sending', language); }
+  if (mesaToken) { return translate('mesaPlaceOrder', language); }
+  return translate('sendOrder', language);
+}
+
+function mapCartItemPayload(ci: CartItem) {
+  return {
+    item: { id: ci.item.id, name: ci.item.name, price: ci.item.price, translations: ci.item.translations },
+    quantity: ci.quantity,
+    selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
+    note: ci.note,
+  };
 }
 
 interface CartDrawerProps {
@@ -181,7 +222,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
       if (shouldOpenCart) openCart();
       fetch(`/api/mesas?token=${encodeURIComponent(token)}`)
         .then(async (res) => {
-          if (!res.ok) { if (!isWaiter) setMesaError(true); return; }
+          if (!res.ok) { if (!isWaiter) { setMesaError(true); } return; }
           const data = await res.json() as MesaInfo;
           setMesaInfo(data);
         })
@@ -252,12 +293,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
             tipo: 'mesa',
             mesa_id: mesaId,
             ...(firstPase ? { pase: firstPase } : {}),
-            items: firstGroupItems.map((ci: CartItem) => ({
-              item: { id: ci.item.id, name: ci.item.name, price: ci.item.price, translations: ci.item.translations },
-              quantity: ci.quantity,
-              selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
-              note: ci.note,
-            })),
+            items: firstGroupItems.map(mapCartItemPayload),
             idioma: language,
           }),
         });
@@ -305,12 +341,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                 tipo: 'mesa',
                 mesa_id: mesaId,
                 ...(pase ? { pase } : {}),
-                items: groupItems.map((ci: CartItem) => ({
-                  item: { id: ci.item.id, name: ci.item.name, price: ci.item.price, translations: ci.item.translations },
-                  quantity: ci.quantity,
-                  selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
-                  note: ci.note,
-                })),
+                items: groupItems.map(mapCartItemPayload),
                 idioma: language,
               }),
             }).catch(() => null)
@@ -337,11 +368,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     // Standard (non-mesa) flow: validate PII
     const nombreError = validateNameInput(nombre, t, language);
     const telefonoError = validatePhoneInput(telefono, t, language);
-    const deliveryError = isRestaurant && deliveryMethod === null
-      ? t('deliveryMethodTitle', language)
-      : isRestaurant && deliveryMethod === 'delivery' && (deliveryLatitude === null || deliveryLongitude === null)
-        ? t('deliverySelectValidAddress', language)
-        : undefined;
+    const deliveryError = resolveDeliveryError(isRestaurant, deliveryMethod, deliveryLatitude, deliveryLongitude, t, language);
     if (nombreError || telefonoError || deliveryError) {
       setErrors({ nombre: nombreError, telefono: telefonoError, delivery: deliveryError });
       return;
@@ -357,12 +384,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: items.map((ci: CartItem) => ({
-            item: { id: ci.item.id, name: ci.item.name, price: ci.item.price, translations: ci.item.translations },
-            quantity: ci.quantity,
-            selectedComplements: ci.selectedComplements?.map(c => ({ id: c.id, name: c.name, price: c.price })),
-            note: ci.note,
-          })),
+          items: items.map(mapCartItemPayload),
           nombre,
           telefono: dialCode + telefono.replaceAll(/\D/g, ''),
           email,
@@ -621,7 +643,6 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
           <div className="flex-1 flex flex-col min-h-0 overflow-y-auto px-4 py-2">
             <ul className="flex flex-col gap-2 cv-auto" style={{ contentVisibility: 'auto' }}>
               {items.map((ci) => {
-                const itemKey = getItemKey(ci.item, ci.selectedComplements);
                 const complementPrice = ci.selectedComplements?.reduce((sum, c) => sum + c.price, 0) || 0;
                 const totalItemPrice = ci.item.price + complementPrice;
                 let itemAnimationClass = '';
@@ -716,11 +737,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                   <div className="flex items-center gap-2 rounded-lg bg-primary/10 border border-primary/20 px-3 py-2.5 min-h-[44px]">
                     <UtensilsCrossed className="size-4 text-primary shrink-0" aria-hidden="true" />
                     <span className="font-semibold text-primary text-sm">
-                      {mesaInfo
-                        ? `${t('mesaLabel', language)} ${mesaInfo.numero}${mesaInfo.nombre ? ` — ${mesaInfo.nombre}` : ''}`
-                        : mesaError
-                          ? `${t('mesaLabel', language)} —`
-                          : `${t('mesaLabel', language)}…`}
+                      {mesaBadgeLabel(mesaInfo, mesaError, t('mesaLabel', language))}
                     </span>
                   </div>
                   {mesaError && (
@@ -908,10 +925,10 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                   </p>
                 )}
                 {discountValid && discountValid.valid && (
-                  <p id="discount-valid" role="status" className="text-xs text-green-600 dark:text-green-400 mt-1 ml-1 flex items-center gap-1">
+                  <output id="discount-valid" className="text-xs text-green-600 dark:text-green-400 mt-1 ml-1 flex items-center gap-1">
                     <Check className="size-3" />
                     {t("discountCodeValid", language)} ({discountValid.porcentaje}%)
-                  </p>
+                  </output>
                 )}
               </div>}
 
@@ -955,9 +972,9 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                 </p>
               )}
               {isDeliveryIncomplete && (
-                <p role="status" className="text-xs text-muted-foreground text-center mb-2">
+                <output className="block text-xs text-muted-foreground text-center mb-2">
                   {t('deliverySelectValidAddress', language)}
-                </p>
+                </output>
               )}
               <div className="flex flex-col gap-2">
                  <Button
@@ -972,7 +989,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                    }}
                    disabled={sending || (mesaToken !== null && mesaError) || isDeliveryIncomplete}
                  >
-                   {sending ? t("sending", language) : mesaToken ? t("mesaPlaceOrder", language) : t("sendOrder", language)}
+                   {orderButtonLabel(sending, mesaToken, t, language)}
                  </Button>
                 <Button
                   variant="ghost"
