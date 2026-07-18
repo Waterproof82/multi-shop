@@ -167,7 +167,7 @@ export function buildEmailHtml(params: {
 }
 
 // Helper to darken/lighten a hex color
-export function adjustColorBrightness(hex: string, percent: number): string {
+function adjustColorBrightness(hex: string, percent: number): string {
   const num = parseInt(hex.replace('#', ''), 16);
   const amt = Math.round(2.55 * percent);
   const R = Math.max(0, Math.min(255, (num >> 16) + amt));

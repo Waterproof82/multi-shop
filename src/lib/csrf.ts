@@ -1,8 +1,6 @@
-import { cookies } from 'next/headers';
 import { randomBytes, createHmac, timingSafeEqual } from 'crypto';
 
 const CSRF_COOKIE_NAME = 'csrf_token';
-const CSRF_HEADER_NAME = 'x-csrf-token';
 
 /**
  * Returns the CSRF HMAC secret, throwing at runtime if the env var is missing.
@@ -35,30 +33,3 @@ export function verifyCsrfToken(token: string, signature: string): boolean {
   }
 }
 
-export async function getCsrfCookie(): Promise<string | null> {
-  const cookieStore = await cookies();
-  return cookieStore.get(CSRF_COOKIE_NAME)?.value || null;
-}
-
-export function getCsrfTokenFromHeader(request: Request): string | null {
-  return request.headers.get(CSRF_HEADER_NAME);
-}
-
-export async function validateCsrfRequest(request: Request): Promise<boolean> {
-  const cookieValue = await getCsrfCookie();
-  const headerToken = getCsrfTokenFromHeader(request);
-  
-  if (!cookieValue || !headerToken) {
-    return false;
-  }
-  
-  const [token, signature] = cookieValue.split(':');
-  if (!verifyCsrfToken(token, signature)) return false;
-  try {
-    return timingSafeEqual(Buffer.from(headerToken), Buffer.from(token));
-  } catch {
-    return false;
-  }
-}
-
-export { CSRF_HEADER_NAME };
