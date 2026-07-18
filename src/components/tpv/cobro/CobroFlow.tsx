@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { MetodoPago, TpvCobro } from '@/core/domain/entities/tpv-types';
-import { getCsrfToken } from '@/lib/csrf-client';
+import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useOnlineStatus } from '@/hooks/tpv/useOnlineStatus';
 import {
   enqueueOfflineCobro,
@@ -32,16 +32,12 @@ interface Props {
 
 type Step = 'metodo' | 'efectivo' | 'tarjeta' | 'confirmado';
 
-async function flushOfflineQueue(csrfToken: string | null): Promise<void> {
+async function flushOfflineQueue(): Promise<void> {
   const entries = await getOfflineQueue();
   if (entries.length === 0) return;
 
-  const res = await fetch('/api/tpv/sync-offline', {
+  const res = await fetchWithCsrf('/api/tpv/sync-offline', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
-    },
     body: JSON.stringify({ entries }),
   });
 
@@ -89,8 +85,7 @@ export function CobroFlow({
   // Flush queue when connectivity is restored
   useEffect(() => {
     if (!isOnline) return;
-    const csrfToken = getCsrfToken();
-    void flushOfflineQueue(csrfToken);
+    void flushOfflineQueue();
   }, [isOnline]);
 
   const confirmarOffline = useCallback(
@@ -127,13 +122,8 @@ export function CobroFlow({
       setEntregadoCents(importe);
       setLoading(true);
 
-      const csrfToken = getCsrfToken();
-      const res = await fetch('/api/tpv/cobro', {
+      const res = await fetchWithCsrf('/api/tpv/cobro', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
-        },
         body: JSON.stringify({
           sesionId,
           metodoPago: metodo,

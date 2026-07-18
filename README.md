@@ -103,6 +103,17 @@ Módulo de analítica de costes para restaurantes. Accesible desde `/admin/analy
 
 Ver `docs/context/food-cost-analytics.md` para arquitectura, RPCs y trampas críticas.
 
+#### Analítica Avanzada — Bloque 3 _(nuevo — 2026-07-18)_
+
+Cuatro módulos de analítica para toma de decisiones operativas. Accesibles desde `/admin/analytics/` y el TPV.
+
+- **Matriz BCG de Menú** (`/admin/analytics/menu-engineering`): scatter plot interactivo que clasifica los productos del menú en cuatro cuadrantes (Estrellas / Vaca / Enigma / Perro) según popularidad (nº ventas) y margen de contribución. Clasificación automática por mediana — sin configuración manual. Reutiliza la RPC `analytics_margen_productos` existente.
+- **Heatmap de Ocupación** (`/admin/analytics/ocupacion`): grid 7×24 (días de semana × horas) que muestra la densidad de sesiones de mesa con intensidad de color. Toggle entre "Nº sesiones" y "Duración media". Nueva RPC `analytics_ocupacion_heatmap` con índice compuesto en `mesa_sesiones`. Útil para dimensionar personal por franja horaria.
+- **Informe de Cierre de Turno** (`/tpv/analytics/cierre/[turnoId]`): resumen completo generado automáticamente al cerrar cada turno TPV — ventas netas, covers, ticket medio, métodos de pago, propinas, top 5 productos y mermas con coste estimado. Server-rendered para impresión instantánea (`@media print`). `TurnoCerrarForm` redirige aquí tras el cierre; botón "Imprimir" en el informe, botón "Volver al TPV" para continuar.
+- **Comparativa de Períodos** (`/admin/analytics/comparativa`): tarjetas delta que muestran la variación % entre dos períodos configurables (semana actual vs anterior, mes actual vs anterior, o fechas libres). Métricas: ventas, covers, ticket medio y margen.
+
+Ver `docs/context/analytics-avanzado.md` para arquitectura, RPCs y trampas críticas.
+
 #### Empleados TPV — autenticación por PIN
 
 Sistema de cajeros y encargados que acceden al TPV con PIN numérico, sin necesidad de email/password ni cuenta en `auth.users`. Los empleados se gestionan desde `/admin/configuracion` → tab "Empleados".

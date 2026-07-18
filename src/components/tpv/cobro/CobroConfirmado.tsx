@@ -88,7 +88,7 @@ export function CobroConfirmado({
   }
 
   return (
-    <div className="flex items-center justify-center w-full h-full">
+    <div className="flex items-start justify-center w-full h-full overflow-y-auto py-8">
       <div className="flex flex-col items-center gap-6 max-w-sm w-full">
         <div className={`w-20 h-20 rounded-full flex items-center justify-center text-4xl border-2 ${esOffline ? 'bg-[#f59e0b22] border-[#f59e0b]' : esParcial ? 'bg-[#f9731622] border-[#f97316]' : 'bg-[#22c55e22] border-[#22c55e]'}`}>
           {esOffline ? '~' : esParcial ? '½' : '✓'}

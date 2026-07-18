@@ -116,7 +116,7 @@ export function TurnoCerrarForm({ turno, stats, mesasAbiertas, isBlindClose }: R
   }
 
   function handleInformeZClose() {
-    router.push('/tpv/turno/abrir');
+    router.push(`/tpv/analytics/cierre/${turno.id}`);
   }
 
   if (informeZ !== null) {
