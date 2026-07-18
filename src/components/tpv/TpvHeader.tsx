@@ -87,7 +87,7 @@ export function TpvHeader({ empresaNombre }: Props) {
   }
 
   return (
-    <>
+    <div className="print:hidden">
     {!isOnline && (
       <div className="flex items-center justify-center gap-2 h-8 px-4 bg-[#f59e0b] text-black text-xs font-semibold shrink-0">
         <span>Sin conexión — modo local</span>
@@ -179,6 +179,6 @@ export function TpvHeader({ empresaNombre }: Props) {
         </button>
       </div>
     </header>
-    </>
+    </div>
   );
 }
