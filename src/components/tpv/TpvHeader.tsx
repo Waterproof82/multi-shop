@@ -50,7 +50,7 @@ export function TpvHeader({ empresaNombre }: Props) {
   const adminRef = useRef<HTMLDivElement>(null);
 
   const isCajero = rol === 'cajero';
-  const showGear = rol === 'admin' || rol === 'superadmin';
+  const showGear = rol === 'admin' || rol === 'superadmin' || rol === 'encargado';
 
   const NAV_ITEMS = [
     { label: 'Mostrador', href: '/tpv/mostrador', activePrefix: '/tpv/mostrador' },
@@ -146,7 +146,7 @@ export function TpvHeader({ empresaNombre }: Props) {
                   <button
                     key={href}
                     type="button"
-                    onClick={() => { setAdminOpen(false); router.push(href); }}
+                    onClick={() => { setAdminOpen(false); window.location.href = href; }}
                     className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#c4c8d8] hover:bg-[#22263a] hover:text-[#e8eaf0] transition-colors text-left ${
                       idx === ADMIN_SHORTCUTS.length - 1 ? 'border-t border-[#2e3347] mt-1' : ''
                     }`}
