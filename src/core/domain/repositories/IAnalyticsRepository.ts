@@ -6,6 +6,8 @@ import type {
   FoodCostRealRow,
   MargenProductoRow,
   AnalyticsPeriodParams,
+  OcupacionHeatmapRow,
+  CierreTurnoReport,
 } from '@/core/domain/entities/analytics-types';
 
 export interface IAnalyticsRepository {
@@ -20,4 +22,10 @@ export interface IAnalyticsRepository {
   margenProductos(
     params: AnalyticsPeriodParams
   ): Promise<Result<MargenProductoRow[]>>;
+
+  ocupacionHeatmap(
+    params: AnalyticsPeriodParams
+  ): Promise<Result<OcupacionHeatmapRow[]>>;
+
+  cierreReporte(turnoId: string): Promise<Result<CierreTurnoReport>>;
 }

@@ -5,9 +5,20 @@
 
 ---
 
+## Pases por Ítem + Flujo Pendientes
+
+**Estado:** 🔶 EN CURSO — T1-T9 completados, falta T10 (kitchen standalone badge)
+**Plan detallado:** `docs/superpowers/plans/2026-07-16-pases-por-item.md`
+**Dependencias:** ninguna
+
+### Pendiente
+- **T10** — `src/app/kitchen/page.tsx`: mostrar badge de pase en cada tarjeta de ítem si `pase !== null`
+
+---
+
 ## Bloque 1 — Gestión de Proveedores y Compras
 
-**Estado:** 0% implementado
+**Estado:** ✅ COMPLETADO Y ARCHIVADO (2026-07-15)
 **Dependencias:** Stock de ingredientes (ya existe)
 **Complejidad:** Alta (nuevo módulo completo)
 
@@ -37,7 +48,7 @@
 
 ## Bloque 2 — Food Cost Avanzado
 
-**Estado:** Base de escandallo implementada (Task 2-5 del plan pre-Electron completan el inventario físico)
+**Estado:** ✅ COMPLETADO Y ARCHIVADO (2026-07-16) — CMP, food-cost, rentabilidad implementados
 **Dependencias:** Escandallos + Stock + Movimientos
 **Complejidad:** Media
 
@@ -64,7 +75,7 @@
 
 ## Bloque 3 — Analítica Avanzada
 
-**Estado:** Analytics básicos existen (`/admin/analytics`)
+**Estado:** ✅ COMPLETADO Y ARCHIVADO (2026-07-18) — BCG, heatmap ocupación, cierre diario, comparativa períodos
 **Dependencias:** Historial de pedidos
 **Complejidad:** Media-Alta
 
@@ -94,7 +105,7 @@
 
 ## Bloque 4 — RBAC Completo
 
-**Estado:** Diferido — ver decisión abajo
+**Estado:** ❌ Diferido — 4.1 y 4.2 descartados; 4.3 (Auditoría) pendiente de implementar
 **Dependencias:** `perfiles_admin.rol`
 **Complejidad:** Media
 
@@ -117,7 +128,7 @@ Los sub-features 4.1 y 4.2 se descartan por ahora. Motivos:
 
 ## Bloque 5 — Integraciones Externas
 
-**Estado:** No iniciado
+**Estado:** ❌ No iniciado
 **Complejidad:** Alta
 
 ### Sub-features

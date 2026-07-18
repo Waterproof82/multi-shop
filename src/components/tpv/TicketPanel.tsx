@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { StickyNote } from 'lucide-react';
 import type { ExistingOrder } from './MostradorClient';
 import type { PendingItem } from '@/hooks/tpv/useMesaActiva';
 import { getCsrfToken } from '@/lib/csrf-client';
@@ -207,10 +208,12 @@ export function TicketPanel({
                     <button
                       type="button"
                       onClick={() => setPendingNotaExpandida(prev => prev === itemKey ? null : itemKey)}
-                      className={`text-xs leading-none shrink-0 mt-0.5 px-1 transition-colors ${notaOpen || item.nota ? 'text-[#a78bfa]' : 'text-[#6b7280] hover:text-[#a78bfa]'}`}
+                      className={`flex items-center gap-0.5 shrink-0 rounded px-1 py-0.5 transition-colors ${notaOpen || item.nota ? 'text-[#a78bfa]' : 'text-[#6b7280] hover:text-[#a78bfa]'}`}
                       aria-label="Nota del ítem"
+                      title="Añadir nota al ítem"
                     >
-                      ✎
+                      <StickyNote className="h-3.5 w-3.5" />
+                      {!item.nota && !notaOpen && <span className="text-[10px] font-medium">Nota</span>}
                     </button>
                     <button
                       type="button"
