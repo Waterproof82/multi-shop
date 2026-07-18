@@ -84,7 +84,7 @@ BEGIN
   )
   SELECT
     v.producto_id,
-    pr.nombre,
+    pr.titulo_es                                                       AS nombre,
     v.unidades                                                         AS unidades_vendidas,
     COALESCE(cu.coste_unitario_cents, 0)                               AS coste_receta_cents,
     (v.unidades * COALESCE(cu.coste_unitario_cents, 0))::BIGINT        AS coste_total_teorico_cents,
@@ -92,7 +92,7 @@ BEGIN
   FROM ventas_agrupadas v
   JOIN public.productos pr ON pr.id = v.producto_id
   LEFT JOIN costes_unitarios cu ON cu.producto_id = v.producto_id
-  ORDER BY pr.nombre;
+  ORDER BY pr.titulo_es;
 END;
 $$;
 
@@ -163,7 +163,7 @@ BEGIN
   WITH
   -- CTE 1: ALL products for this tenant — the universe, no join filter
   universo_productos AS (
-    SELECT pr.id, pr.nombre, pr.precio
+    SELECT pr.id, pr.titulo_es AS nombre, pr.precio
     FROM public.productos pr
     WHERE pr.empresa_id = p_empresa_id
   ),
