@@ -17,6 +17,7 @@ import { useAdmin } from '@/lib/admin-context';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import type { RolAdmin } from '@/core/domain/repositories/IAdminRepository';
+import type { Language } from '@/lib/language-context';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -207,7 +208,7 @@ const INACTIVE_STYLE =
 interface NavFlatItemProps {
   item: NavItemDef;
   pathname: string;
-  language: string;
+  language: Language;
   onClose: () => void;
 }
 
@@ -240,7 +241,7 @@ function NavFlatItem({ item, pathname, language, onClose }: Readonly<NavFlatItem
 interface NavSubItemProps {
   item: NavItemDef;
   pathname: string;
-  language: string;
+  language: Language;
   onClose: () => void;
 }
 
@@ -275,7 +276,7 @@ interface NavGroupAccordionProps {
   isOpen: boolean;
   onToggle: () => void;
   pathname: string;
-  language: string;
+  language: Language;
   onClose: () => void;
 }
 
