@@ -187,6 +187,7 @@ export const translations = {
     administration: "Administración",
     companyConnected: "Empresa conectada",
     sidebarDashboard: "Dashboard",
+    sidebarCatalogo: "Catálogo",
     sidebarCategories: "Categorías",
     sidebarProducts: "Productos",
     sidebarOrders: "Pedidos",
@@ -800,6 +801,7 @@ export const translations = {
     stockSiguiente: "Siguiente",
     stockSinMovimientos: "Sin movimientos encontrados",
     // Compras
+    sidebarCompras: "Compras",
     sidebarComprasProveedores: "Proveedores",
     sidebarComprasPedidos: "Pedidos de compra",
     sidebarComprasAlbaranes: "Albaranes",
@@ -909,6 +911,7 @@ export const translations = {
     comprasIgic15: "15% (IGIC)",
     comprasIva21: "21% (IVA)",
     // Analytics
+    sidebarAnalytica: "Analítica",
     sidebarAnalyticsFoodCost: "Food Cost",
     sidebarAnalyticsRentabilidad: "Rentabilidad",
     analyticsFoodCostTitle: "Food Cost",
@@ -936,6 +939,9 @@ export const translations = {
     analyticsUnits: "Unidades",
     analyticsTotalContrib: "Contribución total",
     analyticsErrorLoading: "Error al cargar datos de analytics",
+    sidebarAnalyticsMenuEngineering: "Ingeniería de Menú",
+    sidebarAnalyticsOcupacion: "Ocupación",
+    sidebarAnalyticsComparativa: "Comparativa",
   },
   en: {
     // UI
@@ -1123,6 +1129,7 @@ export const translations = {
     administration: "Administration",
     companyConnected: "Company connected",
     sidebarDashboard: "Dashboard",
+    sidebarCatalogo: "Catalog",
     sidebarCategories: "Categories",
     sidebarProducts: "Products",
     sidebarOrders: "Orders",
@@ -1735,6 +1742,7 @@ export const translations = {
     stockSiguiente: "Next",
     stockSinMovimientos: "No movements found",
     // Compras
+    sidebarCompras: "Purchases",
     sidebarComprasProveedores: "Suppliers",
     sidebarComprasPedidos: "Purchase Orders",
     sidebarComprasAlbaranes: "Delivery Notes",
@@ -1844,6 +1852,7 @@ export const translations = {
     comprasIgic15: "15% (IGIC)",
     comprasIva21: "21% (VAT)",
     // Analytics
+    sidebarAnalytica: "Analytics",
     sidebarAnalyticsFoodCost: "Food Cost",
     sidebarAnalyticsRentabilidad: "Profitability",
     analyticsFoodCostTitle: "Food Cost",
@@ -1871,6 +1880,9 @@ export const translations = {
     analyticsUnits: "Units",
     analyticsTotalContrib: "Total contribution",
     analyticsErrorLoading: "Error loading analytics data",
+    sidebarAnalyticsMenuEngineering: "Menu Engineering",
+    sidebarAnalyticsOcupacion: "Occupancy",
+    sidebarAnalyticsComparativa: "Comparison",
   },
   fr: {
     // UI - Popup y carrito
@@ -2331,6 +2343,9 @@ export const translations = {
     analyticsUnits: "Unités",
     analyticsTotalContrib: "Contribution totale",
     analyticsErrorLoading: "Erreur lors du chargement des données analytics",
+    sidebarAnalyticsMenuEngineering: "Ingénierie des Menus",
+    sidebarAnalyticsOcupacion: "Occupation",
+    sidebarAnalyticsComparativa: "Comparaison",
   },
   it: {
     // UI - Popup y carrito
@@ -2791,6 +2806,9 @@ export const translations = {
     analyticsUnits: "Unità",
     analyticsTotalContrib: "Contribuzione totale",
     analyticsErrorLoading: "Errore nel caricamento dei dati analytics",
+    sidebarAnalyticsMenuEngineering: "Ingegneria del Menu",
+    sidebarAnalyticsOcupacion: "Occupazione",
+    sidebarAnalyticsComparativa: "Confronto",
   },
   de: {
     // UI - Popup y carrito
@@ -3251,6 +3269,9 @@ export const translations = {
     analyticsUnits: "Einheiten",
     analyticsTotalContrib: "Gesamtbeitrag",
     analyticsErrorLoading: "Fehler beim Laden der Analytics-Daten",
+    sidebarAnalyticsMenuEngineering: "Menüplanung",
+    sidebarAnalyticsOcupacion: "Auslastung",
+    sidebarAnalyticsComparativa: "Vergleich",
   },
 } as const;
 
