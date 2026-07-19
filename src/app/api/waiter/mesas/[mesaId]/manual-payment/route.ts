@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { registerManualMesaPaymentUseCase } from '@/core/application/use-cases/payment/registerManualMesaPaymentUseCase';
+import { getAuditLogRepository } from '@/core/infrastructure/database';
+import { resolveActor } from '@/core/infrastructure/api/audit-actor';
 
 const mesaIdSchema = z.string().uuid('El mesaId debe ser un UUID válido');
 
@@ -29,6 +31,14 @@ export async function POST(
       500;
     return NextResponse.json({ error: result.error.message }, { status });
   }
+
+  const actor = resolveActor(request);
+  void getAuditLogRepository().insert({
+    empresaId,
+    action: 'waiter.pago.manual',
+    payload: { mesaId: parsed.data },
+    ...actor,
+  });
 
   return NextResponse.json(result.data);
 }

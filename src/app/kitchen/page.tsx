@@ -19,11 +19,23 @@ interface KitchenItem {
   mesaNumero: number | null;
   mesaNombre: string | null;
   createdAt: string;
+  pase: string | null;
 }
 
 const BG        = 'oklch(13% 0.02 252)';
 const TEXT_MAIN = 'oklch(92% 0.02 252)';
 const TEXT_DIM  = 'oklch(55% 0.04 252)';
+
+const PASE_LABEL: Record<string, string> = {
+  primer:  '1er Pase',
+  segundo: '2º Pase',
+  postre:  'Postre',
+};
+const PASE_COLOR: Record<string, { bg: string; text: string; border: string }> = {
+  primer:  { bg: 'oklch(24% 0.14 45)',  text: 'oklch(82% 0.20 45)',  border: 'oklch(52% 0.22 45 / 0.7)'  },
+  segundo: { bg: 'oklch(22% 0.12 252)', text: 'oklch(78% 0.18 252)', border: 'oklch(50% 0.20 252 / 0.7)' },
+  postre:  { bg: 'oklch(22% 0.12 148)', text: 'oklch(76% 0.20 148)', border: 'oklch(48% 0.22 148 / 0.7)' },
+};
 
 const TIME_COLORS = [
   { max: 10,       label: '< 10 min',  bg: 'oklch(18% 0.06 228)', border: 'oklch(50% 0.22 228 / 0.55)', text: 'oklch(72% 0.20 228)' },
@@ -148,6 +160,10 @@ function CountdownCard({ item, remaining, lang, onCancelCountdown }: Readonly<Co
             <span className="text-sm font-bold" style={{ color: TEXT_MAIN }}>{item.cantidad}&times;</span>
             <span className="text-sm font-medium truncate" style={{ color: TEXT_MAIN }}>{item.nombre}</span>
           </div>
+          {item.pase && PASE_LABEL[item.pase] && (() => {
+            const pc = PASE_COLOR[item.pase!];
+            return pc ? <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded" style={{ background: pc.bg, color: pc.text, border: `1px solid ${pc.border}` }}>{PASE_LABEL[item.pase!]}</span> : null;
+          })()}
           {item.complementos && <span className="text-[10px]" style={{ color: 'oklch(78% 0.03 252)' }}>({item.complementos})</span>}
           {item.nota && <span className="text-xs font-medium italic block mt-0.5 px-1.5 py-0.5 rounded" style={{ color: 'oklch(88% 0.18 85)', background: 'oklch(28% 0.12 85 / 0.45)' }}>✎ {item.nota}</span>}
         </div>
@@ -196,7 +212,13 @@ function SwipeCard({ item, lang, onPointerDown, onPointerMove, onPointerUp, onPo
           {item.cantidad}
         </div>
         <div className="flex-1 min-w-0">
-          <span className="text-sm font-medium truncate block" style={{ color: TEXT_MAIN }}>{item.nombre}</span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-sm font-medium truncate" style={{ color: TEXT_MAIN }}>{item.nombre}</span>
+            {item.pase && PASE_LABEL[item.pase] && (() => {
+              const pc = PASE_COLOR[item.pase!];
+              return pc ? <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded" style={{ background: pc.bg, color: pc.text, border: `1px solid ${pc.border}` }}>{PASE_LABEL[item.pase!]}</span> : null;
+            })()}
+          </div>
           {item.complementos && <span className="text-[10px]" style={{ color: 'oklch(78% 0.03 252)' }}>({item.complementos})</span>}
           {item.nota && <span className="text-xs font-medium italic block mt-0.5 px-1.5 py-0.5 rounded" style={{ color: 'oklch(88% 0.18 85)', background: 'oklch(28% 0.12 85 / 0.45)' }}>✎ {item.nota}</span>}
         </div>

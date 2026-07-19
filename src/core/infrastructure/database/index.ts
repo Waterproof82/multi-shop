@@ -37,6 +37,8 @@ import type { IComprasRepository } from '@/core/domain/repositories/IComprasRepo
 import { SupabaseComprasRepository } from './supabase-compras.repository';
 import { SupabaseAnalyticsRepository } from '../repositories/supabase-analytics.repository';
 import { AnalyticsUseCase } from '@/core/application/use-cases/analytics.use-case';
+import { SupabaseAuditLogRepository } from '../repositories/supabase-audit-log.repository';
+import type { IAuditLogRepository } from '@/core/domain/repositories/IAuditLogRepository';
 
 // ---------------------------------------------------------------------------
 // Private lazy repository getters (shared between use cases, not exported)
@@ -257,4 +259,10 @@ let _analyticsUseCase: AnalyticsUseCase | undefined;
 export function getAnalyticsUseCase(): AnalyticsUseCase {
   _analyticsUseCase ??= new AnalyticsUseCase(getAnalyticsRepository());
   return _analyticsUseCase;
+}
+
+let _auditLogRepository: IAuditLogRepository | undefined;
+export function getAuditLogRepository(): IAuditLogRepository {
+  _auditLogRepository ??= new SupabaseAuditLogRepository();
+  return _auditLogRepository;
 }

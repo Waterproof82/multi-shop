@@ -162,6 +162,7 @@ const NAV_ENTRIES: NavEntry[] = [
       ],
     },
   },
+  { type: 'item', def: { href: '/admin/audit-log', labelKey: 'sidebarAuditLog', icon: MonitorCheck } },
   { type: 'item', def: { href: '/admin/configuracion', labelKey: 'sidebarSettings', icon: Settings } },
 ];
 

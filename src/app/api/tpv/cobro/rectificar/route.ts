@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth, validationErrorResponse, type AuthResult } from '@/core/infrastructure/api/helpers';
-import { getTpvRepository } from '@/core/infrastructure/database';
+import { getTpvRepository, getAuditLogRepository } from '@/core/infrastructure/database';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { type TpvDetalleItem } from '@/core/domain/entities/tpv-types';
+import { resolveActor } from '@/core/infrastructure/api/audit-actor';
 
 const schema = z.object({
   cobroId: z.string().uuid(),
@@ -91,6 +92,14 @@ export async function POST(req: NextRequest) {
   if (!result.success) {
     return NextResponse.json({ error: 'Error al crear el rectificativo' }, { status: 500 });
   }
+
+  const actor = resolveActor(req);
+  void getAuditLogRepository().insert({
+    empresaId,
+    action: 'tpv.cobro.rectificar',
+    payload: { turnoId: turnoResult.data.id, cobroId: orig.id },
+    ...actor,
+  });
 
   return NextResponse.json(result.data, { status: 201 });
 }
