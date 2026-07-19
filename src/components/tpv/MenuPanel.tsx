@@ -241,7 +241,7 @@ function ComplementDialog({ state, onConfirm, onClose }: Readonly<ComplementDial
   );
 }
 
-export function MenuPanel({ products, categories, onAddItem, mesaSeleccionada }: Props) {
+export function MenuPanel({ products, categories, onAddItem, mesaSeleccionada }: Readonly<Props>) {
   const [activeCatId, setActiveCatId] = useState<string>(ALL_CAT_ID);
   const [search, setSearch] = useState('');
   const [complementDialog, setComplementDialog] = useState<ComplementDialogState | null>(null);
