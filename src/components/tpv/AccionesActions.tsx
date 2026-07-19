@@ -13,11 +13,11 @@ interface Props {
 type ActionVariant = 'default' | 'active' | 'danger';
 
 interface ActionIconProps {
-  readonly emoji: string;
-  readonly label: string;
-  readonly onClick: () => void;
-  readonly disabled?: boolean;
-  readonly variant?: ActionVariant;
+  emoji: string;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  variant?: ActionVariant;
 }
 
 function resolveVariantClass(variant: ActionVariant): string {
@@ -41,7 +41,7 @@ function ActionIcon({ emoji, label, onClick, disabled = false, variant = 'defaul
       className={`w-11 h-11 rounded-xl flex flex-col items-center justify-center gap-0.5 border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${resolveVariantClass(variant)}`}
     >
       <span className="text-xl leading-none" aria-hidden="true">{emoji}</span>
-      <span className={`text-[6.5px] font-semibold uppercase tracking-wide ${resolveLabelClass(variant)}`}>
+      <span className={`text-[8px] font-semibold uppercase tracking-wide ${resolveLabelClass(variant)}`}>
         {label}
       </span>
     </button>
@@ -78,13 +78,11 @@ export function AccionesPanel({ sesionId, turnoId, onRefresh, refreshing }: Read
       <div className="w-7 h-px bg-[#2e3347] my-1" role="separator" />
 
       {!isCajero && (
-        <ActionIcon emoji="📋" label="Historial" onClick={() => router.push('/tpv/historial')} />
-      )}
-      {!isCajero && (
-        <ActionIcon emoji="📊" label="Analítica" onClick={() => router.push('/tpv/analytics')} />
-      )}
-      {!isCajero && (
-        <ActionIcon emoji="⚖️" label="Legal" onClick={() => router.push('/tpv/legal')} />
+        <>
+          <ActionIcon emoji="📋" label="Historial" onClick={() => router.push('/tpv/historial')} />
+          <ActionIcon emoji="📊" label="Analítica" onClick={() => router.push('/tpv/analytics')} />
+          <ActionIcon emoji="⚖️" label="Legal" onClick={() => router.push('/tpv/legal')} />
+        </>
       )}
 
       <div className="flex-1" />
