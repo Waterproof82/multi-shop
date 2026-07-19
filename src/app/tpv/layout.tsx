@@ -126,7 +126,7 @@ export default async function TpvLayout({ children }: { readonly children: React
         initialProductoGrupos={productoGrupos}
       >
         <TpvSwRegistrar />
-        <div className="flex flex-col h-screen bg-[#0f1117] text-[#e8eaf0] overflow-hidden">
+        <div className="flex flex-col h-screen bg-[#f1f5f9] text-[#0f172a] overflow-hidden">
           <TpvHeader empresaNombre={empresaNombre} />
           <main className="flex flex-1 overflow-hidden">
             {children}
