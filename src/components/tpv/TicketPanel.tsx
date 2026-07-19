@@ -36,19 +36,19 @@ function paseShortLabel(p?: string): string {
   return 'Postre';
 }
 
-function paseLongLabel(p: 'primer' | 'segundo' | 'postre') {
-  if (p === 'primer') return '1er pase';
-  if (p === 'segundo') return '2º pase';
-  return 'Postre';
-}
+const PASE_BUTTON_LABEL: Record<'primer' | 'segundo' | 'postre', string> = {
+  primer: 'I · 1er pase',
+  segundo: 'II · 2º pase',
+  postre: '🍮 Postre',
+};
 
 const ESTADO_LABEL: Record<string, string> = {
-  pendiente: 'Pendiente',
-  en_preparacion: 'En cocina',
-  preparado: 'Listo',
-  servido: 'Servido',
-  retenido: 'Retenido',
-  pendiente_validacion: 'Validando',
+  pendiente: '🔴 Pendiente',
+  en_preparacion: '🍳 En cocina',
+  preparado: '✓ Listo',
+  servido: '✓ Servido',
+  retenido: '⏸ Retenido',
+  pendiente_validacion: '⏳ Validando',
 };
 
 const ESTADO_COLOR: Record<string, string> = {
@@ -186,6 +186,20 @@ export function TicketPanel({
             <div className="px-4 py-1.5">
               <span className="text-[10px] font-bold text-[#4f72ff] uppercase tracking-wider">Nuevo pedido</span>
             </div>
+            {(['primer', 'segundo', 'postre'] as const).map(p => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => { setPendingPase(prev => prev === p ? '' : p); setDirectoACocina(false); }}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                  pendingPase === p && !directoACocina
+                    ? 'bg-[#4f72ff] border-[#4f72ff] text-white'
+                    : 'border-[#2e3347] text-[#6b7280] hover:text-white hover:border-[#4f72ff]'
+                }`}
+                >
+                {PASE_BUTTON_LABEL[p]}
+                </button>
+            ))}
             {pendingItems.map((item) => {
               const itemKey = item.productId + item.complementos.map(c => c.nombre).join(',');
               const notaOpen = pendingNotaExpandida === itemKey;
@@ -261,20 +275,6 @@ export function TicketPanel({
         )}
         {pendingItems.length > 0 && (
           <div className="flex gap-1 flex-wrap">
-                {(['primer', 'segundo', 'postre'] as const).map(p => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => { setPendingPase(prev => prev === p ? '' : p); setDirectoACocina(false); }}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${
-                  pendingPase === p && !directoACocina
-                    ? 'bg-[#4f72ff] border-[#4f72ff] text-white'
-                    : 'border-[#2e3347] text-[#6b7280] hover:text-white hover:border-[#4f72ff]'
-                }`}
-                >
-                {paseLongLabel(p)}
-                </button>
-            ))}
             <button
               type="button"
               onClick={() => { setDirectoACocina(prev => !prev); setPendingPase(''); }}
@@ -284,7 +284,7 @@ export function TicketPanel({
                   : 'border-[#2e3347] text-[#6b7280] hover:text-white hover:border-amber-600'
               }`}
             >
-              Envío directo
+              ⚡ Envío directo
             </button>
           </div>
         )}
@@ -302,7 +302,7 @@ export function TicketPanel({
           <button
             type="button"
             disabled={sending || !mesaId}
-            className="w-full bg-[#4f72ff] text-white rounded-xl py-3 text-sm font-bold hover:brightness-110 transition-all disabled:opacity-50"
+            className="w-full bg-[#4f72ff] text-white rounded-xl py-3 text-sm font-bold hover:brightness-110 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             onClick={async () => {
               if (!mesaId) return;
               setSending(true);
@@ -355,7 +355,7 @@ export function TicketPanel({
               }
             }}
           >
-            {sending ? 'Enviando...' : `Enviar a cocina (${fmt(pendingTotal)})`}
+            {sending ? 'Enviando...' : `📤 Enviar a cocina · ${fmt(pendingTotal)}`}
           </button>
         )}
         {hasPendingOrders && canCobrar && !sesionPagada && (
@@ -378,9 +378,9 @@ export function TicketPanel({
           type="button"
           disabled={!canCobrar || hasPendingOrders || sesionPagada}
           onClick={() => router.push(`/tpv/cobro/${sesionId}?turnoId=${turnoId}`)}
-          className="w-full bg-[#22c55e] text-white rounded-xl py-3.5 text-base font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition-all"
+          className="w-full bg-[#22c55e] text-white rounded-xl py-4 text-lg font-extrabold disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition-all flex items-center justify-center gap-2"
         >
-          Cobrar {pendienteEuros > 0 ? fmt(pendienteEuros) : ''}
+          💳 COBRAR {pendienteEuros > 0 ? fmt(pendienteEuros) : ''}
         </button>
       </div>
     </aside>
