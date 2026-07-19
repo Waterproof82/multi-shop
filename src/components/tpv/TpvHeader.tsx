@@ -38,7 +38,7 @@ function TpvClock() {
   return <span className="font-semibold tabular-nums text-sm">{time}</span>;
 }
 
-export function TpvHeader({ empresaNombre }: Props) {
+export function TpvHeader({ empresaNombre }: Readonly<Props>) {
   const pathname = usePathname();
   const router = useRouter();
   const rol = useTpvRol();
