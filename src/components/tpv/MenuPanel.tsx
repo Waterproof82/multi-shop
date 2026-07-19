@@ -302,7 +302,7 @@ export function MenuPanel({ products, categories, onAddItem, mesaSeleccionada }:
         <button
           type="button"
           onClick={() => setActiveCatId(ALL_CAT_ID)}
-          className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+          className={`shrink-0 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
             activeCatId === ALL_CAT_ID
               ? 'bg-[#4f72ff] text-white'
               : 'bg-[#1a1d27] text-[#6b7280] hover:text-white'
@@ -315,7 +315,7 @@ export function MenuPanel({ products, categories, onAddItem, mesaSeleccionada }:
             key={cat.id}
             type="button"
             onClick={() => setActiveCatId(cat.id)}
-            className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+            className={`shrink-0 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
               activeCatId === cat.id
                 ? 'bg-[#4f72ff] text-white'
                 : 'bg-[#1a1d27] text-[#6b7280] hover:text-white'
@@ -332,7 +332,7 @@ export function MenuPanel({ products, categories, onAddItem, mesaSeleccionada }:
           type="search"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Buscar producto..."
+          placeholder="🔍 Buscar producto..."
           className="w-full bg-[#1a1d27] border border-[#2e3347] rounded-lg px-3 py-2 text-sm text-[#e8eaf0] placeholder:text-[#6b7280] focus:outline-none focus:border-[#4f72ff]"
         />
       </div>
@@ -351,7 +351,7 @@ export function MenuPanel({ products, categories, onAddItem, mesaSeleccionada }:
         {activeProducts.length === 0 && (
           <p className="text-center text-sm text-[#6b7280] py-12">Sin productos</p>
         )}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
           {activeProducts.map(p => (
             <button
               key={p.id}
@@ -376,7 +376,7 @@ export function MenuPanel({ products, categories, onAddItem, mesaSeleccionada }:
               </div>
               <div className="p-2.5 flex flex-col gap-1">
                 <p className="text-xs font-medium leading-tight line-clamp-2">{p.titulo_es}</p>
-                <p className="text-sm font-bold text-[#4f72ff]">
+                <p className="text-base font-bold text-[#4f72ff]">
                   {p.precio.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                 </p>
               </div>
