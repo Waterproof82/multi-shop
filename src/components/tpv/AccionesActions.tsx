@@ -21,15 +21,15 @@ interface ActionIconProps {
 }
 
 function resolveVariantClass(variant: ActionVariant): string {
-  if (variant === 'active') return 'bg-[#4f72ff18] border-[#4f72ff55]';
-  if (variant === 'danger') return 'bg-[#ef444415] border-[#ef444433]';
-  return 'border-transparent hover:bg-[#22263a] hover:border-[#2e3347]';
+  if (variant === 'active') return 'bg-[#eff6ff] border-[#93c5fd]';
+  if (variant === 'danger') return 'bg-[#fef2f2] border-[#fca5a5]';
+  return 'border-[#e2e8f0] hover:bg-[#f1f5f9] hover:border-[#cbd5e1]';
 }
 
 function resolveLabelClass(variant: ActionVariant): string {
-  if (variant === 'active') return 'text-[#4f72ff]';
+  if (variant === 'active') return 'text-[#2563eb]';
   if (variant === 'danger') return 'text-[#ef4444]';
-  return 'text-[#6b7280]';
+  return 'text-[#64748b]';
 }
 
 function ActionIcon({ emoji, label, onClick, disabled = false, variant = 'default' }: Readonly<ActionIconProps>) {
@@ -55,7 +55,7 @@ export function AccionesPanel({ sesionId, turnoId, onRefresh, refreshing }: Read
   const hasMesa = sesionId !== null;
 
   return (
-    <aside className="w-16 shrink-0 bg-[#1a1d27] border-l border-[#2e3347] flex flex-col items-center py-3 gap-1.5">
+    <aside className="w-16 shrink-0 bg-white border-l border-[#e2e8f0] flex flex-col items-center py-3 gap-1.5">
       <ActionIcon
         emoji="🪑"
         label="Mesa"
@@ -75,7 +75,7 @@ export function AccionesPanel({ sesionId, turnoId, onRefresh, refreshing }: Read
         disabled={!hasMesa}
       />
 
-      <div className="w-7 h-px bg-[#2e3347] my-1" role="separator" />
+      <div className="w-7 h-px bg-[#e2e8f0] my-1" role="separator" />
 
       {!isCajero && (
         <>
