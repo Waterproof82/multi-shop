@@ -6,10 +6,11 @@ import {
   validationErrorResponse,
   type AuthResult,
 } from '@/core/infrastructure/api/helpers';
-import { getTpvRepository } from '@/core/infrastructure/database';
+import { getTpvRepository, getAuditLogRepository } from '@/core/infrastructure/database';
 import { registrarCobroUseCase } from '@/core/application/use-cases/tpv/registrar-cobro.use-case';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { type TpvDetalleItem } from '@/core/domain/entities/tpv-types';
+import { resolveActor } from '@/core/infrastructure/api/audit-actor';
 import { z } from 'zod';
 
 interface RawPedidoItem {
@@ -93,5 +94,20 @@ export async function POST(req: NextRequest) {
     cerrarSesion: parsed.data.cerrarSesion,
     detalleItems,
   });
+
+  if (result.success) {
+    const actor = resolveActor(req);
+    void getAuditLogRepository().insert({
+      empresaId,
+      action: 'tpv.cobro.completar',
+      payload: {
+        turnoId: parsed.data.turnoId,
+        totalCents: parsed.data.importeCobradoCents,
+        metodo: parsed.data.metodoPago,
+      },
+      ...actor,
+    });
+  }
+
   return handleResult(result);
 }

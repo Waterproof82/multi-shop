@@ -6,8 +6,9 @@ import {
   handleResult,
   type AuthResult,
 } from '@/core/infrastructure/api/helpers';
-import { getTpvRepository } from '@/core/infrastructure/database';
+import { getTpvRepository, getAuditLogRepository } from '@/core/infrastructure/database';
 import { registrarMovimientoCajaUseCase } from '@/core/application/use-cases/tpv/registrar-movimiento-caja.use-case';
+import { resolveActor } from '@/core/infrastructure/api/audit-actor';
 import { z } from 'zod';
 
 const repo = getTpvRepository();
@@ -56,6 +57,20 @@ export async function POST(
     descripcion: parsed.data.descripcion,
     empleadoId,
   });
+
+  if (result.success) {
+    const actor = resolveActor(req);
+    void getAuditLogRepository().insert({
+      empresaId,
+      action: 'tpv.caja.movimiento',
+      payload: {
+        turnoId: id,
+        tipo: parsed.data.tipoEvento,
+        importeCents: parsed.data.montoCents,
+      },
+      ...actor,
+    });
+  }
 
   return handleResult(result);
 }

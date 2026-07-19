@@ -7,8 +7,9 @@ import {
   validationErrorResponse,
   type AuthResult,
 } from '@/core/infrastructure/api/helpers';
-import { getTpvRepository } from '@/core/infrastructure/database';
+import { getTpvRepository, getAuditLogRepository } from '@/core/infrastructure/database';
 import { abrirTurnoUseCase } from '@/core/application/use-cases/tpv/abrir-turno.use-case';
+import { resolveActor } from '@/core/infrastructure/api/audit-actor';
 import { z } from 'zod';
 
 const repo = getTpvRepository();
@@ -64,6 +65,16 @@ export async function POST(req: NextRequest) {
     operadorNombre: parsed.data.operadorNombre,
     efectivoAperturaCents: parsed.data.efectivoAperturaCents,
   });
+
+  if (result.success) {
+    const actor = resolveActor(req);
+    void getAuditLogRepository().insert({
+      empresaId,
+      action: 'tpv.turno.abrir',
+      payload: { turnoId: result.data.id, operadorNombre: parsed.data.operadorNombre },
+      ...actor,
+    });
+  }
 
   return handleResultWithStatus(result, 201);
 }

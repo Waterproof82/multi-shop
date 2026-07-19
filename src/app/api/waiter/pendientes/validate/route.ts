@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getPedidoRepository } from '@/core/infrastructure/database';
+import { getPedidoRepository, getAuditLogRepository } from '@/core/infrastructure/database';
+import { resolveActor } from '@/core/infrastructure/api/audit-actor';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,6 +41,14 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json({ error: 'Error al validar pedido' }, { status: 500 });
   }
+
+  const actor = resolveActor(request);
+  void getAuditLogRepository().insert({
+    empresaId,
+    action: 'waiter.pedido.validar',
+    payload: { pedidoId },
+    ...actor,
+  });
 
   return NextResponse.json({ ok: true });
 }

@@ -7,12 +7,9 @@
 
 ## Pases por Ítem + Flujo Pendientes
 
-**Estado:** 🔶 EN CURSO — T1-T9 completados, falta T10 (kitchen standalone badge)
+**Estado:** ✅ COMPLETADO (2026-07-19) — T1-T10 completados
 **Plan detallado:** `docs/superpowers/plans/2026-07-16-pases-por-item.md`
 **Dependencias:** ninguna
-
-### Pendiente
-- **T10** — `src/app/kitchen/page.tsx`: mostrar badge de pase en cada tarjeta de ítem si `pase !== null`
 
 ---
 
@@ -105,7 +102,7 @@
 
 ## Bloque 4 — RBAC Completo
 
-**Estado:** ❌ Diferido — 4.1 y 4.2 descartados; 4.3 (Auditoría) pendiente de implementar
+**Estado:** ✅ 4.3 completado (2026-07-19) — Auditoría de Acciones implementada y archivada
 **Dependencias:** `perfiles_admin.rol`
 **Complejidad:** Media
 
@@ -119,9 +116,12 @@ Los sub-features 4.1 y 4.2 se descartan por ahora. Motivos:
 
 **Lo que SÍ tiene valor independiente:**
 
-#### 4.3 Auditoría de Acciones ← pendiente de implementar
+#### 4.3 Auditoría de Acciones ✅ COMPLETADO Y ARCHIVADO (2026-07-19)
 - Log de quién hizo qué: abre turno, cierra sesión de mesa, ajusta stock
-- Tabla `audit_log` con `admin_id`, `action`, `payload`, `created_at`
+- Tabla `audit_log` con RLS, índices, y GRANTs completamente implementada
+- 12 rutas instrumentadas (TPV, waiter, admin domains)
+- API `/api/admin/audit-log` con paginación y filtros
+- UI `/admin/audit-log` con tabla interactiva y filtros
 - Útil en cualquier tamaño de negocio para resolver disputas y detectar errores operativos
 
 ---

@@ -3,8 +3,9 @@ import { z } from 'zod';
 import { getDomainFromHeaders, parseMainDomain } from '@/lib/domain-utils';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
-import { getEmpleadoTpvLoginUseCase } from '@/core/infrastructure/database';
+import { getEmpleadoTpvLoginUseCase, getAuditLogRepository } from '@/core/infrastructure/database';
 import { signTpvEmployeeToken } from '@/lib/tpv-employee-auth';
+import { resolveActor } from '@/core/infrastructure/api/audit-actor';
 
 const LoginSchema = z.object({
   pin: z.string().min(4).max(8).regex(/^\d+$/, 'Solo dígitos'),
@@ -38,10 +39,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'PIN inválido' }, { status: 400 });
   }
 
-  const result = await getEmpleadoTpvLoginUseCase().execute(parsed.data.pin, empresa.id as string);
+  const empresaId = empresa.id as string;
+  const result = await getEmpleadoTpvLoginUseCase().execute(parsed.data.pin, empresaId);
   if (!result.success) {
     return NextResponse.json({ error: 'PIN incorrecto' }, { status: 401 });
   }
+
+  const actor = resolveActor(req, result.data.empleadoId);
+  void getAuditLogRepository().insert({
+    empresaId,
+    action: 'tpv.empleado.login',
+    payload: { empleadoId: result.data.empleadoId, rol: result.data.rol },
+    ...actor,
+  });
 
   const token = await signTpvEmployeeToken(result.data);
   const nextUrl = result.data.rol === 'cajero' ? '/tpv/mostrador' : '/tpv/turno/abrir';
