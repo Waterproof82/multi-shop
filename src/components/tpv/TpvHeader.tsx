@@ -53,10 +53,10 @@ export function TpvHeader({ empresaNombre }: Props) {
   const showGear = rol === 'admin' || rol === 'superadmin' || rol === 'encargado';
 
   const NAV_ITEMS = [
-    { label: 'Mostrador', href: '/tpv/mostrador', activePrefix: '/tpv/mostrador' },
-    { label: 'Mesas',     href: '/tpv/mesas?seleccionar=1', activePrefix: '/tpv/mesas' },
-    ...(!isCajero ? [{ label: 'Historial', href: '/tpv/historial', activePrefix: '/tpv/historial' }] : []),
-    ...(!isCajero ? [{ label: 'Mermas', href: '/tpv/mermas', activePrefix: '/tpv/mermas' }] : []),
+    { label: '🛒 Mostrador', href: '/tpv/mostrador', activePrefix: '/tpv/mostrador' },
+    { label: '🪑 Mesas',     href: '/tpv/mesas?seleccionar=1', activePrefix: '/tpv/mesas' },
+    ...(!isCajero ? [{ label: '📋 Historial', href: '/tpv/historial', activePrefix: '/tpv/historial' }] : []),
+    ...(!isCajero ? [{ label: '📉 Mermas', href: '/tpv/mermas', activePrefix: '/tpv/mermas' }] : []),
   ];
 
   useEffect(() => {
@@ -173,8 +173,9 @@ export function TpvHeader({ empresaNombre }: Props) {
         <button
           type="button"
           onClick={() => router.push('/tpv/turno/cerrar')}
-          className="text-xs bg-[#22263a] border border-[#2e3347] px-3 py-1.5 rounded-md hover:border-[#4f72ff] transition-colors"
+          className="text-xs bg-[#ef444412] border border-[#ef444455] text-[#ef4444] px-3 py-1.5 rounded-md hover:bg-[#ef444420] transition-colors flex items-center gap-1.5"
         >
+          <span aria-hidden="true">⏻</span>
           Cierre de Caja
         </button>
       </div>
