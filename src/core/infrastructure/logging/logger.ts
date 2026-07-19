@@ -148,8 +148,18 @@ export class ErrorLogger {
       details?: Record<string, unknown>;
     }
   ): Promise<AppError> {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorStack = error instanceof Error ? error.stack : undefined;
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : typeof error === 'object' && error !== null && 'message' in error
+          ? String((error as Record<string, unknown>).message)
+          : String(error);
+    const errorStack =
+      error instanceof Error
+        ? error.stack
+        : typeof error === 'object' && error !== null && 'hint' in error
+          ? `hint: ${(error as Record<string, unknown>).hint} | code: ${(error as Record<string, unknown>).code}`
+          : undefined;
 
     return this.logAndReturnError(
       'UNHANDLED_ERROR',
