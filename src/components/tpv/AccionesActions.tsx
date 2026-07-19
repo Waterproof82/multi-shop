@@ -10,77 +10,91 @@ interface Props {
   readonly refreshing: boolean;
 }
 
-interface ActionButtonProps {
+type ActionVariant = 'default' | 'active' | 'danger';
+
+interface ActionIconProps {
+  readonly emoji: string;
   readonly label: string;
   readonly onClick: () => void;
   readonly disabled?: boolean;
+  readonly variant?: ActionVariant;
 }
 
-function ActionButton({ label, onClick, disabled = false }: ActionButtonProps) {
+function resolveVariantClass(variant: ActionVariant): string {
+  if (variant === 'active') return 'bg-[#4f72ff18] border-[#4f72ff55]';
+  if (variant === 'danger') return 'bg-[#ef444415] border-[#ef444433]';
+  return 'border-transparent hover:bg-[#22263a] hover:border-[#2e3347]';
+}
+
+function resolveLabelClass(variant: ActionVariant): string {
+  if (variant === 'active') return 'text-[#4f72ff]';
+  if (variant === 'danger') return 'text-[#ef4444]';
+  return 'text-[#6b7280]';
+}
+
+function ActionIcon({ emoji, label, onClick, disabled = false, variant = 'default' }: Readonly<ActionIconProps>) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="w-full text-left px-3 py-2.5 rounded-lg text-sm text-[#e8eaf0] hover:bg-[#22263a] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+      className={`w-11 h-11 rounded-xl flex flex-col items-center justify-center gap-0.5 border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${resolveVariantClass(variant)}`}
     >
-      {label}
+      <span className="text-xl leading-none" aria-hidden="true">{emoji}</span>
+      <span className={`text-[6.5px] font-semibold uppercase tracking-wide ${resolveLabelClass(variant)}`}>
+        {label}
+      </span>
     </button>
   );
 }
 
-interface ActionGroupProps {
-  readonly title: string;
-  readonly children: React.ReactNode;
-}
-
-function ActionGroup({ title, children }: ActionGroupProps) {
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="text-[10px] font-bold text-[#6b7280] uppercase tracking-wider px-3 pb-1">
-        {title}
-      </span>
-      {children}
-    </div>
-  );
-}
-
-export function AccionesPanel({ sesionId, turnoId, onRefresh, refreshing }: Props) {
+export function AccionesPanel({ sesionId, turnoId, onRefresh, refreshing }: Readonly<Props>) {
   const router = useRouter();
   const rol = useTpvRol();
   const isCajero = rol === 'cajero';
   const hasMesa = sesionId !== null;
 
   return (
-    <aside className="w-[200px] shrink-0 bg-[#1a1d27] border-l border-[#2e3347] flex flex-col">
-      <div className="px-4 py-3.5 border-b border-[#2e3347]">
-        <span className="text-xs font-bold text-[#6b7280] uppercase tracking-wider">Acciones</span>
-      </div>
+    <aside className="w-16 shrink-0 bg-[#1a1d27] border-l border-[#2e3347] flex flex-col items-center py-3 gap-1.5">
+      <ActionIcon
+        emoji="🪑"
+        label="Mesa"
+        onClick={() => router.push('/tpv/mesas?seleccionar=1')}
+        variant={hasMesa ? 'active' : 'default'}
+      />
+      <ActionIcon
+        emoji="🔄"
+        label="Actualizar"
+        onClick={() => { void onRefresh(); }}
+        disabled={!hasMesa || refreshing}
+      />
+      <ActionIcon
+        emoji="🧾"
+        label="Ticket"
+        onClick={() => { if (sesionId) router.push(`/tpv/cobro/${sesionId}?turnoId=${turnoId}`); }}
+        disabled={!hasMesa}
+      />
 
-      <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-5 pt-4">
-        <ActionGroup title="Mesa">
-          <ActionButton label="Seleccionar mesa" onClick={() => router.push('/tpv/mesas?seleccionar=1')} />
-          <ActionButton label={refreshing ? 'Actualizando…' : 'Actualizar estado'} onClick={() => { void onRefresh(); }} disabled={!hasMesa || refreshing} />
-          <ActionButton label="Ver ticket completo" onClick={() => { if (sesionId) router.push(`/tpv/cobro/${sesionId}?turnoId=${turnoId}`); }} disabled={!hasMesa} />
-        </ActionGroup>
+      <div className="w-7 h-px bg-[#2e3347] my-1" role="separator" />
 
-        {!isCajero && (
-          <ActionGroup title="Historial">
-            <ActionButton label="Ver historial" onClick={() => router.push('/tpv/historial')} />
-          </ActionGroup>
-        )}
+      {!isCajero && (
+        <ActionIcon emoji="📋" label="Historial" onClick={() => router.push('/tpv/historial')} />
+      )}
+      {!isCajero && (
+        <ActionIcon emoji="📊" label="Analítica" onClick={() => router.push('/tpv/analytics')} />
+      )}
+      {!isCajero && (
+        <ActionIcon emoji="⚖️" label="Legal" onClick={() => router.push('/tpv/legal')} />
+      )}
 
-        <ActionGroup title="Operaciones">
-          <ActionButton label="Cierre de turno" onClick={() => router.push('/tpv/turno/cerrar')} />
-        </ActionGroup>
+      <div className="flex-1" />
 
-        {!isCajero && (
-          <ActionGroup title="Sistema">
-            <ActionButton label="Analítica" onClick={() => router.push('/tpv/analytics')} />
-            <ActionButton label="Conformidad legal" onClick={() => router.push('/tpv/legal')} />
-          </ActionGroup>
-        )}
-      </div>
+      <ActionIcon
+        emoji="⏻"
+        label="Cierre"
+        onClick={() => router.push('/tpv/turno/cerrar')}
+        variant="danger"
+      />
     </aside>
   );
 }
