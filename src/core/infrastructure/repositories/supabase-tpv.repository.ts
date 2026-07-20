@@ -563,7 +563,8 @@ export class SupabaseTpvRepository implements ITpvRepository {
             empresas!tpv_turnos_empresa_id_fkey (
               nombre,
               nif,
-              tipo_impuesto
+              tipo_impuesto,
+              porcentaje_impuesto
             )
           `)
           .eq('id', turnoId)
@@ -572,7 +573,7 @@ export class SupabaseTpvRepository implements ITpvRepository {
 
         supabase
           .from('tpv_cobros')
-          .select('base_imponible_cents, iva_cents, propina_cents, importe_cobrado_cents, metodo_pago')
+          .select('base_imponible_cents, iva_cents, propina_cents, importe_cobrado_cents, metodo_pago, desglose_iva')
           .eq('turno_id', turnoId)
           .eq('empresa_id', empresaId)
           .is('rectifica_cobro_id', null),
@@ -600,7 +601,15 @@ export class SupabaseTpvRepository implements ITpvRepository {
       const turno = turnoRes.data as Record<string, unknown>;
       const empresaRaw = turno.empresas;
       const empresa = (Array.isArray(empresaRaw) ? empresaRaw[0] : empresaRaw) as Record<string, unknown> | null;
-      const cobros = (cobrosRes.data ?? []) as { base_imponible_cents: number | null; iva_cents: number | null; propina_cents: number | null; importe_cobrado_cents: number | null; metodo_pago: string }[];
+      type RawCobroInforme = {
+        base_imponible_cents: number | null;
+        iva_cents: number | null;
+        propina_cents: number | null;
+        importe_cobrado_cents: number | null;
+        metodo_pago: string;
+        desglose_iva: Array<{ porcentaje: number; baseCents: number; ivaCents: number }> | null;
+      };
+      const cobros = (cobrosRes.data ?? []) as RawCobroInforme[];
       const eventos = (eventosRes.data ?? []) as Record<string, unknown>[];
 
       let totalFacturadoCents = 0;
@@ -608,6 +617,7 @@ export class SupabaseTpvRepository implements ITpvRepository {
       let ivaCents = 0;
       let propinaCents = 0;
       const pagoMap = new Map<string, { totalCents: number; numOperaciones: number }>();
+      const ivaMap = new Map<number, { baseCents: number; ivaCents: number }>();
 
       for (const c of cobros) {
         totalFacturadoCents += c.importe_cobrado_cents ?? 0;
@@ -619,6 +629,23 @@ export class SupabaseTpvRepository implements ITpvRepository {
           totalCents: prev.totalCents + (c.importe_cobrado_cents ?? 0),
           numOperaciones: prev.numOperaciones + 1,
         });
+        if (c.desglose_iva && c.desglose_iva.length > 0) {
+          for (const bracket of c.desglose_iva) {
+            const prevBracket = ivaMap.get(bracket.porcentaje) ?? { baseCents: 0, ivaCents: 0 };
+            ivaMap.set(bracket.porcentaje, {
+              baseCents: prevBracket.baseCents + bracket.baseCents,
+              ivaCents: prevBracket.ivaCents + bracket.ivaCents,
+            });
+          }
+        } else {
+          // Legacy cobros (desglose_iva NULL): agregar al bracket del rate general de empresa
+          const legacyRate = (empresa?.porcentaje_impuesto as number | null) ?? 0;
+          const prevLegacy = ivaMap.get(legacyRate) ?? { baseCents: 0, ivaCents: 0 };
+          ivaMap.set(legacyRate, {
+            baseCents: prevLegacy.baseCents + (c.base_imponible_cents ?? 0),
+            ivaCents: prevLegacy.ivaCents + (c.iva_cents ?? 0),
+          });
+        }
       }
 
       const desglosePagos: InformeZDesglosePago[] = Array.from(pagoMap.entries()).map(([metodoPago, v]) => ({
@@ -626,6 +653,16 @@ export class SupabaseTpvRepository implements ITpvRepository {
         totalCents: v.totalCents,
         numOperaciones: v.numOperaciones,
       }));
+
+      const desgloseImpuesto: TpvIvaDesgloseItem[] | undefined = ivaMap.size > 0
+        ? Array.from(ivaMap.entries())
+            .sort(([a], [b]) => a - b)
+            .map(([porcentaje, v]) => ({
+              porcentaje,
+              baseImponibleCents: v.baseCents,
+              ivaCents: v.ivaCents,
+            }))
+        : undefined;
 
       const informeZ: InformeZData = {
         turnoId: turno.id as string,
@@ -647,6 +684,7 @@ export class SupabaseTpvRepository implements ITpvRepository {
         propinaCents,
         numCobros: cobros.length,
         desglosePagos,
+        desgloseImpuesto,
         movimientos: eventos.map(mapEvento),
       };
 

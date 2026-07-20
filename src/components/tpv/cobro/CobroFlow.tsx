@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { MetodoPago, TpvCobro } from '@/core/domain/entities/tpv-types';
+import type { MetodoPago, TpvCobro, TpvDetalleItem } from '@/core/domain/entities/tpv-types';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useOnlineStatus } from '@/hooks/tpv/useOnlineStatus';
 import {
@@ -29,6 +29,7 @@ interface Props {
   readonly empresaRazonSocial?: string | null;
   readonly tipoImpuesto: 'iva' | 'igic';
   readonly porcentajeImpuesto: number;
+  readonly detalleItems?: TpvDetalleItem[];
 }
 
 type Step = 'metodo' | 'efectivo' | 'tarjeta' | 'confirmado';
@@ -65,6 +66,7 @@ export function CobroFlow({
   empresaRazonSocial,
   tipoImpuesto,
   porcentajeImpuesto,
+  detalleItems,
 }: Props) {
   const router = useRouter();
   const isOnline = useOnlineStatus();
@@ -135,6 +137,7 @@ export function CobroFlow({
           turnoId,
           ivaPorcentaje: porcentajeImpuesto,
           cerrarSesion: !esParcial,
+          ...(detalleItems ? { detalleItems } : {}),
         }),
       });
 
@@ -145,7 +148,7 @@ export function CobroFlow({
         setStep('confirmado');
       }
     },
-    [sesionId, metodo, totalFinalCents, propinaCents, descuentoCents, turnoId, porcentajeImpuesto, esParcial],
+    [sesionId, metodo, totalFinalCents, propinaCents, descuentoCents, turnoId, porcentajeImpuesto, esParcial, detalleItems],
   );
 
   function confirmarCobro(importe: number) {
