@@ -5,7 +5,6 @@ import { useTpvRol } from '@/lib/tpv-rol-ctx';
 
 interface Props {
   readonly sesionId: string | null;
-  readonly turnoId: string;
   readonly onRefresh: () => Promise<void>;
   readonly refreshing: boolean;
 }
@@ -48,7 +47,7 @@ function ActionIcon({ emoji, label, onClick, disabled = false, variant = 'defaul
   );
 }
 
-export function AccionesPanel({ sesionId, turnoId, onRefresh, refreshing }: Readonly<Props>) {
+export function AccionesPanel({ sesionId, onRefresh, refreshing }: Readonly<Props>) {
   const router = useRouter();
   const rol = useTpvRol();
   const isCajero = rol === 'cajero';
@@ -61,12 +60,6 @@ export function AccionesPanel({ sesionId, turnoId, onRefresh, refreshing }: Read
         label="Actualizar"
         onClick={() => { void onRefresh(); }}
         disabled={!hasMesa || refreshing}
-      />
-      <ActionIcon
-        emoji="🧾"
-        label="Cobrar"
-        onClick={() => { if (sesionId) router.push(`/tpv/cobro/${sesionId}?turnoId=${turnoId}`); }}
-        disabled={!hasMesa}
       />
 
       {!isCajero && (

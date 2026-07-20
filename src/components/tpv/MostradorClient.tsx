@@ -152,7 +152,6 @@ export function MostradorClient({ initialMesa }: Readonly<Props>) {
       )}
       <AccionesPanel
         sesionId={mesa.sesionId}
-        turnoId={turno.id}
         onRefresh={handleRefresh}
         refreshing={refreshing}
       />
