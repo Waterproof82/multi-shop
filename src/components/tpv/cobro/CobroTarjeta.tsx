@@ -32,7 +32,7 @@ export function CobroTarjeta({
           </p>
         )}
         <p className="text-sm text-[#6b7280] leading-relaxed max-w-xs">
-          Introducí el importe exacto en el datáfono y esperá la confirmación del banco antes de
+          Introduce el importe exacto en el datáfono y espera la confirmación del banco antes de
           confirmar aquí.
         </p>
         <button

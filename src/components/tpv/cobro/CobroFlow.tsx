@@ -92,6 +92,19 @@ export function CobroFlow({
     void flushOfflineQueue();
   }, [isOnline]);
 
+  // Block browser back/forward navigation inside the cobro flow.
+  // Without this, pressing back from the tarjeta step restores a stale
+  // "confirmado" state from bfcache while the mesa remains open.
+  useEffect(() => {
+    history.pushState(null, '', window.location.href);
+    function handlePopState() {
+      history.pushState(null, '', window.location.href);
+      router.replace('/tpv/mostrador');
+    }
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [router]);
+
   const confirmarOffline = useCallback(
     async (importe: number) => {
       setEntregadoCents(importe);
