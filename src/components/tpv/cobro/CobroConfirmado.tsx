@@ -13,6 +13,7 @@ interface Props {
   readonly mesaNumero: number;
   readonly operadorNombre: string;
   readonly empresaNombre: string;
+  readonly empresaRazonSocial?: string | null;
   readonly cobro: TpvCobro | null;
   readonly empresaNif: string | null;
   readonly tipoImpuesto: 'iva' | 'igic';
@@ -45,6 +46,7 @@ export function CobroConfirmado({
   mesaNumero,
   operadorNombre,
   empresaNombre,
+  empresaRazonSocial = null,
   cobro,
   empresaNif,
   tipoImpuesto,
@@ -61,9 +63,15 @@ export function CobroConfirmado({
 
   function buildTicket(): PrintTicket | null {
     if (cobro === null) return null;
+    const desgloseImpuesto = cobro.desgloseIva?.map(d => ({
+      porcentaje: d.porcentaje,
+      baseImponibleCents: d.baseImponibleCents,
+      impuestoCents: d.ivaCents,
+    })) ?? null;
     return {
       empresaNombre,
       empresaNif,
+      razonSocial: empresaRazonSocial ?? null,
       mesaNumero,
       operadorNombre,
       serie: cobro.serie,
@@ -78,6 +86,7 @@ export function CobroConfirmado({
       cobradoAt: cobro.cobradoAt,
       entregadoCents,
       tipoImpuesto,
+      desgloseImpuesto,
     };
   }
 

@@ -283,6 +283,20 @@ Solución: `WaiterLoginForm.handlePinSubmit` dispara `window.dispatchEvent(new C
 - **Auto-update endpoint** — `GET /api/app/version/latest.yml` sirve el archivo YAML para `electron-updater`. El endpoint está en `src/app/api/app/version/latest.yml/route.ts`.
 - **`electron/dist/` en `.gitignore`** — los bundles compilados no se commitean. El proceso de build es: `pnpm build:electron:prep` (esbuild) → `pnpm build:electron:rebuild` (native modules) → `electron-builder --win`.
 
+## 🧾 TPV Cobros — IVA/IGIC, Compliance y RGPD (Trampas Críticas)
+
+> Ver doc completo: `docs/tpv-legal-compliance.md` y `docs/context/legal-compliance.md`
+
+- **IVA/IGIC multi-rate**: `detalle_items[i].impuestoPorcentaje` DEBE estar presente al crear cobro. Sin él, el trigger usa `iva_porcentaje` global como fallback (comportamiento legacy). Resolver per-item con `resolveImpuestoPorcentaje(producto.porcentajeImpuestoOverride, empresa.porcentajeImpuesto)` (`src/lib/tpv/impuesto.ts`).
+- **`desglose_iva` NULL en cobros históricos** — El printer (`browser-printer.ts`) tiene legacy fallback a línea única cuando `desgloseIva` es null. NO backfillable — el trigger de inmutabilidad bloquea UPDATEs en `tpv_cobros`.
+- **Trigger `tpv_cobro_before_insert`** — itera `detalle_items`, agrupa por `ivaPorcentaje`, escribe `desglose_iva JSONB`. Si `detalle_items` está vacío o es NULL, usa path legacy (tasa única desde `iva_porcentaje`). SECURITY DEFINER con `search_path = public, extensions`.
+- **`porcentaje_impuesto_override`** en `productos` — NULL significa "hereda de empresa". El campo en el ProductFormDialog envía `null` (no `0`) cuando se deja vacío. Distinción importante: `null` = heredar, `0` = exento.
+- **`razon_social`** en `empresas` — campo legal para S.L./S.A. Nullable. Si presente, se imprime en el header del ticket en lugar de `nombre`. Distinto del nombre comercial.
+- **RGPD anonimización**: `POST /api/admin/rgpd/anonimizar-cliente` — idempotente, requiere rol admin. Sustituye `nombre/email/telefono`; preserva `id` y relaciones con `pedidos`. Segunda llamada = no-op (200 sin cambios).
+- **`ultima_actividad` en `clientes`** no avanza automáticamente — requiere trigger `trg_pedidos_ultima_actividad` en `pedidos`. Si el trigger falla o no existe, los clientes activos quedan con fecha de creación como base del auto-purge.
+- **pg_cron auto-purge** — usa `INTERVAL '5 years'` (alineado con Art.66 LGT — obligación fiscal española). Si pg_cron no está habilitado en el proyecto Supabase, el job no existe pero las columnas sí. El endpoint manual es el único mecanismo en ese caso.
+- **`resolveImpuestoPorcentaje` existe pero no se usa en el flujo principal** — es un helper disponible; el trigger resuelve server-side. Wire it up en `TpvCatalogProvider` o en el builder de `detalleItems` del cliente para pasar la tasa resuelta a la API.
+
 ## 🗂 TPV Catalog Cache — Contexto Cliente + Offline
 
 > Ver doc completo: `docs/context/tpv-catalog-cache.md`

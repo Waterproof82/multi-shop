@@ -52,6 +52,7 @@ interface ProductoFormData {
   es_especial: boolean;
   activo: boolean;
   tipo_producto: 'comida' | 'bebida';
+  porcentajeImpuestoOverride: number | null;
 }
 
 interface ProductComplementosSectionProps {
@@ -394,6 +395,33 @@ export function ProductFormDialog({
                 <span className="text-sm text-foreground">{t("active", language)}</span>
               </label>
             </div>
+          </div>
+
+          <div className="col-span-2">
+            <label htmlFor="porcentaje_impuesto_override" className="block text-sm font-medium text-foreground mb-1">
+              % Impuesto específico (override)
+            </label>
+            <input
+              id="porcentaje_impuesto_override"
+              type="number"
+              min={0}
+              max={100}
+              step={0.1}
+              value={formData.porcentajeImpuestoOverride ?? ''}
+              onChange={(e) => {
+                const raw = e.target.value;
+                onFormChange({
+                  ...formData,
+                  porcentajeImpuestoOverride: raw === '' ? null : Number.parseFloat(raw),
+                });
+              }}
+              placeholder="Ej: 4"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              aria-describedby="porcentaje_override_help"
+            />
+            <span id="porcentaje_override_help" className="text-xs text-muted-foreground mt-1 block">
+              Si vacío, usa el tipo general de la empresa
+            </span>
           </div>
 
           {editingId !== null && (

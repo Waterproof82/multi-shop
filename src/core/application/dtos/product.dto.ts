@@ -30,6 +30,7 @@ export const createProductSchema = z.object({
   es_especial: z.boolean().default(false),
   activo: z.boolean().default(true),
   tipo_producto: z.enum(['comida', 'bebida']).default('comida'),
+  porcentaje_impuesto_override: z.number().min(0).max(100).nullable().optional(),
 });
 
 export type CreateProductDTO = z.infer<typeof createProductSchema>;

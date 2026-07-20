@@ -45,7 +45,7 @@ import type { IAuditLogRepository } from '@/core/domain/repositories/IAuditLogRe
 // ---------------------------------------------------------------------------
 
 let _clienteRepository: SupabaseClienteRepository | undefined;
-function getClienteRepository(): SupabaseClienteRepository {
+export function getClienteRepository(): SupabaseClienteRepository {
   _clienteRepository ??= new SupabaseClienteRepository(getSupabaseClient());
   return _clienteRepository;
 }
