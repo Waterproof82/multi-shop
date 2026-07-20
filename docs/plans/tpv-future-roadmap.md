@@ -5,9 +5,17 @@
 
 ---
 
+## Pases por Ítem + Flujo Pendientes
+
+**Estado:** ✅ COMPLETADO (2026-07-19) — T1-T10 completados
+**Plan detallado:** `docs/superpowers/plans/2026-07-16-pases-por-item.md`
+**Dependencias:** ninguna
+
+---
+
 ## Bloque 1 — Gestión de Proveedores y Compras
 
-**Estado:** 0% implementado
+**Estado:** ✅ COMPLETADO Y ARCHIVADO (2026-07-15)
 **Dependencias:** Stock de ingredientes (ya existe)
 **Complejidad:** Alta (nuevo módulo completo)
 
@@ -37,7 +45,7 @@
 
 ## Bloque 2 — Food Cost Avanzado
 
-**Estado:** Base de escandallo implementada (Task 2-5 del plan pre-Electron completan el inventario físico)
+**Estado:** ✅ COMPLETADO Y ARCHIVADO (2026-07-16) — CMP, food-cost, rentabilidad implementados
 **Dependencias:** Escandallos + Stock + Movimientos
 **Complejidad:** Media
 
@@ -64,7 +72,7 @@
 
 ## Bloque 3 — Analítica Avanzada
 
-**Estado:** Analytics básicos existen (`/admin/analytics`)
+**Estado:** ✅ COMPLETADO Y ARCHIVADO (2026-07-18) — BCG, heatmap ocupación, cierre diario, comparativa períodos
 **Dependencias:** Historial de pedidos
 **Complejidad:** Media-Alta
 
@@ -94,7 +102,7 @@
 
 ## Bloque 4 — RBAC Completo
 
-**Estado:** Diferido — ver decisión abajo
+**Estado:** ✅ 4.3 completado (2026-07-19) — Auditoría de Acciones implementada y archivada
 **Dependencias:** `perfiles_admin.rol`
 **Complejidad:** Media
 
@@ -108,16 +116,19 @@ Los sub-features 4.1 y 4.2 se descartan por ahora. Motivos:
 
 **Lo que SÍ tiene valor independiente:**
 
-#### 4.3 Auditoría de Acciones ← pendiente de implementar
+#### 4.3 Auditoría de Acciones ✅ COMPLETADO Y ARCHIVADO (2026-07-19)
 - Log de quién hizo qué: abre turno, cierra sesión de mesa, ajusta stock
-- Tabla `audit_log` con `admin_id`, `action`, `payload`, `created_at`
+- Tabla `audit_log` con RLS, índices, y GRANTs completamente implementada
+- 12 rutas instrumentadas (TPV, waiter, admin domains)
+- API `/api/admin/audit-log` con paginación y filtros
+- UI `/admin/audit-log` con tabla interactiva y filtros
 - Útil en cualquier tamaño de negocio para resolver disputas y detectar errores operativos
 
 ---
 
 ## Bloque 5 — Integraciones Externas
 
-**Estado:** No iniciado
+**Estado:** ❌ No iniciado
 **Complejidad:** Alta
 
 ### Sub-features

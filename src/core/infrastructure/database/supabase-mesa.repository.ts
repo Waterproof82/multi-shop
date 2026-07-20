@@ -228,17 +228,41 @@ export class SupabaseMesaRepository implements IMesaRepository {
       const preparadoBySesion: Record<string, number[]> = {};
       const retenidoBySesion: Record<string, DeferredItem[]> = {};
       if (activeSesionIds.length > 0) {
-        type PedidoRow = { id: string; sesion_id: string; estado: string; numero_pedido: number; detalle_pedido: unknown };
+        type PedidoRow = { id: string; sesion_id: string | null; mesa_id: string | null; estado: string; numero_pedido: number; detalle_pedido: unknown };
+        type DetalleItem = { nombre: string; precio: number; cantidad: number; complementos?: Array<{ nombre: string; precio: number }>; translations?: Record<string, { name?: string }> };
+
+        // Primary query: pedidos linked via sesion_id
         const { data: activeData } = await this.supabase
           .from('pedidos')
-          .select('id, sesion_id, estado, numero_pedido, detalle_pedido')
+          .select('id, sesion_id, mesa_id, estado, numero_pedido, detalle_pedido')
           .in('sesion_id', activeSesionIds)
           .neq('estado', 'cerrado');
 
-        type DetalleItem = { nombre: string; precio: number; cantidad: number; complementos?: Array<{ nombre: string; precio: number }>; translations?: Record<string, { name?: string }> };
+        // Defensive fallback: pedidos with sesion_id = NULL that belong to an active mesa.
+        // This can happen when open_mesa_sesion had a stale closed-session reference and
+        // findActiveSesionByMesa returned null — the pedido was inserted with sesion_id = NULL.
+        const activeMesaIds = rows
+          .filter(r => r.sesion_id !== null)
+          .map(r => r.id);
+        const { data: orphanData } = await this.supabase
+          .from('pedidos')
+          .select('id, sesion_id, mesa_id, estado, numero_pedido, detalle_pedido')
+          .in('mesa_id', activeMesaIds)
+          .is('sesion_id', null)
+          .neq('estado', 'cerrado');
+
+        // Build a mesa_id → sesion_id lookup for orphan resolution
+        const mesaToSesion: Record<string, string> = {};
+        for (const r of rows) {
+          if (r.sesion_id) mesaToSesion[r.id] = r.sesion_id;
+        }
+
         const pedidoIdToSesion: Record<string, { sesionId: string; numeroPedido: number; estado: string; detalle: DetalleItem[] }> = {};
-        for (const p of (activeData ?? []) as PedidoRow[]) {
-          const sid = p.sesion_id;
+
+        const allPedidos = [...(activeData ?? []), ...(orphanData ?? [])] as PedidoRow[];
+        for (const p of allPedidos) {
+          const sid = p.sesion_id ?? (p.mesa_id ? mesaToSesion[p.mesa_id] : null);
+          if (!sid) continue;
           countBySesion[sid] = (countBySesion[sid] ?? 0) + 1;
           pedidoIdToSesion[p.id] = {
             sesionId: sid,

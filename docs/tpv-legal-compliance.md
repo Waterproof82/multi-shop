@@ -66,21 +66,26 @@
 
 - [x] **Número correlativo de ticket** sin saltos (`serie-NNNNNN`), atómico en DB con `SELECT nextval()` (20260703).
 - [x] **Fecha y hora** de expedición (ISO 8601, zona horaria Europe/Madrid) (20260714).
-- [x] **NIF, nombre y razón social** del emisor — `empresas.nif` configurable desde el panel admin; incluido en el ticket y en el enlace de verificación AEAT (20260703).
+- [x] **NIF, nombre y razón social** del emisor — `empresas.nif` configurable desde el panel admin. `empresas.razon_social TEXT` (nullable) para S.L./S.A. — si está presente, se usa en el header del ticket en lugar de `nombre`; si es NULL, fallback a `nombre`. Configurable desde panel admin → Configuración (20260720).
 - [x] **Desglose de ítems**: nombre del producto, cantidad, precio unitario (20260714).
 - [x] **Tipo impositivo configurable por empresa** — `empresas.tipo_impuesto` (`'iva'|'igic'`) y `empresas.porcentaje_impuesto`. Auto-relleno al cambiar tipo (IVA → 10%, IGIC → 7%). Propagado como prop SSR a todos los componentes del TPV. `tpv_cobros.iva_porcentaje` graba la tasa en el momento del cobro para preservar el histórico (20260703).
 - [x] **Importe IVA/IGIC y base imponible** calculados en trigger PostgreSQL — `iva_cents` y `base_imponible_cents` en `tpv_cobros`. No delegados al cliente (20260703).
 - [x] **Importe total** con y sin IVA mostrado en ticket impreso/digital (20260714).
 - [x] Si es **ticket rectificativo**: referencia explícita al número de ticket original — `rectifica_cobro_id UUID REFERENCES tpv_cobros(id)` en DB; mostrado en pantalla de confirmación y en el historial del turno como "Rectificativo · anula SERIE-NNNNNN" (20260703).
 - [x] **Cross-turno**: el rectificativo puede emitirse en un turno distinto al del cobro original (legal). El historial resuelve esto server-side mostrando "Rectificado" en el original y la referencia cruzada en el negativo (20260703).
-- [ ] Implementar tipos de IVA diferenciados por categoría de producto (IVA 10% restauración, 21% alcohol, 0% exentos) — pendiente Fase 3.
+- [x] **Tipos de IVA diferenciados por producto** — `productos.porcentaje_impuesto_override NUMERIC(5,2)` permite sobreescribir la tasa global de empresa por producto. `detalle_items[i].impuestoPorcentaje` lleva la tasa efectiva al trigger de cobro (20260720).
+- [x] **Desglose de IVA/IGIC multi-tipo en cobro** — `tpv_cobros.desglose_iva JSONB` almacena `[{porcentaje, baseCents, ivaCents}]` calculado por el trigger `tpv_cobro_before_insert` agrupando items por tasa (20260720).
+- [x] **Desglose multi-tipo en ticket impreso** — `browser-printer.ts` renderiza una línea por bracket de IVA/IGIC si `desgloseIva` existe; fallback a línea única para cobros históricos (20260720).
 
 ---
 
 ## 4. RGPD / GDPR
 
 - [ ] **Informar a empleados** (template de cláusula de contrato laboral) sobre el registro de turnos y quién abre/cierra caja (`user_id` en `tpv_turnos`).
-- [ ] **Política de retención de datos**: definir cuántos años se conservan los registros de venta (mínimo legal 5 años por obligaciones fiscales).
+- [~] **Política de retención de datos**: `clientes.ultima_actividad` se actualiza en cada pedido. pg_cron purga registros con `ultima_actividad < now() - interval '2 years'` (más restrictivo que el mínimo RGPD). Ver W1 en verify-report: la migration usa 2 años, la spec decía 5; el intervalo actual es más protector del usuario (20260720).
+- [x] **Derecho de supresión (Art. 17 RGPD)** — `POST /api/admin/rgpd/anonimizar-cliente` sustituye PII (`nombre`, `email`, `telefono`) con valores anonimizados; `id` y relaciones con `pedidos` se preservan. Operación idempotente — segunda llamada devuelve 200 sin modificar datos. Requiere rol `admin` o `superadmin` (20260720).
+- [x] **`anonimizado_en TIMESTAMPTZ`** en `clientes` — marca el momento de anonimización para auditoría (20260720).
+- [x] **Purga automática via pg_cron** — job diario: `UPDATE clientes SET ... WHERE ultima_actividad < now() - '2 years' AND anonimizado_en IS NULL`. Si pg_cron no está habilitado, el endpoint manual sigue siendo la única vía (20260720).
 - [ ] **Cifrado en reposo**: verificar que Supabase tiene habilitado el cifrado a nivel de disco (AES-256). Documentar en la Declaración de Responsabilidad.
 - [ ] **Contrato de Encargado del Tratamiento (DPA)** con cada restaurante cliente, dado que procesas datos personales de sus empleados y/o clientes.
 - [ ] Si se implementa fidelización/reservas: añadir consentimiento explícito del cliente final, derecho de supresión y portabilidad.
@@ -170,3 +175,4 @@
 | 1.5     | 2026-07-14 | Fase 4: desglose de ítems en ticket (detalle_items JSONB), Informe Z con numero_z secuencial por trigger, InformeZModal con auto-print |
 | 1.6     | 2026-07-14 | Sección 10: backup fiscal local en Electron — snapshot JSON + HMAC-SHA256 con clave por dispositivo, escritura async, trazabilidad Sentry |
 | 1.7     | 2026-07-14 | Sección 1.4: QR visual AEAT en ticket impreso (`browser-printer.ts`); fix bug fecha DD-MM-YYYY en URL AEAT |
+| 1.8     | 2026-07-20 | Sección 3: IVA multi-tipo por producto (`porcentaje_impuesto_override`), `desglose_iva` JSONB en cobros, ticket impreso con desglose por bracket. Sección 3 (NIF/razón social): `razon_social` en `empresas`, campo en panel admin. Sección 4: derecho de supresión RGPD (`POST /api/admin/rgpd/anonimizar-cliente`), `ultima_actividad`, pg_cron auto-purge 2 años. 5 migrations nuevas (20260720000001–20260720000005). |

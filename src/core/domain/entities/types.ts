@@ -21,6 +21,7 @@ export interface Product {
   activo: boolean;
   tipoProducto: 'comida' | 'bebida';
   createdAt: Date;
+  porcentajeImpuestoOverride?: number | null;
 }
 
 export interface Category {
@@ -95,6 +96,7 @@ export interface Empresa {
   nif?: string | null;
   tipoImpuesto?: 'iva' | 'igic';
   porcentajeImpuesto?: number;
+  razonSocial?: string | null;
 }
 
 interface TranslatableText {

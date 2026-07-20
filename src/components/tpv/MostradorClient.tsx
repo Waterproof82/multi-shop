@@ -7,7 +7,7 @@ import { useTpvCatalog } from '@/lib/tpv-catalog-ctx';
 import { TicketPanel } from './TicketPanel';
 import { MenuPanel } from './MenuPanel';
 import { MesasGrid } from './MesasGrid';
-import { AccionesPanel } from './AccionesActions';
+import { useTpvAcciones } from '@/lib/tpv-acciones-ctx';
 
 export interface ExistingOrder {
   id: string;
@@ -35,25 +35,26 @@ interface Props {
 export function MostradorClient({ initialMesa }: Readonly<Props>) {
   const { turno, products, categories, tipoImpuesto, porcentajeImpuesto } = useTpvCatalog();
   const { mesa, addItem, removeItem, clearPending, clearMesa, refreshOrders, updatePendingNota } = useMesaActiva(initialMesa);
-  const [refreshing, setRefreshing] = useState(false);
+  const { registerRefresh } = useTpvAcciones();
   const [yaCobradoCents, setYaCobradoCents] = useState(0);
   const [externalCobro, setExternalCobro] = useState<string | null>(null);
   const [isSesionPagada, setIsSesionPagada] = useState(initialMesa?.sesionPagada ?? false);
 
   const handleRefresh = useCallback(async () => {
     if (!mesa.sesionId) return;
-    setRefreshing(true);
-    try {
-      const res = await fetch(`/api/tpv/pedidos?sesionId=${mesa.sesionId}`);
-      if (res.ok) {
-        const json = await res.json() as { orders: ExistingOrder[]; yaCobradoCents: number };
-        refreshOrders(json.orders);
-        setYaCobradoCents(json.yaCobradoCents);
-      }
-    } finally {
-      setRefreshing(false);
+    const res = await fetch(`/api/tpv/pedidos?sesionId=${mesa.sesionId}`);
+    if (res.ok) {
+      const json = await res.json() as { orders: ExistingOrder[]; yaCobradoCents: number };
+      refreshOrders(json.orders);
+      setYaCobradoCents(json.yaCobradoCents);
     }
   }, [mesa.sesionId, refreshOrders]);
+
+  // Register refresh fn in AccionesPanel context so the button works from layout level.
+  useEffect(() => {
+    registerRefresh(mesa.sesionId, handleRefresh);
+    return () => registerRefresh(null, null);
+  }, [mesa.sesionId, handleRefresh, registerRefresh]);
 
   // Re-fetch on mount to always show fresh data after navigating back from cobro.
   useEffect(() => {
@@ -150,12 +151,6 @@ export function MostradorClient({ initialMesa }: Readonly<Props>) {
           mesaSeleccionada={!!mesa.mesaId}
         />
       )}
-      <AccionesPanel
-        sesionId={mesa.sesionId}
-        turnoId={turno.id}
-        onRefresh={handleRefresh}
-        refreshing={refreshing}
-      />
     </>
   );
 }

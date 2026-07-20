@@ -49,6 +49,7 @@ interface Producto {
   es_especial: boolean;
   activo: boolean;
   tipo_producto: 'comida' | 'bebida';
+  porcentaje_impuesto_override: number | null;
 }
 
 const emptyForm: ProductoFormData = {
@@ -69,6 +70,7 @@ const emptyForm: ProductoFormData = {
   es_especial: false,
   activo: true,
   tipo_producto: 'comida',
+  porcentajeImpuestoOverride: null,
 };
 
 const SortIndicator = ({ field, currentField, direction }: { field: keyof Producto | 'categoria'; currentField: keyof Producto | 'categoria'; direction: 'asc' | 'desc' }) => {
@@ -160,6 +162,7 @@ export default function ProductosPage() {
         descripcion_de: formData.descripcion_de || null,
         foto_url: formData.foto_url || null,
         foto_object_fit: formData.foto_object_fit || 'contain',
+        porcentaje_impuesto_override: formData.porcentajeImpuestoOverride ?? null,
       };
 
       const res = await fetchWithCsrf(url, {
@@ -206,6 +209,7 @@ export default function ProductosPage() {
       es_especial: producto.es_especial,
       activo: producto.activo,
       tipo_producto: producto.tipo_producto ?? 'comida',
+      porcentajeImpuestoOverride: producto.porcentaje_impuesto_override ?? null,
     });
     setEditingId(producto.id);
     setIsModalOpen(true);

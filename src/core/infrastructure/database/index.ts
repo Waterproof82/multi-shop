@@ -37,13 +37,15 @@ import type { IComprasRepository } from '@/core/domain/repositories/IComprasRepo
 import { SupabaseComprasRepository } from './supabase-compras.repository';
 import { SupabaseAnalyticsRepository } from '../repositories/supabase-analytics.repository';
 import { AnalyticsUseCase } from '@/core/application/use-cases/analytics.use-case';
+import { SupabaseAuditLogRepository } from '../repositories/supabase-audit-log.repository';
+import type { IAuditLogRepository } from '@/core/domain/repositories/IAuditLogRepository';
 
 // ---------------------------------------------------------------------------
 // Private lazy repository getters (shared between use cases, not exported)
 // ---------------------------------------------------------------------------
 
 let _clienteRepository: SupabaseClienteRepository | undefined;
-function getClienteRepository(): SupabaseClienteRepository {
+export function getClienteRepository(): SupabaseClienteRepository {
   _clienteRepository ??= new SupabaseClienteRepository(getSupabaseClient());
   return _clienteRepository;
 }
@@ -89,7 +91,7 @@ export function getMesaSesionRepository(): SupabaseMesaSesionRepository {
 }
 
 let _valoracionRepository: SupabaseValoracionRepository | undefined;
-export function getValoracionRepository(): SupabaseValoracionRepository {
+function getValoracionRepository(): SupabaseValoracionRepository {
   _valoracionRepository ??= new SupabaseValoracionRepository(getSupabaseClient());
   return _valoracionRepository;
 }
@@ -248,7 +250,7 @@ export function getComprasRepository(): IComprasRepository {
 }
 
 let _analyticsRepository: SupabaseAnalyticsRepository | undefined;
-export function getAnalyticsRepository(): SupabaseAnalyticsRepository {
+function getAnalyticsRepository(): SupabaseAnalyticsRepository {
   _analyticsRepository ??= new SupabaseAnalyticsRepository();
   return _analyticsRepository;
 }
@@ -257,4 +259,10 @@ let _analyticsUseCase: AnalyticsUseCase | undefined;
 export function getAnalyticsUseCase(): AnalyticsUseCase {
   _analyticsUseCase ??= new AnalyticsUseCase(getAnalyticsRepository());
   return _analyticsUseCase;
+}
+
+let _auditLogRepository: IAuditLogRepository | undefined;
+export function getAuditLogRepository(): IAuditLogRepository {
+  _auditLogRepository ??= new SupabaseAuditLogRepository();
+  return _auditLogRepository;
 }

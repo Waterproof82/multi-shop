@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { TpvTurno, TpvTurnoStats, InformeZData } from '@/core/domain/entities/tpv-types';
-import { getCsrfToken } from '@/lib/csrf-client';
+import { getCsrfToken, fetchWithCsrf } from '@/lib/csrf-client';
 import { useTpvCatalog } from '@/lib/tpv-catalog-ctx';
+import { useTpvIsEmployeeSession } from '@/lib/tpv-rol-ctx';
 import { InformeZModal } from '@/components/tpv/InformeZModal';
 import { logClientError } from '@/lib/client-error';
 
@@ -45,6 +46,7 @@ function getDiferenciaLabel(diferenciaCents: number): string {
 export function TurnoCerrarForm({ turno, stats, mesasAbiertas, isBlindClose }: Readonly<Props>) {
   const router = useRouter();
   const { setTurno } = useTpvCatalog();
+  const isEmployeeSession = useTpvIsEmployeeSession();
   const [efectivoContado, setEfectivoContado] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +85,9 @@ export function TurnoCerrarForm({ turno, stats, mesasAbiertas, isBlindClose }: R
 
       if (res.ok) {
         setTurno(null);
+        if (isEmployeeSession) {
+          await fetchWithCsrf('/api/tpv/empleados/logout', { method: 'POST' });
+        }
         const zRes = await fetch(`/api/tpv/turno/${turno.id}/informe-z`);
         if (zRes.ok) {
           const data = (await zRes.json()) as InformeZData;
@@ -98,7 +103,7 @@ export function TurnoCerrarForm({ turno, stats, mesasAbiertas, isBlindClose }: R
           }
           setInformeZ(data);
         } else {
-          router.push('/tpv/turno/abrir');
+          router.push(isEmployeeSession ? '/tpv/login' : '/tpv/turno/abrir');
         }
       } else {
         let msg = 'Error al cerrar el turno. Inténtalo de nuevo.';
@@ -116,7 +121,7 @@ export function TurnoCerrarForm({ turno, stats, mesasAbiertas, isBlindClose }: R
   }
 
   function handleInformeZClose() {
-    router.push('/tpv/turno/abrir');
+    router.push(isEmployeeSession ? '/tpv/login' : `/tpv/analytics/cierre/${turno.id}`);
   }
 
   if (informeZ !== null) {
@@ -124,7 +129,7 @@ export function TurnoCerrarForm({ turno, stats, mesasAbiertas, isBlindClose }: R
   }
 
   return (
-    <form onSubmit={handleCierre} className="flex flex-col gap-6 w-full max-w-sm">
+    <form onSubmit={handleCierre} className="flex flex-col gap-6 w-full">
       {/* Resumen */}
       <div className="bg-[#22263a] border border-[#2e3347] rounded-xl p-5 flex flex-col gap-3">
         <p className="text-[10px] font-bold text-[#6b7280] uppercase tracking-wider">Resumen del turno</p>

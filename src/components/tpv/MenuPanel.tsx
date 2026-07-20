@@ -86,6 +86,15 @@ interface ComplementDialogProps {
   onClose: () => void;
 }
 
+function resolveConfirmClass(valid: boolean): string {
+  return valid ? 'text-white' : 'text-[#64748b]';
+}
+
+function resolveProgressBackground(isRequired: boolean, isComplete: boolean): string {
+  if (!isRequired) return '#2563eb';
+  return isComplete ? '#16a34a' : '#ef4444';
+}
+
 function ComplementDialog({ state, onConfirm, onClose }: Readonly<ComplementDialogProps>) {
   const [selectedByGroup, setSelectedByGroup] = useState<Record<string, Set<string>>>({});
 
@@ -126,18 +135,18 @@ function ComplementDialog({ state, onConfirm, onClose }: Readonly<ComplementDial
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#1a1d27]">
+    <div className="fixed inset-0 z-50 flex flex-col bg-white">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[#2e3347] shrink-0">
+      <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[#e2e8f0] shrink-0">
         <div>
-          <p className="text-[10px] font-bold text-[#6b7280] uppercase tracking-wider mb-0.5">Complementos</p>
-          <p className="text-base font-bold text-[#e8eaf0]">{state.product.titulo_es}</p>
+          <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-0.5">Complementos</p>
+          <p className="text-base font-bold text-[#0f172a]">{state.product.titulo_es}</p>
         </div>
         <button
           type="button"
           onClick={onClose}
           aria-label="Cerrar"
-          className="w-8 h-8 flex items-center justify-center rounded-lg text-[#6b7280] hover:text-[#e8eaf0] hover:bg-[#2e3347] transition-colors"
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-[#64748b] hover:text-[#0f172a] hover:bg-[#f1f5f9] transition-colors"
         >
           ✕
         </button>
@@ -152,17 +161,17 @@ function ComplementDialog({ state, onConfirm, onClose }: Readonly<ComplementDial
           return (
             <div key={grupo.id}>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-semibold text-[#9ca3af]">{grupo.name}</span>
+                <span className="text-xs font-semibold text-[#475569]">{grupo.name}</span>
                 {isRequired && !isComplete && (
                   <span className="text-[10px] text-[#f59e0b]">Obligatorio</span>
                 )}
               </div>
-              <div className="h-0.5 rounded-full mb-2 overflow-hidden bg-[#2e3347]">
+              <div className="h-0.5 rounded-full mb-2 overflow-hidden bg-[#e2e8f0]">
                 <div
                   className="h-full rounded-full transition-all duration-300"
                   style={{
                     width: isComplete ? '100%' : '0%',
-                    background: isRequired ? (isComplete ? '#22c55e' : '#ef4444') : '#4f72ff',
+                    background: resolveProgressBackground(isRequired, isComplete),
                   }}
                 />
               </div>
@@ -181,27 +190,27 @@ function ComplementDialog({ state, onConfirm, onClose }: Readonly<ComplementDial
                       onClick={toggle}
                       className="flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all text-left"
                       style={{
-                        background: isSelected ? 'oklch(28% 0.10 260 / 0.5)' : 'oklch(20% 0.03 252 / 0.5)',
-                        borderColor: isSelected ? 'oklch(60% 0.18 260)' : 'oklch(35% 0.04 252)',
+                        background: isSelected ? '#eff6ff' : '#f8fafc',
+                        borderColor: isSelected ? '#2563eb' : '#e2e8f0',
                       }}
                     >
                       <span
                         className="w-4 h-4 shrink-0 flex items-center justify-center border-2"
                         style={{
                           borderRadius: grupo.tipo === 'radio' ? '50%' : '4px',
-                          borderColor: isSelected ? 'oklch(60% 0.18 260)' : '#4b5563',
+                          borderColor: isSelected ? '#2563eb' : '#d1d5db',
                         }}
                       >
                         {isSelected && grupo.tipo === 'radio' && (
-                          <span className="w-2 h-2 rounded-full bg-[#4f72ff]" />
+                          <span className="w-2 h-2 rounded-full bg-[#2563eb]" />
                         )}
                         {isSelected && grupo.tipo === 'checkbox' && (
-                          <span className="text-[10px] font-bold leading-none text-[#4f72ff]">✓</span>
+                          <span className="text-[10px] font-bold leading-none text-[#2563eb]">✓</span>
                         )}
                       </span>
-                      <span className="flex-1 text-sm text-[#c8cad4] font-medium">{opt.name}</span>
+                      <span className="flex-1 text-sm text-[#0f172a] font-medium">{opt.name}</span>
                       {opt.precio > 0 && (
-                        <span className="text-xs text-[#4f72ff] shrink-0">+{fmt(opt.precio)}</span>
+                        <span className="text-xs text-[#2563eb] shrink-0">+{fmt(opt.precio)}</span>
                       )}
                     </button>
                   );
@@ -213,16 +222,16 @@ function ComplementDialog({ state, onConfirm, onClose }: Readonly<ComplementDial
       </div>
 
       {/* Footer */}
-      <div className="px-5 py-4 border-t border-[#2e3347] shrink-0 flex flex-col gap-3">
+      <div className="px-5 py-4 border-t border-[#e2e8f0] shrink-0 flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <span className="text-sm text-[#9ca3af]">Total</span>
-          <span className="text-base font-bold text-[#e8eaf0]">{fmt(precioTotal)}</span>
+          <span className="text-sm text-[#64748b]">Total</span>
+          <span className="text-base font-bold text-[#0f172a]">{fmt(precioTotal)}</span>
         </div>
         <div className="flex gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-3 rounded-xl border border-[#2e3347] text-sm text-[#9ca3af] hover:border-[#4b5563] transition-colors"
+            className="flex-1 py-3 rounded-xl border border-[#e2e8f0] text-sm text-[#64748b] hover:border-[#cbd5e1] transition-colors"
           >
             Cancelar
           </button>
@@ -230,8 +239,8 @@ function ComplementDialog({ state, onConfirm, onClose }: Readonly<ComplementDial
             type="button"
             onClick={handleConfirm}
             disabled={!isValid}
-            className="flex-1 py-3 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-40"
-            style={{ background: isValid ? 'oklch(60% 0.18 260)' : '#374151' }}
+            className={`flex-1 py-3 rounded-xl text-sm font-semibold transition-colors disabled:opacity-40 ${resolveConfirmClass(isValid)}`}
+            style={{ background: isValid ? '#2563eb' : '#e2e8f0' }}
           >
             Añadir
           </button>
@@ -241,7 +250,7 @@ function ComplementDialog({ state, onConfirm, onClose }: Readonly<ComplementDial
   );
 }
 
-export function MenuPanel({ products, categories, onAddItem, mesaSeleccionada }: Props) {
+export function MenuPanel({ products, categories, onAddItem, mesaSeleccionada }: Readonly<Props>) {
   const [activeCatId, setActiveCatId] = useState<string>(ALL_CAT_ID);
   const [search, setSearch] = useState('');
   const [complementDialog, setComplementDialog] = useState<ComplementDialogState | null>(null);
@@ -296,16 +305,16 @@ export function MenuPanel({ products, categories, onAddItem, mesaSeleccionada }:
         }}
       />
     )}
-    <section className="flex-1 flex flex-col overflow-hidden bg-[#0f1117]">
+    <section className="flex-1 flex flex-col overflow-hidden bg-[#f1f5f9]">
       {/* Category tabs */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-[#2e3347] overflow-x-auto shrink-0">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-[#e2e8f0] overflow-x-auto shrink-0 bg-white">
         <button
           type="button"
           onClick={() => setActiveCatId(ALL_CAT_ID)}
-          className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+          className={`shrink-0 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
             activeCatId === ALL_CAT_ID
-              ? 'bg-[#4f72ff] text-white'
-              : 'bg-[#1a1d27] text-[#6b7280] hover:text-white'
+              ? 'bg-[#2563eb] text-white'
+              : 'bg-[#f1f5f9] text-[#475569] border border-[#e2e8f0] hover:text-[#0f172a]'
           }`}
         >
           Todo
@@ -315,10 +324,10 @@ export function MenuPanel({ products, categories, onAddItem, mesaSeleccionada }:
             key={cat.id}
             type="button"
             onClick={() => setActiveCatId(cat.id)}
-            className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+            className={`shrink-0 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
               activeCatId === cat.id
-                ? 'bg-[#4f72ff] text-white'
-                : 'bg-[#1a1d27] text-[#6b7280] hover:text-white'
+                ? 'bg-[#2563eb] text-white'
+                : 'bg-[#f1f5f9] text-[#475569] border border-[#e2e8f0] hover:text-[#0f172a]'
             }`}
           >
             {cat.nombre ?? cat.id}
@@ -327,39 +336,39 @@ export function MenuPanel({ products, categories, onAddItem, mesaSeleccionada }:
       </div>
 
       {/* Search */}
-      <div className="px-4 py-3 border-b border-[#2e3347] shrink-0">
+      <div className="px-4 py-3 border-b border-[#e2e8f0] shrink-0 bg-white">
         <input
           type="search"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Buscar producto..."
-          className="w-full bg-[#1a1d27] border border-[#2e3347] rounded-lg px-3 py-2 text-sm text-[#e8eaf0] placeholder:text-[#6b7280] focus:outline-none focus:border-[#4f72ff]"
+          placeholder="🔍 Buscar producto..."
+          className="w-full bg-white border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm text-[#0f172a] placeholder:text-[#94a3b8] focus:outline-none focus:border-[#2563eb]"
         />
       </div>
 
       {/* Product grid */}
       <div className="flex-1 overflow-y-auto p-4 relative">
         {!mesaSeleccionada && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#0f1117]/80 backdrop-blur-[2px]">
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#f1f5f9]/90 backdrop-blur-[2px]">
             <div className="flex flex-col items-center gap-2 text-center px-6">
               <span className="text-3xl">🪑</span>
-              <p className="text-sm font-semibold text-[#e8eaf0]">Selecciona una mesa</p>
-              <p className="text-xs text-[#6b7280]">Elige una mesa en el panel izquierdo para añadir productos.</p>
+              <p className="text-sm font-semibold text-[#0f172a]">Selecciona una mesa</p>
+              <p className="text-xs text-[#64748b]">Elige una mesa en el panel izquierdo para añadir productos.</p>
             </div>
           </div>
         )}
         {activeProducts.length === 0 && (
-          <p className="text-center text-sm text-[#6b7280] py-12">Sin productos</p>
+          <p className="text-center text-sm text-[#94a3b8] py-12">Sin productos</p>
         )}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
           {activeProducts.map(p => (
             <button
               key={p.id}
               type="button"
               onClick={() => handleProductClick(p)}
-              className="bg-[#1a1d27] border border-[#2e3347] rounded-xl overflow-hidden flex flex-col hover:border-[#4f72ff] hover:bg-[#22263a] transition-all text-left active:scale-95"
+              className="bg-white border border-[#e2e8f0] rounded-xl overflow-hidden flex flex-col hover:border-[#2563eb] hover:bg-[#f8fafc] transition-all text-left active:scale-95 shadow-sm"
             >
-              <div className="w-full aspect-square bg-[#0f1117] relative">
+              <div className="w-full aspect-square bg-[#f8fafc] relative">
                 {p.fotoUrl !== null ? (
                   <Image
                     src={p.fotoUrl}
@@ -369,14 +378,14 @@ export function MenuPanel({ products, categories, onAddItem, mesaSeleccionada }:
                     sizes="(max-width: 640px) 50vw, 20vw"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-2xl text-[#2e3347]">
+                  <div className="w-full h-full flex items-center justify-center text-2xl text-[#cbd5e1]">
                     +
                   </div>
                 )}
               </div>
               <div className="p-2.5 flex flex-col gap-1">
-                <p className="text-xs font-medium leading-tight line-clamp-2">{p.titulo_es}</p>
-                <p className="text-sm font-bold text-[#4f72ff]">
+                <p className="text-xs font-semibold leading-tight line-clamp-2 text-[#0f172a] uppercase tracking-wide">{p.titulo_es}</p>
+                <p className="text-base font-bold text-[#2563eb]">
                   {p.precio.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                 </p>
               </div>

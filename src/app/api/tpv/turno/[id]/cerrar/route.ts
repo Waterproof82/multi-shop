@@ -6,9 +6,10 @@ import {
   validationErrorResponse,
   type AuthResult,
 } from '@/core/infrastructure/api/helpers';
-import { getTpvRepository } from '@/core/infrastructure/database';
+import { getTpvRepository, getAuditLogRepository } from '@/core/infrastructure/database';
 import { cerrarTurnoUseCase } from '@/core/application/use-cases/tpv/cerrar-turno.use-case';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
+import { resolveActor } from '@/core/infrastructure/api/audit-actor';
 import { z } from 'zod';
 
 const repo = getTpvRepository();
@@ -89,5 +90,14 @@ export async function POST(
   });
 
   if (!result.success) return errorResponse(result.error.message);
+
+  const actor = resolveActor(req);
+  void getAuditLogRepository().insert({
+    empresaId,
+    action: 'tpv.turno.cerrar',
+    payload: { turnoId: id, fechaCierre: new Date().toISOString() },
+    ...actor,
+  });
+
   return NextResponse.json({ ok: true });
 }

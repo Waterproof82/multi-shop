@@ -12,6 +12,7 @@ export const updateEmpresaSchema = z.object({
   url_mapa: httpsUrlMax500.optional().or(z.literal('')),
   direccion: z.string().max(300).optional().nullable(),
   nif: z.string().max(20).optional().nullable(),
+  razon_social: z.string().max(200).optional().nullable(),
   tipo_impuesto: z.enum(['iva', 'igic']).optional(),
   porcentaje_impuesto: z.number().min(0).max(30).optional(),
   logo_url: httpsUrl.optional().or(z.literal('')).or(z.null()),

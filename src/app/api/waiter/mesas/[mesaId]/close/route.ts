@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getMesaSesionUseCase, getMesaSesionRepository, getPedidoRepository } from '@/core/infrastructure/database';
+import { getMesaSesionUseCase, getMesaSesionRepository, getPedidoRepository, getAuditLogRepository } from '@/core/infrastructure/database';
+import { resolveActor } from '@/core/infrastructure/api/audit-actor';
 
 const mesaIdSchema = z.string().uuid('El mesaId debe ser un UUID válido');
 
@@ -36,6 +37,14 @@ export async function POST(
   if (!result.success) {
     return NextResponse.json({ error: 'Error al cerrar la sesión de mesa' }, { status: 500 });
   }
+
+  const actor = resolveActor(request);
+  void getAuditLogRepository().insert({
+    empresaId,
+    action: 'waiter.mesa.cerrar_sesion',
+    payload: { mesaId: parsed.data },
+    ...actor,
+  });
 
   return NextResponse.json({ ok: true });
 }

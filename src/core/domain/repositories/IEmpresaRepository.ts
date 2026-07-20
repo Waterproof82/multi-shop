@@ -25,6 +25,7 @@ export interface UpdateEmpresaData {
   validacion_pedidos_habilitada?: boolean;
   delivery_habilitado?: boolean;
   nif?: string | null;
+  razon_social?: string | null;
   tipo_impuesto?: 'iva' | 'igic';
   porcentaje_impuesto?: number;
 }

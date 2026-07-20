@@ -69,10 +69,17 @@ export interface TpvMovimientoCajaPayload {
   empleadoId?: string;
 }
 
+export interface TpvIvaDesgloseItem {
+  porcentaje: number;
+  baseImponibleCents: number;
+  ivaCents: number;
+}
+
 export interface TpvDetalleItem {
   nombre: string;
   cantidad: number;
   precioUnitarioCents: number;
+  ivaPorcentaje?: number;
 }
 
 export interface TpvCobro {
@@ -94,6 +101,7 @@ export interface TpvCobro {
   cobradoAt: string;
   rectificaCobroId?: string | null;
   detalleItems: TpvDetalleItem[] | null;
+  desgloseIva?: TpvIvaDesgloseItem[] | null;
 }
 
 export interface TpvCobroCompletoPayload {
@@ -175,6 +183,8 @@ export interface InformeZData {
   propinaCents: number;
   numCobros: number;
   desglosePagos: InformeZDesglosePago[];
+  // Desglose por tipo de impuesto (multi-rate; undefined = legacy turno sin desglose)
+  desgloseImpuesto?: TpvIvaDesgloseItem[];
   // Movimientos de caja del turno
   movimientos: TpvTurnoEvento[];
 }

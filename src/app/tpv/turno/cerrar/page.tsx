@@ -69,8 +69,8 @@ export default async function TurnoCerrarPage() {
   });
 
   return (
-    <div className="flex items-center justify-center w-full h-full">
-      <div className="bg-[#1a1d27] border border-[#2e3347] rounded-2xl p-12 flex flex-col gap-8 w-[440px]">
+    <div className="w-full h-full overflow-y-auto p-8">
+      <div className="max-w-2xl mx-auto flex flex-col gap-8">
         <div className="flex flex-col gap-2">
           <span className="text-xs font-bold text-[#ef4444] uppercase tracking-wider">Cierre de Caja</span>
           <h1 className="text-2xl font-bold">{isBlindClose ? 'Cerrar turno' : 'Arqueo final'}</h1>

@@ -5,8 +5,9 @@ import {
   handleResult,
   validationErrorResponse,
 } from '@/core/infrastructure/api/helpers';
-import { getStockRepository } from '@/core/infrastructure/database';
+import { getStockRepository, getAuditLogRepository } from '@/core/infrastructure/database';
 import { ajustarStockUseCase } from '@/core/application/use-cases/stock/ajustar-stock.use-case';
+import { resolveActor } from '@/core/infrastructure/api/audit-actor';
 
 const ajusteSchema = z.object({
   delta: z.number().refine((v) => v !== 0, { message: 'El delta no puede ser cero' }),
@@ -44,6 +45,16 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
     tipo: parsed.data.tipo,
     turnoId: parsed.data.turnoId,
   });
+
+  if (result.success) {
+    const actor = resolveActor(req);
+    void getAuditLogRepository().insert({
+      empresaId,
+      action: 'admin.stock.ajuste',
+      payload: { ingredienteId, delta: parsed.data.delta },
+      ...actor,
+    });
+  }
 
   return handleResult(result);
 }

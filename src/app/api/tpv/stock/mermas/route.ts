@@ -6,8 +6,9 @@ import {
   validationErrorResponse,
   type AuthResult,
 } from '@/core/infrastructure/api/helpers';
-import { getStockRepository } from '@/core/infrastructure/database';
+import { getStockRepository, getAuditLogRepository } from '@/core/infrastructure/database';
 import { registrarMermaUseCase } from '@/core/application/use-cases/stock/registrar-merma.use-case';
+import { resolveActor } from '@/core/infrastructure/api/audit-actor';
 import { z } from 'zod';
 
 const MermaSchema = z.object({
@@ -40,5 +41,20 @@ export async function POST(req: NextRequest) {
 
   const repo = getStockRepository();
   const result = await registrarMermaUseCase(repo, { ...parsed.data, empresaId });
+
+  if (result.success) {
+    const actor = resolveActor(req);
+    void getAuditLogRepository().insert({
+      empresaId,
+      action: 'tpv.stock.merma',
+      payload: {
+        ingredienteId: parsed.data.ingredienteId,
+        cantidad: parsed.data.cantidad,
+        motivo: parsed.data.motivo,
+      },
+      ...actor,
+    });
+  }
+
   return handleResultWithStatus(result, 201);
 }

@@ -38,7 +38,7 @@ function TpvClock() {
   return <span className="font-semibold tabular-nums text-sm">{time}</span>;
 }
 
-export function TpvHeader({ empresaNombre }: Props) {
+export function TpvHeader({ empresaNombre }: Readonly<Props>) {
   const pathname = usePathname();
   const router = useRouter();
   const rol = useTpvRol();
@@ -50,13 +50,12 @@ export function TpvHeader({ empresaNombre }: Props) {
   const adminRef = useRef<HTMLDivElement>(null);
 
   const isCajero = rol === 'cajero';
-  const showGear = rol === 'admin' || rol === 'superadmin';
+  const showGear = rol === 'admin' || rol === 'superadmin' || rol === 'encargado';
 
   const NAV_ITEMS = [
-    { label: 'Mostrador', href: '/tpv/mostrador', activePrefix: '/tpv/mostrador' },
-    { label: 'Mesas',     href: '/tpv/mesas?seleccionar=1', activePrefix: '/tpv/mesas' },
-    ...(!isCajero ? [{ label: 'Historial', href: '/tpv/historial', activePrefix: '/tpv/historial' }] : []),
-    ...(!isCajero ? [{ label: 'Mermas', href: '/tpv/mermas', activePrefix: '/tpv/mermas' }] : []),
+    { label: '🛒 Mostrador', href: '/tpv/mostrador', activePrefix: '/tpv/mostrador' },
+    { label: '🪑 Mesas',     href: '/tpv/mesas?seleccionar=1', activePrefix: '/tpv/mesas' },
+    ...(!isCajero ? [{ label: '📋 Historial', href: '/tpv/historial', activePrefix: '/tpv/historial' }] : []),
   ];
 
   useEffect(() => {
@@ -87,7 +86,7 @@ export function TpvHeader({ empresaNombre }: Props) {
   }
 
   return (
-    <>
+    <div className="print:hidden">
     {!isOnline && (
       <div className="flex items-center justify-center gap-2 h-8 px-4 bg-[#f59e0b] text-black text-xs font-semibold shrink-0">
         <span>Sin conexión — modo local</span>
@@ -98,10 +97,10 @@ export function TpvHeader({ empresaNombre }: Props) {
         )}
       </div>
     )}
-    <header className="flex items-center justify-between h-14 px-5 bg-[#1a1d27] border-b border-[#2e3347] shrink-0">
+    <header className="flex items-center justify-between h-14 px-5 bg-white border-b border-[#e2e8f0] shrink-0">
       <div className="flex items-center gap-4">
-        <span className="font-bold text-[#4f72ff] text-sm tracking-wide">TPV</span>
-        <span className="text-xs text-[#6b7280]">{empresaNombre}</span>
+        <span className="font-bold text-[#2563eb] text-sm tracking-wide">TPV</span>
+        <span className="text-xs text-[#64748b]">{empresaNombre}</span>
       </div>
 
       <nav className="flex gap-1">
@@ -112,8 +111,8 @@ export function TpvHeader({ empresaNombre }: Props) {
             onClick={() => router.push(href)}
             className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
               pathname.startsWith(activePrefix)
-                ? 'bg-[#22263a] text-[#e8eaf0]'
-                : 'text-[#6b7280] hover:text-[#e8eaf0]'
+                ? 'bg-[#eff6ff] text-[#1e40af] border border-[#93c5fd]'
+                : 'text-[#64748b] hover:text-[#0f172a]'
             }`}
           >
             {label}
@@ -133,25 +132,25 @@ export function TpvHeader({ empresaNombre }: Props) {
               aria-expanded={adminOpen}
               className={`p-1.5 rounded-md border transition-colors ${
                 adminOpen
-                  ? 'bg-[#2e3347] border-[#4f72ff] text-[#4f72ff]'
-                  : 'bg-[#22263a] border-[#2e3347] text-[#6b7280] hover:border-[#4f72ff] hover:text-[#e8eaf0]'
+                  ? 'bg-[#eff6ff] border-[#2563eb] text-[#2563eb]'
+                  : 'bg-[#f8fafc] border-[#e2e8f0] text-[#64748b] hover:border-[#2563eb] hover:text-[#0f172a]'
               }`}
             >
               <Settings className="h-4 w-4" />
             </button>
 
             {adminOpen && (
-              <div className="absolute right-0 top-full mt-2 w-48 bg-[#1a1d27] border border-[#2e3347] rounded-lg shadow-xl z-50 overflow-hidden">
+              <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-[#e2e8f0] rounded-lg shadow-xl z-50 overflow-hidden">
                 {ADMIN_SHORTCUTS.map(({ label, href, icon: Icon }, idx) => (
                   <button
                     key={href}
                     type="button"
-                    onClick={() => { setAdminOpen(false); router.push(href); }}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#c4c8d8] hover:bg-[#22263a] hover:text-[#e8eaf0] transition-colors text-left ${
-                      idx === ADMIN_SHORTCUTS.length - 1 ? 'border-t border-[#2e3347] mt-1' : ''
+                    onClick={() => { setAdminOpen(false); window.location.href = href; }}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#374151] hover:bg-[#f1f5f9] hover:text-[#0f172a] transition-colors text-left ${
+                      idx === ADMIN_SHORTCUTS.length - 1 ? 'border-t border-[#e2e8f0] mt-1' : ''
                     }`}
                   >
-                    <Icon className="h-4 w-4 text-[#4f72ff] flex-shrink-0" />
+                    <Icon className="h-4 w-4 text-[#2563eb] flex-shrink-0" />
                     {label}
                   </button>
                 ))}
@@ -165,7 +164,7 @@ export function TpvHeader({ empresaNombre }: Props) {
             onClick={handleLock}
             disabled={locking}
             aria-label="Bloquear TPV"
-            className="p-1.5 rounded-md border bg-[#22263a] border-[#2e3347] text-[#6b7280] hover:border-[#ef4444] hover:text-[#ef4444] transition-colors disabled:opacity-50"
+            className="p-1.5 rounded-md border bg-[#f8fafc] border-[#e2e8f0] text-[#64748b] hover:border-[#ef4444] hover:text-[#ef4444] transition-colors disabled:opacity-50"
           >
             <Lock className="h-4 w-4" />
           </button>
@@ -173,12 +172,13 @@ export function TpvHeader({ empresaNombre }: Props) {
         <button
           type="button"
           onClick={() => router.push('/tpv/turno/cerrar')}
-          className="text-xs bg-[#22263a] border border-[#2e3347] px-3 py-1.5 rounded-md hover:border-[#4f72ff] transition-colors"
+          className="text-xs bg-[#fef2f2] border border-[#fca5a5] text-[#ef4444] px-3 py-1.5 rounded-md hover:bg-[#fee2e2] transition-colors flex items-center gap-1.5"
         >
+          <span aria-hidden="true">⏻</span>
           Cierre de Caja
         </button>
       </div>
     </header>
-    </>
+    </div>
   );
 }

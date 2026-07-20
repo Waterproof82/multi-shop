@@ -74,14 +74,41 @@ export function InformeZModal({ informe, onClose }: Readonly<Props>) {
         {/* Fiscalidad */}
         <div className="font-bold text-xs mb-1">FISCALIDAD ({impuestoLabel})</div>
         <div className="text-xs space-y-0.5">
-          <div className="flex justify-between">
-            <span>Base imponible:</span>
-            <span>{formatCents(informe.baseImponibleCents)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Cuota {impuestoLabel}:</span>
-            <span>{formatCents(informe.ivaCents)}</span>
-          </div>
+          {informe.desgloseImpuesto && informe.desgloseImpuesto.length > 1 ? (
+            <>
+              {informe.desgloseImpuesto.map(bracket => (
+                <div key={bracket.porcentaje}>
+                  <div className="flex justify-between">
+                    <span>Base {impuestoLabel} {bracket.porcentaje}%:</span>
+                    <span>{formatCents(bracket.baseImponibleCents)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Cuota {impuestoLabel} {bracket.porcentaje}%:</span>
+                    <span>{formatCents(bracket.ivaCents)}</span>
+                  </div>
+                </div>
+              ))}
+              <div className="flex justify-between border-t border-gray-300 pt-0.5">
+                <span>Base imponible total:</span>
+                <span>{formatCents(informe.baseImponibleCents)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Cuota {impuestoLabel} total:</span>
+                <span>{formatCents(informe.ivaCents)}</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex justify-between">
+                <span>Base imponible:</span>
+                <span>{formatCents(informe.baseImponibleCents)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Cuota {impuestoLabel}:</span>
+                <span>{formatCents(informe.ivaCents)}</span>
+              </div>
+            </>
+          )}
           <div className="flex justify-between">
             <span>Propinas (exento):</span>
             <span>{formatCents(informe.propinaCents)}</span>

@@ -32,7 +32,7 @@ export class SupabaseClienteRepository implements IClienteRepository {
       const { data: pedidos } = await this.supabase
         .from('pedidos')
         .select('cliente_id')
-        .eq('empresa_id', empresaId);
+        .eq('empresa_id', empresaId)
 
       const pedidosCount: Record<string, number> = {};
       pedidos?.forEach(p => {
@@ -184,7 +184,7 @@ export class SupabaseClienteRepository implements IClienteRepository {
         .from('clientes')
         .delete()
         .eq('id', id)
-        .eq('empresa_id', empresaId);
+        .eq('empresa_id', empresaId)
 
       if (error) {
         await logger.logAndReturnError(
@@ -199,6 +199,37 @@ export class SupabaseClienteRepository implements IClienteRepository {
       return { success: true, data: undefined };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabaseClienteRepository.delete', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
+  async anonimizarCliente(clienteId: string, empresaId: string): Promise<Result<void>> {
+    try {
+      const { error } = await this.supabase
+        .from('clientes')
+        .update({
+          nombre: 'ANONIMIZADO',
+          email: null,
+          telefono: null,
+          anonimizado_en: new Date().toISOString(),
+        })
+        .eq('id', clienteId)
+        .eq('empresa_id', empresaId)
+        .is('anonimizado_en', null);
+
+      if (error) {
+        await logger.logAndReturnError(
+          'DB_UPDATE_ERROR',
+          error.message,
+          'repository',
+          'SupabaseClienteRepository.anonimizarCliente',
+          { empresaId, details: { code: error.code } }
+        );
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al anonimizar cliente', module: 'repository', method: 'anonimizarCliente' } };
+      }
+      return { success: true, data: undefined };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseClienteRepository.anonimizarCliente', { empresaId });
       return { success: false, error: appError };
     }
   }
