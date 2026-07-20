@@ -16,7 +16,7 @@ const TpvBarChart = dynamic(
     ssr: false,
     loading: () => (
       <div className="flex items-center justify-center h-full">
-        <Loader2 className="h-5 w-5 animate-spin text-[#6b7280]" />
+        <Loader2 className="h-5 w-5 animate-spin text-[#64748b]" />
       </div>
     ),
   }
@@ -137,7 +137,7 @@ interface Props {
   readonly tipoImpuesto: TipoImpuesto;
 }
 
-export function AnalyticsClient({ initialData, tipoImpuesto }: Props) {
+export function AnalyticsClient({ initialData, tipoImpuesto }: Readonly<Props>) {
   const today = toDateStr(new Date());
   const [periodo, setPeriodo] = useState<Periodo>('hoy');
   const [customDesde, setCustomDesde] = useState(today);
@@ -202,34 +202,34 @@ export function AnalyticsClient({ initialData, tipoImpuesto }: Props) {
     .slice(minHora, maxHora + 1);
 
   return (
-    <div className="flex-1 overflow-auto p-6">
+    <div className="flex-1 overflow-auto p-6 bg-[#f1f5f9]">
       <div className="max-w-5xl mx-auto">
 
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-lg font-bold text-[#e8eaf0]">Analítica TPV</h2>
-            <p className="text-xs text-[#6b7280] mt-0.5">Rendimiento de caja por período</p>
+            <h2 className="text-lg font-bold text-[#0f172a]">Analítica TPV</h2>
+            <p className="text-xs text-[#64748b] mt-0.5">Rendimiento de caja por período</p>
           </div>
           <div className="flex items-center gap-2">
-            {loading && <Loader2 className="h-4 w-4 animate-spin text-[#6b7280]" />}
+            {loading && <Loader2 className="h-4 w-4 animate-spin text-[#64748b]" />}
             <button
               type="button"
               onClick={exportPdf}
               title="Exportar informe PDF"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1a1d27] border border-[#2e3347] text-xs text-[#6b7280] hover:text-white hover:border-[#4f72ff] transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#e2e8f0] text-xs text-[#64748b] hover:text-[#0f172a] hover:border-[#2563eb] transition-colors"
             >
               <Download className="h-3.5 w-3.5" />
               PDF
             </button>
-            <div className="flex gap-1 bg-[#1a1d27] border border-[#2e3347] rounded-xl p-1">
+            <div className="flex gap-1 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-1">
               {(['hoy', 'semana', 'mes', 'custom'] as Periodo[]).map(p => (
                 <button
                   key={p}
                   type="button"
                   onClick={() => handlePeriodo(p)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-colors ${
-                    periodo === p ? 'bg-[#4f72ff] text-white' : 'text-[#6b7280] hover:text-white'
+                    periodo === p ? 'bg-[#2563eb] text-white' : 'text-[#64748b] hover:text-[#0f172a]'
                   }`}
                 >
                   {periodoLabel(p)}
@@ -241,24 +241,24 @@ export function AnalyticsClient({ initialData, tipoImpuesto }: Props) {
 
         {/* Custom date inputs */}
         {periodo === 'custom' && (
-          <div className="flex items-center gap-3 mb-6 bg-[#1a1d27] border border-[#2e3347] rounded-xl px-4 py-3">
+          <div className="flex items-center gap-3 mb-6 bg-white border border-[#e2e8f0] rounded-xl px-4 py-3">
             <input
               type="date"
               value={customDesde}
               onChange={e => setCustomDesde(e.target.value)}
-              className="bg-transparent text-sm text-[#e8eaf0] border border-[#2e3347] rounded-lg px-2 py-1"
+              className="bg-transparent text-sm text-[#0f172a] border border-[#e2e8f0] rounded-lg px-2 py-1"
             />
-            <span className="text-[#6b7280] text-sm">→</span>
+            <span className="text-[#64748b] text-sm">→</span>
             <input
               type="date"
               value={customHasta}
               onChange={e => setCustomHasta(e.target.value)}
-              className="bg-transparent text-sm text-[#e8eaf0] border border-[#2e3347] rounded-lg px-2 py-1"
+              className="bg-transparent text-sm text-[#0f172a] border border-[#e2e8f0] rounded-lg px-2 py-1"
             />
             <button
               type="button"
               onClick={handleCustomApply}
-              className="ml-2 px-4 py-1.5 rounded-lg bg-[#4f72ff] text-white text-xs font-semibold"
+              className="ml-2 px-4 py-1.5 rounded-lg bg-[#2563eb] text-white text-xs font-semibold"
             >
               Aplicar
             </button>
@@ -268,11 +268,11 @@ export function AnalyticsClient({ initialData, tipoImpuesto }: Props) {
         {/* KPIs */}
         <div className="grid grid-cols-5 gap-3 mb-6">
           {[
-            { label: 'Facturado', value: fmt(data.totalFacturadoCents), prev: prevData?.totalFacturadoCents, sub: `${data.numCobros} cobros`, color: 'text-[#e8eaf0]' },
-            { label: 'Ticket ∅', value: fmt(data.ticketMedioCents), prev: prevData?.ticketMedioCents, sub: 'por cobro', color: 'text-[#4f72ff]' },
+            { label: 'Facturado', value: fmt(data.totalFacturadoCents), prev: prevData?.totalFacturadoCents, sub: `${data.numCobros} cobros`, color: 'text-[#0f172a]' },
+            { label: 'Ticket ∅', value: fmt(data.ticketMedioCents), prev: prevData?.ticketMedioCents, sub: 'por cobro', color: 'text-[#2563eb]' },
             { label: `${impLabel} total`, value: fmt(data.totalIvaCents), prev: prevData?.totalIvaCents, sub: `Base: ${fmt(data.baseImponibleCents)}`, color: 'text-[#f59e0b]' },
-            { label: 'Propinas', value: fmt(data.totalPropinaCents), prev: prevData?.totalPropinaCents, sub: `exento ${impLabel}`, color: 'text-[#e8eaf0]' },
-            { label: 'Turnos', value: String(data.numTurnos), prev: prevData?.numTurnos, sub: data.duracionMediaMinutos !== null ? `∅ ${Math.floor(data.duracionMediaMinutos / 60)}h ${data.duracionMediaMinutos % 60}m` : '—', color: 'text-[#e8eaf0]' },
+            { label: 'Propinas', value: fmt(data.totalPropinaCents), prev: prevData?.totalPropinaCents, sub: `exento ${impLabel}`, color: 'text-[#0f172a]' },
+            { label: 'Turnos', value: String(data.numTurnos), prev: prevData?.numTurnos, sub: data.duracionMediaMinutos !== null ? `∅ ${Math.floor(data.duracionMediaMinutos / 60)}h ${data.duracionMediaMinutos % 60}m` : '—', color: 'text-[#0f172a]' },
           ].map(kpi => {
             // Para los que son cents, necesitamos el valor numérico
             const currNum = kpi.label === 'Facturado' ? data.totalFacturadoCents
@@ -282,13 +282,13 @@ export function AnalyticsClient({ initialData, tipoImpuesto }: Props) {
               : data.numTurnos;
             const d2 = kpi.prev !== undefined ? delta(currNum, kpi.prev) : null;
             return (
-              <div key={kpi.label} className="bg-[#1a1d27] border border-[#2e3347] rounded-xl px-4 py-3">
-                <p className="text-[10px] text-[#6b7280] uppercase tracking-wider mb-1">{kpi.label}</p>
+              <div key={kpi.label} className="bg-white border border-[#e2e8f0] rounded-xl px-4 py-3 shadow-sm">
+                <p className="text-[10px] text-[#64748b] uppercase tracking-wider mb-1">{kpi.label}</p>
                 <p className={`text-xl font-bold ${kpi.color}`}>{kpi.value}</p>
                 <div className="flex items-center gap-1 mt-1">
-                  <p className="text-[10px] text-[#6b7280]">{kpi.sub}</p>
+                  <p className="text-[10px] text-[#64748b]">{kpi.sub}</p>
                   {d2 !== null && (
-                    <span className={`text-[10px] font-semibold ${d2 >= 0 ? 'text-[#22c55e]' : 'text-[#ef4444]'}`}>
+                    <span className={`text-[10px] font-semibold ${d2 >= 0 ? 'text-[#16a34a]' : 'text-[#ef4444]'}`}>
                       {d2 >= 0 ? '↑' : '↓'}{Math.abs(d2)}%
                     </span>
                   )}
@@ -300,31 +300,31 @@ export function AnalyticsClient({ initialData, tipoImpuesto }: Props) {
 
         {/* Gráfico por hora + Split pago */}
         <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="col-span-2 bg-[#1a1d27] border border-[#2e3347] rounded-xl p-4">
-            <p className="text-sm font-semibold text-[#e8eaf0] mb-4">Ventas por hora</p>
+          <div className="col-span-2 bg-white border border-[#e2e8f0] rounded-xl p-4 shadow-sm">
+            <p className="text-sm font-semibold text-[#0f172a] mb-4">Ventas por hora</p>
             <div className="h-40">
               {activeHours.length > 0
                 ? <TpvBarChart data={chartData} />
-                : <p className="text-center text-[#6b7280] text-sm py-12">Sin datos en este período</p>
+                : <p className="text-center text-[#94a3b8] text-sm py-12">Sin datos en este período</p>
               }
             </div>
           </div>
-          <div className="bg-[#1a1d27] border border-[#2e3347] rounded-xl p-4">
-            <p className="text-sm font-semibold text-[#e8eaf0] mb-4">Método de pago</p>
+          <div className="bg-white border border-[#e2e8f0] rounded-xl p-4 shadow-sm">
+            <p className="text-sm font-semibold text-[#0f172a] mb-4">Método de pago</p>
             <div className="flex flex-col gap-4">
               {[
-                { label: 'Efectivo', cents: data.splitEfectivoCents, pct: pctEfectivo, color: '#22c55e' },
-                { label: 'Tarjeta', cents: data.splitTarjetaCents, pct: 100 - pctEfectivo, color: '#4f72ff' },
+                { label: 'Efectivo', cents: data.splitEfectivoCents, pct: pctEfectivo, color: '#16a34a' },
+                { label: 'Tarjeta', cents: data.splitTarjetaCents, pct: 100 - pctEfectivo, color: '#2563eb' },
               ].map(m => (
                 <div key={m.label}>
                   <div className="flex justify-between mb-1">
                     <span className="text-xs font-semibold" style={{ color: m.color }}>{m.label}</span>
-                    <span className="text-xs text-[#e8eaf0]">{fmt(m.cents)}</span>
+                    <span className="text-xs text-[#0f172a]">{fmt(m.cents)}</span>
                   </div>
-                  <div className="bg-[#2e3347] rounded-full h-2 overflow-hidden">
+                  <div className="bg-[#e2e8f0] rounded-full h-2 overflow-hidden">
                     <div className="h-full rounded-full" style={{ width: `${m.pct}%`, background: m.color }} />
                   </div>
-                  <span className="text-[10px] text-[#6b7280]">{m.pct}%</span>
+                  <span className="text-[10px] text-[#64748b]">{m.pct}%</span>
                 </div>
               ))}
             </div>
@@ -333,15 +333,15 @@ export function AnalyticsClient({ initialData, tipoImpuesto }: Props) {
 
         {/* Heatmap ventas por día × hora */}
         {data.heatmap.length > 0 && (
-          <div className="bg-[#1a1d27] border border-[#2e3347] rounded-xl p-4 mb-6">
-            <p className="text-sm font-semibold text-[#e8eaf0] mb-4">Mapa de calor · día × hora</p>
+          <div className="bg-white border border-[#e2e8f0] rounded-xl p-4 mb-6 shadow-sm">
+            <p className="text-sm font-semibold text-[#0f172a] mb-4">Mapa de calor · día × hora</p>
             <div className="overflow-x-auto">
               <table className="border-separate" style={{ borderSpacing: 2 }}>
                 <thead>
                   <tr>
                     <th className="w-6" />
                     {Array.from({ length: activeHoursHeatmap.max - activeHoursHeatmap.min + 1 }, (_, i) => (
-                      <th key={i} className="text-[9px] text-[#6b7280] font-normal w-6 text-center">
+                      <th key={i} className="text-[9px] text-[#64748b] font-normal w-6 text-center">
                         {activeHoursHeatmap.min + i}
                       </th>
                     ))}
@@ -352,7 +352,7 @@ export function AnalyticsClient({ initialData, tipoImpuesto }: Props) {
                     const dow = uiToDow(uiIdx);
                     return (
                       <tr key={label}>
-                        <td className="text-[9px] text-[#6b7280] pr-1 text-right">{label}</td>
+                        <td className="text-[9px] text-[#64748b] pr-1 text-right">{label}</td>
                         {Array.from({ length: activeHoursHeatmap.max - activeHoursHeatmap.min + 1 }, (_, i) => {
                           const hora = activeHoursHeatmap.min + i;
                           const val = heatmapMap.get(`${dow}-${hora}`) ?? 0;
@@ -362,7 +362,7 @@ export function AnalyticsClient({ initialData, tipoImpuesto }: Props) {
                               key={hora}
                               title={val > 0 ? fmt(val) : '—'}
                               className="w-6 h-6 rounded-sm"
-                              style={{ background: val === 0 ? '#1e2235' : `rgba(79,114,255,${0.15 + intensity * 0.85})` }}
+                              style={{ background: val === 0 ? '#f1f5f9' : `rgba(37,99,235,${0.15 + intensity * 0.85})` }}
                             />
                           );
                         })}
@@ -377,10 +377,10 @@ export function AnalyticsClient({ initialData, tipoImpuesto }: Props) {
 
         {/* Top productos + Historial turnos */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-[#1a1d27] border border-[#2e3347] rounded-xl p-4">
-            <p className="text-sm font-semibold text-[#e8eaf0] mb-4">Productos más vendidos</p>
+          <div className="bg-white border border-[#e2e8f0] rounded-xl p-4 shadow-sm">
+            <p className="text-sm font-semibold text-[#0f172a] mb-4">Productos más vendidos</p>
             {data.topProductos.length === 0
-              ? <p className="text-[#6b7280] text-sm">Sin datos</p>
+              ? <p className="text-[#94a3b8] text-sm">Sin datos</p>
               : (
                 <div className="flex flex-col gap-2">
                   {data.topProductos.map((p, i) => (
@@ -388,40 +388,40 @@ export function AnalyticsClient({ initialData, tipoImpuesto }: Props) {
                       <span
                         className="text-[9px] font-bold w-5 h-5 rounded flex items-center justify-center shrink-0"
                         style={{
-                          background: i < 3 ? '#4f72ff' : '#2e3347',
-                          color: i < 3 ? 'white' : '#6b7280',
+                          background: i < 3 ? '#2563eb' : '#e2e8f0',
+                          color: i < 3 ? 'white' : '#64748b',
                         }}
                       >
                         {i + 1}
                       </span>
-                      <span className="text-sm text-[#c8cad4] flex-1 truncate">{p.nombre}</span>
-                      <span className="text-xs text-[#6b7280] shrink-0">× {p.cantidad}</span>
+                      <span className="text-sm text-[#374151] flex-1 truncate">{p.nombre}</span>
+                      <span className="text-xs text-[#64748b] shrink-0">× {p.cantidad}</span>
                     </div>
                   ))}
                 </div>
               )}
           </div>
 
-          <div className="bg-[#1a1d27] border border-[#2e3347] rounded-xl p-4">
-            <p className="text-sm font-semibold text-[#e8eaf0] mb-4">Turnos del período</p>
+          <div className="bg-white border border-[#e2e8f0] rounded-xl p-4 shadow-sm">
+            <p className="text-sm font-semibold text-[#0f172a] mb-4">Turnos del período</p>
             {data.historialTurnos.length === 0
-              ? <p className="text-[#6b7280] text-sm">Sin turnos</p>
+              ? <p className="text-[#94a3b8] text-sm">Sin turnos</p>
               : (
                 <div className="flex flex-col gap-2">
                   {data.historialTurnos.map(t => (
-                    <div key={t.id} className="bg-[#22263a] rounded-lg px-3 py-2">
+                    <div key={t.id} className="bg-[#f8fafc] border border-[#e2e8f0] rounded-lg px-3 py-2">
                       <div className="flex justify-between items-center mb-1">
-                        <span className="text-sm font-semibold text-[#e8eaf0]">{t.operadorNombre}</span>
+                        <span className="text-sm font-semibold text-[#0f172a]">{t.operadorNombre}</span>
                         {t.activo
-                          ? <span className="text-[10px] text-[#4f72ff] font-bold">● En curso</span>
-                          : <span className="text-sm font-bold text-[#22c55e]">{fmt(t.totalCents)}</span>
+                          ? <span className="text-[10px] text-[#2563eb] font-bold">● En curso</span>
+                          : <span className="text-sm font-bold text-[#16a34a]">{fmt(t.totalCents)}</span>
                         }
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-[10px] text-[#6b7280]">
+                        <span className="text-[10px] text-[#64748b]">
                           {fmtTime(t.aperturaAt)}{t.cierreAt !== null ? ` → ${fmtTime(t.cierreAt)}` : ''} · {fmtDate(t.aperturaAt)}
                         </span>
-                        <span className="text-[10px] text-[#6b7280]">{t.numCobros} cobros</span>
+                        <span className="text-[10px] text-[#64748b]">{t.numCobros} cobros</span>
                       </div>
                     </div>
                   ))}
