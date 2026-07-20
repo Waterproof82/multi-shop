@@ -57,12 +57,6 @@ export function AccionesPanel({ sesionId, turnoId, onRefresh, refreshing }: Read
   return (
     <aside className="w-16 shrink-0 bg-white border-l border-[#e2e8f0] flex flex-col items-center py-3 gap-1.5">
       <ActionIcon
-        emoji="🪑"
-        label="Mesa"
-        onClick={() => router.push('/tpv/mesas?seleccionar=1')}
-        variant={hasMesa ? 'active' : 'default'}
-      />
-      <ActionIcon
         emoji="🔄"
         label="Actualizar"
         onClick={() => { void onRefresh(); }}
@@ -70,29 +64,21 @@ export function AccionesPanel({ sesionId, turnoId, onRefresh, refreshing }: Read
       />
       <ActionIcon
         emoji="🧾"
-        label="Ticket"
+        label="Cobrar"
         onClick={() => { if (sesionId) router.push(`/tpv/cobro/${sesionId}?turnoId=${turnoId}`); }}
         disabled={!hasMesa}
       />
 
-      <div className="w-7 h-px bg-[#e2e8f0] my-1" role="separator" />
-
       {!isCajero && (
         <>
-          <ActionIcon emoji="📋" label="Historial" onClick={() => router.push('/tpv/historial')} />
+          <div className="w-7 h-px bg-[#e2e8f0] my-1" role="separator" />
           <ActionIcon emoji="📊" label="Analítica" onClick={() => router.push('/tpv/analytics')} />
           <ActionIcon emoji="⚖️" label="Legal" onClick={() => router.push('/tpv/legal')} />
+          <ActionIcon emoji="📉" label="Mermas" onClick={() => router.push('/tpv/mermas')} />
         </>
       )}
 
       <div className="flex-1" />
-
-      <ActionIcon
-        emoji="⏻"
-        label="Cierre"
-        onClick={() => router.push('/tpv/turno/cerrar')}
-        variant="danger"
-      />
     </aside>
   );
 }

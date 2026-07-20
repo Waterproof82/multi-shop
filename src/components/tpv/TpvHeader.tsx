@@ -56,7 +56,6 @@ export function TpvHeader({ empresaNombre }: Readonly<Props>) {
     { label: '🛒 Mostrador', href: '/tpv/mostrador', activePrefix: '/tpv/mostrador' },
     { label: '🪑 Mesas',     href: '/tpv/mesas?seleccionar=1', activePrefix: '/tpv/mesas' },
     ...(!isCajero ? [{ label: '📋 Historial', href: '/tpv/historial', activePrefix: '/tpv/historial' }] : []),
-    ...(!isCajero ? [{ label: '📉 Mermas', href: '/tpv/mermas', activePrefix: '/tpv/mermas' }] : []),
   ];
 
   useEffect(() => {
