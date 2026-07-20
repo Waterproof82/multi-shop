@@ -34,7 +34,7 @@
     "@radix-ui/react-toast": "1.2.19",
     "@sentry/nextjs": "^10.65.0",
     "@smithy/node-http-handler": "^4.4.14",
-    "@supabase/supabase-js": "^2.110.2",
+    "@supabase/supabase-js": "^2.110.7",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.36.3",
     "@zxing/browser": "^0.2.0",
