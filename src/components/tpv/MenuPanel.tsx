@@ -90,6 +90,11 @@ function resolveConfirmClass(valid: boolean): string {
   return valid ? 'text-white' : 'text-[#64748b]';
 }
 
+function resolveProgressBackground(isRequired: boolean, isComplete: boolean): string {
+  if (!isRequired) return '#2563eb';
+  return isComplete ? '#16a34a' : '#ef4444';
+}
+
 function ComplementDialog({ state, onConfirm, onClose }: Readonly<ComplementDialogProps>) {
   const [selectedByGroup, setSelectedByGroup] = useState<Record<string, Set<string>>>({});
 
@@ -166,7 +171,7 @@ function ComplementDialog({ state, onConfirm, onClose }: Readonly<ComplementDial
                   className="h-full rounded-full transition-all duration-300"
                   style={{
                     width: isComplete ? '100%' : '0%',
-                    background: isRequired ? (isComplete ? '#16a34a' : '#ef4444') : '#2563eb',
+                    background: resolveProgressBackground(isRequired, isComplete),
                   }}
                 />
               </div>
