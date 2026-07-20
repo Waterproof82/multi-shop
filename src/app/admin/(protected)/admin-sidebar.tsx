@@ -162,7 +162,7 @@ const NAV_ENTRIES: NavEntry[] = [
       ],
     },
   },
-  { type: 'item', def: { href: '/admin/audit-log', labelKey: 'sidebarAuditLog', icon: MonitorCheck } },
+  { type: 'item', def: { href: '/admin/audit-log', labelKey: 'sidebarAuditLog', icon: MonitorCheck, requiresRestaurant: true } },
   { type: 'item', def: { href: '/admin/configuracion', labelKey: 'sidebarSettings', icon: Settings } },
 ];
 
@@ -495,13 +495,15 @@ export function AdminSidebar({ empresaId: _empresaId }: Readonly<AdminSidebarPro
 
           {/* Footer */}
           <div className="p-4 border-t border-white/10 space-y-1">
-            <a
-              href="/tpv/mostrador"
-              className="flex items-center gap-3 px-4 py-2.5 min-h-[44px] text-sm text-slate-300 hover:bg-white/5 hover:text-white w-full rounded-lg transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
-            >
-              <MonitorCheck className="h-4 w-4 flex-shrink-0" />
-              Ir al TPV
-            </a>
+            {filterCtx.isRestaurant && (
+              <a
+                href="/tpv/mostrador"
+                className="flex items-center gap-3 px-4 py-2.5 min-h-[44px] text-sm text-slate-300 hover:bg-white/5 hover:text-white w-full rounded-lg transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+              >
+                <MonitorCheck className="h-4 w-4 flex-shrink-0" />
+                Ir al TPV
+              </a>
+            )}
             <Link
               href="/"
               className="flex items-center gap-3 px-4 py-2.5 min-h-[44px] text-sm text-slate-300 hover:bg-white/5 hover:text-white w-full rounded-lg transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
