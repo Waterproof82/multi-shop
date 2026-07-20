@@ -2,12 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useTpvRol } from '@/lib/tpv-rol-ctx';
-
-interface Props {
-  readonly sesionId: string | null;
-  readonly onRefresh: () => Promise<void>;
-  readonly refreshing: boolean;
-}
+import { useTpvAcciones } from '@/lib/tpv-acciones-ctx';
 
 type ActionVariant = 'default' | 'active' | 'danger';
 
@@ -47,9 +42,10 @@ function ActionIcon({ emoji, label, onClick, disabled = false, variant = 'defaul
   );
 }
 
-export function AccionesPanel({ sesionId, onRefresh, refreshing }: Readonly<Props>) {
+export function AccionesPanel() {
   const router = useRouter();
   const rol = useTpvRol();
+  const { sesionId, refreshing, triggerRefresh } = useTpvAcciones();
   const isCajero = rol === 'cajero';
   const hasMesa = sesionId !== null;
 
@@ -58,7 +54,7 @@ export function AccionesPanel({ sesionId, onRefresh, refreshing }: Readonly<Prop
       <ActionIcon
         emoji="🔄"
         label="Actualizar"
-        onClick={() => { void onRefresh(); }}
+        onClick={triggerRefresh}
         disabled={!hasMesa || refreshing}
       />
 
@@ -66,12 +62,15 @@ export function AccionesPanel({ sesionId, onRefresh, refreshing }: Readonly<Prop
         <>
           <div className="w-7 h-px bg-[#e2e8f0] my-1" role="separator" />
           <ActionIcon emoji="📊" label="Analítica" onClick={() => router.push('/tpv/analytics')} />
-          <ActionIcon emoji="⚖️" label="Legal" onClick={() => router.push('/tpv/legal')} />
           <ActionIcon emoji="📉" label="Mermas" onClick={() => router.push('/tpv/mermas')} />
         </>
       )}
 
       <div className="flex-1" />
+
+      {!isCajero && (
+        <ActionIcon emoji="⚖️" label="Legal" onClick={() => router.push('/tpv/legal')} />
+      )}
     </aside>
   );
 }

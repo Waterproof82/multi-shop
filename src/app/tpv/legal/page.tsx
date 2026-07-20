@@ -33,18 +33,18 @@ interface CheckItemProps {
 
 function CheckItem({ label, status, detail }: Readonly<CheckItemProps>) {
   const colors = {
-    done:    { dot: 'bg-[#22c55e]', text: 'text-[#22c55e]', label: 'Implementado' },
-    partial: { dot: 'bg-[#eab308]', text: 'text-[#eab308]', label: 'Parcial' },
-    pending: { dot: 'bg-[#6b7280]', text: 'text-[#6b7280]', label: 'Pendiente' },
+    done:    { dot: 'bg-[#16a34a]', text: 'text-[#16a34a]', label: 'Implementado' },
+    partial: { dot: 'bg-[#f59e0b]', text: 'text-[#f59e0b]', label: 'Parcial' },
+    pending: { dot: 'bg-[#94a3b8]', text: 'text-[#94a3b8]', label: 'Pendiente' },
   }[status];
 
   return (
-    <div className="flex items-start gap-3 py-2.5 border-b border-[#2e3347] last:border-0">
+    <div className="flex items-start gap-3 py-2.5 border-b border-[#e2e8f0] last:border-0">
       <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${colors.dot}`} />
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-[#c8cad4]">{label}</p>
+        <p className="text-sm text-[#0f172a]">{label}</p>
         {detail !== undefined && (
-          <p className="text-xs text-[#6b7280] mt-0.5">{detail}</p>
+          <p className="text-xs text-[#64748b] mt-0.5">{detail}</p>
         )}
       </div>
       <span className={`text-[10px] font-bold uppercase tracking-wider shrink-0 mt-0.5 ${colors.text}`}>
@@ -72,40 +72,40 @@ export default async function TpvLegalPage() {
   });
 
   return (
-    <div className="min-h-screen bg-[#0f1117] text-[#e8eaf0] p-6">
-      <div className="max-w-2xl mx-auto flex flex-col gap-8">
+    <div className="flex-1 overflow-auto p-6 bg-[#f1f5f9]">
+      <div className="max-w-2xl mx-auto flex flex-col gap-6">
 
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-[10px] font-bold text-[#4f72ff] uppercase tracking-widest mb-1">
+            <p className="text-[10px] font-bold text-[#2563eb] uppercase tracking-widest mb-1">
               Conformidad Legal
             </p>
-            <h1 className="text-2xl font-bold">Sobre este TPV</h1>
-            <p className="text-sm text-[#6b7280] mt-1">{fechaHora}</p>
+            <h1 className="text-2xl font-bold text-[#0f172a]">Sobre este TPV</h1>
+            <p className="text-sm text-[#64748b] mt-1">{fechaHora}</p>
           </div>
           <Link
             href="/tpv/mostrador"
-            className="shrink-0 px-4 py-2 rounded-lg border border-[#2e3347] text-sm text-[#6b7280] hover:text-white transition-colors"
+            className="shrink-0 px-4 py-2 rounded-lg border border-[#e2e8f0] bg-white text-sm text-[#64748b] hover:text-[#0f172a] hover:border-[#cbd5e1] transition-colors"
           >
             ← Volver
           </Link>
         </div>
 
         {/* System identification */}
-        <div className="bg-[#1a1d27] border border-[#2e3347] rounded-xl p-5 flex flex-col gap-3">
-          <p className="text-[10px] font-bold text-[#6b7280] uppercase tracking-wider">
+        <div className="bg-white border border-[#e2e8f0] rounded-xl p-5 flex flex-col gap-3 shadow-sm">
+          <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">
             Identificación del Sistema
           </p>
           <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-            <span className="text-[#6b7280]">Software</span>
-            <span className="font-mono">multi_shop TPV v{TPV_VERSION}</span>
-            <span className="text-[#6b7280]">Serie de tickets</span>
-            <span className="font-mono">T</span>
-            <span className="text-[#6b7280]">Registros en cadena</span>
-            <span className="font-mono">{stats.count.toLocaleString('es-ES')}</span>
-            <span className="text-[#6b7280]">Integridad</span>
-            <span className={stats.integrity === 'ok' ? 'text-[#22c55e] font-semibold' : 'text-[#ef4444] font-semibold'}>
+            <span className="text-[#64748b]">Software</span>
+            <span className="font-mono text-[#0f172a]">multi_shop TPV v{TPV_VERSION}</span>
+            <span className="text-[#64748b]">Serie de tickets</span>
+            <span className="font-mono text-[#0f172a]">T</span>
+            <span className="text-[#64748b]">Registros en cadena</span>
+            <span className="font-mono text-[#0f172a]">{stats.count.toLocaleString('es-ES')}</span>
+            <span className="text-[#64748b]">Integridad</span>
+            <span className={stats.integrity === 'ok' ? 'text-[#16a34a] font-semibold' : 'text-[#ef4444] font-semibold'}>
               {stats.integrity === 'ok' ? 'Verificada' : 'Error'}
             </span>
           </div>
@@ -115,28 +115,28 @@ export default async function TpvLegalPage() {
         <LegalChainVerify />
 
         {/* Declaración de Responsabilidad */}
-        <div className="bg-[#1a1d27] border border-[#2e3347] rounded-xl p-5 flex flex-col gap-4">
-          <p className="text-[10px] font-bold text-[#6b7280] uppercase tracking-wider">
+        <div className="bg-white border border-[#e2e8f0] rounded-xl p-5 flex flex-col gap-4 shadow-sm">
+          <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">
             Declaración de Responsabilidad del Fabricante
           </p>
-          <div className="text-sm text-[#c8cad4] leading-relaxed space-y-3">
+          <div className="text-sm text-[#475569] leading-relaxed space-y-3">
             <p>
               El fabricante del presente software TPV declara bajo su responsabilidad que
-              el sistema <strong className="text-[#e8eaf0]">multi_shop TPV versión {TPV_VERSION}</strong> cumple
+              el sistema <strong className="text-[#0f172a]">multi_shop TPV versión {TPV_VERSION}</strong> cumple
               con los requisitos establecidos en:
             </p>
-            <ul className="list-disc list-inside space-y-1 text-[#a0a4b8] pl-2">
-              <li>Artículo 29.2.j de la <strong className="text-[#c8cad4]">Ley 58/2003 General Tributaria</strong></li>
-              <li><strong className="text-[#c8cad4]">Real Decreto 1007/2023</strong> — Reglamento Verifactu</li>
-              <li><strong className="text-[#c8cad4]">Real Decreto 1619/2012</strong> — Reglamento de facturación</li>
+            <ul className="list-disc list-inside space-y-1 text-[#64748b] pl-2">
+              <li>Artículo 29.2.j de la <strong className="text-[#475569]">Ley 58/2003 General Tributaria</strong></li>
+              <li><strong className="text-[#475569]">Real Decreto 1007/2023</strong> — Reglamento Verifactu</li>
+              <li><strong className="text-[#475569]">Real Decreto 1619/2012</strong> — Reglamento de facturación</li>
             </ul>
             <p>
               El sistema garantiza la inalterabilidad de los registros de venta mediante
               cadena de hashes SHA-256, numeración correlativa sin saltos por empresa
               y bloqueo técnico de operaciones DELETE y UPDATE sobre campos fiscales.
             </p>
-            <p className="text-[#6b7280] text-xs border-t border-[#2e3347] pt-3 mt-2">
-              Declaración emitida el <strong className="text-[#a0a4b8]">{DECLARATION_DATE}</strong>.
+            <p className="text-[#94a3b8] text-xs border-t border-[#e2e8f0] pt-3 mt-2">
+              Declaración emitida el <strong className="text-[#64748b]">{DECLARATION_DATE}</strong>.
               Este documento tiene carácter informativo interno; la declaración firmada
               conforme al artículo 8 del RD 1007/2023 se adjunta al contrato comercial.
             </p>
@@ -144,12 +144,12 @@ export default async function TpvLegalPage() {
         </div>
 
         {/* Compliance checklist */}
-        <div className="bg-[#1a1d27] border border-[#2e3347] rounded-xl p-5 flex flex-col gap-1">
-          <p className="text-[10px] font-bold text-[#6b7280] uppercase tracking-wider mb-3">
+        <div className="bg-white border border-[#e2e8f0] rounded-xl p-5 flex flex-col gap-1 shadow-sm">
+          <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-3">
             Estado de Cumplimiento
           </p>
 
-          <p className="text-[11px] font-semibold text-[#4f72ff] uppercase tracking-wider mb-1">
+          <p className="text-[11px] font-semibold text-[#2563eb] uppercase tracking-wider mb-1">
             Verifactu / RD 1007/2023
           </p>
           <CheckItem
@@ -193,7 +193,7 @@ export default async function TpvLegalPage() {
             detail="Requiere NIF de empresa configurado"
           />
 
-          <p className="text-[11px] font-semibold text-[#4f72ff] uppercase tracking-wider mt-4 mb-1">
+          <p className="text-[11px] font-semibold text-[#2563eb] uppercase tracking-wider mt-4 mb-1">
             RD 1619/2012 — Contenido del ticket
           </p>
           <CheckItem
@@ -222,7 +222,7 @@ export default async function TpvLegalPage() {
             detail="detalle_pedido en tabla pedidos"
           />
 
-          <p className="text-[11px] font-semibold text-[#4f72ff] uppercase tracking-wider mt-4 mb-1">
+          <p className="text-[11px] font-semibold text-[#2563eb] uppercase tracking-wider mt-4 mb-1">
             TicketBAI (País Vasco)
           </p>
           <CheckItem
@@ -231,7 +231,7 @@ export default async function TpvLegalPage() {
             detail="Aplica solo si empresa.provincia ∈ Álava, Guipúzcoa, Vizcaya"
           />
 
-          <p className="text-[11px] font-semibold text-[#4f72ff] uppercase tracking-wider mt-4 mb-1">
+          <p className="text-[11px] font-semibold text-[#2563eb] uppercase tracking-wider mt-4 mb-1">
             RGPD / PCI-DSS
           </p>
           <CheckItem

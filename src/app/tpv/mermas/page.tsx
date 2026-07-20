@@ -88,13 +88,13 @@ function IngredienteSelect({
 }>) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-bold text-[#6b7280] uppercase tracking-wider">
+      <label className="text-xs font-bold text-[#64748b] uppercase tracking-wider">
         Ingrediente *
       </label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="bg-[#22263a] border border-[#2e3347] rounded-xl px-4 py-3 text-sm text-[#e8eaf0] outline-none focus:border-[#4f72ff] transition-colors"
+        className="bg-white border border-[#e2e8f0] rounded-xl px-4 py-3 text-sm text-[#0f172a] outline-none focus:border-[#2563eb] transition-colors"
         required
       >
         <option value="">— Seleccionar ingrediente —</option>
@@ -114,7 +114,7 @@ function MotivoSelector({
 }: Readonly<{ value: MotivoMerma; onChange: (m: MotivoMerma) => void }>) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-bold text-[#6b7280] uppercase tracking-wider">
+      <label className="text-xs font-bold text-[#64748b] uppercase tracking-wider">
         Motivo *
       </label>
       <div className="grid grid-cols-2 gap-2">
@@ -125,8 +125,8 @@ function MotivoSelector({
             onClick={() => onChange(v)}
             className={`py-2.5 px-3 rounded-xl border text-sm font-medium transition-all text-left ${
               value === v
-                ? 'border-[#4f72ff] bg-[#4f72ff15] text-[#e8eaf0]'
-                : 'border-[#2e3347] bg-[#22263a] text-[#6b7280] hover:border-[#4f72ff] hover:text-[#e8eaf0]'
+                ? 'border-[#2563eb] bg-[#eff6ff] text-[#0f172a]'
+                : 'border-[#e2e8f0] bg-[#f8fafc] text-[#64748b] hover:border-[#2563eb] hover:text-[#0f172a]'
             }`}
           >
             {label}
@@ -199,7 +199,7 @@ export default function MermasPage() {
   if (turno === undefined) {
     return (
       <div className="flex items-center justify-center w-full h-full">
-        <span className="text-[#6b7280] text-sm">Cargando...</span>
+        <span className="text-[#64748b] text-sm">Cargando...</span>
       </div>
     );
   }
@@ -207,32 +207,32 @@ export default function MermasPage() {
   if (turno === null) {
     return (
       <div className="flex items-center justify-center w-full h-full">
-        <div className="bg-[#1a1d27] border border-[#2e3347] rounded-2xl p-8 flex flex-col gap-3 items-center">
+        <div className="bg-white border border-[#e2e8f0] rounded-2xl p-8 flex flex-col gap-3 items-center shadow-sm">
           <span className="text-2xl">⚠️</span>
-          <p className="text-[#e8eaf0] font-semibold">No hay turno activo</p>
-          <p className="text-sm text-[#6b7280]">Abre un turno de caja antes de registrar mermas.</p>
+          <p className="text-[#0f172a] font-semibold">No hay turno activo</p>
+          <p className="text-sm text-[#64748b]">Abre un turno de caja antes de registrar mermas.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center justify-center w-full h-full p-6">
-      <div className="bg-[#1a1d27] border border-[#2e3347] rounded-2xl p-8 flex flex-col gap-6 w-full max-w-[520px]">
+    <div className="flex items-center justify-center w-full h-full p-6 overflow-auto">
+      <div className="bg-white border border-[#e2e8f0] rounded-2xl p-8 flex flex-col gap-6 w-full max-w-[520px] shadow-sm">
         <div className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-[#4f72ff] uppercase tracking-wider">TPV — Turno activo</span>
-          <h1 className="text-xl font-bold">Registrar merma</h1>
-          <p className="text-xs text-[#6b7280]">Operador: {turno.operadorNombre}</p>
+          <span className="text-xs font-bold text-[#2563eb] uppercase tracking-wider">TPV — Turno activo</span>
+          <h1 className="text-xl font-bold text-[#0f172a]">Registrar merma</h1>
+          <p className="text-xs text-[#64748b]">Operador: {turno.operadorNombre}</p>
         </div>
 
         {success && (
-          <div className="bg-[#22c55e18] border border-[#22c55e40] rounded-xl px-4 py-3 text-sm text-[#22c55e] font-medium">
+          <div className="bg-[#f0fdf4] border border-[#86efac] rounded-xl px-4 py-3 text-sm text-[#16a34a] font-medium">
             Merma registrada correctamente.
           </div>
         )}
 
         {errorMsg && (
-          <div className="bg-[#ef444418] border border-[#ef444440] rounded-xl px-4 py-3 text-sm text-[#ef4444] font-medium">
+          <div className="bg-[#fef2f2] border border-[#fca5a5] rounded-xl px-4 py-3 text-sm text-[#ef4444] font-medium">
             {errorMsg}
           </div>
         )}
@@ -245,7 +245,7 @@ export default function MermasPage() {
           />
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-[#6b7280] uppercase tracking-wider">
+            <label className="text-xs font-bold text-[#64748b] uppercase tracking-wider">
               Cantidad *
             </label>
             <input
@@ -257,7 +257,7 @@ export default function MermasPage() {
               onChange={(e) => updateField('cantidad', e.target.value)}
               placeholder="0.00"
               required
-              className="bg-[#22263a] border border-[#2e3347] rounded-xl px-4 py-3 text-sm text-[#e8eaf0] outline-none focus:border-[#4f72ff] transition-colors"
+              className="bg-white border border-[#e2e8f0] rounded-xl px-4 py-3 text-sm text-[#0f172a] outline-none focus:border-[#2563eb] transition-colors"
             />
           </div>
 
@@ -267,7 +267,7 @@ export default function MermasPage() {
           />
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-[#6b7280] uppercase tracking-wider">
+            <label className="text-xs font-bold text-[#64748b] uppercase tracking-wider">
               Operador *
             </label>
             <input
@@ -276,13 +276,13 @@ export default function MermasPage() {
               value={form.operadorNombre}
               onChange={(e) => updateField('operadorNombre', e.target.value)}
               required
-              className="bg-[#22263a] border border-[#2e3347] rounded-xl px-4 py-3 text-sm text-[#e8eaf0] outline-none focus:border-[#4f72ff] transition-colors"
+              className="bg-white border border-[#e2e8f0] rounded-xl px-4 py-3 text-sm text-[#0f172a] outline-none focus:border-[#2563eb] transition-colors"
             />
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-[#6b7280] uppercase tracking-wider">
-              Notas <span className="normal-case font-normal text-[#6b7280]">(opcional)</span>
+            <label className="text-xs font-bold text-[#64748b] uppercase tracking-wider">
+              Notas <span className="normal-case font-normal text-[#64748b]">(opcional)</span>
             </label>
             <textarea
               maxLength={500}
@@ -290,14 +290,14 @@ export default function MermasPage() {
               value={form.notas}
               onChange={(e) => updateField('notas', e.target.value)}
               placeholder="Descripción adicional..."
-              className="bg-[#22263a] border border-[#2e3347] rounded-xl px-4 py-3 text-sm text-[#e8eaf0] outline-none focus:border-[#4f72ff] transition-colors resize-none"
+              className="bg-white border border-[#e2e8f0] rounded-xl px-4 py-3 text-sm text-[#0f172a] outline-none focus:border-[#2563eb] transition-colors resize-none"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading || !form.ingredienteId || !form.cantidad || !form.operadorNombre}
-            className="w-full py-3.5 rounded-xl bg-[#4f72ff] text-white font-bold text-sm hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-3.5 rounded-xl bg-[#2563eb] text-white font-bold text-sm hover:bg-[#1d4ed8] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Registrando...' : 'Registrar merma'}
           </button>

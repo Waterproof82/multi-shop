@@ -13,6 +13,8 @@ import { getSupabaseClient } from '@/core/infrastructure/database/supabase-clien
 import { TpvHeader } from '@/components/tpv/TpvHeader';
 import { TpvRolProvider } from '@/lib/tpv-rol-ctx';
 import { TpvCatalogProvider } from '@/lib/tpv-catalog-ctx';
+import { TpvAccionesProvider } from '@/lib/tpv-acciones-ctx';
+import { AccionesPanel } from '@/components/tpv/AccionesActions';
 import type { RolAdmin } from '@/core/domain/repositories/IAdminRepository';
 import { TpvSwRegistrar } from '@/components/tpv-sw-registrar';
 
@@ -125,13 +127,16 @@ export default async function TpvLayout({ children }: { readonly children: React
         initialComplementoGrupos={complementoGrupos}
         initialProductoGrupos={productoGrupos}
       >
-        <TpvSwRegistrar />
-        <div className="flex flex-col h-screen bg-[#f1f5f9] text-[#0f172a] overflow-hidden">
-          <TpvHeader empresaNombre={empresaNombre} />
-          <main className="flex flex-1 overflow-hidden">
-            {children}
-          </main>
-        </div>
+        <TpvAccionesProvider>
+          <TpvSwRegistrar />
+          <div className="flex flex-col h-screen bg-[#f1f5f9] text-[#0f172a] overflow-hidden">
+            <TpvHeader empresaNombre={empresaNombre} />
+            <main className="flex flex-1 overflow-hidden">
+              {children}
+              <AccionesPanel />
+            </main>
+          </div>
+        </TpvAccionesProvider>
       </TpvCatalogProvider>
     </TpvRolProvider>
   );
