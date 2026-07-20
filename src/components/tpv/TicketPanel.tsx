@@ -112,34 +112,34 @@ export function TicketPanel({
   }
 
   return (
-    <aside className="w-[300px] shrink-0 bg-[#1a1d27] border-r border-[#2e3347] flex flex-col">
-      <div className="px-4 py-3.5 border-b border-[#2e3347] flex justify-between items-center">
-        <span className="text-xs font-bold text-[#6b7280] uppercase tracking-wider">Ticket activo</span>
+    <aside className="w-[300px] shrink-0 bg-white border-r border-[#e2e8f0] flex flex-col">
+      <div className="px-4 py-3.5 border-b border-[#e2e8f0] flex justify-between items-center">
+        <span className="text-xs font-bold text-[#64748b] uppercase tracking-wider">Ticket activo</span>
         {mesaLabel && (
-          <span className="text-xs text-[#4f72ff] font-semibold">{mesaLabel}</span>
+          <span className="text-xs text-[#2563eb] font-semibold">{mesaLabel}</span>
         )}
       </div>
 
       <div className="flex-1 overflow-y-auto py-2">
         {!hasContent && (
-          <p className="px-4 py-8 text-center text-sm text-[#6b7280]">
+          <p className="px-4 py-8 text-center text-sm text-[#94a3b8]">
             Selecciona una mesa para ver el ticket
           </p>
         )}
 
         {/* Existing orders from DB */}
         {existingOrders.map(order => (
-          <div key={order.id} className="border-b border-[#2e3347]/50 last:border-b-0">
+          <div key={order.id} className="border-b border-[#e2e8f0] last:border-b-0">
             <button
               type="button"
               onClick={() => setNotaExpandida(prev => prev === order.id ? null : order.id)}
-              className="w-full flex items-center justify-between px-4 py-1.5 hover:bg-[#22263a]/40 transition-colors"
+              className="w-full flex items-center justify-between px-4 py-1.5 hover:bg-[#f8fafc] transition-colors"
             >
-              <span className="text-[10px] font-bold text-[#6b7280] uppercase tracking-wider">
+              <span className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">
                 Pedido #{order.numeroPedido}
-                {getNota(order) && <span className="ml-1.5 text-[#4f72ff]">✎</span>}
+                {getNota(order) && <span className="ml-1.5 text-[#2563eb]">✎</span>}
                 {order.pase && (
-                  <span className="ml-2 text-[#4f72ff]">{paseShortLabel(order.pase)}</span>
+                  <span className="ml-2 text-[#2563eb]">{paseShortLabel(order.pase)}</span>
                 )}
               </span>
               <span
@@ -150,17 +150,17 @@ export function TicketPanel({
               </span>
             </button>
             {order.items.map((item, idx) => (
-              <div key={`${order.id}-${idx}`} className="flex items-start gap-2.5 px-4 py-2 hover:bg-[#22263a]/50 transition-colors">
-                <span className="w-5 h-5 rounded bg-[#22263a] text-[#6b7280] text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+              <div key={`${order.id}-${idx}`} className="flex items-start gap-2.5 px-4 py-2 hover:bg-[#f8fafc] transition-colors">
+                <span className="w-5 h-5 rounded bg-[#f1f5f9] text-[#475569] text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
                   {item.cantidad}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate text-[#c8cad4]">{item.nombre}</p>
+                  <p className="text-sm font-medium truncate text-[#0f172a]">{item.nombre}</p>
                   {item.complementos.length > 0 && (
-                    <p className="text-[10px] text-[#6b7280] truncate">{item.complementos.join(', ')}</p>
+                    <p className="text-[10px] text-[#64748b] truncate">{item.complementos.join(', ')}</p>
                   )}
                 </div>
-                <span className="text-sm font-semibold shrink-0 text-[#c8cad4]">
+                <span className="text-sm font-semibold shrink-0 text-[#0f172a]">
                   {fmt(item.precio * item.cantidad)}
                 </span>
               </div>
@@ -173,7 +173,7 @@ export function TicketPanel({
                   value={getNota(order)}
                   onChange={e => handleNotaChange(order.id, e.target.value)}
                   placeholder="Añadir nota al pedido..."
-                  className="w-full bg-[#0f1117] border border-[#2e3347] rounded-lg px-3 py-2 text-xs text-[#e8eaf0] placeholder:text-[#4b5563] focus:outline-none focus:border-[#4f72ff] transition-colors resize-none"
+                  className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-lg px-3 py-2 text-xs text-[#0f172a] placeholder:text-[#94a3b8] focus:outline-none focus:border-[#2563eb] transition-colors resize-none"
                 />
               </div>
             )}
@@ -182,9 +182,9 @@ export function TicketPanel({
 
         {/* Pending items (draft, not yet sent) */}
         {pendingItems.length > 0 && (
-          <div className="border-t border-[#4f72ff]/30">
+          <div className="border-t border-[#93c5fd]/50">
             <div className="px-4 py-1.5">
-              <span className="text-[10px] font-bold text-[#4f72ff] uppercase tracking-wider">Nuevo pedido</span>
+              <span className="text-[10px] font-bold text-[#2563eb] uppercase tracking-wider">Nuevo pedido</span>
             </div>
             {(['primer', 'segundo', 'postre'] as const).map(p => (
               <button
@@ -193,8 +193,8 @@ export function TicketPanel({
                 onClick={() => { setPendingPase(prev => prev === p ? '' : p); setDirectoACocina(false); }}
                 className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${
                   pendingPase === p && !directoACocina
-                    ? 'bg-[#4f72ff] border-[#4f72ff] text-white'
-                    : 'border-[#2e3347] text-[#6b7280] hover:text-white hover:border-[#4f72ff]'
+                    ? 'bg-[#2563eb] border-[#2563eb] text-white'
+                    : 'border-[#e2e8f0] text-[#475569] hover:border-[#2563eb] hover:text-[#1e40af]'
                 }`}
                 >
                 {PASE_BUTTON_LABEL[p]}
@@ -204,25 +204,25 @@ export function TicketPanel({
               const itemKey = item.productId + item.complementos.map(c => c.nombre).join(',');
               const notaOpen = pendingNotaExpandida === itemKey;
               return (
-                <div key={itemKey} className="border-b border-[#2e3347]/30 last:border-b-0">
-                  <div className="flex items-start gap-2.5 px-4 py-2.5 hover:bg-[#22263a] transition-colors">
-                    <span className="w-6 h-6 rounded-md bg-[#4f72ff] text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                <div key={itemKey} className="border-b border-[#e2e8f0] last:border-b-0">
+                  <div className="flex items-start gap-2.5 px-4 py-2.5 hover:bg-[#f8fafc] transition-colors">
+                    <span className="w-6 h-6 rounded-md bg-[#2563eb] text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
                       {item.cantidad}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{item.nombre}</p>
+                      <p className="text-sm font-medium truncate text-[#0f172a]">{item.nombre}</p>
                       {item.complementos.length > 0 && (
-                        <p className="text-[10px] text-[#6b7280] truncate">{item.complementos.map(c => c.nombre).join(', ')}</p>
+                        <p className="text-[10px] text-[#64748b] truncate">{item.complementos.map(c => c.nombre).join(', ')}</p>
                       )}
                       {item.nota && !notaOpen && (
                         <p className="text-[10px] italic text-[#a78bfa] truncate">✎ {item.nota}</p>
                       )}
                     </div>
-                    <span className="text-sm font-semibold shrink-0">{fmt(item.precioTotal * item.cantidad)}</span>
+                    <span className="text-sm font-semibold shrink-0 text-[#0f172a]">{fmt(item.precioTotal * item.cantidad)}</span>
                     <button
                       type="button"
                       onClick={() => setPendingNotaExpandida(prev => prev === itemKey ? null : itemKey)}
-                      className={`flex items-center gap-0.5 shrink-0 rounded px-1 py-0.5 transition-colors ${notaOpen || item.nota ? 'text-[#a78bfa]' : 'text-[#6b7280] hover:text-[#a78bfa]'}`}
+                      className={`flex items-center gap-0.5 shrink-0 rounded px-1 py-0.5 transition-colors ${notaOpen || item.nota ? 'text-[#a78bfa]' : 'text-[#94a3b8] hover:text-[#a78bfa]'}`}
                       aria-label="Nota del ítem"
                       title="Añadir nota al ítem"
                     >
@@ -232,7 +232,7 @@ export function TicketPanel({
                     <button
                       type="button"
                       onClick={() => onRemovePending(item.nombre, item.complementos)}
-                      className="text-[#6b7280] hover:text-red-400 text-base leading-none shrink-0 mt-0.5"
+                      className="text-[#94a3b8] hover:text-red-500 text-base leading-none shrink-0 mt-0.5"
                       aria-label={`Eliminar ${item.nombre}`}
                     >
                       ×
@@ -246,7 +246,7 @@ export function TicketPanel({
                         value={item.nota ?? ''}
                         onChange={e => onUpdatePendingNota(item.productId, item.complementos, e.target.value || undefined)}
                         placeholder="Nota para este ítem..."
-                        className="w-full bg-[#0f1117] border border-[#2e3347] rounded-lg px-3 py-2 text-xs text-[#e8eaf0] placeholder:text-[#4b5563] focus:outline-none focus:border-[#a78bfa] transition-colors resize-none"
+                        className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-lg px-3 py-2 text-xs text-[#0f172a] placeholder:text-[#94a3b8] focus:outline-none focus:border-[#a78bfa] transition-colors resize-none"
                         autoFocus
                       />
                     </div>
@@ -258,20 +258,20 @@ export function TicketPanel({
         )}
       </div>
 
-      <div className="border-t border-[#2e3347] p-4 flex flex-col gap-3">
+      <div className="border-t border-[#e2e8f0] p-4 flex flex-col gap-3">
         {hasContent && (
           <>
-            <div className="flex justify-between text-sm text-[#6b7280]">
+            <div className="flex justify-between text-sm text-[#64748b]">
               <span>Subtotal</span><span>{fmt(subtotal)}</span>
             </div>
-            <div className="flex justify-between text-sm text-[#6b7280]">
+            <div className="flex justify-between text-sm text-[#64748b]">
               <span>{tipoImpuesto.toUpperCase()} ({porcentajeImpuesto}%)</span><span>{fmt(iva)}</span>
             </div>
-            <div className="text-2xl font-bold mt-1">{fmt(total)}</div>
+            <div className="text-2xl font-bold mt-1 text-[#0f172a]">{fmt(total)}</div>
           </>
         )}
         {sendError && (
-          <p className="text-xs text-red-400 text-center">{sendError}</p>
+          <p className="text-xs text-red-600 text-center">{sendError}</p>
         )}
         {pendingItems.length > 0 && (
           <div className="flex gap-1 flex-wrap">
@@ -281,7 +281,7 @@ export function TicketPanel({
               className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${
                 directoACocina
                   ? 'bg-amber-600 border-amber-600 text-white'
-                  : 'border-[#2e3347] text-[#6b7280] hover:text-white hover:border-amber-600'
+                  : 'border-[#e2e8f0] text-[#475569] hover:border-amber-600 hover:text-amber-700'
               }`}
             >
               ⚡ Envío directo
@@ -295,14 +295,14 @@ export function TicketPanel({
             value={pendingNota}
             onChange={e => setPendingNota(e.target.value)}
             placeholder="Nota del pedido (opcional)..."
-            className="w-full bg-[#0f1117] border border-[#2e3347] rounded-xl px-3 py-2 text-xs text-[#e8eaf0] placeholder:text-[#4b5563] focus:outline-none focus:border-[#4f72ff] transition-colors resize-none"
+            className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-3 py-2 text-xs text-[#0f172a] placeholder:text-[#94a3b8] focus:outline-none focus:border-[#2563eb] transition-colors resize-none"
           />
         )}
         {pendingItems.length > 0 && (
           <button
             type="button"
             disabled={sending || !mesaId}
-            className="w-full bg-[#4f72ff] text-white rounded-xl py-3 text-sm font-bold hover:brightness-110 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full bg-[#2563eb] text-white rounded-xl py-3 text-sm font-bold hover:brightness-110 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             onClick={async () => {
               if (!mesaId) return;
               setSending(true);
@@ -359,17 +359,17 @@ export function TicketPanel({
           </button>
         )}
         {hasPendingOrders && canCobrar && !sesionPagada && (
-          <div className="flex items-start gap-2 rounded-xl px-3 py-2.5 bg-[#f9731615] border border-[#f9731640]">
+          <div className="flex items-start gap-2 rounded-xl px-3 py-2.5 bg-[#fff7ed] border border-[#fed7aa]">
             <span className="text-sm leading-none mt-0.5">🍽</span>
-            <p className="text-xs leading-snug text-[#f97316]">
+            <p className="text-xs leading-snug text-[#ea580c]">
               Quedan pedidos sin servir. Servilos antes de cobrar.
             </p>
           </div>
         )}
         {sesionPagada && (
-          <div className="flex items-start gap-2 rounded-xl px-3 py-2.5 bg-[#22c55e15] border border-[#22c55e40]">
+          <div className="flex items-start gap-2 rounded-xl px-3 py-2.5 bg-[#f0fdf4] border border-[#bbf7d0]">
             <span className="text-sm leading-none mt-0.5">✓</span>
-            <p className="text-xs leading-snug text-[#22c55e]">
+            <p className="text-xs leading-snug text-[#16a34a]">
               Mesa cobrada por el camarero.
             </p>
           </div>
@@ -378,7 +378,7 @@ export function TicketPanel({
           type="button"
           disabled={!canCobrar || hasPendingOrders || sesionPagada}
           onClick={() => router.push(`/tpv/cobro/${sesionId}?turnoId=${turnoId}`)}
-          className="w-full bg-[#22c55e] text-white rounded-xl py-4 text-lg font-extrabold disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition-all flex items-center justify-center gap-2"
+          className="w-full bg-[#16a34a] text-white rounded-xl py-4 text-lg font-extrabold disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition-all flex items-center justify-center gap-2"
         >
           💳 COBRAR {pendienteEuros > 0 ? fmt(pendienteEuros) : ''}
         </button>
