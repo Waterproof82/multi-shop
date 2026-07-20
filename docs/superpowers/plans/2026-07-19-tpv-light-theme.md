@@ -1,6 +1,6 @@
 # TPV Light Theme Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Reemplazar el tema oscuro del TPV por un tema claro profesional para mayor legibilidad en luz ambiental.
 
@@ -30,7 +30,7 @@
 
 ### layout.tsx
 
-- [ ] **Step 1: Actualizar fondo del layout**
+- [x] **Step 1: Actualizar fondo del layout**
 
 Localizar la línea (~129) con `bg-[#0f1117] text-[#e8eaf0]` y reemplazar:
 
@@ -44,7 +44,7 @@ Localizar la línea (~129) con `bg-[#0f1117] text-[#e8eaf0]` y reemplazar:
 
 ### TpvHeader.tsx
 
-- [ ] **Step 2: Actualizar `<header>` background**
+- [x] **Step 2: Actualizar `<header>` background**
 
 ```tsx
 // ANTES:
@@ -54,7 +54,7 @@ Localizar la línea (~129) con `bg-[#0f1117] text-[#e8eaf0]` y reemplazar:
 <header className="flex items-center justify-between h-14 px-5 bg-white border-b border-[#e2e8f0] shrink-0">
 ```
 
-- [ ] **Step 3: Actualizar colores del logo y empresa**
+- [x] **Step 3: Actualizar colores del logo y empresa**
 
 ```tsx
 // ANTES:
@@ -66,7 +66,7 @@ Localizar la línea (~129) con `bg-[#0f1117] text-[#e8eaf0]` y reemplazar:
 <span className="text-xs text-[#64748b]">{empresaNombre}</span>
 ```
 
-- [ ] **Step 4: Actualizar nav tabs**
+- [x] **Step 4: Actualizar nav tabs**
 
 ```tsx
 // ANTES:
@@ -84,7 +84,7 @@ className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
 }`}
 ```
 
-- [ ] **Step 5: Actualizar botón Admin (gear)**
+- [x] **Step 5: Actualizar botón Admin (gear)**
 
 ```tsx
 // ANTES:
@@ -102,7 +102,7 @@ className={`p-1.5 rounded-md border transition-colors ${
 }`}
 ```
 
-- [ ] **Step 6: Actualizar admin dropdown**
+- [x] **Step 6: Actualizar admin dropdown**
 
 ```tsx
 // ANTES (wrapper):
@@ -128,7 +128,7 @@ className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#374151] ho
 <Icon className="h-4 w-4 text-[#2563eb] flex-shrink-0" />
 ```
 
-- [ ] **Step 7: Actualizar botón Lock y botón Cierre**
+- [x] **Step 7: Actualizar botón Lock y botón Cierre**
 
 ```tsx
 // Lock button — ANTES:
@@ -144,7 +144,7 @@ className="text-xs bg-[#ef444412] border border-[#ef444455] text-[#ef4444] px-3 
 className="text-xs bg-[#fef2f2] border border-[#fca5a5] text-[#ef4444] px-3 py-1.5 rounded-md hover:bg-[#fee2e2] transition-colors flex items-center gap-1.5"
 ```
 
-- [ ] **Step 8: Verificar lint**
+- [x] **Step 8: Verificar lint**
 
 ```bash
 pnpm lint
@@ -152,7 +152,7 @@ pnpm lint
 
 Esperado: sin errores en `layout.tsx` ni `TpvHeader.tsx`.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/app/tpv/layout.tsx src/components/tpv/TpvHeader.tsx
@@ -166,7 +166,7 @@ git commit -m "feat(tpv): tema claro en layout y TpvHeader"
 **Files:**
 - Modify: `src/components/tpv/AccionesActions.tsx`
 
-- [ ] **Step 1: Actualizar `resolveVariantClass`**
+- [x] **Step 1: Actualizar `resolveVariantClass`**
 
 ```tsx
 // REEMPLAZAR función completa:
@@ -177,7 +177,7 @@ function resolveVariantClass(variant: ActionVariant): string {
 }
 ```
 
-- [ ] **Step 2: Actualizar `resolveLabelClass`**
+- [x] **Step 2: Actualizar `resolveLabelClass`**
 
 ```tsx
 // REEMPLAZAR función completa:
@@ -188,7 +188,7 @@ function resolveLabelClass(variant: ActionVariant): string {
 }
 ```
 
-- [ ] **Step 3: Actualizar sidebar y separador**
+- [x] **Step 3: Actualizar sidebar y separador**
 
 ```tsx
 // <aside> — ANTES:
@@ -204,7 +204,7 @@ function resolveLabelClass(variant: ActionVariant): string {
 <div className="w-7 h-px bg-[#e2e8f0] my-1" role="separator" />
 ```
 
-- [ ] **Step 4: Verificar lint**
+- [x] **Step 4: Verificar lint**
 
 ```bash
 pnpm lint
@@ -212,7 +212,7 @@ pnpm lint
 
 Esperado: sin errores en `AccionesActions.tsx`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/tpv/AccionesActions.tsx
@@ -228,7 +228,7 @@ git commit -m "feat(tpv): tema claro en AccionesPanel"
 
 Hay muchos cambios en este archivo. Aplicarlos todos antes de hacer lint.
 
-- [ ] **Step 1: Actualizar `<aside>` y header del panel**
+- [x] **Step 1: Actualizar `<aside>` y header del panel**
 
 ```tsx
 // <aside> — ANTES:
@@ -256,7 +256,7 @@ Hay muchos cambios en este archivo. Aplicarlos todos antes de hacer lint.
 <span className="text-xs text-[#2563eb] font-semibold">{mesaLabel}</span>
 ```
 
-- [ ] **Step 2: Actualizar estado vacío y filas de orders existentes**
+- [x] **Step 2: Actualizar estado vacío y filas de orders existentes**
 
 ```tsx
 // Empty state — ANTES:
@@ -296,7 +296,7 @@ className="w-full flex items-center justify-between px-4 py-1.5 hover:bg-[#f8faf
 <span className="ml-2 text-[#2563eb]">{paseShortLabel(order.pase)}</span>
 ```
 
-- [ ] **Step 3: Actualizar items de orders existentes**
+- [x] **Step 3: Actualizar items de orders existentes**
 
 ```tsx
 // Item row — ANTES:
@@ -330,7 +330,7 @@ className="w-full bg-[#0f1117] border border-[#2e3347] rounded-lg px-3 py-2 text
 className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-lg px-3 py-2 text-xs text-[#0f172a] placeholder:text-[#94a3b8] focus:outline-none focus:border-[#2563eb] transition-colors resize-none"
 ```
 
-- [ ] **Step 4: Actualizar sección "Nuevo pedido" (pending items)**
+- [x] **Step 4: Actualizar sección "Nuevo pedido" (pending items)**
 
 ```tsx
 // Border top pending — ANTES:
@@ -388,7 +388,7 @@ className="w-full bg-[#0f1117] border border-[#2e3347] rounded-lg px-3 py-2 text
 className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-lg px-3 py-2 text-xs text-[#0f172a] placeholder:text-[#94a3b8] focus:outline-none focus:border-[#a78bfa] transition-colors resize-none"
 ```
 
-- [ ] **Step 5: Actualizar sección inferior (totales, pases, botones)**
+- [x] **Step 5: Actualizar sección inferior (totales, pases, botones)**
 
 ```tsx
 // Border top bottom section — ANTES:
@@ -448,7 +448,7 @@ className="w-full bg-[#4f72ff] text-white rounded-xl py-3 text-sm font-bold hove
 className="w-full bg-[#2563eb] text-white rounded-xl py-3 text-sm font-bold hover:brightness-110 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
 ```
 
-- [ ] **Step 6: Actualizar cajas de advertencia y botón Cobrar**
+- [x] **Step 6: Actualizar cajas de advertencia y botón Cobrar**
 
 ```tsx
 // Warning "pedidos sin servir" — ANTES:
@@ -478,7 +478,7 @@ className="w-full bg-[#22c55e] text-white rounded-xl py-4 text-lg font-extrabold
 className="w-full bg-[#16a34a] text-white rounded-xl py-4 text-lg font-extrabold disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition-all flex items-center justify-center gap-2"
 ```
 
-- [ ] **Step 7: Verificar lint**
+- [x] **Step 7: Verificar lint**
 
 ```bash
 pnpm lint
@@ -486,7 +486,7 @@ pnpm lint
 
 Esperado: sin errores en `TicketPanel.tsx`.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/components/tpv/TicketPanel.tsx
@@ -504,7 +504,7 @@ Este archivo tiene dos áreas: la función `MenuPanel` y la función interna `Co
 
 ### Cambios en `MenuPanel`
 
-- [ ] **Step 1: Actualizar `<section>`, tabs y search**
+- [x] **Step 1: Actualizar `<section>`, tabs y search**
 
 ```tsx
 // Section — ANTES:
@@ -560,7 +560,7 @@ className="w-full bg-[#1a1d27] border border-[#2e3347] rounded-lg px-3 py-2 text
 className="w-full bg-white border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm text-[#0f172a] placeholder:text-[#94a3b8] focus:outline-none focus:border-[#2563eb]"
 ```
 
-- [ ] **Step 2: Actualizar overlay no-mesa y estado vacío**
+- [x] **Step 2: Actualizar overlay no-mesa y estado vacío**
 
 ```tsx
 // Overlay no-mesa — ANTES:
@@ -588,7 +588,7 @@ className="w-full bg-white border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm 
 <p className="text-center text-sm text-[#94a3b8] py-12">Sin productos</p>
 ```
 
-- [ ] **Step 3: Actualizar product cards**
+- [x] **Step 3: Actualizar product cards**
 
 ```tsx
 // Card button — ANTES:
@@ -624,7 +624,7 @@ className="bg-white border border-[#e2e8f0] rounded-xl overflow-hidden flex flex
 
 ### Cambios en `ComplementDialog`
 
-- [ ] **Step 4: Actualizar dialog wrapper, header y grupo names**
+- [x] **Step 4: Actualizar dialog wrapper, header y grupo names**
 
 ```tsx
 // Dialog wrapper — ANTES:
@@ -670,7 +670,7 @@ className="w-8 h-8 flex items-center justify-center rounded-lg text-[#64748b] ho
 <div className="h-0.5 rounded-full mb-2 overflow-hidden bg-[#e2e8f0]">
 ```
 
-- [ ] **Step 5: Actualizar progress bar fill (inline style)**
+- [x] **Step 5: Actualizar progress bar fill (inline style)**
 
 ```tsx
 // ANTES:
@@ -686,7 +686,7 @@ style={{
 }}
 ```
 
-- [ ] **Step 6: Actualizar option buttons (inline styles)**
+- [x] **Step 6: Actualizar option buttons (inline styles)**
 
 ```tsx
 // Option button style — ANTES:
@@ -738,7 +738,7 @@ style={{
 <span className="text-xs text-[#2563eb] shrink-0">+{fmt(opt.precio)}</span>
 ```
 
-- [ ] **Step 7: Actualizar footer del dialog**
+- [x] **Step 7: Actualizar footer del dialog**
 
 ```tsx
 // Footer border — ANTES:
@@ -766,7 +766,7 @@ className="flex-1 py-3 rounded-xl border border-[#2e3347] text-sm text-[#9ca3af]
 className="flex-1 py-3 rounded-xl border border-[#e2e8f0] text-sm text-[#64748b] hover:border-[#cbd5e1] transition-colors"
 ```
 
-- [ ] **Step 8: Añadir `resolveConfirmClass` y actualizar confirm button**
+- [x] **Step 8: Añadir `resolveConfirmClass` y actualizar confirm button**
 
 El botón de confirmar actualmente tiene `text-white` hardcodeado. En tema claro, cuando está deshabilitado el fondo es `#e2e8f0` (gris claro) y el texto blanco sería invisible. Se necesita una función de módulo (SonarLint S3358 prohíbe ternarios anidados en JSX).
 
@@ -800,7 +800,7 @@ Actualizar el confirm button:
 >
 ```
 
-- [ ] **Step 9: Verificar lint**
+- [x] **Step 9: Verificar lint**
 
 ```bash
 pnpm lint
@@ -808,7 +808,7 @@ pnpm lint
 
 Esperado: sin errores en `MenuPanel.tsx`.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add src/components/tpv/MenuPanel.tsx

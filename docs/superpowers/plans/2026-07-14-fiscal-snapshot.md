@@ -1,6 +1,6 @@
 # Fiscal Snapshot Local al Cerrar Turno — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Guardar el `InformeZData` como JSON en disco local (via Electron IPC) cada vez que se cierra un turno en el TPV.
 
@@ -28,7 +28,7 @@
 
 Este archivo añade `electronAPI` al tipo `Window` de TypeScript. Sin él, cualquier referencia a `window.electronAPI` en el frontend es un error de tipo.
 
-- [ ] **Step 1: Crear `src/types/electron.d.ts`**
+- [x] **Step 1: Crear `src/types/electron.d.ts`**
 
 ```typescript
 // src/types/electron.d.ts
@@ -49,7 +49,7 @@ declare global {
 
 > Usamos `unknown` en `print` y `saveFiscalSnapshot` porque el main process recibe JSON serializado — el tipo concreto no necesita viajar al preload.
 
-- [ ] **Step 2: Verificar que TypeScript lo recoge**
+- [x] **Step 2: Verificar que TypeScript lo recoge**
 
 El `tsconfig.json` ya incluye `"src/**/*.ts"` — el archivo es auto-descubierto. Verificar:
 
@@ -59,7 +59,7 @@ pnpm tsc --noEmit 2>&1 | head -30
 
 Esperado: sin errores nuevos relacionados con `electronAPI`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/types/electron.d.ts
@@ -75,7 +75,7 @@ git commit -m "feat(tpv): add Window.electronAPI global type declaration"
 
 Añadimos el handler `fiscal:save-snapshot` dentro de `setupIpc()`. El handler recibe el `InformeZData` serializado, crea el directorio si no existe, y escribe el JSON.
 
-- [ ] **Step 1: Añadir imports de `fs` al inicio de `electron/main.ts`**
+- [x] **Step 1: Añadir imports de `fs` al inicio de `electron/main.ts`**
 
 Al inicio del archivo, después de los imports existentes, añadir:
 
@@ -88,7 +88,7 @@ El import de `path` ya existe. Si no existe, añadirlo también:
 import * as path from 'path';
 ```
 
-- [ ] **Step 2: Añadir tipo local para el payload**
+- [x] **Step 2: Añadir tipo local para el payload**
 
 Justo después de la interfaz `StoreSchema` (línea ~11), añadir:
 
@@ -103,7 +103,7 @@ interface FiscalSnapshotPayload {
 
 > No importamos desde `@/` porque electron/main.ts tiene su propio contexto de compilación. El tipo mínimo es suficiente — IPC serializa todo a JSON de todas formas.
 
-- [ ] **Step 3: Añadir handler en `setupIpc()`**
+- [x] **Step 3: Añadir handler en `setupIpc()`**
 
 Dentro de la función `setupIpc()`, después del handler `printer:print`:
 
@@ -124,7 +124,7 @@ Dentro de la función `setupIpc()`, después del handler `printer:print`:
   });
 ```
 
-- [ ] **Step 4: Verificar que el archivo compila sin errores**
+- [x] **Step 4: Verificar que el archivo compila sin errores**
 
 ```bash
 cd electron && npx tsc --noEmit 2>&1 | head -30
@@ -138,7 +138,7 @@ npx tsc --noEmit --allowJs --moduleResolution node electron/main.ts 2>&1 | head 
 
 Esperado: sin errores en el handler nuevo.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add electron/main.ts
@@ -154,7 +154,7 @@ git commit -m "feat(tpv): add fiscal:save-snapshot IPC handler — saves Informe
 
 Añadimos `saveFiscalSnapshot` al objeto expuesto por `contextBridge.exposeInMainWorld`.
 
-- [ ] **Step 1: Añadir `saveFiscalSnapshot` al contextBridge**
+- [x] **Step 1: Añadir `saveFiscalSnapshot` al contextBridge**
 
 El archivo actual (`electron/preload.ts`) expone:
 ```typescript
@@ -189,7 +189,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 });
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add electron/preload.ts
@@ -205,7 +205,7 @@ git commit -m "feat(tpv): expose saveFiscalSnapshot via contextBridge preload"
 
 El punto de llamada exacto es después de obtener el `InformeZData` (línea ~87-88). La llamada es fire-and-forget: no bloqueamos `setInformeZ(data)` ni el modal.
 
-- [ ] **Step 1: Localizar el punto de inserción en `handleCierre`**
+- [x] **Step 1: Localizar el punto de inserción en `handleCierre`**
 
 En `src/components/tpv/TurnoCerrarForm.tsx`, dentro de `handleCierre`, el bloque relevante es:
 
@@ -218,7 +218,7 @@ En `src/components/tpv/TurnoCerrarForm.tsx`, dentro de `handleCierre`, el bloque
       }
 ```
 
-- [ ] **Step 2: Añadir la llamada fire-and-forget**
+- [x] **Step 2: Añadir la llamada fire-and-forget**
 
 Reemplazar ese bloque por:
 
@@ -234,7 +234,7 @@ Reemplazar ese bloque por:
 
 > `void` descarta la promesa intencionalmente (fire-and-forget). `window.electronAPI?.saveFiscalSnapshot` es `undefined` en web — no hay efecto secundario fuera de Electron.
 
-- [ ] **Step 3: Verificar que TypeScript acepta el cambio**
+- [x] **Step 3: Verificar que TypeScript acepta el cambio**
 
 ```bash
 pnpm tsc --noEmit 2>&1 | grep TurnoCerrarForm
@@ -242,7 +242,7 @@ pnpm tsc --noEmit 2>&1 | grep TurnoCerrarForm
 
 Esperado: sin salida (sin errores en ese archivo).
 
-- [ ] **Step 4: Verificar lint**
+- [x] **Step 4: Verificar lint**
 
 ```bash
 pnpm lint 2>&1 | grep TurnoCerrarForm
@@ -250,7 +250,7 @@ pnpm lint 2>&1 | grep TurnoCerrarForm
 
 Esperado: sin warnings ni errores nuevos.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/tpv/TurnoCerrarForm.tsx
@@ -266,17 +266,17 @@ git commit -m "feat(tpv): save InformeZ fiscal snapshot to disk on turno close"
 
 ### Smoke test (requiere build Electron)
 
-- [ ] **Step 1: Compilar el bundle Electron**
+- [x] **Step 1: Compilar el bundle Electron**
 
 ```bash
 pnpm build:electron:prep
 ```
 
-- [ ] **Step 2: Abrir el TPV en Electron y cerrar un turno**
+- [x] **Step 2: Abrir el TPV en Electron y cerrar un turno**
 
 Abrir un turno → cobrar al menos una venta → cerrar el turno con arqueo.
 
-- [ ] **Step 3: Verificar el archivo en disco**
+- [x] **Step 3: Verificar el archivo en disco**
 
 En Windows:
 ```
@@ -285,7 +285,7 @@ En Windows:
 
 Abrir el JSON y verificar que contiene `turnoId`, `numeroZ`, `hashEncadenado`, `desglosePagos`.
 
-- [ ] **Step 4: Marcar el ítem en el checklist legal**
+- [x] **Step 4: Marcar el ítem en el checklist legal**
 
 En `docs/tpv-legal-compliance.md`, en la sección **WAL / Backup Fiscal**, añadir:
 
@@ -295,7 +295,7 @@ En `docs/tpv-legal-compliance.md`, en la sección **WAL / Backup Fiscal**, añad
 
 > Si la sección no existe todavía, añadirla al final del documento bajo un nuevo `## 10. Backup Fiscal Local`.
 
-- [ ] **Step 5: Commit final**
+- [x] **Step 5: Commit final**
 
 ```bash
 git add docs/tpv-legal-compliance.md
