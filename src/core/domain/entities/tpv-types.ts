@@ -69,10 +69,17 @@ export interface TpvMovimientoCajaPayload {
   empleadoId?: string;
 }
 
+export interface TpvIvaDesgloseItem {
+  porcentaje: number;
+  baseImponibleCents: number;
+  ivaCents: number;
+}
+
 export interface TpvDetalleItem {
   nombre: string;
   cantidad: number;
   precioUnitarioCents: number;
+  impuestoPorcentaje?: number;
 }
 
 export interface TpvCobro {
@@ -94,6 +101,7 @@ export interface TpvCobro {
   cobradoAt: string;
   rectificaCobroId?: string | null;
   detalleItems: TpvDetalleItem[] | null;
+  desgloseIva?: TpvIvaDesgloseItem[] | null;
 }
 
 export interface TpvCobroCompletoPayload {

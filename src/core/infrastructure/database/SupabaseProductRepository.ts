@@ -27,6 +27,7 @@ export class SupabaseProductRepository implements IProductRepository {
       esEspecial: row.es_especial as boolean,
       activo: row.activo as boolean,
       tipoProducto: (row.tipo_producto as string) === 'bebida' ? 'bebida' : 'comida',
+      porcentajeImpuestoOverride: (row.porcentaje_impuesto_override as number | null) ?? null,
       createdAt: new Date(row.created_at as string),
     };
   }
@@ -188,6 +189,10 @@ export class SupabaseProductRepository implements IProductRepository {
 
     if (data.foto_url !== undefined) {
       updatePayload.foto_url = data.foto_url === "" ? null : data.foto_url;
+    }
+
+    if (data.porcentaje_impuesto_override !== undefined) {
+      updatePayload.porcentaje_impuesto_override = data.porcentaje_impuesto_override ?? null;
     }
 
     return updatePayload;

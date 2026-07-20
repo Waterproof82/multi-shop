@@ -28,6 +28,7 @@ function toAdminProduct(prod: Product) {
     es_especial: prod.esEspecial,
     activo: prod.activo,
     tipo_producto: prod.tipoProducto,
+    porcentaje_impuesto_override: prod.porcentajeImpuestoOverride ?? null,
   };
 }
 

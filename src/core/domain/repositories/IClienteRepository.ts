@@ -25,4 +25,5 @@ export interface IClienteRepository {
   create(data: CreateClienteData): Promise<Result<Cliente>>;
   update(id: string, empresaId: string, data: Partial<UpdateClienteData>): Promise<Result<Cliente>>;
   delete(id: string, empresaId: string): Promise<Result<void>>;
+  anonimizarCliente(clienteId: string, empresaId: string): Promise<Result<void>>;
 }

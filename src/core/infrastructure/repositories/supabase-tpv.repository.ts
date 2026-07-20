@@ -6,6 +6,7 @@ import {
   TpvTurnoStats,
   TpvCobro,
   TpvCobroCompletoPayload,
+  TpvIvaDesgloseItem,
   TpvAnalytics,
   GetAnalyticsParams,
   TpvTurnoResumen,
@@ -52,6 +53,15 @@ function mapEvento(row: Record<string, unknown>): TpvTurnoEvento {
     descripcion: row.descripcion as string | null,
     createdAt: row.created_at as string,
   };
+}
+
+function mapDesgloseIva(raw: unknown): TpvIvaDesgloseItem[] | null {
+  if (!Array.isArray(raw)) return null;
+  return (raw as Record<string, unknown>[]).map((item) => ({
+    porcentaje: item['porcentaje'] as number,
+    baseImponibleCents: item['baseCents'] as number,
+    ivaCents: item['ivaCents'] as number,
+  }));
 }
 
 export class SupabaseTpvRepository implements ITpvRepository {
@@ -284,6 +294,7 @@ export class SupabaseTpvRepository implements ITpvRepository {
           cobradoAt: row.cobrado_at as string,
           rectificaCobroId: row.rectifica_cobro_id as string | null ?? null,
           detalleItems: (row.detalle_items as TpvCobro['detalleItems']) ?? null,
+          desgloseIva: mapDesgloseIva(row.desglose_iva),
         },
       };
     } catch (e) {

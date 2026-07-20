@@ -26,6 +26,7 @@ interface Props {
   readonly empresaId: string;
   readonly empresaNombre: string;
   readonly empresaNif: string | null;
+  readonly empresaRazonSocial?: string | null;
   readonly tipoImpuesto: 'iva' | 'igic';
   readonly porcentajeImpuesto: number;
 }
@@ -61,6 +62,7 @@ export function CobroFlow({
   empresaId,
   empresaNombre,
   empresaNif,
+  empresaRazonSocial,
   tipoImpuesto,
   porcentajeImpuesto,
 }: Props) {
@@ -209,6 +211,7 @@ export function CobroFlow({
       operadorNombre={operadorNombre}
       empresaNombre={empresaNombre}
       empresaNif={empresaNif}
+      empresaRazonSocial={empresaRazonSocial}
       cobro={cobro}
       tipoImpuesto={tipoImpuesto}
       esParcial={esParcial}

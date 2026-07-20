@@ -1,8 +1,33 @@
 import QRCode from 'qrcode';
-import type { PrintTicket, ThermalPrinter } from './types';
+import type { PrintTicket, PrintTicketDesgloseItem, ThermalPrinter } from './types';
 
 function fmt(cents: number): string {
   return (cents / 100).toLocaleString('es-ES', { minimumFractionDigits: 2 }) + ' \u20ac';
+}
+
+function resolveImpuestoLabel(tipoImpuesto: 'iva' | 'igic'): string {
+  if (tipoImpuesto === 'igic') return 'IGIC';
+  return 'IVA';
+}
+
+function buildDesgloseRows(items: PrintTicketDesgloseItem[], label: string): string {
+  return items
+    .map(
+      (item) =>
+        `<tr><td>Base imponible (${item.porcentaje}% ${label})</td><td style="text-align:right">${fmt(item.baseImponibleCents)}</td></tr>` +
+        `<tr><td>${label} ${item.porcentaje}%</td><td style="text-align:right">${fmt(item.impuestoCents)}</td></tr>`,
+    )
+    .join('');
+}
+
+function buildImpuestoRows(ticket: PrintTicket, label: string): string {
+  if (ticket.desgloseImpuesto != null && ticket.desgloseImpuesto.length > 1) {
+    return buildDesgloseRows(ticket.desgloseImpuesto, label);
+  }
+  return (
+    `<tr><td>Base imponible</td><td style="text-align:right">${fmt(ticket.baseImponibleCents)}</td></tr>` +
+    `<tr><td>${label} ${ticket.ivaPorcentaje}%</td><td style="text-align:right">${fmt(ticket.ivaCents)}</td></tr>`
+  );
 }
 
 function buildAeatUrl(ticket: PrintTicket, serieNum: string): string | null {
@@ -17,6 +42,19 @@ function buildAeatUrl(ticket: PrintTicket, serieNum: string): string | null {
   return `https://www2.agenciatributaria.gob.es/wlpl/TIKE-CONT/ValidarQR?${params.toString()}`;
 }
 
+async function buildAeatBlock(ticket: PrintTicket, serieNum: string): Promise<string> {
+  const aeatUrl = buildAeatUrl(ticket, serieNum);
+  if (!aeatUrl) return '';
+  const qrDataUrl = await QRCode.toDataURL(aeatUrl, { width: 160, margin: 1 });
+  return `
+      <tr><td colspan="2" style="padding-top:8px;text-align:center">
+        <img src="${qrDataUrl}" width="120" height="120" alt="QR AEAT"/>
+      </td></tr>
+      <tr><td colspan="2" style="padding-top:2px;word-break:break-all;font-size:8px;color:#555;text-align:center">
+        Verificar en AEAT
+      </td></tr>`;
+}
+
 async function buildReceiptHtml(ticket: PrintTicket): Promise<string> {
   const dt = new Date(ticket.cobradoAt);
   const fecha = dt.toLocaleDateString('es-ES');
@@ -25,20 +63,14 @@ async function buildReceiptHtml(ticket: PrintTicket): Promise<string> {
   const cambio = ticket.metodoPago === 'efectivo'
     ? Math.max(0, ticket.entregadoCents - ticket.importeCobradoCents)
     : 0;
-  const labelImpuesto = ticket.tipoImpuesto.toUpperCase();
+  const labelImpuesto = resolveImpuestoLabel(ticket.tipoImpuesto);
 
-  const aeatUrl = buildAeatUrl(ticket, serieNum);
-  let aeatBlock = '';
-  if (aeatUrl) {
-    const qrDataUrl = await QRCode.toDataURL(aeatUrl, { width: 160, margin: 1 });
-    aeatBlock = `
-      <tr><td colspan="2" style="padding-top:8px;text-align:center">
-        <img src="${qrDataUrl}" width="120" height="120" alt="QR AEAT"/>
-      </td></tr>
-      <tr><td colspan="2" style="padding-top:2px;word-break:break-all;font-size:8px;color:#555;text-align:center">
-        Verificar en AEAT
-      </td></tr>`;
-  }
+  const aeatBlock = await buildAeatBlock(ticket, serieNum);
+  const impuestoRows = buildImpuestoRows(ticket, labelImpuesto);
+
+  const razonSocialLine = ticket.razonSocial
+    ? `<p class="center small">${ticket.razonSocial}</p>`
+    : '';
 
   const propinaRow = ticket.propinaCents > 0
     ? `<tr><td>Propina</td><td style="text-align:right">${fmt(ticket.propinaCents)}</td></tr>`
@@ -69,6 +101,7 @@ async function buildReceiptHtml(ticket: PrintTicket): Promise<string> {
 </head>
 <body>
 <h1>${ticket.empresaNombre}</h1>
+${razonSocialLine}
 <p class="center small">${ticket.empresaNif ? 'NIF: ' + ticket.empresaNif : ''}</p>
 <hr class="sep"/>
 <table>
@@ -79,8 +112,7 @@ async function buildReceiptHtml(ticket: PrintTicket): Promise<string> {
 </table>
 <hr class="sep"/>
 <table>
-  <tr><td>Base imponible</td><td style="text-align:right">${fmt(ticket.baseImponibleCents)}</td></tr>
-  <tr><td>${labelImpuesto} ${ticket.ivaPorcentaje}%</td><td style="text-align:right">${fmt(ticket.ivaCents)}</td></tr>
+  ${impuestoRows}
   ${propinaRow}
   <tr class="total"><td>TOTAL</td><td style="text-align:right">${fmt(ticket.importeCobradoCents)}</td></tr>
 </table>

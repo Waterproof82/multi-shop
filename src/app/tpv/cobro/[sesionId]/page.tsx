@@ -55,7 +55,7 @@ export default async function CobroPage({ params, searchParams }: Readonly<Props
       .neq('estado', 'cancelado'),
     supabase
       .from('empresas')
-      .select('nombre, nif, tipo_impuesto, porcentaje_impuesto')
+      .select('nombre, nif, tipo_impuesto, porcentaje_impuesto, razon_social')
       .eq('id', empresaId)
       .maybeSingle(),
     supabase
@@ -88,9 +88,11 @@ export default async function CobroPage({ params, searchParams }: Readonly<Props
     nif: string | null;
     tipo_impuesto: string | null;
     porcentaje_impuesto: number | null;
+    razon_social: string | null;
   } | null;
   const empresaNombre = empresaRow?.nombre ?? 'Empresa';
   const nif = empresaRow?.nif ?? null;
+  const empresaRazonSocial = empresaRow?.razon_social ?? null;
   const tipoImpuesto = (empresaRow?.tipo_impuesto as 'iva' | 'igic' | null) ?? 'iva';
   const porcentajeImpuesto = empresaRow?.porcentaje_impuesto ?? 10;
 
@@ -105,6 +107,7 @@ export default async function CobroPage({ params, searchParams }: Readonly<Props
       empresaId={empresaId}
       empresaNombre={empresaNombre}
       empresaNif={nif}
+      empresaRazonSocial={empresaRazonSocial}
       tipoImpuesto={tipoImpuesto}
       porcentajeImpuesto={porcentajeImpuesto}
     />

@@ -102,4 +102,11 @@ Registro de normativas aplicables al sistema. Actualizar cada vez que se identif
   - PII (email, teléfono de clientes) — nunca se loguea (regla en CLAUDE.md)
   - `Sentry` — `maskAllText: true` + `blockAllMedia: true` obligatorios en Session Replay
   - Backups cifrados con HMAC-SHA256 para snapshots fiscales Electron
-- **Fichero clave:** `docs/context/sentry-monitoring.md`
+  - `clientes.anonimizado_en` — campo TIMESTAMPTZ que indica si un cliente fue anonimizado vía derecho de supresión
+  - `clientes.ultima_actividad` — se actualiza por trigger `trg_pedidos_ultima_actividad` en cada INSERT a `pedidos`. Base para el auto-purge.
+  - `POST /api/admin/rgpd/anonimizar-cliente` — sustituye `nombre/email/telefono` con placeholders; preserva `id` y FKs con `pedidos`. Idempotente. Solo `admin`/`superadmin`.
+  - pg_cron job diario: purga `clientes` con `ultima_actividad < now() - '2 years'` AND `anonimizado_en IS NULL`. Requiere extensión pg_cron en Supabase; si no está disponible, el endpoint manual es el único mecanismo.
+- **Trampas**:
+  - `ultima_actividad` solo avanza vía trigger en `pedidos`. Si se crea un cliente sin pedidos, su `ultima_actividad = created_at`. La purga automática eventualmente anonimiza clientes sin pedidos en `>2 años`.
+  - pg_cron no habilitado → el job no existe pero las columnas sí. La anonimización manual sigue funcionando.
+- **Fichero clave:** `docs/context/sentry-monitoring.md`, `src/app/api/admin/rgpd/anonimizar-cliente/route.ts`

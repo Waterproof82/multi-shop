@@ -44,12 +44,13 @@ const CobroSchema = z.object({
   propinaCents: z.number().int().min(0),
   descuentoCents: z.number().int().min(0).optional().default(0),
   turnoId: z.string().uuid(),
-  ivaPorcentaje: z.number().min(0).max(30).optional().default(10),
+  ivaPorcentaje: z.number().min(0).max(100).optional().default(10),
   cerrarSesion: z.boolean().optional().default(true),
   detalleItems: z.array(z.object({
     nombre: z.string().max(200),
     cantidad: z.number().int().positive(),
     precioUnitarioCents: z.number().int().min(0),
+    impuestoPorcentaje: z.number().min(0).max(100).optional(),
   })).optional(),
 });
 

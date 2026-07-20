@@ -184,13 +184,13 @@ export default async function TpvLegalPage() {
           />
           <CheckItem
             label="Ticket rectificativo (cobro de signo negativo)"
-            status="pending"
-            detail="Columna rectifica_cobro_id — pendiente de implementar"
+            status="done"
+            detail="Columna rectifica_cobro_id en tpv_cobros — implementado"
           />
           <CheckItem
             label="QR AEAT en pantalla de confirmación"
-            status="pending"
-            detail="Requiere NIF de empresa configurado"
+            status="done"
+            detail="Generado automáticamente cuando la empresa tiene NIF configurado"
           />
 
           <p className="text-[11px] font-semibold text-[#2563eb] uppercase tracking-wider mt-4 mb-1">
@@ -207,14 +207,14 @@ export default async function TpvLegalPage() {
             detail="cobrado_at TIMESTAMPTZ en tpv_cobros"
           />
           <CheckItem
-            label="IVA desglosado por tipo impositivo"
-            status="partial"
-            detail="10% restauración implementado; tipos por producto pendientes"
+            label="IVA/IGIC desglosado por tipo impositivo"
+            status="done"
+            detail="Multi-rate desglose con override por producto; etiqueta IVA o IGIC según empresa"
           />
           <CheckItem
             label="NIF, nombre y razón social del emisor"
-            status="partial"
-            detail="Columna nif añadida a empresas; exposición en ticket pendiente"
+            status="done"
+            detail="NIF, nombre y razón social impresos en ticket; columna razon_social en empresas"
           />
           <CheckItem
             label="Desglose de ítems (nombre, cantidad, precio)"
@@ -228,7 +228,7 @@ export default async function TpvLegalPage() {
           <CheckItem
             label="Firma digital XML + envío a hacienda foral"
             status="pending"
-            detail="Aplica solo si empresa.provincia ∈ Álava, Guipúzcoa, Vizcaya"
+            detail="Solo aplica si empresa.provincia ∈ Álava, Guipúzcoa, Vizcaya — fuera del ámbito actual"
           />
 
           <p className="text-[11px] font-semibold text-[#2563eb] uppercase tracking-wider mt-4 mb-1">
@@ -241,8 +241,8 @@ export default async function TpvLegalPage() {
           />
           <CheckItem
             label="Retención y anonimización de datos personales"
-            status="pending"
-            detail="Política de retención pendiente de definir"
+            status="partial"
+            detail="Endpoint POST /api/admin/rgpd/anonimizar-cliente implementado (manual). Automatización con pg_cron pendiente de activar según política de retención del tenant"
           />
         </div>
 

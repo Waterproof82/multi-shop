@@ -18,6 +18,7 @@ interface EmpresaDatosFormProps {
     url_mapa: string;
     direccion: string;
     nif: string;
+    razonSocial: string;
     tipoImpuesto: 'iva' | 'igic';
     porcentajeImpuesto: number;
   };
@@ -51,6 +52,7 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
           ...formData,
           tipo_impuesto: formData.tipoImpuesto,
           porcentaje_impuesto: formData.porcentajeImpuesto,
+          razon_social: formData.razonSocial || null,
         }),
       });
 
@@ -140,6 +142,26 @@ export function EmpresaDatosForm({ initialData }: EmpresaDatosFormProps) {
           />
           <span id="nif_help" className="text-xs text-muted-foreground">
             Requerido para tickets fiscales (Verifactu / RD 1619/2012)
+          </span>
+        </div>
+
+        {/* Razón social */}
+        <div className="flex flex-col gap-2">
+          <label htmlFor="razon_social" className="text-sm font-medium text-foreground flex items-center gap-2">
+            <FileText className="w-4 h-4" />
+            Razón social
+          </label>
+          <Input
+            id="razon_social"
+            name="razon_social"
+            type="text"
+            value={formData.razonSocial}
+            onChange={(e) => handleChange('razonSocial', e.target.value)}
+            placeholder="Ej: Mi Empresa S.L."
+            aria-describedby="razon_social_help"
+          />
+          <span id="razon_social_help" className="text-xs text-muted-foreground">
+            Nombre legal completo. Se imprime en el encabezado del ticket fiscal.
           </span>
         </div>
 
