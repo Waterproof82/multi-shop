@@ -6,6 +6,7 @@ import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 import { getEmpleadoTpvLoginUseCase, getAuditLogRepository } from '@/core/infrastructure/database';
 import { signTpvEmployeeToken } from '@/lib/tpv-employee-auth';
 import { resolveActor } from '@/core/infrastructure/api/audit-actor';
+import { generateCsrfToken, signCsrfToken } from '@/lib/csrf';
 
 const LoginSchema = z.object({
   pin: z.string().min(4).max(8).regex(/^\d+$/, 'Solo dígitos'),
@@ -56,11 +57,21 @@ export async function POST(req: NextRequest) {
   const token = await signTpvEmployeeToken(result.data);
   const nextUrl = result.data.rol === 'cajero' ? '/tpv/mostrador' : '/tpv/turno/abrir';
 
+  const csrfToken = generateCsrfToken();
+  const csrfSignature = signCsrfToken(csrfToken);
+
   const response = NextResponse.json({ ok: true, nextUrl, rol: result.data.rol });
   response.cookies.set('tpv_employee_token', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
+    path: '/',
+    maxAge: 60 * 60,
+  });
+  response.cookies.set('csrf_token', `${csrfToken}:${csrfSignature}`, {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
     path: '/',
     maxAge: 60 * 60,
   });

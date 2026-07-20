@@ -97,7 +97,10 @@ export default async function TpvLayout({ children }: { readonly children: React
   // Redirect to turno/abrir if no active turno — skip for pages that don't need one
   const requiresTurno = !TURNO_OPTIONAL_PREFIXES.some(p => pathname.startsWith(p));
   if (requiresTurno && (!turnoResult.success || turnoResult.data === null)) {
-    redirect('/tpv/turno/abrir');
+    // Cajeros cannot open a turno — redirecting them to /turno/abrir creates an infinite loop.
+    // Send them to /tpv/turno/espera so they can wait for an encargado.
+    if (rol === 'cajero') redirect('/tpv/turno/espera');
+    else redirect('/tpv/turno/abrir');
   }
 
   const products = productsResult.success ? productsResult.data : [];

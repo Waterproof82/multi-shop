@@ -21,6 +21,7 @@ interface Props {
   readonly turnoId: string;
   readonly totalCents: number;
   readonly yaCobradoCents: number;
+  readonly mesaId?: string;
   readonly mesaNumero: number;
   readonly operadorNombre: string;
   readonly empresaId: string;
@@ -58,6 +59,7 @@ export function CobroFlow({
   turnoId,
   totalCents,
   yaCobradoCents,
+  mesaId,
   mesaNumero,
   operadorNombre,
   empresaId,
@@ -99,11 +101,14 @@ export function CobroFlow({
     history.pushState(null, '', window.location.href);
     function handlePopState() {
       history.pushState(null, '', window.location.href);
-      router.replace('/tpv/mostrador');
+      const params = mesaId
+        ? `?mesaId=${mesaId}&mesaNumero=${mesaNumero}`
+        : '';
+      router.replace(`/tpv/mostrador${params}`);
     }
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [router]);
+  }, [router, mesaId, mesaNumero]);
 
   const confirmarOffline = useCallback(
     async (importe: number) => {

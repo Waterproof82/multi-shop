@@ -100,7 +100,7 @@ export default async function MostradorPage({
 
   return (
     <MostradorClient
-      key={mesaId ?? 'no-mesa'}
+      key={mesaId ? `${mesaId}:${mesaData.sesionId ?? ''}` : 'no-mesa'}
       initialMesa={mesaId ? {
         mesaId,
         sesionId: mesaData.sesionId,

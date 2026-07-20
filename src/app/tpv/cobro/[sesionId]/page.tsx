@@ -82,7 +82,7 @@ export default async function CobroPage({ params, searchParams }: Readonly<Props
   const [sesionRes, pedidosRes, empresaRes, cobrosRes] = await Promise.all([
     supabase
       .from('mesa_sesiones')
-      .select('id, propina_cents, mesas!mesa_sesiones_mesa_id_fkey(numero)')
+      .select('id, mesa_id, propina_cents, mesas!mesa_sesiones_mesa_id_fkey(numero)')
       .eq('id', sesionId)
       .maybeSingle(),
     supabase
@@ -106,6 +106,7 @@ export default async function CobroPage({ params, searchParams }: Readonly<Props
 
   const sesionData = sesion as unknown as {
     id: string;
+    mesa_id: string | null;
     propina_cents: number;
     mesas: { numero: number } | null;
   };
@@ -160,6 +161,7 @@ export default async function CobroPage({ params, searchParams }: Readonly<Props
       turnoId={turnoId}
       totalCents={Math.round(pedidosTotal * 100)}
       yaCobradoCents={yaCobradoCents}
+      mesaId={sesionData.mesa_id ?? undefined}
       mesaNumero={sesionData.mesas?.numero ?? 0}
       operadorNombre={operadorNombre}
       empresaId={empresaId}
