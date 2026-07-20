@@ -93,7 +93,7 @@ export function CobroMetodoPropina({
   return (
     <div className="flex items-center justify-center w-full h-full gap-6 p-8">
       {/* Resumen lateral */}
-      <div className="w-56 bg-[#1a1d27] border border-[#2e3347] rounded-2xl p-5 flex flex-col gap-3 self-start">
+      <div className="w-56 bg-white border border-[#e2e8f0] rounded-2xl p-5 flex flex-col gap-3 self-start shadow-sm">
         <p className="text-[10px] font-bold text-[#6b7280] uppercase tracking-wider">Resumen</p>
         <div className="flex justify-between text-sm text-[#6b7280]">
           <span>Consumo total</span><span>{fmt(totalCents)}</span>
@@ -118,7 +118,7 @@ export function CobroMetodoPropina({
             <span>Propina</span><span>{fmt(propinaCents)}</span>
           </div>
         )}
-        <div className="h-px bg-[#2e3347]" />
+        <div className="h-px bg-[#e2e8f0]" />
         <div className="flex justify-between items-baseline">
           <span className="text-sm text-[#6b7280]">{esParcial ? 'A COBRAR' : 'TOTAL'}</span>
           <span className="text-2xl font-bold">{fmt(totalFinal)}</span>
@@ -131,7 +131,7 @@ export function CobroMetodoPropina({
       </div>
 
       {/* Panel principal */}
-      <div className="bg-[#1a1d27] border border-[#2e3347] rounded-2xl p-7 flex flex-col gap-6 w-[420px]">
+      <div className="bg-white border border-[#e2e8f0] rounded-2xl p-7 flex flex-col gap-6 w-[420px] shadow-sm">
         <h2 className="text-lg font-bold">¿Cómo paga el cliente?</h2>
 
         {/* Importe a cobrar */}
@@ -139,8 +139,8 @@ export function CobroMetodoPropina({
           <label className="text-xs font-bold text-[#6b7280] uppercase tracking-wider">
             Importe a cobrar
           </label>
-          <div className="flex items-center gap-2 bg-[#22263a] border border-[#2e3347] rounded-xl px-4 focus-within:border-[#4f72ff] transition-colors">
-            <span className="text-[#6b7280] font-semibold">€</span>
+          <div className="flex items-center gap-2 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-4 focus-within:border-[#2563eb] transition-colors">
+            <span className="text-[#64748b] font-semibold">€</span>
             <input
               type="text"
               inputMode="decimal"
@@ -154,7 +154,7 @@ export function CobroMetodoPropina({
               <button
                 type="button"
                 onClick={resetImporteToTotal}
-                className="text-[10px] text-[#4f72ff] font-bold hover:underline shrink-0"
+                className="text-[10px] text-[#2563eb] font-bold hover:underline shrink-0"
               >
                 Total
               </button>
@@ -172,7 +172,7 @@ export function CobroMetodoPropina({
           <label className="text-xs font-bold text-[#6b7280] uppercase tracking-wider">
             Descuento <span className="normal-case font-normal">(opcional)</span>
           </label>
-          <div className="flex items-center gap-2 bg-[#22263a] border border-[#2e3347] rounded-xl px-4 focus-within:border-[#ef4444] transition-colors">
+          <div className="flex items-center gap-2 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-4 focus-within:border-[#ef4444] transition-colors">
             <span className="text-[#6b7280] font-semibold">€</span>
             <input
               type="text"
@@ -205,8 +205,8 @@ export function CobroMetodoPropina({
               onClick={() => onMetodoChange(m)}
               className={`flex flex-col items-center gap-3 py-8 px-4 rounded-xl border-2 transition-all ${
                 metodo === m
-                  ? 'border-[#4f72ff] bg-[#4f72ff15]'
-                  : 'border-[#2e3347] bg-[#22263a] hover:border-[#4f72ff]'
+                  ? 'border-[#2563eb] bg-[#eff6ff]'
+                  : 'border-[#e2e8f0] bg-[#f8fafc] hover:border-[#2563eb]'
               }`}
             >
               <span className="text-4xl">{m === 'efectivo' ? '💵' : '💳'}</span>
@@ -219,7 +219,7 @@ export function CobroMetodoPropina({
         </div>
 
         {/* Propina */}
-        <div className="bg-[#22263a] border border-[#2e3347] rounded-xl p-4 flex flex-col gap-3">
+        <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-4 flex flex-col gap-3">
           <div className="flex items-center gap-2">
             <span className="text-lg">💰</span>
             <div>
@@ -241,12 +241,12 @@ export function CobroMetodoPropina({
             <button
               type="button"
               onClick={() => onPropinaChange(0)}
-              className="px-3 py-1.5 rounded-lg border border-[#2e3347] text-[#6b7280] text-sm font-semibold hover:text-[#e8eaf0] transition-colors"
+              className="px-3 py-1.5 rounded-lg border border-[#e2e8f0] text-[#64748b] text-sm font-semibold hover:text-[#0f172a] transition-colors"
             >
               Sin propina
             </button>
           </div>
-          <div className="flex items-center gap-2 bg-[#0f1117] border border-[#2e3347] rounded-lg px-3 focus-within:border-[#eab308] transition-colors">
+          <div className="flex items-center gap-2 bg-white border border-[#e2e8f0] rounded-lg px-3 focus-within:border-[#eab308] transition-colors">
             <span className="text-[#6b7280] font-semibold">€</span>
             <input
               type="number"
@@ -266,14 +266,14 @@ export function CobroMetodoPropina({
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 py-3 rounded-xl border border-[#2e3347] text-[#6b7280] text-sm font-semibold hover:text-[#e8eaf0] hover:border-[#e8eaf0] transition-colors"
+            className="flex-1 py-3 rounded-xl border border-[#e2e8f0] text-[#64748b] text-sm font-semibold hover:text-[#0f172a] hover:border-[#cbd5e1] transition-colors"
           >
             Cancelar
           </button>
           <button
             type="button"
             onClick={onContinuar}
-            className="flex-[2] py-3 rounded-xl bg-[#4f72ff] text-white font-bold hover:brightness-110 transition-all"
+            className="flex-[2] py-3 rounded-xl bg-[#2563eb] text-white font-bold hover:brightness-110 transition-all"
           >
             Continuar — {fmt(totalFinal)}
           </button>

@@ -35,11 +35,11 @@ export default async function TpvLoginPage() {
     .maybeSingle();
 
   return (
-    <div className="min-h-screen bg-[#0f1117] flex items-center justify-center p-4">
-      <div className="bg-[#1a1d27] border border-[#2e3347] rounded-2xl p-12 flex flex-col gap-8 w-full max-w-sm">
+    <div className="min-h-screen bg-[#f1f5f9] flex items-center justify-center p-4">
+      <div className="bg-white border border-[#e2e8f0] rounded-2xl p-12 flex flex-col gap-8 w-full max-w-sm shadow-sm">
         <div className="flex flex-col gap-2 items-center text-center">
-          <span className="text-xs font-bold text-[#4f72ff] uppercase tracking-wider">TPV</span>
-          <h1 className="text-2xl font-bold text-[#e8eaf0]">
+          <span className="text-xs font-bold text-[#2563eb] uppercase tracking-wider">TPV</span>
+          <h1 className="text-2xl font-bold text-[#0f172a]">
             {(empresa as { nombre: string } | null)?.nombre ?? 'Acceso TPV'}
           </h1>
           <p className="text-sm text-[#6b7280] leading-relaxed">

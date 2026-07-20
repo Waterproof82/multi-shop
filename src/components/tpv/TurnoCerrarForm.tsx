@@ -131,7 +131,7 @@ export function TurnoCerrarForm({ turno, stats, mesasAbiertas, isBlindClose }: R
   return (
     <form onSubmit={handleCierre} className="flex flex-col gap-6 w-full">
       {/* Resumen */}
-      <div className="bg-[#22263a] border border-[#2e3347] rounded-xl p-5 flex flex-col gap-3">
+      <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-5 flex flex-col gap-3">
         <p className="text-[10px] font-bold text-[#6b7280] uppercase tracking-wider">Resumen del turno</p>
         <div className="flex justify-between text-sm">
           <span className="text-[#6b7280]">Operador</span>
@@ -147,7 +147,7 @@ export function TurnoCerrarForm({ turno, stats, mesasAbiertas, isBlindClose }: R
         </div>
         {!isBlindClose && (
           <>
-            <div className="h-px bg-[#2e3347]" />
+            <div className="h-px bg-[#e2e8f0]" />
             <div className="flex justify-between text-sm">
               <span className="text-[#6b7280]">Total efectivo (teórico)</span>
               <span className="font-semibold">
@@ -171,7 +171,7 @@ export function TurnoCerrarForm({ turno, stats, mesasAbiertas, isBlindClose }: R
         <label className="text-xs font-bold text-[#6b7280] uppercase tracking-wider">
           Cuenta el efectivo sin mirar el sistema
         </label>
-        <div className="flex items-center gap-2 bg-[#22263a] border border-[#2e3347] rounded-xl px-4 focus-within:border-[#4f72ff] transition-colors">
+        <div className="flex items-center gap-2 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-4 focus-within:border-[#2563eb] transition-colors">
           <span className="text-[#6b7280] font-semibold">€</span>
           <input
             type="number"
@@ -228,7 +228,7 @@ export function TurnoCerrarForm({ turno, stats, mesasAbiertas, isBlindClose }: R
         <button
           type="button"
           onClick={() => router.push('/tpv/mostrador')}
-          className="flex-1 py-3.5 rounded-xl border border-[#2e3347] text-[#6b7280] font-semibold hover:text-[#e8eaf0] transition-colors"
+          className="flex-1 py-3.5 rounded-xl border border-[#e2e8f0] text-[#64748b] font-semibold hover:text-[#0f172a] transition-colors"
         >
           Cancelar
         </button>

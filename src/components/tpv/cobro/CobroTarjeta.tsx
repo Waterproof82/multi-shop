@@ -46,7 +46,7 @@ export function CobroTarjeta({
         <button
           type="button"
           onClick={onBack}
-          className="py-3 px-8 rounded-xl border border-[#2e3347] text-[#6b7280] text-sm font-semibold hover:text-[#e8eaf0] transition-colors"
+          className="py-3 px-8 rounded-xl border border-[#e2e8f0] text-[#64748b] text-sm font-semibold hover:text-[#0f172a] transition-colors"
         >
           ← Cambiar método
         </button>
