@@ -4,7 +4,6 @@ import { verifyTpvEmployeeToken } from '@/lib/tpv-employee-auth';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { getDomainFromHeaders, parseMainDomain } from '@/lib/domain-utils';
 import { TpvLoginForm } from '@/components/tpv/TpvLoginForm';
-import { TpvBackButton } from './TpvBackButton';
 
 export async function TpvLoginContent() {
   const cookieStore = await cookies();
@@ -42,7 +41,12 @@ export async function TpvLoginContent() {
           </p>
         </div>
         <TpvLoginForm />
-        <TpvBackButton />
+        <a
+          href="/admin/login"
+          className="text-xs text-[#94a3b8] hover:text-[#64748b] text-center transition-colors"
+        >
+          Acceso con email y contraseña →
+        </a>
       </div>
     </div>
   );
