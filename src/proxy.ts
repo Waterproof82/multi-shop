@@ -384,7 +384,7 @@ export async function proxy(request: NextRequest) {
 
   // TPV auth: login and logout are public; all others try admin_token then tpv_employee_token
   if (path.startsWith('/api/tpv')) {
-    if (path === '/api/tpv/empleados/login' || path === '/api/tpv/empleados/logout') {
+    if (path === '/api/tpv/empleados/login' || path === '/api/tpv/empleados/logout' || path === '/api/tpv/activate') {
       return NextResponse.next();
     }
     const adminResult = await handleAdminAuth(request, origin);
