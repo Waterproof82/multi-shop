@@ -42,20 +42,44 @@ function ActionIcon({ emoji, label, onClick, disabled = false, variant = 'defaul
   );
 }
 
+const ADMIN_SHORTCUTS = [
+  { emoji: '📦', label: 'Produc.',   href: '/admin/productos' },
+  { emoji: '🏷️', label: 'Categ.',    href: '/admin/categorias' },
+  { emoji: '🧩', label: 'Compl.',    href: '/admin/complementos' },
+  { emoji: '📋', label: 'Recetas',   href: '/admin/stock/recetas' },
+  { emoji: '🧂', label: 'Ingred.',   href: '/admin/stock/ingredientes' },
+  { emoji: '👥', label: 'Empleados', href: '/admin/empleados-tpv' },
+  { emoji: '🖥️', label: 'Admin',     href: '/admin' },
+] as const;
+
+function toAdmin(href: string) {
+  window.location.href = `/admin/login?from=tpv&next=${encodeURIComponent(href)}`;
+}
+
 export function AccionesPanel() {
   const router = useRouter();
   const rol = useTpvRol();
   const { hasPendingItems } = useTpvAcciones();
   const isCajero = rol === 'cajero';
+  const isAdmin = rol === 'admin' || rol === 'superadmin' || rol === 'encargado';
 
   if (hasPendingItems) return null;
 
   return (
-    <aside className="w-16 shrink-0 bg-white border-l border-[#e2e8f0] flex flex-col items-center py-3 gap-1.5">
+    <aside className="w-16 shrink-0 bg-white border-l border-[#e2e8f0] flex flex-col items-center py-3 gap-1.5 overflow-y-auto">
       {!isCajero && (
         <>
           <ActionIcon emoji="📊" label="Analítica" onClick={() => router.push('/tpv/analytics')} />
           <ActionIcon emoji="📉" label="Mermas" onClick={() => router.push('/tpv/mermas')} />
+        </>
+      )}
+
+      {isAdmin && (
+        <>
+          <div className="w-8 border-t border-[#e2e8f0] my-0.5" />
+          {ADMIN_SHORTCUTS.map(({ emoji, label, href }) => (
+            <ActionIcon key={href} emoji={emoji} label={label} onClick={() => toAdmin(href)} />
+          ))}
         </>
       )}
 

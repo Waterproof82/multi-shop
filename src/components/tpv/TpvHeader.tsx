@@ -1,21 +1,14 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
-import { Settings, Package, Tags, BookOpen, Archive, LayoutDashboard, Lock } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Settings, Lock } from 'lucide-react';
 import { useOnlineStatus } from '@/hooks/tpv/useOnlineStatus';
 import { getQueueCount } from '@/lib/tpv/offline-queue';
 import { LowStockBadge } from '@/components/tpv/LowStockBadge';
 import { useTpvRol, useTpvIsEmployeeSession } from '@/lib/tpv-rol-ctx';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 
-const ADMIN_SHORTCUTS = [
-  { label: 'Productos',    href: '/admin/productos',           icon: Package },
-  { label: 'Categorías',  href: '/admin/categorias',          icon: Tags },
-  { label: 'Recetas',     href: '/admin/stock/recetas',       icon: BookOpen },
-  { label: 'Ingredientes',href: '/admin/stock/ingredientes',  icon: Archive },
-  { label: 'Panel admin', href: '/admin',                     icon: LayoutDashboard },
-] as const;
 
 interface Props {
   readonly empresaNombre: string;
@@ -45,9 +38,7 @@ export function TpvHeader({ empresaNombre }: Readonly<Props>) {
   const isEmployeeSession = useTpvIsEmployeeSession();
   const isOnline = useOnlineStatus();
   const [pendingCount, setPendingCount] = useState(0);
-  const [adminOpen, setAdminOpen] = useState(false);
   const [locking, setLocking] = useState(false);
-  const adminRef = useRef<HTMLDivElement>(null);
 
   const isCajero = rol === 'cajero';
   const showGear = rol === 'admin' || rol === 'superadmin' || rol === 'encargado';
@@ -57,17 +48,6 @@ export function TpvHeader({ empresaNombre }: Readonly<Props>) {
     { label: '🪑 Mesas',     href: '/tpv/mesas?seleccionar=1', activePrefix: '/tpv/mesas' },
     ...(!isCajero ? [{ label: '📋 Historial', href: '/tpv/historial', activePrefix: '/tpv/historial' }] : []),
   ];
-
-  useEffect(() => {
-    if (!adminOpen) return;
-    function handleClick(e: MouseEvent) {
-      if (adminRef.current && !adminRef.current.contains(e.target as Node)) {
-        setAdminOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [adminOpen]);
 
   useEffect(() => {
     getQueueCount()
@@ -124,39 +104,14 @@ export function TpvHeader({ empresaNombre }: Readonly<Props>) {
         <LowStockBadge />
         <TpvClock />
         {showGear && (
-          <div ref={adminRef} className="relative">
-            <button
-              type="button"
-              onClick={() => setAdminOpen(o => !o)}
-              aria-label="Accesos de administración"
-              aria-expanded={adminOpen}
-              className={`p-1.5 rounded-md border transition-colors ${
-                adminOpen
-                  ? 'bg-[#eff6ff] border-[#2563eb] text-[#2563eb]'
-                  : 'bg-[#f8fafc] border-[#e2e8f0] text-[#64748b] hover:border-[#2563eb] hover:text-[#0f172a]'
-              }`}
-            >
-              <Settings className="h-4 w-4" />
-            </button>
-
-            {adminOpen && (
-              <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-[#e2e8f0] rounded-lg shadow-xl z-50 overflow-hidden">
-                {ADMIN_SHORTCUTS.map(({ label, href, icon: Icon }, idx) => (
-                  <button
-                    key={href}
-                    type="button"
-                    onClick={() => { setAdminOpen(false); window.location.href = `/admin/login?from=tpv&next=${encodeURIComponent(href)}`; }}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#374151] hover:bg-[#f1f5f9] hover:text-[#0f172a] transition-colors text-left ${
-                      idx === ADMIN_SHORTCUTS.length - 1 ? 'border-t border-[#e2e8f0] mt-1' : ''
-                    }`}
-                  >
-                    <Icon className="h-4 w-4 text-[#2563eb] flex-shrink-0" />
-                    {label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={() => { window.location.href = `/admin/login?from=tpv&next=${encodeURIComponent('/admin')}`; }}
+            aria-label="Ir al panel de administración"
+            className="p-1.5 rounded-md border bg-[#f8fafc] border-[#e2e8f0] text-[#64748b] hover:border-[#2563eb] hover:text-[#0f172a] transition-colors"
+          >
+            <Settings className="h-4 w-4" />
+          </button>
         )}
         {isEmployeeSession && (
           <button
