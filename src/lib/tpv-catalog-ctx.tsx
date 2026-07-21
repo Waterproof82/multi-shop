@@ -178,11 +178,19 @@ export function TpvCatalogProvider({
       .on('broadcast', { event: 'new-order' }, () => { void refreshMesas(); })
       .subscribe();
 
+    // item-update broadcast fires when kitchen/bar marks or cancels items.
+    // Without this, the grid total and order count stay stale after cancellations.
+    const itemUpdateCh = supabase
+      .channel('waiter-items-update')
+      .on('broadcast', { event: 'item-update' }, () => { void refreshMesas(); })
+      .subscribe();
+
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       void supabase.removeChannel(catalogCh);
       void supabase.removeChannel(mesasCh);
       void supabase.removeChannel(newOrderCh);
+      void supabase.removeChannel(itemUpdateCh);
     };
   }, [empresaId, scheduleCatalogRefresh, refreshMesas]);
 
