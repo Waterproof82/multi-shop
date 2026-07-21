@@ -166,6 +166,12 @@ export function TpvCatalogProvider({
         schema: 'public',
         table: 'mesa_sesiones',
       }, () => { void refreshMesas(); })
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'pedidos',
+        filter: `empresa_id=eq.${empresaId}`,
+      }, () => { void refreshMesas(); })
       .subscribe();
 
     return () => {
