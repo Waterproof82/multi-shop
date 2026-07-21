@@ -5,6 +5,7 @@ import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-c
 import { useMesaActiva } from '@/hooks/tpv/useMesaActiva';
 import { useTpvCatalog } from '@/lib/tpv-catalog-ctx';
 import { TicketPanel } from './TicketPanel';
+import { NuevoPedidoPanel } from './NuevoPedidoPanel';
 import { MenuPanel } from './MenuPanel';
 import { MesasGrid } from './MesasGrid';
 import { useTpvAcciones } from '@/lib/tpv-acciones-ctx';
@@ -129,17 +130,12 @@ export function MostradorClient({ initialMesa }: Readonly<Props>) {
         mesaNumero={mesa.mesaNumero}
         mesaName={mesa.mesaName}
         existingOrders={mesa.existingOrders}
-        pendingItems={mesa.pendingItems}
         existingTotal={mesa.existingTotal}
-        pendingTotal={mesa.pendingTotal}
         yaCobradoCents={yaCobradoCents}
         turnoId={turno.id}
         tipoImpuesto={tipoImpuesto}
         porcentajeImpuesto={porcentajeImpuesto}
         sesionPagada={isSesionPagada}
-        onRemovePending={removeItem}
-        onUpdatePendingNota={updatePendingNota}
-        onPendingSent={clearPending}
       />
       {!mesa.mesaId ? (
         <MesasGrid modo="seleccionar" />
@@ -149,6 +145,19 @@ export function MostradorClient({ initialMesa }: Readonly<Props>) {
           categories={categories}
           onAddItem={addItem}
           mesaSeleccionada={!!mesa.mesaId}
+        />
+      )}
+      {mesa.mesaId && (
+        <NuevoPedidoPanel
+          sesionId={mesa.sesionId}
+          mesaId={mesa.mesaId}
+          mesaNumero={mesa.mesaNumero}
+          mesaName={mesa.mesaName}
+          pendingItems={mesa.pendingItems}
+          pendingTotal={mesa.pendingTotal}
+          onPendingSent={clearPending}
+          onRemovePending={removeItem}
+          onUpdatePendingNota={updatePendingNota}
         />
       )}
     </>
