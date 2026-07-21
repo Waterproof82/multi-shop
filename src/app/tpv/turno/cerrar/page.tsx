@@ -63,10 +63,30 @@ export default async function TurnoCerrarPage() {
 
   type MesaJoin = { numero: number | null; nombre: string | null };
   type SesionRow = { id: string; mesas: MesaJoin | MesaJoin[] | null };
-  const mesasAbiertas = ((sesionesRes.data ?? []) as unknown as SesionRow[]).map(s => {
-    const mesa = Array.isArray(s.mesas) ? s.mesas[0] : s.mesas;
-    return { mesaNumero: mesa?.numero ?? null, mesaNombre: mesa?.nombre ?? null };
-  });
+  const rawSesiones = (sesionesRes.data ?? []) as unknown as SesionRow[];
+
+  // Only warn about sessions that have at least one active (non-cancelled, non-closed) pedido.
+  // Sessions where all orders were cancelled have no pending amount and must not block turno close.
+  const activeSesionIds = new Set<string>();
+  if (rawSesiones.length > 0) {
+    const sesionIds = rawSesiones.map(s => s.id);
+    const { data: activePedidos } = await supabase
+      .from('pedidos')
+      .select('sesion_id')
+      .in('sesion_id', sesionIds)
+      .neq('estado', 'cerrado')
+      .neq('estado', 'cancelado');
+    for (const p of (activePedidos ?? []) as { sesion_id: string }[]) {
+      if (p.sesion_id) activeSesionIds.add(p.sesion_id);
+    }
+  }
+
+  const mesasAbiertas = rawSesiones
+    .filter(s => activeSesionIds.has(s.id))
+    .map(s => {
+      const mesa = Array.isArray(s.mesas) ? s.mesas[0] : s.mesas;
+      return { mesaNumero: mesa?.numero ?? null, mesaNombre: mesa?.nombre ?? null };
+    });
 
   return (
     <div className="w-full h-full overflow-y-auto p-8">
