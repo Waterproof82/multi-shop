@@ -166,18 +166,21 @@ export function TpvCatalogProvider({
         schema: 'public',
         table: 'mesa_sesiones',
       }, () => { void refreshMesas(); })
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'pedidos',
-        filter: `empresa_id=eq.${empresaId}`,
-      }, () => { void refreshMesas(); })
+      .subscribe();
+
+    // postgres_changes on pedidos requires authenticated role — anon client never
+    // receives those events. Use the existing broadcast fired by the DB trigger
+    // (notify_waiter_new_order) instead: it fires on every INSERT regardless of RLS.
+    const newOrderCh = supabase
+      .channel('tpv-catalog-new-order')
+      .on('broadcast', { event: 'new-order' }, () => { void refreshMesas(); })
       .subscribe();
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       void supabase.removeChannel(catalogCh);
       void supabase.removeChannel(mesasCh);
+      void supabase.removeChannel(newOrderCh);
     };
   }, [empresaId, scheduleCatalogRefresh, refreshMesas]);
 
