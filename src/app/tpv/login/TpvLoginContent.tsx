@@ -4,6 +4,7 @@ import { verifyTpvEmployeeToken } from '@/lib/tpv-employee-auth';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { getDomainFromHeaders, parseMainDomain } from '@/lib/domain-utils';
 import { TpvLoginForm } from '@/components/tpv/TpvLoginForm';
+import { TpvBackButton } from './TpvBackButton';
 
 export async function TpvLoginContent() {
   const cookieStore = await cookies();
@@ -41,12 +42,7 @@ export async function TpvLoginContent() {
           </p>
         </div>
         <TpvLoginForm />
-        <a
-          href="/tpv/mostrador"
-          className="text-sm text-[#64748b] hover:text-[#0f172a] text-center transition-colors"
-        >
-          ← Volver al TPV
-        </a>
+        <TpvBackButton />
       </div>
     </div>
   );
