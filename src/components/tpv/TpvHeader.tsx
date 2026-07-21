@@ -145,7 +145,7 @@ export function TpvHeader({ empresaNombre }: Readonly<Props>) {
                   <button
                     key={href}
                     type="button"
-                    onClick={() => { setAdminOpen(false); window.location.href = href; }}
+                    onClick={() => { setAdminOpen(false); window.location.href = `/admin/login?from=tpv&next=${encodeURIComponent(href)}`; }}
                     className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#374151] hover:bg-[#f1f5f9] hover:text-[#0f172a] transition-colors text-left ${
                       idx === ADMIN_SHORTCUTS.length - 1 ? 'border-t border-[#e2e8f0] mt-1' : ''
                     }`}
