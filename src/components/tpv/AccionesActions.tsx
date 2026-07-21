@@ -32,10 +32,10 @@ function ActionIcon({ emoji, label, onClick, disabled = false, variant = 'defaul
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`w-16 h-14 rounded-xl flex flex-col items-center justify-center gap-0.5 border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${resolveVariantClass(variant)}`}
+      className={`w-[72px] h-16 rounded-xl flex flex-col items-center justify-center gap-1 border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${resolveVariantClass(variant)}`}
     >
       <span className="text-xl leading-none" aria-hidden="true">{emoji}</span>
-      <span className={`text-[10px] font-semibold uppercase tracking-wide ${resolveLabelClass(variant)}`}>
+      <span className={`text-[11px] font-semibold uppercase tracking-wide ${resolveLabelClass(variant)}`}>
         {label}
       </span>
     </button>
@@ -64,7 +64,7 @@ export function AccionesPanel() {
   if (hasPendingItems) return null;
 
   return (
-    <aside className="w-20 shrink-0 bg-white border-l border-[#e2e8f0] flex flex-col items-center py-3 gap-1.5 overflow-y-auto">
+    <aside className="w-24 shrink-0 bg-white border-l border-[#e2e8f0] flex flex-col items-center py-4 gap-2 overflow-y-auto">
       {!isCajero && (
         <>
           <ActionIcon emoji="📊" label="Analítica" onClick={() => router.push('/tpv/analytics')} />
