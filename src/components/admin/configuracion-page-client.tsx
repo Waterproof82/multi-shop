@@ -165,7 +165,7 @@ export function ConfiguracionPageClient({
 
       {/* Empleados TPV — solo restaurantes */}
       {empresaTipo !== 'tienda' && (
-        <div className="bg-card rounded-lg shadow-elegant border border-border p-6">
+        <div id="empleados-tpv" className="bg-card rounded-lg shadow-elegant border border-border p-6">
           <h2 className="text-lg font-semibold mb-6 text-foreground flex items-center gap-2">
             <Users className="w-5 h-5" />
             Empleados TPV

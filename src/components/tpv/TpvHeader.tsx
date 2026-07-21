@@ -103,16 +103,6 @@ export function TpvHeader({ empresaNombre }: Readonly<Props>) {
       <div className="flex items-center gap-4">
         <LowStockBadge />
         <TpvClock />
-        {showGear && (
-          <button
-            type="button"
-            onClick={() => { window.location.href = `/admin/login?from=tpv&next=${encodeURIComponent('/admin')}`; }}
-            aria-label="Ir al panel de administración"
-            className="p-1.5 rounded-md border bg-[#f8fafc] border-[#e2e8f0] text-[#64748b] hover:border-[#2563eb] hover:text-[#0f172a] transition-colors"
-          >
-            <Settings className="h-4 w-4" />
-          </button>
-        )}
         {isEmployeeSession && (
           <button
             type="button"
@@ -124,14 +114,26 @@ export function TpvHeader({ empresaNombre }: Readonly<Props>) {
             <Lock className="h-4 w-4" />
           </button>
         )}
-        <button
-          type="button"
-          onClick={() => router.push('/tpv/turno/cerrar')}
-          className="text-xs bg-[#fef2f2] border border-[#fca5a5] text-[#ef4444] px-3 py-1.5 rounded-md hover:bg-[#fee2e2] transition-colors flex items-center gap-1.5"
-        >
-          <span aria-hidden="true">⏻</span>
-          Cierre de Caja
-        </button>
+        <div className="flex items-center gap-2">
+          {showGear && (
+            <button
+              type="button"
+              onClick={() => { window.location.href = '/admin'; }}
+              aria-label="Ir al panel de administración"
+              className="p-1.5 rounded-md border bg-[#f8fafc] border-[#e2e8f0] text-[#64748b] hover:border-[#2563eb] hover:text-[#0f172a] transition-colors"
+            >
+              <Settings className="h-4 w-4" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => router.push('/tpv/turno/cerrar')}
+            className="text-xs bg-[#fef2f2] border border-[#fca5a5] text-[#ef4444] px-3 py-1.5 rounded-md hover:bg-[#fee2e2] transition-colors flex items-center gap-1.5"
+          >
+            <span aria-hidden="true">⏻</span>
+            Cierre de Caja
+          </button>
+        </div>
       </div>
     </header>
     </div>

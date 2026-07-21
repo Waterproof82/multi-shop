@@ -43,17 +43,15 @@ function ActionIcon({ emoji, label, onClick, disabled = false, variant = 'defaul
 }
 
 const ADMIN_SHORTCUTS = [
-  { emoji: '📦', label: 'Produc.',   href: '/admin/productos' },
-  { emoji: '🏷️', label: 'Categ.',    href: '/admin/categorias' },
-  { emoji: '🧩', label: 'Compl.',    href: '/admin/complementos' },
-  { emoji: '📋', label: 'Recetas',   href: '/admin/stock/recetas' },
-  { emoji: '🧂', label: 'Ingred.',   href: '/admin/stock/ingredientes' },
-  { emoji: '👥', label: 'Empleados', href: '/admin/configuracion' },
-  { emoji: '🖥️', label: 'Admin',     href: '/admin' },
+  { emoji: '📦', label: 'Produc.',  href: '/admin/productos' },
+  { emoji: '🏷️', label: 'Categ.',   href: '/admin/categorias' },
+  { emoji: '🧩', label: 'Compl.',   href: '/admin/complementos' },
+  { emoji: '📋', label: 'Recetas',  href: '/admin/stock/recetas' },
+  { emoji: '🧂', label: 'Ingred.',  href: '/admin/stock/ingredientes' },
 ] as const;
 
 function toAdmin(href: string) {
-  window.location.href = `/admin/login?from=tpv&next=${encodeURIComponent(href)}`;
+  window.location.href = href;
 }
 
 export function AccionesPanel() {
@@ -85,7 +83,13 @@ export function AccionesPanel() {
 
       <div className="flex-1" />
 
+      {isAdmin && (
+        <ActionIcon emoji="👥" label="Empleados" onClick={() => toAdmin('/admin/configuracion#empleados-tpv')} />
+      )}
       <ActionIcon emoji="⚖️" label="Legal" onClick={() => router.push('/tpv/legal')} />
+      {isAdmin && (
+        <ActionIcon emoji="🖥️" label="Admin" onClick={() => toAdmin('/admin')} />
+      )}
     </aside>
   );
 }
