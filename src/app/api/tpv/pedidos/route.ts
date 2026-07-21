@@ -46,16 +46,43 @@ interface SynthesisResult {
   cancelledItemsByPedido: Map<string, Set<number>>;
 }
 
+type ItemEstadoRow = { pedido_id: string; item_idx: number; estado: string };
+
+function buildOverridesByPedido(rows: ItemEstadoRow[]): Map<string, Map<number, string>> {
+  const map = new Map<string, Map<number, string>>();
+  for (const row of rows) {
+    if (!map.has(row.pedido_id)) map.set(row.pedido_id, new Map());
+    map.get(row.pedido_id)!.set(row.item_idx, row.estado);
+  }
+  return map;
+}
+
+function synthesizeOnePedido(p: RawPedido, overrides: Map<number, string>, resultado: SynthesisResult): void {
+  const detalle = (p.detalle_pedido as unknown[]) ?? [];
+  if (overrides.size === 0) return;
+  if (!isRetenidoReadyToSynthesize(p, detalle, overrides)) return;
+
+  const cancelled = new Set<number>();
+  for (const [idx, est] of overrides) {
+    if (est === 'cancelado') cancelled.add(idx);
+  }
+  if (cancelled.size > 0) resultado.cancelledItemsByPedido.set(p.id, cancelled);
+
+  const itemStates = detalle.map((_, idx) => overrides.get(idx) ?? 'pendiente');
+  const allCancelled     = itemStates.length > 0 && itemStates.every(s => s === 'cancelado');
+  const allDone          = itemStates.every(s => s === 'servido' || s === 'cancelado');
+  const anyListo         = itemStates.includes('listo');
+  const anyEnPreparacion = itemStates.includes('en_preparacion');
+
+  resultado.estado.set(p.id, resolveSynthesizedEstado(allCancelled, allDone, anyListo, anyEnPreparacion));
+}
+
 async function buildSynthesizedEstado(
   supabase: ReturnType<typeof getSupabaseClient>,
   rawPedidos: RawPedido[]
 ): Promise<SynthesisResult> {
-  const resultado: SynthesisResult = {
-    estado: new Map(),
-    cancelledItemsByPedido: new Map(),
-  };
+  const resultado: SynthesisResult = { estado: new Map(), cancelledItemsByPedido: new Map() };
   const allIds = rawPedidos.map(p => p.id);
-
   if (allIds.length === 0) return resultado;
 
   try {
@@ -64,33 +91,9 @@ async function buildSynthesizedEstado(
       .select('pedido_id, item_idx, estado')
       .in('pedido_id', allIds);
 
-    const overridesByPedido = new Map<string, Map<number, string>>();
-    for (const row of (itemEstados ?? []) as { pedido_id: string; item_idx: number; estado: string }[]) {
-      if (!overridesByPedido.has(row.pedido_id)) overridesByPedido.set(row.pedido_id, new Map());
-      overridesByPedido.get(row.pedido_id)!.set(row.item_idx, row.estado);
-    }
-
+    const overridesByPedido = buildOverridesByPedido((itemEstados ?? []) as ItemEstadoRow[]);
     for (const p of rawPedidos) {
-      const detalle = (p.detalle_pedido as unknown[]) ?? [];
-      const overrides = overridesByPedido.get(p.id) ?? new Map<number, string>();
-
-      if (overrides.size === 0) continue; // No kitchen activity yet, keep original estado
-      if (!isRetenidoReadyToSynthesize(p, detalle, overrides)) continue;
-
-      // Track which item indices are cancelled so we can hide them in the ticket
-      const cancelled = new Set<number>();
-      for (const [idx, est] of overrides) {
-        if (est === 'cancelado') cancelled.add(idx);
-      }
-      if (cancelled.size > 0) resultado.cancelledItemsByPedido.set(p.id, cancelled);
-
-      const itemStates = detalle.map((_, idx) => overrides.get(idx) ?? 'pendiente');
-      const allCancelled     = itemStates.length > 0 && itemStates.every(s => s === 'cancelado');
-      const allDone          = itemStates.every(s => s === 'servido' || s === 'cancelado');
-      const anyListo         = itemStates.includes('listo');
-      const anyEnPreparacion = itemStates.includes('en_preparacion');
-
-      resultado.estado.set(p.id, resolveSynthesizedEstado(allCancelled, allDone, anyListo, anyEnPreparacion));
+      synthesizeOnePedido(p, overridesByPedido.get(p.id) ?? new Map(), resultado);
     }
   } catch { /* best-effort */ }
 

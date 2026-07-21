@@ -41,7 +41,7 @@ async function fetchTurno(): Promise<TpvTurno | null> {
 }
 
 async function fetchIngredientes(): Promise<Ingrediente[]> {
-  const res = await fetch('/api/admin/stock/ingredientes');
+  const res = await fetch('/api/tpv/stock/ingredientes');
   if (!res.ok) return [];
   const json = (await res.json()) as Ingrediente[];
   return Array.isArray(json) ? json : [];

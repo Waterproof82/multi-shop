@@ -61,9 +61,7 @@ export function AccionesPanel() {
 
       <div className="flex-1" />
 
-      {!isCajero && (
-        <ActionIcon emoji="⚖️" label="Legal" onClick={() => router.push('/tpv/legal')} />
-      )}
+      <ActionIcon emoji="⚖️" label="Legal" onClick={() => router.push('/tpv/legal')} />
     </aside>
   );
 }

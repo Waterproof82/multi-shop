@@ -140,7 +140,9 @@ Usar siempre en RLS policies para aislar datos por empresa.
 
 4. **Mesa grid badge no se actualiza al marcar ítems en cocina** → la cocina modifica `pedido_item_estados`, que no toca `mesa_sesiones`. `WaiterLoginForm` sólo escuchaba `mesa_sesiones`. **Fix:** agregar suscripción al broadcast `waiter-items-update` (canal `'waiter-items-update'`, evento `'item-update'`).
 
-5. **Race condition broadcast vs. auto-cancel en MostradorClient** → `realtime.send()` dentro de un trigger de DB es asíncrono: el broadcast `item-update` puede llegar al cliente antes de que la transacción que cancela el pedido commitee. El refresh inmediato devuelve el pedido todavía activo. **Fix:** añadir `postgres_changes` en `pedidos` filtrado por `sesion_id` (canal `tpv-pedidos-{sesionId}`) en `MostradorClient`. Ese evento es transaccional y solo llega después del commit completo.
+5. **`removeSessionItemUseCase` bypasea `pedido_item_estados`** → cuando el camarero elimina ítems desde el ticket del waiter, `removeSessionItemUseCase` hace DELETE o UPDATE directamente en `pedidos.detalle_pedido`, sin tocar `pedido_item_estados`. El trigger `notify_waiter_items_update` solo escucha esa tabla → nunca disparaba → el grid de mesas del TPV quedaba stale. **Fix:** trigger `pedidos_notify_item_update` (migración `20260721000002`) en la tabla `pedidos`, evento DELETE o UPDATE OF `detalle_pedido`/`total`, emite el mismo broadcast `waiter-items-update`. `TpvCatalogProvider` también suscribe a ese canal para refrescar totales del grid.
+
+6. **Race condition broadcast vs. auto-cancel en MostradorClient** → `realtime.send()` dentro de un trigger de DB es asíncrono: el broadcast `item-update` puede llegar al cliente antes de que la transacción que cancela el pedido commitee. El refresh inmediato devuelve el pedido todavía activo. **Fix:** añadir `postgres_changes` en `pedidos` filtrado por `sesion_id` (canal `tpv-pedidos-{sesionId}`) en `MostradorClient`. Ese evento es transaccional y solo llega después del commit completo.
 
 ### Arquitectura de canales activa
 
@@ -150,7 +152,7 @@ Usar siempre en RLS policies para aislar datos por empresa.
 | `waiter-new-order` | broadcast `new-order` | trigger notify_waiter_new_order (todos los INSERTs) | WaiterBanner, MostradorClient |
 | `waiter-new-order-kitchen` | broadcast `new-order` | trigger notify_waiter_new_order | WaiterKitchenPage |
 | `waiter-new-order-bar` | broadcast `new-order` | trigger notify_waiter_new_order | BarPage |
-| `waiter-items-update` | broadcast `item-update` | trigger notify_waiter_items_update | WaiterBanner, BarPage, WaiterLoginForm, MostradorClient |
+| `waiter-items-update` | broadcast `item-update` | trigger notify_waiter_items_update + trigger pedidos_notify_item_update | WaiterBanner, BarPage, WaiterLoginForm, MostradorClient, TpvCatalogProvider |
 | `tpv-pedidos-{sesionId}` | postgres_changes | pedidos (UPDATE, filter sesion_id) | MostradorClient |
 | `tpv-sesion-close-{sesionId}` | postgres_changes | mesa_sesiones (UPDATE, filter id) | MostradorClient |
 | `waiter-kitchen-{uid}` | postgres_changes | pedido_item_estados, pedidos | WaiterKitchenPage |
@@ -204,6 +206,7 @@ Solución: `WaiterLoginForm.handlePinSubmit` dispara `window.dispatchEvent(new C
 - **`findLowStockAlerts` filtra en memoria**: supabase-js no soporta comparaciones col-to-col. Se traen todos los ingredientes con `umbral_alerta > 0` y se filtra en JS. No usar `.lt('cantidad_actual', 'umbral_alerta')` — no funciona.
 - **Sidebar stock**: `requiresRestaurant: true` en los tres ítems de stock — invisible para tiendas.
 - **`LowStockBadge`** montado en `TpvHeader` y `CobroMetodoPropina`. Nunca bloquea el flujo de cobro.
+- **`/api/admin/stock/ingredientes` NO sirve para el TPV** — `resolveAdminContext` exige rol `admin|superadmin`. Los encargados (por PIN o admin_token) reciben 403. Usar `/api/tpv/stock/ingredientes` desde contexto TPV — acepta `encargado|admin|superadmin` vía `requireAuth`.
 
 ## 🍽 Sistema Tipo Producto (Restaurante)
 
@@ -302,6 +305,7 @@ Solución: `WaiterLoginForm.handlePinSubmit` dispara `window.dispatchEvent(new C
 - **`ultima_actividad` en `clientes`** no avanza automáticamente — requiere trigger `trg_pedidos_ultima_actividad` en `pedidos`. Si el trigger falla o no existe, los clientes activos quedan con fecha de creación como base del auto-purge.
 - **pg_cron auto-purge** — usa `INTERVAL '5 years'` (alineado con Art.66 LGT — obligación fiscal española). Si pg_cron no está habilitado en el proyecto Supabase, el job no existe pero las columnas sí. El endpoint manual es el único mecanismo en ese caso.
 - **`resolveImpuestoPorcentaje` existe pero no se usa en el flujo principal** — es un helper disponible; el trigger resuelve server-side. Wire it up en `TpvCatalogProvider` o en el builder de `detalleItems` del cliente para pasar la tasa resuelta a la API.
+- **`/tpv/legal` usa dual-auth** — la página SSR lee `admin_token` primero, luego `tpv_employee_token` como fallback. Redirige a `/tpv/login` (no `/admin/login`) si ninguno resuelve `empresaId`. Visible para TODOS los roles (incluyendo cajero) — solo contiene información de cumplimiento legal, no datos sensibles.
 
 ## 🗂 TPV Catalog Cache — Contexto Cliente + Offline
 
