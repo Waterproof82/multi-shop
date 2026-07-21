@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { StickyNote } from 'lucide-react';
 import type { PendingItem } from '@/hooks/tpv/useMesaActiva';
@@ -40,10 +40,8 @@ export function NuevoPedidoPanel({
   const [directoACocina, setDirectoACocina] = useState(false);
   const [pendingNota, setPendingNota] = useState('');
   const [notaExpandida, setNotaExpandida] = useState<string | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
   return (
-    <aside className="w-[260px] shrink-0 bg-[#f8fafc] border-l border-[#e2e8f0] flex flex-col">
+    <aside className="w-[300px] shrink-0 bg-[#f8fafc] border-l border-[#e2e8f0] flex flex-col">
       <div className="px-4 py-3.5 border-b border-[#e2e8f0] flex items-center justify-between bg-white">
         <span className="text-xs font-bold text-[#2563eb] uppercase tracking-wider">Nuevo pedido</span>
         {pendingItems.length > 0 && (
@@ -66,42 +64,39 @@ export function NuevoPedidoPanel({
               const notaOpen = notaExpandida === itemKey;
               return (
                 <div key={itemKey} className="border-b border-[#e2e8f0] last:border-b-0 bg-white">
-                  <div className="flex items-start gap-2.5 px-4 py-2.5">
-                    <span className="w-6 h-6 rounded-md bg-[#2563eb] text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                  <div className="flex items-center gap-2 px-3 py-2 min-h-[52px]">
+                    <span className="w-7 h-7 rounded-md bg-[#2563eb] text-white text-xs font-bold flex items-center justify-center shrink-0">
                       {item.cantidad}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate text-[#0f172a]">{item.nombre}</p>
+                      <p className="text-sm font-semibold text-[#0f172a] leading-snug line-clamp-2">{item.nombre}</p>
                       {item.complementos.length > 0 && (
-                        <p className="text-[10px] text-[#64748b] truncate">{item.complementos.map(c => c.nombre).join(', ')}</p>
+                        <p className="text-[10px] text-[#64748b] line-clamp-1">{item.complementos.map(c => c.nombre).join(', ')}</p>
                       )}
                       {item.nota && !notaOpen && (
-                        <p className="text-[10px] italic text-[#a78bfa] truncate">✎ {item.nota}</p>
+                        <p className="text-[10px] italic text-[#a78bfa] line-clamp-1">✎ {item.nota}</p>
                       )}
                     </div>
-                    <span className="text-sm font-semibold shrink-0 text-[#0f172a]">{fmt(item.precioTotal * item.cantidad)}</span>
                     <button
                       type="button"
                       onClick={() => setNotaExpandida(prev => prev === itemKey ? null : itemKey)}
-                      className={`flex items-center gap-0.5 shrink-0 rounded px-1 py-0.5 transition-colors ${notaOpen || item.nota ? 'text-[#a78bfa]' : 'text-[#94a3b8] hover:text-[#a78bfa]'}`}
+                      className={`w-11 h-11 flex items-center justify-center rounded-lg shrink-0 transition-colors ${notaOpen || item.nota ? 'text-[#a78bfa] bg-[#f5f3ff]' : 'text-[#94a3b8] hover:text-[#a78bfa] hover:bg-[#f5f3ff]'}`}
                       aria-label="Nota del ítem"
                     >
-                      <StickyNote className="h-3.5 w-3.5" />
-                      {!item.nota && !notaOpen && <span className="text-[10px] font-medium">Nota</span>}
+                      <StickyNote className="h-5 w-5" />
                     </button>
                     <button
                       type="button"
                       onClick={() => onRemovePending(item.nombre, item.complementos)}
-                      className="text-[#94a3b8] hover:text-red-500 text-base leading-none shrink-0 mt-0.5"
+                      className="w-11 h-11 flex items-center justify-center rounded-lg text-[#94a3b8] hover:text-red-500 hover:bg-red-50 shrink-0 transition-colors text-xl"
                       aria-label={`Eliminar ${item.nombre}`}
                     >
                       ×
                     </button>
                   </div>
                   {notaOpen && (
-                    <div className="px-4 pb-3">
+                    <div className="px-3 pb-3">
                       <textarea
-                        ref={textareaRef}
                         rows={2}
                         maxLength={500}
                         value={item.nota ?? ''}

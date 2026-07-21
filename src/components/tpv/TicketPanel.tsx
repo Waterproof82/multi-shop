@@ -176,7 +176,7 @@ export function TicketPanel({
           <div className="flex items-start gap-2 rounded-xl px-3 py-2.5 bg-[#fff7ed] border border-[#fed7aa]">
             <span className="text-sm leading-none mt-0.5">🍽</span>
             <p className="text-xs leading-snug text-[#ea580c]">
-              Quedan pedidos sin servir. Servilos antes de cobrar.
+              Quedan pedidos sin servir. Sírvelos antes de cobrar.
             </p>
           </div>
         )}
