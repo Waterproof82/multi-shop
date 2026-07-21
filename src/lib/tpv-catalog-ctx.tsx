@@ -169,10 +169,12 @@ export function TpvCatalogProvider({
       .subscribe();
 
     // postgres_changes on pedidos requires authenticated role — anon client never
-    // receives those events. Use the existing broadcast fired by the DB trigger
+    // receives those events. Use the broadcast fired by the DB trigger
     // (notify_waiter_new_order) instead: it fires on every INSERT regardless of RLS.
+    // IMPORTANT: channel name MUST match exactly what the trigger broadcasts to ('waiter-new-order').
+    // For broadcast routing in Supabase, the channel name IS the routing key.
     const newOrderCh = supabase
-      .channel('tpv-catalog-new-order')
+      .channel('waiter-new-order')
       .on('broadcast', { event: 'new-order' }, () => { void refreshMesas(); })
       .subscribe();
 
