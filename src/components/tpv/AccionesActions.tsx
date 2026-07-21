@@ -84,7 +84,7 @@ export function AccionesPanel() {
       <div className="flex-1" />
 
       {isAdmin && (
-        <ActionIcon emoji="👥" label="Empleados" onClick={() => toAdmin('/admin/configuracion#empleados-tpv')} />
+        <ActionIcon emoji="👥" label="Empleados" onClick={() => toAdmin('/admin/empleados-tpv')} />
       )}
       <ActionIcon emoji="⚖️" label="Legal" onClick={() => router.push('/tpv/legal')} />
     </aside>

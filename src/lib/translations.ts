@@ -942,6 +942,7 @@ export const translations = {
     sidebarAnalyticsMenuEngineering: "Ingeniería de Menú",
     sidebarAnalyticsOcupacion: "Ocupación",
     sidebarAnalyticsComparativa: "Comparativa",
+    sidebarEmpleadosTpv: 'Empleados TPV',
     // Audit Log
     sidebarAuditLog: 'Registro de Auditoría',
     auditLogTitle: 'Registro de Auditoría',
@@ -1916,6 +1917,7 @@ export const translations = {
     sidebarAnalyticsMenuEngineering: "Menu Engineering",
     sidebarAnalyticsOcupacion: "Occupancy",
     sidebarAnalyticsComparativa: "Comparison",
+    sidebarEmpleadosTpv: 'TPV Employees',
     // Audit Log
     sidebarAuditLog: 'Audit Log',
     auditLogTitle: 'Audit Log',

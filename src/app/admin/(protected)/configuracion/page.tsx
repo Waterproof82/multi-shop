@@ -73,7 +73,6 @@ export default async function ConfiguracionPage() {
       empresaNombre={empresaData?.nombre ?? ''}
       empresaId={empresaId}
       empresaSlug={empresaSlug}
-      empresaTipo={empresaData?.tipo ?? null}
       empresaDatos={empresaDatos}
       empresaApariencia={empresaApariencia}
       colores={empresaData?.colores ?? null}
