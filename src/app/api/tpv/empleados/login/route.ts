@@ -61,6 +61,10 @@ export async function POST(req: NextRequest) {
   const csrfSignature = signCsrfToken(csrfToken);
 
   const response = NextResponse.json({ ok: true, nextUrl, rol: result.data.rol });
+  // Clear admin_token so the employee session takes full precedence.
+  // Without this, a previously-logged-in admin/encargado cookie would override the cajero
+  // role in layout SSR (admin_token is checked first) and grant full access.
+  response.cookies.set('admin_token', '', { maxAge: 0, path: '/' });
   response.cookies.set('tpv_employee_token', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',

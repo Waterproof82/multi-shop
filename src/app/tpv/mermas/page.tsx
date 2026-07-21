@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Ingrediente, MotivoMerma } from '@/core/domain/entities/stock-types';
 import type { TpvTurno } from '@/core/domain/entities/tpv-types';
 import { getCsrfToken } from '@/lib/csrf-client';
+import { useTpvRol } from '@/lib/tpv-rol-ctx';
 
 
 const MOTIVOS: { value: MotivoMerma; label: string }[] = [
@@ -138,6 +140,8 @@ function MotivoSelector({
 }
 
 export default function MermasPage() {
+  const rol = useTpvRol();
+  const router = useRouter();
   const [turno, setTurno] = useState<TpvTurno | null | undefined>(undefined);
   const [ingredientes, setIngredientes] = useState<Ingrediente[]>([]);
   const [form, setForm] = useState<FormState>(buildEmptyForm(''));
@@ -146,6 +150,7 @@ export default function MermasPage() {
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
+    if (rol === 'cajero') { router.replace('/tpv/mostrador'); return; }
     void fetchTurno().then((t) => {
       setTurno(t);
       if (t) {
@@ -153,7 +158,8 @@ export default function MermasPage() {
       }
     });
     void fetchIngredientes().then(setIngredientes);
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rol]);
 
   function updateField<K extends keyof FormState>(key: K, val: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: val }));
