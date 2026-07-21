@@ -305,31 +305,47 @@ export function TicketPanel({
             className="w-full bg-[#2563eb] text-white rounded-xl py-3 text-sm font-bold hover:brightness-110 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             onClick={async () => {
               if (!mesaId) return;
-              setSending(true);
               setSendError(null);
+
+              const csrfToken = getCsrfToken();
+              const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+              if (csrfToken) headers['x-csrf-token'] = csrfToken;
+              const body = JSON.stringify({
+                mesaId,
+                items: pendingItems.map(i => ({
+                  productId: i.productId,
+                  nombre: i.nombre,
+                  precio: i.precioTotal,
+                  cantidad: i.cantidad,
+                  complementos: i.complementos.map(c => c.nombre),
+                  ...(i.nota ? { nota: i.nota } : {}),
+                })),
+                nota: pendingNota || undefined,
+                pase: (!directoACocina && pendingPase) ? pendingPase : undefined,
+                directoACocina,
+              });
+
+              // Mesa ya tiene sesión → optimistic: limpia el ticket ya y envía en background
+              if (sesionId) {
+                onPendingSent();
+                setPendingNota('');
+                setPendingPase('');
+                setDirectoACocina(false);
+                void fetch('/api/tpv/pedidos', { method: 'POST', headers, body })
+                  .then(async res => {
+                    if (!res.ok) {
+                      const err = await res.json() as { error?: string };
+                      setSendError(err.error ?? 'Error al enviar el pedido');
+                    }
+                  })
+                  .catch(() => setSendError('Error de conexión'));
+                return;
+              }
+
+              // Primer pedido de la mesa: necesitamos el sesionId del server para la URL
+              setSending(true);
               try {
-                const csrfToken = getCsrfToken();
-                const res = await fetch('/api/tpv/pedidos', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
-                  },
-                  body: JSON.stringify({
-                    mesaId,
-                    items: pendingItems.map(i => ({
-                      productId: i.productId,
-                      nombre: i.nombre,
-                      precio: i.precioTotal,
-                      cantidad: i.cantidad,
-                      complementos: i.complementos.map(c => c.nombre),
-                      ...(i.nota ? { nota: i.nota } : {}),
-                    })),
-                    nota: pendingNota || undefined,
-                    pase: (!directoACocina && pendingPase) ? pendingPase : undefined,
-                    directoACocina,
-                  }),
-                });
+                const res = await fetch('/api/tpv/pedidos', { method: 'POST', headers, body });
                 if (!res.ok) {
                   const err = await res.json() as { error?: string };
                   setSendError(err.error ?? 'Error al enviar el pedido');
@@ -339,14 +355,9 @@ export function TicketPanel({
                   setPendingNota('');
                   setPendingPase('');
                   setDirectoACocina(false);
-                  // If the mesa had no session yet, navigate to include the new sesionId in the URL
-                  if (!sesionId && json.sesionId && mesaId) {
-                    const params = new URLSearchParams({ mesaId, mesaNumero: String(mesaNumero ?? ''), sesionId: json.sesionId });
-                    if (mesaName) params.set('mesaName', mesaName);
-                    router.replace(`/tpv/mostrador?${params.toString()}`);
-                  } else {
-                    router.refresh();
-                  }
+                  const params = new URLSearchParams({ mesaId, mesaNumero: String(mesaNumero ?? ''), sesionId: json.sesionId ?? '' });
+                  if (mesaName) params.set('mesaName', mesaName);
+                  router.replace(`/tpv/mostrador?${params.toString()}`);
                 }
               } catch {
                 setSendError('Error de conexión');
