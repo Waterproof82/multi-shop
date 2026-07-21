@@ -236,7 +236,8 @@ export class SupabaseMesaRepository implements IMesaRepository {
           .from('pedidos')
           .select('id, sesion_id, mesa_id, estado, numero_pedido, detalle_pedido')
           .in('sesion_id', activeSesionIds)
-          .neq('estado', 'cerrado');
+          .neq('estado', 'cerrado')
+          .neq('estado', 'cancelado');
 
         // Defensive fallback: pedidos with sesion_id = NULL that belong to an active mesa.
         // This can happen when open_mesa_sesion had a stale closed-session reference and
@@ -249,7 +250,8 @@ export class SupabaseMesaRepository implements IMesaRepository {
           .select('id, sesion_id, mesa_id, estado, numero_pedido, detalle_pedido')
           .in('mesa_id', activeMesaIds)
           .is('sesion_id', null)
-          .neq('estado', 'cerrado');
+          .neq('estado', 'cerrado')
+          .neq('estado', 'cancelado');
 
         // Build a mesa_id → sesion_id lookup for orphan resolution
         const mesaToSesion: Record<string, string> = {};
