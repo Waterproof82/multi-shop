@@ -41,6 +41,12 @@ export async function TpvLoginContent() {
           </p>
         </div>
         <TpvLoginForm />
+        <a
+          href="/tpv/mostrador"
+          className="text-sm text-[#64748b] hover:text-[#0f172a] text-center transition-colors"
+        >
+          ← Volver al TPV
+        </a>
       </div>
     </div>
   );
