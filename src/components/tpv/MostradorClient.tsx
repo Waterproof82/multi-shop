@@ -93,9 +93,23 @@ export function MostradorClient({ initialMesa }: Readonly<Props>) {
       .on('broadcast', { event: 'item-update' }, refresh)
       .subscribe();
 
+    // postgres_changes on pedidos: catches estado changes (e.g. auto-cancel) that
+    // arrive after the transaction commits — more reliable than the async broadcast
+    // for the case where all items are cancelled from waiter pendientes.
+    const sesionId = mesa.sesionId;
+    const chPedidos = supabase
+      .channel(`tpv-pedidos-${sesionId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `sesion_id=eq.${sesionId}` },
+        refresh
+      )
+      .subscribe();
+
     return () => {
       void supabase.removeChannel(chNew);
       void supabase.removeChannel(chItems);
+      void supabase.removeChannel(chPedidos);
     };
   }, [mesa.sesionId, handleRefresh]);
 

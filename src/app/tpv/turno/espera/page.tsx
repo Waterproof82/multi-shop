@@ -13,10 +13,10 @@ export default function TurnoEsperaPage() {
           </p>
         </div>
         <a
-          href="/tpv/mostrador"
+          href="/tpv/login"
           className="text-sm text-[#2563eb] font-semibold hover:underline"
         >
-          Recargar
+          Introducir PIN
         </a>
       </div>
     </div>
