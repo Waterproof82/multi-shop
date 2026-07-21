@@ -87,9 +87,6 @@ export function AccionesPanel() {
         <ActionIcon emoji="👥" label="Empleados" onClick={() => toAdmin('/admin/configuracion#empleados-tpv')} />
       )}
       <ActionIcon emoji="⚖️" label="Legal" onClick={() => router.push('/tpv/legal')} />
-      {isAdmin && (
-        <ActionIcon emoji="🖥️" label="Admin" onClick={() => toAdmin('/admin')} />
-      )}
     </aside>
   );
 }
