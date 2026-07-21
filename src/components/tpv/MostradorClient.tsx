@@ -68,6 +68,15 @@ export function MostradorClient({ initialMesa }: Readonly<Props>) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Re-fetch when the user returns to this tab (e.g. after cancelling orders in waiter panel).
+  useEffect(() => {
+    const handleVisible = () => {
+      if (document.visibilityState === 'visible') void handleRefresh();
+    };
+    document.addEventListener('visibilitychange', handleVisible);
+    return () => document.removeEventListener('visibilitychange', handleVisible);
+  }, [handleRefresh]);
+
   // Real-time: re-fetch orders when new pedidos arrive or kitchen marks items.
   useEffect(() => {
     if (!mesa.sesionId) return;
