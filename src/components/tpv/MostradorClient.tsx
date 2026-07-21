@@ -130,6 +130,8 @@ export function MostradorClient({ initialMesa }: Readonly<Props>) {
           const row = payload.new as { cerrada_at: string | null; sesion_pagada: boolean };
           if (row.cerrada_at) {
             setExternalCobro(`La mesa ${mesaNumero} ha sido cobrada desde otro canal.`);
+            setIsSesionPagada(false);
+            setYaCobradoCents(0);
             clearMesa();
           } else if (row.sesion_pagada) {
             setIsSesionPagada(true);
