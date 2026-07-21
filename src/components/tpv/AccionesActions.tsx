@@ -32,45 +32,61 @@ function ActionIcon({ emoji, label, onClick, disabled = false, variant = 'defaul
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`w-11 h-11 rounded-xl flex flex-col items-center justify-center gap-0.5 border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${resolveVariantClass(variant)}`}
+      className={`w-[72px] h-16 rounded-xl flex flex-col items-center justify-center gap-1 border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${resolveVariantClass(variant)}`}
     >
       <span className="text-xl leading-none" aria-hidden="true">{emoji}</span>
-      <span className={`text-[8px] font-semibold uppercase tracking-wide ${resolveLabelClass(variant)}`}>
+      <span className={`text-[11px] font-semibold uppercase tracking-wide ${resolveLabelClass(variant)}`}>
         {label}
       </span>
     </button>
   );
 }
 
+const ADMIN_SHORTCUTS = [
+  { emoji: '📦', label: 'Produc.',  href: '/admin/productos' },
+  { emoji: '🏷️', label: 'Categ.',   href: '/admin/categorias' },
+  { emoji: '🧩', label: 'Compl.',   href: '/admin/complementos' },
+  { emoji: '📋', label: 'Recetas',  href: '/admin/stock/recetas' },
+  { emoji: '🧂', label: 'Ingred.',  href: '/admin/stock/ingredientes' },
+] as const;
+
+function toAdmin(href: string) {
+  window.location.href = href;
+}
+
 export function AccionesPanel() {
   const router = useRouter();
   const rol = useTpvRol();
-  const { sesionId, refreshing, triggerRefresh } = useTpvAcciones();
+  const { hasPendingItems } = useTpvAcciones();
   const isCajero = rol === 'cajero';
-  const hasMesa = sesionId !== null;
+  const isAdmin = rol === 'admin' || rol === 'superadmin' || rol === 'encargado';
+
+  if (hasPendingItems) return null;
 
   return (
-    <aside className="w-16 shrink-0 bg-white border-l border-[#e2e8f0] flex flex-col items-center py-3 gap-1.5">
-      <ActionIcon
-        emoji="🔄"
-        label="Actualizar"
-        onClick={triggerRefresh}
-        disabled={!hasMesa || refreshing}
-      />
-
+    <aside className="w-24 shrink-0 bg-white border-l border-[#e2e8f0] flex flex-col items-center py-4 gap-2 overflow-y-auto">
       {!isCajero && (
         <>
-          <div className="w-7 h-px bg-[#e2e8f0] my-1" role="separator" />
           <ActionIcon emoji="📊" label="Analítica" onClick={() => router.push('/tpv/analytics')} />
           <ActionIcon emoji="📉" label="Mermas" onClick={() => router.push('/tpv/mermas')} />
         </>
       )}
 
+      {isAdmin && (
+        <>
+          <div className="w-8 border-t border-[#e2e8f0] my-0.5" />
+          {ADMIN_SHORTCUTS.map(({ emoji, label, href }) => (
+            <ActionIcon key={href} emoji={emoji} label={label} onClick={() => toAdmin(href)} />
+          ))}
+        </>
+      )}
+
       <div className="flex-1" />
 
-      {!isCajero && (
-        <ActionIcon emoji="⚖️" label="Legal" onClick={() => router.push('/tpv/legal')} />
+      {isAdmin && (
+        <ActionIcon emoji="👥" label="Empleados" onClick={() => toAdmin('/admin/empleados-tpv')} />
       )}
+      <ActionIcon emoji="⚖️" label="Legal" onClick={() => router.push('/tpv/legal')} />
     </aside>
   );
 }

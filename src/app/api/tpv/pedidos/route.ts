@@ -41,13 +41,48 @@ type RawComplement = string | { nombre?: string; name?: string };
 type RawItem = { nombre?: string; precio?: number; cantidad?: number; complementos?: RawComplement[] };
 type RawPedido = { id: string; numero_pedido: number; detalle_pedido: RawItem[]; total: number; estado: string; nota?: string | null; pase?: string | null };
 
+interface SynthesisResult {
+  estado: Map<string, string>;
+  cancelledItemsByPedido: Map<string, Set<number>>;
+}
+
+type ItemEstadoRow = { pedido_id: string; item_idx: number; estado: string };
+
+function buildOverridesByPedido(rows: ItemEstadoRow[]): Map<string, Map<number, string>> {
+  const map = new Map<string, Map<number, string>>();
+  for (const row of rows) {
+    if (!map.has(row.pedido_id)) map.set(row.pedido_id, new Map());
+    map.get(row.pedido_id)!.set(row.item_idx, row.estado);
+  }
+  return map;
+}
+
+function synthesizeOnePedido(p: RawPedido, overrides: Map<number, string>, resultado: SynthesisResult): void {
+  const detalle = (p.detalle_pedido as unknown[]) ?? [];
+  if (overrides.size === 0) return;
+  if (!isRetenidoReadyToSynthesize(p, detalle, overrides)) return;
+
+  const cancelled = new Set<number>();
+  for (const [idx, est] of overrides) {
+    if (est === 'cancelado') cancelled.add(idx);
+  }
+  if (cancelled.size > 0) resultado.cancelledItemsByPedido.set(p.id, cancelled);
+
+  const itemStates = detalle.map((_, idx) => overrides.get(idx) ?? 'pendiente');
+  const allCancelled     = itemStates.length > 0 && itemStates.every(s => s === 'cancelado');
+  const allDone          = itemStates.every(s => s === 'servido' || s === 'cancelado');
+  const anyListo         = itemStates.includes('listo');
+  const anyEnPreparacion = itemStates.includes('en_preparacion');
+
+  resultado.estado.set(p.id, resolveSynthesizedEstado(allCancelled, allDone, anyListo, anyEnPreparacion));
+}
+
 async function buildSynthesizedEstado(
   supabase: ReturnType<typeof getSupabaseClient>,
   rawPedidos: RawPedido[]
-): Promise<Map<string, string>> {
-  const resultado = new Map<string, string>();
+): Promise<SynthesisResult> {
+  const resultado: SynthesisResult = { estado: new Map(), cancelledItemsByPedido: new Map() };
   const allIds = rawPedidos.map(p => p.id);
-
   if (allIds.length === 0) return resultado;
 
   try {
@@ -56,26 +91,9 @@ async function buildSynthesizedEstado(
       .select('pedido_id, item_idx, estado')
       .in('pedido_id', allIds);
 
-    const overridesByPedido = new Map<string, Map<number, string>>();
-    for (const row of (itemEstados ?? []) as { pedido_id: string; item_idx: number; estado: string }[]) {
-      if (!overridesByPedido.has(row.pedido_id)) overridesByPedido.set(row.pedido_id, new Map());
-      overridesByPedido.get(row.pedido_id)!.set(row.item_idx, row.estado);
-    }
-
+    const overridesByPedido = buildOverridesByPedido((itemEstados ?? []) as ItemEstadoRow[]);
     for (const p of rawPedidos) {
-      const detalle = (p.detalle_pedido as unknown[]) ?? [];
-      const overrides = overridesByPedido.get(p.id) ?? new Map<number, string>();
-
-      if (overrides.size === 0) continue; // No kitchen activity yet, keep original estado
-      if (!isRetenidoReadyToSynthesize(p, detalle, overrides)) continue;
-
-      const itemStates = detalle.map((_, idx) => overrides.get(idx) ?? 'pendiente');
-      const allCancelled     = itemStates.length > 0 && itemStates.every(s => s === 'cancelado');
-      const allDone          = itemStates.every(s => s === 'servido' || s === 'cancelado');
-      const anyListo         = itemStates.includes('listo');
-      const anyEnPreparacion = itemStates.includes('en_preparacion');
-
-      resultado.set(p.id, resolveSynthesizedEstado(allCancelled, allDone, anyListo, anyEnPreparacion));
+      synthesizeOnePedido(p, overridesByPedido.get(p.id) ?? new Map(), resultado);
     }
   } catch { /* best-effort */ }
 
@@ -118,11 +136,11 @@ export async function GET(req: NextRequest) {
 
   // Synthesize effective estado from pedido_item_estados for ALL pedidos.
   // pedidos.estado is never updated by kitchen — the source of truth is pedido_item_estados.
-  const synthesizedEstado = await buildSynthesizedEstado(supabase, rawPedidos);
+  const synthesis = await buildSynthesizedEstado(supabase, rawPedidos);
 
   const orders = rawPedidos
-    .filter(p => synthesizedEstado.get(p.id) !== 'cancelado')
-    .map(p => normalizePedidoOrder(p, synthesizedEstado));
+    .filter(p => synthesis.estado.get(p.id) !== 'cancelado')
+    .map(p => normalizePedidoOrder(p, synthesis));
 
   return NextResponse.json({ orders, yaCobradoCents });
 }
@@ -132,21 +150,29 @@ function normComplement(c: RawComplement): string {
   return c.nombre ?? c.name ?? '';
 }
 
-function normalizePedidoOrder(p: RawPedido, synthesizedEstado: Map<string, string>) {
-  return ({
-      id: p.id,
-      numeroPedido: p.numero_pedido,
-      estado: synthesizedEstado.get(p.id) ?? p.estado,
-      items: (p.detalle_pedido ?? []).map(it => ({
-        nombre: it.nombre ?? '',
-        precio: Number(it.precio ?? 0),
-        cantidad: Number(it.cantidad ?? 1),
-        complementos: (it.complementos ?? []).map(normComplement).filter(Boolean),
-      })),
-      total: Number(p.total),
-      nota: p.nota ?? null,
-      pase: p.pase ?? null,
-    });
+function normalizePedidoOrder(p: RawPedido, synthesis: SynthesisResult) {
+  const cancelled = synthesis.cancelledItemsByPedido.get(p.id) ?? new Set<number>();
+  const activeItems = (p.detalle_pedido ?? [])
+    .map((it, idx) => ({ it, idx }))
+    .filter(({ idx }) => !cancelled.has(idx))
+    .map(({ it }) => ({
+      nombre: it.nombre ?? '',
+      precio: Number(it.precio ?? 0),
+      cantidad: Number(it.cantidad ?? 1),
+      complementos: (it.complementos ?? []).map(normComplement).filter(Boolean),
+    }));
+  const activeTotal = cancelled.size > 0
+    ? activeItems.reduce((sum, it) => sum + it.precio * it.cantidad, 0)
+    : Number(p.total);
+  return {
+    id: p.id,
+    numeroPedido: p.numero_pedido,
+    estado: synthesis.estado.get(p.id) ?? p.estado,
+    items: activeItems,
+    total: activeTotal,
+    nota: p.nota ?? null,
+    pase: p.pase ?? null,
+  };
 }
 
 export async function POST(req: NextRequest) {

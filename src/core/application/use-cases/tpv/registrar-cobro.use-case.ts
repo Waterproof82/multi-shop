@@ -47,6 +47,16 @@ export async function registrarCobroUseCase(
         },
       };
     }
+
+    // Mark all non-cancelled pedidos in the session as 'cerrado'.
+    // pedidos.estado is never updated by the kitchen/bar flow (that uses
+    // pedido_item_estados as source of truth). Without this, the historial
+    // shows orders as 'pendiente' even after they were served and paid.
+    await supabase
+      .from('pedidos')
+      .update({ estado: 'cerrado' })
+      .eq('sesion_id', payload.sesionId)
+      .neq('estado', 'cancelado');
   }
 
   // 3. Create cobro record (hash chain) + accumulate turno totals

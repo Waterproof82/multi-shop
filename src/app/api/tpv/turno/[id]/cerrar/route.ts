@@ -49,20 +49,31 @@ export async function POST(
 
   const { id } = await params;
 
-  // Guard: no cerrar si hay mesas con sesión abierta
+  // Guard: no cerrar si hay mesas con sesión abierta que tenga pedidos activos.
+  // Sessions where every order was cancelled have no pending amount and must not block close.
   const supabase = getSupabaseClient();
   const { data: sesionesAbiertas } = await supabase
     .from('mesa_sesiones')
     .select('id')
     .eq('empresa_id', empresaId)
-    .is('cerrada_at', null)
-    .limit(1);
+    .is('cerrada_at', null);
 
   if (sesionesAbiertas && sesionesAbiertas.length > 0) {
-    return NextResponse.json(
-      { error: 'Hay mesas sin cobrar. Cerrá o cobrá todas las mesas antes de cerrar el turno.' },
-      { status: 409 },
-    );
+    const sesionIds = sesionesAbiertas.map((s: { id: string }) => s.id);
+    const { data: activePedidos } = await supabase
+      .from('pedidos')
+      .select('id')
+      .in('sesion_id', sesionIds)
+      .neq('estado', 'cerrado')
+      .neq('estado', 'cancelado')
+      .limit(1);
+
+    if (activePedidos && activePedidos.length > 0) {
+      return NextResponse.json(
+        { error: 'Hay mesas sin cobrar. Cierra o cobra todas las mesas antes de cerrar el turno.' },
+        { status: 409 },
+      );
+    }
   }
 
   const empleadoCierreId =

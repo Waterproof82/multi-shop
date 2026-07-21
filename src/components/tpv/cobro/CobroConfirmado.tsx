@@ -129,7 +129,7 @@ export function CobroConfirmado({
           </div>
         )}
 
-        <div className="w-full bg-[#22263a] border border-[#2e3347] rounded-xl p-5 flex flex-col gap-3">
+        <div className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-5 flex flex-col gap-3">
           <div className="flex justify-between text-sm">
             <span className="text-[#6b7280]">Total cobrado</span>
             <span className="font-semibold">{fmt(totalFinalCents)}</span>
@@ -165,9 +165,9 @@ export function CobroConfirmado({
 
           {/* Item lines — shown when detalleItems is available */}
           {cobro?.detalleItems && cobro.detalleItems.length > 0 && (
-            <div className="border-t border-[#2e3347] pt-3">
+            <div className="border-t border-[#e2e8f0] pt-3">
               {cobro.detalleItems.map((item, i) => (
-                <div key={i} className="flex justify-between text-xs text-[#9ca3af]">
+                <div key={i} className="flex justify-between text-xs text-[#6b7280]">
                   <span>{item.cantidad}x {item.nombre}</span>
                   <span>{((item.precioUnitarioCents * item.cantidad) / 100).toFixed(2).replace('.', ',')} €</span>
                 </div>
@@ -178,7 +178,7 @@ export function CobroConfirmado({
           {/* IVA breakdown — shown when cobro is available */}
           {cobro !== null && (
             <>
-              <div className="h-px bg-[#2e3347]" />
+              <div className="h-px bg-[#e2e8f0]" />
               <p className="text-[10px] font-bold text-[#6b7280] uppercase tracking-wider">Desglose {tipoImpuesto.toUpperCase()}</p>
               <div className="flex justify-between text-xs text-[#6b7280]">
                 <span>Base imponible ({cobro.ivaPorcentaje}% {tipoImpuesto.toUpperCase()})</span>
@@ -206,7 +206,7 @@ export function CobroConfirmado({
 
         {/* AEAT verification URL */}
         {cobro !== null && empresaNif !== null && empresaNif !== '' && (
-          <div className="w-full bg-[#0f1117] border border-[#2e3347] rounded-xl p-3 flex flex-col gap-1.5">
+          <div className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-3 flex flex-col gap-1.5">
             <p className="text-[10px] font-bold text-[#6b7280] uppercase tracking-wider">
               Verificación AEAT
             </p>
@@ -214,7 +214,7 @@ export function CobroConfirmado({
               href={buildAeatUrl(empresaNif, cobro)}
               target="_blank"
               rel="noreferrer"
-              className="text-xs text-[#4f72ff] break-all hover:underline leading-relaxed"
+              className="text-xs text-[#2563eb] break-all hover:underline leading-relaxed"
             >
               {buildAeatUrl(empresaNif, cobro)}
             </a>
@@ -231,14 +231,14 @@ export function CobroConfirmado({
             type="button"
             disabled={cobro === null || isPrinting}
             onClick={handlePrint}
-            className="flex-1 py-3 rounded-xl border border-[#2e3347] text-sm font-semibold hover:border-[#e8eaf0] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex-1 py-3 rounded-xl border border-[#e2e8f0] text-sm font-semibold hover:border-[#0f172a] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {isPrinting ? '...' : 'Imprimir'}
           </button>
           <button
             type="button"
             onClick={onNuevaOperacion}
-            className="flex-[2] py-3 rounded-xl bg-[#4f72ff] text-white font-bold hover:brightness-110 transition-all"
+            className="flex-[2] py-3 rounded-xl bg-[#2563eb] text-white font-bold hover:brightness-110 transition-all"
           >
             {esParcial ? 'Volver al mostrador →' : 'Cerrar mesa →'}
           </button>

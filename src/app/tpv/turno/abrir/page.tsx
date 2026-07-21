@@ -39,9 +39,9 @@ export default async function TurnoAbrirPage() {
 
   return (
     <div className="flex items-center justify-center w-full h-full">
-      <div className="bg-[#1a1d27] border border-[#2e3347] rounded-2xl p-12 flex flex-col gap-8 w-[440px]">
+      <div className="bg-white border border-[#e2e8f0] rounded-2xl p-12 flex flex-col gap-8 w-[440px] shadow-sm">
         <div className="flex flex-col gap-2">
-          <span className="text-xs font-bold text-[#4f72ff] uppercase tracking-wider">TPV</span>
+          <span className="text-xs font-bold text-[#2563eb] uppercase tracking-wider">TPV</span>
           <h1 className="text-2xl font-bold">¿Quién está a cargo hoy?</h1>
           <p className="text-sm text-[#6b7280] leading-relaxed">
             Este nombre quedará registrado en el turno de caja y en todas las operaciones.

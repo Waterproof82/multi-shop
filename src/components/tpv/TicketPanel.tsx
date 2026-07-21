@@ -4,7 +4,6 @@ import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { StickyNote } from 'lucide-react';
 import type { ExistingOrder } from './MostradorClient';
-import type { PendingItem } from '@/hooks/tpv/useMesaActiva';
 import { getCsrfToken } from '@/lib/csrf-client';
 
 interface Props {
@@ -13,17 +12,12 @@ interface Props {
   readonly mesaNumero: number | null;
   readonly mesaName: string | null;
   readonly existingOrders: ExistingOrder[];
-  readonly pendingItems: PendingItem[];
   readonly existingTotal: number;
-  readonly pendingTotal: number;
   readonly yaCobradoCents: number;
   readonly turnoId: string;
   readonly tipoImpuesto: 'iva' | 'igic';
   readonly porcentajeImpuesto: number;
   readonly sesionPagada: boolean;
-  readonly onRemovePending: (nombre: string, complementos: { nombre: string; precio: number }[]) => void;
-  readonly onUpdatePendingNota: (productId: string, complementos: { nombre: string; precio: number }[], nota: string | undefined) => void;
-  readonly onPendingSent: () => void;
 }
 
 function fmt(euros: number): string {
@@ -35,12 +29,6 @@ function paseShortLabel(p?: string): string {
   if (p === 'segundo') return '2º';
   return 'Postre';
 }
-
-const PASE_BUTTON_LABEL: Record<'primer' | 'segundo' | 'postre', string> = {
-  primer: 'I · 1er pase',
-  segundo: 'II · 2º pase',
-  postre: '🍮 Postre',
-};
 
 const ESTADO_LABEL: Record<string, string> = {
   pendiente: '🔴 Pendiente',
@@ -61,26 +49,18 @@ const ESTADO_COLOR: Record<string, string> = {
 };
 
 export function TicketPanel({
-  sesionId, mesaId, mesaNumero, mesaName, existingOrders, pendingItems,
-  existingTotal, pendingTotal, yaCobradoCents, turnoId, tipoImpuesto, porcentajeImpuesto,
-  sesionPagada, onRemovePending, onUpdatePendingNota, onPendingSent,
+  sesionId, mesaId, mesaNumero, mesaName, existingOrders,
+  existingTotal, yaCobradoCents, turnoId, tipoImpuesto, porcentajeImpuesto,
+  sesionPagada,
 }: Readonly<Props>) {
-  
   const router = useRouter();
-  const [sending, setSending] = useState(false);
-  const [sendError, setSendError] = useState<string | null>(null);
-  const [pendingPase, setPendingPase] = useState<'primer' | 'segundo' | 'postre' | ''>('');
-  const [directoACocina, setDirectoACocina] = useState(false);
-  const [notaExpandida, setNotaExpandida] = useState<string | null>(null); // pedido id expandido
-  const [pendingNotaExpandida, setPendingNotaExpandida] = useState<string | null>(null); // pending item key expandido
+  const [notaExpandida, setNotaExpandida] = useState<string | null>(null);
   const [notasLocal, setNotasLocal] = useState<Record<string, string>>({});
-  const [pendingNota, setPendingNota] = useState('');
   const notaSaveRef = useRef<NodeJS.Timeout | null>(null);
-  const total = existingTotal + pendingTotal;
+
   const impuestoRate = porcentajeImpuesto / 100;
-  const subtotal = total / (1 + impuestoRate);
-  const iva = total - subtotal;
-  const hasContent = existingOrders.length > 0 || pendingItems.length > 0;
+  const subtotal = existingTotal / (1 + impuestoRate);
+  const iva = existingTotal - subtotal;
   const canCobrar = sesionId !== null;
   const pendienteEuros = Math.max(0, existingTotal - yaCobradoCents / 100);
   const hasPendingOrders = existingOrders.some(
@@ -112,7 +92,7 @@ export function TicketPanel({
   }
 
   return (
-    <aside className="w-[300px] shrink-0 bg-white border-r border-[#e2e8f0] flex flex-col">
+    <aside className="w-[260px] shrink-0 bg-white border-r border-[#e2e8f0] flex flex-col">
       <div className="px-4 py-3.5 border-b border-[#e2e8f0] flex justify-between items-center">
         <span className="text-xs font-bold text-[#64748b] uppercase tracking-wider">Ticket activo</span>
         {mesaLabel && (
@@ -121,13 +101,12 @@ export function TicketPanel({
       </div>
 
       <div className="flex-1 overflow-y-auto py-2">
-        {!hasContent && (
+        {existingOrders.length === 0 && (
           <p className="px-4 py-8 text-center text-sm text-[#94a3b8]">
-            Selecciona una mesa para ver el ticket
+            {mesaId ? 'Sin pedidos enviados aún' : 'Seleccioná una mesa para ver el ticket'}
           </p>
         )}
 
-        {/* Existing orders from DB */}
         {existingOrders.map(order => (
           <div key={order.id} className="border-b border-[#e2e8f0] last:border-b-0">
             <button
@@ -179,87 +158,10 @@ export function TicketPanel({
             )}
           </div>
         ))}
-
-        {/* Pending items (draft, not yet sent) */}
-        {pendingItems.length > 0 && (
-          <div className="border-t border-[#93c5fd]/50">
-            <div className="px-4 py-1.5">
-              <span className="text-[10px] font-bold text-[#2563eb] uppercase tracking-wider">Nuevo pedido</span>
-            </div>
-            {(['primer', 'segundo', 'postre'] as const).map(p => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => { setPendingPase(prev => prev === p ? '' : p); setDirectoACocina(false); }}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${
-                  pendingPase === p && !directoACocina
-                    ? 'bg-[#2563eb] border-[#2563eb] text-white'
-                    : 'border-[#e2e8f0] text-[#475569] hover:border-[#2563eb] hover:text-[#1e40af]'
-                }`}
-                >
-                {PASE_BUTTON_LABEL[p]}
-                </button>
-            ))}
-            {pendingItems.map((item) => {
-              const itemKey = item.productId + item.complementos.map(c => c.nombre).join(',');
-              const notaOpen = pendingNotaExpandida === itemKey;
-              return (
-                <div key={itemKey} className="border-b border-[#e2e8f0] last:border-b-0">
-                  <div className="flex items-start gap-2.5 px-4 py-2.5 hover:bg-[#f8fafc] transition-colors">
-                    <span className="w-6 h-6 rounded-md bg-[#2563eb] text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
-                      {item.cantidad}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate text-[#0f172a]">{item.nombre}</p>
-                      {item.complementos.length > 0 && (
-                        <p className="text-[10px] text-[#64748b] truncate">{item.complementos.map(c => c.nombre).join(', ')}</p>
-                      )}
-                      {item.nota && !notaOpen && (
-                        <p className="text-[10px] italic text-[#a78bfa] truncate">✎ {item.nota}</p>
-                      )}
-                    </div>
-                    <span className="text-sm font-semibold shrink-0 text-[#0f172a]">{fmt(item.precioTotal * item.cantidad)}</span>
-                    <button
-                      type="button"
-                      onClick={() => setPendingNotaExpandida(prev => prev === itemKey ? null : itemKey)}
-                      className={`flex items-center gap-0.5 shrink-0 rounded px-1 py-0.5 transition-colors ${notaOpen || item.nota ? 'text-[#a78bfa]' : 'text-[#94a3b8] hover:text-[#a78bfa]'}`}
-                      aria-label="Nota del ítem"
-                      title="Añadir nota al ítem"
-                    >
-                      <StickyNote className="h-3.5 w-3.5" />
-                      {!item.nota && !notaOpen && <span className="text-[10px] font-medium">Nota</span>}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onRemovePending(item.nombre, item.complementos)}
-                      className="text-[#94a3b8] hover:text-red-500 text-base leading-none shrink-0 mt-0.5"
-                      aria-label={`Eliminar ${item.nombre}`}
-                    >
-                      ×
-                    </button>
-                  </div>
-                  {notaOpen && (
-                    <div className="px-4 pb-3">
-                      <textarea
-                        rows={2}
-                        maxLength={500}
-                        value={item.nota ?? ''}
-                        onChange={e => onUpdatePendingNota(item.productId, item.complementos, e.target.value || undefined)}
-                        placeholder="Nota para este ítem..."
-                        className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-lg px-3 py-2 text-xs text-[#0f172a] placeholder:text-[#94a3b8] focus:outline-none focus:border-[#a78bfa] transition-colors resize-none"
-                        autoFocus
-                      />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
       </div>
 
       <div className="border-t border-[#e2e8f0] p-4 flex flex-col gap-3">
-        {hasContent && (
+        {existingOrders.length > 0 && (
           <>
             <div className="flex justify-between text-sm text-[#64748b]">
               <span>Subtotal</span><span>{fmt(subtotal)}</span>
@@ -267,102 +169,14 @@ export function TicketPanel({
             <div className="flex justify-between text-sm text-[#64748b]">
               <span>{tipoImpuesto.toUpperCase()} ({porcentajeImpuesto}%)</span><span>{fmt(iva)}</span>
             </div>
-            <div className="text-2xl font-bold mt-1 text-[#0f172a]">{fmt(total)}</div>
+            <div className="text-2xl font-bold mt-1 text-[#0f172a]">{fmt(existingTotal)}</div>
           </>
-        )}
-        {sendError && (
-          <p className="text-xs text-red-600 text-center">{sendError}</p>
-        )}
-        {pendingItems.length > 0 && (
-          <div className="flex gap-1 flex-wrap">
-            <button
-              type="button"
-              onClick={() => { setDirectoACocina(prev => !prev); setPendingPase(''); }}
-              className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${
-                directoACocina
-                  ? 'bg-amber-600 border-amber-600 text-white'
-                  : 'border-[#e2e8f0] text-[#475569] hover:border-amber-600 hover:text-amber-700'
-              }`}
-            >
-              ⚡ Envío directo
-            </button>
-          </div>
-        )}
-        {pendingItems.length > 0 && (
-          <textarea
-            rows={2}
-            maxLength={500}
-            value={pendingNota}
-            onChange={e => setPendingNota(e.target.value)}
-            placeholder="Nota del pedido (opcional)..."
-            className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-3 py-2 text-xs text-[#0f172a] placeholder:text-[#94a3b8] focus:outline-none focus:border-[#2563eb] transition-colors resize-none"
-          />
-        )}
-        {pendingItems.length > 0 && (
-          <button
-            type="button"
-            disabled={sending || !mesaId}
-            className="w-full bg-[#2563eb] text-white rounded-xl py-3 text-sm font-bold hover:brightness-110 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-            onClick={async () => {
-              if (!mesaId) return;
-              setSending(true);
-              setSendError(null);
-              try {
-                const csrfToken = getCsrfToken();
-                const res = await fetch('/api/tpv/pedidos', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
-                  },
-                  body: JSON.stringify({
-                    mesaId,
-                    items: pendingItems.map(i => ({
-                      productId: i.productId,
-                      nombre: i.nombre,
-                      precio: i.precioTotal,
-                      cantidad: i.cantidad,
-                      complementos: i.complementos.map(c => c.nombre),
-                      ...(i.nota ? { nota: i.nota } : {}),
-                    })),
-                    nota: pendingNota || undefined,
-                    pase: (!directoACocina && pendingPase) ? pendingPase : undefined,
-                    directoACocina,
-                  }),
-                });
-                if (!res.ok) {
-                  const err = await res.json() as { error?: string };
-                  setSendError(err.error ?? 'Error al enviar el pedido');
-                } else {
-                  const json = await res.json() as { sesionId?: string | null };
-                  onPendingSent();
-                  setPendingNota('');
-                  setPendingPase('');
-                  setDirectoACocina(false);
-                  // If the mesa had no session yet, navigate to include the new sesionId in the URL
-                  if (!sesionId && json.sesionId && mesaId) {
-                    const params = new URLSearchParams({ mesaId, mesaNumero: String(mesaNumero ?? ''), sesionId: json.sesionId });
-                    if (mesaName) params.set('mesaName', mesaName);
-                    router.replace(`/tpv/mostrador?${params.toString()}`);
-                  } else {
-                    router.refresh();
-                  }
-                }
-              } catch {
-                setSendError('Error de conexión');
-              } finally {
-                setSending(false);
-              }
-            }}
-          >
-            {sending ? 'Enviando...' : `📤 Enviar a cocina · ${fmt(pendingTotal)}`}
-          </button>
         )}
         {hasPendingOrders && canCobrar && !sesionPagada && (
           <div className="flex items-start gap-2 rounded-xl px-3 py-2.5 bg-[#fff7ed] border border-[#fed7aa]">
             <span className="text-sm leading-none mt-0.5">🍽</span>
             <p className="text-xs leading-snug text-[#ea580c]">
-              Quedan pedidos sin servir. Servilos antes de cobrar.
+              Quedan pedidos sin servir. Sírvelos antes de cobrar.
             </p>
           </div>
         )}

@@ -5,6 +5,7 @@ import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-c
 import { useMesaActiva } from '@/hooks/tpv/useMesaActiva';
 import { useTpvCatalog } from '@/lib/tpv-catalog-ctx';
 import { TicketPanel } from './TicketPanel';
+import { NuevoPedidoPanel } from './NuevoPedidoPanel';
 import { MenuPanel } from './MenuPanel';
 import { MesasGrid } from './MesasGrid';
 import { useTpvAcciones } from '@/lib/tpv-acciones-ctx';
@@ -35,7 +36,7 @@ interface Props {
 export function MostradorClient({ initialMesa }: Readonly<Props>) {
   const { turno, products, categories, tipoImpuesto, porcentajeImpuesto } = useTpvCatalog();
   const { mesa, addItem, removeItem, clearPending, clearMesa, refreshOrders, updatePendingNota } = useMesaActiva(initialMesa);
-  const { registerRefresh } = useTpvAcciones();
+  const { registerRefresh, setHasPendingItems } = useTpvAcciones();
   const [yaCobradoCents, setYaCobradoCents] = useState(0);
   const [externalCobro, setExternalCobro] = useState<string | null>(null);
   const [isSesionPagada, setIsSesionPagada] = useState(initialMesa?.sesionPagada ?? false);
@@ -50,6 +51,11 @@ export function MostradorClient({ initialMesa }: Readonly<Props>) {
     }
   }, [mesa.sesionId, refreshOrders]);
 
+  // Sync pending items flag into context so AccionesPanel can hide itself
+  useEffect(() => {
+    setHasPendingItems(mesa.pendingItems.length > 0);
+  }, [mesa.pendingItems.length, setHasPendingItems]);
+
   // Register refresh fn in AccionesPanel context so the button works from layout level.
   useEffect(() => {
     registerRefresh(mesa.sesionId, handleRefresh);
@@ -61,6 +67,15 @@ export function MostradorClient({ initialMesa }: Readonly<Props>) {
     void handleRefresh();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Re-fetch when the user returns to this tab (e.g. after cancelling orders in waiter panel).
+  useEffect(() => {
+    const handleVisible = () => {
+      if (document.visibilityState === 'visible') void handleRefresh();
+    };
+    document.addEventListener('visibilitychange', handleVisible);
+    return () => document.removeEventListener('visibilitychange', handleVisible);
+  }, [handleRefresh]);
 
   // Real-time: re-fetch orders when new pedidos arrive or kitchen marks items.
   useEffect(() => {
@@ -78,9 +93,23 @@ export function MostradorClient({ initialMesa }: Readonly<Props>) {
       .on('broadcast', { event: 'item-update' }, refresh)
       .subscribe();
 
+    // postgres_changes on pedidos: catches estado changes (e.g. auto-cancel) that
+    // arrive after the transaction commits — more reliable than the async broadcast
+    // for the case where all items are cancelled from waiter pendientes.
+    const sesionId = mesa.sesionId;
+    const chPedidos = supabase
+      .channel(`tpv-pedidos-${sesionId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `sesion_id=eq.${sesionId}` },
+        refresh
+      )
+      .subscribe();
+
     return () => {
       void supabase.removeChannel(chNew);
       void supabase.removeChannel(chItems);
+      void supabase.removeChannel(chPedidos);
     };
   }, [mesa.sesionId, handleRefresh]);
 
@@ -101,6 +130,8 @@ export function MostradorClient({ initialMesa }: Readonly<Props>) {
           const row = payload.new as { cerrada_at: string | null; sesion_pagada: boolean };
           if (row.cerrada_at) {
             setExternalCobro(`La mesa ${mesaNumero} ha sido cobrada desde otro canal.`);
+            setIsSesionPagada(false);
+            setYaCobradoCents(0);
             clearMesa();
           } else if (row.sesion_pagada) {
             setIsSesionPagada(true);
@@ -129,17 +160,12 @@ export function MostradorClient({ initialMesa }: Readonly<Props>) {
         mesaNumero={mesa.mesaNumero}
         mesaName={mesa.mesaName}
         existingOrders={mesa.existingOrders}
-        pendingItems={mesa.pendingItems}
         existingTotal={mesa.existingTotal}
-        pendingTotal={mesa.pendingTotal}
         yaCobradoCents={yaCobradoCents}
         turnoId={turno.id}
         tipoImpuesto={tipoImpuesto}
         porcentajeImpuesto={porcentajeImpuesto}
         sesionPagada={isSesionPagada}
-        onRemovePending={removeItem}
-        onUpdatePendingNota={updatePendingNota}
-        onPendingSent={clearPending}
       />
       {!mesa.mesaId ? (
         <MesasGrid modo="seleccionar" />
@@ -149,6 +175,19 @@ export function MostradorClient({ initialMesa }: Readonly<Props>) {
           categories={categories}
           onAddItem={addItem}
           mesaSeleccionada={!!mesa.mesaId}
+        />
+      )}
+      {mesa.mesaId && mesa.pendingItems.length > 0 && (
+        <NuevoPedidoPanel
+          sesionId={mesa.sesionId}
+          mesaId={mesa.mesaId}
+          mesaNumero={mesa.mesaNumero}
+          mesaName={mesa.mesaName}
+          pendingItems={mesa.pendingItems}
+          pendingTotal={mesa.pendingTotal}
+          onPendingSent={clearPending}
+          onRemovePending={removeItem}
+          onUpdatePendingNota={updatePendingNota}
         />
       )}
     </>

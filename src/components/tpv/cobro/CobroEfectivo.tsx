@@ -41,7 +41,7 @@ export function CobroEfectivo({ totalFinalCents, loading, onConfirmar, onBack }:
   return (
     <div className="flex items-center justify-center w-full h-full gap-6 p-8">
       <div className="flex flex-col gap-4 flex-1 max-w-xs">
-        <div className="bg-[#22263a] border border-[#2e3347] rounded-xl p-4">
+        <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-4">
           <p className="text-[10px] font-bold text-[#6b7280] uppercase tracking-wider mb-1">
             Entrega el cliente
           </p>
@@ -75,7 +75,7 @@ export function CobroEfectivo({ totalFinalCents, loading, onConfirmar, onBack }:
               key={n}
               type="button"
               onClick={() => setRaw(String(n))}
-              className="px-3 py-2 bg-[#22263a] border border-[#2e3347] rounded-lg text-sm font-semibold hover:border-[#4f72ff] hover:text-[#4f72ff] transition-colors"
+              className="px-3 py-2 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg text-sm font-semibold hover:border-[#2563eb] hover:text-[#2563eb] transition-colors"
             >
               {n} €
             </button>
@@ -83,7 +83,7 @@ export function CobroEfectivo({ totalFinalCents, loading, onConfirmar, onBack }:
           <button
             type="button"
             onClick={() => setRaw(String(Math.ceil(totalFinalCents / 100)))}
-            className="px-3 py-2 bg-[#22263a] border border-[#2e3347] rounded-lg text-sm font-semibold hover:border-[#4f72ff] hover:text-[#4f72ff] transition-colors"
+            className="px-3 py-2 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg text-sm font-semibold hover:border-[#2563eb] hover:text-[#2563eb] transition-colors"
           >
             Exacto
           </button>
@@ -99,8 +99,8 @@ export function CobroEfectivo({ totalFinalCents, loading, onConfirmar, onBack }:
               onClick={() => handlePad(k)}
               className={`py-4 rounded-xl border text-lg font-bold transition-colors ${
                 k === '⌫'
-                  ? 'bg-[#22263a] border-[#2e3347] text-[#ef4444] hover:bg-[#ef444420]'
-                  : 'bg-[#22263a] border-[#2e3347] hover:bg-[#2e3347]'
+                  ? 'bg-[#f8fafc] border-[#e2e8f0] text-[#ef4444] hover:bg-[#fef2f2]'
+                  : 'bg-[#f8fafc] border-[#e2e8f0] hover:bg-[#e2e8f0]'
               }`}
             >
               {k}
@@ -118,7 +118,7 @@ export function CobroEfectivo({ totalFinalCents, loading, onConfirmar, onBack }:
         <button
           type="button"
           onClick={onBack}
-          className="w-full py-3 rounded-xl border border-[#2e3347] text-[#6b7280] text-sm font-semibold hover:text-[#e8eaf0] transition-colors"
+          className="w-full py-3 rounded-xl border border-[#e2e8f0] text-[#64748b] text-sm font-semibold hover:text-[#0f172a] transition-colors"
         >
           ← Volver
         </button>

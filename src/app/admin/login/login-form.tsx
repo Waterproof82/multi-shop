@@ -235,11 +235,19 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
           </button>
         </form>
 
-        <div className="mt-6 text-center">
-          <Link href="/" className="text-sm text-primary hover:underline">
-            ← {t("backToMenu", language)}
-          </Link>
-        </div>
+        {searchParams.get('from') === 'tpv' ? (
+          <div className="mt-6 text-center">
+            <Link href="/tpv/mostrador" className="text-sm text-primary hover:underline">
+              ← Volver al TPV
+            </Link>
+          </div>
+        ) : !searchParams.get('next')?.startsWith('/admin') && !searchParams.get('next')?.startsWith('/tpv') && (
+          <div className="mt-6 text-center">
+            <Link href="/" className="text-sm text-primary hover:underline">
+              ← {t("backToMenu", language)}
+            </Link>
+          </div>
+        )}
       </div>
 
       <TpvPinCard />

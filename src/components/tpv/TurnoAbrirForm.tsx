@@ -64,10 +64,10 @@ export function TurnoAbrirForm({ defaultOperador = '' }: Props) {
           placeholder="Escribe tu nombre..."
           autoFocus={!isReadOnly}
           maxLength={100}
-          className={`bg-[#22263a] border border-[#2e3347] rounded-xl px-4 py-3.5 text-lg font-medium outline-none transition-colors placeholder:text-[#6b7280] placeholder:text-base placeholder:font-normal ${
+          className={`bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-4 py-3.5 text-lg font-medium outline-none transition-colors placeholder:text-[#94a3b8] placeholder:text-base placeholder:font-normal text-[#0f172a] ${
             isReadOnly
               ? 'cursor-default opacity-70'
-              : 'focus:border-[#4f72ff]'
+              : 'focus:border-[#2563eb]'
           }`}
         />
         {isReadOnly && (
@@ -79,7 +79,7 @@ export function TurnoAbrirForm({ defaultOperador = '' }: Props) {
         <label className="text-xs font-semibold text-[#6b7280] uppercase tracking-wider">
           Efectivo en caja al abrir
         </label>
-        <div className="flex items-center gap-2 bg-[#22263a] border border-[#2e3347] rounded-xl px-4 focus-within:border-[#4f72ff] transition-colors">
+        <div className="flex items-center gap-2 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-4 focus-within:border-[#2563eb] transition-colors">
           <span className="text-[#6b7280] font-semibold">€</span>
           <input
             type="number"
@@ -102,7 +102,7 @@ export function TurnoAbrirForm({ defaultOperador = '' }: Props) {
       <button
         type="submit"
         disabled={!canSubmit}
-        className="bg-[#4f72ff] text-white rounded-xl py-4 text-base font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition-all"
+        className="bg-[#2563eb] text-white rounded-xl py-4 text-base font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition-all"
       >
         {loading ? 'Abriendo turno...' : 'Comenzar turno'}
       </button>

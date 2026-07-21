@@ -60,11 +60,11 @@ export function useMesaActiva(initial: InitialMesa | null = null) {
   const [mesa, setMesa] = useState<MesaActiva>(() => buildInitial(initial));
 
   const refreshOrders = useCallback((orders: ExistingOrder[]) => {
-    setMesa(prev => ({
-      ...prev,
-      existingOrders: orders,
-      existingTotal: calcExistingTotal(orders),
-    }));
+    setMesa(prev => {
+      // If clearMesa() was already called, mesaId is null — ignore stale async refreshes.
+      if (!prev.mesaId) return prev;
+      return { ...prev, existingOrders: orders, existingTotal: calcExistingTotal(orders) };
+    });
   }, []);
 
   const selectMesa = useCallback((id: string, sesion: string, numero: number, name: string | null = null) => {

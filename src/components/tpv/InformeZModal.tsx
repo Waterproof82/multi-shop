@@ -166,7 +166,7 @@ export function InformeZModal({ informe, onClose }: Readonly<Props>) {
           <button
             type="button"
             onClick={onClose}
-            className="w-full bg-[#1a1d27] text-white py-3 rounded-lg font-semibold text-sm hover:bg-[#2e3347] transition-colors"
+            className="w-full bg-[#0f172a] text-white py-3 rounded-lg font-semibold text-sm hover:bg-[#1e293b] transition-colors"
           >
             Finalizar turno
           </button>

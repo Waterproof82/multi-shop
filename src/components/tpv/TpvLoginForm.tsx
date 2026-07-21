@@ -50,7 +50,7 @@ export function TpvLoginForm() {
         placeholder="PIN (4-8 dígitos)"
         autoFocus
         style={{ WebkitTextSecurity: 'disc' } as React.CSSProperties}
-        className="bg-[#22263a] border border-[#2e3347] rounded-xl px-4 py-3.5 text-2xl font-bold text-center tracking-widest outline-none focus:border-[#4f72ff] transition-colors placeholder:text-base placeholder:font-normal placeholder:tracking-normal placeholder:text-[#6b7280]"
+        className="bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-4 py-3.5 text-2xl font-bold text-center tracking-widest outline-none focus:border-[#2563eb] transition-colors placeholder:text-base placeholder:font-normal placeholder:tracking-normal placeholder:text-[#94a3b8] text-[#0f172a]"
       />
       {error !== null && (
         <p className="text-sm text-red-400 bg-red-400/10 border border-red-400/30 rounded-lg px-4 py-3 text-center">
@@ -60,7 +60,7 @@ export function TpvLoginForm() {
       <button
         type="submit"
         disabled={pin.length < 4 || loading}
-        className="bg-[#4f72ff] text-white rounded-xl py-4 text-base font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition-all"
+        className="bg-[#2563eb] text-white rounded-xl py-4 text-base font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition-all"
       >
         {loading ? 'Verificando...' : 'Entrar'}
       </button>
