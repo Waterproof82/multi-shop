@@ -140,15 +140,19 @@ Usar siempre en RLS policies para aislar datos por empresa.
 
 4. **Mesa grid badge no se actualiza al marcar ítems en cocina** → la cocina modifica `pedido_item_estados`, que no toca `mesa_sesiones`. `WaiterLoginForm` sólo escuchaba `mesa_sesiones`. **Fix:** agregar suscripción al broadcast `waiter-items-update` (canal `'waiter-items-update'`, evento `'item-update'`).
 
+5. **Race condition broadcast vs. auto-cancel en MostradorClient** → `realtime.send()` dentro de un trigger de DB es asíncrono: el broadcast `item-update` puede llegar al cliente antes de que la transacción que cancela el pedido commitee. El refresh inmediato devuelve el pedido todavía activo. **Fix:** añadir `postgres_changes` en `pedidos` filtrado por `sesion_id` (canal `tpv-pedidos-{sesionId}`) en `MostradorClient`. Ese evento es transaccional y solo llega después del commit completo.
+
 ### Arquitectura de canales activa
 
 | Canal | Tipo | Tabla/evento | Quién escucha |
 |---|---|---|---|
 | `waiter-banner-{uid}` | postgres_changes | pedidos, pedido_item_estados, mesa_sesiones | WaiterBanner |
-| `waiter-new-order` | broadcast `new-order` | trigger notify_waiter_new_order (todos los INSERTs) | WaiterBanner |
+| `waiter-new-order` | broadcast `new-order` | trigger notify_waiter_new_order (todos los INSERTs) | WaiterBanner, MostradorClient |
 | `waiter-new-order-kitchen` | broadcast `new-order` | trigger notify_waiter_new_order | WaiterKitchenPage |
 | `waiter-new-order-bar` | broadcast `new-order` | trigger notify_waiter_new_order | BarPage |
-| `waiter-items-update` | broadcast `item-update` | trigger notify_waiter_items_update | WaiterBanner, BarPage, WaiterLoginForm |
+| `waiter-items-update` | broadcast `item-update` | trigger notify_waiter_items_update | WaiterBanner, BarPage, WaiterLoginForm, MostradorClient |
+| `tpv-pedidos-{sesionId}` | postgres_changes | pedidos (UPDATE, filter sesion_id) | MostradorClient |
+| `tpv-sesion-close-{sesionId}` | postgres_changes | mesa_sesiones (UPDATE, filter id) | MostradorClient |
 | `waiter-kitchen-{uid}` | postgres_changes | pedido_item_estados, pedidos | WaiterKitchenPage |
 | `waiter-bar-{uid}` | postgres_changes | pedido_item_estados, pedidos | BarPage |
 | `waiter-pendientes-{uid}` | postgres_changes | pedidos, pedido_item_estados, mesa_sesiones | WaiterPendientesPage |
@@ -182,6 +186,8 @@ Solución: `WaiterLoginForm.handlePinSubmit` dispara `window.dispatchEvent(new C
 - **`countBebidasTotal`** excluye `estado='cancelado'` además de `'servido'` para que el badge de bebidas en WaiterBanner descuente cancelaciones correctamente.
 - **Pausa en pendientes**: en `handleConfirmBoth`, la pausa (⏸) prevalece sobre la selección (✓). Un ítem puede estar simultáneamente seleccionado Y pausado → va a `pausedIndices` → kitchen retenido. NO usar `&& !selected.has(...)` en ese filtro.
 - **`pedidos.estado` NUNCA se actualiza** por cocina/bar al marcar ítems. La source of truth real está en `pedido_item_estados`. La route `/api/mesas/[mesaId]/orders` sintetiza el estado efectivo de cada pedido comparando item-level estados (`listo`/`servido`/`cancelado`). NO leer `pedido.estado` directamente para saber si un pedido está servido.
+- **Trigger `trg_auto_cancel_pedido`** (migración `20260721000001`): cuando TODOS los ítems de un pedido tienen fila en `pedido_item_estados` con `estado='cancelado'`, el trigger setea `pedidos.estado='cancelado'` automáticamente. Esto sincroniza el estado del pedido con la cancelación ítem a ítem desde Waiter Pendientes y Kitchen. El trigger corre dentro de la transacción del INSERT/UPDATE — después del commit, `MostradorClient` recibe el evento `postgres_changes` y oculta el pedido del ticket.
+- **`normalizePedidoOrder` filtra ítems cancelados individualmente** — `GET /api/tpv/pedidos` sintetiza `cancelledItemsByPedido` desde `pedido_item_estados` y los excluye del array `items` devuelto. El total se recalcula sin esos ítems. Si todos los ítems de un pedido están cancelados, el pedido se omite por completo (sintetizado como `cancelado`).
 - **`hasPlatosPoServir`** en `mesa-orders-client.tsx` bloquea pago y cierre cuando algún pedido sintetizado tiene estado ∈ `{pendiente_validacion, pendiente, en_preparacion, preparado}`. Ver `docs/context/waiter-ticket-ux.md`.
 - **`propina_cents`** en `mesa_sesiones`: propina acordada por la mesa en céntimos. Se expone como `propinaCents` en `GET /api/mesas/[mesaId]/orders` y se suma al total cobrado en Redsys (full payment y división). Actualizable por cualquier participante vía `PATCH /api/mesas/[mesaId]/propina`. Ver `docs/context/propina.md`.
 
@@ -317,6 +323,9 @@ Solución: `WaiterLoginForm.handlePinSubmit` dispara `window.dispatchEvent(new C
 
 - **`pinHash` NUNCA en respuestas API** — las rutas `GET` y `POST` de `/api/admin/empleados-tpv` deben strippear `pinHash` antes de devolver. Usar `({ pinHash: _, ...rest }) => rest`. No agregar `pinHash` a DTOs de respuesta.
 - **Dual-auth en proxy — orden importa** — el proxy prueba `admin_token` PRIMERO, luego `tpv_employee_token`. Agregar nuevas rutas TPV públicas a la lista explícita (`/tpv/login`, `/api/tpv/empleados/login`, `/api/tpv/empleados/logout`) en `proxy.ts`.
+- **`admin_token` se borra al hacer login por PIN** — `/api/tpv/empleados/login` setea `admin_token='' maxAge=0` en la response. Sin esto, un `admin_token` previo de encargado/admin tiene prioridad sobre `tpv_employee_token` del cajero en layout SSR y páginas protegidas: el cajero heredaría el rol del admin y accedería a historial, analíticas y mermas. El layout lee `admin_token` PRIMERO; borrar el token en el login por PIN es la única forma de garantizar el aislamiento de rol.
+- **Cajero tiene acceso restringido** — historial (`/tpv/historial`) y analíticas (`/tpv/analytics`) tienen guard SSR que redirige cajeros a `/tpv/mostrador`. Mermas (`/tpv/mermas`) es `'use client'` y usa `useTpvRol()` con `useRouter().replace('/tpv/mostrador')` en un `useEffect`. En `AccionesActions` y `TpvHeader` los links de estas secciones se ocultan para `isCajero`.
+- **`/tpv/turno/espera`** — pantalla de espera para cajero sin turno activo. El CTA "Introducir PIN" lleva a `/tpv/login` (no a `/tpv/mostrador`, que crearía un loop).
 - **`x-pathname` para bypass del layout TPV** — el proxy inyecta `x-pathname` en headers de página. El layout `src/app/tpv/layout.tsx` hace early return `<>{children}</>` cuando el path es `/tpv/login`. Sin este header, el layout bloquearía la página de login.
 - **`user_id` nullable en `tpv_turnos`** — desde la migración `20260708000001`. Nunca asumir que `user_id` existe en un turno. Los turnos abiertos por empleado tienen `user_id = NULL` y `operador_id` apuntando a `empleados_tpv`.
 - **Solo `encargado` puede abrir turno por PIN** — en `src/app/tpv/turno/abrir/page.tsx`, si el payload del token tiene `rol === 'cajero'`, se redirige a `/tpv/mostrador`. El cajero nunca ve la pantalla de abrir turno.
@@ -327,6 +336,20 @@ Solución: `WaiterLoginForm.handlePinSubmit` dispara `window.dispatchEvent(new C
 - **Arqueo ciego para cajero** — `isBlindClose = (rol === 'cajero')`. La diferencia entre contado y teórico se calcula SERVER-SIDE en `/api/tpv/turno/[id]/cerrar`. `TurnoCerrarForm` con `isBlindClose=true` oculta totales teóricos y diferencia — no enviarlos desde el cliente no es suficiente (el server los calcula).
 - **`tpv_employee_token` audience** — el JWT usa audience `'tpv-employee'`. No confundir con el `admin_token` que no tiene audience explícita. `verifyTpvEmployeeToken` en `src/lib/tpv-employee-auth.ts` valida esta audience; si falla silenciosamente, comprobar que el token se generó con `signTpvEmployeeToken`, no con `authAdminUseCase`.
 - **CSRF requerido** — el proxy aplica validación CSRF también a requests de `tpv_employee_token`. El cliente debe usar `fetchWithCsrf` en todas las mutaciones del TPV.
+
+## 🖥 TPV Mostrador — Trampas Críticas
+
+- **`visibilitychange` refresh** — `MostradorClient` escucha `document.visibilitychange` y llama `handleRefresh()` cuando la pestaña vuelve a estar visible. Garantiza datos frescos al volver desde Waiter (otra pestaña o ventana) sin depender del realtime.
+- **Re-fetch en mount** — un `useEffect([], [])` dispara `handleRefresh()` al montar para limpiar cualquier dato stale del Router Cache de Next.js al volver de `/tpv/cobro`.
+- **Realtime dual: broadcast + postgres_changes** — `MostradorClient` usa dos capas: (1) broadcasts `new-order` e `item-update` para actualización rápida (asíncronos, pueden llegar antes del commit); (2) `postgres_changes` en `pedidos` filtrado por `sesion_id` para la cancelación de pedidos, que necesita esperar al commit para que el trigger `trg_auto_cancel_pedido` haya corrido.
+- **`externalCobro` banner** — cuando `mesa_sesiones.cerrada_at` se actualiza desde otro canal (cobro externo), `MostradorClient` muestra un banner verde y llama `clearMesa()`. El banner se cierra manualmente.
+- **`isSesionPagada` sync** — cuando `mesa_sesiones.sesion_pagada` cambia a `true` vía realtime, `MostradorClient` actualiza `isSesionPagada` sin recargar. `TicketPanel` usa ese estado para bloquear acciones de cobro.
+
+## 🧾 TPV Cierre de Turno — Trampas Críticas
+
+- **"Mesas sin cobrar" no bloquea cuando todas las órdenes están canceladas** — tanto la página SSR `/tpv/turno/cerrar` como el API guard `POST /api/tpv/turno/[id]/cerrar` hacen un segundo query a `pedidos` para verificar que las sesiones abiertas (`cerrada_at IS NULL`) tengan al menos un pedido activo (`neq estado cerrado/cancelado`). Las sesiones donde todas las órdenes se cancelaron no bloquean el cierre.
+- **`get_mesas_with_sessions` RPC excluye pedidos cancelados** del `session_total` y del `activeOrderCount`. Si el badge de la mesa grid muestra pedidos o importes incorrectos tras cancelaciones masivas, revisar la migración `20260721000001` y el RPC en Supabase.
+- **`countBySesion` en `supabase-mesa.repository.ts`** — excluye `estado='cerrado'` Y `estado='cancelado'`. Sin ambos filtros, los pedidos cancelados inflan el badge de pedidos activos en el grid de mesas.
 
 ## 🧩 Sistema de Complementos por Producto — Trampas Críticas
 
