@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useTpvRol } from '@/lib/tpv-rol-ctx';
+import { useTpvAcciones } from '@/lib/tpv-acciones-ctx';
 
 type ActionVariant = 'default' | 'active' | 'danger';
 
@@ -44,7 +45,10 @@ function ActionIcon({ emoji, label, onClick, disabled = false, variant = 'defaul
 export function AccionesPanel() {
   const router = useRouter();
   const rol = useTpvRol();
+  const { hasPendingItems } = useTpvAcciones();
   const isCajero = rol === 'cajero';
+
+  if (hasPendingItems) return null;
 
   return (
     <aside className="w-16 shrink-0 bg-white border-l border-[#e2e8f0] flex flex-col items-center py-3 gap-1.5">

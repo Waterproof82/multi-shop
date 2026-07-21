@@ -36,7 +36,7 @@ interface Props {
 export function MostradorClient({ initialMesa }: Readonly<Props>) {
   const { turno, products, categories, tipoImpuesto, porcentajeImpuesto } = useTpvCatalog();
   const { mesa, addItem, removeItem, clearPending, clearMesa, refreshOrders, updatePendingNota } = useMesaActiva(initialMesa);
-  const { registerRefresh } = useTpvAcciones();
+  const { registerRefresh, setHasPendingItems } = useTpvAcciones();
   const [yaCobradoCents, setYaCobradoCents] = useState(0);
   const [externalCobro, setExternalCobro] = useState<string | null>(null);
   const [isSesionPagada, setIsSesionPagada] = useState(initialMesa?.sesionPagada ?? false);
@@ -50,6 +50,11 @@ export function MostradorClient({ initialMesa }: Readonly<Props>) {
       setYaCobradoCents(json.yaCobradoCents);
     }
   }, [mesa.sesionId, refreshOrders]);
+
+  // Sync pending items flag into context so AccionesPanel can hide itself
+  useEffect(() => {
+    setHasPendingItems(mesa.pendingItems.length > 0);
+  }, [mesa.pendingItems.length, setHasPendingItems]);
 
   // Register refresh fn in AccionesPanel context so the button works from layout level.
   useEffect(() => {
@@ -147,7 +152,7 @@ export function MostradorClient({ initialMesa }: Readonly<Props>) {
           mesaSeleccionada={!!mesa.mesaId}
         />
       )}
-      {mesa.mesaId && (
+      {mesa.mesaId && mesa.pendingItems.length > 0 && (
         <NuevoPedidoPanel
           sesionId={mesa.sesionId}
           mesaId={mesa.mesaId}
