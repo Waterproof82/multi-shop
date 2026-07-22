@@ -25,6 +25,7 @@ let mainWindow: BrowserWindow;
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
+    title: 'Multisistema TPV',
     width: 1280,
     height: 800,
     minWidth: 1024,
