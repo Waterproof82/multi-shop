@@ -1443,6 +1443,9 @@ El warning de VS Code es un falso positivo del plugin de GitHub Actions (no cono
 - [`docs/context/tpv-empleados-pin.md`](docs/context/tpv-empleados-pin.md) — TPV empleados PIN: arquitectura dual-auth, permisos por rol, arqueo ciego, trampas críticas
 - [`docs/context/compras-system.md`](docs/context/compras-system.md) — Compras y Proveedores (SIALTI): tablas, compliance CE 178/2002 / Ley Antifraude / RD 1619/2012, RPC transaccional, códigos de error, trampas críticas
 - [`docs/context/legal-compliance.md`](docs/context/legal-compliance.md) — Registro de leyes y normativas referenciadas en el proyecto
+- [`docs/context/rgpd-clientes.md`](docs/context/rgpd-clientes.md) — RGPD: ciclo de vida de datos de clientes (alta → actividad → Vercel Cron purga 5 años → derecho al olvido)
+- [`docs/context/alergenos-system.md`](docs/context/alergenos-system.md) — Sistema de alérgenos EU (Reglamento 1169/2011): 14 sustancias, iconos SVG, 5 idiomas
+- [`docs/context/audit-log.md`](docs/context/audit-log.md) — Audit log operativo: quién hizo qué (distinto del export fiscal de /tpv/legal)
 - [`docs/superpowers/specs/2026-07-08-empleados-tpv-permisos-design.md`](docs/superpowers/specs/2026-07-08-empleados-tpv-permisos-design.md) — Spec de diseño del sistema de empleados TPV con PIN
 
 ---
