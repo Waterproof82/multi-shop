@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, globalShortcut } from 'electron';
+import { app, BrowserWindow, ipcMain, globalShortcut, Menu } from 'electron';
 import * as path from 'path';
 import { promises as fsPromises } from 'fs';
 import * as crypto from 'crypto';
@@ -19,6 +19,9 @@ interface FiscalSnapshotPayload {
   numeroZ: number;
   [key: string]: unknown;
 }
+
+app.setName('Multisistema TPV');
+Menu.setApplicationMenu(null);
 
 const store = new Store<StoreSchema>();
 let mainWindow: BrowserWindow;

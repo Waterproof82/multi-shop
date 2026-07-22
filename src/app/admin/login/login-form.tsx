@@ -237,9 +237,9 @@ export default function LoginForm({ empresaNombre }: LoginFormProps) {
 
         {searchParams.get('from') === 'tpv' ? (
           <div className="mt-6 text-center">
-            <Link href="/tpv/mostrador" className="text-sm text-primary hover:underline">
+            <a href="/tpv/mostrador" className="text-sm text-primary hover:underline">
               ← Volver al TPV
-            </Link>
+            </a>
           </div>
         ) : !searchParams.get('next')?.startsWith('/admin') && !searchParams.get('next')?.startsWith('/tpv') && (
           <div className="mt-6 text-center">

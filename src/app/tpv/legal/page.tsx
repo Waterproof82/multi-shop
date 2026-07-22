@@ -122,8 +122,19 @@ export default async function TpvLegalPage() {
           </div>
         </div>
 
-        {/* Chain verification + export */}
-        <LegalChainVerify />
+        {/* Inspector de Hacienda / Auditoría Fiscal */}
+        <div className="flex flex-col gap-4">
+          <div>
+            <p className="text-[10px] font-bold text-[#2563eb] uppercase tracking-widest mb-0.5">
+              Inspector de Hacienda / Auditoría Fiscal
+            </p>
+            <p className="text-xs text-[#64748b]">
+              Verificación de integridad, exportación de registros y enlace temporal para inspectores de la AEAT.
+            </p>
+          </div>
+          <LegalChainVerify />
+          <InspectorTokenGenerator />
+        </div>
 
         {/* Declaración de Responsabilidad */}
         <div className="bg-white border border-[#e2e8f0] rounded-xl p-5 flex flex-col gap-4 shadow-sm">
@@ -308,9 +319,6 @@ export default async function TpvLegalPage() {
             detail="Vercel Cron mensual: anonimiza clientes con >5 años de inactividad. Derecho al olvido manual: POST /api/admin/rgpd/anonimizar-cliente"
           />
         </div>
-
-        {/* Inspector Hacienda */}
-        <InspectorTokenGenerator />
 
         {/* Documentación RGPD */}
         <div className="bg-white border border-[#e2e8f0] rounded-xl p-5 flex flex-col gap-3 shadow-sm">
