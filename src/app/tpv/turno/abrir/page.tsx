@@ -16,6 +16,7 @@ export default async function TurnoAbrirPage() {
     const admin = await getAuthAdminUseCase().verifyToken(adminToken);
     if (admin?.empresaId) {
       empresaId = admin.empresaId;
+      defaultOperador = admin.nombreCompleto ?? '';
     }
   }
 

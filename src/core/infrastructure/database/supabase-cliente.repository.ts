@@ -284,11 +284,14 @@ export class SupabaseClienteRepository implements IClienteRepository {
           .order('created_at', { ascending: false }),
       ]);
 
-      if (clienteResult.error?.code === 'PGRST116' || !clienteResult.data) {
-        return { success: false, error: { code: 'NOT_FOUND', message: 'Cliente no encontrado', module: 'repository', method: 'exportarCliente' } };
-      }
       if (clienteResult.error) {
+        if (clienteResult.error.code === 'PGRST116') {
+          return { success: false, error: { code: 'NOT_FOUND', message: 'Cliente no encontrado', module: 'repository', method: 'exportarCliente' } };
+        }
         return { success: false, error: { code: 'DB_ERROR', message: clienteResult.error.message, module: 'repository', method: 'exportarCliente' } };
+      }
+      if (!clienteResult.data) {
+        return { success: false, error: { code: 'NOT_FOUND', message: 'Cliente no encontrado', module: 'repository', method: 'exportarCliente' } };
       }
 
       const c = clienteResult.data as Record<string, unknown>;
