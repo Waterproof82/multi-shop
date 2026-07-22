@@ -30,6 +30,7 @@ export interface TpvCobroPayload {
   ivaPorcentaje?: number;
   cerrarSesion?: boolean;
   detalleItems?: TpvDetalleItem[];
+  empleadoId?: string | null;
 }
 
 export interface TpvTurnoStats {
@@ -102,6 +103,7 @@ export interface TpvCobro {
   rectificaCobroId?: string | null;
   detalleItems: TpvDetalleItem[] | null;
   desgloseIva?: TpvIvaDesgloseItem[] | null;
+  empleadoId?: string | null;
 }
 
 export interface TpvCobroCompletoPayload {
@@ -115,6 +117,7 @@ export interface TpvCobroCompletoPayload {
   ivaPorcentaje?: number;
   rectificaCobroId?: string | null;
   detalleItems?: TpvDetalleItem[];
+  empleadoId?: string | null;
 }
 
 export type TipoImpuesto = 'iva' | 'igic';

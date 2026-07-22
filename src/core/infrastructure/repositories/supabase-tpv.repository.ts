@@ -250,6 +250,7 @@ export class SupabaseTpvRepository implements ITpvRepository {
           iva_porcentaje: payload.ivaPorcentaje ?? 10,
           rectifica_cobro_id: payload.rectificaCobroId ?? null,
           detalle_items: payload.detalleItems ?? null,
+          empleado_id: payload.empleadoId ?? null,
         })
         .select()
         .single();
@@ -295,6 +296,7 @@ export class SupabaseTpvRepository implements ITpvRepository {
           rectificaCobroId: row.rectifica_cobro_id as string | null ?? null,
           detalleItems: (row.detalle_items as TpvCobro['detalleItems']) ?? null,
           desgloseIva: mapDesgloseIva(row.desglose_iva),
+          empleadoId: (row.empleado_id as string | null) ?? null,
         },
       };
     } catch (e) {

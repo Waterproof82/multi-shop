@@ -125,12 +125,16 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const empleadoId =
+    req.headers.get('x-employee-id') ?? req.headers.get('x-admin-id') ?? null;
+
   const repo = getTpvRepository();
   const result = await registrarCobroUseCase(repo, {
     ...parsed.data,
     empresaId,
     cerrarSesion: parsed.data.cerrarSesion,
     detalleItems,
+    empleadoId,
   });
 
   if (result.success) {
