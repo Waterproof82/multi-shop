@@ -31,6 +31,13 @@ export const createProductSchema = z.object({
   activo: z.boolean().default(true),
   tipo_producto: z.enum(['comida', 'bebida']).default('comida'),
   porcentaje_impuesto_override: z.number().min(0).max(100).nullable().optional(),
+  alergenos: z.array(
+    z.enum([
+      'gluten', 'crustaceans', 'eggs', 'fish', 'peanuts',
+      'soy', 'dairy', 'treenuts', 'celery', 'mustard',
+      'sesame', 'sulphites', 'lupin', 'molluscs',
+    ])
+  ).optional().default([]),
 });
 
 export type CreateProductDTO = z.infer<typeof createProductSchema>;

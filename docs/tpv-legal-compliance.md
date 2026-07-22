@@ -82,10 +82,10 @@
 ## 4. RGPD / GDPR
 
 - [ ] **Informar a empleados** (template de cláusula de contrato laboral) sobre el registro de turnos y quién abre/cierra caja (`user_id` en `tpv_turnos`).
-- [~] **Política de retención de datos**: `clientes.ultima_actividad` se actualiza en cada pedido. pg_cron purga registros con `ultima_actividad < now() - interval '2 years'` (más restrictivo que el mínimo RGPD). Ver W1 en verify-report: la migration usa 2 años, la spec decía 5; el intervalo actual es más protector del usuario (20260720).
+- [x] **Política de retención de datos**: `clientes.ultima_actividad` (DEFAULT NOW(), actualizada por trigger `trg_pedidos_ultima_actividad` en cada INSERT a `pedidos`). Purga automática a los 5 años de inactividad, alineado con Art.66 LGT (20260720/20260722).
 - [x] **Derecho de supresión (Art. 17 RGPD)** — `POST /api/admin/rgpd/anonimizar-cliente` sustituye PII (`nombre`, `email`, `telefono`) con valores anonimizados; `id` y relaciones con `pedidos` se preservan. Operación idempotente — segunda llamada devuelve 200 sin modificar datos. Requiere rol `admin` o `superadmin` (20260720).
 - [x] **`anonimizado_en TIMESTAMPTZ`** en `clientes` — marca el momento de anonimización para auditoría (20260720).
-- [x] **Purga automática via pg_cron** — job diario: `UPDATE clientes SET ... WHERE ultima_actividad < now() - '2 years' AND anonimizado_en IS NULL`. Si pg_cron no está habilitado, el endpoint manual sigue siendo la única vía (20260720).
+- [x] **Purga automática via Vercel Cron** — `GET /api/cron/rgpd-purge` protegido por `CRON_SECRET`. Ejecución mensual (día 1, 03:00 UTC). Anonimiza `clientes` con `ultima_actividad < now() - 5 años AND anonimizado_en IS NULL`. pg_cron no disponible (plan Free Supabase) — Vercel Cron es el mecanismo activo (20260722).
 - [ ] **Cifrado en reposo**: verificar que Supabase tiene habilitado el cifrado a nivel de disco (AES-256). Documentar en la Declaración de Responsabilidad.
 - [ ] **Contrato de Encargado del Tratamiento (DPA)** con cada restaurante cliente, dado que procesas datos personales de sus empleados y/o clientes.
 - [ ] Si se implementa fidelización/reservas: añadir consentimiento explícito del cliente final, derecho de supresión y portabilidad.
@@ -176,3 +176,5 @@
 | 1.6     | 2026-07-14 | Sección 10: backup fiscal local en Electron — snapshot JSON + HMAC-SHA256 con clave por dispositivo, escritura async, trazabilidad Sentry |
 | 1.7     | 2026-07-14 | Sección 1.4: QR visual AEAT en ticket impreso (`browser-printer.ts`); fix bug fecha DD-MM-YYYY en URL AEAT |
 | 1.8     | 2026-07-20 | Sección 3: IVA multi-tipo por producto (`porcentaje_impuesto_override`), `desglose_iva` JSONB en cobros, ticket impreso con desglose por bracket. Sección 3 (NIF/razón social): `razon_social` en `empresas`, campo en panel admin. Sección 4: derecho de supresión RGPD (`POST /api/admin/rgpd/anonimizar-cliente`), `ultima_actividad`, pg_cron auto-purge 2 años. 5 migrations nuevas (20260720000001–20260720000005). |
+| 1.9     | 2026-07-22 | Sección 4: purga automática migrada de pg_cron (no disponible en plan Free) a Vercel Cron mensual (`GET /api/cron/rgpd-purge`, `CRON_SECRET`). Intervalo corregido a 5 años (Art.66 LGT). Ver `docs/context/rgpd-clientes.md`. |
+| 2.0     | 2026-07-22 | Sección nueva: retención fiscal `pedidos`. Trigger `pedidos_no_delete` bloquea DELETE en `pedidos` (Art.66 LGT). Cierra el único gap de datos de negocio no protegidos. Tabla de gaps actualizada: todos los requisitos de retención cubiertos. |

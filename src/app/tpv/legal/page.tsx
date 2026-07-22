@@ -141,6 +141,7 @@ export default async function TpvLegalPage() {
               <li>Artículo 29.2.j de la <strong className="text-[#475569]">Ley 58/2003 General Tributaria</strong></li>
               <li><strong className="text-[#475569]">Real Decreto 1007/2023</strong> — Reglamento Verifactu</li>
               <li><strong className="text-[#475569]">Real Decreto 1619/2012</strong> — Reglamento de facturación</li>
+              <li><strong className="text-[#475569]">Reglamento (UE) N.º 1169/2011</strong> — Información alimentaria facilitada al consumidor (alérgenos)</li>
             </ul>
             <p>
               El sistema garantiza la inalterabilidad de los registros de venta mediante
@@ -235,12 +236,45 @@ export default async function TpvLegalPage() {
           />
 
           <p className="text-[11px] font-semibold text-[#2563eb] uppercase tracking-wider mt-4 mb-1">
+            Reglamento UE 1169/2011 — Información Alimentaria
+          </p>
+          <CheckItem
+            label="Etiquetado de alérgenos (14 sustancias Anexo II)"
+            status="done"
+            detail="Columna alergenos text[] en productos; iconos SVG y nombres en carta pública en 5 idiomas"
+          />
+          <CheckItem
+            label="Disponibilidad en punto de venta"
+            status="done"
+            detail="Alérgenos visibles en carta digital del cliente antes de realizar el pedido"
+          />
+
+          <p className="text-[11px] font-semibold text-[#2563eb] uppercase tracking-wider mt-4 mb-1">
             TicketBAI (País Vasco)
           </p>
           <CheckItem
             label="Firma digital XML + envío a hacienda foral"
             status="pending"
             detail="Solo aplica si empresa.provincia ∈ Álava, Guipúzcoa, Vizcaya — fuera del ámbito actual"
+          />
+
+          <p className="text-[11px] font-semibold text-[#2563eb] uppercase tracking-wider mt-4 mb-1">
+            Art.66 LGT — Retención Fiscal 5 años
+          </p>
+          <CheckItem
+            label="Cobros no borrables"
+            status="done"
+            detail="Trigger tpv_cobro_block_delete — DELETE bloqueado en tpv_cobros"
+          />
+          <CheckItem
+            label="Turnos no borrables"
+            status="done"
+            detail="Trigger tpv_turno_no_delete — DELETE bloqueado en tpv_turnos"
+          />
+          <CheckItem
+            label="Pedidos no borrables"
+            status="done"
+            detail="Trigger pedidos_no_delete — DELETE bloqueado en pedidos (fuente de datos de cobros)"
           />
 
           <p className="text-[11px] font-semibold text-[#2563eb] uppercase tracking-wider mt-4 mb-1">
@@ -253,8 +287,8 @@ export default async function TpvLegalPage() {
           />
           <CheckItem
             label="Retención y anonimización de datos personales"
-            status="partial"
-            detail="Endpoint POST /api/admin/rgpd/anonimizar-cliente implementado (manual). Automatización con pg_cron pendiente de activar según política de retención del tenant"
+            status="done"
+            detail="Vercel Cron mensual: anonimiza clientes con >5 años de inactividad. Derecho al olvido manual: POST /api/admin/rgpd/anonimizar-cliente"
           />
         </div>
 
