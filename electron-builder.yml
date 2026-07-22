@@ -14,6 +14,7 @@ win:
   target: nsis
 nsis:
   oneClick: false
+  include: electron/installer.nsh
 publish:
   provider: generic
   url: https://app.multishop.es/api/app/version/
