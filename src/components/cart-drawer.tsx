@@ -1265,7 +1265,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                 >
                   política de privacidad
                 </a>
-                . Tus datos se usarán únicamente para gestionar tu pedido.
+                {'. Tus datos se usarán únicamente para gestionar tu pedido.'}
               </p>
 
               <div className="flex flex-col gap-2">
