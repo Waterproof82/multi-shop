@@ -545,7 +545,8 @@ function grandTotalColorClass(discountValid: { valid: boolean } | null): string 
   return discountValid?.valid ? 'text-green-600 dark:text-green-400' : 'text-foreground';
 }
 
-function isSubmitDisabled(sending: boolean, mesaToken: string | null, mesaError: boolean, isDeliveryIncomplete: boolean): boolean {
+function isSubmitDisabled(sending: boolean, mesaToken: string | null, mesaError: boolean, isDeliveryIncomplete: boolean, ageConfirmed: boolean): boolean {
+  if (mesaToken === null && !ageConfirmed) return true;
   return sending || (mesaToken !== null && mesaError) || isDeliveryIncomplete;
 }
 
@@ -623,6 +624,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
   const router = useRouter();
   const shouldReduceMotion = useReducedMotion() ?? false;
   const [sending, setSending] = useState(false);
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState<{ numeroPedido: number } | null>(null);
   const [activeOrderTokens, setActiveOrderTokens] = useState<string[]>([]);
   const [showActiveOrdersDialog, setShowActiveOrdersDialog] = useState(false);
@@ -1268,12 +1270,27 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                 {'. Tus datos se usarán únicamente para gestionar tu pedido.'}
               </p>
 
+              {/* Verificación edad mínima LOPDGDD Art.7 — solo pedidos con datos personales */}
+              {mesaToken === null && (
+                <label className="flex items-start gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={ageConfirmed}
+                    onChange={e => setAgeConfirmed(e.target.checked)}
+                    className="mt-0.5 shrink-0 accent-primary"
+                  />
+                  <span className="text-[10px] text-muted-foreground leading-relaxed">
+                    Confirmo que tengo 14 años o más (LOPDGDD Art.7)
+                  </span>
+                </label>
+              )}
+
               <div className="flex flex-col gap-2">
                  <Button
                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full py-3 text-lg font-semibold shadow-elegant transition-colors duration-150 min-h-[44px]"
                    size="lg"
                    onClick={handleSendOrder}
-                   disabled={isSubmitDisabled(sending, mesaToken, mesaError, isDeliveryIncomplete)}
+                   disabled={isSubmitDisabled(sending, mesaToken, mesaError, isDeliveryIncomplete, ageConfirmed)}
                  >
                    {orderButtonLabel(sending, mesaToken, t, language)}
                  </Button>

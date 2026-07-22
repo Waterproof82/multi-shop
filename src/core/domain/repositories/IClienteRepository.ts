@@ -7,6 +7,8 @@ export interface CreateClienteData {
   telefono?: string | null;
   direccion?: string | null;
   idioma?: string | null;
+  aceptar_promociones?: boolean;
+  marketing_consent_at?: string | null;
 }
 
 export interface UpdateClienteData {
@@ -16,6 +18,7 @@ export interface UpdateClienteData {
   direccion?: string | null;
   aceptar_promociones?: boolean | null;
   idioma?: string | null;
+  marketing_consent_at?: string | null;
 }
 
 export interface IClienteRepository {

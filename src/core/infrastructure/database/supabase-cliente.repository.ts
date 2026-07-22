@@ -121,7 +121,8 @@ export class SupabaseClienteRepository implements IClienteRepository {
           telefono: data.telefono || null,
           direccion: data.direccion || null,
           idioma: data.idioma || 'es',
-          aceptar_promociones: false,
+          aceptar_promociones: data.aceptar_promociones ?? false,
+          marketing_consent_at: data.marketing_consent_at ?? null,
         })
         .select()
         .single();
@@ -152,6 +153,7 @@ export class SupabaseClienteRepository implements IClienteRepository {
       if (data.direccion !== undefined) updatePayload.direccion = data.direccion;
       if (data.aceptar_promociones !== undefined) updatePayload.aceptar_promociones = data.aceptar_promociones;
       if (data.idioma !== undefined) updatePayload.idioma = data.idioma;
+      if (data.marketing_consent_at !== undefined) updatePayload.marketing_consent_at = data.marketing_consent_at;
 
       const { data: updated, error } = await this.supabase
         .from('clientes')
