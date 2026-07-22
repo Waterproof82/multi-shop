@@ -130,15 +130,29 @@ export default async function TpvHistorialPage({
     hash: string;
     cobrado_at: string;
     rectifica_cobro_id: string | null;
+    empleado_id: string | null;
   };
 
   const { data: cobrosRaw } = await supabase
     .from('tpv_cobros')
-    .select('id, serie, numero_ticket, metodo_pago, importe_cobrado_cents, propina_cents, iva_porcentaje, base_imponible_cents, iva_cents, hash, cobrado_at, rectifica_cobro_id')
+    .select('id, serie, numero_ticket, metodo_pago, importe_cobrado_cents, propina_cents, iva_porcentaje, base_imponible_cents, iva_cents, hash, cobrado_at, rectifica_cobro_id, empleado_id')
     .eq('turno_id', turnoSeleccionado.id)
     .order('numero_ticket', { ascending: false });
 
   const cobrosArray = (cobrosRaw ?? []) as RawCobro[];
+
+  // Resolve employee names from empleados_tpv for cobros processed by a cajero/encargado
+  const empleadoIds = [...new Set(cobrosArray.map(c => c.empleado_id).filter((id): id is string => id !== null))];
+  const { data: empleadosRaw } = empleadoIds.length > 0
+    ? await supabase
+        .from('empleados_tpv')
+        .select('id, nombre')
+        .in('id', empleadoIds)
+    : { data: [] };
+  const empleadosMap = new Map(
+    ((empleadosRaw ?? []) as { id: string; nombre: string }[]).map(e => [e.id, e.nombre])
+  );
+
   const cobrosIds = cobrosArray.map(c => c.id);
 
   // IDs de cobros de ESTE turno referenciados por rectificativos de cualquier turno
@@ -185,6 +199,7 @@ export default async function TpvHistorialPage({
     rectificaCobroId: c.rectifica_cobro_id,
     yaRectificado: yaRectificadoSet.has(c.id),
     originalTicket: c.rectifica_cobro_id ? (originalesMap.get(c.rectifica_cobro_id) ?? null) : null,
+    cajeroNombre: c.empleado_id ? (empleadosMap.get(c.empleado_id) ?? null) : null,
   }));
 
   return (

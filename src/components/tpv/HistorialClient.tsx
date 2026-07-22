@@ -36,6 +36,7 @@ interface CobroRow {
   rectificaCobroId: string | null;
   yaRectificado: boolean;
   originalTicket: { serie: string; numeroTicket: number } | null;
+  cajeroNombre: string | null;
 }
 
 interface TurnoOption {
@@ -157,6 +158,11 @@ function CobrosList({ cobros }: Readonly<{ cobros: CobroRow[] }>) {
             </span>
             <span className="text-xs text-[#64748b] capitalize flex-1">
               {c.metodoPago}
+              {c.cajeroNombre && (
+                <span className="ml-2 text-[#2563eb] text-[10px] normal-case">
+                  · {c.cajeroNombre}
+                </span>
+              )}
               {isRectificativo && (
                 <span className="ml-2 text-[#f59e0b] font-bold text-[10px] uppercase">
                   Rectificativo{originalLabel ? ` · anula ${originalLabel}` : ''}
