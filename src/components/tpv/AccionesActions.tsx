@@ -51,7 +51,7 @@ const ADMIN_SHORTCUTS = [
 ] as const;
 
 function toAdmin(href: string) {
-  window.location.href = href;
+  window.location.href = `/admin/login?from=tpv&next=${encodeURIComponent(href)}`;
 }
 
 export function AccionesPanel() {
