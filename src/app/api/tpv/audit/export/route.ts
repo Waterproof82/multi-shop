@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
       let query = supabase
         .from('tpv_cobros')
         .select(
-          'id, serie, numero_ticket, metodo_pago, importe_cobrado_cents, propina_cents, descuento_cents, iva_porcentaje, base_imponible_cents, iva_cents, desglose_iva, detalle_items, rectifica_cobro_id, hash_anterior, hash, cobrado_at, turno_id, sesion_id'
+          'id, serie, numero_ticket, metodo_pago, importe_cobrado_cents, propina_cents, descuento_cents, iva_porcentaje, base_imponible_cents, iva_cents, desglose_iva, detalle_items, rectifica_cobro_id, hash_anterior, hash, cobrado_at, turno_id, sesion_id, empleado_id'
         )
         .eq('empresa_id', empresaId)
         .order('numero_ticket', { ascending: true });
@@ -97,6 +97,9 @@ export async function GET(req: NextRequest) {
       // Integridad — cadena de hashes SHA-256
       hash: r.hash,
       hash_anterior: r.hash_anterior,
+
+      // Operador que procesó el cobro
+      empleado_id: r.empleado_id ?? null,
 
       // Referencias internas
       turno_id: r.turno_id,
