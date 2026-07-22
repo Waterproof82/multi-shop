@@ -6,9 +6,33 @@ type VerifyResult =
   | { ok: true; total: number; checked: number; message?: string }
   | { ok: false; total: number; checked: number; error: string };
 
+function buildYearOptions(): { label: string; desde: string; hasta: string }[] {
+  const currentYear = new Date().getFullYear();
+  const options = [];
+  for (let y = currentYear; y >= currentYear - 4; y--) {
+    options.push({
+      label: String(y),
+      desde: `${y}-01-01`,
+      hasta: `${y}-12-31`,
+    });
+  }
+  return options;
+}
+
 export function LegalChainVerify() {
   const [state, setState] = useState<'idle' | 'loading' | 'done'>('idle');
   const [result, setResult] = useState<VerifyResult | null>(null);
+
+  const currentYear = new Date().getFullYear();
+  const [desde, setDesde] = useState(`${currentYear}-01-01`);
+  const [hasta, setHasta] = useState(`${currentYear}-12-31`);
+
+  const yearOptions = buildYearOptions();
+
+  function applyYear(desde: string, hasta: string) {
+    setDesde(desde);
+    setHasta(hasta);
+  }
 
   async function verify() {
     setState('loading');
@@ -22,6 +46,9 @@ export function LegalChainVerify() {
       setState('done');
     }
   }
+
+  const exportUrl = `/api/tpv/audit/export?desde=${desde}&hasta=${hasta}`;
+  const exportAllUrl = '/api/tpv/audit/export';
 
   return (
     <div className="bg-white border border-[#e2e8f0] rounded-xl p-5 flex flex-col gap-4 shadow-sm">
@@ -69,20 +96,60 @@ export function LegalChainVerify() {
         </div>
       )}
 
-      <div className="flex gap-3">
+      {/* Exportación por período — acceso para auditores */}
+      <div className="border-t border-[#e2e8f0] pt-4 flex flex-col gap-3">
+        <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">
+          Exportación de registros
+        </p>
+
+        {/* Accesos rápidos por año */}
+        <div className="flex flex-wrap gap-2">
+          {yearOptions.map(opt => (
+            <button
+              key={opt.label}
+              type="button"
+              onClick={() => applyYear(opt.desde, opt.hasta)}
+              className={`px-3 py-1 rounded-md text-xs font-semibold border transition-colors ${
+                desde === opt.desde && hasta === opt.hasta
+                  ? 'bg-[#2563eb] text-white border-[#2563eb]'
+                  : 'bg-white text-[#475569] border-[#e2e8f0] hover:border-[#2563eb] hover:text-[#2563eb]'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Rango personalizado */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <input
+            type="date"
+            value={desde}
+            onChange={e => setDesde(e.target.value)}
+            className="px-2 py-1 text-xs border border-[#e2e8f0] rounded-md bg-[#f8fafc] text-[#0f172a] focus:outline-none focus:border-[#2563eb]"
+          />
+          <span className="text-xs text-[#64748b]">hasta</span>
+          <input
+            type="date"
+            value={hasta}
+            onChange={e => setHasta(e.target.value)}
+            className="px-2 py-1 text-xs border border-[#e2e8f0] rounded-md bg-[#f8fafc] text-[#0f172a] focus:outline-none focus:border-[#2563eb]"
+          />
+          <a
+            href={exportUrl}
+            download
+            className="px-3 py-1 rounded-md bg-[#2563eb] text-white text-xs font-bold hover:bg-[#1d4ed8] transition-colors"
+          >
+            Exportar período →
+          </a>
+        </div>
+
         <a
-          href="/api/tpv/audit/export"
+          href={exportAllUrl}
           download
-          className="text-xs text-[#2563eb] hover:underline"
+          className="text-xs text-[#64748b] hover:text-[#2563eb] hover:underline w-fit"
         >
-          Exportar todos los cobros (JSON) →
-        </a>
-        <a
-          href={`/api/tpv/audit/export?desde=${new Date().toISOString().slice(0, 10)}&hasta=${new Date().toISOString().slice(0, 10)}`}
-          download
-          className="text-xs text-[#64748b] hover:text-[#2563eb] hover:underline"
-        >
-          Exportar hoy →
+          Exportar todos los registros (historial completo) →
         </a>
       </div>
     </div>

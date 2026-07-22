@@ -259,6 +259,25 @@ export default async function TpvLegalPage() {
           />
 
           <p className="text-[11px] font-semibold text-[#2563eb] uppercase tracking-wider mt-4 mb-1">
+            Art.66 LGT — Retención Fiscal 5 años
+          </p>
+          <CheckItem
+            label="Cobros no borrables"
+            status="done"
+            detail="Trigger tpv_cobro_block_delete — DELETE bloqueado en tpv_cobros"
+          />
+          <CheckItem
+            label="Turnos no borrables"
+            status="done"
+            detail="Trigger tpv_turno_no_delete — DELETE bloqueado en tpv_turnos"
+          />
+          <CheckItem
+            label="Pedidos no borrables"
+            status="done"
+            detail="Trigger pedidos_no_delete — DELETE bloqueado en pedidos (fuente de datos de cobros)"
+          />
+
+          <p className="text-[11px] font-semibold text-[#2563eb] uppercase tracking-wider mt-4 mb-1">
             RGPD / PCI-DSS
           </p>
           <CheckItem
@@ -268,8 +287,8 @@ export default async function TpvLegalPage() {
           />
           <CheckItem
             label="Retención y anonimización de datos personales"
-            status="partial"
-            detail="Endpoint POST /api/admin/rgpd/anonimizar-cliente implementado (manual). Automatización con pg_cron pendiente de activar según política de retención del tenant"
+            status="done"
+            detail="Vercel Cron mensual: anonimiza clientes con >5 años de inactividad. Derecho al olvido manual: POST /api/admin/rgpd/anonimizar-cliente"
           />
         </div>
 
