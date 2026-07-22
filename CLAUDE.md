@@ -367,6 +367,18 @@ Solución: `WaiterLoginForm.handlePinSubmit` dispara `window.dispatchEvent(new C
 - **`selectedComplements` en `PendingItem`**: `{ id, name, price }[]`. Se serializa como `{ nombre, precio }` en `detalle_pedido[i].complementos` al crear pedido.
 - **Admin gestión**: `/admin/complementos` — crear/editar grupos globales del tenant. Asignación por producto en el tab "Complementos" de `ProductFormDialog`.
 
+## 🥜 Sistema de Alérgenos — Trampas Críticas
+
+> Ver doc completo: `docs/context/alergenos-system.md`
+
+- **14 alérgenos EU fijos** (Reglamento 1169/2011 Anexo II) — columna `productos.alergenos text[] NOT NULL DEFAULT '{}'`. Zod valida con `z.enum([...14 códigos...])` server-side; códigos inválidos son rechazados.
+- **`mapUpdateProductPayload` tiene allowlist explícita** en `SupabaseProductRepository` (~línea 183). `'alergenos'` está en la lista — si se añaden más campos a `Product` en el futuro, deben agregarse aquí o se descartan silenciosamente.
+- **No requiere endpoint separado** — los alérgenos son parte del payload del PATCH de producto. A diferencia de `complementos`, no hay PUT independiente.
+- **`AllergenSelector.language` es `string`, no `Language`** — cast interno a `Parameters<typeof t>[1]`. No usar `Language` en ese prop para no crear acoplamiento cruzado entre módulos.
+- **Iconos en `src/components/allergen-icons.tsx`**: `AllergenBadges` (cards del menú, solo iconos), `AllergenList` (dialog de detalle, icono + nombre). Ambos devuelven `null` cuando `alergenos` está vacío — sin render, sin elementos vacíos.
+- **`allergenDairy` y `allergenTreeNuts`** son claves de traducción legacy (existían antes de este cambio). No confundir con los códigos de DB `'milk'` y `'nuts'`. Las claves legacy NO se eliminan — backward compat.
+- **Los alérgenos NO viajan al pipeline de cocina/bar** — son informativos para el cliente en la carta pública. `pedidos.detalle_pedido` no incluye alérgenos.
+
 ## 🔭 Sentry — Monitoring y Observabilidad
 
 > Ver doc completo: `docs/context/sentry-monitoring.md`

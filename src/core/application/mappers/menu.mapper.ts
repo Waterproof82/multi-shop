@@ -54,6 +54,7 @@ function mapProductToItem(product: Product, categoryName: string): MenuItemVM {
     highlight: product.esEspecial,
     tipoProducto: product.tipoProducto,
     translations: mapProductTranslations(product),
+    alergenos: product.alergenos ?? [],
   };
 }
 

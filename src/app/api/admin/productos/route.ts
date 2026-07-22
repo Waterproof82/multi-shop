@@ -29,6 +29,7 @@ function toAdminProduct(prod: Product) {
     activo: prod.activo,
     tipo_producto: prod.tipoProducto,
     porcentaje_impuesto_override: prod.porcentajeImpuestoOverride ?? null,
+    alergenos: prod.alergenos ?? [],
   };
 }
 

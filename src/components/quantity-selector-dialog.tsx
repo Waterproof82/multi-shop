@@ -20,6 +20,7 @@ import { useCart } from "@/lib/cart-context"
 import { t } from "@/lib/translations"
 import { formatPrice } from "@/lib/format-price"
 import type { MenuItemVM, ComplementGroupVM, ComplementVM } from "@/core/application/dtos/menu-view-model"
+import { AllergenList } from "@/components/allergen-icons"
 
 interface QuantitySelectorDialogProps {
   item: MenuItemVM | null
@@ -241,6 +242,8 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
               })}
             </div>
           )}
+
+          <AllergenList alergenos={item.alergenos} language={language} />
 
           <div className="space-y-3">
           <div className="space-y-2">

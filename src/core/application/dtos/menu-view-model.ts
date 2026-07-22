@@ -48,6 +48,7 @@ export interface MenuItemVM {
   complements?: ComplementVM[];
   requiresComplement?: boolean;
   complementGroups?: ComplementGroupVM[];
+  alergenos?: string[];
 }
 
 export interface MenuSubcategoryVM {

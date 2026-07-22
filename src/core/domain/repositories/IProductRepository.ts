@@ -20,6 +20,7 @@ export interface CreateProductData {
   activo?: boolean;
   tipo_producto?: 'comida' | 'bebida';
   porcentaje_impuesto_override?: number | null;
+  alergenos?: string[];
 }
 
 export interface UpdateProductData extends Partial<CreateProductData> {

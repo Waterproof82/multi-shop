@@ -50,6 +50,7 @@ interface Producto {
   activo: boolean;
   tipo_producto: 'comida' | 'bebida';
   porcentaje_impuesto_override: number | null;
+  alergenos: string[];
 }
 
 const emptyForm: ProductoFormData = {
@@ -71,6 +72,7 @@ const emptyForm: ProductoFormData = {
   activo: true,
   tipo_producto: 'comida',
   porcentajeImpuestoOverride: null,
+  alergenos: [],
 };
 
 const SortIndicator = ({ field, currentField, direction }: { field: keyof Producto | 'categoria'; currentField: keyof Producto | 'categoria'; direction: 'asc' | 'desc' }) => {
@@ -210,6 +212,7 @@ export default function ProductosPage() {
       activo: producto.activo,
       tipo_producto: producto.tipo_producto ?? 'comida',
       porcentajeImpuestoOverride: producto.porcentaje_impuesto_override ?? null,
+      alergenos: producto.alergenos ?? [],
     });
     setEditingId(producto.id);
     setIsModalOpen(true);
@@ -704,6 +707,7 @@ export default function ProductosPage() {
         saving={saving}
         onSubmit={handleSubmit}
         empresaSlug={empresaSlug}
+        empresaTipo={empresaTipo}
       />
 
       <DeleteConfirmDialog
