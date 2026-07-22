@@ -110,3 +110,17 @@ Registro de normativas aplicables al sistema. Actualizar cada vez que se identif
   - `ultima_actividad` solo avanza vía trigger en `pedidos`. Si se crea un cliente sin pedidos, su `ultima_actividad = created_at`. La purga automática eventualmente anonimiza clientes sin pedidos en `>2 años`.
   - pg_cron no habilitado → el job no existe pero las columnas sí. La anonimización manual sigue funcionando.
 - **Fichero clave:** `docs/context/sentry-monitoring.md`, `src/app/api/admin/rgpd/anonimizar-cliente/route.ts`
+
+---
+
+## Módulo: Carta Digital
+
+### Reglamento (UE) N.º 1169/2011 — Información Alimentaria al Consumidor (Alérgenos)
+- **Qué exige:** Todo operador de restauración que ofrezca información alimentaria no envasada (menú digital, carta, etc.) debe declarar las 14 sustancias del Anexo II que puedan causar alergias o intolerancias.
+- **Donde aplica en el sistema:**
+  - `productos.alergenos text[]` — columna de alérgenos por producto; códigos válidos definidos como `z.enum([...14 valores...])` en `product.dto.ts`
+  - `src/components/allergen-icons.tsx` — 14 iconos SVG inline (`AllergenBadges` en cards, `AllergenList` en dialog de detalle)
+  - `src/lib/translations.ts` — nombres de alérgenos en ES / EN / FR / IT / DE según terminología oficial del Anexo II
+  - `/tpv/legal` — sección de cumplimiento "Reglamento UE 1169/2011" con estado Implementado
+- **Migración:** `supabase/migrations/20260722000001_productos_alergenos.sql`
+- **Fichero clave:** `docs/context/alergenos-system.md`
