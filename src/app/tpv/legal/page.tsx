@@ -5,6 +5,7 @@ import { getAuthAdminUseCase } from '@/core/infrastructure/database';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { verifyTpvEmployeeToken } from '@/lib/tpv-employee-auth';
 import { LegalChainVerify } from '@/components/tpv/LegalChainVerify';
+import { InspectorTokenGenerator } from '@/components/tpv/InspectorTokenGenerator';
 import { FABRICANTE, TPV_VERSION, DECLARATION_DATE } from '@/lib/fabricante';
 
 export const dynamic = 'force-dynamic';
@@ -307,6 +308,9 @@ export default async function TpvLegalPage() {
             detail="Vercel Cron mensual: anonimiza clientes con >5 años de inactividad. Derecho al olvido manual: POST /api/admin/rgpd/anonimizar-cliente"
           />
         </div>
+
+        {/* Inspector Hacienda */}
+        <InspectorTokenGenerator />
 
         {/* Documentación RGPD */}
         <div className="bg-white border border-[#e2e8f0] rounded-xl p-5 flex flex-col gap-3 shadow-sm">

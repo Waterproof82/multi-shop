@@ -1,13 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, requireRole, type AuthResult } from '@/core/infrastructure/api/helpers';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
+import { verifyInspectorToken } from '@/lib/inspector-token';
 
 export async function GET(req: NextRequest) {
-  const { empresaId, error: authError } = (await requireAuth(req)) as AuthResult;
-  if (authError) return authError;
+  let empresaId: string | null = null;
 
-  const forbidden = requireRole(req, ['encargado', 'admin', 'superadmin']);
-  if (forbidden) return forbidden;
+  // Allow inspector token as alternative auth (for Hacienda inspectors)
+  const inspectorToken = req.nextUrl.searchParams.get('inspector_token');
+  if (inspectorToken) {
+    const payload = await verifyInspectorToken(inspectorToken);
+    if (!payload) return NextResponse.json({ error: 'Token de inspector inválido o expirado' }, { status: 401 });
+    empresaId = payload.empresaId;
+  } else {
+    const auth = (await requireAuth(req)) as AuthResult;
+    if (auth.error) return auth.error;
+    const forbidden = requireRole(req, ['encargado', 'admin', 'superadmin']);
+    if (forbidden) return forbidden;
+    empresaId = auth.empresaId;
+  }
 
   if (!empresaId) return NextResponse.json({ error: 'empresaId requerido' }, { status: 401 });
 
