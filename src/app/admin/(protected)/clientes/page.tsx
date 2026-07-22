@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Search, Mail, Phone, User, Users, Pencil, Plus, MapPin, Trash2, Download } from 'lucide-react';
+import { Search, Mail, Phone, User, Users, Pencil, Plus, MapPin, Trash2, Download, UserX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -214,6 +214,19 @@ export default function ClientesPage() {
     }
   };
 
+  const handleAnonimizarCliente = async (cliente: Cliente) => {
+    if (!confirm(`¿Anonimizar a "${cliente.nombre ?? cliente.email}"? Esta acción no se puede deshacer.`)) return;
+    setSaving(true);
+    try {
+      await fetchWithCsrf(`/api/admin/rgpd/anonimizar-cliente?clienteId=${cliente.id}`, { method: 'POST' });
+      await fetchClientes();
+    } catch (error) {
+      logClientError(error, 'handleAnonimizarCliente');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleDeleteCliente = (cliente: Cliente) => {
     setDeleteConfirm({ show: true, id: cliente.id, nombre: cliente.nombre });
   };
@@ -338,6 +351,7 @@ export default function ClientesPage() {
                   <th className="px-4 py-3 text-center text-xs font-medium text-slate-300 uppercase">{t("promotionsLabel", language)}</th>
                   <th className="px-4 py-3"></th>
                   <th className="px-4 py-3"></th>
+                  <th className="px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/10">
@@ -425,6 +439,16 @@ export default function ClientesPage() {
                       >
                         <Download className="size-4 text-blue-500" />
                       </a>
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => void handleAnonimizarCliente(cliente)}
+                        disabled={!!cliente.anonimizado_en}
+                        className="p-2 hover:bg-orange-500/10 rounded-lg transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="Anonimizar datos personales (RGPD Art.17)"
+                      >
+                        <UserX className="size-4 text-orange-500" />
+                      </button>
                     </td>
                     <td className="px-4 py-3">
                       <button

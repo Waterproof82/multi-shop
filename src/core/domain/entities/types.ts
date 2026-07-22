@@ -153,6 +153,9 @@ export interface Cliente {
   idioma: string | null;
   aceptar_promociones: boolean | null;
   created_at: string;
+  anonimizado_en: string | null;
+  terms_accepted_at: string | null;
+  marketing_consent_at: string | null;
 }
 
 export interface PedidoComplemento {
