@@ -387,6 +387,10 @@ export async function proxy(request: NextRequest) {
     if (path === '/api/tpv/empleados/login' || path === '/api/tpv/empleados/logout' || path === '/api/tpv/activate') {
       return NextResponse.next();
     }
+    // Inspector token: allow unauthenticated access to the audit export endpoint
+    if (path === '/api/tpv/audit/export' && request.nextUrl.searchParams.has('inspector_token')) {
+      return NextResponse.next();
+    }
     const adminResult = await handleAdminAuth(request, origin);
     if (adminResult.status === 200) return adminResult;
     return handleTpvEmployeeAuth(request, origin);

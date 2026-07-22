@@ -20,6 +20,8 @@ interface FiscalSnapshotPayload {
   [key: string]: unknown;
 }
 
+app.setName('Multisistema TPV');
+
 const store = new Store<StoreSchema>();
 let mainWindow: BrowserWindow;
 
