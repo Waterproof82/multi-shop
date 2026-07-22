@@ -43,12 +43,50 @@ export function InspectorTokenGenerator() {
   return (
     <div className="bg-white border border-[#e2e8f0] rounded-xl p-5 flex flex-col gap-3 shadow-sm">
       <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">
-        Acceso Inspector Hacienda
+        Enlace temporal para inspector de la AEAT
       </p>
-      <p className="text-xs text-[#64748b] leading-relaxed">
-        Genera un enlace temporal (24 h) que permite a un inspector de la AEAT descargar
-        los registros de cobros sin necesidad de credenciales de administrador.
-      </p>
+
+      {/* Explanation */}
+      <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-4 flex flex-col gap-3 text-xs text-[#475569]">
+        <p className="leading-relaxed">
+          El botón de arriba (<em>Exportar período / Exportar todos</em>) descarga el mismo archivo JSON,
+          pero requiere que seas tú quien lo descargue con sesión activa de administrador o encargado.
+        </p>
+        <p className="leading-relaxed">
+          Este enlace genera una <strong className="text-[#0f172a]">URL firmada con token JWT de 24 horas</strong>{' '}
+          que cualquiera puede abrir en el navegador sin necesidad de cuenta en el sistema.
+          Está pensado para que puedas pasársela directamente al inspector de la AEAT, que podrá
+          descargar los registros desde su propio ordenador.
+        </p>
+        <div className="border-t border-[#e2e8f0] pt-3">
+          <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2">
+            Datos incluidos en el archivo (idénticos en ambos casos)
+          </p>
+          <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+            {[
+              'Número y serie de cada ticket',
+              'Fecha y hora exacta del cobro',
+              'Método de pago (efectivo / tarjeta)',
+              'Importe total cobrado',
+              'Base imponible y cuota IVA/IGIC',
+              'Desglose por tipo impositivo (10%, 21%…)',
+              'Líneas de venta: producto, cantidad, precio',
+              'Hash SHA-256 de cada registro',
+              'Encadenamiento de hashes (cadena de integridad)',
+              'NIF y razón social del establecimiento',
+              'Referencia a ticket rectificado (si aplica)',
+            ].map(item => (
+              <div key={item} className="flex items-start gap-1.5">
+                <span className="text-[#16a34a] shrink-0 mt-0.5">✓</span>
+                <span>{item}</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-[#94a3b8] mt-3">
+            Formato JSON · Normativa: RD 1619/2012 · Ley 11/2021 · RD 1007/2023
+          </p>
+        </div>
+      </div>
 
       {state.status === 'idle' && (
         <button
