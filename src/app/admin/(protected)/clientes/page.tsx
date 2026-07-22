@@ -29,6 +29,7 @@ interface Cliente {
   aceptar_promociones: boolean | null;
   numero_pedidos?: number;
   created_at: string;
+  anonimizado_en?: string | null;
 }
 
 const LANGUAGES = [
@@ -219,7 +220,11 @@ export default function ClientesPage() {
     setSaving(true);
     try {
       await fetchWithCsrf(`/api/admin/rgpd/anonimizar-cliente?clienteId=${cliente.id}`, { method: 'POST' });
-      await fetchClientes();
+      const res = await fetchWithCsrf(`/api/admin/clientes?empresaId=${effectiveEmpresaId}`, {});
+      if (res.ok) {
+        const data = await res.json() as { clientes?: Cliente[] };
+        setClientes(data.clientes ?? []);
+      }
     } catch (error) {
       logClientError(error, 'handleAnonimizarCliente');
     } finally {
