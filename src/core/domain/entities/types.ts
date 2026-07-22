@@ -133,6 +133,8 @@ export interface EmpresaPublic {
   direccion: string | null;
   telefono: string | null;
   emailNotification: string | null;
+  nif: string | null;
+  razonSocial: string | null;
   descuentoBienvenidaActivo: boolean;
   descuentoBienvenidaPorcentaje: number;
   descuentoBienvenidaDuracion?: number | null;

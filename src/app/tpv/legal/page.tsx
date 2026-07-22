@@ -5,11 +5,9 @@ import { getAuthAdminUseCase } from '@/core/infrastructure/database';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { verifyTpvEmployeeToken } from '@/lib/tpv-employee-auth';
 import { LegalChainVerify } from '@/components/tpv/LegalChainVerify';
+import { FABRICANTE, TPV_VERSION, DECLARATION_DATE } from '@/lib/fabricante';
 
 export const dynamic = 'force-dynamic';
-
-const TPV_VERSION = '1.0.0';
-const DECLARATION_DATE = '2026-07-03';
 
 type CobroCount = { count: number; integrity: 'ok' | 'empty' };
 
@@ -132,6 +130,18 @@ export default async function TpvLegalPage() {
             Declaración de Responsabilidad del Fabricante
           </p>
           <div className="text-sm text-[#475569] leading-relaxed space-y-3">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs bg-[#f8fafc] border border-[#e2e8f0] rounded-lg p-3 mb-1">
+              <span className="text-[#64748b]">Fabricante</span>
+              <span className="font-mono text-[#0f172a]">{FABRICANTE.nombre} ({FABRICANTE.nombreComercial})</span>
+              <span className="text-[#64748b]">NIF</span>
+              <span className="font-mono text-[#0f172a]">{FABRICANTE.nif}</span>
+              <span className="text-[#64748b]">Dirección</span>
+              <span className="font-mono text-[#0f172a]">{FABRICANTE.direccion}</span>
+              <span className="text-[#64748b]">Email</span>
+              <span className="font-mono text-[#0f172a]">{FABRICANTE.email}</span>
+              <span className="text-[#64748b]">Web</span>
+              <span className="font-mono text-[#0f172a]">{FABRICANTE.web}</span>
+            </div>
             <p>
               El fabricante del presente software TPV declara bajo su responsabilidad que
               el sistema <strong className="text-[#0f172a]">multi_shop TPV versión {TPV_VERSION}</strong> cumple
@@ -147,6 +157,12 @@ export default async function TpvLegalPage() {
               El sistema garantiza la inalterabilidad de los registros de venta mediante
               cadena de hashes SHA-256, numeración correlativa sin saltos por empresa
               y bloqueo técnico de operaciones DELETE y UPDATE sobre campos fiscales.
+            </p>
+            <p>
+              El sistema opera en <strong className="text-[#0f172a]">modo conservación</strong>{' '}
+              conforme al Art. 6 del RD 1007/2023: los registros de venta se almacenan con
+              garantías de integridad e inalterabilidad. El envío automatizado a la AEAT
+              (modo Verifactu) no es obligatorio para el ámbito de aplicación actual.
             </p>
             <p className="text-[#94a3b8] text-xs border-t border-[#e2e8f0] pt-3 mt-2">
               Declaración emitida el <strong className="text-[#64748b]">{DECLARATION_DATE}</strong>.
@@ -290,6 +306,51 @@ export default async function TpvLegalPage() {
             status="done"
             detail="Vercel Cron mensual: anonimiza clientes con >5 años de inactividad. Derecho al olvido manual: POST /api/admin/rgpd/anonimizar-cliente"
           />
+        </div>
+
+        {/* Documentación RGPD */}
+        <div className="bg-white border border-[#e2e8f0] rounded-xl p-5 flex flex-col gap-3 shadow-sm">
+          <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">
+            Documentación Legal RGPD
+          </p>
+          <div className="flex flex-col gap-2">
+            <Link
+              href="/tpv/legal/dpa"
+              className="flex items-center justify-between px-4 py-3 rounded-lg border border-[#e2e8f0] hover:border-[#2563eb] hover:bg-[#f0f9ff] transition-colors group"
+            >
+              <div>
+                <p className="text-sm font-medium text-[#0f172a] group-hover:text-[#2563eb]">
+                  Contrato de Encargado del Tratamiento (DPA)
+                </p>
+                <p className="text-xs text-[#64748b] mt-0.5">Art.28 RGPD — relación DOC PC ↔ restaurante</p>
+              </div>
+              <span className="text-[#94a3b8] group-hover:text-[#2563eb] text-lg">→</span>
+            </Link>
+            <Link
+              href="/tpv/legal/ropa"
+              className="flex items-center justify-between px-4 py-3 rounded-lg border border-[#e2e8f0] hover:border-[#2563eb] hover:bg-[#f0f9ff] transition-colors group"
+            >
+              <div>
+                <p className="text-sm font-medium text-[#0f172a] group-hover:text-[#2563eb]">
+                  Registro de Actividades de Tratamiento (ROPA)
+                </p>
+                <p className="text-xs text-[#64748b] mt-0.5">Art.30 RGPD — 6 actividades documentadas</p>
+              </div>
+              <span className="text-[#94a3b8] group-hover:text-[#2563eb] text-lg">→</span>
+            </Link>
+            <Link
+              href="/tpv/legal/clausula-empleados"
+              className="flex items-center justify-between px-4 py-3 rounded-lg border border-[#e2e8f0] hover:border-[#2563eb] hover:bg-[#f0f9ff] transition-colors group"
+            >
+              <div>
+                <p className="text-sm font-medium text-[#0f172a] group-hover:text-[#2563eb]">
+                  Cláusula de Protección de Datos — Empleados
+                </p>
+                <p className="text-xs text-[#64748b] mt-0.5">Art.13 RGPD + LOPDGDD — plantilla para firmar</p>
+              </div>
+              <span className="text-[#94a3b8] group-hover:text-[#2563eb] text-lg">→</span>
+            </Link>
+          </div>
         </div>
 
       </div>

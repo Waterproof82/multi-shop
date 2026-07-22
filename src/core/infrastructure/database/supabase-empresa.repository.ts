@@ -215,7 +215,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
     footer1_es, footer1_en, footer1_fr, footer1_it, footer1_de,
     footer2_es, footer2_en, footer2_fr, footer2_it, footer2_de,
     fb, instagram, url_mapa,
-    direccion, telefono_whatsapp, email_notification,
+    direccion, telefono_whatsapp, email_notification, nif, razon_social,
     descuento_bienvenida_activo, descuento_bienvenida_porcentaje, descuento_bienvenida_duracion,
     mesas_habilitadas, pagos_pickup_habilitados, delivery_habilitado
   `;
@@ -268,6 +268,8 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
       direccion: (data.direccion as string | null) ?? null,
       telefono: (data.telefono_whatsapp as string | null) ?? null,
       emailNotification: (data.email_notification as string | null) ?? null,
+      nif: (data.nif as string | null) ?? null,
+      razonSocial: (data.razon_social as string | null) ?? null,
       descuentoBienvenidaActivo: (data.descuento_bienvenida_activo as boolean) ?? false,
       descuentoBienvenidaPorcentaje: Number(data.descuento_bienvenida_porcentaje ?? 5),
       descuentoBienvenidaDuracion: Number(data.descuento_bienvenida_duracion ?? 30),

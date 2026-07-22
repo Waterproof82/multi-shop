@@ -6,6 +6,18 @@ type VerifyResult =
   | { ok: true; total: number; checked: number; message?: string }
   | { ok: false; total: number; checked: number; error: string };
 
+function ManifestRow({ label, note }: Readonly<{ label: string; note?: string }>) {
+  return (
+    <div className="flex items-start gap-1.5">
+      <span className="text-[#16a34a] text-xs mt-0.5 shrink-0">✓</span>
+      <span className="text-xs text-[#475569]">
+        {label}
+        {note !== undefined && <span className="text-[#94a3b8] ml-1">({note})</span>}
+      </span>
+    </div>
+  );
+}
+
 function buildYearOptions(): { label: string; desde: string; hasta: string }[] {
   const currentYear = new Date().getFullYear();
   const options = [];
@@ -151,6 +163,59 @@ export function LegalChainVerify() {
         >
           Exportar todos los registros (historial completo) →
         </a>
+
+        {/* Manifiesto — contenido del export */}
+        <div className="mt-1 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-4 flex flex-col gap-3">
+          <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">
+            Contenido del archivo exportado
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+
+            <div className="flex flex-col gap-1.5">
+              <p className="text-[10px] font-bold text-[#2563eb] uppercase tracking-wider">Identificación</p>
+              <ManifestRow label="Número y serie de ticket" />
+              <ManifestRow label="Fecha y hora de cobro" />
+              <ManifestRow label="Método de pago (efectivo / tarjeta)" />
+              <ManifestRow label="Referencia a ticket rectificado" note="si aplica" />
+              <ManifestRow label="NIF y nombre del emisor" />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <p className="text-[10px] font-bold text-[#2563eb] uppercase tracking-wider">Importes</p>
+              <ManifestRow label="Importe total cobrado" />
+              <ManifestRow label="Propina" note="si aplica" />
+              <ManifestRow label="Descuento aplicado" note="si aplica" />
+              <ManifestRow label="Base imponible total" />
+              <ManifestRow label="Cuota IVA / IGIC total" />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <p className="text-[10px] font-bold text-[#2563eb] uppercase tracking-wider">Fiscalidad (RD 1619/2012)</p>
+              <ManifestRow label="Desglose por tipo impositivo" note="10%, 21%, etc." />
+              <ManifestRow label="Base imponible por bracket" />
+              <ManifestRow label="Cuota IVA/IGIC por bracket" />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <p className="text-[10px] font-bold text-[#2563eb] uppercase tracking-wider">Líneas de venta</p>
+              <ManifestRow label="Nombre del producto" />
+              <ManifestRow label="Cantidad y precio unitario" />
+              <ManifestRow label="Tipo impositivo por línea" />
+            </div>
+
+            <div className="flex flex-col gap-1.5 sm:col-span-2">
+              <p className="text-[10px] font-bold text-[#2563eb] uppercase tracking-wider">Integridad (Verifactu / RD 1007/2023)</p>
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                <ManifestRow label="Hash SHA-256 del registro" />
+                <ManifestRow label="Hash del registro anterior (encadenamiento)" />
+              </div>
+            </div>
+
+          </div>
+          <p className="text-[10px] text-[#94a3b8] border-t border-[#e2e8f0] pt-2 mt-1">
+            Formato JSON · Normativa: RD 1619/2012 · Ley 11/2021 · RD 1007/2023
+          </p>
+        </div>
       </div>
     </div>
   );

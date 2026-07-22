@@ -27,4 +27,5 @@ export interface IClienteRepository {
   delete(id: string, empresaId: string): Promise<Result<void>>;
   anonimizarCliente(clienteId: string, empresaId: string): Promise<Result<void>>;
   purgeExpiredClientes(): Promise<Result<number>>;
+  exportarCliente(clienteId: string, empresaId: string): Promise<Result<Record<string, unknown>>>;
 }
