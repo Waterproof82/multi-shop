@@ -5,11 +5,9 @@ import { getAuthAdminUseCase } from '@/core/infrastructure/database';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { verifyTpvEmployeeToken } from '@/lib/tpv-employee-auth';
 import { LegalChainVerify } from '@/components/tpv/LegalChainVerify';
+import { FABRICANTE, TPV_VERSION, DECLARATION_DATE } from '@/lib/fabricante';
 
 export const dynamic = 'force-dynamic';
-
-const TPV_VERSION = '1.0.0';
-const DECLARATION_DATE = '2026-07-03';
 
 type CobroCount = { count: number; integrity: 'ok' | 'empty' };
 
@@ -132,6 +130,18 @@ export default async function TpvLegalPage() {
             Declaración de Responsabilidad del Fabricante
           </p>
           <div className="text-sm text-[#475569] leading-relaxed space-y-3">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs bg-[#f8fafc] border border-[#e2e8f0] rounded-lg p-3 mb-1">
+              <span className="text-[#64748b]">Fabricante</span>
+              <span className="font-mono text-[#0f172a]">{FABRICANTE.nombre} ({FABRICANTE.nombreComercial})</span>
+              <span className="text-[#64748b]">NIF</span>
+              <span className="font-mono text-[#0f172a]">{FABRICANTE.nif}</span>
+              <span className="text-[#64748b]">Dirección</span>
+              <span className="font-mono text-[#0f172a]">{FABRICANTE.direccion}</span>
+              <span className="text-[#64748b]">Email</span>
+              <span className="font-mono text-[#0f172a]">{FABRICANTE.email}</span>
+              <span className="text-[#64748b]">Web</span>
+              <span className="font-mono text-[#0f172a]">{FABRICANTE.web}</span>
+            </div>
             <p>
               El fabricante del presente software TPV declara bajo su responsabilidad que
               el sistema <strong className="text-[#0f172a]">multi_shop TPV versión {TPV_VERSION}</strong> cumple
@@ -147,6 +157,12 @@ export default async function TpvLegalPage() {
               El sistema garantiza la inalterabilidad de los registros de venta mediante
               cadena de hashes SHA-256, numeración correlativa sin saltos por empresa
               y bloqueo técnico de operaciones DELETE y UPDATE sobre campos fiscales.
+            </p>
+            <p>
+              El sistema opera en <strong className="text-[#0f172a]">modo conservación</strong>{' '}
+              conforme al Art. 6 del RD 1007/2023: los registros de venta se almacenan con
+              garantías de integridad e inalterabilidad. El envío automatizado a la AEAT
+              (modo Verifactu) no es obligatorio para el ámbito de aplicación actual.
             </p>
             <p className="text-[#94a3b8] text-xs border-t border-[#e2e8f0] pt-3 mt-2">
               Declaración emitida el <strong className="text-[#64748b]">{DECLARATION_DATE}</strong>.

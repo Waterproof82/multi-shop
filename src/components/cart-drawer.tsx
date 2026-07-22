@@ -1253,6 +1253,21 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                   {t('deliverySelectValidAddress', language)}
                 </output>
               )}
+
+              {/* Aviso privacidad RGPD Art.13 — base jurídica: ejecución del contrato */}
+              <p className="text-[10px] text-muted-foreground text-center leading-relaxed mb-1">
+                Al confirmar aceptas nuestra{' '}
+                <a
+                  href="/privacidad"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-foreground"
+                >
+                  política de privacidad
+                </a>
+                . Tus datos se usarán únicamente para gestionar tu pedido.
+              </p>
+
               <div className="flex flex-col gap-2">
                  <Button
                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-full py-3 text-lg font-semibold shadow-elegant transition-colors duration-150 min-h-[44px]"

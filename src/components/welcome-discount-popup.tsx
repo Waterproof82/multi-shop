@@ -20,6 +20,7 @@ interface WelcomeDiscountPopupProps {
 export function WelcomeDiscountPopup({ empresaId, empresaNombre, porcentaje, idioma }: WelcomeDiscountPopupProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [email, setEmail] = useState('');
+  const [marketingConsent, setMarketingConsent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +54,12 @@ export function WelcomeDiscountPopup({ empresaId, empresaNombre, porcentaje, idi
     e.preventDefault();
     setError(null);
     setIsLoading(true);
+
+    if (!marketingConsent) {
+      setError('Debes aceptar recibir comunicaciones para continuar.');
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const response = await fetchWithCsrf('/api/descuento/subscribe', {
@@ -153,15 +160,46 @@ export function WelcomeDiscountPopup({ empresaId, empresaNombre, porcentaje, idi
                   </div>
                 </div>
 
+                {/* Consentimiento explícito marketing — RGPD Art.6.1.a + LSSI-CE */}
+                <div className="flex items-start gap-2">
+                  <input
+                    id="welcome-marketing-consent"
+                    type="checkbox"
+                    checked={marketingConsent}
+                    onChange={e => setMarketingConsent(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+                    required
+                    aria-describedby="welcome-consent-desc"
+                  />
+                  <label
+                    htmlFor="welcome-marketing-consent"
+                    id="welcome-consent-desc"
+                    className="text-xs text-muted-foreground leading-snug cursor-pointer"
+                  >
+                    Acepto recibir promociones y descuentos de{' '}
+                    <strong className="text-foreground">{empresaNombre}</strong> por email.
+                    Puedo darme de baja en cualquier momento. Consulta nuestra{' '}
+                    <a
+                      href="/privacidad"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-foreground"
+                    >
+                      política de privacidad
+                    </a>
+                    .
+                  </label>
+                </div>
+
                 {error && (
                   <p role="alert" className="text-sm text-destructive">
                     {error}
                   </p>
                 )}
 
-                <Button 
-                  type="submit" 
-                  disabled={isLoading}
+                <Button
+                  type="submit"
+                  disabled={isLoading || !marketingConsent}
                   className="w-full min-h-[44px]"
                 >
                   {isLoading ? (
