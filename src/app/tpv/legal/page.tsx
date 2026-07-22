@@ -141,6 +141,7 @@ export default async function TpvLegalPage() {
               <li>Artículo 29.2.j de la <strong className="text-[#475569]">Ley 58/2003 General Tributaria</strong></li>
               <li><strong className="text-[#475569]">Real Decreto 1007/2023</strong> — Reglamento Verifactu</li>
               <li><strong className="text-[#475569]">Real Decreto 1619/2012</strong> — Reglamento de facturación</li>
+              <li><strong className="text-[#475569]">Reglamento (UE) N.º 1169/2011</strong> — Información alimentaria facilitada al consumidor (alérgenos)</li>
             </ul>
             <p>
               El sistema garantiza la inalterabilidad de los registros de venta mediante
@@ -232,6 +233,20 @@ export default async function TpvLegalPage() {
             label="Desglose de ítems (nombre, cantidad, precio)"
             status="done"
             detail="detalle_pedido en tabla pedidos"
+          />
+
+          <p className="text-[11px] font-semibold text-[#2563eb] uppercase tracking-wider mt-4 mb-1">
+            Reglamento UE 1169/2011 — Información Alimentaria
+          </p>
+          <CheckItem
+            label="Etiquetado de alérgenos (14 sustancias Anexo II)"
+            status="done"
+            detail="Columna alergenos text[] en productos; iconos SVG y nombres en carta pública en 5 idiomas"
+          />
+          <CheckItem
+            label="Disponibilidad en punto de venta"
+            status="done"
+            detail="Alérgenos visibles en carta digital del cliente antes de realizar el pedido"
           />
 
           <p className="text-[11px] font-semibold text-[#2563eb] uppercase tracking-wider mt-4 mb-1">
