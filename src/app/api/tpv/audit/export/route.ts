@@ -17,50 +17,89 @@ export async function GET(req: NextRequest) {
 
   const supabase = getSupabaseClient();
 
-  let query = supabase
-    .from('tpv_cobros')
-    .select(
-      'id, serie, numero_ticket, metodo_pago, importe_cobrado_cents, propina_cents, iva_porcentaje, base_imponible_cents, iva_cents, hash_anterior, hash, cobrado_at, turno_id, sesion_id'
-    )
-    .eq('empresa_id', empresaId)
-    .order('numero_ticket', { ascending: true });
+  const [cobrosResult, empresaResult] = await Promise.all([
+    (() => {
+      let query = supabase
+        .from('tpv_cobros')
+        .select(
+          'id, serie, numero_ticket, metodo_pago, importe_cobrado_cents, propina_cents, descuento_cents, iva_porcentaje, base_imponible_cents, iva_cents, desglose_iva, detalle_items, rectifica_cobro_id, hash_anterior, hash, cobrado_at, turno_id, sesion_id'
+        )
+        .eq('empresa_id', empresaId)
+        .order('numero_ticket', { ascending: true });
+      if (desde) query = query.gte('cobrado_at', `${desde}T00:00:00Z`);
+      if (hasta) query = query.lte('cobrado_at', `${hasta}T23:59:59Z`);
+      return query;
+    })(),
+    supabase
+      .from('empresas')
+      .select('nombre, nif, razon_social, tipo_impuesto')
+      .eq('id', empresaId)
+      .single(),
+  ]);
 
-  if (desde) query = query.gte('cobrado_at', `${desde}T00:00:00Z`);
-  if (hasta) query = query.lte('cobrado_at', `${hasta}T23:59:59Z`);
+  if (cobrosResult.error) return NextResponse.json({ error: cobrosResult.error.message }, { status: 500 });
 
-  const { data, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  const rows = (data ?? []) as Record<string, unknown>[];
+  const rows = (cobrosResult.data ?? []) as Record<string, unknown>[];
+  const empresa = empresaResult.data as Record<string, unknown> | null;
 
   const exportData = {
+    // ── Metadatos del export ──────────────────────────────────────────────
     exported_at: new Date().toISOString(),
-    empresa_id: empresaId,
+    normativa: ['RD 1619/2012', 'Ley 11/2021 (Ley Antifraude)', 'RD 1007/2023 (Verifactu)'],
     periodo: { desde: desde ?? 'inicio', hasta: hasta ?? 'hoy' },
-    total: rows.length,
+    total_cobros: rows.length,
+
+    // ── Identificación del emisor ─────────────────────────────────────────
+    emisor: {
+      empresa_id: empresaId,
+      nombre: empresa?.razon_social ?? empresa?.nombre ?? null,
+      nif: empresa?.nif ?? null,
+      tipo_impuesto: empresa?.tipo_impuesto ?? 'iva',
+    },
+
+    // ── Registros de venta ────────────────────────────────────────────────
     cobros: rows.map(r => ({
+      // Identificación del ticket
       id: r.id,
       serie: r.serie,
       numero_ticket: r.numero_ticket,
+      cobrado_at: r.cobrado_at,
       metodo_pago: r.metodo_pago,
+      rectifica_cobro_id: r.rectifica_cobro_id ?? null,
+
+      // Importes
       importe_cobrado_cents: r.importe_cobrado_cents,
       propina_cents: r.propina_cents,
+      descuento_cents: r.descuento_cents ?? null,
+
+      // Fiscalidad — totales
       iva_porcentaje: r.iva_porcentaje,
       base_imponible_cents: r.base_imponible_cents,
       iva_cents: r.iva_cents,
-      hash_anterior: r.hash_anterior,
+
+      // Fiscalidad — desglose por tipo impositivo (RD 1619/2012)
+      desglose_iva: r.desglose_iva ?? null,
+
+      // Líneas de venta — detalle de productos
+      detalle_items: r.detalle_items ?? null,
+
+      // Integridad — cadena de hashes SHA-256
       hash: r.hash,
-      cobrado_at: r.cobrado_at,
+      hash_anterior: r.hash_anterior,
+
+      // Referencias internas
       turno_id: r.turno_id,
       sesion_id: r.sesion_id,
     })),
   };
 
+  const filename = `tpv-cobros-${empresa?.nif ?? empresaId}-${new Date().toISOString().slice(0, 10)}.json`;
+
   return new NextResponse(JSON.stringify(exportData, null, 2), {
     status: 200,
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
-      'Content-Disposition': `attachment; filename="tpv-cobros-${empresaId}-${new Date().toISOString().slice(0, 10)}.json"`,
+      'Content-Disposition': `attachment; filename="${filename}"`,
     },
   });
 }
