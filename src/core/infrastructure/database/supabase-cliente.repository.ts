@@ -203,6 +203,39 @@ export class SupabaseClienteRepository implements IClienteRepository {
     }
   }
 
+  async purgeExpiredClientes(): Promise<Result<number>> {
+    try {
+      const cutoff = new Date(Date.now() - 5 * 365.25 * 24 * 60 * 60 * 1000).toISOString();
+      const { data, error } = await this.supabase
+        .from('clientes')
+        .update({
+          nombre: 'ANONIMIZADO',
+          email: null,
+          telefono: null,
+          anonimizado_en: new Date().toISOString(),
+        })
+        .is('anonimizado_en', null)
+        .lt('ultima_actividad', cutoff)
+        .select('id');
+
+      if (error) {
+        await logger.logAndReturnError(
+          'DB_UPDATE_ERROR',
+          error.message,
+          'repository',
+          'SupabaseClienteRepository.purgeExpiredClientes',
+          { details: { code: error.code } }
+        );
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al purgar clientes expirados', module: 'repository', method: 'purgeExpiredClientes' } };
+      }
+
+      return { success: true, data: data?.length ?? 0 };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseClienteRepository.purgeExpiredClientes', {});
+      return { success: false, error: appError };
+    }
+  }
+
   async anonimizarCliente(clienteId: string, empresaId: string): Promise<Result<void>> {
     try {
       const { error } = await this.supabase
