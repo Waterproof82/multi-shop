@@ -354,6 +354,18 @@ export default async function TpvLegalPage() {
               </div>
               <span className="text-[#94a3b8] group-hover:text-[#2563eb] text-lg">→</span>
             </Link>
+            <Link
+              href="/tpv/legal/brechas"
+              className="flex items-center justify-between px-4 py-3 rounded-lg border border-[#fecaca] hover:border-[#dc2626] hover:bg-[#fef2f2] transition-colors group"
+            >
+              <div>
+                <p className="text-sm font-medium text-[#0f172a] group-hover:text-[#dc2626]">
+                  Protocolo de Brechas de Seguridad
+                </p>
+                <p className="text-xs text-[#64748b] mt-0.5">Art.33–34 RGPD — 72 h para notificar a la AEPD</p>
+              </div>
+              <span className="text-[#94a3b8] group-hover:text-[#dc2626] text-lg">→</span>
+            </Link>
           </div>
         </div>
 

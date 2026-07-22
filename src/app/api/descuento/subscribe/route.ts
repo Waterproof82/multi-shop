@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getEmpresaPublicRepository, getDescuentoUseCase } from '@/core/infrastructure/database';
+import { getEmpresaPublicRepository, getDescuentoUseCase, getClienteRepository } from '@/core/infrastructure/database';
 import { parseMainDomain, getDomainFromHeaders } from '@/lib/domain-utils';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 import { subscribeWelcomeDiscountSchema } from '@/core/application/dtos/descuento.dto';
@@ -50,6 +50,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Este email ya tiene un código de descuento' }, { status: 409 });
     }
     return NextResponse.json({ error: 'Error al procesar la solicitud' }, { status: 500 });
+  }
+
+  // Persist marketing consent (RGPD Art.6.1.a + LSSI-CE) — best effort, non-blocking
+  try {
+    const clienteRepo = getClienteRepository();
+    const consentAt = new Date().toISOString();
+    const existing = await clienteRepo.findByEmail(email, empresa.id);
+    if (existing.success && existing.data) {
+      await clienteRepo.update(existing.data.id, empresa.id, {
+        aceptar_promociones: true,
+        marketing_consent_at: consentAt,
+      });
+    } else {
+      await clienteRepo.create({
+        empresaId: empresa.id,
+        email: email.toLowerCase(),
+        aceptar_promociones: true,
+        marketing_consent_at: consentAt,
+      });
+    }
+  } catch {
+    // Non-fatal — subscription succeeded, consent persistence failed
   }
 
   return NextResponse.json({ success: true });
