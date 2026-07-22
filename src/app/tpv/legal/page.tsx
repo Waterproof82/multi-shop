@@ -308,6 +308,51 @@ export default async function TpvLegalPage() {
           />
         </div>
 
+        {/* Documentación RGPD */}
+        <div className="bg-white border border-[#e2e8f0] rounded-xl p-5 flex flex-col gap-3 shadow-sm">
+          <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">
+            Documentación Legal RGPD
+          </p>
+          <div className="flex flex-col gap-2">
+            <Link
+              href="/tpv/legal/dpa"
+              className="flex items-center justify-between px-4 py-3 rounded-lg border border-[#e2e8f0] hover:border-[#2563eb] hover:bg-[#f0f9ff] transition-colors group"
+            >
+              <div>
+                <p className="text-sm font-medium text-[#0f172a] group-hover:text-[#2563eb]">
+                  Contrato de Encargado del Tratamiento (DPA)
+                </p>
+                <p className="text-xs text-[#64748b] mt-0.5">Art.28 RGPD — relación DOC PC ↔ restaurante</p>
+              </div>
+              <span className="text-[#94a3b8] group-hover:text-[#2563eb] text-lg">→</span>
+            </Link>
+            <Link
+              href="/tpv/legal/ropa"
+              className="flex items-center justify-between px-4 py-3 rounded-lg border border-[#e2e8f0] hover:border-[#2563eb] hover:bg-[#f0f9ff] transition-colors group"
+            >
+              <div>
+                <p className="text-sm font-medium text-[#0f172a] group-hover:text-[#2563eb]">
+                  Registro de Actividades de Tratamiento (ROPA)
+                </p>
+                <p className="text-xs text-[#64748b] mt-0.5">Art.30 RGPD — 6 actividades documentadas</p>
+              </div>
+              <span className="text-[#94a3b8] group-hover:text-[#2563eb] text-lg">→</span>
+            </Link>
+            <Link
+              href="/tpv/legal/clausula-empleados"
+              className="flex items-center justify-between px-4 py-3 rounded-lg border border-[#e2e8f0] hover:border-[#2563eb] hover:bg-[#f0f9ff] transition-colors group"
+            >
+              <div>
+                <p className="text-sm font-medium text-[#0f172a] group-hover:text-[#2563eb]">
+                  Cláusula de Protección de Datos — Empleados
+                </p>
+                <p className="text-xs text-[#64748b] mt-0.5">Art.13 RGPD + LOPDGDD — plantilla para firmar</p>
+              </div>
+              <span className="text-[#94a3b8] group-hover:text-[#2563eb] text-lg">→</span>
+            </Link>
+          </div>
+        </div>
+
       </div>
     </div>
   );

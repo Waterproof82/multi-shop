@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Search, Mail, Phone, User, Users, Pencil, Plus, MapPin, Trash2 } from 'lucide-react';
+import { Search, Mail, Phone, User, Users, Pencil, Plus, MapPin, Trash2, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -337,6 +337,7 @@ export default function ClientesPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">{t("date", language)}</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-slate-300 uppercase">{t("promotionsLabel", language)}</th>
                   <th className="px-4 py-3"></th>
+                  <th className="px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/10">
@@ -414,6 +415,16 @@ export default function ClientesPage() {
                       >
                         <Pencil className="size-4 text-muted-foreground" />
                       </button>
+                    </td>
+                    <td className="px-4 py-3">
+                      <a
+                        href={`/api/admin/rgpd/exportar-cliente?clienteId=${cliente.id}`}
+                        download
+                        className="p-2 hover:bg-blue-500/10 rounded-lg transition-colors inline-flex items-center justify-center min-h-[44px] min-w-[44px]"
+                        title="Exportar datos RGPD (Art.20)"
+                      >
+                        <Download className="size-4 text-blue-500" />
+                      </a>
                     </td>
                     <td className="px-4 py-3">
                       <button

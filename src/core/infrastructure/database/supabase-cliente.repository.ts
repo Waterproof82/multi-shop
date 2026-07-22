@@ -266,4 +266,67 @@ export class SupabaseClienteRepository implements IClienteRepository {
       return { success: false, error: appError };
     }
   }
+
+  async exportarCliente(clienteId: string, empresaId: string): Promise<Result<Record<string, unknown>>> {
+    try {
+      const [clienteResult, pedidosResult] = await Promise.all([
+        this.supabase
+          .from('clientes')
+          .select('id, nombre, email, telefono, direccion, idioma, aceptar_promociones, anonimizado_en, ultima_actividad, terms_accepted_at, marketing_consent_at, created_at')
+          .eq('id', clienteId)
+          .eq('empresa_id', empresaId)
+          .single(),
+        this.supabase
+          .from('pedidos')
+          .select('id, numero_pedido, total, moneda, estado, created_at, detalle_pedido, direccion_entrega')
+          .eq('cliente_id', clienteId)
+          .eq('empresa_id', empresaId)
+          .order('created_at', { ascending: false }),
+      ]);
+
+      if (clienteResult.error?.code === 'PGRST116' || !clienteResult.data) {
+        return { success: false, error: { code: 'NOT_FOUND', message: 'Cliente no encontrado', module: 'repository', method: 'exportarCliente' } };
+      }
+      if (clienteResult.error) {
+        return { success: false, error: { code: 'DB_ERROR', message: clienteResult.error.message, module: 'repository', method: 'exportarCliente' } };
+      }
+
+      const c = clienteResult.data as Record<string, unknown>;
+      return {
+        success: true,
+        data: {
+          exported_at: new Date().toISOString(),
+          normativa: ['RGPD Art.15 (acceso)', 'RGPD Art.20 (portabilidad)', 'Ley Orgánica 3/2018 (LOPDGDD)'],
+          datos_personales: {
+            id: c.id,
+            nombre: c.nombre,
+            email: c.email,
+            telefono: c.telefono,
+            direccion: c.direccion,
+            idioma: c.idioma,
+            aceptar_promociones: c.aceptar_promociones,
+            terms_accepted_at: c.terms_accepted_at,
+            marketing_consent_at: c.marketing_consent_at,
+            anonimizado_en: c.anonimizado_en,
+            ultima_actividad: c.ultima_actividad,
+            alta_en: c.created_at,
+          },
+          historial_pedidos: (pedidosResult.data ?? []).map((p: Record<string, unknown>) => ({
+            id: p.id,
+            numero_pedido: p.numero_pedido,
+            total: p.total,
+            moneda: p.moneda,
+            estado: p.estado,
+            fecha: p.created_at,
+            items: p.detalle_pedido,
+            direccion_entrega: p.direccion_entrega,
+          })),
+          total_pedidos: pedidosResult.data?.length ?? 0,
+        },
+      };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseClienteRepository.exportarCliente', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
 }
