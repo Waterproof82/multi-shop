@@ -131,10 +131,20 @@ ${razonSocialLine}
 
 export class BrowserPrinter implements ThermalPrinter {
   async print(ticket: PrintTicket): Promise<void> {
+    const html = await buildReceiptHtml(ticket);
     const win = window.open('', '_blank', 'width=420,height=650');
     if (win === null) throw new Error('El navegador bloqueó la ventana de impresión');
-    win.document.write(await buildReceiptHtml(ticket));
-    win.document.close();
+
+    // Wait for the load event so the QR data URL image is decoded and
+    // painted before the print dialog opens — otherwise it renders blank.
+    await new Promise<void>((resolve) => {
+      win.addEventListener('load', () => resolve(), { once: true });
+      win.document.write(html);
+      win.document.close();
+      // Fallback: if load already fired (some browsers do this synchronously)
+      if (win.document.readyState === 'complete') resolve();
+    });
+
     win.focus();
     win.print();
     win.close();
