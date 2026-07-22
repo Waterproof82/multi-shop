@@ -40,7 +40,8 @@ export default async function TpvLayout({ children }: { readonly children: React
   const headersList = await headers();
   const pathname = headersList.get('x-pathname') ?? '';
 
-  if (pathname === '/tpv/login') {
+  const FRAMELESS_PATHS = ['/tpv/login', '/tpv/turno/abrir', '/tpv/turno/espera'];
+  if (FRAMELESS_PATHS.includes(pathname)) {
     return <>{children}</>;
   }
 
