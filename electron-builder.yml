@@ -14,7 +14,6 @@ win:
   target: nsis
 nsis:
   oneClick: false
-  allowToChangeInstallationDirectory: true
 publish:
   provider: generic
   url: https://app.multishop.es/api/app/version/
