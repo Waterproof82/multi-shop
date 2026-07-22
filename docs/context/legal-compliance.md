@@ -14,6 +14,15 @@ Registro de normativas aplicables al sistema. Actualizar cada vez que se identif
   - `movimientos_stock` — diseño append-only; descuadres siempre via nuevo movimiento, nunca editando el pasado
 - **Fichero clave:** `supabase/migrations/20260714000002_tpv_turno_eventos.sql`
 
+### Art.66 LGT — Retención fiscal mínima 5 años
+- **Qué exige:** Los registros de ventas, pedidos y cobros deben conservarse durante al menos 5 años para posibles inspecciones de Hacienda.
+- **Donde aplica en el sistema:**
+  - `tpv_cobros` — trigger `tpv_cobro_no_delete` bloquea DELETE (RD 1619/2012)
+  - `tpv_turnos` — trigger `tpv_turno_no_delete` bloquea DELETE (Ley 11/2021)
+  - `pedidos` — trigger `pedidos_no_delete` bloquea DELETE (Art.66 LGT). Los pedidos son la fuente de datos de `tpv_cobros`; borrarlos rompería el audit trail fiscal aunque el cobro permanezca intacto.
+- **Estrategia de retención:** datos conservados indefinidamente (supera el mínimo legal). No se implementa archivado externo — el volumen de datos de un restaurante en 5 años (~400 MB) es trivial para Supabase Pro.
+- **Fichero clave:** `supabase/migrations/20260722000002_pedidos_block_delete.sql`
+
 ### RD 1619/2012 — Reglamento de Facturación
 - **Qué exige:** Toda factura debe incluir los tipos de IVA aplicados y sus bases imponibles desglosadas.
 - **Donde aplica en el sistema:**
