@@ -118,7 +118,7 @@ export function TpvHeader({ empresaNombre }: Readonly<Props>) {
           {showGear && (
             <button
               type="button"
-              onClick={() => { window.location.href = '/admin'; }}
+              onClick={() => { window.location.href = '/admin/login?from=tpv&next=/admin'; }}
               aria-label="Ir al panel de administración"
               className="p-1.5 rounded-md border bg-[#f8fafc] border-[#e2e8f0] text-[#64748b] hover:border-[#2563eb] hover:text-[#0f172a] transition-colors"
             >
