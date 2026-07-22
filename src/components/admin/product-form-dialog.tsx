@@ -286,6 +286,7 @@ interface ProductFormDialogProps {
   saving: boolean;
   onSubmit: (e: React.SyntheticEvent) => void;
   empresaSlug: string;
+  empresaTipo?: 'restaurante' | 'tienda' | null;
 }
 
 export function ProductFormDialog({
@@ -300,6 +301,7 @@ export function ProductFormDialog({
   saving,
   onSubmit,
   empresaSlug,
+  empresaTipo,
 }: Readonly<ProductFormDialogProps>) {
   const { language } = useLanguage();
   const handleClose = () => onOpenChange(false);
@@ -490,13 +492,15 @@ export function ProductFormDialog({
             </span>
           </div>
 
-          <div className="col-span-2 pt-2 border-t border-border">
-            <AllergenSelector
-              selected={formData.alergenos}
-              onChange={(alergenos) => onFormChange({ ...formData, alergenos })}
-              language={language}
-            />
-          </div>
+          {empresaTipo === 'restaurante' && (
+            <div className="col-span-2 pt-2 border-t border-border">
+              <AllergenSelector
+                selected={formData.alergenos}
+                onChange={(alergenos) => onFormChange({ ...formData, alergenos })}
+                language={language}
+              />
+            </div>
+          )}
 
           {editingId !== null && (
             <div className="col-span-2 pt-2 border-t border-border">

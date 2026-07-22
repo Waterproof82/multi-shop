@@ -707,6 +707,7 @@ export default function ProductosPage() {
         saving={saving}
         onSubmit={handleSubmit}
         empresaSlug={empresaSlug}
+        empresaTipo={empresaTipo}
       />
 
       <DeleteConfirmDialog
