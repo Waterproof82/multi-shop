@@ -25,6 +25,8 @@ import {
 } from '@/components/ui/select';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
+import { AllergenIcon, ALLERGEN_KEYS, ALLERGEN_TRANSLATION_KEY } from '@/components/allergen-icons';
+import type { AllergenKey } from '@/components/allergen-icons';
 
 interface Categoria {
   id: string;
@@ -53,6 +55,7 @@ interface ProductoFormData {
   activo: boolean;
   tipo_producto: 'comida' | 'bebida';
   porcentajeImpuestoOverride: number | null;
+  alergenos: string[];
 }
 
 interface ProductComplementosSectionProps {
@@ -157,6 +160,69 @@ function ProductComplementosSection({ productoId }: Readonly<ProductComplementos
               )}
             </label>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface AllergenSelectorProps {
+  selected: string[];
+  onChange: (alergenos: string[]) => void;
+  language: string;
+}
+
+function AllergenSelector({ selected, onChange, language }: Readonly<AllergenSelectorProps>) {
+  const [open, setOpen] = useState(false);
+
+  function toggleAllergen(key: AllergenKey) {
+    if (selected.includes(key)) {
+      onChange(selected.filter(k => k !== key));
+    } else {
+      onChange([...selected, key]);
+    }
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen(prev => !prev)}
+        className="w-full flex items-center justify-between gap-3 py-2 text-left group"
+      >
+        <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+          {open ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+          Alérgenos
+          {selected.length > 0 && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+              {selected.length} seleccionado{selected.length !== 1 ? 's' : ''}
+            </span>
+          )}
+        </span>
+      </button>
+
+      {open && (
+        <div className="mt-2 grid grid-cols-2 gap-1.5">
+          {ALLERGEN_KEYS.map((key) => {
+            const tKey = ALLERGEN_TRANSLATION_KEY[key];
+            const label = t(tKey, language as Parameters<typeof t>[1]);
+            const isChecked = selected.includes(key);
+            return (
+              <label
+                key={key}
+                className="flex items-center gap-2 cursor-pointer p-2 border border-border rounded-lg hover:bg-muted/50 transition-colors"
+              >
+                <input
+                  type="checkbox"
+                  checked={isChecked}
+                  onChange={() => toggleAllergen(key)}
+                  className="w-4 h-4 accent-primary shrink-0"
+                />
+                <AllergenIcon allergen={key} className="w-4 h-4 text-muted-foreground shrink-0" />
+                <span className="text-xs text-foreground truncate">{label}</span>
+              </label>
+            );
+          })}
         </div>
       )}
     </div>
@@ -422,6 +488,14 @@ export function ProductFormDialog({
             <span id="porcentaje_override_help" className="text-xs text-muted-foreground mt-1 block">
               Si vacío, usa el tipo general de la empresa
             </span>
+          </div>
+
+          <div className="col-span-2 pt-2 border-t border-border">
+            <AllergenSelector
+              selected={formData.alergenos}
+              onChange={(alergenos) => onFormChange({ ...formData, alergenos })}
+              language={language}
+            />
           </div>
 
           {editingId !== null && (

@@ -28,6 +28,7 @@ export class SupabaseProductRepository implements IProductRepository {
       activo: row.activo as boolean,
       tipoProducto: (row.tipo_producto as string) === 'bebida' ? 'bebida' : 'comida',
       porcentajeImpuestoOverride: (row.porcentaje_impuesto_override as number | null) ?? null,
+      alergenos: (row.alergenos as string[]) ?? [],
       createdAt: new Date(row.created_at as string),
     };
   }
@@ -66,6 +67,7 @@ export class SupabaseProductRepository implements IProductRepository {
           es_especial: data.es_especial,
           activo: data.activo,
           tipo_producto: tipoProducto,
+          alergenos: data.alergenos ?? [],
         })
         .select()
         .single();
@@ -178,7 +180,7 @@ export class SupabaseProductRepository implements IProductRepository {
     const fieldsToMap = [
       'categoria_id', 'titulo_es', 'titulo_en', 'titulo_fr', 'titulo_it', 'titulo_de',
       'descripcion_es', 'descripcion_en', 'descripcion_fr', 'descripcion_it', 'descripcion_de',
-      'precio', 'es_especial', 'activo', 'foto_object_fit', 'tipo_producto'
+      'precio', 'es_especial', 'activo', 'foto_object_fit', 'tipo_producto', 'alergenos'
     ];
 
     for (const field of fieldsToMap) {

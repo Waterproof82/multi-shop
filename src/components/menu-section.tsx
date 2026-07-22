@@ -17,6 +17,7 @@ import { t } from "@/lib/translations"
 import { formatPrice } from "@/lib/format-price"
 import { MenuCategoryVM, MenuItemVM, MenuSubcategoryVM } from "@/core/application/dtos/menu-view-model"
 import { QuantitySelectorDialog } from "@/components/quantity-selector-dialog"
+import { AllergenBadges, AllergenList } from "@/components/allergen-icons"
 
 type LanguageKey = 'en' | 'fr' | 'it' | 'de';
 
@@ -395,6 +396,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
             {displayDescription}
           </p>
         )}
+        <AllergenBadges alergenos={item.alergenos} className="mb-2" />
         <div className="flex items-center justify-between gap-3 pt-3 mt-auto border-t border-border/50">
           <span className="text-lg font-bold text-foreground tabular-nums group-hover:text-primary transition-colors duration-200">
             {formatPrice(item.price, 'EUR', safeLanguage)}
@@ -496,6 +498,7 @@ function ItemDetailDialog(props: Readonly<{
             })}
           </div>
         )}
+        <AllergenList alergenos={item.alergenos} language={safeLanguage} />
       </DialogContent>
     </Dialog>
   );

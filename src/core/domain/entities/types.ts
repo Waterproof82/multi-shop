@@ -22,6 +22,7 @@ export interface Product {
   tipoProducto: 'comida' | 'bebida';
   createdAt: Date;
   porcentajeImpuestoOverride?: number | null;
+  alergenos: string[];
 }
 
 export interface Category {
