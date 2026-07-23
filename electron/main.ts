@@ -51,6 +51,11 @@ function createWindow(): void {
   }
 
   blockDangerousShortcuts();
+
+  // Keep our version title — prevent web page from overriding it
+  mainWindow.webContents.on('page-title-updated', (event) => {
+    event.preventDefault();
+  });
 }
 
 function blockDangerousShortcuts(): void {
@@ -173,13 +178,8 @@ async function checkForPortableUpdate(domain: string): Promise<void> {
     const tmpExe = path.join(app.getPath('temp'), `tpv-update-${tpv.version}.exe`);
     const currentExe = process.execPath;
 
-    await dialog.showMessageBox(mainWindow, {
-      type: 'info',
-      title: 'Descargando actualización',
-      message: 'Descargando actualización, por favor espera...',
-      buttons: [],
-      noLink: true,
-    });
+    // Download in background — no blocking dialog
+    mainWindow.setTitle(`Multisistema TPV v${current} — Descargando ${tpv.version}...`);
 
     const dlRes = await fetch(tpv.exeUrl);
     if (!dlRes.ok) throw new Error('Error al descargar la actualización');
@@ -196,6 +196,14 @@ async function checkForPortableUpdate(domain: string): Promise<void> {
       'del "%~f0"',
     ].join('\r\n');
     await fsPromises.writeFile(scriptPath, script, 'utf-8');
+
+    await dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'Actualización lista',
+      message: `v${tpv.version} descargada. La aplicación se reiniciará ahora.`,
+      buttons: ['Reiniciar'],
+      defaultId: 0,
+    });
 
     exec(`start "" "${scriptPath}"`);
     app.quit();
