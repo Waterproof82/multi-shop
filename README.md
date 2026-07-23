@@ -271,6 +271,65 @@ El panel `/waiter` se distribuye como **APK nativo para Android** en PDAs de cam
 
 Ver `docs/context/capacitor-android-pda.md` para el proceso de build y release.
 
+### Electron TPV Windows (activo — en producción)
+
+El TPV se distribuye también como **aplicación de escritorio nativa para Windows** mediante Electron. El mismo código Next.js que corre en el navegador se envuelve en una ventana Electron, eliminando la barra del navegador y habilitando integración nativa (impresión térmica, pantalla completa, atajos globales).
+
+- **Formato portable**: un único `.exe` sin instalador. No requiere permisos de administrador para ejecutar. Los datos de configuración (dominio, impresora, clave de firma) se guardan en `%AppData%\Multisistema TPV\` mediante `electron-store`.
+- **Título de ventana con versión**: la barra de título muestra `Multisistema TPV vX.Y.Z` permanentemente. El evento `page-title-updated` está interceptado para que el contenido web no sobreescriba el título.
+- **Auto-update en línea**: al arrancar, la app consulta `GET /api/app/version` en el dominio configurado. Si hay una versión más nueva publicada en GitHub Releases, muestra un diálogo de confirmación, descarga el nuevo `.exe` en background (con progreso en el título de ventana) y ejecuta un script PowerShell oculto que:
+  1. Espera 2 s a que la app cierre
+  2. Reemplaza el `.exe` en su ubicación actual
+  3. Lanza la nueva versión
+  4. Se auto-elimina
+
+  El proceso es completamente silencioso — no aparece ninguna ventana CMD ni terminal.
+
+- **Distribución de releases**: los ejecutables se publican como assets en **GitHub Releases** (sin límite de tamaño). Supabase Storage no se usa para el `.exe` porque el plan gratuito tiene un límite de 50 MB por archivo (el ejecutable pesa ~90 MB).
+- **API de versiones unificada** (`GET /api/app/version`): mismo endpoint para APK del camarero y exe del TPV. Responde:
+
+  ```json
+  {
+    "version": "1.2.3",
+    "versionCode": 31,
+    "apkUrl": "https://...",
+    "tpv": {
+      "version": "0.3.9",
+      "exeUrl": "https://github.com/.../TPV.MultiShop.0.3.9.exe"
+    }
+  }
+  ```
+
+- **Debug log**: en cada arranque escribe `%AppData%\Multisistema TPV\tpv-update.log` con la versión actual, dominio configurado, respuesta de la API y resultado del chequeo de versión. Útil para diagnosticar por qué el popup de actualización no aparece.
+- **Impresión térmica nativa**: IPC renderer → main → `node-thermal-printer`. Nunca se accede a Node.js desde el renderer (preload con `contextIsolation`).
+- **Atajos globales**: `Ctrl+Shift+R` abre el diálogo de reconfiguración del dominio. `F5` fuerza un reload de la webview.
+
+#### Proceso de build y release (Electron)
+
+```bash
+# 1. Compilar TypeScript de Electron
+pnpm build:electron:prep
+
+# 2. Rebuild módulos nativos (node-thermal-printer) contra la versión de Electron
+pnpm build:electron:rebuild
+
+# 3. Generar el exe portable
+pnpm exec electron-builder --win
+# → dist/TPV MultiShop X.Y.Z.exe
+
+# 4. Commit, tag y publicar en GitHub
+git add package.json electron/main.ts
+git commit -m "chore: bump version to X.Y.Z"
+git tag vX.Y.Z && git push && git push origin vX.Y.Z
+gh release create vX.Y.Z "dist/TPV MultiShop X.Y.Z.exe" \
+  --title "TPV MultiShop vX.Y.Z" \
+  --notes "Descripción de cambios"
+```
+
+> **Nota:** editar siempre `electron/main.ts` (fuente TypeScript). Nunca `electron/dist/main.js` — es el bundle generado por esbuild y se sobreescribe en cada build.
+
+Ver `docs/context/electron-tpv.md` para trampas críticas e integración con impresora.
+
 ---
 
 ## Stack Tecnológico
@@ -293,6 +352,11 @@ Ver `docs/context/capacitor-android-pda.md` para el proceso de build y release.
 | Glovo Business LaaS | — | Despacho de riders (DH On Demand Rider API) |
 | @zxing/browser | — | Decodificación QR in-app (iOS Safari + Android Chrome) |
 | Service Worker (vanilla) | — | Caching offline para `/waiter` — sin Workbox/Serwist |
+| Electron | 31.x | App de escritorio Windows (TPV portable con auto-update) |
+| electron-builder | 24.x | Packaging del exe portable para Windows |
+| electron-store | — | Persistencia de config local (dominio, impresora, clave firma) |
+| node-thermal-printer | — | Impresión térmica nativa desde el proceso main de Electron |
+| Capacitor | — | App Android nativa para panel `/waiter` (PDAs de camarero) |
 
 ---
 
