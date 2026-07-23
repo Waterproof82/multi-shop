@@ -147,7 +147,9 @@ function setupAutoUpdater(): void {
     url: `https://${domain}/api/app/version/`,
   } as Parameters<typeof autoUpdater.setFeedURL>[0]);
 
-  autoUpdater.checkForUpdatesAndNotify().catch(() => {
+  // Manual updates only — auto-download disabled to avoid file locks during manual installs
+  autoUpdater.autoDownload = false;
+  autoUpdater.checkForUpdates().catch(() => {
     // Silencioso — no crashear si no hay red o no hay nueva versión
   });
 }

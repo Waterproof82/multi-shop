@@ -13,9 +13,8 @@ extraMetadata:
 win:
   target: nsis
 nsis:
-  oneClick: false
+  oneClick: true
   perMachine: true
-  include: electron/installer.nsh
 publish:
   provider: generic
   url: https://app.multishop.es/api/app/version/
