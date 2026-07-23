@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, globalShortcut, Menu, dialog } from 'electron';
 import * as path from 'path';
 import { promises as fsPromises } from 'fs';
+import { appendFileSync } from 'fs';
 import * as crypto from 'crypto';
 import { exec } from 'child_process';
 import Store from 'electron-store';
@@ -152,15 +153,26 @@ function isNewerVersion(remote: string, current: string): boolean {
   return rPat > cPat;
 }
 
+function writeUpdateLog(msg: string): void {
+  try {
+    const logPath = path.join(app.getPath('userData'), 'tpv-update.log');
+    appendFileSync(logPath, `[${new Date().toISOString()}] ${msg}\n`, 'utf-8');
+  } catch { /* ignore */ }
+}
+
 async function checkForPortableUpdate(domain: string): Promise<void> {
+  writeUpdateLog(`checkForPortableUpdate start — domain=${domain} current=${app.getVersion()}`);
   try {
     const res = await fetch(`https://${domain}/api/app/version`);
+    writeUpdateLog(`API response status=${res.status}`);
     if (!res.ok) return;
     const data = await res.json() as { tpv?: { version: string; exeUrl: string | null } };
+    writeUpdateLog(`API tpv=${JSON.stringify(data.tpv)}`);
     const tpv = data.tpv;
     if (!tpv?.version || !tpv.exeUrl) return;
 
     const current = app.getVersion();
+    writeUpdateLog(`version check — remote=${tpv.version} current=${current} isNewer=${isNewerVersion(tpv.version, current)}`);
     if (!isNewerVersion(tpv.version, current)) return;
 
     const choice = await dialog.showMessageBox(mainWindow, {
@@ -207,8 +219,8 @@ async function checkForPortableUpdate(domain: string): Promise<void> {
 
     exec(`start "" "${scriptPath}"`);
     app.quit();
-  } catch {
-    // Silencioso — no crashear si no hay red o el update falla
+  } catch (err) {
+    writeUpdateLog(`ERROR: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
