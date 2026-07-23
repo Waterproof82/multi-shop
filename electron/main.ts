@@ -155,9 +155,16 @@ function isNewerVersion(remote: string, current: string): boolean {
 
 function writeUpdateLog(msg: string): void {
   try {
-    const logPath = path.join(app.getPath('userData'), 'tpv-update.log');
+    const dir = app.getPath('userData');
+    const logPath = path.join(dir, 'tpv-update.log');
     appendFileSync(logPath, `[${new Date().toISOString()}] ${msg}\n`, 'utf-8');
-  } catch { /* ignore */ }
+  } catch (e) {
+    // last-resort: write next to exe
+    try {
+      const exeDir = path.dirname(process.execPath);
+      appendFileSync(path.join(exeDir, 'tpv-update.log'), `[${new Date().toISOString()}] ${msg}\n`, 'utf-8');
+    } catch { /* ignore */ }
+  }
 }
 
 async function checkForPortableUpdate(domain: string): Promise<void> {
@@ -232,6 +239,7 @@ app.whenReady().then(() => {
   registerGlobalShortcuts();
   setupIpc();
   const domain = store.get('domain') as string | undefined;
+  writeUpdateLog(`app.whenReady — version=${app.getVersion()} userData=${app.getPath('userData')} domain=${domain ?? '(no domain)'}`);
   if (domain) void checkForPortableUpdate(domain);
 }).catch(console.error);
 
