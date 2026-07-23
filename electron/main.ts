@@ -205,14 +205,13 @@ async function checkForPortableUpdate(domain: string): Promise<void> {
     const buffer = Buffer.from(await dlRes.arrayBuffer());
     await fsPromises.writeFile(tmpExe, buffer);
 
-    const scriptPath = path.join(app.getPath('temp'), 'tpv-self-update.bat');
+    const scriptPath = path.join(app.getPath('temp'), 'tpv-self-update.ps1');
     const script = [
-      '@echo off',
-      'timeout /t 2 /nobreak > nul',
-      `copy /Y "${tmpExe}" "${currentExe}"`,
-      `start "" "${currentExe}"`,
-      `del "${tmpExe}"`,
-      'del "%~f0"',
+      'Start-Sleep -Seconds 2',
+      `Copy-Item -Force '${tmpExe}' '${currentExe}'`,
+      `Start-Process '${currentExe}'`,
+      `Remove-Item -Force '${tmpExe}' -ErrorAction SilentlyContinue`,
+      `Remove-Item -Force $MyInvocation.MyCommand.Path -ErrorAction SilentlyContinue`,
     ].join('\r\n');
     await fsPromises.writeFile(scriptPath, script, 'utf-8');
 
@@ -224,7 +223,7 @@ async function checkForPortableUpdate(domain: string): Promise<void> {
       defaultId: 0,
     });
 
-    exec(`start "" "${scriptPath}"`);
+    exec(`powershell -WindowStyle Hidden -ExecutionPolicy Bypass -File "${scriptPath}"`);
     app.quit();
   } catch (err) {
     writeUpdateLog(`ERROR: ${err instanceof Error ? err.message : String(err)}`);
