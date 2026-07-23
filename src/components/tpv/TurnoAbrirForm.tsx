@@ -87,7 +87,7 @@ export function TurnoAbrirForm({ defaultOperador = '' }: Props) {
             step="0.01"
             value={efectivo}
             onChange={e => setEfectivo(e.target.value)}
-            className="flex-1 bg-transparent py-3.5 text-lg font-bold outline-none"
+            className="flex-1 bg-transparent py-3.5 text-lg font-bold outline-none text-[#0f172a]"
           />
         </div>
         <span className="text-xs text-[#6b7280]">Puede ser 0,00 € si la caja está vacía</span>

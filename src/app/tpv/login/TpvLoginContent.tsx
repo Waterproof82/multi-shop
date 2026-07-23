@@ -42,7 +42,7 @@ export async function TpvLoginContent() {
         </div>
         <TpvLoginForm />
         <a
-          href="/admin/login"
+          href="/admin/login?from=tpv"
           className="text-xs text-[#94a3b8] hover:text-[#64748b] text-center transition-colors"
         >
           Acceso con email y contraseña →
