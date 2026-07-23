@@ -53,7 +53,7 @@ function createWindow(): void {
   blockDangerousShortcuts();
 
   // Keep our version title — prevent web page from overriding it
-  mainWindow.webContents.on('page-title-updated', (event) => {
+  mainWindow.on('page-title-updated', (event) => {
     event.preventDefault();
   });
 }

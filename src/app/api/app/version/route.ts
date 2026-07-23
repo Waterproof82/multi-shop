@@ -22,7 +22,7 @@ async function getTpvRelease(): Promise<{ version: string; exeUrl: string } | nu
   try {
     const res = await fetch(
       `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
-      { headers: { 'User-Agent': 'multishop-server' }, next: { revalidate: 300 } }
+      { headers: { 'User-Agent': 'multishop-server' }, next: { revalidate: 60 } }
     );
     if (!res.ok) return null;
     const release = await res.json() as GithubRelease;
