@@ -11,9 +11,7 @@ files:
 extraMetadata:
   main: electron/dist/main.js
 win:
-  target: nsis
-nsis:
-  oneClick: true
+  target: portable
 publish:
   provider: generic
   url: https://app.multishop.es/api/app/version/
