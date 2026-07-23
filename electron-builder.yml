@@ -14,6 +14,7 @@ win:
   target: nsis
 nsis:
   oneClick: false
+  perMachine: true
   include: electron/installer.nsh
 publish:
   provider: generic
