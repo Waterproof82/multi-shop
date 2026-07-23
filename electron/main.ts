@@ -1,9 +1,9 @@
-import { app, BrowserWindow, ipcMain, globalShortcut, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, globalShortcut, Menu, dialog } from 'electron';
 import * as path from 'path';
 import { promises as fsPromises } from 'fs';
 import * as crypto from 'crypto';
+import { exec } from 'child_process';
 import Store from 'electron-store';
-import { autoUpdater } from 'electron-updater';
 import { listPrinters, printReceipt } from './printer/index';
 import type { ReceiptData } from './printer/receipt';
 
@@ -28,7 +28,7 @@ let mainWindow: BrowserWindow;
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
-    title: 'Multisistema TPV',
+    title: `Multisistema TPV v${app.getVersion()}`,
     width: 1280,
     height: 800,
     minWidth: 1024,
@@ -138,20 +138,70 @@ function setupIpc(): void {
   });
 }
 
-function setupAutoUpdater(): void {
-  const domain = store.get('domain') as string | undefined;
-  if (!domain) return;
+function isNewerVersion(remote: string, current: string): boolean {
+  const parse = (v: string) => v.split('.').map(Number);
+  const [rMaj, rMin, rPat] = parse(remote);
+  const [cMaj, cMin, cPat] = parse(current);
+  if (rMaj !== cMaj) return rMaj > cMaj;
+  if (rMin !== cMin) return rMin > cMin;
+  return rPat > cPat;
+}
 
-  autoUpdater.setFeedURL({
-    provider: 'generic',
-    url: `https://${domain}/api/app/version/`,
-  } as Parameters<typeof autoUpdater.setFeedURL>[0]);
+async function checkForPortableUpdate(domain: string): Promise<void> {
+  try {
+    const res = await fetch(`https://${domain}/api/app/version`);
+    if (!res.ok) return;
+    const data = await res.json() as { tpv?: { version: string; exeUrl: string | null } };
+    const tpv = data.tpv;
+    if (!tpv?.version || !tpv.exeUrl) return;
 
-  // Manual updates only — auto-download disabled to avoid file locks during manual installs
-  autoUpdater.autoDownload = false;
-  autoUpdater.checkForUpdates().catch(() => {
-    // Silencioso — no crashear si no hay red o no hay nueva versión
-  });
+    const current = app.getVersion();
+    if (!isNewerVersion(tpv.version, current)) return;
+
+    const choice = await dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'Actualización disponible',
+      message: `Nueva versión ${tpv.version} disponible`,
+      detail: `Versión instalada: ${current}\n\nSe descargará y reemplazará automáticamente al hacer clic en Actualizar.`,
+      buttons: ['Actualizar ahora', 'Más tarde'],
+      defaultId: 0,
+      cancelId: 1,
+    });
+
+    if (choice.response !== 0) return;
+
+    const tmpExe = path.join(app.getPath('temp'), `tpv-update-${tpv.version}.exe`);
+    const currentExe = process.execPath;
+
+    await dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'Descargando actualización',
+      message: 'Descargando actualización, por favor espera...',
+      buttons: [],
+      noLink: true,
+    });
+
+    const dlRes = await fetch(tpv.exeUrl);
+    if (!dlRes.ok) throw new Error('Error al descargar la actualización');
+    const buffer = Buffer.from(await dlRes.arrayBuffer());
+    await fsPromises.writeFile(tmpExe, buffer);
+
+    const scriptPath = path.join(app.getPath('temp'), 'tpv-self-update.bat');
+    const script = [
+      '@echo off',
+      'timeout /t 2 /nobreak > nul',
+      `copy /Y "${tmpExe}" "${currentExe}"`,
+      `start "" "${currentExe}"`,
+      `del "${tmpExe}"`,
+      'del "%~f0"',
+    ].join('\r\n');
+    await fsPromises.writeFile(scriptPath, script, 'utf-8');
+
+    exec(`start "" "${scriptPath}"`);
+    app.quit();
+  } catch {
+    // Silencioso — no crashear si no hay red o el update falla
+  }
 }
 
 app.whenReady().then(() => {
@@ -161,7 +211,8 @@ app.whenReady().then(() => {
   createWindow();
   registerGlobalShortcuts();
   setupIpc();
-  setupAutoUpdater();
+  const domain = store.get('domain') as string | undefined;
+  if (domain) void checkForPortableUpdate(domain);
 }).catch(console.error);
 
 app.on('window-all-closed', () => {
