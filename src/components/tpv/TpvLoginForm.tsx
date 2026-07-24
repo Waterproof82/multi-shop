@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+import { FichajeDialog } from '@/components/laborcontrol/FichajeDialog';
 
 export function TpvLoginForm() {
-  const [pin, setPin] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [pin, setPin]           = useState('');
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState<string | null>(null);
+  const [pendingNav, setPendingNav] = useState<{ nextUrl: string; empleadoId: string } | null>(null);
 
   async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -26,20 +28,47 @@ export function TpvLoginForm() {
       return;
     }
 
-    const data = await res.json() as { nextUrl?: string; rol?: string };
+    const data = await res.json() as { nextUrl?: string; rol?: string; empleadoId?: string };
     // Notify TpvRolProvider of the new role before navigating so the cached layout
     // context updates immediately (Next.js Router Cache reuses the layout component).
     window.dispatchEvent(new CustomEvent('tpv-auth-changed', {
       detail: { rol: data.rol ?? 'cajero', isEmployeeSession: true },
     }));
-    const form = document.createElement('form');
-    form.method = 'GET';
-    form.action = data.nextUrl ?? '/tpv/mostrador';
-    document.body.appendChild(form);
-    form.submit();
+
+    if (data.empleadoId) {
+      setPendingNav({ nextUrl: data.nextUrl ?? '/tpv/mostrador', empleadoId: data.empleadoId });
+    } else {
+      doNavigate(data.nextUrl ?? '/tpv/mostrador');
+    }
   }
 
+  const doNavigate = useCallback((nextUrl: string) => {
+    const form = document.createElement('form');
+    form.method = 'GET';
+    form.action = nextUrl;
+    document.body.appendChild(form);
+    form.submit();
+  }, []);
+
+  const handleFichajeDone = useCallback(() => {
+    if (pendingNav) doNavigate(pendingNav.nextUrl);
+  }, [pendingNav, doNavigate]);
+
+  const handleFichajeSkip = useCallback(() => {
+    if (pendingNav) doNavigate(pendingNav.nextUrl);
+  }, [pendingNav, doNavigate]);
+
   return (
+    <>
+    {pendingNav !== null && (
+      <FichajeDialog
+        open
+        empleadoId={pendingNav.empleadoId}
+        sugerido="entrada"
+        onDone={handleFichajeDone}
+        onSkip={handleFichajeSkip}
+      />
+    )}
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       <input
         type="text"
@@ -65,5 +94,6 @@ export function TpvLoginForm() {
         {loading ? 'Verificando...' : 'Entrar'}
       </button>
     </form>
+    </>
   );
 }
