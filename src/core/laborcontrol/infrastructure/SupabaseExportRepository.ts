@@ -20,7 +20,6 @@ function mapFichajeRow(row: Record<string, unknown>): FichajeEvento {
     refCorreccion:     (row.ref_correccion as string) ?? null,
     timestampEvento:   new Date(row.timestamp_evento as string),
     timestampServidor: new Date(row.timestamp_servidor as string),
-    origenOffline:     row.origen_offline as boolean,
     motivo:            (row.motivo as string) ?? null,
     chainHash:         row.chain_hash as string,
     prevHash:          row.prev_hash as string,
@@ -45,54 +44,91 @@ function mapPerfilRow(row: Record<string, unknown>): PerfilLaboral {
   };
 }
 
+interface EmpresaInfo {
+  nombre: string;
+  nif?: string;
+}
+
 export class SupabaseExportRepository implements IExportRepository {
   private get db() { return getSupabaseClient(); }
+
+  private async resolveEmpresaInfo(empresaId: string): Promise<EmpresaInfo> {
+    const { data } = await this.db
+      .from('empresas')
+      .select('nombre, nif, razon_social')
+      .eq('id', empresaId)
+      .maybeSingle();
+    const row = data as { nombre?: string; nif?: string; razon_social?: string } | null;
+    return {
+      nombre: row?.razon_social ?? row?.nombre ?? empresaId,
+      nif:    row?.nif ?? undefined,
+    };
+  }
+
+  private async resolveEmpleadoNombres(empleadoIds: string[]): Promise<Map<string, string>> {
+    if (empleadoIds.length === 0) return new Map();
+    const { data } = await this.db
+      .from('empleados_tpv')
+      .select('id, nombre')
+      .in('id', empleadoIds);
+    return new Map(
+      ((data ?? []) as { id: string; nombre: string }[]).map(e => [e.id, e.nombre])
+    );
+  }
+
+  private async buildExportRows(
+    perfiles: unknown[],
+    empresaId: string,
+    from: Date,
+    to: Date,
+    incluirPausas: boolean,
+    nombreMap: Map<string, string>,
+  ) {
+    return Promise.all(
+      perfiles.map(async (p) => {
+        const perfil: PerfilLaboral = {
+          ...mapPerfilRow(p as Record<string, unknown>),
+          empleadoNombre: nombreMap.get((p as Record<string, unknown>).empleado_id as string),
+        };
+        let q = this.db
+          .from('lc_fichajes')
+          .select('*')
+          .eq('empresa_id', empresaId)
+          .eq('empleado_id', perfil.empleadoId)
+          .gte('timestamp_servidor', from.toISOString())
+          .lte('timestamp_servidor', to.toISOString())
+          .order('timestamp_servidor', { ascending: true });
+        if (!incluirPausas) q = q.not('tipo', 'in', '(inicio_pausa,fin_pausa)');
+        const { data: fichajes } = await q;
+        return { empleado: perfil, fichajes: (fichajes ?? []).map(f => mapFichajeRow(f as Record<string, unknown>)) };
+      })
+    );
+  }
 
   async generateStream(query: ExportQuery): Promise<Result<{ stream: Readable; contentType: string; filename: string }>> {
     try {
       const dateRange = `${query.from.toISOString().slice(0, 10)}_${query.to.toISOString().slice(0, 10)}`;
 
-      // Fetch perfiles
       let perfilQuery = this.db.from('lc_perfil_laboral').select('*').eq('empresa_id', query.empresaId);
       if (query.empleadoId) perfilQuery = perfilQuery.eq('empleado_id', query.empleadoId);
       const { data: perfiles, error: perfilError } = await perfilQuery;
       if (perfilError) return { success: false, error: await logger.logFromCatch(perfilError, 'repository', 'generateStream') };
 
-      // Fetch fichajes for each perfil
-      const exportRows = await Promise.all(
-        (perfiles ?? []).map(async (p) => {
-          const perfil = mapPerfilRow(p as Record<string, unknown>);
-          let fichajeQuery = this.db
-            .from('lc_fichajes')
-            .select('*')
-            .eq('empresa_id', query.empresaId)
-            .eq('empleado_id', perfil.empleadoId)
-            .gte('timestamp_servidor', query.from.toISOString())
-            .lte('timestamp_servidor', query.to.toISOString())
-            .order('timestamp_servidor', { ascending: true });
-          if (!query.incluirPausas) {
-            fichajeQuery = fichajeQuery.not('tipo', 'in', '(inicio_pausa,fin_pausa)');
-          }
-          const { data: fichajes } = await fichajeQuery;
-          return { empleado: perfil, fichajes: (fichajes ?? []).map(f => mapFichajeRow(f as Record<string, unknown>)) };
-        })
+      const [empresaInfo, nombreMap] = await Promise.all([
+        this.resolveEmpresaInfo(query.empresaId),
+        this.resolveEmpleadoNombres((perfiles ?? []).map(p => (p as Record<string, unknown>).empleado_id as string)),
+      ]);
+
+      const exportRows = await this.buildExportRows(
+        perfiles ?? [], query.empresaId, query.from, query.to, query.incluirPausas, nombreMap
       );
 
-      const empresaNombre = query.empresaId; // caller can pass name via metadata if needed
-
       if (query.format === 'pdf') {
-        const stream = await renderFichajesPdf(exportRows, query.from, query.to, empresaNombre);
-        return {
-          success: true,
-          data: {
-            stream,
-            contentType: 'application/pdf',
-            filename: `fichajes_${dateRange}.pdf`,
-          },
-        };
+        const stream = await renderFichajesPdf(exportRows, query.from, query.to, empresaInfo);
+        return { success: true, data: { stream, contentType: 'application/pdf', filename: `fichajes_${dateRange}.pdf` } };
       }
 
-      const stream = await renderFichajesExcel(exportRows, query.from, query.to, empresaNombre);
+      const stream = await renderFichajesExcel(exportRows, query.from, query.to, empresaInfo);
       return {
         success: true,
         data: {
@@ -117,24 +153,18 @@ export class SupabaseExportRepository implements IExportRepository {
       if (perfilError) return { success: false, error: await logger.logFromCatch(perfilError, 'repository', 'generateResumenParcialStream') };
 
       const from = new Date(year, month - 1, 1);
-      const to = new Date(year, month, 0, 23, 59, 59);
+      const to   = new Date(year, month, 0, 23, 59, 59);
 
-      const exportRows = await Promise.all(
-        (perfiles ?? []).map(async (p) => {
-          const perfil = mapPerfilRow(p as Record<string, unknown>);
-          const { data: fichajes } = await this.db
-            .from('lc_fichajes')
-            .select('*')
-            .eq('empresa_id', empresaId)
-            .eq('empleado_id', perfil.empleadoId)
-            .gte('timestamp_servidor', from.toISOString())
-            .lte('timestamp_servidor', to.toISOString())
-            .order('timestamp_servidor', { ascending: true });
-          return { empleado: perfil, fichajes: (fichajes ?? []).map(f => mapFichajeRow(f as Record<string, unknown>)) };
-        })
+      const [empresaInfo, nombreMap] = await Promise.all([
+        this.resolveEmpresaInfo(empresaId),
+        this.resolveEmpleadoNombres((perfiles ?? []).map(p => (p as Record<string, unknown>).empleado_id as string)),
+      ]);
+
+      const exportRows = await this.buildExportRows(
+        perfiles ?? [], empresaId, from, to, true, nombreMap
       );
 
-      const stream = await renderFichajesPdf(exportRows, from, to, empresaId);
+      const stream = await renderFichajesPdf(exportRows, from, to, empresaInfo);
       return {
         success: true,
         data: {

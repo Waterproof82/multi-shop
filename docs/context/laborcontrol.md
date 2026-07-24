@@ -80,7 +80,6 @@ Supabase Infrastructure (BEFORE INSERT trigger → chain hash)
 | `lc_fichajes_hold_archive` | Archivo de fichajes liberados de retención |
 | `lc_audit_log` | Log de todas las acciones del módulo (append-only) |
 | `lc_review_queue` | Cola de fichajes pendientes de revisión por supervisor |
-| `lc_horas_extra` | Registro de horas extra con tipo de compensación |
 | `lc_rlt_asignaciones` | Representantes Legales de los Trabajadores por empresa |
 
 ### `lc_fichajes` — estructura y particionado
@@ -102,7 +101,6 @@ CREATE TABLE public.lc_fichajes (
   ref_correccion    UUID,                   -- record_id que se corrige
   timestamp_evento  TIMESTAMPTZ NOT NULL,   -- hora según el cliente
   timestamp_servidor TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
-  origen_offline    BOOLEAN NOT NULL DEFAULT false,
   motivo            TEXT,
   chain_hash        TEXT NOT NULL,          -- SHA-256 del payload canónico
   prev_hash         TEXT NOT NULL,          -- hash del registro anterior
@@ -182,12 +180,6 @@ El campo `superseded` no existe en BD — es calculado en el use case `ObtenerMi
 | `GET` | `/api/laborcontrol/holds` | `admin` | Lista retenciones activas |
 | `POST` | `/api/laborcontrol/holds` | `admin` | Crea retención (bloquea purga RGPD) |
 
-### Horas Extra
-
-| Método | Ruta | Auth | Descripción |
-|--------|------|------|-------------|
-| `GET` | `/api/laborcontrol/overtime?from=&to=` | `admin / encargado` | Listado de horas extra en el período |
-
 ### Cron Jobs (Vercel)
 
 | Ruta | Cron | Descripción |
@@ -199,28 +191,40 @@ El campo `superseded` no existe en BD — es calculado en el use case `ObtenerMi
 
 ## 6. Integración con TPV
 
+### Kiosk (modo principal)
+
+`/tpv/fichajes` es la ruta principal de fichaje. Opera en **modo kiosk**: cualquier empleado puede fichar introduciendo su PIN sin cerrar la sesión del cajero/admin activo. Flujo en dos fases:
+
+1. **Fase 1** (`{ pin }`): identifica al empleado y sugiere el tipo de evento (`entrada / salida / inicio_pausa / fin_pausa`) según su último registro.
+2. **Fase 2** (`{ pin, tipo }`): registra el fichaje en `lc_fichajes` vía `POST /api/laborcontrol/fichaje/kiosk`.
+
 ### FichajeDialog
 
 Componente modal `src/components/laborcontrol/FichajeDialog.tsx` que aparece en dos momentos del flujo TPV:
 
 1. **Post-login** (`TpvLoginForm`): tras autenticarse con PIN, aparece el diálogo preguntando "¿Fichar entrada?" El empleado puede fichar o omitir.
-2. **Post-cierre de turno** (`TurnoCerrarForm`): al cerrar el turno (especialmente en sesión de empleado), aparece el diálogo para "Fichar salida".
-
-El diálogo detecta el estado de conexión (`navigator.onLine`). Si está offline, encola el fichaje en IndexedDB cifrado y lo sincroniza automáticamente al recuperar red.
+2. **Post-cierre de turno** (`TurnoCerrarForm`): al cerrar el turno, aparece el diálogo para "Fichar salida".
 
 ### Mis Fichajes (empleado)
 
-Ruta `/tpv/fichajes` — solo accesible con `tpv_employee_token`. Muestra los últimos 30 días de fichajes del empleado autenticado. Tiene un timer de inactividad de 60 segundos que redirige automáticamente a `/tpv/mostrador`.
+Ruta `/tpv/fichajes` — accesible con cualquier sesión de empleado autenticada. Muestra los últimos 30 días de fichajes del empleado autenticado. Tiene un timer de inactividad de 60 segundos que redirige automáticamente a `/tpv/mostrador`.
 
 ### Navegación
 
-El `TpvHeader` muestra el enlace "⏱ Fichajes" en la barra de navegación solo cuando la sesión es de empleado (`isEmployeeSession = true`).
+El `TpvHeader` muestra dos grupos de enlaces en la barra de navegación:
+
+- **Grupo principal**: Analítica, Mostrador, etc.
+- **Grupo laboral** (estilo ámbar, separado visualmente): `⏱ Fichajes` (todos los roles) y `📋 Jornada` (solo `admin` / `encargado`).
 
 ---
 
 ## 7. Panel Supervisor
 
-Ruta: `/laborcontrol/supervisor`
+Rutas:
+- `/tpv/jornada` — panel inline dentro del shell TPV (acceso rápido desde el header)
+- `/laborcontrol/supervisor` — acceso directo con botón volver (mismo componente `SupervisorPanel`)
+
+Protección de ruta: `src/app/laborcontrol/layout.tsx` verifica que el token activo sea `admin / encargado / superadmin`. Redirige a `/tpv/login` si no se cumple.
 
 Dashboard en tiempo real (cliente) que muestra el estado actual de cada empleado:
 
@@ -237,18 +241,7 @@ Se actualiza automáticamente vía **Supabase Realtime** — suscripción a `pos
 
 ---
 
-## 8. Offline y Electron
-
-### Cola Offline (IndexedDB + AES-GCM)
-
-`src/lib/laborcontrol/offline-queue.ts`
-
-Cuando el dispositivo pierde conexión:
-1. El `FichajeDialog` detecta `navigator.onLine = false`
-2. Llama a `enqueue()` — cifra el payload con AES-GCM 256-bit (clave generada y almacenada en IndexedDB)
-3. El store `laborcontrol_offline` en IndexedDB guarda la entrada cifrada con IV aleatorio
-4. Al recuperar conexión (`window.addEventListener('online', ...)`) se ejecuta `syncQueue()` automáticamente
-5. `syncQueue()` descifra cada entrada, la envía a `/api/laborcontrol/fichaje` con `origenOffline: true`, y la elimina si el servidor responde 200 ó 409
+## 8. Electron
 
 ### PIN Cache Electron
 
@@ -286,7 +279,7 @@ computeChainHash({
 
 `PdfRenderer.ts` genera un PDF con:
 - Cabecera: nombre de empresa, empleado, período
-- Tabla de fichajes: fecha/hora evento, tipo, fecha/hora servidor, si fue offline
+- Tabla de fichajes: fecha/hora evento, tipo, fecha/hora servidor, motivo/corrección
 - Pie con cláusula RGPD: "El registro de jornada se realiza en base al Art. 6.1.c RGPD (obligación legal) en cumplimiento del Art. 34.9 ET."
 
 Usa `renderToStream()` → retorna un `Readable` Node.js que el API route convierte a `ReadableStream` Web para Next.js (`new ReadableStream({ start(controller) { stream.on('data', ...) } })`).
@@ -295,7 +288,7 @@ Usa `renderToStream()` → retorna un `Readable` Node.js que el API route convie
 
 `ExcelRenderer.ts` genera un XLSX con:
 - Una hoja por empleado
-- Columnas: Fecha/hora evento, Tipo, Acción, Fecha/hora servidor, Offline, Motivo, Chain Hash
+- Columnas: Fecha/hora evento, Tipo, Acción, Fecha/hora servidor, Motivo/Corrección, Chain Hash
 - Formato de fecha `dd/mm/yyyy hh:mm:ss` en columnas de timestamp
 - Column widths ajustados (hash SHA-256 en col 7 = width 68)
 - Streaming real con `PassThrough` — no acumula el workbook completo en memoria

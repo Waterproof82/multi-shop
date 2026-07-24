@@ -277,7 +277,7 @@ export default async function TpvLegalPage() {
             detail="Alérgenos visibles en carta digital del cliente antes de realizar el pedido"
           />
 
-          <p className="text-[11px] font-semibold text-[#2563eb] uppercase tracking-wider mt-4 mb-1">
+          <p className="text-[11px] font-semibold text-[#d97706] uppercase tracking-wider mt-4 mb-1">
             Art. 34.9 ET / RD-Ley 8/2019 — Registro de Jornada
           </p>
           <CheckItem
@@ -360,9 +360,9 @@ export default async function TpvLegalPage() {
         </div>
 
         {/* Fichaje Digital — Auditoría */}
-        <div className="bg-white border border-[#e2e8f0] rounded-xl p-5 flex flex-col gap-3 shadow-sm">
+        <div className="bg-white border border-[#fde68a] rounded-xl p-5 flex flex-col gap-3 shadow-sm">
           <div>
-            <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">
+            <p className="text-[10px] font-bold text-[#d97706] uppercase tracking-wider">
               Fichaje Digital — Auditoría de Jornada
             </p>
             <p className="text-xs text-[#64748b] mt-1">
@@ -372,27 +372,27 @@ export default async function TpvLegalPage() {
           <div className="flex flex-col gap-2">
             <Link
               href="/laborcontrol/supervisor"
-              className="flex items-center justify-between px-4 py-3 rounded-lg border border-[#e2e8f0] hover:border-[#2563eb] hover:bg-[#f0f9ff] transition-colors group"
+              className="flex items-center justify-between px-4 py-3 rounded-lg border border-[#e2e8f0] hover:border-[#d97706] hover:bg-[#fffbeb] transition-colors group"
             >
               <div>
-                <p className="text-sm font-medium text-[#0f172a] group-hover:text-[#2563eb]">
+                <p className="text-sm font-medium text-[#0f172a] group-hover:text-[#d97706]">
                   Panel Supervisor — Estado en tiempo real
                 </p>
                 <p className="text-xs text-[#64748b] mt-0.5">Estado actual de jornada de cada empleado (en jornada / pausa / fuera)</p>
               </div>
-              <span className="text-[#94a3b8] group-hover:text-[#2563eb] text-lg">→</span>
+              <span className="text-[#94a3b8] group-hover:text-[#d97706] text-lg">→</span>
             </Link>
             <Link
               href="/laborcontrol/rlt"
-              className="flex items-center justify-between px-4 py-3 rounded-lg border border-[#e2e8f0] hover:border-[#2563eb] hover:bg-[#f0f9ff] transition-colors group"
+              className="flex items-center justify-between px-4 py-3 rounded-lg border border-[#e2e8f0] hover:border-[#d97706] hover:bg-[#fffbeb] transition-colors group"
             >
               <div>
-                <p className="text-sm font-medium text-[#0f172a] group-hover:text-[#2563eb]">
+                <p className="text-sm font-medium text-[#0f172a] group-hover:text-[#d97706]">
                   Vista RLT — Representante Legal de los Trabajadores
                 </p>
                 <p className="text-xs text-[#64748b] mt-0.5">Art. 64 ET — acceso de solo lectura al registro de jornada</p>
               </div>
-              <span className="text-[#94a3b8] group-hover:text-[#2563eb] text-lg">→</span>
+              <span className="text-[#94a3b8] group-hover:text-[#d97706] text-lg">→</span>
             </Link>
           </div>
           <p className="text-[11px] text-[#94a3b8] border-t border-[#e2e8f0] pt-3 mt-1">

@@ -46,8 +46,12 @@ export function TpvHeader({ empresaNombre }: Readonly<Props>) {
   const NAV_ITEMS = [
     { label: '🛒 Mostrador', href: '/tpv/mostrador', activePrefix: '/tpv/mostrador' },
     { label: '🪑 Mesas',     href: '/tpv/mesas?seleccionar=1', activePrefix: '/tpv/mesas' },
-    ...(isEmployeeSession ? [{ label: '⏱ Fichajes', href: '/tpv/fichajes', activePrefix: '/tpv/fichajes' }] : []),
     ...(!isCajero ? [{ label: '📋 Historial', href: '/tpv/historial', activePrefix: '/tpv/historial' }] : []),
+  ];
+
+  const LABOR_ITEMS = [
+    { label: '⏱ Fichajes', href: '/tpv/fichajes',            activePrefix: '/tpv/fichajes' },
+    ...(showGear ? [{ label: '📋 Jornada', href: '/tpv/jornada', activePrefix: '/tpv/jornada' }] : []),
   ];
 
   useEffect(() => {
@@ -84,7 +88,7 @@ export function TpvHeader({ empresaNombre }: Readonly<Props>) {
         <span className="text-xs text-[#64748b]">{empresaNombre}</span>
       </div>
 
-      <nav className="flex gap-1">
+      <nav className="flex items-center gap-1">
         {NAV_ITEMS.map(({ label, href, activePrefix }) => (
           <button
             key={href}
@@ -94,6 +98,24 @@ export function TpvHeader({ empresaNombre }: Readonly<Props>) {
               pathname.startsWith(activePrefix)
                 ? 'bg-[#eff6ff] text-[#1e40af] border border-[#93c5fd]'
                 : 'text-[#64748b] hover:text-[#0f172a]'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+
+        {/* Labor group separator */}
+        <div className="w-px h-5 bg-[#e2e8f0] mx-1" aria-hidden="true" />
+
+        {LABOR_ITEMS.map(({ label, href, activePrefix }) => (
+          <button
+            key={href}
+            type="button"
+            onClick={() => router.push(href)}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              pathname.startsWith(activePrefix)
+                ? 'bg-[#fffbeb] text-[#92400e] border border-[#fcd34d]'
+                : 'text-[#b45309] hover:bg-[#fffbeb] hover:text-[#78350f]'
             }`}
           >
             {label}

@@ -60,8 +60,6 @@ export async function POST(req: NextRequest) {
     actorId:         empleadoId,
     tipo:            parsed.data.tipo,
     timestampEvento: new Date(parsed.data.timestampEvento),
-    origenOffline:   parsed.data.origenOffline,
-    driftSegundos:   parsed.data.driftSegundos,
   });
 
   return handleResult(result);

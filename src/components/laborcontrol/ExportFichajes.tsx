@@ -72,7 +72,7 @@ export function ExportFichajes() {
           Exportar registros de jornada
         </p>
         <p className="text-xs text-[#94a3b8] mt-0.5">
-          Descarga todos los fichajes del período seleccionado. Incluye horas extra y pausas.
+          Descarga todos los fichajes del período seleccionado. Incluye entradas, salidas y pausas.
         </p>
       </div>
 

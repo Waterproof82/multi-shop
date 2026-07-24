@@ -14,13 +14,11 @@ export async function GET(req: NextRequest) {
 
   const sp = new URL(req.url).searchParams;
   const parsed = ExportQuerySchema.safeParse({
-    tipo:              sp.get('tipo'),
-    empleadoId:        sp.get('empleadoId') ?? undefined,
-    centroId:          sp.get('centroId') ?? undefined,
-    from:              sp.get('from'),
-    to:                sp.get('to'),
-    incluirHorasExtra: sp.get('incluirHorasExtra') ?? 'true',
-    incluirPausas:     sp.get('incluirPausas') ?? 'true',
+    tipo:          sp.get('tipo'),
+    empleadoId:    sp.get('empleadoId') ?? undefined,
+    from:          sp.get('from'),
+    to:            sp.get('to'),
+    incluirPausas: sp.get('incluirPausas') ?? 'true',
   });
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -28,14 +26,11 @@ export async function GET(req: NextRequest) {
 
   const uc = getLcGenerarExportUseCase();
   const result = await uc.execute(ctx.empresaId, {
-    empleadoId:            parsed.data.empleadoId ?? null,
-    centroId:              parsed.data.centroId ?? null,
-    from:                  new Date(parsed.data.from),
-    to:                    new Date(parsed.data.to + 'T23:59:59.999Z'),
-    format:                parsed.data.tipo,
-    incluirPausas:         parsed.data.incluirPausas,
-    incluirHorasExtra:     parsed.data.incluirHorasExtra,
-    incluirResumenParcial: false,
+    empleadoId:    parsed.data.empleadoId ?? null,
+    from:          new Date(parsed.data.from),
+    to:            new Date(parsed.data.to + 'T23:59:59.999Z'),
+    format:        parsed.data.tipo,
+    incluirPausas: parsed.data.incluirPausas,
   });
 
   if (!result.success) {

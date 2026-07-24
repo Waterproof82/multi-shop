@@ -8,7 +8,6 @@ export interface RegistrarFichajeInput {
   actorId: string;
   tipo: FichajeEvento['tipo'];
   timestampEvento: Date;
-  origenOffline: boolean;
   motivo?: string;
 }
 

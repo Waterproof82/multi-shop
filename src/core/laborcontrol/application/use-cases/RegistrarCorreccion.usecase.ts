@@ -41,7 +41,6 @@ export class RegistrarCorreccionUseCase {
       refCorreccion:   input.refCorreccion,
       timestampEvento: input.timestampEvento ?? new Date(),
       motivo:          input.motivo,
-      origenOffline:   false,
     });
     if (!result.success) return result;
 
