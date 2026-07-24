@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import type { EstadoSupervisor } from '@/core/laborcontrol/domain/types';
 
 // Read-only view for RLT (Representante Legal de los Trabajadores)
@@ -37,9 +38,17 @@ export default function RltPage() {
 
   return (
     <div className="p-8 flex flex-col gap-6 max-w-4xl">
-      <div className="flex flex-col gap-1">
-        <span className="text-xs font-bold text-[#64748b] uppercase tracking-wider">Vista RLT (solo lectura)</span>
-        <h1 className="text-2xl font-bold">Registro de jornada</h1>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-bold text-[#64748b] uppercase tracking-wider">Vista RLT (solo lectura)</span>
+          <h1 className="text-2xl font-bold">Registro de jornada</h1>
+        </div>
+        <Link
+          href="/tpv/legal"
+          className="shrink-0 px-4 py-2 rounded-lg border border-[#e2e8f0] bg-white text-sm text-[#64748b] hover:text-[#0f172a] hover:border-[#cbd5e1] transition-colors"
+        >
+          ← Volver
+        </Link>
       </div>
 
       <div className="border border-[#e2e8f0] rounded-xl overflow-hidden">

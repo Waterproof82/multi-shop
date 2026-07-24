@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useId } from 'react';
+import Link from 'next/link';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import type { EstadoSupervisor } from '@/core/laborcontrol/domain/types';
 
@@ -62,9 +63,17 @@ export default function SupervisorPage() {
 
   return (
     <div className="p-8 flex flex-col gap-6 max-w-4xl">
-      <div className="flex flex-col gap-1">
-        <span className="text-xs font-bold text-[#2563eb] uppercase tracking-wider">Control de jornada</span>
-        <h1 className="text-2xl font-bold">Panel supervisor</h1>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-bold text-[#2563eb] uppercase tracking-wider">Control de jornada</span>
+          <h1 className="text-2xl font-bold">Panel supervisor</h1>
+        </div>
+        <Link
+          href="/tpv/legal"
+          className="shrink-0 px-4 py-2 rounded-lg border border-[#e2e8f0] bg-white text-sm text-[#64748b] hover:text-[#0f172a] hover:border-[#cbd5e1] transition-colors"
+        >
+          ← Volver
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
