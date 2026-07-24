@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
   const csrfToken = generateCsrfToken();
   const csrfSignature = signCsrfToken(csrfToken);
 
-  const response = NextResponse.json({ ok: true, nextUrl, rol: result.data.rol });
+  const response = NextResponse.json({ ok: true, nextUrl, rol: result.data.rol, empleadoId: result.data.empleadoId });
   // Clear admin_token so the employee session takes full precedence.
   // Without this, a previously-logged-in admin/encargado cookie would override the cajero
   // role in layout SSR (admin_token is checked first) and grant full access.

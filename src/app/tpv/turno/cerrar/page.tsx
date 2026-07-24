@@ -19,6 +19,7 @@ export default async function TurnoCerrarPage() {
   const cookieStore = await cookies();
   let rol: RolAdmin = 'cajero';
   let empresaId: string | null = null;
+  let empleadoId: string | undefined;
 
   const adminToken = cookieStore.get('admin_token')?.value;
   if (adminToken) {
@@ -36,6 +37,7 @@ export default async function TurnoCerrarPage() {
     if (!payload) redirect('/tpv/login');
     rol = payload.rol;
     empresaId = payload.empresaId;
+    empleadoId = payload.empleadoId;
   }
 
   if (!empresaId) redirect('/tpv/login');
@@ -100,7 +102,7 @@ export default async function TurnoCerrarPage() {
               : 'Cuenta el efectivo en la caja. El sistema calculará la diferencia.'}
           </p>
         </div>
-        <TurnoCerrarForm turno={turno} stats={stats} mesasAbiertas={mesasAbiertas} isBlindClose={isBlindClose} />
+        <TurnoCerrarForm turno={turno} stats={stats} mesasAbiertas={mesasAbiertas} isBlindClose={isBlindClose} empleadoId={empleadoId} />
       </div>
     </div>
   );

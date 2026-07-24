@@ -92,6 +92,28 @@ export class SupabaseEmpleadoTpvRepository implements IEmpleadoTpvRepository {
 
   async delete(id: string, empresaId: string): Promise<Result<void>> {
     try {
+      // Guard: if the employee has a labor profile (lc_perfil_laboral), a hard DELETE
+      // is blocked by ON DELETE RESTRICT FK. Redirect to soft-delete (setActivo = false).
+      const { data: profile, error: profileError } = await this.supabase
+        .from('lc_perfil_laboral')
+        .select('id')
+        .eq('empresa_id', empresaId)
+        .eq('empleado_id', id)
+        .maybeSingle();
+
+      if (profileError) return { success: false, error: await logger.logFromCatch(profileError, 'repository', 'delete') };
+
+      if (profile) {
+        // Soft-delete: deactivate profile + employee
+        const { error: profileDeactivateError } = await this.supabase
+          .from('lc_perfil_laboral')
+          .update({ activo: false })
+          .eq('empresa_id', empresaId)
+          .eq('empleado_id', id);
+        if (profileDeactivateError) return { success: false, error: await logger.logFromCatch(profileDeactivateError, 'repository', 'delete') };
+        return this.setActivo(id, empresaId, false);
+      }
+
       const { error } = await this.supabase
         .from('empleados_tpv')
         .delete()
