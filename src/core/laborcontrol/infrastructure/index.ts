@@ -64,6 +64,7 @@ export function getLcVerificarCadenaUseCase() {
   return new VerificarCadenaUseCase(getChainRepo(), getAuditRepo());
 }
 
+export function getLcFichajeRepo()     { return getFichajeRepo(); }
 export function getLcChainRepo()       { return getChainRepo(); }
 export function getLcPerfilRepo()      { return getPerfilRepo(); }
 export function getLcHoldRepo()        { return getHoldRepo(); }

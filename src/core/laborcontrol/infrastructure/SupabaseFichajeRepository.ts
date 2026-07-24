@@ -17,7 +17,6 @@ function mapRow(row: Record<string, unknown>): FichajeEvento {
     refCorreccion:     (row.ref_correccion as string) ?? null,
     timestampEvento:   new Date(row.timestamp_evento as string),
     timestampServidor: new Date(row.timestamp_servidor as string),
-    origenOffline:     row.origen_offline as boolean,
     motivo:            (row.motivo as string) ?? null,
     chainHash:         row.chain_hash as string,
     prevHash:          row.prev_hash as string,
@@ -39,7 +38,6 @@ export class SupabaseFichajeRepository implements IFichajeRepository {
           actor_id:         input.actorId,
           tipo:             input.tipo,
           timestamp_evento: input.timestampEvento.toISOString(),
-          origen_offline:   input.origenOffline,
           motivo:           input.motivo ?? null,
           // Placeholders — BEFORE INSERT trigger overwrites these
           chain_hash: 'PENDING',
@@ -75,7 +73,6 @@ export class SupabaseFichajeRepository implements IFichajeRepository {
           accion:           c.accion,
           ref_correccion:   c.refCorreccion,
           timestamp_evento: c.timestampEvento.toISOString(),
-          origen_offline:   c.origenOffline,
           motivo:           c.motivo,
           chain_hash: 'PENDING',
           prev_hash:  'PENDING',

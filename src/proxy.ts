@@ -338,11 +338,13 @@ async function handleTpvEmployeeAuth(request: NextRequest, origin: string | null
   requestHeaders.set('x-empresa-id', payload.empresaId);
   requestHeaders.set('x-admin-rol', payload.rol);
   requestHeaders.set('x-employee-id', payload.empleadoId);
+  requestHeaders.set('x-employee-nombre', payload.nombre);
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set('x-empresa-id', payload.empresaId);
   response.headers.set('x-admin-rol', payload.rol);
   response.headers.set('x-employee-id', payload.empleadoId);
+  response.headers.set('x-employee-nombre', payload.nombre);
 
   if (refreshedToken) {
     response.cookies.set('tpv_employee_token', refreshedToken, {

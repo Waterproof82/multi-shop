@@ -11,7 +11,6 @@ Un **fichaje** es un evento de jornada laboral registrado digitalmente. Cada vez
 - **Quién**: `empleado_id` + `actor_id` (la misma persona si ficha él mismo, distinto si lo registra un supervisor)
 - **Qué**: `tipo` del evento (`entrada | salida | inicio_pausa | fin_pausa`)
 - **Cuándo**: `timestamp_evento` (hora según el dispositivo) + `timestamp_servidor` (hora del servidor, fuente de verdad)
-- **Cómo**: `origen_offline` (si el dispositivo estaba sin conexión cuando ocurrió)
 - **Huella**: `chain_hash` SHA-256 calculado automáticamente en la base de datos
 
 ---
@@ -19,25 +18,22 @@ Un **fichaje** es un evento de jornada laboral registrado digitalmente. Cada vez
 ## Ciclo de vida de un fichaje
 
 ```
-Empleado pulsa "Fichar entrada"
+Empleado introduce PIN en /tpv/fichajes (modo kiosk)
         ↓
-FichajeDialog (componente modal)
-  ├── Online  → POST /api/laborcontrol/fichaje (tiempo real)
-  └── Offline → enqueue() → IndexedDB cifrado
-                    ↓ (al recuperar red)
-              syncQueue() → POST /api/laborcontrol/fichaje (origenOffline: true)
+POST /api/laborcontrol/fichaje/kiosk
+  Fase 1 { pin }        → identifica empleado + tipo sugerido
+  Fase 2 { pin, tipo }  → registra el fichaje
         ↓
-API Route valida con Zod
-  └── RegistrarFichajeUseCase
-        ├── Verifica perfil laboral activo
-        ├── Comprueba drift de reloj (> 5 min → flag en motivo)
-        └── SupabaseFichajeRepository.registrar()
-              ↓
-        BEFORE INSERT trigger (Postgres)
-              ├── Obtiene chain_seq (secuencia global)
-              ├── Lee prev_hash del último fichaje de la empresa
-              ├── Calcula SHA-256 del payload canónico
-              └── Escribe chain_hash + prev_hash en la fila
+RegistrarFichajeUseCase
+  ├── Verifica perfil laboral activo
+  ├── Lee último fichaje (para detectar orphans)
+  └── SupabaseFichajeRepository.registrar()
+        ↓
+  BEFORE INSERT trigger (Postgres)
+        ├── Obtiene chain_seq (secuencia global)
+        ├── Lee prev_hash del último fichaje de la empresa
+        ├── Calcula SHA-256 del payload canónico
+        └── Escribe chain_hash + prev_hash en la fila
         ↓
 IAuditRepository.insert() → lc_audit_log
 ```
@@ -165,18 +161,6 @@ lc_fichajes_2026_09  → septiembre 2026
 
 ---
 
-## Offline
-
-Cuando el dispositivo pierde conexión:
-
-1. `FichajeDialog` detecta `navigator.onLine = false`
-2. Muestra aviso ámbar: "Sin conexión — el fichaje se guardará offline"
-3. `enqueue()` cifra el payload con AES-GCM 256-bit y lo guarda en IndexedDB
-4. Al volver online → `syncQueue()` envía todos los pendientes con `origenOffline: true`
-5. El servidor los procesa normalmente (con drift check si el timestamp difiere >5 min)
-
-Los fichajes offline son **totalmente válidos** — quedan marcados con `origen_offline = true` para trazabilidad, pero tienen el mismo valor legal que los online.
-
 ---
 
 ## Conservación legal
@@ -193,8 +177,8 @@ El Art. 34.9 ET exige conservar los registros de jornada durante **4 años**. La
 
 | Rol | Puede hacer |
 |-----|-------------|
-| `cajero` / `encargado` | Fichar su propia entrada/salida/pausa desde FichajeDialog o `/tpv/fichajes` |
-| `encargado` | Ver estado supervisor, registrar correcciones |
+| `cajero` / `encargado` / `admin` | Fichar desde `/tpv/fichajes` (modo kiosk por PIN) |
+| `encargado` | Ver panel jornada (`/tpv/jornada`), registrar correcciones |
 | `admin` | Todo lo anterior + exportar PDF/Excel + verificar cadena + gestionar holds |
 | RLT | Vista de solo lectura en `/laborcontrol/rlt` |
 

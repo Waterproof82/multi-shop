@@ -27,6 +27,7 @@ const TURNO_OPTIONAL_PREFIXES = [
   '/tpv/historial',
   '/tpv/analytics',
   '/tpv/mermas',
+  '/tpv/jornada',
 ];
 
 export const dynamic = 'force-dynamic';

@@ -27,7 +27,6 @@ export interface FichajeEvento {
   refCorreccion: string | null;
   timestampEvento: Date;
   timestampServidor: Date;
-  origenOffline: boolean;
   motivo: string | null;
   chainHash: string;
   prevHash: string;
@@ -61,21 +60,6 @@ export interface Correccion {
   timestampEvento: Date;
   motivo: string;
   actorId: string;
-  origenOffline: boolean;
-}
-
-// Overtime entry
-export interface HorasExtra {
-  id: string;
-  empresaId: string;
-  empleadoId: string;
-  centroId: string;
-  fecha: string; // YYYY-MM-DD
-  horasExtra: number;
-  compensacion: Compensacion;
-  notas: string | null;
-  registradoPor: string;
-  createdAt: Date;
 }
 
 // Legal hold
@@ -132,13 +116,10 @@ export interface EstadoSupervisor {
 export interface ExportQuery {
   empresaId: string;
   empleadoId: string | null;
-  centroId: string | null;
   from: Date;
   to: Date;
   format: 'pdf' | 'excel';
   incluirPausas: boolean;
-  incluirHorasExtra: boolean;
-  incluirResumenParcial: boolean;
 }
 
 // Chain segment verification result
@@ -170,18 +151,3 @@ export interface ReviewQueueItem {
   resolvedBy: string | null;
 }
 
-// Offline queue item (IndexedDB)
-export interface OfflineQueueItem {
-  localId: string;
-  empleadoId: string;
-  centroId: string;
-  tipo: FichajeTipo;
-  timestampEvento: string; // ISO 8601
-  clockOffsetMs: number;
-  localHash: string;
-  encryptedPayload: string; // AES-GCM: base64(IV).base64(ciphertext)
-  createdAt: string;
-  attempts: number;
-  status: 'pending' | 'failed' | 'synced';
-  errorMessage: string | null;
-}

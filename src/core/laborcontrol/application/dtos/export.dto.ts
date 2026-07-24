@@ -1,13 +1,11 @@
 import { z } from 'zod';
 
 export const ExportQuerySchema = z.object({
-  tipo:               z.enum(['pdf', 'excel']),
-  empleadoId:         z.string().uuid().optional(),
-  centroId:           z.string().uuid().optional(),
-  from:               z.string().date(),
-  to:                 z.string().date(),
-  incluirHorasExtra:  z.coerce.boolean().default(true),
-  incluirPausas:      z.coerce.boolean().default(true),
+  tipo:          z.enum(['pdf', 'excel']),
+  empleadoId:    z.string().uuid().optional(),
+  from:          z.string().date(),
+  to:            z.string().date(),
+  incluirPausas: z.coerce.boolean().default(true),
 });
 
 export const ResumenParcialQuerySchema = z.object({
