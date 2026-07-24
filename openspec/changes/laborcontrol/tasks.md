@@ -49,46 +49,46 @@ Chain strategy: feature-branch-chain
 
 ## Phase 2: Repositories + Use Cases
 
-- [ ] 2.1 Create `src/core/laborcontrol/infrastructure/SupabaseFichajeRepository.ts` — insert + query by empleado+range
-- [ ] 2.2 Create `src/core/laborcontrol/infrastructure/SupabasePerfilLaboralRepository.ts` — CRUD + getByEmpleado
-- [ ] 2.3 Create `src/core/laborcontrol/infrastructure/SupabaseChainRepository.ts` — sealAnchor, verifySegment (calls `lc_verify_chain_segment` RPC)
-- [ ] 2.4 Create `src/core/laborcontrol/infrastructure/SupabaseAuditRepository.ts` — insert only
-- [ ] 2.5 Create `src/core/laborcontrol/infrastructure/SupabaseHoldRepository.ts` — create, list, lift
-- [ ] 2.6 Create `src/core/laborcontrol/infrastructure/renderers/PdfRenderer.ts` — `@react-pdf/renderer` renderToStream
-- [ ] 2.7 Create `src/core/laborcontrol/infrastructure/renderers/ExcelRenderer.ts` — exceljs WorkbookWriter stream
-- [ ] 2.8 Create `src/core/laborcontrol/infrastructure/SupabaseExportRepository.ts` — normalized fichaje query, injects renderers
-- [ ] 2.9 Create `src/core/laborcontrol/application/use-cases/RegistrarFichaje.usecase.ts` — drift check, insert, audit
-- [ ] 2.10 Create `src/core/laborcontrol/application/use-cases/RegistrarCorreccion.usecase.ts` — validate ref, insert correccion, orphan detection
-- [ ] 2.11 Create `src/core/laborcontrol/application/use-cases/ObtenerMisFichajes.usecase.ts` — query + supersede resolution
-- [ ] 2.12 Create `src/core/laborcontrol/application/use-cases/ObtenerEstadoSupervisor.usecase.ts` — current state per employee
-- [ ] 2.13 Create `src/core/laborcontrol/application/use-cases/GenerarExport.usecase.ts` — orchestrates query → renderer
-- [ ] 2.14 Create `src/core/laborcontrol/application/use-cases/GenerarResumenParcial.usecase.ts` — Art. 12.4.c ET monthly summary PDF
-- [ ] 2.15 Create `src/core/laborcontrol/application/use-cases/GestionarHold.usecase.ts` — create + lift holds
-- [ ] 2.16 Create `src/core/laborcontrol/application/use-cases/VerificarCadena.usecase.ts` — calls chain repo + audit log
+- [x] 2.1 Create `src/core/laborcontrol/infrastructure/SupabaseFichajeRepository.ts` — insert + query by empleado+range
+- [x] 2.2 Create `src/core/laborcontrol/infrastructure/SupabasePerfilLaboralRepository.ts` — CRUD + getByEmpleado
+- [x] 2.3 Create `src/core/laborcontrol/infrastructure/SupabaseChainRepository.ts` — sealAnchor, verifySegment (calls `lc_verify_chain_segment` RPC)
+- [x] 2.4 Create `src/core/laborcontrol/infrastructure/SupabaseAuditRepository.ts` — insert only
+- [x] 2.5 Create `src/core/laborcontrol/infrastructure/SupabaseHoldRepository.ts` — create, list, lift
+- [x] 2.6 Create `src/core/laborcontrol/infrastructure/renderers/PdfRenderer.ts` — `@react-pdf/renderer` renderToStream
+- [x] 2.7 Create `src/core/laborcontrol/infrastructure/renderers/ExcelRenderer.ts` — exceljs WorkbookWriter stream
+- [x] 2.8 Create `src/core/laborcontrol/infrastructure/SupabaseExportRepository.ts` — normalized fichaje query, injects renderers
+- [x] 2.9 Create `src/core/laborcontrol/application/use-cases/RegistrarFichaje.usecase.ts` — drift check, insert, audit
+- [x] 2.10 Create `src/core/laborcontrol/application/use-cases/RegistrarCorreccion.usecase.ts` — validate ref, insert correccion, orphan detection
+- [x] 2.11 Create `src/core/laborcontrol/application/use-cases/ObtenerMisFichajes.usecase.ts` — query + supersede resolution
+- [x] 2.12 Create `src/core/laborcontrol/application/use-cases/ObtenerEstadoSupervisor.usecase.ts` — current state per employee
+- [x] 2.13 Create `src/core/laborcontrol/application/use-cases/GenerarExport.usecase.ts` — orchestrates query → renderer
+- [x] 2.14 Create `src/core/laborcontrol/application/use-cases/GenerarResumenParcial.usecase.ts` — Art. 12.4.c ET monthly summary PDF
+- [x] 2.15 Create `src/core/laborcontrol/application/use-cases/GestionarHold.usecase.ts` — create + lift holds
+- [x] 2.16 Create `src/core/laborcontrol/application/use-cases/VerificarCadena.usecase.ts` — calls chain repo + audit log
 
 ## Phase 3: API Routes
 
-- [ ] 3.1 Create `src/app/api/laborcontrol/fichaje/route.ts` — POST, `tpv_employee_token` auth
-- [ ] 3.2 Create `src/app/api/laborcontrol/fichajes/[empleadoId]/route.ts` — GET with `from`/`to` params
-- [ ] 3.3 Create `src/app/api/laborcontrol/correcciones/route.ts` — POST, requireRole admin/encargado
-- [ ] 3.4 Create `src/app/api/laborcontrol/supervisor/route.ts` — GET, requireRole admin/encargado
-- [ ] 3.5 Create `src/app/api/laborcontrol/export/route.ts` — GET, streams PDF/Excel
-- [ ] 3.6 Create `src/app/api/laborcontrol/export/parcial/route.ts` — GET, Art. 12.4.c summary PDF
-- [ ] 3.7 Create `src/app/api/laborcontrol/chain/verify/route.ts` — GET, requireRole admin
-- [ ] 3.8 Create `src/app/api/laborcontrol/holds/route.ts` — GET + POST, requireRole admin
-- [ ] 3.9 Create `src/app/api/laborcontrol/overtime/route.ts` — GET, requireRole admin/encargado
-- [ ] 3.10 Create `src/app/api/laborcontrol/cron/partition/route.ts` — GET (Vercel Cron `CRON_SECRET` guard)
-- [ ] 3.11 Create `src/app/api/laborcontrol/cron/seal/route.ts` — GET (Vercel Cron, seals prev month anchors)
+- [x] 3.1 Create `src/app/api/laborcontrol/fichaje/route.ts` — POST, `tpv_employee_token` auth
+- [x] 3.2 Create `src/app/api/laborcontrol/fichajes/[empleadoId]/route.ts` — GET with `from`/`to` params
+- [x] 3.3 Create `src/app/api/laborcontrol/correcciones/route.ts` — POST, requireRole admin/encargado
+- [x] 3.4 Create `src/app/api/laborcontrol/supervisor/route.ts` — GET, requireRole admin/encargado
+- [x] 3.5 Create `src/app/api/laborcontrol/export/route.ts` — GET, streams PDF/Excel
+- [x] 3.6 Create `src/app/api/laborcontrol/export/parcial/route.ts` — GET, Art. 12.4.c summary PDF
+- [x] 3.7 Create `src/app/api/laborcontrol/chain/verify/route.ts` — GET, requireRole admin
+- [x] 3.8 Create `src/app/api/laborcontrol/holds/route.ts` — GET + POST, requireRole admin
+- [x] 3.9 Create `src/app/api/laborcontrol/overtime/route.ts` — GET, requireRole admin/encargado
+- [x] 3.10 Create `src/app/api/laborcontrol/cron/partition/route.ts` — GET (Vercel Cron `CRON_SECRET` guard)
+- [x] 3.11 Create `src/app/api/laborcontrol/cron/seal/route.ts` — GET (Vercel Cron, seals prev month anchors)
 
 ## Phase 4: UI + TPV Integration + Offline
 
-- [ ] 4.1 Create `src/app/laborcontrol/supervisor/page.tsx` — Realtime dashboard (`EstadoSupervisor[]`, `lc_fichajes` channel)
-- [ ] 4.2 Create `src/app/laborcontrol/rlt/page.tsx` — read-only view for RLT users (requireRole rlt)
-- [ ] 4.3 Create `src/app/tpv/fichajes/page.tsx` — employee self-view, 60s inactivity timeout, `tpv_employee_token` only
-- [ ] 4.4 Create `src/components/laborcontrol/FichajeDialog.tsx` — modal "¿Fichar entrada/salida?" with online/offline branch
-- [ ] 4.5 Integrate `FichajeDialog` into TPV login flow (`TpvLoginForm` — post-PIN success)
-- [ ] 4.6 Integrate `FichajeDialog` into TPV turn-close flow (turno cerrar page)
-- [ ] 4.7 Add "Mis fichajes" link to TPV mostrador layout
-- [ ] 4.8 Create `src/lib/laborcontrol/offline-queue.ts` — IndexedDB `laborcontrol_offline` store, AES-GCM encryption, sync loop
-- [ ] 4.9 Create `src/lib/laborcontrol/pin-cache.ts` — Electron-only bcryptjs PIN cache (electron-store key `lc_pin_cache`, rate limit 4 attempts/30s)
-- [ ] 4.10 Add canonical hash TypeScript reference to `src/lib/laborcontrol/chain-hash.ts` (for verification tools)
+- [x] 4.1 Create `src/app/laborcontrol/supervisor/page.tsx` — Realtime dashboard (`EstadoSupervisor[]`, `lc_fichajes` channel)
+- [x] 4.2 Create `src/app/laborcontrol/rlt/page.tsx` — read-only view for RLT users (requireRole rlt)
+- [x] 4.3 Create `src/app/tpv/fichajes/page.tsx` — employee self-view, 60s inactivity timeout, `tpv_employee_token` only
+- [x] 4.4 Create `src/components/laborcontrol/FichajeDialog.tsx` — modal "¿Fichar entrada/salida?" with online/offline branch
+- [x] 4.5 Integrate `FichajeDialog` into TPV login flow (`TpvLoginForm` — post-PIN success)
+- [x] 4.6 Integrate `FichajeDialog` into TPV turn-close flow (turno cerrar page)
+- [x] 4.7 Add "Mis fichajes" link to TPV mostrador layout
+- [x] 4.8 Create `src/lib/laborcontrol/offline-queue.ts` — IndexedDB `laborcontrol_offline` store, AES-GCM encryption, sync loop
+- [x] 4.9 Create `src/lib/laborcontrol/pin-cache.ts` — Electron-only bcryptjs PIN cache (electron-store key `lc_pin_cache`, rate limit 4 attempts/30s)
+- [x] 4.10 Add canonical hash TypeScript reference to `src/lib/laborcontrol/chain-hash.ts` (for verification tools)
