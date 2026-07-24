@@ -39,6 +39,7 @@ export interface PerfilLaboral {
   id: string;
   empresaId: string;
   empleadoId: string;
+  empleadoNombre?: string;
   centroId: string;
   jornadaTeoricaHoras: number;
   tipoContrato: TipoContrato;

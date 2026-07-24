@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useId } from 'react';
 import Link from 'next/link';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import type { EstadoSupervisor } from '@/core/laborcontrol/domain/types';
+import { ExportFichajes } from '@/components/laborcontrol/ExportFichajes';
 
 export const dynamic = 'force-dynamic';
 
@@ -103,6 +104,8 @@ export default function SupervisorPage() {
       {estados.length === 0 && (
         <p className="text-sm text-[#6b7280]">No hay empleados con perfil laboral activo.</p>
       )}
+
+      <ExportFichajes />
     </div>
   );
 }

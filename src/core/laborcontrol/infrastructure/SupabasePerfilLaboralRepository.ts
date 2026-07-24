@@ -5,10 +5,12 @@ import type { PerfilLaboral } from '../domain/types';
 import type { IPerfilLaboralRepository, CreatePerfilLaboralInput, UpdatePerfilLaboralInput } from '../domain/interfaces/IPerfilLaboralRepository';
 
 function mapRow(row: Record<string, unknown>): PerfilLaboral {
+  const empJoin = row.empleados_tpv as { nombre?: string } | undefined;
   return {
     id:                   row.id as string,
     empresaId:            row.empresa_id as string,
     empleadoId:           row.empleado_id as string,
+    empleadoNombre:       empJoin?.nombre,
     centroId:             row.centro_id as string,
     jornadaTeoricaHoras:  Number(row.jornada_teorica_horas),
     tipoContrato:         row.tipo_contrato as PerfilLaboral['tipoContrato'],
@@ -66,7 +68,7 @@ export class SupabasePerfilLaboralRepository implements IPerfilLaboralRepository
     try {
       let query = this.db
         .from('lc_perfil_laboral')
-        .select('*')
+        .select('*, empleados_tpv(nombre)')
         .eq('empresa_id', empresaId);
       if (soloActivos) query = query.eq('activo', true);
       const { data, error } = await query.order('created_at', { ascending: true });

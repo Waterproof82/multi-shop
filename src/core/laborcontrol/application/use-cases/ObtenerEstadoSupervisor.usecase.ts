@@ -31,7 +31,7 @@ export class ObtenerEstadoSupervisorUseCase {
         const ultimo = ultimoResult.success ? ultimoResult.data : null;
         return {
           empleadoId:                perfil.empleadoId,
-          empleadoNombre:            perfil.empleadoId, // enriched at API layer via join
+          empleadoNombre:            perfil.empleadoNombre ?? perfil.empleadoId,
           centroId:                  perfil.centroId,
           estado:                    derivarEstado(ultimo),
           ultimoEvento:              ultimo,

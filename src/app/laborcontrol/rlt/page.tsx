@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import type { EstadoSupervisor } from '@/core/laborcontrol/domain/types';
+import { ExportFichajes } from '@/components/laborcontrol/ExportFichajes';
 
 // Read-only view for RLT (Representante Legal de los Trabajadores)
 // Mirrors supervisor panel but no mutations
@@ -78,6 +79,8 @@ export default function RltPage() {
           <p className="px-4 py-6 text-sm text-[#6b7280]">Sin datos</p>
         )}
       </div>
+
+      <ExportFichajes />
     </div>
   );
 }
