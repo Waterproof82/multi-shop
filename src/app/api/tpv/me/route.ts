@@ -8,5 +8,5 @@ export async function GET() {
 
   if (!rol) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  return NextResponse.json({ rol, isEmployeeSession: !!empleadoId });
+  return NextResponse.json({ rol, isEmployeeSession: !!empleadoId, empleadoId: empleadoId ?? null });
 }

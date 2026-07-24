@@ -14,6 +14,10 @@ interface StoreSchema {
   signingKey: string;
 }
 
+interface PinCacheSchema {
+  [empleadoId: string]: string;
+}
+
 interface FiscalSnapshotPayload {
   empresaNombre: string;
   aperturaAt: string;
@@ -25,6 +29,7 @@ app.setName('Multisistema TPV');
 Menu.setApplicationMenu(null);
 
 const store = new Store<StoreSchema>();
+const pinStore = new Store<PinCacheSchema>({ name: 'lc-pin-cache' });
 let mainWindow: BrowserWindow;
 
 function createWindow(): void {
@@ -110,6 +115,18 @@ function setupIpc(): void {
       return { success: false, error: 'Impresora no configurada' };
     }
     return printReceipt(printerName, data);
+  });
+
+  ipcMain.handle('lc-pin:get', (_event, empleadoId: string) =>
+    pinStore.get(empleadoId),
+  );
+
+  ipcMain.handle('lc-pin:set', (_event, empleadoId: string, hash: string) => {
+    pinStore.set(empleadoId, hash);
+  });
+
+  ipcMain.handle('lc-pin:delete', (_event, empleadoId: string) => {
+    pinStore.delete(empleadoId);
   });
 
   ipcMain.handle('fiscal:save-snapshot', async (_event, data: FiscalSnapshotPayload) => {
