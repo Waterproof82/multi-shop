@@ -338,11 +338,13 @@ async function handleTpvEmployeeAuth(request: NextRequest, origin: string | null
   requestHeaders.set('x-empresa-id', payload.empresaId);
   requestHeaders.set('x-admin-rol', payload.rol);
   requestHeaders.set('x-employee-id', payload.empleadoId);
+  requestHeaders.set('x-employee-nombre', payload.nombre);
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set('x-empresa-id', payload.empresaId);
   response.headers.set('x-admin-rol', payload.rol);
   response.headers.set('x-employee-id', payload.empleadoId);
+  response.headers.set('x-employee-nombre', payload.nombre);
 
   if (refreshedToken) {
     response.cookies.set('tpv_employee_token', refreshedToken, {
@@ -389,6 +391,17 @@ export async function proxy(request: NextRequest) {
     }
     // Inspector token: allow unauthenticated access to the audit export endpoint
     if (path === '/api/tpv/audit/export' && request.nextUrl.searchParams.has('inspector_token')) {
+      return NextResponse.next();
+    }
+    const adminResult = await handleAdminAuth(request, origin);
+    if (adminResult.status === 200) return adminResult;
+    return handleTpvEmployeeAuth(request, origin);
+  }
+
+  // LaborControl auth: cron endpoints are public (CRON_SECRET guard handled inside the route)
+  // All others try admin_token first, then tpv_employee_token
+  if (path.startsWith('/api/laborcontrol')) {
+    if (path.startsWith('/api/laborcontrol/cron/')) {
       return NextResponse.next();
     }
     const adminResult = await handleAdminAuth(request, origin);

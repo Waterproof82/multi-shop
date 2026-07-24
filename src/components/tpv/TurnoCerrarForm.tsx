@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import type { TpvTurno, TpvTurnoStats, InformeZData } from '@/core/domain/entities/tpv-types';
 import { getCsrfToken, fetchWithCsrf } from '@/lib/csrf-client';
@@ -8,6 +8,7 @@ import { useTpvCatalog } from '@/lib/tpv-catalog-ctx';
 import { useTpvIsEmployeeSession } from '@/lib/tpv-rol-ctx';
 import { InformeZModal } from '@/components/tpv/InformeZModal';
 import { logClientError } from '@/lib/client-error';
+import { FichajeDialog } from '@/components/laborcontrol/FichajeDialog';
 
 interface MesaAbierta {
   mesaNumero: number | null;
@@ -19,6 +20,7 @@ interface Props {
   readonly stats: TpvTurnoStats;
   readonly mesasAbiertas: MesaAbierta[];
   readonly isBlindClose: boolean;
+  readonly empleadoId?: string;
 }
 
 function fmt(cents: number) {
@@ -43,7 +45,7 @@ function getDiferenciaLabel(diferenciaCents: number): string {
   return 'Faltante';
 }
 
-export function TurnoCerrarForm({ turno, stats, mesasAbiertas, isBlindClose }: Readonly<Props>) {
+export function TurnoCerrarForm({ turno, stats, mesasAbiertas, isBlindClose, empleadoId }: Readonly<Props>) {
   const router = useRouter();
   const { setTurno } = useTpvCatalog();
   const isEmployeeSession = useTpvIsEmployeeSession();
@@ -51,6 +53,8 @@ export function TurnoCerrarForm({ turno, stats, mesasAbiertas, isBlindClose }: R
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [informeZ, setInformeZ] = useState<InformeZData | null>(null);
+  const [showFichajeDialog, setShowFichajeDialog] = useState(false);
+  const [pendingNav, setPendingNav] = useState<string | null>(null);
 
   const contadoCents = Math.round(parseFloat(efectivoContado || '0') * 100);
   const teoricoCents = turno.efectivoAperturaCents + stats.totalEfectivoCents;
@@ -89,6 +93,7 @@ export function TurnoCerrarForm({ turno, stats, mesasAbiertas, isBlindClose }: R
           await fetchWithCsrf('/api/tpv/empleados/logout', { method: 'POST' });
         }
         const zRes = await fetch(`/api/tpv/turno/${turno.id}/informe-z`);
+        const nextNav = isEmployeeSession ? '/tpv/login' : '/tpv/turno/abrir';
         if (zRes.ok) {
           const data = (await zRes.json()) as InformeZData;
           const snapshotPromise = window.electronAPI?.saveFiscalSnapshot(data);
@@ -102,8 +107,11 @@ export function TurnoCerrarForm({ turno, stats, mesasAbiertas, isBlindClose }: R
               .catch(err => { logClientError(err, 'saveFiscalSnapshot'); });
           }
           setInformeZ(data);
+        } else if (isEmployeeSession && empleadoId) {
+          setPendingNav(nextNav);
+          setShowFichajeDialog(true);
         } else {
-          router.push(isEmployeeSession ? '/tpv/login' : '/tpv/turno/abrir');
+          router.push(nextNav);
         }
       } else {
         let msg = 'Error al cerrar el turno. Inténtalo de nuevo.';
@@ -120,8 +128,33 @@ export function TurnoCerrarForm({ turno, stats, mesasAbiertas, isBlindClose }: R
     }
   }
 
+  const handleFichajeDone = useCallback(() => {
+    if (pendingNav) router.push(pendingNav);
+  }, [pendingNav, router]);
+
+  const handleFichajeSkip = useCallback(() => {
+    if (pendingNav) router.push(pendingNav);
+  }, [pendingNav, router]);
+
   function handleInformeZClose() {
-    router.push(isEmployeeSession ? '/tpv/login' : `/tpv/analytics/cierre/${turno.id}`);
+    if (isEmployeeSession && empleadoId) {
+      setPendingNav(isEmployeeSession ? '/tpv/login' : `/tpv/analytics/cierre/${turno.id}`);
+      setShowFichajeDialog(true);
+    } else {
+      router.push(isEmployeeSession ? '/tpv/login' : `/tpv/analytics/cierre/${turno.id}`);
+    }
+  }
+
+  if (showFichajeDialog && empleadoId !== undefined) {
+    return (
+      <FichajeDialog
+        open
+        empleadoId={empleadoId}
+        sugerido="salida"
+        onDone={handleFichajeDone}
+        onSkip={handleFichajeSkip}
+      />
+    );
   }
 
   if (informeZ !== null) {
