@@ -151,6 +151,25 @@ export interface ChainVerifyResult {
   verifiedAt: Date;
 }
 
+// Review queue item — orphan, drift, ack requests, disputes (lc_review_queue)
+export type ReviewTipo = 'orphan' | 'drift' | 'sync_failed' | 'ack_pendiente' | 'disputa';
+export type ReviewEstado = 'pendiente' | 'visto' | 'disputado' | 'resuelto';
+
+export interface ReviewQueueItem {
+  id: string;
+  empresaId: string;
+  centroId: string;
+  empleadoId: string;
+  recordId: string | null;
+  tipoRevision: ReviewTipo;
+  estado: ReviewEstado;
+  detalle: Record<string, unknown>;
+  createdAt: Date;
+  updatedAt: Date;
+  resolvedAt: Date | null;
+  resolvedBy: string | null;
+}
+
 // Offline queue item (IndexedDB)
 export interface OfflineQueueItem {
   localId: string;

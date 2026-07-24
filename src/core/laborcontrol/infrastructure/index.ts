@@ -4,6 +4,7 @@ import { SupabaseChainRepository } from './SupabaseChainRepository';
 import { SupabaseAuditRepository } from './SupabaseAuditRepository';
 import { SupabaseHoldRepository } from './SupabaseHoldRepository';
 import { SupabaseExportRepository } from './SupabaseExportRepository';
+import { SupabaseReviewQueueRepository } from './SupabaseReviewQueueRepository';
 import { RegistrarFichajeUseCase } from '../application/use-cases/RegistrarFichaje.usecase';
 import { RegistrarCorreccionUseCase } from '../application/use-cases/RegistrarCorreccion.usecase';
 import { ObtenerMisFichajesUseCase } from '../application/use-cases/ObtenerMisFichajes.usecase';
@@ -20,21 +21,23 @@ let _chainRepo: SupabaseChainRepository | undefined;
 let _auditRepo: SupabaseAuditRepository | undefined;
 let _holdRepo: SupabaseHoldRepository | undefined;
 let _exportRepo: SupabaseExportRepository | undefined;
+let _reviewQueueRepo: SupabaseReviewQueueRepository | undefined;
 
-function getFichajeRepo() { return (_fichajeRepo ??= new SupabaseFichajeRepository()); }
-function getPerfilRepo()  { return (_perfilRepo  ??= new SupabasePerfilLaboralRepository()); }
-function getChainRepo()   { return (_chainRepo   ??= new SupabaseChainRepository()); }
-function getAuditRepo()   { return (_auditRepo   ??= new SupabaseAuditRepository()); }
-function getHoldRepo()    { return (_holdRepo    ??= new SupabaseHoldRepository()); }
-function getExportRepo()  { return (_exportRepo  ??= new SupabaseExportRepository()); }
+function getFichajeRepo()     { return (_fichajeRepo     ??= new SupabaseFichajeRepository()); }
+function getPerfilRepo()      { return (_perfilRepo      ??= new SupabasePerfilLaboralRepository()); }
+function getChainRepo()       { return (_chainRepo       ??= new SupabaseChainRepository()); }
+function getAuditRepo()       { return (_auditRepo       ??= new SupabaseAuditRepository()); }
+function getHoldRepo()        { return (_holdRepo        ??= new SupabaseHoldRepository()); }
+function getExportRepo()      { return (_exportRepo      ??= new SupabaseExportRepository()); }
+function getReviewQueueRepo() { return (_reviewQueueRepo ??= new SupabaseReviewQueueRepository()); }
 
 // Use case factories (new instance per request is fine — they hold no state)
 export function getLcRegistrarFichajeUseCase() {
-  return new RegistrarFichajeUseCase(getFichajeRepo(), getAuditRepo());
+  return new RegistrarFichajeUseCase(getFichajeRepo(), getAuditRepo(), getReviewQueueRepo());
 }
 
 export function getLcRegistrarCorreccionUseCase() {
-  return new RegistrarCorreccionUseCase(getFichajeRepo(), getAuditRepo());
+  return new RegistrarCorreccionUseCase(getFichajeRepo(), getAuditRepo(), getReviewQueueRepo());
 }
 
 export function getLcObtenerMisFichajesUseCase() {
@@ -61,6 +64,7 @@ export function getLcVerificarCadenaUseCase() {
   return new VerificarCadenaUseCase(getChainRepo(), getAuditRepo());
 }
 
-export function getLcChainRepo() { return getChainRepo(); }
-export function getLcPerfilRepo() { return getPerfilRepo(); }
-export function getLcHoldRepo() { return getHoldRepo(); }
+export function getLcChainRepo()       { return getChainRepo(); }
+export function getLcPerfilRepo()      { return getPerfilRepo(); }
+export function getLcHoldRepo()        { return getHoldRepo(); }
+export function getLcReviewQueueRepo() { return getReviewQueueRepo(); }

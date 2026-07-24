@@ -5,6 +5,8 @@ import { useId } from 'react';
 import type { FichajeEvento } from '@/core/laborcontrol/domain/types';
 import { getCsrfToken } from '@/lib/csrf-client';
 
+const RGPD_KEY = (id: string) => `lc_rgpd_v1_${id}`;
+
 interface Props {
   readonly open: boolean;
   readonly empleadoId: string;
@@ -22,10 +24,18 @@ const TIPO_LABEL: Record<Exclude<FichajeEvento['tipo'], 'correccion'>, string> =
 
 export function FichajeDialog({ open, empleadoId, sugerido = 'entrada', onDone, onSkip }: Props) {
   const dialogId = useId();
-  const [loading, setLoading]     = useState(false);
-  const [error, setError]         = useState<string | null>(null);
-  const [isOnline, setIsOnline]   = useState(true);
-  const [queued, setQueued]       = useState(false);
+  const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState<string | null>(null);
+  const [isOnline, setIsOnline]     = useState(true);
+  const [queued, setQueued]         = useState(false);
+  const [rgpdPending, setRgpdPending] = useState(false);
+
+  // LC-G-001: Check if RGPD clause must be shown (first fichaje per device)
+  useEffect(() => {
+    if (!open) return;
+    const accepted = localStorage.getItem(RGPD_KEY(empleadoId));
+    if (accepted === null) setRgpdPending(true);
+  }, [open, empleadoId]);
 
   useEffect(() => {
     const update = () => setIsOnline(navigator.onLine);
@@ -87,6 +97,49 @@ export function FichajeDialog({ open, empleadoId, sugerido = 'entrada', onDone, 
   }, [empleadoId, isOnline, onDone, sugerido]);
 
   if (!open) return null;
+
+  // LC-G-001: RGPD first-fichaje informative clause
+  if (rgpdPending) {
+    return (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={`${dialogId}-rgpd-title`}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      >
+        <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm flex flex-col gap-5">
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-bold text-[#2563eb] uppercase tracking-wider">
+              Información de tratamiento de datos
+            </span>
+            <h2 id={`${dialogId}-rgpd-title`} className="text-lg font-bold text-[#0f172a]">
+              Registro de jornada — Art. 34.9 ET
+            </h2>
+          </div>
+          <p className="text-sm text-[#374151] leading-relaxed">
+            Tu empresa está obligada a registrar tu jornada laboral diaria según el{' '}
+            <strong>Art. 34.9 del Estatuto de los Trabajadores</strong> (RD-Ley 8/2019).
+          </p>
+          <p className="text-sm text-[#374151] leading-relaxed">
+            Los datos registrados (hora de entrada, salida y pausas) se conservan durante{' '}
+            <strong>4 años</strong> y están a disposición de la Inspección de Trabajo y tu
+            representante sindical (RLT). La base legal del tratamiento es{' '}
+            <strong>Art. 6.1.c RGPD</strong> (obligación legal).
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              localStorage.setItem(RGPD_KEY(empleadoId), '1');
+              setRgpdPending(false);
+            }}
+            className="w-full py-3 rounded-xl bg-[#2563eb] text-white font-bold hover:brightness-110 transition-all"
+          >
+            Entendido — continuar
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
