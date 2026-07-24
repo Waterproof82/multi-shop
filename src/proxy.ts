@@ -396,6 +396,17 @@ export async function proxy(request: NextRequest) {
     return handleTpvEmployeeAuth(request, origin);
   }
 
+  // LaborControl auth: cron endpoints are public (CRON_SECRET guard handled inside the route)
+  // All others try admin_token first, then tpv_employee_token
+  if (path.startsWith('/api/laborcontrol')) {
+    if (path.startsWith('/api/laborcontrol/cron/')) {
+      return NextResponse.next();
+    }
+    const adminResult = await handleAdminAuth(request, origin);
+    if (adminResult.status === 200) return adminResult;
+    return handleTpvEmployeeAuth(request, origin);
+  }
+
   // Superadmin auth (protected routes)
   if (path.startsWith('/api/superadmin')) {
     const adminAuthResponse = await handleAdminAuth(request, origin);

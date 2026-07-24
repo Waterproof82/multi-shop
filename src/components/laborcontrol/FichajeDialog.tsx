@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useId } from 'react';
 import type { FichajeEvento } from '@/core/laborcontrol/domain/types';
+import { getCsrfToken } from '@/lib/csrf-client';
 
 interface Props {
   readonly open: boolean;
@@ -56,9 +57,13 @@ export function FichajeDialog({ open, empleadoId, sugerido = 'entrada', onDone, 
     }
 
     try {
+      const csrfToken = getCsrfToken();
       const res = await fetch('/api/laborcontrol/fichaje', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
+        },
         body: JSON.stringify({
           empleadoId,
           tipo:            sugerido,

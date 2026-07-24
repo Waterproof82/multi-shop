@@ -330,6 +330,72 @@ gh release create vX.Y.Z "dist/TPV MultiShop X.Y.Z.exe" \
 
 Ver `docs/context/electron-tpv.md` para trampas críticas e integración con impresora.
 
+### ⏱️ Fichaje Digital — LaborControl (Art. 34.9 ET · RD-Ley 8/2019)
+
+Módulo de registro de jornada laboral con cumplimiento legal completo para el mercado español. Integrado en el TPV y accesible desde cualquier dispositivo. Inmutable por diseño: los registros **nunca se borran ni modifican** — toda corrección es un evento adicional con trazabilidad completa.
+
+#### Registro de eventos
+
+- **Cuatro tipos de evento**: `entrada | salida | inicio_pausa | fin_pausa`. Las correcciones de supervisor generan un quinto tipo (`correccion`) que referencia al registro original.
+- **Doble timestamp**: `timestamp_evento` (dispositivo) y `timestamp_servidor` (fuente de verdad). Si difieren más de 5 minutos, se añade un flag automático en `motivo` — el fichaje sigue siendo válido.
+- **Origen offline**: los fichajes realizados sin conexión se marcan `origen_offline = true` para trazabilidad pero tienen el mismo valor legal.
+- **Resolución de `superseded`**: calculada en memoria en `ObtenerMisFichajesUseCase` — no existe en DB. Una corrección que referencia un registro lo marca como anulado o rectificado sin borrar nada.
+
+#### Cadena de integridad SHA-256
+
+Cada fichaje encadena el hash del anterior (blockchain-like). Si alguien modifica un registro en la DB, la ruptura es matemáticamente detectable:
+
+```
+Fichaje #N
+  chain_hash = SHA-256("v1|chain_seq=N|empresa_id=X|empleado_id=Y|tipo=Z|ts=ISO|prev=HASH_ANTERIOR")
+  prev_hash  = chain_hash del fichaje N-1
+```
+
+- El trigger `BEFORE INSERT` en PostgreSQL calcula `chain_hash` y `prev_hash` automáticamente — el cliente siempre envía `chain_hash='PENDING'`.
+- Verificación por período: `GET /api/laborcontrol/chain/verify?year=2026&month=7` → `{ status: 'ok' | 'tampered', totalRows, brokenAt }`.
+- Implementación TypeScript en `src/lib/laborcontrol/chain-hash.ts` — idéntica al payload canónico de Postgres, para auditoría cruzada.
+
+#### Tabla particionada mensualmente
+
+`lc_fichajes` usa particionado nativo PostgreSQL por `timestamp_servidor`:
+
+- `lc_fichajes_2026_07`, `lc_fichajes_2026_08`, … — queries por período leen solo la partición relevante.
+- **Cron automático (Vercel)**: día 25 a las 01:00 UTC crea la partición del mes siguiente; día 2 a las 02:00 UTC sella las anclas del mes anterior.
+- Purga quirúrgica en el futuro: `DROP TABLE lc_fichajes_YYYY_MM` sin afectar al resto (después del período legal de 4 años del Art. 34.9 ET).
+
+#### Flujo TPV — FichajeDialog
+
+- Al hacer login con PIN → `FichajeDialog` aparece con `sugerido="entrada"` antes de redirigir al mostrador.
+- Al cerrar turno → `FichajeDialog` aparece con `sugerido="salida"` (solo si la sesión es de empleado, no admin).
+- Enlace **⏱ Fichajes** en el header del TPV para empleados → `/tpv/fichajes` (vista "Mis fichajes" con historial y estado actual).
+
+#### Modo offline con AES-GCM 256-bit
+
+1. `FichajeDialog` detecta `navigator.onLine === false` → aviso ámbar.
+2. El payload se cifra con AES-GCM 256-bit y se guarda en IndexedDB.
+3. Al recuperar conexión → `syncQueue()` envía todos los pendientes con `origenOffline: true`.
+4. El servidor los procesa normalmente con drift check.
+
+#### PIN offline (Electron)
+
+Los empleados del TPV Electron pueden autenticarse offline con su PIN. El hash bcrypt (work factor 12) se guarda en `electron-store` vía IPC (`window.electronAPI.lcPinStore`). Rate limit: 4 intentos / 30 segundos por empleado.
+
+#### Panel supervisor y RLT
+
+- `/laborcontrol/supervisor` — panel en tiempo real vía Supabase Realtime (`postgres_changes INSERT on lc_fichajes`). Muestra estado actual de cada empleado (🟢 En jornada / 🟡 En pausa / ⚫ Fuera).
+- `/laborcontrol/rlt` — vista de solo lectura para el Representante Legal de los Trabajadores (Art. 64 ET).
+
+#### Exportación y compliance Art. 12.4.c ET
+
+- **Export PDF**: `@react-pdf/renderer` genera PDF con todos los fichajes del período, firma del empleado y datos de la empresa.
+- **Export Excel**: `exceljs` (WorkbookWriter streaming) genera XLSX con hojas por empleado.
+- **Resumen parcial**: para trabajadores a tiempo parcial, resumen mensual obligatorio (Art. 12.4.c ET) generado server-side como stream.
+- **Legal holds** (`lc_legal_holds`): retenciones manuales que bloquean cualquier purga para un empleado o empresa específica.
+- **Offboarding suave**: al eliminar un empleado con perfil laboral, sus fichajes se conservan — el perfil se desactiva, no se borra.
+
+Ver `docs/context/laborcontrol.md` para arquitectura completa, tablas, API y trampas críticas.
+Ver `docs/context/fichaje-digital.md` para el mecanismo de fichaje en detalle.
+
 ---
 
 ## Stack Tecnológico
@@ -1481,6 +1547,7 @@ El warning de VS Code es un falso positivo del plugin de GitHub Actions (no cono
 | **Compras y Proveedores (SIALTI)** | Módulo completo de compras multi-tenant (Bloque 1). Maestro de proveedores con catálogo por proveedor. Pedidos de compra (borrador → enviado → recibido). Albaranes de recepción con trazabilidad sanitaria obligatoria para ingredientes perecederos: `numero_lote` + `fecha_caducidad >= hoy` (Reg. CE 178/2002). Albaranes inmutables al recibir: triggers DB bloquean UPDATE/DELETE (Ley Antifraude 11/2021). Recepción atómica via RPC `recibir_albaran_transaccional`: genera `movimientos_stock` y actualiza `cantidad_actual` en una transacción. Facturas con desglose de IVA soportado al 0/4/10/21% y validación matemática ±2 céntimos (RD 1619/2012). Pago integrado con turno de caja activo: inserta `tpv_turno_eventos` tipo `compra_proveedor`. Panel admin en `/admin/compras/` (4 tabs). Disponible para tienda y restaurante. |
 | **Telegram Multi-modo** | tienda → quick-reply buttons. restaurante takeaway → time-selector + tracking en vivo. mesa → gestionado in-app (sin Telegram). |
 | **Delivery + Pago online** | Zona de cobertura por CP configurable. Cotización Glovo en tiempo real. Pago Redsys TPV Virtual obligatorio para delivery. Auto-despacho de rider al confirmar pago. Tracking page post-pago. |
+| **Fichaje Digital (LaborControl)** | Registro de jornada laboral conforme al Art. 34.9 ET y RD-Ley 8/2019. Cadena SHA-256 inmutable por trigger PostgreSQL (verificable vía API). Tabla `lc_fichajes` particionada mensualmente con cron automático (Vercel). FichajeDialog integrado en TPV (login PIN → entrada, cierre turno → salida). Cola offline IndexedDB + AES-GCM 256-bit + sync automático al recuperar red. Panel supervisor en tiempo real (Supabase Realtime). Vista RLT (solo lectura Art. 64 ET). Export PDF (`@react-pdf/renderer`) y Excel (ExcelJS streaming). Resumen mensual Art. 12.4.c ET para parciales. Legal holds. PIN offline bcrypt/Electron. |
 
 ## Documentación
 
@@ -1511,6 +1578,8 @@ El warning de VS Code es un falso positivo del plugin de GitHub Actions (no cono
 - [`docs/context/alergenos-system.md`](docs/context/alergenos-system.md) — Sistema de alérgenos EU (Reglamento 1169/2011): 14 sustancias, iconos SVG, 5 idiomas
 - [`docs/context/audit-log.md`](docs/context/audit-log.md) — Audit log operativo: quién hizo qué (distinto del export fiscal de /tpv/legal)
 - [`docs/superpowers/specs/2026-07-08-empleados-tpv-permisos-design.md`](docs/superpowers/specs/2026-07-08-empleados-tpv-permisos-design.md) — Spec de diseño del sistema de empleados TPV con PIN
+- [`docs/context/laborcontrol.md`](docs/context/laborcontrol.md) — LaborControl (fichaje digital): arquitectura completa, tablas DB, API endpoints, cadena SHA-256, exportación, offline, Electron PIN, trampas críticas
+- [`docs/context/fichaje-digital.md`](docs/context/fichaje-digital.md) — Fichaje digital: concepto, ciclo de vida, tipos de evento, correcciones, cadena de integridad, particionado, flujo offline, conservación legal
 
 ---
 
