@@ -3,6 +3,14 @@
     {
       "path": "/api/cron/rgpd-purge",
       "schedule": "0 3 1 * *"
+    },
+    {
+      "path": "/api/laborcontrol/cron/seal",
+      "schedule": "0 2 2 * *"
+    },
+    {
+      "path": "/api/laborcontrol/cron/partition",
+      "schedule": "0 1 25 * *"
     }
   ]
 }

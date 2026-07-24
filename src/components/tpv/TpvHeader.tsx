@@ -46,6 +46,7 @@ export function TpvHeader({ empresaNombre }: Readonly<Props>) {
   const NAV_ITEMS = [
     { label: '🛒 Mostrador', href: '/tpv/mostrador', activePrefix: '/tpv/mostrador' },
     { label: '🪑 Mesas',     href: '/tpv/mesas?seleccionar=1', activePrefix: '/tpv/mesas' },
+    ...(isEmployeeSession ? [{ label: '⏱ Fichajes', href: '/tpv/fichajes', activePrefix: '/tpv/fichajes' }] : []),
     ...(!isCajero ? [{ label: '📋 Historial', href: '/tpv/historial', activePrefix: '/tpv/historial' }] : []),
   ];
 
