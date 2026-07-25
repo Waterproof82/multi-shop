@@ -225,6 +225,9 @@ function buildCsp(nonce: string, path: string): string {
   return [
     "default-src 'self'",
     scriptSrc,
+    // 'unsafe-inline' for style-src is accepted risk: Tailwind v4 injects runtime
+    // styles that cannot be nonce-attributed. Upgrading to hash-based CSP requires
+    // a Tailwind v4 CSP plugin that does not yet exist. Tracked as P3.
     "style-src 'self' 'unsafe-inline'",
     `img-src ${imgSources}`,
     `media-src ${mediaSources}`,
@@ -256,6 +259,30 @@ async function handleWaiterAuth(request: NextRequest, origin: string | null): Pr
       NextResponse.json({ error: 'WAITER_UNAUTHORIZED' }, { status: 401 }),
       origin
     );
+  }
+
+  // CSRF check for mutative methods — mirrors handleTpvEmployeeAuth pattern
+  const isMutativeMethod = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(request.method);
+  if (isMutativeMethod) {
+    const csrfCookie = request.cookies.get('csrf_token')?.value;
+    const csrfHeader = request.headers.get('x-csrf-token');
+    if (!csrfHeader || !csrfCookie) {
+      return addCorsHeaders(
+        NextResponse.json(createErrorResponse(AUTH_ERRORS.CSRF_REQUIRED), { status: 403 }),
+        origin
+      );
+    }
+    const [tokenCsrf, signature] = csrfCookie.split(':');
+    const csrfHeaderMatchesToken = (() => {
+      try { return timingSafeEqual(Buffer.from(csrfHeader), Buffer.from(tokenCsrf)); }
+      catch { return false; }
+    })();
+    if (!tokenCsrf || !signature || !verifyCsrfToken(tokenCsrf, signature) || !csrfHeaderMatchesToken) {
+      return addCorsHeaders(
+        NextResponse.json(createErrorResponse(AUTH_ERRORS.CSRF_INVALID), { status: 403 }),
+        origin
+      );
+    }
   }
 
   const requestHeaders = new Headers(request.headers);
