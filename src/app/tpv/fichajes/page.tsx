@@ -285,7 +285,7 @@ export default function FichajesPage() {
   const pendingNotifs = notifs.filter(n => n.estado === 'pendiente');
 
   return (
-    <div className="p-6 flex flex-col gap-6 max-w-2xl mx-auto">
+    <div className="p-6 flex flex-col gap-6 max-w-2xl mx-auto w-full h-full overflow-hidden">
 
       {/* Header */}
       <div>
@@ -470,7 +470,7 @@ export default function FichajesPage() {
       </div>
 
       {/* ── Kiosk feed — last 30 fichajes across all employees ── */}
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 flex-1 min-h-0">
         <span className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">
           Últimos fichajes · 30 días
         </span>
@@ -514,7 +514,7 @@ export default function FichajesPage() {
         {historyLoading ? (
           <p className="text-sm text-[#6b7280]">Cargando historial...</p>
         ) : (
-          <div className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
+          <div className="flex flex-col gap-2 flex-1 min-h-0 overflow-y-auto pr-1">
             {recentFichajes.map(f => (
               <div
                 key={f.recordId}
