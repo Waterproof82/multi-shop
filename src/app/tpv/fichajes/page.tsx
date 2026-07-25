@@ -190,8 +190,7 @@ export default function FichajesPage() {
     setTimeout(() => pinRef.current?.focus(), 50);
   }, []);
 
-  const handleLookup = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
+  const doLookup = useCallback(async () => {
     if (pin.length < 4) return;
     setKiosk({ phase: 'loading' });
 
@@ -226,6 +225,18 @@ export default function FichajesPage() {
       setKiosk({ phase: 'error', message: 'Error de red. Inténtalo de nuevo.' });
     }
   }, [pin]);
+
+  const handleLookup = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    void doLookup();
+  }, [doLookup]);
+
+  // Auto-submit when PIN reaches minimum length — no button press needed
+  useEffect(() => {
+    if (pin.length < 4 || kiosk.phase !== 'idle') return;
+    const timer = setTimeout(() => void doLookup(), 400);
+    return () => clearTimeout(timer);
+  }, [pin, kiosk.phase, doLookup]);
 
   const handleFichar = useCallback(async (nombre: string, tipo: FichajeTipo) => {
     // Optimistic: show done state and add to feed immediately
@@ -316,15 +327,18 @@ export default function FichajesPage() {
               value={pin}
               onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
               placeholder="PIN (4–8 dígitos)"
+              disabled={kiosk.phase === 'loading'}
               style={{ WebkitTextSecurity: 'disc' } as React.CSSProperties}
-              className="flex-1 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-4 py-3.5 text-2xl font-bold text-center tracking-widest outline-none focus:border-[#2563eb] transition-colors placeholder:text-sm placeholder:font-normal placeholder:tracking-normal placeholder:text-[#94a3b8] text-[#0f172a]"
+              className="flex-1 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-4 py-3.5 text-2xl font-bold text-center tracking-widest outline-none focus:border-[#2563eb] disabled:opacity-50 transition-colors placeholder:text-sm placeholder:font-normal placeholder:tracking-normal placeholder:text-[#94a3b8] text-[#0f172a]"
             />
             <button
               type="submit"
               disabled={pin.length < 4 || kiosk.phase === 'loading'}
               className="px-5 rounded-xl bg-[#2563eb] text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition-all text-sm shrink-0"
             >
-              {kiosk.phase === 'loading' ? '...' : 'Identificar'}
+              {kiosk.phase === 'loading' ? (
+                <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : 'Identificar'}
             </button>
           </form>
         )}
