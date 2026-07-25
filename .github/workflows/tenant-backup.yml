@@ -13,12 +13,27 @@ jobs:
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           BACKUP_SECRET: ${{ secrets.BACKUP_SECRET }}
         run: |
-          response=$(curl -s -o /dev/null -w "%{http_code}" \
-            -X POST "$SUPABASE_URL/functions/v1/tenant-backup" \
-            -H "Authorization: Bearer $BACKUP_SECRET" \
-            -H "Content-Type: application/json")
-          echo "HTTP status: $response"
-          if [ "$response" != "200" ] && [ "$response" != "207" ]; then
-            echo "Backup failed with status $response"
-            exit 1
-          fi
+          BASE_URL="${SUPABASE_URL%/}"
+          TARGET_URL="${BASE_URL}/functions/v1/tenant-backup"
+          echo "Calling: $TARGET_URL"
+
+          for attempt in 1 2 3; do
+            response=$(curl -s -o /tmp/backup_body.txt -w "%{http_code}" \
+              --max-time 120 \
+              -X POST "$TARGET_URL" \
+              -H "Authorization: Bearer $BACKUP_SECRET" \
+              -H "Content-Type: application/json")
+            echo "Attempt $attempt — HTTP status: $response"
+            if [ "$response" = "200" ] || [ "$response" = "207" ]; then
+              cat /tmp/backup_body.txt
+              exit 0
+            fi
+            echo "Response body: $(cat /tmp/backup_body.txt)"
+            if [ "$attempt" -lt 3 ]; then
+              echo "Retrying in 15s…"
+              sleep 15
+            fi
+          done
+
+          echo "Backup failed after 3 attempts (last status: $response)"
+          exit 1
