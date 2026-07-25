@@ -6,6 +6,7 @@ import { getSupabaseClient } from '@/core/infrastructure/database/supabase-clien
 import { verifyTpvEmployeeToken } from '@/lib/tpv-employee-auth';
 import { LegalChainVerify } from '@/components/tpv/LegalChainVerify';
 import { InspectorTokenGenerator } from '@/components/tpv/InspectorTokenGenerator';
+import { RltAccessLink } from '@/components/tpv/RltAccessLink';
 import { FABRICANTE, TPV_VERSION, DECLARATION_DATE } from '@/lib/fabricante';
 
 export const dynamic = 'force-dynamic';
@@ -57,11 +58,15 @@ function CheckItem({ label, status, detail }: Readonly<CheckItemProps>) {
 export default async function TpvLegalPage() {
   const cookieStore = await cookies();
   let empresaId: string | null = null;
+  let isAdmin = false;
 
   const adminToken = cookieStore.get('admin_token')?.value;
   if (adminToken) {
     const admin = await getAuthAdminUseCase().verifyToken(adminToken);
-    if (admin?.empresaId) empresaId = admin.empresaId;
+    if (admin?.empresaId) {
+      empresaId = admin.empresaId;
+      isAdmin = true;
+    }
   }
 
   if (!empresaId) {
@@ -313,7 +318,7 @@ export default async function TpvLegalPage() {
           <CheckItem
             label="Modo offline con sincronización diferida"
             status="done"
-            detail="IndexedDB + AES-GCM 256-bit — fichajes offline marcados origen_offline=true, misma validez legal"
+            detail="IndexedDB + AES-GCM 256-bit — cola cifrada local, sincronización automática al recuperar red"
           />
 
           <p className="text-[11px] font-semibold text-[#2563eb] uppercase tracking-wider mt-4 mb-1">
@@ -382,18 +387,7 @@ export default async function TpvLegalPage() {
               </div>
               <span className="text-[#94a3b8] group-hover:text-[#d97706] text-lg">→</span>
             </Link>
-            <Link
-              href="/laborcontrol/rlt"
-              className="flex items-center justify-between px-4 py-3 rounded-lg border border-[#e2e8f0] hover:border-[#d97706] hover:bg-[#fffbeb] transition-colors group"
-            >
-              <div>
-                <p className="text-sm font-medium text-[#0f172a] group-hover:text-[#d97706]">
-                  Vista RLT — Representante Legal de los Trabajadores
-                </p>
-                <p className="text-xs text-[#64748b] mt-0.5">Art. 64 ET — acceso de solo lectura al registro de jornada</p>
-              </div>
-              <span className="text-[#94a3b8] group-hover:text-[#d97706] text-lg">→</span>
-            </Link>
+            <RltAccessLink canAccess={isAdmin} />
           </div>
           <p className="text-[11px] text-[#94a3b8] border-t border-[#e2e8f0] pt-3 mt-1">
             Verificación de la cadena de integridad: <span className="font-mono">GET /api/laborcontrol/chain/verify?year=YYYY&amp;month=M</span> (requiere token admin)
