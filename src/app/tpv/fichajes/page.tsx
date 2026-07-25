@@ -2,8 +2,16 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import type { FichajeConEstado } from '@/core/laborcontrol/application/use-cases/ObtenerMisFichajes.usecase';
 import type { ReviewQueueItem } from '@/core/laborcontrol/domain/types';
+
+interface RecienteFichaje {
+  recordId:          string;
+  empleadoId:        string;
+  empleadoNombre:    string;
+  tipo:              string;
+  timestampEvento:   string;
+  timestampServidor: string;
+}
 import { getCsrfToken } from '@/lib/csrf-client';
 
 export const dynamic = 'force-dynamic';
@@ -98,8 +106,8 @@ export default function FichajesPage() {
   const [kiosk, setKiosk] = useState<KioskState>({ phase: 'idle' });
 
   // History
-  const [fichajes, setFichajes]       = useState<FichajeConEstado[]>([]);
-  const [notifs, setNotifs]           = useState<ReviewQueueItem[]>([]);
+  const [recentFichajes, setRecentFichajes] = useState<RecienteFichaje[]>([]);
+  const [notifs, setNotifs]                 = useState<ReviewQueueItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
   // Inactivity timer
@@ -141,18 +149,24 @@ export default function FichajesPage() {
     })();
   }, [router]);
 
-  // Load personal history when employee session is present
+  const loadRecentFichajes = useCallback(async () => {
+    setHistoryLoading(true);
+    const res = await fetch('/api/laborcontrol/fichajes/recientes');
+    if (res.ok) setRecentFichajes(await res.json() as RecienteFichaje[]);
+    setHistoryLoading(false);
+  }, []);
+
+  // Load global kiosk feed once session is ready
+  useEffect(() => {
+    if (sessionLoading) return;
+    void loadRecentFichajes();
+  }, [sessionLoading, loadRecentFichajes]);
+
+  // Load personal review notifications when employee session is present
   useEffect(() => {
     if (!empleadoId) return;
-    setHistoryLoading(true);
-    const { from, to } = getDateRange();
-    void Promise.all([
-      fetch(`/api/laborcontrol/fichajes/${empleadoId}?from=${from}&to=${to}`),
-      fetch('/api/laborcontrol/review-queue'),
-    ]).then(async ([fichajesRes, notifsRes]) => {
-      if (fichajesRes.ok) setFichajes(await fichajesRes.json() as FichajeConEstado[]);
-      if (notifsRes.ok)   setNotifs(await notifsRes.json() as ReviewQueueItem[]);
-      setHistoryLoading(false);
+    void fetch('/api/laborcontrol/review-queue').then(async res => {
+      if (res.ok) setNotifs(await res.json() as ReviewQueueItem[]);
     });
   }, [empleadoId]);
 
@@ -234,10 +248,11 @@ export default function FichajesPage() {
       const data = await res.json() as { timestampServidor: string };
       setKiosk({ phase: 'done', nombre, tipo, timestamp: data.timestampServidor });
       successTimer.current = setTimeout(resetKiosk, 3000);
+      void loadRecentFichajes();
     } catch {
       setKiosk({ phase: 'error', message: 'Error de red. Inténtalo de nuevo.' });
     }
-  }, [pin, resetKiosk]);
+  }, [pin, resetKiosk, loadRecentFichajes]);
 
   if (sessionLoading) {
     return <div className="p-6 text-sm text-[#6b7280]">Cargando...</div>;
@@ -430,92 +445,78 @@ export default function FichajesPage() {
         )}
       </div>
 
-      {/* ── Personal history — only if employee session ── */}
-      {empleadoId !== null && (
-        <div className="flex flex-col gap-4">
-          <div>
-            <span className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">
-              Mis fichajes · últimos 30 días
-            </span>
-            {empleadoNombre !== null && (
-              <p className="text-lg font-bold text-[#0f172a] mt-0.5">{empleadoNombre}</p>
+      {/* ── Kiosk feed — last 30 fichajes across all employees ── */}
+      <div className="flex flex-col gap-4">
+        <span className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">
+          Últimos fichajes · 30 días
+        </span>
+
+        {/* Pending review notifications — only for employee session */}
+        {empleadoId !== null && pendingNotifs.length > 0 && (
+          <div className="flex flex-col gap-2">
+            {pendingNotifs.map(n => (
+              <div
+                key={n.id}
+                className="border border-amber-200 bg-amber-50 rounded-xl px-4 py-3 flex flex-col gap-2"
+              >
+                <p className="text-sm font-medium text-amber-800">
+                  {REVISION_LABEL[n.tipoRevision] ?? n.tipoRevision}
+                </p>
+                {typeof n.detalle.mensaje === 'string' && (
+                  <p className="text-xs text-amber-700">{n.detalle.mensaje}</p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void markNotif(n.id, 'visto')}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-white border border-amber-200 text-amber-700 hover:bg-amber-100 transition-colors"
+                  >
+                    Visto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void markNotif(n.id, 'disputado')}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-white border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+                  >
+                    Disputar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Fichajes list */}
+        {historyLoading ? (
+          <p className="text-sm text-[#6b7280]">Cargando historial...</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {recentFichajes.map(f => (
+              <div
+                key={f.recordId}
+                className="border border-[#e2e8f0] bg-white rounded-xl px-4 py-3 flex items-center gap-3"
+              >
+                <span
+                  className={`w-2.5 h-2.5 rounded-full shrink-0 ${TIPO_DOT[f.tipo] ?? 'bg-[#94a3b8]'}`}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-[#0f172a]">
+                    {f.empleadoNombre}
+                  </p>
+                  <p className="text-xs text-[#6b7280] mt-0.5">
+                    {HISTORY_TIPO_LABEL[f.tipo] ?? f.tipo} · {formatEvent(f.timestampServidor)}
+                  </p>
+                </div>
+              </div>
+            ))}
+            {recentFichajes.length === 0 && (
+              <p className="text-sm text-[#6b7280] text-center py-8">
+                No hay fichajes en los últimos 30 días.
+              </p>
             )}
           </div>
-
-          {/* Pending review notifications */}
-          {pendingNotifs.length > 0 && (
-            <div className="flex flex-col gap-2">
-              {pendingNotifs.map(n => (
-                <div
-                  key={n.id}
-                  className="border border-amber-200 bg-amber-50 rounded-xl px-4 py-3 flex flex-col gap-2"
-                >
-                  <p className="text-sm font-medium text-amber-800">
-                    {REVISION_LABEL[n.tipoRevision] ?? n.tipoRevision}
-                  </p>
-                  {typeof n.detalle.mensaje === 'string' && (
-                    <p className="text-xs text-amber-700">{n.detalle.mensaje}</p>
-                  )}
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void markNotif(n.id, 'visto')}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-white border border-amber-200 text-amber-700 hover:bg-amber-100 transition-colors"
-                    >
-                      Visto
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void markNotif(n.id, 'disputado')}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-white border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
-                    >
-                      Disputar
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Fichajes list */}
-          {historyLoading ? (
-            <p className="text-sm text-[#6b7280]">Cargando historial...</p>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {fichajes.map(f => (
-                <div
-                  key={f.recordId}
-                  className={`border rounded-xl px-4 py-3 flex items-center gap-3 ${
-                    f.superseded
-                      ? 'border-[#fecaca] bg-[#fef2f2] opacity-50'
-                      : 'border-[#e2e8f0] bg-white'
-                  }`}
-                >
-                  <span
-                    className={`w-2.5 h-2.5 rounded-full shrink-0 ${TIPO_DOT[f.tipo] ?? 'bg-[#94a3b8]'}`}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-[#0f172a]">
-                      {HISTORY_TIPO_LABEL[f.tipo] ?? f.tipo}
-                      {f.superseded && (
-                        <span className="ml-2 text-xs font-normal text-[#94a3b8]">(anulado)</span>
-                      )}
-                    </p>
-                    <p className="text-xs text-[#6b7280] mt-0.5">
-                      {formatEvent(f.timestampEvento)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-              {fichajes.length === 0 && (
-                <p className="text-sm text-[#6b7280] text-center py-8">
-                  No hay fichajes en los últimos 30 días.
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
