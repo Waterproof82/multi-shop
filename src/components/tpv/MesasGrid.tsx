@@ -251,7 +251,6 @@ export function MesasGrid({ modo }: Readonly<Props>) {
   const turnoId = turno?.id ?? null;
   return (
     <div className="flex-1 overflow-auto p-6">
-      <h2 className="text-lg font-bold mb-5 text-[#0f172a]">Mesas</h2>
       {mesas.length === 0 && (
         <p className="text-[#6b7280] text-sm">No hay mesas configuradas.</p>
       )}
