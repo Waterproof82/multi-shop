@@ -228,8 +228,23 @@ export default function FichajesPage() {
   }, [pin]);
 
   const handleFichar = useCallback(async (nombre: string, tipo: FichajeTipo) => {
-    setKiosk({ phase: 'fichando' });
+    // Optimistic: show done state and add to feed immediately
+    const tempId    = `opt-${Date.now()}`;
+    const optimisticTs = new Date().toISOString();
 
+    setKiosk({ phase: 'done', nombre, tipo, timestamp: optimisticTs });
+    successTimer.current = setTimeout(resetKiosk, 3000);
+
+    setRecentFichajes(prev => [{
+      recordId:          tempId,
+      empleadoId:        '',
+      empleadoNombre:    nombre,
+      tipo,
+      timestampEvento:   optimisticTs,
+      timestampServidor: optimisticTs,
+    }, ...prev]);
+
+    // Confirm with server in background
     const csrfToken = getCsrfToken();
     try {
       const res = await fetch('/api/laborcontrol/fichaje/kiosk', {
@@ -240,19 +255,28 @@ export default function FichajesPage() {
         },
         body: JSON.stringify({ pin, tipo }),
       });
+
       if (!res.ok) {
+        // Revert on server error
+        if (successTimer.current) clearTimeout(successTimer.current);
         const json = await res.json() as { error?: string };
         setKiosk({ phase: 'error', message: json.error ?? 'Error al fichar' });
+        setRecentFichajes(prev => prev.filter(f => f.recordId !== tempId));
         return;
       }
+
+      // Replace optimistic timestamp with real server timestamp
       const data = await res.json() as { timestampServidor: string };
-      setKiosk({ phase: 'done', nombre, tipo, timestamp: data.timestampServidor });
-      successTimer.current = setTimeout(resetKiosk, 3000);
-      void loadRecentFichajes();
+      setRecentFichajes(prev => prev.map(f =>
+        f.recordId === tempId ? { ...f, timestampServidor: data.timestampServidor } : f
+      ));
     } catch {
+      // Revert on network error
+      if (successTimer.current) clearTimeout(successTimer.current);
       setKiosk({ phase: 'error', message: 'Error de red. Inténtalo de nuevo.' });
+      setRecentFichajes(prev => prev.filter(f => f.recordId !== tempId));
     }
-  }, [pin, resetKiosk, loadRecentFichajes]);
+  }, [pin, resetKiosk]);
 
   if (sessionLoading) {
     return <div className="p-6 text-sm text-[#6b7280]">Cargando...</div>;
@@ -490,7 +514,7 @@ export default function FichajesPage() {
         {historyLoading ? (
           <p className="text-sm text-[#6b7280]">Cargando historial...</p>
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
             {recentFichajes.map(f => (
               <div
                 key={f.recordId}
