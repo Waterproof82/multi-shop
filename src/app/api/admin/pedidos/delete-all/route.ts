@@ -1,10 +1,17 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getPedidoUseCase } from '@/core/infrastructure/database';
 import { requireAuth, requireRole, successResponse, validationErrorResponse, handleResult, type AuthResult } from '@/core/infrastructure/api/helpers';
 import { rateLimitAdmin } from '@/core/infrastructure/api/rate-limit';
 
 export async function DELETE(request: NextRequest) {
+  // Defense-in-depth: this endpoint must never run in production.
+  // The DB trigger pedidos_block_delete() is the final guard,
+  // but we fail fast here to prevent accidental exposure.
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'NOT_AVAILABLE' }, { status: 403 });
+  }
+
   const rateLimited = await rateLimitAdmin(request);
   if (rateLimited) return rateLimited;
 
