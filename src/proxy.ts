@@ -417,7 +417,8 @@ export async function proxy(request: NextRequest) {
       return NextResponse.next();
     }
     // Inspector token: allow unauthenticated access to the audit export endpoint
-    if (path === '/api/tpv/audit/export' && request.nextUrl.searchParams.has('inspector_token')) {
+    // Token must be passed in Authorization: Bearer header (not query param) to avoid URL exposure in logs
+    if (path === '/api/tpv/audit/export' && request.headers.get('authorization')?.startsWith('Bearer ')) {
       return NextResponse.next();
     }
     const adminResult = await handleAdminAuth(request, origin);

@@ -7,7 +7,9 @@ export async function GET(req: NextRequest) {
   let empresaId: string | null = null;
 
   // Allow inspector token as alternative auth (for Hacienda inspectors)
-  const inspectorToken = req.nextUrl.searchParams.get('inspector_token');
+  // Token is passed in Authorization: Bearer header (never in URL query params)
+  const authHeader = req.headers.get('authorization');
+  const inspectorToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
   if (inspectorToken) {
     const payload = await verifyInspectorToken(inspectorToken);
     if (!payload) return NextResponse.json({ error: 'Token de inspector inválido o expirado' }, { status: 401 });
