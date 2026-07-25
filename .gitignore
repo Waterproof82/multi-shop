@@ -102,3 +102,7 @@ android/app/src/main/*
 !android/app/src/main/java/
 !android/app/src/main/res/
 .superpowers/
+
+# Playwright
+test-results/
+playwright-report/
