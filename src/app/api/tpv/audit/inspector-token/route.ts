@@ -19,12 +19,10 @@ export async function POST(req: NextRequest) {
 
   const token = await signInspectorToken({ empresaId, emitidoPor: adminId });
 
-  const exportUrl = `/api/tpv/audit/export?inspector_token=${token}`;
-
   return NextResponse.json({
     token,
-    export_url: exportUrl,
+    inspector_url: '/tpv/audit/inspector',
     expires_in: '24h',
-    instructions: 'Comparta la export_url con el inspector. El enlace expira en 24 horas y permite descargar los registros de cobros en formato JSON.',
+    instructions: 'Entregue el token al inspector. Deberá acceder a /tpv/audit/inspector y pegarlo en el formulario para descargar los registros de cobros.',
   });
 }

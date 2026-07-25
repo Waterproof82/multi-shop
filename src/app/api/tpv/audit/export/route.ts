@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { requireAuth, requireRole, type AuthResult } from '@/core/infrastructure/api/helpers';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { verifyInspectorToken } from '@/lib/inspector-token';
@@ -7,7 +8,9 @@ export async function GET(req: NextRequest) {
   let empresaId: string | null = null;
 
   // Allow inspector token as alternative auth (for Hacienda inspectors)
-  const inspectorToken = req.nextUrl.searchParams.get('inspector_token');
+  // Token is passed in Authorization: Bearer header (never in URL query params)
+  const authHeader = req.headers.get('authorization');
+  const inspectorToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
   if (inspectorToken) {
     const payload = await verifyInspectorToken(inspectorToken);
     if (!payload) return NextResponse.json({ error: 'Token de inspector inválido o expirado' }, { status: 401 });
@@ -23,8 +26,9 @@ export async function GET(req: NextRequest) {
   if (!empresaId) return NextResponse.json({ error: 'empresaId requerido' }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
-  const desde = searchParams.get('desde'); // YYYY-MM-DD
-  const hasta = searchParams.get('hasta'); // YYYY-MM-DD
+  const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable();
+  const desde = dateSchema.safeParse(searchParams.get('desde')).data ?? null;
+  const hasta = dateSchema.safeParse(searchParams.get('hasta')).data ?? null;
 
   const supabase = getSupabaseClient();
 
@@ -107,7 +111,8 @@ export async function GET(req: NextRequest) {
     })),
   };
 
-  const filename = `tpv-cobros-${empresa?.nif ?? empresaId}-${new Date().toISOString().slice(0, 10)}.json`;
+  const safeNif = ((empresa?.nif ?? empresaId) as string).replace(/[^a-zA-Z0-9-]/g, '');
+  const filename = `tpv-cobros-${safeNif}-${new Date().toISOString().slice(0, 10)}.json`;
 
   return new NextResponse(JSON.stringify(exportData, null, 2), {
     status: 200,
