@@ -1,4 +1,5 @@
 import { SignJWT, jwtVerify } from 'jose';
+import { isTokenRevoked } from '@/lib/token-revocation';
 
 export interface InspectorTokenPayload {
   empresaId: string;
@@ -40,6 +41,7 @@ export async function verifyInspectorToken(token: string): Promise<InspectorToke
       typeof exp !== 'number' ||
       typeof jti !== 'string'
     ) return null;
+    if (await isTokenRevoked(jti)) return null;
     return { empresaId, emitidoPor, exp, jti };
   } catch {
     return null;
