@@ -22,9 +22,9 @@ export function InspectorTokenGenerator() {
         setState({ status: 'error', message: (body.error as string | undefined) ?? `Error ${res.status}` });
         return;
       }
-      const data = await res.json() as { export_url: string; expires_in: string };
+      const data = await res.json() as { inspector_url: string; expires_in: string };
       const base = typeof window !== 'undefined' ? window.location.origin : '';
-      setState({ status: 'done', exportUrl: base + data.export_url, expiresIn: data.expires_in });
+      setState({ status: 'done', exportUrl: base + data.inspector_url, expiresIn: data.expires_in });
     } catch (e) {
       setState({ status: 'error', message: e instanceof Error ? e.message : 'Error inesperado' });
     }
