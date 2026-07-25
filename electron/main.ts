@@ -31,6 +31,21 @@ Menu.setApplicationMenu(null);
 const store = new Store<StoreSchema>();
 const pinStore = new Store<PinCacheSchema>({ name: 'lc-pin-cache' });
 let mainWindow: BrowserWindow;
+let splashWindow: BrowserWindow | null = null;
+
+function createSplash(): void {
+  splashWindow = new BrowserWindow({
+    width: 320,
+    height: 220,
+    frame: false,
+    resizable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    transparent: false,
+    webPreferences: { nodeIntegration: false, contextIsolation: true },
+  });
+  void splashWindow.loadFile(path.join(__dirname, '../splash.html'));
+}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -41,12 +56,20 @@ function createWindow(): void {
     minHeight: 768,
     frame: true,
     kiosk: false,
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
     },
+  });
+
+  mainWindow.once('ready-to-show', () => {
+    splashWindow?.close();
+    splashWindow = null;
+    mainWindow.show();
+    mainWindow.focus();
   });
 
   const domain = store.get('domain') as string | undefined;
@@ -251,6 +274,7 @@ app.whenReady().then(() => {
   if (!store.get('signingKey')) {
     store.set('signingKey', crypto.randomBytes(32).toString('hex'));
   }
+  createSplash();
   createWindow();
   registerGlobalShortcuts();
   setupIpc();
