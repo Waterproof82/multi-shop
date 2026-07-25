@@ -78,7 +78,6 @@ export function FichajeDialog({ open, empleadoId, sugerido = 'entrada', onDone, 
           empleadoId,
           tipo:            sugerido,
           timestampEvento: new Date().toISOString(),
-          origenOffline:   false,
         }),
       });
 

@@ -128,6 +128,27 @@ Registro de normativas aplicables al sistema. Actualizar cada vez que se identif
 
 ---
 
+## Módulo: LaborControl (Fichaje Digital)
+
+### RD-Ley 8/2019 — Obligación de Registro de Jornada
+
+- **Qué exige:** Las empresas deben registrar diariamente la jornada laboral de sus trabajadores, incluyendo hora de inicio y fin, y conservar los registros durante **4 años** (Art. 34.9 ET).
+- **Donde aplica en el sistema:**
+  - `lc_fichajes` — tabla principal de fichajes con cadena de hashes SHA-256 (`chain_hash`, `prev_hash`) para inalterabilidad. Triggers bloquean UPDATE y DELETE (`lc_immutable_guard`).
+  - `lc_chain_anchors` — segmentos de cadena cerrados por año/mes. Permiten verificar la integridad del histórico sin cargar todos los registros.
+  - `lc_canonical_payload()` — función SECURITY DEFINER que serializa el payload de forma determinista para el hash. Búsqueda de tenant isolation: `empresa_id` obligatorio en cada registro.
+  - `lc_fichajes_chain_before()` / `lc_fichajes_chain_verify_after()` — triggers BEFORE/AFTER INSERT que calculan y verifican el hash de cadena.
+  - **Particiones por mes**: `lc_fichajes_2026_07`, `lc_fichajes_2026_08`... cada partición tiene RLS propio (migración `20260725000001`). `lc_create_next_partition()` aplica RLS automáticamente en nuevas particiones.
+- **Verificación de integridad:** `GET /api/laborcontrol/verify-chain` — recalcula la cadena completa y detecta registros alterados.
+- **Exportación:** `GET /api/laborcontrol/export` — genera Excel/PDF con los fichajes del período, firmado con datos de la empresa.
+- **Ficheros clave:**
+  - `docs/context/laborcontrol.md` — arquitectura completa del módulo
+  - `docs/context/fichaje-digital.md` — flujo de kiosk y autenticación por PIN
+  - `supabase/migrations/20260724000002_lc_fichajes_chain.sql`
+  - `supabase/migrations/20260725000001_partition_rls.sql`
+
+---
+
 ## Módulo: Carta Digital
 
 ### Reglamento (UE) N.º 1169/2011 — Información Alimentaria al Consumidor (Alérgenos)

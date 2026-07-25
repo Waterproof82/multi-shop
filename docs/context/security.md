@@ -236,6 +236,20 @@ export function verifyCsrfToken(token: string, signature: string): boolean {
 }
 ```
 
+### CSRF en rutas de camarero y cocina (`/api/waiter/*`, `/api/kitchen/*`)
+
+Implementado en `proxy.ts` → `handleWaiterAuth`. Mismo patrón double-submit que el admin:
+
+- Métodos mutativos (POST/PUT/DELETE/PATCH): requieren cookie `csrf_token` + header `x-csrf-token`
+- GET: exento
+- Kitchen hereda el mismo guard porque usa el mismo handler
+
+Códigos de error:
+- `403 CSRF_REQUIRED` — header `x-csrf-token` ausente con sesión válida
+- `403 CSRF_INVALID` — token presente pero firma HMAC no válida
+
+El frontend waiter obtiene el CSRF token al hacer login (`POST /api/waiter/login`) y lo envía en todas las mutaciones vía `fetchWithCsrf`.
+
 ---
 
 ## Content Security Policy (CSP)
@@ -533,6 +547,104 @@ Las tablas sensibles tienen políticas `AS RESTRICTIVE FOR ALL TO anon USING (fa
 ### RLS e `auth.uid()` en políticas
 
 Las políticas de `perfiles_admin` y `promociones` usan `(SELECT auth.uid())` (con SELECT) en lugar de `auth.uid()` directo para evitar re-evaluación por fila y mejorar el rendimiento de los planes de query.
+
+### RLS en particiones de fichajes (`lc_fichajes_2026_*`)
+
+Las tablas de partición de fichajes **no heredan RLS del padre** — cada partición necesita `ENABLE ROW LEVEL SECURITY` propio con sus políticas.
+
+Políticas por partición (migración `20260725000001`):
+- `anon DENY ALL` — ningún acceso sin autenticar
+- `admin SELECT` — solo admins del tenant vía `get_mi_empresa_id()`
+- `service_role SELECT` — acceso internal
+
+La función `lc_create_next_partition()` aplica RLS automáticamente en toda partición nueva con `EXECUTE format()` — no requiere intervención manual.
+
+---
+
+## Funciones SECURITY DEFINER — Trampas Críticas
+
+### REVOKE FROM PUBLIC, no FROM anon
+
+En Postgres, `anon` no tiene un grant explícito — hereda EXECUTE de `PUBLIC`. Hacer `REVOKE EXECUTE FROM anon` no tiene efecto si `PUBLIC` sigue teniendo el grant.
+
+La secuencia correcta para proteger una función SECURITY DEFINER:
+
+```sql
+-- 1. Eliminar el grant heredado por anon (y por cualquier rol sin grant explícito)
+REVOKE EXECUTE ON FUNCTION public.mi_funcion() FROM PUBLIC;
+
+-- 2. Re-otorgar solo a los roles que necesitan acceso directo
+GRANT EXECUTE ON FUNCTION public.mi_funcion() TO service_role;
+-- (solo si la función es llamable por usuarios autenticados vía RPC):
+-- GRANT EXECUTE ON FUNCTION public.mi_funcion() TO authenticated;
+```
+
+Para verificar el estado actual de grants:
+
+```sql
+SELECT p.proname, unnest(p.proacl)::text AS acl_entry
+FROM pg_catalog.pg_proc p
+JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
+WHERE n.nspname = 'public' AND p.proname = 'mi_funcion';
+-- `=X/postgres` = PUBLIC grant (anon lo hereda) — debe desaparecer tras el REVOKE
+```
+
+### Funciones de trigger vs. funciones RPC
+
+Las funciones de trigger (RETURNS TRIGGER) nunca deben ser llamables por usuarios finales via RPC. REVOKE FROM PUBLIC **y** FROM authenticated:
+
+```sql
+REVOKE EXECUTE ON FUNCTION public.mi_trigger_fn() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.mi_trigger_fn() FROM authenticated;
+```
+
+Las funciones RPC llamadas desde API routes con `getSupabaseClient()` (service_role): REVOKE FROM PUBLIC y FROM authenticated; el servicio_role mantiene su GRANT y PostgREST lo usa correctamente.
+
+### `get_mi_empresa_id()` — excepción intencional
+
+Esta función SECURITY DEFINER es accesible por `authenticated` por diseño — es llamada directamente desde cláusulas `USING` de RLS policies. Moverla o revocarle acceso a authenticated rompería el aislamiento de tenant en todas las tablas que la usan.
+
+---
+
+## Endpoint de desarrollo protegido en producción
+
+`DELETE /api/admin/pedidos/delete-all` — usado solo en desarrollo para limpiar datos de prueba. Tiene un guard fail-fast en la primera línea del handler:
+
+```typescript
+if (process.env.NODE_ENV === 'production') {
+  return NextResponse.json({ error: 'Not available in production' }, { status: 403 });
+}
+```
+
+El endpoint existe para conveniencia en desarrollo pero nunca debe ejecutarse en producción.
+
+---
+
+## Tests E2E — suite de seguridad
+
+`e2e/waiter-csrf.spec.ts` — tests Playwright en modo API (sin browser) que verifican:
+
+| Test | Qué valida |
+|------|-----------|
+| `POST sin waiter_token` → 401 | Auth check funciona |
+| `GET /api/waiter/me sin csrf` → no 403 | GET exento de CSRF |
+| `POST con waiter_token sin csrf` → 403 | CSRF_REQUIRED |
+| `POST con csrf inválido` → 403 | CSRF_INVALID |
+| `POST /api/kitchen/*` → 401/403 | Kitchen hereda el guard |
+| RLS `lc_fichajes_2026_07` anon | PostgREST devuelve 0 filas o 404 |
+| RLS `lc_fichajes_2026_08` anon | PostgREST devuelve 0 filas o 404 |
+
+Configuración en `playwright.config.ts`. Para ejecutar:
+
+```bash
+# Con servidor ya corriendo:
+PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test e2e/waiter-csrf.spec.ts
+
+# Con servidor en variables de Supabase (RLS tests):
+PLAYWRIGHT_BASE_URL=... NEXT_PUBLIC_SUPABASE_URL=... NEXT_PUBLIC_SUPABASE_ANON_KEY=... npx playwright test e2e/waiter-csrf.spec.ts
+```
+
+Los tests 4 y 5 (CSRF con token válido) requieren `PLAYWRIGHT_WAITER_TOKEN` — se omiten con skip si no está definido.
 
 ---
 
@@ -911,4 +1023,5 @@ Lista de las 10 vulnerabilidades web más críticas publicada por la Open Web Ap
 | `unsafe-inline` en `style-src` | Low | Estándar para la mayoría de aplicaciones Next.js. Mejorable con style nonces si el framework lo soporta en el futuro. |
 | Order number gaps | Low | Si el INSERT falla tras `get_next_pedido_number`, el número se pierde. Operacionalmente menor, no es riesgo de seguridad. |
 | Rate limit por tenant en pedidos públicos | Low | La creación de pedidos y clientes usa rate limit por IP. Para tenants con mucho tráfico legítimo desde IPs compartidas (NAT corporativo), considerar rate limit compuesto `empresaId:ip`. |
-| Leaked password protection (Supabase Auth) | Info | Supabase advierte que la protección contra contraseñas filtradas (HaveIBeenPwned) está deshabilitada. **Requiere plan Pro** — no disponible en el plan actual. No aplica tampoco porque el login de admin usa credenciales de `auth.users` de Supabase gestionadas internamente, no contraseñas definidas por usuarios finales. |
+| Leaked password protection (Supabase Auth) | Info | Requiere plan Pro de Supabase. Aceptado como riesgo conocido — el login de admin usa `auth.users` gestionado internamente, no contraseñas de usuarios finales. Ver `openspec/changes/security-hardening/manual-steps.md` cuando se actualice al plan Pro. |
+| `get_mi_empresa_id()` callable por authenticated | Info | Intencional — necesario para cláusulas USING de RLS policies. No es un vector de ataque: la función solo devuelve el empresaId del admin autenticado. |

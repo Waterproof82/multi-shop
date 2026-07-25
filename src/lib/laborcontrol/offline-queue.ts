@@ -1,6 +1,7 @@
 // Offline queue for laborcontrol fichajes
 // Uses IndexedDB store "laborcontrol_offline" with AES-GCM encryption
 // Syncs to /api/laborcontrol/fichaje when the device regains connectivity
+import { fetchWithCsrf } from '@/lib/csrf-client';
 
 const DB_NAME    = 'laborcontrol';
 const STORE_NAME = 'laborcontrol_offline';
@@ -162,14 +163,13 @@ export async function syncQueue(): Promise<void> {
         timestampEvento: string;
       };
 
-      const res = await fetch('/api/laborcontrol/fichaje', {
+      const res = await fetchWithCsrf('/api/laborcontrol/fichaje', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           empleadoId:      payload.empleadoId,
           tipo:            payload.tipo,
           timestampEvento: payload.timestampEvento,
-          origenOffline:   true,
         }),
       });
 

@@ -2,8 +2,16 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import type { FichajeConEstado } from '@/core/laborcontrol/application/use-cases/ObtenerMisFichajes.usecase';
 import type { ReviewQueueItem } from '@/core/laborcontrol/domain/types';
+
+interface RecienteFichaje {
+  recordId:          string;
+  empleadoId:        string;
+  empleadoNombre:    string;
+  tipo:              string;
+  timestampEvento:   string;
+  timestampServidor: string;
+}
 import { getCsrfToken } from '@/lib/csrf-client';
 
 export const dynamic = 'force-dynamic';
@@ -98,8 +106,8 @@ export default function FichajesPage() {
   const [kiosk, setKiosk] = useState<KioskState>({ phase: 'idle' });
 
   // History
-  const [fichajes, setFichajes]       = useState<FichajeConEstado[]>([]);
-  const [notifs, setNotifs]           = useState<ReviewQueueItem[]>([]);
+  const [recentFichajes, setRecentFichajes] = useState<RecienteFichaje[]>([]);
+  const [notifs, setNotifs]                 = useState<ReviewQueueItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
   // Inactivity timer
@@ -141,18 +149,24 @@ export default function FichajesPage() {
     })();
   }, [router]);
 
-  // Load personal history when employee session is present
+  const loadRecentFichajes = useCallback(async () => {
+    setHistoryLoading(true);
+    const res = await fetch('/api/laborcontrol/fichajes/recientes');
+    if (res.ok) setRecentFichajes(await res.json() as RecienteFichaje[]);
+    setHistoryLoading(false);
+  }, []);
+
+  // Load global kiosk feed once session is ready
+  useEffect(() => {
+    if (sessionLoading) return;
+    void loadRecentFichajes();
+  }, [sessionLoading, loadRecentFichajes]);
+
+  // Load personal review notifications when employee session is present
   useEffect(() => {
     if (!empleadoId) return;
-    setHistoryLoading(true);
-    const { from, to } = getDateRange();
-    void Promise.all([
-      fetch(`/api/laborcontrol/fichajes/${empleadoId}?from=${from}&to=${to}`),
-      fetch('/api/laborcontrol/review-queue'),
-    ]).then(async ([fichajesRes, notifsRes]) => {
-      if (fichajesRes.ok) setFichajes(await fichajesRes.json() as FichajeConEstado[]);
-      if (notifsRes.ok)   setNotifs(await notifsRes.json() as ReviewQueueItem[]);
-      setHistoryLoading(false);
+    void fetch('/api/laborcontrol/review-queue').then(async res => {
+      if (res.ok) setNotifs(await res.json() as ReviewQueueItem[]);
     });
   }, [empleadoId]);
 
@@ -176,8 +190,7 @@ export default function FichajesPage() {
     setTimeout(() => pinRef.current?.focus(), 50);
   }, []);
 
-  const handleLookup = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
+  const doLookup = useCallback(async () => {
     if (pin.length < 4) return;
     setKiosk({ phase: 'loading' });
 
@@ -213,9 +226,36 @@ export default function FichajesPage() {
     }
   }, [pin]);
 
-  const handleFichar = useCallback(async (nombre: string, tipo: FichajeTipo) => {
-    setKiosk({ phase: 'fichando' });
+  const handleLookup = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    void doLookup();
+  }, [doLookup]);
 
+  // Auto-submit when PIN reaches minimum length — no button press needed
+  useEffect(() => {
+    if (pin.length < 4 || kiosk.phase !== 'idle') return;
+    const timer = setTimeout(() => void doLookup(), 400);
+    return () => clearTimeout(timer);
+  }, [pin, kiosk.phase, doLookup]);
+
+  const handleFichar = useCallback(async (nombre: string, tipo: FichajeTipo) => {
+    // Optimistic: show done state and add to feed immediately
+    const tempId    = `opt-${Date.now()}`;
+    const optimisticTs = new Date().toISOString();
+
+    setKiosk({ phase: 'done', nombre, tipo, timestamp: optimisticTs });
+    successTimer.current = setTimeout(resetKiosk, 3000);
+
+    setRecentFichajes(prev => [{
+      recordId:          tempId,
+      empleadoId:        '',
+      empleadoNombre:    nombre,
+      tipo,
+      timestampEvento:   optimisticTs,
+      timestampServidor: optimisticTs,
+    }, ...prev]);
+
+    // Confirm with server in background
     const csrfToken = getCsrfToken();
     try {
       const res = await fetch('/api/laborcontrol/fichaje/kiosk', {
@@ -226,16 +266,26 @@ export default function FichajesPage() {
         },
         body: JSON.stringify({ pin, tipo }),
       });
+
       if (!res.ok) {
+        // Revert on server error
+        if (successTimer.current) clearTimeout(successTimer.current);
         const json = await res.json() as { error?: string };
         setKiosk({ phase: 'error', message: json.error ?? 'Error al fichar' });
+        setRecentFichajes(prev => prev.filter(f => f.recordId !== tempId));
         return;
       }
+
+      // Replace optimistic timestamp with real server timestamp
       const data = await res.json() as { timestampServidor: string };
-      setKiosk({ phase: 'done', nombre, tipo, timestamp: data.timestampServidor });
-      successTimer.current = setTimeout(resetKiosk, 3000);
+      setRecentFichajes(prev => prev.map(f =>
+        f.recordId === tempId ? { ...f, timestampServidor: data.timestampServidor } : f
+      ));
     } catch {
+      // Revert on network error
+      if (successTimer.current) clearTimeout(successTimer.current);
       setKiosk({ phase: 'error', message: 'Error de red. Inténtalo de nuevo.' });
+      setRecentFichajes(prev => prev.filter(f => f.recordId !== tempId));
     }
   }, [pin, resetKiosk]);
 
@@ -246,7 +296,7 @@ export default function FichajesPage() {
   const pendingNotifs = notifs.filter(n => n.estado === 'pendiente');
 
   return (
-    <div className="p-6 flex flex-col gap-6 max-w-2xl mx-auto">
+    <div className="p-6 flex flex-col gap-6 max-w-2xl mx-auto w-full h-full overflow-hidden">
 
       {/* Header */}
       <div>
@@ -277,15 +327,18 @@ export default function FichajesPage() {
               value={pin}
               onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
               placeholder="PIN (4–8 dígitos)"
+              disabled={kiosk.phase === 'loading'}
               style={{ WebkitTextSecurity: 'disc' } as React.CSSProperties}
-              className="flex-1 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-4 py-3.5 text-2xl font-bold text-center tracking-widest outline-none focus:border-[#2563eb] transition-colors placeholder:text-sm placeholder:font-normal placeholder:tracking-normal placeholder:text-[#94a3b8] text-[#0f172a]"
+              className="flex-1 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-4 py-3.5 text-2xl font-bold text-center tracking-widest outline-none focus:border-[#2563eb] disabled:opacity-50 transition-colors placeholder:text-sm placeholder:font-normal placeholder:tracking-normal placeholder:text-[#94a3b8] text-[#0f172a]"
             />
             <button
               type="submit"
               disabled={pin.length < 4 || kiosk.phase === 'loading'}
               className="px-5 rounded-xl bg-[#2563eb] text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition-all text-sm shrink-0"
             >
-              {kiosk.phase === 'loading' ? '...' : 'Identificar'}
+              {kiosk.phase === 'loading' ? (
+                <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : 'Identificar'}
             </button>
           </form>
         )}
@@ -430,92 +483,78 @@ export default function FichajesPage() {
         )}
       </div>
 
-      {/* ── Personal history — only if employee session ── */}
-      {empleadoId !== null && (
-        <div className="flex flex-col gap-4">
-          <div>
-            <span className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">
-              Mis fichajes · últimos 30 días
-            </span>
-            {empleadoNombre !== null && (
-              <p className="text-lg font-bold text-[#0f172a] mt-0.5">{empleadoNombre}</p>
+      {/* ── Kiosk feed — last 30 fichajes across all employees ── */}
+      <div className="flex flex-col gap-4 flex-1 min-h-0">
+        <span className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">
+          Últimos fichajes · 30 días
+        </span>
+
+        {/* Pending review notifications — only for employee session */}
+        {empleadoId !== null && pendingNotifs.length > 0 && (
+          <div className="flex flex-col gap-2">
+            {pendingNotifs.map(n => (
+              <div
+                key={n.id}
+                className="border border-amber-200 bg-amber-50 rounded-xl px-4 py-3 flex flex-col gap-2"
+              >
+                <p className="text-sm font-medium text-amber-800">
+                  {REVISION_LABEL[n.tipoRevision] ?? n.tipoRevision}
+                </p>
+                {typeof n.detalle.mensaje === 'string' && (
+                  <p className="text-xs text-amber-700">{n.detalle.mensaje}</p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void markNotif(n.id, 'visto')}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-white border border-amber-200 text-amber-700 hover:bg-amber-100 transition-colors"
+                  >
+                    Visto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void markNotif(n.id, 'disputado')}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-white border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+                  >
+                    Disputar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Fichajes list */}
+        {historyLoading ? (
+          <p className="text-sm text-[#6b7280]">Cargando historial...</p>
+        ) : (
+          <div className="flex flex-col gap-2 flex-1 min-h-0 overflow-y-auto pr-1">
+            {recentFichajes.map(f => (
+              <div
+                key={f.recordId}
+                className="border border-[#e2e8f0] bg-white rounded-xl px-4 py-3 flex items-center gap-3"
+              >
+                <span
+                  className={`w-2.5 h-2.5 rounded-full shrink-0 ${TIPO_DOT[f.tipo] ?? 'bg-[#94a3b8]'}`}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-[#0f172a]">
+                    {f.empleadoNombre}
+                  </p>
+                  <p className="text-xs text-[#6b7280] mt-0.5">
+                    {HISTORY_TIPO_LABEL[f.tipo] ?? f.tipo} · {formatEvent(f.timestampServidor)}
+                  </p>
+                </div>
+              </div>
+            ))}
+            {recentFichajes.length === 0 && (
+              <p className="text-sm text-[#6b7280] text-center py-8">
+                No hay fichajes en los últimos 30 días.
+              </p>
             )}
           </div>
-
-          {/* Pending review notifications */}
-          {pendingNotifs.length > 0 && (
-            <div className="flex flex-col gap-2">
-              {pendingNotifs.map(n => (
-                <div
-                  key={n.id}
-                  className="border border-amber-200 bg-amber-50 rounded-xl px-4 py-3 flex flex-col gap-2"
-                >
-                  <p className="text-sm font-medium text-amber-800">
-                    {REVISION_LABEL[n.tipoRevision] ?? n.tipoRevision}
-                  </p>
-                  {typeof n.detalle.mensaje === 'string' && (
-                    <p className="text-xs text-amber-700">{n.detalle.mensaje}</p>
-                  )}
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void markNotif(n.id, 'visto')}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-white border border-amber-200 text-amber-700 hover:bg-amber-100 transition-colors"
-                    >
-                      Visto
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void markNotif(n.id, 'disputado')}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-white border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
-                    >
-                      Disputar
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Fichajes list */}
-          {historyLoading ? (
-            <p className="text-sm text-[#6b7280]">Cargando historial...</p>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {fichajes.map(f => (
-                <div
-                  key={f.recordId}
-                  className={`border rounded-xl px-4 py-3 flex items-center gap-3 ${
-                    f.superseded
-                      ? 'border-[#fecaca] bg-[#fef2f2] opacity-50'
-                      : 'border-[#e2e8f0] bg-white'
-                  }`}
-                >
-                  <span
-                    className={`w-2.5 h-2.5 rounded-full shrink-0 ${TIPO_DOT[f.tipo] ?? 'bg-[#94a3b8]'}`}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-[#0f172a]">
-                      {HISTORY_TIPO_LABEL[f.tipo] ?? f.tipo}
-                      {f.superseded && (
-                        <span className="ml-2 text-xs font-normal text-[#94a3b8]">(anulado)</span>
-                      )}
-                    </p>
-                    <p className="text-xs text-[#6b7280] mt-0.5">
-                      {formatEvent(f.timestampEvento)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-              {fichajes.length === 0 && (
-                <p className="text-sm text-[#6b7280] text-center py-8">
-                  No hay fichajes en los últimos 30 días.
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
