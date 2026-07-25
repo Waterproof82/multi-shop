@@ -80,7 +80,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `Backup ${date} not found` }, { status: 404 });
   }
 
-  const snapshot = JSON.parse(snapshotText) as Snapshot;
+  let snapshot: Snapshot;
+  try {
+    snapshot = JSON.parse(snapshotText) as Snapshot;
+  } catch {
+    return NextResponse.json({ error: 'Backup file is corrupted or invalid JSON' }, { status: 400 });
+  }
   const supabase = getSupabaseClient();
 
   // SECURITY: force empresa_id on every row to match the authenticated tenant.
