@@ -1,12 +1,19 @@
 appId: com.multishop.tpv
 productName: TPV MultiShop
+# 'normal' trades slightly larger file for faster extraction on launch.
+# 'maximum' (default) is smallest file but slowest to unpack.
+compression: normal
 directories:
   output: dist/
 files:
   - electron/dist/**
   - electron/setup.html
+  - electron/splash.html
   - electron/setup.js
   - electron/package.json
+  # All dependencies are bundled into electron/dist/main.js by esbuild.
+  # No native .node modules exist, so node_modules are fully redundant here.
+  - "!electron/node_modules/**"
   - package.json
 extraMetadata:
   main: electron/dist/main.js
