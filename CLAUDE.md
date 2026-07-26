@@ -90,6 +90,27 @@ Usar siempre en RLS policies para aislar datos por empresa.
 - Dev: `pnpm dev`
 - Build: `pnpm build` (Ignorar "Skipping validation of types")
 - Lint: `pnpm lint`
+- **DB Smoke (OBLIGATORIO tras cada migracion):** `pnpm db:smoke`
+- E2E DB smoke (con Playwright): `pnpm e2e:db`
+- E2E completo: `pnpm e2e`
+
+## Tests — Checklist Post-Migracion (OBLIGATORIO)
+
+Tras CADA `supabase db push` o `supabase migration up`:
+1. `pnpm db:smoke` — verifica que las funciones DB con `digest()` son invocables
+   Si falla: la migracion rompio algo. Revisar `SET search_path = public, extensions, pg_catalog`.
+2. `pnpm e2e:db` — verifica que las rutas de API no devuelven 500 inesperados
+   Requiere `NEXT_PUBLIC_SUPABASE_URL` y opcionalmente `PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY`.
+
+**Smoke tests cubren:**
+- `lc_canonical_payload()` — digest() reachable desde la funcion
+- `lc_verify_chain_segment()` — digest() reachable desde la funcion
+- `POST /api/laborcontrol/fichaje/kiosk` — no 500 (auth barrier)
+- `POST /api/tpv/stock/mermas` — no 500 (auth barrier)
+
+**Archivos:**
+- `supabase/tests/smoke-db-functions.sql` — SQL smoke tests
+- `e2e/db-smoke.spec.ts` — Playwright E2E smoke tests
 
 ## Realtime — Patrones Criticos (Waiter System)
 
