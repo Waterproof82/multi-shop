@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronDown, Table2, UtensilsCrossed, Wine, Pause, CheckCh
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
+import { fetchWithCsrf, ensureCsrfToken } from '@/lib/csrf-client';
 
 interface PendienteItem {
   idx: number;
@@ -157,9 +158,8 @@ async function validateNewPedido(
   const pausedIndices = items
     .filter(i => i.tipo === sendTipo && paused.has(`${pedidoId}:${i.idx}`))
     .map(i => i.idx);
-  const r = await fetch('/api/waiter/pendientes/validate', {
+  const r = await fetchWithCsrf('/api/waiter/pendientes/validate', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ pedidoId, retainIndices, pausedIndices }),
   });
   return r.ok;
@@ -174,9 +174,8 @@ async function releaseSelectedPedidoItems(
   if (toRelease.length === 0) return [];
   const releasedIdx: number[] = [];
   for (const item of toRelease) {
-    const r = await fetch(`/api/waiter/kitchen/items/${pedidoId}/${item.idx}/status`, {
+    const r = await fetchWithCsrf(`/api/waiter/kitchen/items/${pedidoId}/${item.idx}/status`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ estado: 'pendiente' }),
     });
     if (r.ok) releasedIdx.push(item.idx);
@@ -194,9 +193,8 @@ async function validateBothTypesPedido(
   const pausedIndices = items
     .filter(i => i.tipo === 'comida' && paused.has(`${pedidoId}:${i.idx}`))
     .map(i => i.idx);
-  const r = await fetch('/api/waiter/pendientes/validate', {
+  const r = await fetchWithCsrf('/api/waiter/pendientes/validate', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ pedidoId, retainIndices: notSelected, pausedIndices }),
   });
   return r.ok;
@@ -445,6 +443,8 @@ export default function WaiterPendientesPage() {
       globalThis.dispatchEvent(new CustomEvent('waiter-realtime-update'));
     }
   }, [isTabVisible, waiterEmpresaId, fetchPendientes]);
+
+  useEffect(() => { void ensureCsrfToken(); }, []);
 
   useEffect(() => {
     const tick = setInterval(() => setMesas(p => [...p]), 1000);
@@ -890,7 +890,7 @@ export default function WaiterPendientesPage() {
                   {/* Fila 1: timer + seleccionar/deseleccionar todos */}
                   <div className="flex items-center gap-2 px-3 py-2"
                     style={{ background: 'oklch(18% 0.03 252)', borderBottom: '1px solid oklch(35% 0.08 252 / 0.25)' }}>
-                    <span className="text-[10px] font-mono" style={{ color: TEXT_DIM }}>{formatTimer(elapsed)}</span>
+                    <span className="text-[10px] font-mono" style={{ color: TEXT_DIM }} suppressHydrationWarning>{formatTimer(elapsed)}</span>
                     <button
                       className="ml-auto text-[10px] px-2 py-0.5 rounded font-medium"
                       style={{
