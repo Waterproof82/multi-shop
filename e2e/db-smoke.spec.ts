@@ -12,16 +12,16 @@
  * Escenarios cubiertos:
  *   1. [sin credenciales] LaborControl kiosk → 401, NUNCA 500
  *      Un 500 aquí significa que el error de DB escapa antes del auth check.
- *   2. [PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY] RPC directa a lc_canonical_payload
+ *   2. [SUPABASE_SERVICE_ROLE_KEY] RPC directa a lc_canonical_payload
  *      → 200 con payload v1|... Verifica que digest() es reachable desde la función.
- *   3. [PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY] RPC directa a lc_verify_chain_segment
+ *   3. [SUPABASE_SERVICE_ROLE_KEY] RPC directa a lc_verify_chain_segment
  *      → 200 con status OK. Verifica que digest() es reachable desde esa función.
  *   4. [PLAYWRIGHT_ADMIN_TOKEN + PLAYWRIGHT_CSRF_TOKEN] POST /api/laborcontrol/fichaje/kiosk
  *      → respuesta de negocio (no 500). Ejercita el path completo DB.
  *
  * Variables de entorno:
  *   NEXT_PUBLIC_SUPABASE_URL              — URL del proyecto Supabase
- *   PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY  — service_role key (no anon key)
+ *   SUPABASE_SERVICE_ROLE_KEY  — service_role key (no anon key)
  *   PLAYWRIGHT_ADMIN_TOKEN               — cookie admin_token de sesión real
  *   PLAYWRIGHT_CSRF_TOKEN                — valor del csrf_token para POST mutativos
  */
@@ -37,7 +37,7 @@ function supabaseUrl(): string | undefined {
 }
 
 function serviceRoleKey(): string | undefined {
-  return process.env.PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY;
+  return process.env.SUPABASE_SERVICE_ROLE_KEY;
 }
 
 function adminToken(): string | undefined {
@@ -85,14 +85,14 @@ test.describe('DB smoke — auth barrier (sin credenciales)', () => {
 
 
 // ── Suite 2: RPC directa con service_role ────────────────────────────────────
-// Requiere PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY.
+// Requiere SUPABASE_SERVICE_ROLE_KEY.
 // Llama las funciones DB directamente via Supabase REST para verificar
 // que digest() es reachable desde cada función.
 
 test.describe('DB smoke — RPC directa (service_role)', () => {
   test('lc_canonical_payload RPC → 200 con payload v1|... (digest reachable)', async ({ request }) => {
     if (!supabaseUrl() || !serviceRoleKey()) {
-      test.skip(true, 'NEXT_PUBLIC_SUPABASE_URL o PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY no definidos');
+      test.skip(true, 'NEXT_PUBLIC_SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY no definidos');
       return;
     }
 
@@ -132,7 +132,7 @@ test.describe('DB smoke — RPC directa (service_role)', () => {
 
   test('lc_verify_chain_segment RPC → 200 con status OK (digest reachable)', async ({ request }) => {
     if (!supabaseUrl() || !serviceRoleKey()) {
-      test.skip(true, 'NEXT_PUBLIC_SUPABASE_URL o PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY no definidos');
+      test.skip(true, 'NEXT_PUBLIC_SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY no definidos');
       return;
     }
 
