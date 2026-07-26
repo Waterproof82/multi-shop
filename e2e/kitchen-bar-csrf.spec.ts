@@ -23,48 +23,67 @@
  *   GET   /api/waiter/mesas            ← debe quedar EXENTO de CSRF
  *
  * Escenarios por ruta mutativa:
- *   A. Sin waiter_token                        → 401 UNAUTHORIZED (nunca 403 ni 500)
- *   B. Con waiter_token, sin x-csrf-token      → 403 CSRF_REQUIRED  [necesita PLAYWRIGHT_WAITER_TOKEN]
- *   C. Con waiter_token, csrf_token inválido   → 403 CSRF_INVALID   [necesita PLAYWRIGHT_WAITER_TOKEN]
+ *   A. Sin waiter_token                        → 401 (nunca 403 ni 500) — sin credenciales
+ *   B. Con waiter_token, sin x-csrf-token      → 403 CSRF_REQUIRED      — necesita PLAYWRIGHT_WAITER_PIN
+ *   C. Con waiter_token, csrf inválido         → 403 CSRF_INVALID        — necesita PLAYWRIGHT_WAITER_PIN
+ *
+ * Autenticación automática (beforeAll):
+ *   1. GET /api/admin/login → csrf_token cookie (endpoint público, sin credenciales)
+ *   2. POST /api/waiter/auth con PLAYWRIGHT_WAITER_PIN → waiter_token cookie
+ *   Extraemos ambos cookies de Set-Cookie y los usamos para construir las cabeceras de test.
  *
  * Variables de entorno:
- *   PLAYWRIGHT_WAITER_TOKEN  — cookie waiter_token de sesión real
- *   PLAYWRIGHT_CSRF_TOKEN    — valor del csrf_token (sin :sig) de sesión real
+ *   PLAYWRIGHT_WAITER_PIN  — PIN numérico del camarero (ej: "1234"). Sin él, B y C se saltan.
  */
 
 import { test, expect, type APIRequestContext } from '@playwright/test';
 
-// ── helpers ───────────────────────────────────────────────────────────────────
+// ── constantes ────────────────────────────────────────────────────────────────
 
 const DUMMY_UUID = '00000000-0000-0000-0000-000000000099';
 const DUMMY_IDX  = '0';
 
-function waiterToken(): string | undefined {
-  return process.env.PLAYWRIGHT_WAITER_TOKEN;
+// ── sesión de autenticación (compartida por suites B y C) ─────────────────────
+
+/** waiter_token extraído del Set-Cookie de /api/waiter/auth */
+let sessionWaiterToken: string | undefined;
+/** csrf_token completo (token:sig) extraído del Set-Cookie de /api/admin/login */
+let sessionCsrfCookie: string | undefined;
+/** solo la parte token (sin :sig), para el header x-csrf-token */
+let sessionCsrfToken: string | undefined;
+
+function parseCookieValue(setCookieHeader: string, name: string): string | undefined {
+  // Set-Cookie puede contener múltiples cookies separadas por \n en Playwright
+  for (const line of setCookieHeader.split('\n')) {
+    const match = line.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
+    if (match) return decodeURIComponent(match[1]);
+  }
+  return undefined;
 }
 
-function csrfToken(): string | undefined {
-  return process.env.PLAYWRIGHT_CSRF_TOKEN;
-}
+test.beforeAll(async ({ playwright, baseURL }) => {
+  const pin = process.env.PLAYWRIGHT_WAITER_PIN;
+  if (!pin) return; // Suites B y C se saltan — suite A siempre corre
 
-/** Cookie header con waiter_token válido pero SIN csrf_token */
-function cookieNocsrf(token: string): string {
-  return `waiter_token=${token}`;
-}
+  const ctx = await playwright.request.newContext({ baseURL });
 
-/** Cookie header con waiter_token válido Y csrf_token con firma incorrecta */
-function cookieInvalidCsrf(token: string): string {
-  return `waiter_token=${token}; csrf_token=fakecookie:fakesig`;
-}
+  // 1. Obtener csrf_token (endpoint público, no requiere auth)
+  const csrfRes = await ctx.get('/api/admin/login');
+  if (csrfRes.ok()) {
+    const csrfSetCookie = csrfRes.headers()['set-cookie'] ?? '';
+    sessionCsrfCookie = parseCookieValue(csrfSetCookie, 'csrf_token');
+    sessionCsrfToken  = sessionCsrfCookie?.split(':')[0];
+  }
 
-/** Headers para CSRF válido (necesita credenciales reales) */
-function headersValidCsrf(token: string): Record<string, string> {
-  const csrf = csrfToken() ?? 'real-csrf-token';
-  return {
-    cookie: `waiter_token=${token}; csrf_token=${csrf}:sig`,
-    'x-csrf-token': csrf,
-  };
-}
+  // 2. Login como camarero para obtener waiter_token
+  const authRes = await ctx.post('/api/waiter/auth', { data: { pin } });
+  if (authRes.ok()) {
+    const authSetCookie = authRes.headers()['set-cookie'] ?? '';
+    sessionWaiterToken = parseCookieValue(authSetCookie, 'waiter_token');
+  }
+
+  await ctx.dispose();
+});
 
 // ── rutas mutativas bajo test ─────────────────────────────────────────────────
 
@@ -132,11 +151,10 @@ const GET_EXEMPT_ROUTES = [
   '/api/waiter/mesas',
 ];
 
-// ── Suite A: sin waiter_token → 401, nunca 403 ni 500 ────────────────────────
-// No requiere variables de entorno. Verifica que el auth check llega ANTES
-// que cualquier lógica de negocio. Un 500 aquí sería una fuga de error de DB.
+// ── Suite A: sin waiter_token → 401 ──────────────────────────────────────────
+// Sin variables de entorno. Verifica el auth barrier — nunca 500.
 
-test.describe('Kitchen/Bar — Escenario A: sin waiter_token', () => {
+test.describe('Kitchen/Bar — A: sin waiter_token', () => {
   let request: APIRequestContext;
 
   test.beforeEach(async ({ playwright, baseURL }) => {
@@ -148,7 +166,7 @@ test.describe('Kitchen/Bar — Escenario A: sin waiter_token', () => {
   });
 
   for (const route of PATCH_ROUTES) {
-    test(`${route.label} sin auth → 401, nunca 403/500`, async () => {
+    test(`${route.label} → 401, nunca 403/500`, async () => {
       const res = await request.patch(route.url, { data: route.body });
       expect(res.status()).not.toBe(403);
       expect(res.status()).not.toBe(500);
@@ -157,7 +175,7 @@ test.describe('Kitchen/Bar — Escenario A: sin waiter_token', () => {
   }
 
   for (const route of POST_ROUTES) {
-    test(`${route.label} sin auth → 401, nunca 403/500`, async () => {
+    test(`${route.label} → 401, nunca 500`, async () => {
       const res = await request.post(route.url, { data: route.body });
       expect(res.status()).not.toBe(500);
       expect([401, 403]).toContain(res.status());
@@ -166,9 +184,8 @@ test.describe('Kitchen/Bar — Escenario A: sin waiter_token', () => {
 });
 
 // ── Suite GET: rutas de lectura exentas de CSRF ───────────────────────────────
-// GET nunca debe ser bloqueado por CSRF — solo por auth (401 si sin token).
 
-test.describe('Kitchen/Bar — GET routes exentas de CSRF', () => {
+test.describe('Kitchen/Bar — GET exentas de CSRF', () => {
   let request: APIRequestContext;
 
   test.beforeEach(async ({ playwright, baseURL }) => {
@@ -180,21 +197,19 @@ test.describe('Kitchen/Bar — GET routes exentas de CSRF', () => {
   });
 
   for (const url of GET_EXEMPT_ROUTES) {
-    test(`GET ${url} sin csrf_token → no 403 (solo 401 o 200)`, async () => {
+    test(`GET ${url} → no 403 ni 500`, async () => {
       const res = await request.get(url);
-      // GET sin CSRF nunca debe devolver 403 (CSRF error).
-      // Puede devolver 401 (sin auth) o 200 (si auth ya está en cookie).
       expect(res.status()).not.toBe(403);
       expect(res.status()).not.toBe(500);
     });
   }
 });
 
-// ── Suite B: con waiter_token válido, sin csrf_token → 403 CSRF_REQUIRED ─────
-// Requiere PLAYWRIGHT_WAITER_TOKEN. Verifica que el CSRF check está activo
-// en todas las rutas mutativas de kitchen y bar.
+// ── Suite B: waiter_token válido, sin csrf_token → 403 CSRF_REQUIRED ─────────
+// Activa con PLAYWRIGHT_WAITER_PIN. Verifica que el CSRF check está activo
+// en todas las rutas mutativas.
 
-test.describe('Kitchen/Bar — Escenario B: waiter_token válido, sin csrf_token', () => {
+test.describe('Kitchen/Bar — B: waiter_token OK, sin csrf_token', () => {
   let request: APIRequestContext;
 
   test.beforeEach(async ({ playwright, baseURL }) => {
@@ -206,13 +221,13 @@ test.describe('Kitchen/Bar — Escenario B: waiter_token válido, sin csrf_token
   });
 
   for (const route of PATCH_ROUTES) {
-    test(`${route.label} sin csrf_token → 403 CSRF_REQUIRED`, async () => {
-      if (!waiterToken()) {
-        test.skip(true, 'PLAYWRIGHT_WAITER_TOKEN no definido');
+    test(`${route.label} → 403 CSRF_REQUIRED`, async () => {
+      if (!sessionWaiterToken) {
+        test.skip(true, 'PLAYWRIGHT_WAITER_PIN no definido o login falló');
         return;
       }
       const res = await request.patch(route.url, {
-        headers: { cookie: cookieNocsrf(waiterToken()!) },
+        headers: { cookie: `waiter_token=${sessionWaiterToken}` }, // sin csrf_token
         data: route.body,
       });
       expect(res.status()).toBe(403);
@@ -222,13 +237,13 @@ test.describe('Kitchen/Bar — Escenario B: waiter_token válido, sin csrf_token
   }
 
   for (const route of POST_ROUTES) {
-    test(`${route.label} sin csrf_token → 403 CSRF_REQUIRED`, async () => {
-      if (!waiterToken()) {
-        test.skip(true, 'PLAYWRIGHT_WAITER_TOKEN no definido');
+    test(`${route.label} → 403 CSRF_REQUIRED`, async () => {
+      if (!sessionWaiterToken) {
+        test.skip(true, 'PLAYWRIGHT_WAITER_PIN no definido o login falló');
         return;
       }
       const res = await request.post(route.url, {
-        headers: { cookie: cookieNocsrf(waiterToken()!) },
+        headers: { cookie: `waiter_token=${sessionWaiterToken}` },
         data: route.body,
       });
       expect(res.status()).toBe(403);
@@ -238,11 +253,11 @@ test.describe('Kitchen/Bar — Escenario B: waiter_token válido, sin csrf_token
   }
 });
 
-// ── Suite C: con waiter_token válido, csrf_token inválido → 403 CSRF_INVALID ──
-// Requiere PLAYWRIGHT_WAITER_TOKEN. Verifica que el token CSRF es validado
-// criptográficamente (no basta con tener cualquier valor en el header).
+// ── Suite C: waiter_token válido, csrf_token inválido → 403 CSRF_INVALID ──────
+// Activa con PLAYWRIGHT_WAITER_PIN. Verifica que el token CSRF es validado
+// criptográficamente — no basta con tener cualquier valor.
 
-test.describe('Kitchen/Bar — Escenario C: waiter_token válido, csrf_token inválido', () => {
+test.describe('Kitchen/Bar — C: waiter_token OK, csrf inválido', () => {
   let request: APIRequestContext;
 
   test.beforeEach(async ({ playwright, baseURL }) => {
@@ -254,14 +269,14 @@ test.describe('Kitchen/Bar — Escenario C: waiter_token válido, csrf_token inv
   });
 
   for (const route of PATCH_ROUTES) {
-    test(`${route.label} con csrf inválido → 403 CSRF_INVALID`, async () => {
-      if (!waiterToken()) {
-        test.skip(true, 'PLAYWRIGHT_WAITER_TOKEN no definido');
+    test(`${route.label} → 403 CSRF_INVALID`, async () => {
+      if (!sessionWaiterToken) {
+        test.skip(true, 'PLAYWRIGHT_WAITER_PIN no definido o login falló');
         return;
       }
       const res = await request.patch(route.url, {
         headers: {
-          cookie: cookieInvalidCsrf(waiterToken()!),
+          cookie: `waiter_token=${sessionWaiterToken}; csrf_token=fakecookie:fakesig`,
           'x-csrf-token': 'fakectoken',
         },
         data: route.body,
@@ -273,14 +288,14 @@ test.describe('Kitchen/Bar — Escenario C: waiter_token válido, csrf_token inv
   }
 
   for (const route of POST_ROUTES) {
-    test(`${route.label} con csrf inválido → 403 CSRF_INVALID`, async () => {
-      if (!waiterToken()) {
-        test.skip(true, 'PLAYWRIGHT_WAITER_TOKEN no definido');
+    test(`${route.label} → 403 CSRF_INVALID`, async () => {
+      if (!sessionWaiterToken) {
+        test.skip(true, 'PLAYWRIGHT_WAITER_PIN no definido o login falló');
         return;
       }
       const res = await request.post(route.url, {
         headers: {
-          cookie: cookieInvalidCsrf(waiterToken()!),
+          cookie: `waiter_token=${sessionWaiterToken}; csrf_token=fakecookie:fakesig`,
           'x-csrf-token': 'fakectoken',
         },
         data: route.body,
@@ -288,6 +303,60 @@ test.describe('Kitchen/Bar — Escenario C: waiter_token válido, csrf_token inv
       expect(res.status()).toBe(403);
       const body = await res.json() as Record<string, unknown>;
       expect(String(body.error ?? body.code ?? '')).toMatch(/CSRF_INVALID/i);
+    });
+  }
+});
+
+// ── Suite D: waiter_token válido, csrf correcto → nunca 403 ──────────────────
+// Activa con PLAYWRIGHT_WAITER_PIN. Verifica el camino feliz: con auth y CSRF
+// correctos, el proxy pasa la request (aunque la ruta devuelva 4xx por datos
+// de negocio inválidos, nunca debe ser un error de CSRF).
+
+test.describe('Kitchen/Bar — D: waiter_token OK, csrf correcto', () => {
+  let request: APIRequestContext;
+
+  test.beforeEach(async ({ playwright, baseURL }) => {
+    request = await playwright.request.newContext({ baseURL });
+  });
+
+  test.afterEach(async () => {
+    await request.dispose();
+  });
+
+  for (const route of PATCH_ROUTES) {
+    test(`${route.label} → no 403 (CSRF pasa, error de negocio aceptable)`, async () => {
+      if (!sessionWaiterToken || !sessionCsrfCookie || !sessionCsrfToken) {
+        test.skip(true, 'PLAYWRIGHT_WAITER_PIN no definido o login falló');
+        return;
+      }
+      const res = await request.patch(route.url, {
+        headers: {
+          cookie: `waiter_token=${sessionWaiterToken}; csrf_token=${sessionCsrfCookie}`,
+          'x-csrf-token': sessionCsrfToken,
+        },
+        data: route.body,
+      });
+      // CSRF correcto → nunca 403 por CSRF. Puede ser 4xx por datos inválidos.
+      expect(res.status()).not.toBe(403);
+      expect(res.status()).not.toBe(500);
+    });
+  }
+
+  for (const route of POST_ROUTES) {
+    test(`${route.label} → no 403 (CSRF pasa, error de negocio aceptable)`, async () => {
+      if (!sessionWaiterToken || !sessionCsrfCookie || !sessionCsrfToken) {
+        test.skip(true, 'PLAYWRIGHT_WAITER_PIN no definido o login falló');
+        return;
+      }
+      const res = await request.post(route.url, {
+        headers: {
+          cookie: `waiter_token=${sessionWaiterToken}; csrf_token=${sessionCsrfCookie}`,
+          'x-csrf-token': sessionCsrfToken,
+        },
+        data: route.body,
+      });
+      expect(res.status()).not.toBe(403);
+      expect(res.status()).not.toBe(500);
     });
   }
 });
