@@ -197,6 +197,7 @@ export default function MermasPage() {
     if (result.ok) {
       setSuccess(true);
       setForm(buildEmptyForm(turno.operadorNombre));
+      window.dispatchEvent(new CustomEvent('low-stock-refresh'));
     } else {
       setErrorMsg(result.message ?? 'Error al registrar la merma');
     }

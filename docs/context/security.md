@@ -604,6 +604,32 @@ Las funciones RPC llamadas desde API routes con `getSupabaseClient()` (service_r
 
 Esta función SECURITY DEFINER es accesible por `authenticated` por diseño — es llamada directamente desde cláusulas `USING` de RLS policies. Moverla o revocarle acceso a authenticated rompería el aislamiento de tenant en todas las tablas que la usan.
 
+### `SET search_path` y pgcrypto en Supabase
+
+En Supabase, pgcrypto no vive en `pg_catalog` sino en el schema `extensions`. Toda función que use `digest()` (u otras funciones de pgcrypto) **debe** incluir `extensions` en su `search_path`:
+
+```sql
+CREATE OR REPLACE FUNCTION public.mi_funcion()
+...
+SET search_path = public, extensions, pg_catalog
+AS $func$ ... $func$;
+```
+
+Con `SET search_path = public, pg_catalog` (sin `extensions`), el error en runtime es:
+```
+function digest(bytea, unknown) does not exist
+```
+
+El `search_path` del caller **no se hereda** por el callee — cada función PL/pgSQL resuelve nombres en su propio scope.
+
+Para verificar en qué schema viven las funciones de pgcrypto:
+```sql
+SELECT n.nspname, p.proname
+FROM pg_proc p JOIN pg_namespace n ON p.pronamespace = n.oid
+WHERE p.proname = 'digest';
+-- → extensions
+```
+
 ---
 
 ## Endpoint de desarrollo protegido en producción

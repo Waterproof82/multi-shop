@@ -70,17 +70,21 @@ export function LowStockBadge({ className }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
 
   useEffect(() => {
-    fetchAlerts()
-      .then(setAlerts)
-      .catch(() => { /* silent fail — no badge shown */ });
-
-    const id = setInterval(() => {
+    function refresh() {
       fetchAlerts()
         .then(setAlerts)
-        .catch(() => { /* silent */ });
-    }, 3 * 60 * 1000); // recheck every 3 minutes
+        .catch(() => { /* silent fail — no badge shown */ });
+    }
 
-    return () => clearInterval(id);
+    refresh();
+
+    const id = setInterval(refresh, 3 * 60 * 1000); // recheck every 3 minutes
+
+    window.addEventListener('low-stock-refresh', refresh);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener('low-stock-refresh', refresh);
+    };
   }, []);
 
   if (alerts.length === 0) return null;
