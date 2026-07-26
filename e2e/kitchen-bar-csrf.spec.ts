@@ -127,11 +127,6 @@ const POST_ROUTES = [
     body: {},
   },
   {
-    label: 'POST /api/waiter/mesas/{id}/orders/items',
-    url: `/api/waiter/mesas/${DUMMY_UUID}/orders/items`,
-    body: {},
-  },
-  {
     label: 'POST /api/waiter/mesas/{id}/manual-payment',
     url: `/api/waiter/mesas/${DUMMY_UUID}/manual-payment`,
     body: {},
@@ -140,6 +135,24 @@ const POST_ROUTES = [
     label: 'POST /api/waiter/pendientes/validate',
     url: '/api/waiter/pendientes/validate',
     body: {},
+  },
+  {
+    label: 'POST /api/waiter/mesa',
+    url: '/api/waiter/mesa',
+    body: {},
+  },
+  {
+    label: 'POST /api/waiter/device-token',
+    url: '/api/waiter/device-token',
+    body: {},
+  },
+];
+
+const DELETE_ROUTES = [
+  {
+    label: 'DELETE /api/waiter/mesas/{id}/orders/items',
+    url: `/api/waiter/mesas/${DUMMY_UUID}/orders/items`,
+    body: { nombre: 'test', precio: 0, cantidadAEliminar: 1 },
   },
 ];
 
@@ -177,6 +190,14 @@ test.describe('Kitchen/Bar — A: sin waiter_token', () => {
   for (const route of POST_ROUTES) {
     test(`${route.label} → 401, nunca 500`, async () => {
       const res = await request.post(route.url, { data: route.body });
+      expect(res.status()).not.toBe(500);
+      expect([401, 403]).toContain(res.status());
+    });
+  }
+
+  for (const route of DELETE_ROUTES) {
+    test(`${route.label} → 401, nunca 500`, async () => {
+      const res = await request.delete(route.url, { data: route.body });
       expect(res.status()).not.toBe(500);
       expect([401, 403]).toContain(res.status());
     });
@@ -251,6 +272,22 @@ test.describe('Kitchen/Bar — B: waiter_token OK, sin csrf_token', () => {
       expect(body.code).toBe('AUTH_004');
     });
   }
+
+  for (const route of DELETE_ROUTES) {
+    test(`${route.label} → 403 CSRF_REQUIRED`, async () => {
+      if (!sessionWaiterToken) {
+        test.skip(true, 'PLAYWRIGHT_WAITER_PIN no definido o login falló');
+        return;
+      }
+      const res = await request.delete(route.url, {
+        headers: { cookie: `waiter_token=${sessionWaiterToken}` },
+        data: route.body,
+      });
+      expect(res.status()).toBe(403);
+      const body = await res.json() as Record<string, unknown>;
+      expect(body.code).toBe('AUTH_004');
+    });
+  }
 });
 
 // ── Suite C: waiter_token válido, csrf_token inválido → 403 CSRF_INVALID ──────
@@ -294,6 +331,25 @@ test.describe('Kitchen/Bar — C: waiter_token OK, csrf inválido', () => {
         return;
       }
       const res = await request.post(route.url, {
+        headers: {
+          cookie: `waiter_token=${sessionWaiterToken}; csrf_token=fakecookie:fakesig`,
+          'x-csrf-token': 'fakectoken',
+        },
+        data: route.body,
+      });
+      expect(res.status()).toBe(403);
+      const body = await res.json() as Record<string, unknown>;
+      expect(body.code).toBe('AUTH_005');
+    });
+  }
+
+  for (const route of DELETE_ROUTES) {
+    test(`${route.label} → 403 CSRF_INVALID`, async () => {
+      if (!sessionWaiterToken) {
+        test.skip(true, 'PLAYWRIGHT_WAITER_PIN no definido o login falló');
+        return;
+      }
+      const res = await request.delete(route.url, {
         headers: {
           cookie: `waiter_token=${sessionWaiterToken}; csrf_token=fakecookie:fakesig`,
           'x-csrf-token': 'fakectoken',
@@ -357,6 +413,23 @@ test.describe('Kitchen/Bar — D: waiter_token OK, csrf correcto', () => {
       });
       // CSRF correcto → nunca 403 por CSRF.
       // Puede ser 4xx o 500 por UUID dummy — lo relevante es que no bloquea CSRF.
+      expect(res.status()).not.toBe(403);
+    });
+  }
+
+  for (const route of DELETE_ROUTES) {
+    test(`${route.label} → no 403 (CSRF pasa, error de negocio aceptable)`, async () => {
+      if (!sessionWaiterToken || !sessionCsrfCookie || !sessionCsrfToken) {
+        test.skip(true, 'PLAYWRIGHT_WAITER_PIN no definido o login falló');
+        return;
+      }
+      const res = await request.delete(route.url, {
+        headers: {
+          cookie: `waiter_token=${sessionWaiterToken}; csrf_token=${sessionCsrfCookie}`,
+          'x-csrf-token': sessionCsrfToken,
+        },
+        data: route.body,
+      });
       expect(res.status()).not.toBe(403);
     });
   }
