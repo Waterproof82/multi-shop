@@ -523,7 +523,18 @@ export default function WaiterPendientesPage() {
             return released.length > 0 ? ([pedido.id, released] as const) : null;
           } else {
             const ok = await validateNewPedido(pedido.id, pedido.items, sendTipo, selected, paused, mode);
-            return ok ? ([pedido.id, pedido.items.map(i => i.idx)] as const) : null;
+            // Only remove sendTipo items that actually leave pendientes from local
+            // state. Items of the other tipo (retained with from_validation=true)
+            // and unselected sendTipo items (mode='selected') stay in pendientes.
+            // Paused sendTipo items go to kitchen as retenido — also leave pendientes.
+            const sentIndices = pedido.items
+              .filter(i => {
+                if (i.tipo !== sendTipo) return false;
+                if (mode === 'selected' && !selected.has(`${pedido.id}:${i.idx}`)) return false;
+                return true;
+              })
+              .map(i => i.idx);
+            return ok && sentIndices.length > 0 ? ([pedido.id, sentIndices] as const) : null;
           }
         })
       );
