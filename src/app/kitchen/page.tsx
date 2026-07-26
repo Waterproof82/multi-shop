@@ -4,7 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
-import { getCsrfToken } from '@/lib/csrf-client';
+import { fetchWithCsrf } from '@/lib/csrf-client';
 import { UtensilsCrossed, LogOut } from 'lucide-react';
 import type { ItemEstado } from '@/core/domain/repositories/IPedidoRepository';
 
@@ -370,13 +370,8 @@ export default function KitchenPage() {
   // ── Countdown ──────────────────────────────────────────────────────────────
 
   const applyItemListo = useCallback((pedidoId: string, itemIdx: number) => {
-    const csrfToken = getCsrfToken();
-    void fetch(`/api/kitchen/items/${encodeURIComponent(pedidoId)}/${itemIdx}/status`, {
+    void fetchWithCsrf(`/api/kitchen/items/${encodeURIComponent(pedidoId)}/${itemIdx}/status`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
-      },
       body: JSON.stringify({ estado: 'listo' }),
     }).then(r => {
       if (r.ok) setItems(prev => prev.filter(notMatchingItem(pedidoId, itemIdx)));
@@ -413,13 +408,8 @@ export default function KitchenPage() {
   // ── PATCH ──────────────────────────────────────────────────────────────────
 
   const patchEstado = useCallback(async (pedidoId: string, itemIdx: number, estado: ItemEstado) => {
-    const csrfToken = getCsrfToken();
-    const r = await fetch(`/api/kitchen/items/${encodeURIComponent(pedidoId)}/${itemIdx}/status`, {
+    const r = await fetchWithCsrf(`/api/kitchen/items/${encodeURIComponent(pedidoId)}/${itemIdx}/status`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
-      },
       body: JSON.stringify({ estado }),
     });
     if (r.ok) void fetchItems();

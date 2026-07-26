@@ -66,7 +66,7 @@ const COUNTDOWN_SECONDS = 5;
 const COUNTDOWN_COLOR   = { bg: 'oklch(22% 0.16 148)', border: 'oklch(50% 0.26 148 / 0.6)' };
 import { useLanguage, type Language } from '@/lib/language-context';
 import { t } from '@/lib/translations';
-import { getCsrfToken } from '@/lib/csrf-client';
+import { getCsrfToken, ensureCsrfToken, fetchWithCsrf } from '@/lib/csrf-client';
 
 interface BarOrder {
   id: string;
@@ -406,6 +406,9 @@ export default function BarPage() {
     return () => { timers.forEach(id => clearInterval(id)); };
   }, []);
 
+  // Ensure csrf_token cookie exists so beforeunload and sync fetch calls find it.
+  useEffect(() => { void ensureCsrfToken(); }, []);
+
   // On navigation: persist in-flight countdowns to localStorage, then fire PATCH only if order is complete.
   useEffect(() => {
     const handleBeforeUnload = () => {
@@ -484,13 +487,8 @@ export default function BarPage() {
     setServedKeys(new Set(next));
 
     // Per-item PATCH — always fires when a single item countdown completes
-    const csrfItem = getCsrfToken();
-    fetch(`/api/waiter/kitchen/items/${encodeURIComponent(orderId)}/${detallePedidoIdx}/status`, {
+    fetchWithCsrf(`/api/waiter/kitchen/items/${encodeURIComponent(orderId)}/${detallePedidoIdx}/status`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(csrfItem ? { 'x-csrf-token': csrfItem } : {}),
-      },
       body: JSON.stringify({ estado: 'servido' }),
     }).catch(() => {});
 
@@ -502,13 +500,8 @@ export default function BarPage() {
     // Pure bebida: → 'servido' (fully done).
     const nuevoEstado = hasComida ? 'anotado' : 'servido';
     const isNotCurrentOrder = (o: BarOrder) => o.id !== orderId;
-    const csrfOrder = getCsrfToken();
-    fetch(`/api/waiter/orders/${encodeURIComponent(orderId)}/status`, {
+    fetchWithCsrf(`/api/waiter/orders/${encodeURIComponent(orderId)}/status`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(csrfOrder ? { 'x-csrf-token': csrfOrder } : {}),
-      },
       body: JSON.stringify({ estado: nuevoEstado }),
     }).then(r => {
       if (r.ok) {
@@ -634,14 +627,9 @@ export default function BarPage() {
     if (!pendingBarCancel) return;
     const items = pendingBarCancel;
     setPendingBarCancel(null);
-    const csrfCancel = getCsrfToken();
     await Promise.all(items.map(item =>
-      fetch(`/api/waiter/kitchen/items/${encodeURIComponent(item.orderId)}/${item.detallePedidoIdx}/status`, {
+      fetchWithCsrf(`/api/waiter/kitchen/items/${encodeURIComponent(item.orderId)}/${item.detallePedidoIdx}/status`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(csrfCancel ? { 'x-csrf-token': csrfCancel } : {}),
-        },
         body: JSON.stringify({ estado: 'cancelado' }),
       })
     ));
