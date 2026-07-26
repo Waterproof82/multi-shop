@@ -138,4 +138,43 @@ test.describe('Kitchen CSRF — browser client flow', () => {
 
     expect(status).not.toBe(403);
   });
+
+  test('waiter/pendientes page: csrf_token se obtiene automáticamente tras PIN login', async ({ page, context }) => {
+    // Regresión 2026-07-26: updateItemPase / releaseRetainedPedidoItems / cancel loop
+    // usaban fetch() plano sin x-csrf-token. Con PIN-only login → 403.
+    const pin = process.env.PLAYWRIGHT_WAITER_PIN;
+    if (!pin) {
+      test.skip(true, 'PLAYWRIGHT_WAITER_PIN no definido');
+      return;
+    }
+
+    const authRes = await context.request.post('/api/waiter/auth', { data: { pin } });
+    expect(authRes.ok()).toBeTruthy();
+
+    await page.goto('/waiter/pendientes');
+    await page.waitForLoadState('load');
+    await page.waitForTimeout(3000);
+
+    const status = await page.evaluate(async (dummyUuid: string) => {
+      const cookieEntry = document.cookie.split(';').find(c => c.trim().startsWith('csrf_token='));
+      const csrfToken = cookieEntry
+        ? decodeURIComponent(cookieEntry.split('=').slice(1).join('=')).split(':')[0]
+        : null;
+
+      // Ejercita el mismo endpoint que updateItemPase / releaseRetainedPedidoItems
+      const res = await fetch(`/api/waiter/kitchen/items/${dummyUuid}/0/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
+        },
+        body: JSON.stringify({ estado: 'pendiente' }),
+      });
+      return res.status;
+    }, DUMMY_UUID);
+
+    // 403 → regresión: csrf_token no disponible tras PIN login.
+    // 4xx distinto de 403 o 500 → aceptable (negocio/FK dummy).
+    expect(status).not.toBe(403);
+  });
 });

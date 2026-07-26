@@ -81,6 +81,28 @@ test.describe('DB smoke — auth barrier (sin credenciales)', () => {
     expect(res.status()).not.toBe(500);
     expect([400, 401, 403]).toContain(res.status());
   });
+
+  test('POST /api/tpv/cobro sin auth → 401, nunca 500 (tpv_cobro_before_insert digest reachable)', async () => {
+    // Regresión 2026-07-26: migración 20260725000003 sobrescribió search_path de
+    // tpv_cobro_before_insert con "public, pg_catalog", eliminando "extensions"
+    // donde vive pgcrypto. digest() fallaba con "function does not exist" → 500.
+    // Un 4xx aquí confirma que auth check pasó primero (o el trigger no explotó).
+    const res = await request.post('/api/tpv/cobro', {
+      data: { turnoId: DUMMY_UUID, pedidoId: DUMMY_UUID, metodoPago: 'efectivo' },
+    });
+    expect(res.status()).not.toBe(500);
+    expect([400, 401, 403, 404, 422]).toContain(res.status());
+  });
+
+  test('POST /api/tpv/turno/abrir sin auth → 401, nunca 500 (tpv_turno_before_insert digest reachable)', async () => {
+    // Mismo patrón: tpv_turno_before_insert usa digest() — fallaba con 500 tras
+    // migración 20260725000003. Fix: migración 20260726000002.
+    const res = await request.post('/api/tpv/turno/abrir', {
+      data: { cajaId: DUMMY_UUID, efectivoInicial: 0 },
+    });
+    expect(res.status()).not.toBe(500);
+    expect([400, 401, 403, 404, 422]).toContain(res.status());
+  });
 });
 
 
