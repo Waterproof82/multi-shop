@@ -1,4 +1,8 @@
 import { defineConfig } from '@playwright/test';
+import { config } from 'dotenv';
+
+// Load .env.local so PLAYWRIGHT_* and SUPABASE_* vars are available in tests
+config({ path: '.env.local', override: false });
 
 export default defineConfig({
   testDir: './e2e',

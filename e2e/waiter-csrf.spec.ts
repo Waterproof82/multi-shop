@@ -83,7 +83,7 @@ test.describe('Waiter CSRF protection', () => {
 
     expect(res.status()).toBe(403);
     const body = await res.json();
-    expect(body.error ?? body.code).toMatch(/CSRF_REQUIRED/i);
+    expect(body.code).toBe('AUTH_004');
   });
 
   // ── 4. Con waiter_token + csrf_token inválido → 403 CSRF_INVALID ─────────
@@ -104,7 +104,7 @@ test.describe('Waiter CSRF protection', () => {
 
     expect(res.status()).toBe(403);
     const body = await res.json();
-    expect(body.error ?? body.code).toMatch(/CSRF_INVALID/i);
+    expect(body.code).toBe('AUTH_005');
   });
 
   // ── 5. Kitchen hereda el mismo guard ─────────────────────────────────────
