@@ -40,13 +40,6 @@ function serviceRoleKey(): string | undefined {
   return process.env.SUPABASE_SERVICE_ROLE_KEY;
 }
 
-function adminToken(): string | undefined {
-  return process.env.PLAYWRIGHT_ADMIN_TOKEN;
-}
-
-function csrfToken(): string | undefined {
-  return process.env.PLAYWRIGHT_CSRF_TOKEN;
-}
 
 // ── Suite 1: Auth barrier (sin credenciales) ──────────────────────────────────
 // No necesita variables de entorno. Verifica que las rutas críticas
@@ -191,42 +184,91 @@ test.describe('DB smoke — RPC directa (service_role)', () => {
 });
 
 
-// ── Suite 3: Full API path con credenciales ────────────────────────────────────
-// Requiere PLAYWRIGHT_ADMIN_TOKEN y PLAYWRIGHT_CSRF_TOKEN.
-// Ejercita el path completo: autenticación → use case → repositorio → DB trigger.
+// ── Suite 3: Full API path con login automático ───────────────────────────────
+// Requiere PLAYWRIGHT_ADMIN_EMAIL y PLAYWRIGHT_ADMIN_PASSWORD.
+// Hace login real en beforeAll, luego ejercita el path completo:
+//   autenticación → use case → repositorio → DB trigger (digest reachable).
 
-test.describe('DB smoke — full API path (credenciales reales)', () => {
+function adminEmail(): string | undefined    { return process.env.PLAYWRIGHT_ADMIN_EMAIL; }
+function adminPassword(): string | undefined { return process.env.PLAYWRIGHT_ADMIN_PASSWORD; }
+
+test.describe('DB smoke — full API path (login automático)', () => {
   let request: APIRequestContext;
+  let csrfHeader: string | null = null;
 
-  test.beforeEach(async ({ playwright, baseURL }) => {
+  test.beforeAll(async ({ playwright, baseURL }) => {
+    if (!adminEmail() || !adminPassword()) return;
+
     request = await playwright.request.newContext({ baseURL });
+
+    // Login: las cookies admin_token + csrf_token se guardan en el context automáticamente
+    const loginRes = await request.post('/api/admin/login', {
+      data: { email: adminEmail()!, password: adminPassword()! },
+    });
+
+    if (loginRes.ok()) {
+      const body = await loginRes.json() as { csrfToken?: string };
+      csrfHeader = body.csrfToken ?? null;
+    }
   });
 
-  test.afterEach(async () => {
-    await request.dispose();
+  test.afterAll(async () => {
+    await request?.dispose();
   });
 
-  test('POST /api/laborcontrol/fichaje/kiosk con admin_token → no 500', async () => {
-    if (!adminToken() || !csrfToken()) {
-      test.skip(true, 'PLAYWRIGHT_ADMIN_TOKEN o PLAYWRIGHT_CSRF_TOKEN no definidos');
+  test('POST /api/laborcontrol/fichaje/kiosk con admin_token → no 500 (lc trigger digest reachable)', async () => {
+    if (!adminEmail() || !adminPassword()) {
+      test.skip(true, 'PLAYWRIGHT_ADMIN_EMAIL o PLAYWRIGHT_ADMIN_PASSWORD no definidos');
+      return;
+    }
+    if (!csrfHeader) {
+      test.skip(true, 'Login de admin falló en beforeAll — verificar credenciales');
       return;
     }
 
     const res = await request.post('/api/laborcontrol/fichaje/kiosk', {
-      headers: {
-        cookie: `admin_token=${adminToken()!}; csrf_token=${csrfToken()!}:sig`,
-        'x-csrf-token': csrfToken()!,
-      },
-      data: {
-        pin: '0000',          // PIN inválido — esperamos 4xx de negocio, no 500 de DB
-        tipo: 'entrada',
-        accion: 'fichaje_entrada',
-      },
+      headers: { 'x-csrf-token': csrfHeader },
+      data: { pin: '0000', tipo: 'entrada', accion: 'fichaje_entrada' },
     });
 
-    // Cualquier 4xx es correcto: significa que la petición llegó al use case
-    // y la DB respondió de forma esperada (pin incorrecto, empleado no encontrado, etc.)
-    // Un 500 significa que la DB explotó (digest not found u otro error crítico).
+    // 4xx = llegó al use case, DB respondió correctamente (pin inválido, etc.)
+    // 500 = ERROR: digest() not found u otro fallo de DB
+    expect(res.status()).not.toBe(500);
+  });
+
+  test('POST /api/tpv/cobro con admin_token → no 500 (tpv_cobro trigger digest reachable)', async () => {
+    if (!adminEmail() || !adminPassword()) {
+      test.skip(true, 'PLAYWRIGHT_ADMIN_EMAIL o PLAYWRIGHT_ADMIN_PASSWORD no definidos');
+      return;
+    }
+    if (!csrfHeader) {
+      test.skip(true, 'Login de admin falló en beforeAll — verificar credenciales');
+      return;
+    }
+
+    const res = await request.post('/api/tpv/cobro', {
+      headers: { 'x-csrf-token': csrfHeader },
+      data: { turnoId: DUMMY_UUID, pedidoId: DUMMY_UUID, metodoPago: 'efectivo' },
+    });
+
+    expect(res.status()).not.toBe(500);
+  });
+
+  test('POST /api/tpv/turno/abrir con admin_token → no 500 (tpv_turno trigger digest reachable)', async () => {
+    if (!adminEmail() || !adminPassword()) {
+      test.skip(true, 'PLAYWRIGHT_ADMIN_EMAIL o PLAYWRIGHT_ADMIN_PASSWORD no definidos');
+      return;
+    }
+    if (!csrfHeader) {
+      test.skip(true, 'Login de admin falló en beforeAll — verificar credenciales');
+      return;
+    }
+
+    const res = await request.post('/api/tpv/turno/abrir', {
+      headers: { 'x-csrf-token': csrfHeader },
+      data: { cajaId: DUMMY_UUID, efectivoInicial: 0 },
+    });
+
     expect(res.status()).not.toBe(500);
   });
 });
