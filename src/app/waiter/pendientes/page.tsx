@@ -80,9 +80,8 @@ function getMergedItems(mesa: PendienteMesa): MergedItem[] {
 }
 
 async function updateItemPase(pedidoId: string, itemIdx: number, pase: string | null): Promise<boolean> {
-  const r = await fetch(`/api/waiter/kitchen/items/${pedidoId}/${itemIdx}/status`, {
+  const r = await fetchWithCsrf(`/api/waiter/kitchen/items/${pedidoId}/${itemIdx}/status`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ pase }),
   });
   return r.ok;
@@ -132,9 +131,8 @@ async function releaseRetainedPedidoItems(
   });
   const releasedIdx: number[] = [];
   for (const item of toRelease) {
-    const r = await fetch(`/api/waiter/kitchen/items/${pedidoId}/${item.idx}/status`, {
+    const r = await fetchWithCsrf(`/api/waiter/kitchen/items/${pedidoId}/${item.idx}/status`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ estado: 'pendiente' }),
     });
     if (r.ok) releasedIdx.push(item.idx);
@@ -623,9 +621,8 @@ export default function WaiterPendientesPage() {
         if (toCancel.length === 0) continue;
         const cancelledIdx: number[] = [];
         for (const item of toCancel) {
-          const r = await fetch(`/api/waiter/kitchen/items/${encodeURIComponent(pedido.id)}/${item.idx}/status`, {
+          const r = await fetchWithCsrf(`/api/waiter/kitchen/items/${encodeURIComponent(pedido.id)}/${item.idx}/status`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ estado: 'cancelado' }),
           });
           if (r.ok) cancelledIdx.push(item.idx);
