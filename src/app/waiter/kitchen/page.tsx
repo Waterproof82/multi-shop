@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { useSearchParams } from 'next/navigation';
-import { fetchWithCsrf } from '@/lib/csrf-client';
+import { fetchWithCsrf, ensureCsrfToken } from '@/lib/csrf-client';
 import { useLanguage, type Language } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import { UtensilsCrossed, ChevronLeft, ChevronDown, ChevronsUpDown, TimerOff, CheckCheck, PlayCircle, Pause, Table2, Trash2, Layers } from 'lucide-react';
@@ -278,6 +278,9 @@ export default function WaiterKitchenPage() {
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
   }, []);
+
+  // Ensure csrf_token cookie exists on mount so the first PATCH never fires without it.
+  useEffect(() => { void ensureCsrfToken(); }, []);
 
   // Fetch empresaId on mount for tenant-scoped Realtime filter
   useEffect(() => {
