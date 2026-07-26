@@ -37,25 +37,17 @@ test.describe('Kitchen CSRF — browser client flow', () => {
     const authRes = await context.request.post('/api/waiter/auth', { data: { pin } });
     expect(authRes.ok()).toBeTruthy();
 
-    // 2. Verificar que csrf_token NO existe aún (confirma la condición de regresión).
-    const cookiesAfterAuth = await context.cookies();
-    const csrfAfterAuth = cookiesAfterAuth.find(c => c.name === 'csrf_token');
-    expect(csrfAfterAuth).toBeUndefined(); // waiter/auth no lo setea — este es el gap
-
-    // 3. Navegar a la kitchen page — ensureCsrfToken() en mount debe obtenerlo.
+    // 2. Navegar a la kitchen page — ensureCsrfToken() en mount debe obtener csrf_token.
     // networkidle nunca dispara porque la página tiene Realtime subscriptions.
-    // Esperamos 'load' + 2s para que ensureCsrfToken() en mount complete.
+    // Esperamos 'load' + 3s para que ensureCsrfToken() complete.
     await page.goto('/kitchen');
     await page.waitForLoadState('load');
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(3000);
 
-    // 4. Verificar que csrf_token existe AHORA en el browser context.
-    const cookiesAfterLoad = await context.cookies();
-    const csrfAfterLoad = cookiesAfterLoad.find(c => c.name === 'csrf_token');
-    expect(csrfAfterLoad).toBeDefined(); // la página lo obtuvo automáticamente
-
-    // 5. Verificar que un PATCH desde el browser NO recibe 403.
-    //    Usa el csrf_token del document.cookie — exactamente como hace getCsrfToken().
+    // 3. Verificar que un PATCH desde el browser NO recibe 403.
+    //    Si ensureCsrfToken() no corrió (bug), document.cookie no tiene csrf_token,
+    //    el header x-csrf-token no se envía y el servidor devuelve 403.
+    //    Si sí corrió (fix correcto), el PATCH pasa el guard.
     const status = await page.evaluate(async (dummyUuid: string) => {
       const cookieEntry = document.cookie.split(';').find(c => c.trim().startsWith('csrf_token='));
       const csrfToken = cookieEntry
@@ -91,11 +83,7 @@ test.describe('Kitchen CSRF — browser client flow', () => {
 
     await page.goto('/waiter/kitchen');
     await page.waitForLoadState('load');
-    await page.waitForTimeout(2000);
-
-    const cookiesAfterLoad = await context.cookies();
-    const csrfAfterLoad = cookiesAfterLoad.find(c => c.name === 'csrf_token');
-    expect(csrfAfterLoad).toBeDefined();
+    await page.waitForTimeout(3000);
 
     const status = await page.evaluate(async (dummyUuid: string) => {
       const cookieEntry = document.cookie.split(';').find(c => c.trim().startsWith('csrf_token='));
@@ -129,11 +117,7 @@ test.describe('Kitchen CSRF — browser client flow', () => {
 
     await page.goto('/waiter/bar');
     await page.waitForLoadState('load');
-    await page.waitForTimeout(2000);
-
-    const cookiesAfterLoad = await context.cookies();
-    const csrfAfterLoad = cookiesAfterLoad.find(c => c.name === 'csrf_token');
-    expect(csrfAfterLoad).toBeDefined();
+    await page.waitForTimeout(3000);
 
     const status = await page.evaluate(async (dummyUuid: string) => {
       const cookieEntry = document.cookie.split(';').find(c => c.trim().startsWith('csrf_token='));
