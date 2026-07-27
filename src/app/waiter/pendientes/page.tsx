@@ -678,17 +678,29 @@ export default function WaiterPendientesPage() {
       paseItemsForPedido: MergedItem[],
       mesaPaused: Set<string>
     ): Promise<number[]> => {
-      const selectedForPedido = new Set(paseItemsForPedido.map((i: MergedItem) => i.globalKey));
+      // Paused items must NOT be sent to kitchen — exclude them from the
+      // "selected" set so validateNewPedido puts them in retainIndices
+      // (from_validation=true) and they remain visible in the pendientes queue.
+      const selectedForPedido = new Set(
+        paseItemsForPedido
+          .filter((i: MergedItem) => !mesaPaused.has(i.globalKey))
+          .map((i: MergedItem) => i.globalKey)
+      );
+      // Nothing to send — all items in this pase are paused
+      if (selectedForPedido.size === 0) return [];
+
       const tiposInPase = [...new Set(paseItemsForPedido.map((i: MergedItem) => i.tipo))] as Array<'comida' | 'bebida'>;
       const removedIdxs: number[] = [];
 
       for (const tipo of tiposInPase) {
         if (pedido.validated) {
-          const released = await releaseRetainedPedidoItems(pedido.id, pedido.items, tipo, selectedForPedido, mesaPaused, 'selected');
+          // Pass empty paused set: paused items are already excluded from selectedForPedido
+          const released = await releaseRetainedPedidoItems(pedido.id, pedido.items, tipo, selectedForPedido, new Set<string>(), 'selected');
           removedIdxs.push(...released);
         } else {
-          const ok = await validateNewPedido(pedido.id, pedido.items, tipo, selectedForPedido, mesaPaused, 'selected');
-          if (ok) removedIdxs.push(...pedido.items.filter((i: PendienteItem) => i.tipo === tipo).map((i: PendienteItem) => i.idx));
+          // Pass empty paused set: paused items not in selectedForPedido → retainIndices (from_validation=true)
+          const ok = await validateNewPedido(pedido.id, pedido.items, tipo, selectedForPedido, new Set<string>(), 'selected');
+          if (ok) removedIdxs.push(...pedido.items.filter((i: PendienteItem) => i.tipo === tipo && selectedForPedido.has(`${pedido.id}:${i.idx}`)).map((i: PendienteItem) => i.idx));
         }
       }
       return removedIdxs;
@@ -1032,7 +1044,8 @@ export default function WaiterPendientesPage() {
         const { mesaId, pase } = pendingLanzarPase;
         const mesa = mesas.find(m => m.mesaId === mesaId);
         const mergedItems = mesa ? getMergedItems(mesa) : [];
-        const count = mergedItems.filter(i => i.pase === pase).length;
+        const mesaPausedForDialog = pausedMap[mesaId] ?? new Set<string>();
+        const count = mergedItems.filter(i => i.pase === pase && !mesaPausedForDialog.has(i.globalKey)).length;
         const col = PASE_COLOR[pase];
         const displayLabel = mesa?.mesaNombre ?? String(mesa?.mesaNumero ?? '—');
         return (
