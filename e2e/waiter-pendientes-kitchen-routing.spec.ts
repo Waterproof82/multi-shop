@@ -568,6 +568,10 @@ test.describe('Suite 5 — lanzar pase + pausa: retainIndices vs pausedIndices (
   let pedidoRetainId: string | undefined;
   // Pedido B: ítem 0 en pausedIndices → debe ir a kitchen como retenido (from_validation=false)
   let pedidoPausedId: string | undefined;
+  // Pedido C: ya validado (estado='pendiente') con ítem retenido (from_validation=true).
+  //           Simula releaseRetainedPedidoItems para ítems pausados — PATCH estado='retenido'
+  //           debe moverlo a kitchen retenidos (from_validation=false).
+  let pedidoValidatedPausedId: string | undefined;
 
   const supabaseUrl    = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY;
@@ -627,6 +631,39 @@ test.describe('Suite 5 — lanzar pase + pausa: retainIndices vs pausedIndices (
         },
       });
       if (resB.ok()) pedidoPausedId = idB;
+
+      // Crear pedido C — ya validado con un ítem retenido (from_validation=true).
+      // Simula el path releaseRetainedPedidoItems para ítems pausados en pedidos ya
+      // validados: PATCH con estado='retenido' → from_validation=false → kitchen retenidos.
+      const idC = randomUUID();
+      const resC = await dbCtx.post('/rest/v1/pedidos', {
+        headers: supabaseHeaders(),
+        data: {
+          id: idC,
+          empresa_id: sessionEmpresaId,
+          mesa_id: mesaId,
+          estado: 'pendiente',
+          validated_at: new Date().toISOString(),
+          detalle_pedido: [
+            { nombre: '__test_release_paused__', cantidad: 1, precio: 0, tipo_producto: 'comida' },
+          ],
+        },
+      });
+      if (resC.ok()) {
+        pedidoValidatedPausedId = idC;
+        // Pre-crear el ítem como from_validation=true (retenido en pendientes)
+        await dbCtx.post('/rest/v1/pedido_item_estados', {
+          headers: supabaseHeaders(),
+          data: {
+            pedido_id: idC,
+            item_idx: 0,
+            empresa_id: sessionEmpresaId,
+            estado: 'retenido',
+            from_validation: true,
+            updated_at: new Date().toISOString(),
+          },
+        });
+      }
     } finally {
       await appCtx.dispose();
       await dbCtx.dispose();
@@ -636,7 +673,7 @@ test.describe('Suite 5 — lanzar pase + pausa: retainIndices vs pausedIndices (
   test.afterAll(async ({ playwright }) => {
     if (!supabaseUrl || !serviceRoleKey) return;
     const dbCtx = await playwright.request.newContext({ baseURL: supabaseUrl });
-    for (const id of [pedidoRetainId, pedidoPausedId].filter(Boolean)) {
+    for (const id of [pedidoRetainId, pedidoPausedId, pedidoValidatedPausedId].filter(Boolean)) {
       await dbCtx.patch(`/rest/v1/pedidos?id=eq.${id}`, {
         headers: { ...supabaseHeaders(), Prefer: '' },
         data: { estado: 'cancelado' },
@@ -744,6 +781,63 @@ test.describe('Suite 5 — lanzar pase + pausa: retainIndices vs pausedIndices (
     const inPendientes = allPedidos.find(p => p.id === pedidoPausedId);
     // Si falla aquí → pausedIndices (from_validation=false) está apareciendo en pendientes
     // cuando no debería.
+    expect(inPendientes).toBeUndefined();
+  });
+
+  // ── Contrato C: pedido ya validado — PATCH retenido mueve from_validation=true → false ──
+  //
+  // Simula releaseRetainedPedidoItems para ítems PAUSADOS en pedidos ya validados
+  // (pedido.validated=true). La función llama PATCH con estado='retenido' en lugar de
+  // 'pendiente'. upsertItemEstado siempre escribe from_validation=false, así que el ítem
+  // debe aparecer en kitchen retenidos y desaparecer de pendientes.
+
+  test('validated pedido + PATCH estado=retenido → from_validation=false en kitchen, NO en pendientes', async () => {
+    if (!pedidoValidatedPausedId || !sessionWaiterToken || !sessionCsrfCookie || !sessionCsrfToken) {
+      test.skip(true, 'Requiere PLAYWRIGHT_WAITER_PIN + PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY');
+      return;
+    }
+
+    // Simular lo que hace releaseRetainedPedidoItems para un ítem pausado en un pedido validado:
+    // PATCH con estado='retenido' (en vez de 'pendiente') → from_validation=false
+    const patchRes = await request.patch(
+      `/api/waiter/kitchen/items/${pedidoValidatedPausedId}/0/status`,
+      {
+        headers: {
+          cookie: `waiter_token=${sessionWaiterToken}; csrf_token=${sessionCsrfCookie}`,
+          'x-csrf-token': sessionCsrfToken,
+        },
+        data: { estado: 'retenido' },
+      }
+    );
+    // Si falla aquí → el endpoint no acepta estado='retenido' o hay error de auth.
+    expect(patchRes.status()).toBe(200);
+
+    // Ítem debe aparecer en kitchen como retenido (from_validation=false)
+    const kitchenRes = await request.get('/api/waiter/kitchen/items', {
+      headers: { cookie: `waiter_token=${sessionWaiterToken}` },
+    });
+    expect(kitchenRes.status()).toBe(200);
+    const kitchenBody = await kitchenRes.json() as { items: Array<{ pedidoId: string; itemIdx: number; estado: string }> };
+    const inKitchen = kitchenBody.items.find(
+      i => i.pedidoId === pedidoValidatedPausedId && i.itemIdx === 0
+    );
+    // Si falla aquí → upsertItemEstado no escribe from_validation=false correctamente,
+    // o el item no aparece en kitchen como retenido.
+    expect(inKitchen).toBeDefined();
+    expect(inKitchen?.estado).toBe('retenido');
+
+    // Ítem NO debe aparecer en pendientes (from_validation=false excluye de la vista)
+    const pendientesRes = await request.get('/api/waiter/pendientes/orders', {
+      headers: { cookie: `waiter_token=${sessionWaiterToken}` },
+    });
+    expect(pendientesRes.status()).toBe(200);
+    const pendientesBody = await pendientesRes.json() as {
+      mesas: Array<{ pedidos: Array<{ id: string }> }>;
+    };
+    const allPedidos = pendientesBody.mesas.flatMap(m => m.pedidos);
+    const inPendientes = allPedidos.find(p => p.id === pedidoValidatedPausedId);
+    // Si falla aquí → el ítem con from_validation=false está siendo mostrado en pendientes
+    // cuando solo deben mostrarse los from_validation=true.
     expect(inPendientes).toBeUndefined();
   });
 });

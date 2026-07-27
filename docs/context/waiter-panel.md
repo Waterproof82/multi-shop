@@ -209,60 +209,54 @@ Lanzar un pase llama a `handleLanzarPase(mesaId, pase)`, que:
 2. Para cada pedido, llama a `processPaseItemsForPedido`.
 3. Actualiza el UI optimistamente eliminando los ítems enviados.
 
-### Pausa en el contexto de pases — trampa crítica
+### Pausa en pendientes — semántica del botón Pause
 
-El camarero puede marcar ítems individuales como **pausados** (icono `Pause`) antes de lanzar el pase. La pausa indica "no envíes este ítem a cocina todavía".
+El camarero puede marcar ítems individuales como **pausados** (icono `Pause`) en `/waiter/pendientes`. La pausa indica "envía este ítem a cocina como **retenido**" — es decir, el ítem irá al tab "Retenidos" de `/waiter/kitchen` y el cocinero lo verá como un ítem intencionalmente en espera.
 
-**Trampa**: en versiones anteriores, `processPaseItemsForPedido` incluía los ítems pausados en `selectedForPedido` (el conjunto de "ítems a enviar"). Al llamar `validateNewPedido` en modo `selected`, los pausados caían en `pausedIndices` → `from_validation=false` → llegaban a cocina como **kitchen-retenidos**. El camarero veía AMBOS ítems en cocina.
-
-**Fix** (en `page.tsx` — `processPaseItemsForPedido`):
-```ts
-// ANTES (bug): todos los ítems del pase, incluyendo pausados
-const selectedForPedido = new Set(paseItemsForPedido.map(i => i.globalKey));
-
-// DESPUÉS (correcto): excluir pausados
-const selectedForPedido = new Set(
-  paseItemsForPedido
-    .filter(i => !mesaPaused.has(i.globalKey))
-    .map(i => i.globalKey)
-);
-// Pasar Set vacío como `paused` — los ítems pausados ya están fuera de selected
-// y caerán en retainIndices (from_validation=true) automáticamente
-await validateNewPedido(pedido.id, items, tipo, selectedForPedido, new Set(), 'selected');
-```
+**Esto es diferente a "no enviar todavía"** — el ítem SÍ sale de pendientes, pero llega a cocina como retenido (no como pendiente normal).
 
 ### `retainIndices` vs `pausedIndices` — diferencia semántica
 
-Ambos retienen ítems, pero con destinos distintos:
+Ambos generan `estado='retenido'` en DB, pero con `from_validation` opuesto:
 
-| Argumento | `from_validation` | Destino |
-|-----------|-------------------|---------|
-| `retainIndices` | `true` | Cola de pendientes del camarero (`/waiter/pendientes`) |
-| `pausedIndices` | `false` | Kitchen retenidos (`/waiter/kitchen` tab Retenidos) |
+| Argumento API | `from_validation` | Destino visible |
+|---------------|-------------------|-----------------|
+| `retainIndices` | `true` | Cola del camarero (`/waiter/pendientes`) — el camarero debe liberarlo |
+| `pausedIndices` | `false` | Kitchen retenidos (`/waiter/kitchen` tab Retenidos) — el cocinero lo ve |
 
-**Regla**: cuando el camarero pausa un ítem en pendientes y luego lanza el pase, el ítem pausado debe ir a `retainIndices` (quedarse en pendientes), NO a `pausedIndices` (que lo enviaría a cocina). Esto se logra excluyendo los pausados de `selectedForPedido` y pasando un `Set` vacío como `paused`.
+**Regla**: el botón `Pause` en `/waiter/pendientes` → `pausedIndices` → `from_validation=false` → kitchen retenidos. Los ítems que se quedan en pendientes (porque no están seleccionados NI pausados) → `retainIndices` → `from_validation=true`.
 
-### Flujo completo: lanzar pase con pausa
+### Flujo completo: lanzar pase con ítem pausado
 
 ```
 Camarero en /waiter/pendientes:
   Pedido A — 2º pase — ítem X (comida), ítem Y (comida)
-  Camarero pausa ítem X (Pause)
+  Camarero pausa ítem X (icono Pause)
   Camarero pulsa "Lanzar 2º pase"
 
 processPaseItemsForPedido:
-  selectedForPedido = {Y}         ← X excluido (pausado)
-  validateNewPedido(..., selected={Y}, paused=Set(), mode='selected')
-    → retainIndices = [X.idx]      ← X no está en selected → retainIndices
-    → pausedIndices = []           ← paused vacío
-    → DB: X → { estado: 'retenido', from_validation: true }  (pendientes)
-    →     Y → sin row              (llega a cocina como 'pendiente')
+  selectedForPedido = {Y}          ← X excluido (está pausado)
+  pausedForPedido   = {X}          ← X va a pausedIndices
+
+  validateNewPedido(..., selected={Y}, paused={X}, mode='selected')
+    → retainIndices = []            ← ningún ítem sin seleccionar ni pausar
+    → pausedIndices = [X.idx]       ← X pausado → kitchen retenidos
+    → DB: X → { estado: 'retenido', from_validation: false }  (kitchen retenido)
+    →     Y → sin row               (llega a cocina como 'pendiente' normal)
 
 Resultado:
-  ✅ Ítem X permanece en /waiter/pendientes (from_validation=true)
-  ✅ Ítem Y va a /waiter/kitchen como pendiente
-  ❌ ANTES: X llegaba a kitchen como retenido (from_validation=false)
+  ✅ Ítem X va a /waiter/kitchen tab Retenidos (from_validation=false)
+  ✅ Ítem Y va a /waiter/kitchen como pendiente normal
+  ✅ Ambos desaparecen de /waiter/pendientes
 ```
+
+### Trampas históricas (bugs ya resueltos)
+
+**Bug 1** (resuelto en commit 0dae005): `releaseRetainedPedidoItems` para pedidos ya validados (`pedido.validated=true`) excluía los ítems pausados con el filtro `mode='selected' && !isSelected`. Resultado: los ítems pausados se quedaban en pendientes en lugar de ir a kitchen retenidos. Fix: incluir ítems pausados en el filtro y llamar PATCH con `estado='retenido'` para ellos.
+
+**Bug 2** (resuelto en el mismo commit): en `handleConfirm` (pedidos no validados), `sentIndices` excluía ítems pausados. Resultado: el ítem pausado permanecía visible en el UI hasta que `fetchPendientes()` actualizaba el estado. Fix: incluir pausados en `sentIndices` para la eliminación optimista del UI.
+
+**Bug anterior** (resuelto antes de los anteriores): `processPaseItemsForPedido` incluía los pausados en `selectedForPedido` con `paused=Set()`. Resultado: los pausados caían en `retainIndices` → se quedaban en pendientes en vez de ir a kitchen retenidos.
 
 ---
 
