@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { UtensilsCrossed, KeyRound, Pause, ReceiptText, X, CheckSquare, ExternalLink, PlayCircle, BellRing } from "lucide-react";
 import { formatPrice } from "@/lib/format-price";
+import { fetchWithCsrf } from "@/lib/csrf-client";
 import type { MesaWithSession } from "@/core/domain/repositories/IMesaRepository";
 
 export const WAITER_MESA_KEY = "waiter_mesa";
@@ -483,9 +484,8 @@ export function WaiterLoginForm() {
   async function handleViewTicket(mesa: MesaWithSession) {
     setMesaLoading(mesa.id);
     try {
-      const res = await fetch("/api/waiter/mesa", {
+      const res = await fetchWithCsrf("/api/waiter/mesa", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mesaNumero: mesa.numero }),
       });
       if (res.ok) {
@@ -516,9 +516,8 @@ export function WaiterLoginForm() {
     setError(null);
 
     try {
-      const res = await fetch("/api/waiter/mesa", {
+      const res = await fetchWithCsrf("/api/waiter/mesa", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mesaNumero: mesa.numero }),
       });
 
