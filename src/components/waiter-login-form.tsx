@@ -469,7 +469,7 @@ export function WaiterLoginForm() {
           return;
         }
       }
-      await fetch(`/api/waiter/mesas/${encodeURIComponent(mesa.id)}/close`, { method: 'POST' });
+      await fetchWithCsrf(`/api/waiter/mesas/${encodeURIComponent(mesa.id)}/close`, { method: 'POST' });
       await refresh();
     } finally {
       setMesaLoading(null);
@@ -477,7 +477,7 @@ export function WaiterLoginForm() {
   }
 
   async function handleDismissCall(mesa: MesaWithSession) {
-    await fetch(`/api/waiter/mesas/${encodeURIComponent(mesa.id)}/dismiss-call`, { method: 'POST' });
+    await fetchWithCsrf(`/api/waiter/mesas/${encodeURIComponent(mesa.id)}/dismiss-call`, { method: 'POST' });
     await refresh();
   }
 
@@ -501,7 +501,7 @@ export function WaiterLoginForm() {
   async function handleLaunchRetenidos(mesa: MesaWithSession) {
     setLaunching(true);
     try {
-      await fetch(`/api/waiter/kitchen/mesas/${encodeURIComponent(mesa.id)}/release-retenidos`, {
+      await fetchWithCsrf(`/api/waiter/kitchen/mesas/${encodeURIComponent(mesa.id)}/release-retenidos`, {
         method: 'POST',
       });
       await refresh();

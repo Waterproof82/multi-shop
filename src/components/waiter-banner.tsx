@@ -7,6 +7,7 @@ import { UtensilsCrossed, ArrowLeftRight, LogOut, X, ShoppingCart, ChevronDown, 
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { getWaiterMesa, clearWaiterMesa, saveWaiterMesa } from "@/components/waiter-login-form";
+import { fetchWithCsrf } from "@/lib/csrf-client";
 import { useCart } from "@/lib/cart-context";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -388,7 +389,7 @@ export function WaiterBanner() {
     setSwitchingId(mesa.id);
     try {
       if (!mesa.sesionId) {
-        const r = await fetch(`/api/waiter/mesas/${encodeURIComponent(mesa.id)}/open`, { method: "POST" });
+        const r = await fetchWithCsrf(`/api/waiter/mesas/${encodeURIComponent(mesa.id)}/open`, { method: "POST" });
         if (!r.ok) { setSwitchingId(null); return; }
       }
       saveWaiterMesa({ mesaId: mesa.id, mesaNumero: mesa.numero, mesaNombre: mesa.nombre });
@@ -405,7 +406,7 @@ export function WaiterBanner() {
     setClosing(true);
     setCloseError(null);
     try {
-      const res = await fetch(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/close`, { method: "POST" });
+      const res = await fetchWithCsrf(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/close`, { method: "POST" });
       if (res.ok || res.status === 404) {
         clearWaiterMesa();
         globalThis.location.href = "/waiter";

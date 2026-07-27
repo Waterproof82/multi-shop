@@ -104,6 +104,69 @@ test.describe('Routing — auth barrier (sin vars de entorno)', () => {
     expect(res.status()).not.toBe(500);
     expect([401, 403]).toContain(res.status());
   });
+
+  test('POST /api/waiter/mesa sin token → 401, nunca 500', async () => {
+    const res = await request.post('/api/waiter/mesa', {
+      data: { mesaNumero: 1 },
+    });
+    expect(res.status()).not.toBe(500);
+    expect([401, 403]).toContain(res.status());
+  });
+
+  test('POST /api/waiter/mesa con waiter_token pero sin csrf_token → 403 (regresión)', async () => {
+    const token = process.env.PLAYWRIGHT_WAITER_TOKEN ?? sessionWaiterToken;
+    if (!token) {
+      test.skip(true, 'PLAYWRIGHT_WAITER_TOKEN o PLAYWRIGHT_WAITER_PIN no definido');
+      return;
+    }
+    const res = await request.post('/api/waiter/mesa', {
+      headers: { cookie: `waiter_token=${token}` },
+      data: { mesaNumero: 1 },
+    });
+    expect(res.status()).toBe(403);
+  });
+
+  test('POST /api/waiter/mesas/{id}/close sin token → 401, nunca 500', async () => {
+    const res = await request.post('/api/waiter/mesas/00000000-0000-0000-0000-000000000001/close');
+    expect(res.status()).not.toBe(500);
+    expect([401, 403]).toContain(res.status());
+  });
+
+  test('POST /api/waiter/mesas/{id}/open sin token → 401, nunca 500', async () => {
+    const res = await request.post('/api/waiter/mesas/00000000-0000-0000-0000-000000000001/open');
+    expect(res.status()).not.toBe(500);
+    expect([401, 403]).toContain(res.status());
+  });
+
+  test('POST /api/waiter/mesas/{id}/dismiss-call sin token → 401, nunca 500', async () => {
+    const res = await request.post('/api/waiter/mesas/00000000-0000-0000-0000-000000000001/dismiss-call');
+    expect(res.status()).not.toBe(500);
+    expect([401, 403]).toContain(res.status());
+  });
+
+  test('POST /api/waiter/mesas/{id}/close con token pero sin csrf_token → 403 (regresión)', async () => {
+    const token = process.env.PLAYWRIGHT_WAITER_TOKEN ?? sessionWaiterToken;
+    if (!token) {
+      test.skip(true, 'PLAYWRIGHT_WAITER_TOKEN o PLAYWRIGHT_WAITER_PIN no definido');
+      return;
+    }
+    const res = await request.post('/api/waiter/mesas/00000000-0000-0000-0000-000000000001/close', {
+      headers: { cookie: `waiter_token=${token}` },
+    });
+    expect(res.status()).toBe(403);
+  });
+
+  test('POST /api/waiter/mesas/{id}/open con token pero sin csrf_token → 403 (regresión)', async () => {
+    const token = process.env.PLAYWRIGHT_WAITER_TOKEN ?? sessionWaiterToken;
+    if (!token) {
+      test.skip(true, 'PLAYWRIGHT_WAITER_TOKEN o PLAYWRIGHT_WAITER_PIN no definido');
+      return;
+    }
+    const res = await request.post('/api/waiter/mesas/00000000-0000-0000-0000-000000000001/open', {
+      headers: { cookie: `waiter_token=${token}` },
+    });
+    expect(res.status()).toBe(403);
+  });
 });
 
 // ── Suite 2: Comportamiento con auth real (requiere PLAYWRIGHT_WAITER_PIN) ────
@@ -148,6 +211,40 @@ test.describe('Routing — con auth real (requiere PLAYWRIGHT_WAITER_PIN)', () =
     expect(res.status()).toBe(200);
     const body = await res.json() as { mesas: unknown[] };
     expect(Array.isArray(body.mesas)).toBe(true);
+  });
+
+  test('POST /api/waiter/mesa con CSRF correcto + mesa válida → 200 con mesaId', async () => {
+    if (!sessionWaiterToken || !sessionCsrfCookie || !sessionCsrfToken) {
+      test.skip(true, 'PLAYWRIGHT_WAITER_PIN no definido o CSRF no disponible');
+      return;
+    }
+    const res = await request.post('/api/waiter/mesa', {
+      headers: {
+        cookie: `waiter_token=${sessionWaiterToken}; csrf_token=${sessionCsrfCookie}`,
+        'x-csrf-token': sessionCsrfToken,
+      },
+      data: { mesaNumero: 1 },
+    });
+    expect(res.status()).toBe(200);
+    const body = await res.json() as { mesaId: string; mesaNumero: number };
+    expect(typeof body.mesaId).toBe('string');
+    expect(body.mesaNumero).toBe(1);
+  });
+
+  test('POST /api/waiter/mesa con CSRF correcto + mesa inexistente → 404, nunca 500', async () => {
+    if (!sessionWaiterToken || !sessionCsrfCookie || !sessionCsrfToken) {
+      test.skip(true, 'PLAYWRIGHT_WAITER_PIN no definido o CSRF no disponible');
+      return;
+    }
+    const res = await request.post('/api/waiter/mesa', {
+      headers: {
+        cookie: `waiter_token=${sessionWaiterToken}; csrf_token=${sessionCsrfCookie}`,
+        'x-csrf-token': sessionCsrfToken,
+      },
+      data: { mesaNumero: 99999 },
+    });
+    expect(res.status()).not.toBe(500);
+    expect(res.status()).toBe(404);
   });
 
   test('POST validate con UUID inexistente y CSRF correcto → 404, nunca 500', async () => {

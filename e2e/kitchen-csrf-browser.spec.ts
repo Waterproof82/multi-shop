@@ -16,6 +16,9 @@
  *   2. Navegar a /kitchen             → ensureCsrfToken() en mount → csrf_token ✅
  *   3. PATCH desde el browser         → x-csrf-token presente → no 403
  *
+ * Auth: se autentica UNA sola vez en beforeAll para no agotar el rate limiter
+ * (5 auth/min por IP). Cada test inyecta el waiter_token via context.addCookies().
+ *
  * Variables de entorno requeridas:
  *   PLAYWRIGHT_WAITER_PIN — PIN numérico del camarero. Sin él el test se salta.
  */
@@ -24,30 +27,40 @@ import { test, expect } from '@playwright/test';
 
 const DUMMY_UUID = '00000000-0000-0000-0000-000000000099';
 
-test.describe('Kitchen CSRF — browser client flow', () => {
-  test('csrf_token se obtiene automáticamente tras waiter PIN login', async ({ page, context }) => {
+let sharedWaiterToken: string | undefined;
+
+test.describe.serial('Kitchen CSRF — browser client flow', () => {
+  test.beforeAll(async ({ playwright, baseURL }) => {
     const pin = process.env.PLAYWRIGHT_WAITER_PIN;
-    if (!pin) {
+    if (!pin) return;
+
+    const ctx = await playwright.request.newContext({ baseURL });
+    const authRes = await ctx.post('/api/waiter/auth', { data: { pin } });
+    if (authRes.ok()) {
+      const raw = authRes.headers()['set-cookie'] ?? '';
+      const match = raw.match(/(?:^|;\s*)waiter_token=([^;]+)/);
+      if (match) sharedWaiterToken = decodeURIComponent(match[1]);
+    }
+    await ctx.dispose();
+  });
+
+  test('csrf_token se obtiene automáticamente tras waiter PIN login', async ({ page, context }) => {
+    if (!sharedWaiterToken) {
       test.skip(true, 'PLAYWRIGHT_WAITER_PIN no definido');
       return;
     }
 
-    // 1. Login como camarero — solo setea waiter_token, NO csrf_token.
-    //    Este es el estado real del browser antes de que la página cargue.
-    const authRes = await context.request.post('/api/waiter/auth', { data: { pin } });
-    expect(authRes.ok()).toBeTruthy();
+    await context.addCookies([{
+      name: 'waiter_token',
+      value: sharedWaiterToken,
+      domain: new URL(process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000').hostname,
+      path: '/',
+    }]);
 
-    // 2. Navegar a la kitchen page — ensureCsrfToken() en mount debe obtener csrf_token.
-    // networkidle nunca dispara porque la página tiene Realtime subscriptions.
-    // Esperamos 'load' + 3s para que ensureCsrfToken() complete.
     await page.goto('/kitchen');
     await page.waitForLoadState('load');
     await page.waitForTimeout(3000);
 
-    // 3. Verificar que un PATCH desde el browser NO recibe 403.
-    //    Si ensureCsrfToken() no corrió (bug), document.cookie no tiene csrf_token,
-    //    el header x-csrf-token no se envía y el servidor devuelve 403.
-    //    Si sí corrió (fix correcto), el PATCH pasa el guard.
     const status = await page.evaluate(async (dummyUuid: string) => {
       const cookieEntry = document.cookie.split(';').find(c => c.trim().startsWith('csrf_token='));
       const csrfToken = cookieEntry
@@ -65,21 +78,21 @@ test.describe('Kitchen CSRF — browser client flow', () => {
       return res.status;
     }, DUMMY_UUID);
 
-    // 403 → regresión: el header CSRF no se envió (token no disponible).
-    // 500 → DB error por UUID dummy — aceptable, el CSRF pasó.
-    // 4xx distinto de 403 → también aceptable (negocio).
     expect(status).not.toBe(403);
   });
 
   test('waiter/kitchen page: csrf_token se obtiene automáticamente tras PIN login', async ({ page, context }) => {
-    const pin = process.env.PLAYWRIGHT_WAITER_PIN;
-    if (!pin) {
+    if (!sharedWaiterToken) {
       test.skip(true, 'PLAYWRIGHT_WAITER_PIN no definido');
       return;
     }
 
-    const authRes = await context.request.post('/api/waiter/auth', { data: { pin } });
-    expect(authRes.ok()).toBeTruthy();
+    await context.addCookies([{
+      name: 'waiter_token',
+      value: sharedWaiterToken,
+      domain: new URL(process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000').hostname,
+      path: '/',
+    }]);
 
     await page.goto('/waiter/kitchen');
     await page.waitForLoadState('load');
@@ -106,14 +119,17 @@ test.describe('Kitchen CSRF — browser client flow', () => {
   });
 
   test('waiter/bar page: csrf_token se obtiene automáticamente tras PIN login', async ({ page, context }) => {
-    const pin = process.env.PLAYWRIGHT_WAITER_PIN;
-    if (!pin) {
+    if (!sharedWaiterToken) {
       test.skip(true, 'PLAYWRIGHT_WAITER_PIN no definido');
       return;
     }
 
-    const authRes = await context.request.post('/api/waiter/auth', { data: { pin } });
-    expect(authRes.ok()).toBeTruthy();
+    await context.addCookies([{
+      name: 'waiter_token',
+      value: sharedWaiterToken,
+      domain: new URL(process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000').hostname,
+      path: '/',
+    }]);
 
     await page.goto('/waiter/bar');
     await page.waitForLoadState('load');
@@ -142,14 +158,17 @@ test.describe('Kitchen CSRF — browser client flow', () => {
   test('waiter/pendientes page: csrf_token se obtiene automáticamente tras PIN login', async ({ page, context }) => {
     // Regresión 2026-07-26: updateItemPase / releaseRetainedPedidoItems / cancel loop
     // usaban fetch() plano sin x-csrf-token. Con PIN-only login → 403.
-    const pin = process.env.PLAYWRIGHT_WAITER_PIN;
-    if (!pin) {
+    if (!sharedWaiterToken) {
       test.skip(true, 'PLAYWRIGHT_WAITER_PIN no definido');
       return;
     }
 
-    const authRes = await context.request.post('/api/waiter/auth', { data: { pin } });
-    expect(authRes.ok()).toBeTruthy();
+    await context.addCookies([{
+      name: 'waiter_token',
+      value: sharedWaiterToken,
+      domain: new URL(process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000').hostname,
+      path: '/',
+    }]);
 
     await page.goto('/waiter/pendientes');
     await page.waitForLoadState('load');
