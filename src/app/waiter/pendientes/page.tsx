@@ -125,15 +125,19 @@ async function releaseRetainedPedidoItems(
   const toRelease = items.filter(i => {
     if (i.tipo !== sendTipo) return false;
     const isSelected = selected.has(`${pedidoId}:${i.idx}`);
-    if (mode === 'selected' && !isSelected) return false;
-    if (paused.has(`${pedidoId}:${i.idx}`) && !isSelected) return false;
+    const isPaused = paused.has(`${pedidoId}:${i.idx}`);
+    // Paused items must also be released (to kitchen retenidos), not skipped.
+    if (mode === 'selected' && !isSelected && !isPaused) return false;
     return true;
   });
   const releasedIdx: number[] = [];
   for (const item of toRelease) {
+    const isPaused = paused.has(`${pedidoId}:${item.idx}`);
     const r = await fetchWithCsrf(`/api/waiter/kitchen/items/${pedidoId}/${item.idx}/status`, {
       method: 'PATCH',
-      body: JSON.stringify({ estado: 'pendiente' }),
+      // Paused items → retenido (from_validation=false) → kitchen retenidos tab.
+      // Normal items → pendiente → kitchen main queue.
+      body: JSON.stringify({ estado: isPaused ? 'retenido' : 'pendiente' }),
     });
     if (r.ok) releasedIdx.push(item.idx);
   }
@@ -525,12 +529,12 @@ export default function WaiterPendientesPage() {
             const ok = await validateNewPedido(pedido.id, pedido.items, sendTipo, selected, paused, mode);
             // Only remove sendTipo items that actually leave pendientes from local
             // state. Items of the other tipo (retained with from_validation=true)
-            // and unselected sendTipo items (mode='selected') stay in pendientes.
+            // and unselected/non-paused sendTipo items (mode='selected') stay in pendientes.
             // Paused sendTipo items go to kitchen as retenido — also leave pendientes.
             const sentIndices = pedido.items
               .filter(i => {
                 if (i.tipo !== sendTipo) return false;
-                if (mode === 'selected' && !selected.has(`${pedido.id}:${i.idx}`)) return false;
+                if (mode === 'selected' && !selected.has(`${pedido.id}:${i.idx}`) && !paused.has(`${pedido.id}:${i.idx}`)) return false;
                 return true;
               })
               .map(i => i.idx);
