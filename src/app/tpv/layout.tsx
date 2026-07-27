@@ -41,7 +41,8 @@ export default async function TpvLayout({ children }: { readonly children: React
   const headersList = await headers();
   const pathname = headersList.get('x-pathname') ?? '';
 
-  const FRAMELESS_PATHS = ['/tpv/login', '/tpv/turno/abrir', '/tpv/turno/espera', '/tpv/audit/inspector'];
+  // /tpv/legal es pública — inspectores de Hacienda acceden sin credenciales (Art. 12 RD 1007/2023)
+  const FRAMELESS_PATHS = ['/tpv/login', '/tpv/turno/abrir', '/tpv/turno/espera', '/tpv/audit/inspector', '/tpv/legal'];
   if (FRAMELESS_PATHS.includes(pathname)) {
     return <>{children}</>;
   }

@@ -57,7 +57,7 @@ const PrintReceiptSchema = z.object({
     impuestoCents: z.number().int().min(0),
     totalCents: z.number().int().min(0),
   }),
-  aeatUrl: z.string().max(2048),
+  aeatUrl: z.string().max(2048).nullable(),
   esCobro: z.boolean(),
   rectificaNumero: z.string().max(50).optional(),
 });

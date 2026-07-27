@@ -7,7 +7,7 @@ export interface ReceiptData {
     direccion: string;
   };
   ticket: {
-    serie: string;        // ej: "T-000042"
+    serie: string;        // ej: "T000042" (no hyphen per RD 1007/2023 AEAT numserie format)
     fecha: string;        // ISO 8601, zona Europe/Madrid
     operador: string;
   };
@@ -24,7 +24,7 @@ export interface ReceiptData {
     impuestoCents: number;
     totalCents: number;
   };
-  aeatUrl: string;
+  aeatUrl: string | null;
   esCobro: boolean;
   rectificaNumero?: string;
 }
@@ -95,14 +95,16 @@ export async function buildAndPrint(
   printer.println(`TOTAL: ${centsToEur(data.totales.totalCents)} EUR`);
   printer.bold(false);
 
-  // 6. QR code verificación AEAT
-  printer.alignCenter();
-  printer.printQR(data.aeatUrl, {
-    cellSize: 3,
-    correction: 'M',
-    model: 2,
-  });
-  printer.println(data.aeatUrl);
+  // 6. QR code verificación AEAT (omitted when aeatUrl is absent — empresa sin NIF)
+  if (data.aeatUrl) {
+    printer.alignCenter();
+    printer.printQR(data.aeatUrl, {
+      cellSize: 3,
+      correction: 'M',
+      model: 2,
+    });
+    printer.println(data.aeatUrl);
+  }
 
   // 7. Pie
   printer.println('');

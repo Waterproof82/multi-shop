@@ -104,6 +104,7 @@ export interface TpvCobro {
   detalleItems: TpvDetalleItem[] | null;
   desgloseIva?: TpvIvaDesgloseItem[] | null;
   empleadoId?: string | null;
+  verifactuQrUrl?: string | null;
 }
 
 export interface TpvCobroCompletoPayload {

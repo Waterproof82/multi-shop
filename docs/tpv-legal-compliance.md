@@ -36,7 +36,15 @@
 
 - [x] **URL de verificación AEAT** mostrada en `CobroConfirmado` con formato correcto: `DD-MM-AAAA` (no ISO 8601). Parámetros: `nif`, `numserie` (serie+ticket 6 dígitos), `fecha`, `importe` (20260703).
 - [x] **QR visual AEAT en ticket impreso** — `browser-printer.ts` genera imagen QR base64 con la librería `qrcode` y la incrusta en el HTML de impresión. `buildAeatUrl()` calcula la fecha con `DD-MM-YYYY` correcto (bug previo en `fecha.split('/').reverse()` generaba `YYYY-MM-DD`) (20260714).
+- [x] **`tpv_cobros.verifactu_qr_url` persistida en DB** — la URL AEAT se computa y almacena atómicamente en el trigger `tpv_cobro_before_insert()` (paso 4, tras el hash chain). Formato `numserie=T000042` (sin guión, conforme Anexo II RD 1007/2023). `verifactu_qr_url` es campo fiscal inmutable — protegido por `tpv_cobro_block_update()` (20260729).
+- [x] **Formato numserie sin guión** — `T000042` (no `T-000042`). Corregido en `browser-printer.ts` y `tpv_cobro_before_insert()` (20260729).
 - [ ] Verificar con la AEAT que el formato de `numserie` y `fecha` pasan la validación del servicio web.
+
+### 1.5b Declaración modo No-VeriFactu (Art. 12 RD 1007/2023) — **Fase 1 completada**
+
+- [x] **`empresas.verifactu_mode`** — columna `TEXT NOT NULL DEFAULT 'no-verifactu'` con CHECK constraint `('no-verifactu', 'verifactu')`. Todas las empresas operan en modo No-VeriFactu por defecto (20260729).
+- [x] **Sección Art. 12 en `/tpv/legal`** — declaración explícita de modo No-VeriFactu, mención de QR por ticket, cadena de hashes y inalterabilidad (20260729).
+- [x] **Fase 2 (envío VERI\*FACTU XML a AEAT)** — pendiente. Plazo obligatorio: enero 2027 (grandes empresas) / julio 2027 (resto) conforme a RD 15/2025.
 
 ### 1.5 Declaración de Responsabilidad del fabricante
 
@@ -105,7 +113,7 @@
 
 - [x] Secuencia Postgres `tpv_numero_serie` por `empresa_id`: incremento atómico sin saltos (20260703).
 - [x] El número es único y sobrevive reinicios del servidor — generado con `SELECT nextval()` en trigger, no en lógica de aplicación (20260703).
-- [~] Formato actual: `{SERIE}-{NNNNNN}` (ej: `T-000042`). Formato con fecha (`{SERIE}-{AAAAMMDD}-{NUMERO}`) pendiente como opción configurable.
+- [x] Formato AEAT: `{SERIE}{NNNNNN}` (ej: `T000042`, sin guión). Corregido en `browser-printer.ts` y trigger `tpv_cobro_before_insert()` (20260729). Nota: la visualización en pantalla (`T-000042` con guión) es solo UX — la URL AEAT nunca usa guión.
 
 ---
 

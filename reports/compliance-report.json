@@ -1,10 +1,10 @@
 {
   "meta": {
-    "version": "0.4.0",
-    "commit": "54f14da4106cb40ff192043eb008ce5fad687846",
-    "commitShort": "54f14da",
+    "version": "0.5.0",
+    "commit": "sdd/verifactu-gap001",
+    "commitShort": "gap001",
     "branch": "main",
-    "auditDate": "2026-07-27T13:44:05Z",
+    "auditDate": "2026-07-29T00:00:00Z",
     "skill": "audit-tpv@v1.0",
     "mode": "pre-certification"
   },
@@ -50,13 +50,13 @@
   },
   "complianceMetrics": {
     "Ley_11_2021": { "total": 6, "covered": 6, "partial": 0, "gaps": 0, "pct": 100 },
-    "RD_1007_2023": { "total": 6, "covered": 4, "partial": 1, "gaps": 1, "pct": 67 },
+    "RD_1007_2023": { "total": 6, "covered": 5, "partial": 1, "gaps": 0, "pct": 83 },
     "SIALTI": { "total": 6, "covered": 5, "partial": 1, "gaps": 0, "pct": 83 },
     "RD_Ley_8_2019": { "total": 3, "covered": 3, "partial": 0, "gaps": 0, "pct": 100 },
     "Art66_LGT": { "total": 2, "covered": 1, "partial": 1, "gaps": 0, "pct": 75 },
     "RGPD": { "total": 2, "covered": 0, "partial": 2, "gaps": 0, "pct": 50 },
     "OWASP": { "total": 3, "covered": 3, "partial": 0, "gaps": 0, "pct": 100 },
-    "TOTAL": { "total": 30, "covered": 23, "partial": 6, "gaps": 1, "pct": 77 }
+    "TOTAL": { "total": 30, "covered": 24, "partial": 6, "gaps": 0, "pct": 80 }
   },
   "scores": {
     "legal_compliance": 92,
@@ -74,7 +74,19 @@
       "norm": "RD 1007/2023",
       "priority": "P1",
       "risk": 25,
-      "blocker": true
+      "blocker": true,
+      "status": "resolved",
+      "resolution": "No-VeriFactu mode (Art. 12 RD 1007/2023) formalizado. verifactu_mode column en empresas, verifactu_qr_url persistida en tpv_cobros, declaración Art. 12 en /tpv/legal.",
+      "resolution_date": "2026-07-29",
+      "evidence": [
+        "empresas.verifactu_mode column added (DEFAULT 'no-verifactu', CHECK constraint)",
+        "tpv_cobros.verifactu_qr_url computed atomically on INSERT by trigger tpv_cobro_before_insert()",
+        "/tpv/legal Art. 12 No-VeriFactu declaration section added",
+        "Electron thermal printer null guard for aeatUrl; numserie format T000042 (no hyphen)"
+      ],
+      "phase2_pending": true,
+      "phase2_deadline": "2027-01-01",
+      "phase2_note": "VERI*FACTU XML + submission to AEAT. Mandatory deadline: Jan 2027 (large companies) / Jul 2027 (rest) per RD 15/2025."
     },
     {
       "id": "GAP-002",
@@ -110,9 +122,9 @@
     }
   ],
   "verdict": {
-    "status": "NO_LISTO",
-    "readyFor": ["Ley_11_2021", "RD_Ley_8_2019", "SIALTI_parcial"],
-    "notReadyFor": ["VeriFactu_completo"],
-    "blockers": ["GAP-001"]
+    "status": "LISTO_PARCIAL",
+    "readyFor": ["Ley_11_2021", "RD_Ley_8_2019", "SIALTI_parcial", "VeriFactu_NoVeriFactu_Phase1"],
+    "notReadyFor": ["VeriFactu_submission_Phase2"],
+    "blockers": []
   }
 }
