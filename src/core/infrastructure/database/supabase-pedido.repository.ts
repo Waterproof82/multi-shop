@@ -1535,7 +1535,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           .from('pedidos')
           .select(`id, created_at, detalle_pedido, pase, mesa_id, mesas!inner(numero, nombre)`)
           .eq('empresa_id', empresaId)
-          .eq('estado', 'pendiente')
+          .in('estado', ['pendiente', 'anotado'])
           .in('id', [...retenidoMap.keys()])
           .order('created_at', { ascending: true });
         addValidatedRetenidos(mesaMap, (validatedPedidos ?? []) as Array<Record<string, unknown>>, retenidoMap);
