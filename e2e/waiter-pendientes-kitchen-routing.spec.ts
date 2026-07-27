@@ -312,6 +312,7 @@ test.describe('Bug A+B regression — from_validation=true routing (requiere PIN
         data: {
           id: testId,
           empresa_id: sessionEmpresaId,
+          total: 0,
           mesa_id: mesaId,
           estado: 'pendiente',
           detalle_pedido: [
@@ -449,6 +450,7 @@ test.describe('Bug C regression — comida retenida con pedido en estado anotado
         data: {
           id: testId,
           empresa_id: sessionEmpresaId,
+          total: 0,
           mesa_id: mesaId,
           estado: 'anotado',
           detalle_pedido: [
@@ -607,6 +609,7 @@ test.describe('Suite 5 — lanzar pase + pausa: retainIndices vs pausedIndices (
         data: {
           id: idA,
           empresa_id: sessionEmpresaId,
+          total: 0,
           mesa_id: mesaId,
           estado: 'pendiente_validacion',
           detalle_pedido: [
@@ -623,6 +626,7 @@ test.describe('Suite 5 — lanzar pase + pausa: retainIndices vs pausedIndices (
         data: {
           id: idB,
           empresa_id: sessionEmpresaId,
+          total: 0,
           mesa_id: mesaId,
           estado: 'pendiente_validacion',
           detalle_pedido: [
@@ -641,6 +645,7 @@ test.describe('Suite 5 — lanzar pase + pausa: retainIndices vs pausedIndices (
         data: {
           id: idC,
           empresa_id: sessionEmpresaId,
+          total: 0,
           mesa_id: mesaId,
           estado: 'pendiente',
           validated_at: new Date().toISOString(),
