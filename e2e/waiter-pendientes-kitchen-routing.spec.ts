@@ -656,9 +656,9 @@ test.describe('Suite 5 — lanzar pase + pausa: retainIndices vs pausedIndices (
   // ── Contrato A: retainIndices → from_validation=true → ítem en PENDIENTES ────
 
   test('retainIndices=[0] → ítem queda en pendientes (from_validation=true), NO en kitchen', async () => {
-    // Este es el comportamiento correcto que processPaseItemsForPedido debe generar
-    // cuando el camarero pausa un ítem antes de "lanzar pase": el ítem pausado
-    // NO está en selectedForPedido → cae en notSelectedOfTipo → retainIndices.
+    // Verifica el contrato de retainIndices: ítems que deben quedarse en pendientes
+    // (e.g. retenidos por falta de stock). processPaseItemsForPedido NO usa este
+    // camino para ítems pausados — los pausados van a pausedIndices (ver Contrato B).
     if (!pedidoRetainId || !sessionWaiterToken || !sessionCsrfCookie || !sessionCsrfToken) {
       test.skip(true, 'Requiere PLAYWRIGHT_WAITER_PIN + PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY');
       return;
@@ -702,9 +702,10 @@ test.describe('Suite 5 — lanzar pase + pausa: retainIndices vs pausedIndices (
   // ── Contrato B: pausedIndices → from_validation=false → ítem en KITCHEN retenido ──
 
   test('pausedIndices=[0] → ítem va a kitchen como retenido (from_validation=false), NO en pendientes', async () => {
-    // Este es el comportamiento que processPaseItemsForPedido NO debe generar
-    // para ítems pausados. Si los pausados llegan aquí (en pausedIndices en vez
-    // de retainIndices), irían a kitchen como retenidos — ese era el bug original.
+    // Verifica el contrato de pausedIndices: ítems pausados por el camarero en
+    // "lanzar pase" van a kitchen como retenidos (from_validation=false, estado='retenido').
+    // Esto es el comportamiento CORRECTO — processPaseItemsForPedido pone los pausados
+    // en pausedForPedido que se pasa como pausedIndices a validateNewPedido.
     if (!pedidoPausedId || !sessionWaiterToken || !sessionCsrfCookie || !sessionCsrfToken) {
       test.skip(true, 'Requiere PLAYWRIGHT_WAITER_PIN + PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY');
       return;

@@ -150,7 +150,7 @@ async function validateNewPedido(
 ): Promise<boolean> {
   const autoRetain = items.filter(i => i.tipo !== sendTipo).map(i => i.idx);
   const notSelectedOfTipo = mode === 'selected'
-    ? items.filter(i => i.tipo === sendTipo && !selected.has(`${pedidoId}:${i.idx}`)).map(i => i.idx)
+    ? items.filter(i => i.tipo === sendTipo && !selected.has(`${pedidoId}:${i.idx}`) && !paused.has(`${pedidoId}:${i.idx}`)).map(i => i.idx)
     : [];
   const retainIndices = [...new Set([...autoRetain, ...notSelectedOfTipo])];
   const pausedIndices = items
@@ -678,29 +678,32 @@ export default function WaiterPendientesPage() {
       paseItemsForPedido: MergedItem[],
       mesaPaused: Set<string>
     ): Promise<number[]> => {
-      // Paused items must NOT be sent to kitchen — exclude them from the
-      // "selected" set so validateNewPedido puts them in retainIndices
-      // (from_validation=true) and they remain visible in the pendientes queue.
+      // Non-paused items → kitchen normally (selectedForPedido)
+      // Paused items → kitchen as retenido (pausedForPedido → pausedIndices → from_validation=false)
       const selectedForPedido = new Set(
         paseItemsForPedido
           .filter((i: MergedItem) => !mesaPaused.has(i.globalKey))
           .map((i: MergedItem) => i.globalKey)
       );
-      // Nothing to send — all items in this pase are paused
-      if (selectedForPedido.size === 0) return [];
+      const pausedForPedido = new Set(
+        paseItemsForPedido
+          .filter((i: MergedItem) => mesaPaused.has(i.globalKey))
+          .map((i: MergedItem) => i.globalKey)
+      );
+      if (selectedForPedido.size === 0 && pausedForPedido.size === 0) return [];
 
       const tiposInPase = [...new Set(paseItemsForPedido.map((i: MergedItem) => i.tipo))] as Array<'comida' | 'bebida'>;
       const removedIdxs: number[] = [];
 
       for (const tipo of tiposInPase) {
         if (pedido.validated) {
-          // Pass empty paused set: paused items are already excluded from selectedForPedido
-          const released = await releaseRetainedPedidoItems(pedido.id, pedido.items, tipo, selectedForPedido, new Set<string>(), 'selected');
+          const released = await releaseRetainedPedidoItems(pedido.id, pedido.items, tipo, selectedForPedido, pausedForPedido, 'selected');
           removedIdxs.push(...released);
         } else {
-          // Pass empty paused set: paused items not in selectedForPedido → retainIndices (from_validation=true)
-          const ok = await validateNewPedido(pedido.id, pedido.items, tipo, selectedForPedido, new Set<string>(), 'selected');
-          if (ok) removedIdxs.push(...pedido.items.filter((i: PendienteItem) => i.tipo === tipo && selectedForPedido.has(`${pedido.id}:${i.idx}`)).map((i: PendienteItem) => i.idx));
+          const ok = await validateNewPedido(pedido.id, pedido.items, tipo, selectedForPedido, pausedForPedido, 'selected');
+          if (ok) removedIdxs.push(...pedido.items.filter(
+            (i: PendienteItem) => i.tipo === tipo && (selectedForPedido.has(`${pedido.id}:${i.idx}`) || pausedForPedido.has(`${pedido.id}:${i.idx}`))
+          ).map((i: PendienteItem) => i.idx));
         }
       }
       return removedIdxs;
