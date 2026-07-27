@@ -391,17 +391,16 @@ export function WaiterLoginForm() {
         }
       });
 
-    // Listen to item-update broadcast so "Platos listos" badge updates when kitchen
-    // marks items as preparado — pedido_item_estados changes don't touch mesa_sesiones.
-    const broadcastChannel = supabase
-      .channel('waiter-items-update')
-      .on('broadcast', { event: 'item-update' }, debouncedRefresh)
-      .subscribe();
+    // Listen via the WaiterBanner-dispatched DOM event instead of subscribing to the
+    // Supabase broadcast channel directly. Both components use the same singleton client,
+    // so competing .channel('waiter-items-update') subscriptions silently drop each other.
+    // WaiterBanner already receives 'item-update' and re-dispatches as CustomEvent.
+    globalThis.addEventListener('waiter-realtime-update', debouncedRefresh);
 
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
+      globalThis.removeEventListener('waiter-realtime-update', debouncedRefresh);
       void supabase.removeChannel(channel);
-      void supabase.removeChannel(broadcastChannel);
     };
   }, [step, empresaId, refresh]);
 
