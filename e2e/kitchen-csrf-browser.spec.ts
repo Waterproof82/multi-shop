@@ -196,4 +196,48 @@ test.describe.serial('Kitchen CSRF — browser client flow', () => {
     // 4xx distinto de 403 o 500 → aceptable (negocio/FK dummy).
     expect(status).not.toBe(403);
   });
+
+  test('waiter mesa grid se refresca al recibir CustomEvent waiter-realtime-update (regresión channel singleton)', async ({ page, context }) => {
+    // Regresión 2026-07-27: WaiterLoginForm suscribía channel('waiter-items-update')
+    // directamente. WaiterBanner usa el mismo singleton Supabase y el mismo canal →
+    // ambos competían; el grid dejaba de recibir item-update y no mostraba "Platos listos"
+    // sin recargar la página.
+    //
+    // Fix: WaiterLoginForm escucha CustomEvent('waiter-realtime-update') que WaiterBanner
+    // re-dispara, en lugar de suscribirse al canal WebSocket directamente.
+    //
+    // Este test verifica que el grid llama GET /api/waiter/mesas dentro de los 500 ms
+    // siguientes al CustomEvent. El polling es cada 2 s, así que un fetch en <500 ms
+    // solo puede ser respuesta directa al event listener.
+    if (!sharedWaiterToken) {
+      test.skip(true, 'PLAYWRIGHT_WAITER_PIN no definido');
+      return;
+    }
+
+    await context.addCookies([{
+      name: 'waiter_token',
+      value: sharedWaiterToken,
+      domain: new URL(process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000').hostname,
+      path: '/',
+    }]);
+
+    await page.goto('/waiter');
+    await page.waitForLoadState('load');
+    // Esperar a que el grid se muestre (GET /api/waiter/me → tables step)
+    // y dejar pasar el primer ciclo de polling (2 s) para que no interfiera.
+    await page.waitForTimeout(2200);
+
+    // Ventana de 500 ms: apretada para que el polling de 2 s no pueda disparar.
+    const refreshPromise = page.waitForRequest(
+      req => req.url().includes('/api/waiter/mesas') && req.method() === 'GET',
+      { timeout: 500 }
+    );
+
+    await page.evaluate(() => {
+      globalThis.dispatchEvent(new CustomEvent('waiter-realtime-update'));
+    });
+
+    // Si WaiterLoginForm NO escucha el CustomEvent, esto falla con timeout.
+    await refreshPromise;
+  });
 });

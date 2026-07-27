@@ -8,7 +8,7 @@
 | `waiter-new-order` | broadcast `new-order` | trigger notify_waiter_new_order (todos los INSERTs) | WaiterBanner, MostradorClient |
 | `waiter-new-order-kitchen` | broadcast `new-order` | trigger notify_waiter_new_order | WaiterKitchenPage |
 | `waiter-new-order-bar` | broadcast `new-order` | trigger notify_waiter_new_order | BarPage |
-| `waiter-items-update` | broadcast `item-update` | trigger notify_waiter_items_update + trigger pedidos_notify_item_update | WaiterBanner, BarPage, WaiterLoginForm, MostradorClient, TpvCatalogProvider |
+| `waiter-items-update` | broadcast `item-update` | trigger notify_waiter_items_update + trigger pedidos_notify_item_update | WaiterBanner, BarPage, MostradorClient, TpvCatalogProvider |
 | `tpv-pedidos-{sesionId}` | postgres_changes | pedidos (UPDATE, filter sesion_id) | MostradorClient |
 | `tpv-sesion-close-{sesionId}` | postgres_changes | mesa_sesiones (UPDATE, filter id) | MostradorClient |
 | `waiter-kitchen-{uid}` | postgres_changes | pedido_item_estados, pedidos | WaiterKitchenPage |
@@ -19,7 +19,9 @@
 
 ## DOM relay: `waiter-realtime-update`
 
-`WaiterBanner` dispara `globalThis.dispatchEvent(new CustomEvent('waiter-realtime-update'))` cuando recibe cualquier update de Realtime. Los componentes waiter lo escuchan como fallback. **Nunca** hacer fetch en el handler si `confirmingRef.current.size > 0`.
+`WaiterBanner` dispara `globalThis.dispatchEvent(new CustomEvent('waiter-realtime-update'))` cuando recibe cualquier update de Realtime. Los componentes que no son dueños de un canal propio deben escuchar este evento DOM en lugar de suscribirse directamente a `waiter-items-update`. **Nunca** hacer fetch en el handler si `confirmingRef.current.size > 0`.
+
+**Regla crítica — singleton conflict:** El cliente Supabase es un singleton. Si dos componentes llaman `.channel('waiter-items-update')` sobre el mismo cliente, compiten por el mismo canal y uno de ellos puede dejar de recibir eventos silenciosamente. `WaiterBanner` es el ÚNICO dueño de `waiter-items-update`. Todos los demás componentes que necesiten reaccionar a cambios de ítems deben escuchar `waiter-realtime-update` vía DOM.
 
 ## Trampas conocidas
 
@@ -50,9 +52,17 @@ Cuando pendientes valida multiples pedidos secuencialmente, el trigger de DB lan
 
 ### 4. Mesa grid badge no se actualiza al marcar items en cocina
 
-La cocina modifica `pedido_item_estados`, que no toca `mesa_sesiones`. `WaiterLoginForm` solo escuchaba `mesa_sesiones`.
+La cocina modifica `pedido_item_estados`, que no toca `mesa_sesiones`. `WaiterLoginForm` solo escuchaba `mesa_sesiones` → el badge "Platos listos" no aparecía hasta recargar la página.
 
-**Fix:** agregar suscripcion al broadcast `waiter-items-update` (canal `'waiter-items-update'`, evento `'item-update'`).
+**Primer intento (bug):** agregar suscripción directa a `channel('waiter-items-update')` en `WaiterLoginForm`. Funcionaba en aislamiento pero en producción `WaiterBanner` ya suscribía el mismo canal en el mismo cliente singleton — uno de los dos dejaba de recibir eventos silenciosamente.
+
+**Fix correcto (commit 72632be):** eliminar la suscripción directa y escuchar el DOM relay en su lugar:
+```ts
+globalThis.addEventListener('waiter-realtime-update', debouncedRefresh);
+// cleanup:
+globalThis.removeEventListener('waiter-realtime-update', debouncedRefresh);
+```
+`WaiterBanner` ya recibe `item-update` y re-dispara `CustomEvent('waiter-realtime-update')` — `WaiterLoginForm` reacciona sin competir por el canal WebSocket.
 
 ### 5. `removeSessionItemUseCase` bypasea `pedido_item_estados`
 
