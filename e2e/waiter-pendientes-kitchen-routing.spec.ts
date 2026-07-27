@@ -400,3 +400,143 @@ test.describe('Bug A+B regression — from_validation=true routing (requiere PIN
     expect(found?.items.length).toBeGreaterThan(0);
   });
 });
+
+// ── Suite 4: Regresión Bug C — pedido mixto en estado 'anotado' ──────────────
+//
+// Reproduce la trampa documentada en docs/context/waiter-panel.md:
+// cuando el bar sirve las bebidas de un pedido mixto, el pedido pasa de
+// 'pendiente' a 'anotado'. Si findPendientesValidacion filtra solo por
+// estado='pendiente', la comida retenida desaparece de /waiter/pendientes.
+//
+// Fix: .in('estado', ['pendiente', 'anotado']) en supabase-pedido.repository.ts
+
+test.describe('Bug C regression — comida retenida con pedido en estado anotado (requiere PIN + service role)', () => {
+  let request: APIRequestContext;
+  let testPedidoId: string | undefined;
+
+  const supabaseUrl    = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY;
+
+  function supabaseHeaders() {
+    return {
+      apikey: serviceRoleKey!,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+    };
+  }
+
+  test.beforeAll(async ({ playwright, baseURL }) => {
+    if (!sessionWaiterToken || !sessionEmpresaId || !supabaseUrl || !serviceRoleKey) return;
+
+    const appCtx = await playwright.request.newContext({ baseURL });
+    const dbCtx  = await playwright.request.newContext({ baseURL: supabaseUrl });
+
+    try {
+      // Obtener primera mesa válida
+      const mesasRes = await appCtx.get('/api/waiter/mesas', {
+        headers: { cookie: `waiter_token=${sessionWaiterToken}` },
+      });
+      if (!mesasRes.ok()) return;
+      const mesasBody = await mesasRes.json() as { mesas: Array<{ id: string }> };
+      const mesaId = mesasBody.mesas[0]?.id;
+      if (!mesaId) return;
+
+      // Crear pedido sintético en estado 'anotado' (simula: bar sirvió bebidas en pedido mixto)
+      const testId = randomUUID();
+      const insertRes = await dbCtx.post('/rest/v1/pedidos', {
+        headers: supabaseHeaders(),
+        data: {
+          id: testId,
+          empresa_id: sessionEmpresaId,
+          mesa_id: mesaId,
+          estado: 'anotado',
+          detalle_pedido: [
+            { nombre: '__test_comida_anotado__', cantidad: 1, precio: 0, tipo_producto: 'comida' },
+          ],
+        },
+      });
+
+      if (!insertRes.ok()) return;
+      testPedidoId = testId;
+
+      // Crear ítem retenido con from_validation=true (comida enviada de vuelta a pendientes)
+      await dbCtx.post('/rest/v1/pedido_item_estados', {
+        headers: supabaseHeaders(),
+        data: {
+          pedido_id: testId,
+          item_idx: 0,
+          empresa_id: sessionEmpresaId,
+          estado: 'retenido',
+          from_validation: true,
+          updated_at: new Date().toISOString(),
+        },
+      });
+    } finally {
+      await appCtx.dispose();
+      await dbCtx.dispose();
+    }
+  });
+
+  test.afterAll(async ({ playwright }) => {
+    if (!testPedidoId || !supabaseUrl || !serviceRoleKey) return;
+
+    const dbCtx = await playwright.request.newContext({ baseURL: supabaseUrl });
+    await dbCtx.patch(`/rest/v1/pedidos?id=eq.${testPedidoId}`, {
+      headers: { ...supabaseHeaders(), Prefer: '' },
+      data: { estado: 'cancelado' },
+    });
+    await dbCtx.delete(`/rest/v1/pedido_item_estados?pedido_id=eq.${testPedidoId}`, {
+      headers: { ...supabaseHeaders(), Prefer: '' },
+    });
+    await dbCtx.dispose();
+  });
+
+  test.beforeEach(async ({ playwright, baseURL }) => {
+    request = await playwright.request.newContext({ baseURL });
+  });
+  test.afterEach(async () => { await request.dispose(); });
+
+  test('Bug C: comida retenida (from_validation=true) en pedido "anotado" SÍ aparece en /api/waiter/pendientes/orders', async () => {
+    // Regresión: findPendientesValidacion filtraba solo estado='pendiente'.
+    // Cuando el bar sirve bebidas de un pedido mixto, el pedido pasa a 'anotado'
+    // y la comida desaparecía de la vista del camarero.
+    if (!testPedidoId || !sessionWaiterToken) {
+      test.skip(true, 'Datos de test no creados — requiere PLAYWRIGHT_WAITER_PIN + PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY');
+      return;
+    }
+
+    const res = await request.get('/api/waiter/pendientes/orders', {
+      headers: { cookie: `waiter_token=${sessionWaiterToken}` },
+    });
+    expect(res.status()).toBe(200);
+    const body = await res.json() as {
+      mesas: Array<{ pedidos: Array<{ id: string; validated?: boolean; items: unknown[] }> }>;
+    };
+
+    const allPedidos = body.mesas.flatMap(m => m.pedidos);
+    const found = allPedidos.find(p => p.id === testPedidoId);
+
+    // Si falla aquí → findPendientesValidacion no incluye 'anotado' en el filtro de estado.
+    expect(found).toBeDefined();
+    expect(found?.validated).toBe(true);
+    expect(found?.items.length).toBeGreaterThan(0);
+  });
+
+  test('Bug C: comida retenida (from_validation=true) en pedido "anotado" NO aparece en /api/waiter/kitchen/items', async () => {
+    if (!testPedidoId || !sessionWaiterToken) {
+      test.skip(true, 'Datos de test no creados — requiere PLAYWRIGHT_WAITER_PIN + PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY');
+      return;
+    }
+
+    const res = await request.get('/api/waiter/kitchen/items', {
+      headers: { cookie: `waiter_token=${sessionWaiterToken}` },
+    });
+    expect(res.status()).toBe(200);
+    const body = await res.json() as { items: Array<{ pedidoId: string; itemIdx: number }> };
+
+    // El ítem no debe filtrarse hacia la cocina — sigue retenido en pendientes
+    const leaked = body.items.find(i => i.pedidoId === testPedidoId && i.itemIdx === 0);
+    expect(leaked).toBeUndefined();
+  });
+});

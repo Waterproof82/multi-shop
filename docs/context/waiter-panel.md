@@ -147,6 +147,57 @@ There is no `en_preparacion` or `preparado` state in bar. Items are either pendi
 
 ---
 
+## Trampas Críticas — Pendientes + Kitchen Routing
+
+### Pedido estado `anotado` en flujo mixto comida+bebida
+
+Cuando un camarero valida un pedido mixto (comida + bebida) desde `/waiter/pendientes`, el flujo es:
+
+1. `validate` mueve el pedido de `pendiente_validacion` → `pendiente`.
+2. Los ítems de bebida van al bar (`from_validation = false`).
+3. Los ítems de comida **retenidos** se marcan con `from_validation = true` — quedan visibles en `/waiter/pendientes` como "validated+retenido".
+4. Cuando el bar sirve **todas las bebidas** del pedido mixto, la bar page actualiza el estado del pedido a `anotado` (no `servido`) para que el cocinero siga viendo la comida.
+
+**Trampa**: `findPendientesValidacion` solo buscaba pedidos con `estado = 'pendiente'`. Después de que el bar sirvió las bebidas, el pedido pasa a `anotado` y la comida retenida desaparece de la vista del camarero.
+
+**Fix** (aplicado en `supabase-pedido.repository.ts`):
+```ts
+// ANTES (bug):
+.eq('estado', 'pendiente')
+
+// DESPUÉS (correcto):
+.in('estado', ['pendiente', 'anotado'])
+```
+
+**Regla**: toda función que busque pedidos con ítems retenidos en pendientes (`from_validation = true`) DEBE incluir `anotado` en el filtro de estado del pedido.
+
+### `from_validation` — significado del flag
+
+| Valor | Significado |
+|-------|-------------|
+| `false` | Ítem retenido intencionalmente en la cocina (cocinero pausó el ítem). Visible en `/waiter/kitchen` modo Retenidos. |
+| `true` | Ítem devuelto a la cola de pendientes del camarero. NO visible en kitchen. Visible en `/waiter/pendientes` como validated+retenido. |
+
+Nunca mezclar los dos significados. El flag `from_validation` se establece en el momento de la validación y no cambia.
+
+### Estado del pedido cuando hay comida retenida
+
+```
+pendiente_validacion  ← pedido creado, esperando validación del camarero
+       ↓ validate()
+    pendiente          ← bebidas van al bar; comida retenida en pendientes
+       ↓ bar sirve todas las bebidas del pedido mixto
+     anotado           ← comida sigue retenida en pendientes (from_validation=true)
+       ↓ camarero libera comida desde pendientes
+    pendiente          ← comida va a la cocina
+       ↓ cocina sirve
+     cerrado / servido
+```
+
+El ciclo `pendiente → anotado` es exclusivo de pedidos mixtos donde las bebidas se sirven antes que la comida sea liberada.
+
+---
+
 ## Session Lifecycle
 
 ```
