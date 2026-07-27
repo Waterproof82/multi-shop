@@ -540,3 +540,209 @@ test.describe('Bug C regression — comida retenida con pedido en estado anotado
     expect(leaked).toBeUndefined();
   });
 });
+
+// ── Suite 5: Regresión "lanzar pase + pausa" ─────────────────────────────────
+//
+// Reproduce el bug 2026-07-27: "Lanzar Xº pase" enviaba a cocina los ítems
+// que el camarero había marcado como pausados.
+//
+// Root cause: processPaseItemsForPedido incluía todos los ítems del pase en
+// selectedForPedido (incluyendo pausados). En validateNewPedido, los pausados
+// caían en pausedIndices → from_validation=false → kitchen retenidos.
+//
+// Fix: los pausados se excluyen de selectedForPedido → caen en retainIndices
+// → from_validation=true → se quedan en la cola de pendientes.
+//
+// Esta suite verifica el CONTRATO del endpoint /api/waiter/pendientes/validate:
+//
+//   retainIndices=[idx]  → from_validation=true  → ítem en PENDIENTES, NO en kitchen
+//   pausedIndices=[idx]  → from_validation=false → ítem en KITCHEN como retenido, NO en pendientes
+//
+// El cliente (processPaseItemsForPedido) debe enviar ítems pausados como
+// retainIndices (no en selected → notSelectedOfTipo), nunca como pausedIndices.
+
+test.describe('Suite 5 — lanzar pase + pausa: retainIndices vs pausedIndices (requiere PIN + service role)', () => {
+  let request: APIRequestContext;
+
+  // Pedido A: ítem 0 en retainIndices → debe quedarse en pendientes (from_validation=true)
+  let pedidoRetainId: string | undefined;
+  // Pedido B: ítem 0 en pausedIndices → debe ir a kitchen como retenido (from_validation=false)
+  let pedidoPausedId: string | undefined;
+
+  const supabaseUrl    = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY;
+
+  function supabaseHeaders() {
+    return {
+      apikey: serviceRoleKey!,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+    };
+  }
+
+  test.beforeAll(async ({ playwright, baseURL }) => {
+    if (!sessionWaiterToken || !sessionEmpresaId || !supabaseUrl || !serviceRoleKey) return;
+
+    const appCtx = await playwright.request.newContext({ baseURL });
+    const dbCtx  = await playwright.request.newContext({ baseURL: supabaseUrl });
+
+    try {
+      const mesasRes = await appCtx.get('/api/waiter/mesas', {
+        headers: { cookie: `waiter_token=${sessionWaiterToken}` },
+      });
+      if (!mesasRes.ok()) return;
+      const mesasBody = await mesasRes.json() as { mesas: Array<{ id: string }> };
+      const mesaId = mesasBody.mesas[0]?.id;
+      if (!mesaId) return;
+
+      // Crear pedido A — para verificar retainIndices (comida que se queda en pendientes)
+      const idA = randomUUID();
+      const resA = await dbCtx.post('/rest/v1/pedidos', {
+        headers: supabaseHeaders(),
+        data: {
+          id: idA,
+          empresa_id: sessionEmpresaId,
+          mesa_id: mesaId,
+          estado: 'pendiente_validacion',
+          detalle_pedido: [
+            { nombre: '__test_pase_retain__', cantidad: 1, precio: 0, tipo_producto: 'comida' },
+          ],
+        },
+      });
+      if (resA.ok()) pedidoRetainId = idA;
+
+      // Crear pedido B — para verificar pausedIndices (comida que va a kitchen retenido)
+      const idB = randomUUID();
+      const resB = await dbCtx.post('/rest/v1/pedidos', {
+        headers: supabaseHeaders(),
+        data: {
+          id: idB,
+          empresa_id: sessionEmpresaId,
+          mesa_id: mesaId,
+          estado: 'pendiente_validacion',
+          detalle_pedido: [
+            { nombre: '__test_pase_paused__', cantidad: 1, precio: 0, tipo_producto: 'comida' },
+          ],
+        },
+      });
+      if (resB.ok()) pedidoPausedId = idB;
+    } finally {
+      await appCtx.dispose();
+      await dbCtx.dispose();
+    }
+  });
+
+  test.afterAll(async ({ playwright }) => {
+    if (!supabaseUrl || !serviceRoleKey) return;
+    const dbCtx = await playwright.request.newContext({ baseURL: supabaseUrl });
+    for (const id of [pedidoRetainId, pedidoPausedId].filter(Boolean)) {
+      await dbCtx.patch(`/rest/v1/pedidos?id=eq.${id}`, {
+        headers: { ...supabaseHeaders(), Prefer: '' },
+        data: { estado: 'cancelado' },
+      });
+      await dbCtx.delete(`/rest/v1/pedido_item_estados?pedido_id=eq.${id}`, {
+        headers: { ...supabaseHeaders(), Prefer: '' },
+      });
+    }
+    await dbCtx.dispose();
+  });
+
+  test.beforeEach(async ({ playwright, baseURL }) => {
+    request = await playwright.request.newContext({ baseURL });
+  });
+  test.afterEach(async () => { await request.dispose(); });
+
+  // ── Contrato A: retainIndices → from_validation=true → ítem en PENDIENTES ────
+
+  test('retainIndices=[0] → ítem queda en pendientes (from_validation=true), NO en kitchen', async () => {
+    // Este es el comportamiento correcto que processPaseItemsForPedido debe generar
+    // cuando el camarero pausa un ítem antes de "lanzar pase": el ítem pausado
+    // NO está en selectedForPedido → cae en notSelectedOfTipo → retainIndices.
+    if (!pedidoRetainId || !sessionWaiterToken || !sessionCsrfCookie || !sessionCsrfToken) {
+      test.skip(true, 'Requiere PLAYWRIGHT_WAITER_PIN + PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY');
+      return;
+    }
+
+    // Validar con ítem 0 en retainIndices (simula: ítem pausado excluido de selected)
+    const validateRes = await request.post('/api/waiter/pendientes/validate', {
+      headers: {
+        cookie: `waiter_token=${sessionWaiterToken}; csrf_token=${sessionCsrfCookie}`,
+        'x-csrf-token': sessionCsrfToken,
+      },
+      data: { pedidoId: pedidoRetainId, retainIndices: [0], pausedIndices: [] },
+    });
+    expect(validateRes.status()).toBe(200);
+
+    // Ítem 0 debe aparecer en pendientes (from_validation=true)
+    const pendientesRes = await request.get('/api/waiter/pendientes/orders', {
+      headers: { cookie: `waiter_token=${sessionWaiterToken}` },
+    });
+    expect(pendientesRes.status()).toBe(200);
+    const pendientesBody = await pendientesRes.json() as {
+      mesas: Array<{ pedidos: Array<{ id: string; validated?: boolean }> }>;
+    };
+    const allPedidos = pendientesBody.mesas.flatMap(m => m.pedidos);
+    const found = allPedidos.find(p => p.id === pedidoRetainId);
+    // Si falla aquí → retainIndices no genera from_validation=true correctamente.
+    expect(found).toBeDefined();
+    expect(found?.validated).toBe(true);
+
+    // Ítem 0 NO debe aparecer en kitchen
+    const kitchenRes = await request.get('/api/waiter/kitchen/items', {
+      headers: { cookie: `waiter_token=${sessionWaiterToken}` },
+    });
+    expect(kitchenRes.status()).toBe(200);
+    const kitchenBody = await kitchenRes.json() as { items: Array<{ pedidoId: string; itemIdx: number }> };
+    const leaked = kitchenBody.items.find(i => i.pedidoId === pedidoRetainId && i.itemIdx === 0);
+    // Si falla aquí → from_validation=true no está excluyendo el ítem de kitchen.
+    expect(leaked).toBeUndefined();
+  });
+
+  // ── Contrato B: pausedIndices → from_validation=false → ítem en KITCHEN retenido ──
+
+  test('pausedIndices=[0] → ítem va a kitchen como retenido (from_validation=false), NO en pendientes', async () => {
+    // Este es el comportamiento que processPaseItemsForPedido NO debe generar
+    // para ítems pausados. Si los pausados llegan aquí (en pausedIndices en vez
+    // de retainIndices), irían a kitchen como retenidos — ese era el bug original.
+    if (!pedidoPausedId || !sessionWaiterToken || !sessionCsrfCookie || !sessionCsrfToken) {
+      test.skip(true, 'Requiere PLAYWRIGHT_WAITER_PIN + PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY');
+      return;
+    }
+
+    // Validar con ítem 0 en pausedIndices (simula el camino INCORRECTO que producía el bug)
+    const validateRes = await request.post('/api/waiter/pendientes/validate', {
+      headers: {
+        cookie: `waiter_token=${sessionWaiterToken}; csrf_token=${sessionCsrfCookie}`,
+        'x-csrf-token': sessionCsrfToken,
+      },
+      data: { pedidoId: pedidoPausedId, retainIndices: [], pausedIndices: [0] },
+    });
+    expect(validateRes.status()).toBe(200);
+
+    // Ítem 0 debe aparecer en kitchen como retenido (from_validation=false)
+    const kitchenRes = await request.get('/api/waiter/kitchen/items', {
+      headers: { cookie: `waiter_token=${sessionWaiterToken}` },
+    });
+    expect(kitchenRes.status()).toBe(200);
+    const kitchenBody = await kitchenRes.json() as { items: Array<{ pedidoId: string; itemIdx: number; estado: string }> };
+    const inKitchen = kitchenBody.items.find(i => i.pedidoId === pedidoPausedId && i.itemIdx === 0);
+    // Si falla aquí → pausedIndices no genera from_validation=false correctamente.
+    expect(inKitchen).toBeDefined();
+    expect(inKitchen?.estado).toBe('retenido');
+
+    // Ítem 0 NO debe aparecer en pendientes
+    const pendientesRes = await request.get('/api/waiter/pendientes/orders', {
+      headers: { cookie: `waiter_token=${sessionWaiterToken}` },
+    });
+    expect(pendientesRes.status()).toBe(200);
+    const pendientesBody = await pendientesRes.json() as {
+      mesas: Array<{ pedidos: Array<{ id: string }> }>;
+    };
+    const allPedidos = pendientesBody.mesas.flatMap(m => m.pedidos);
+    const inPendientes = allPedidos.find(p => p.id === pedidoPausedId);
+    // Si falla aquí → pausedIndices (from_validation=false) está apareciendo en pendientes
+    // cuando no debería.
+    expect(inPendientes).toBeUndefined();
+  });
+});

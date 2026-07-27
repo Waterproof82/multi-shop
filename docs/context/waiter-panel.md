@@ -198,6 +198,74 @@ El ciclo `pendiente → anotado` es exclusivo de pedidos mixtos donde las bebida
 
 ---
 
+## Flujo de Pases y Pausa en `/waiter/pendientes`
+
+### Pases (primer / segundo / postre)
+
+Cada ítem en pendientes puede tener un `pase` asignado (`primer`, `segundo`, `postre`). El camarero puede lanzar todos los ítems de un pase de golpe con el botón **"Lanzar Xº pase"**.
+
+Lanzar un pase llama a `handleLanzarPase(mesaId, pase)`, que:
+1. Recoge todos los ítems del pase en la mesa via `getMergedItems`.
+2. Para cada pedido, llama a `processPaseItemsForPedido`.
+3. Actualiza el UI optimistamente eliminando los ítems enviados.
+
+### Pausa en el contexto de pases — trampa crítica
+
+El camarero puede marcar ítems individuales como **pausados** (icono `Pause`) antes de lanzar el pase. La pausa indica "no envíes este ítem a cocina todavía".
+
+**Trampa**: en versiones anteriores, `processPaseItemsForPedido` incluía los ítems pausados en `selectedForPedido` (el conjunto de "ítems a enviar"). Al llamar `validateNewPedido` en modo `selected`, los pausados caían en `pausedIndices` → `from_validation=false` → llegaban a cocina como **kitchen-retenidos**. El camarero veía AMBOS ítems en cocina.
+
+**Fix** (en `page.tsx` — `processPaseItemsForPedido`):
+```ts
+// ANTES (bug): todos los ítems del pase, incluyendo pausados
+const selectedForPedido = new Set(paseItemsForPedido.map(i => i.globalKey));
+
+// DESPUÉS (correcto): excluir pausados
+const selectedForPedido = new Set(
+  paseItemsForPedido
+    .filter(i => !mesaPaused.has(i.globalKey))
+    .map(i => i.globalKey)
+);
+// Pasar Set vacío como `paused` — los ítems pausados ya están fuera de selected
+// y caerán en retainIndices (from_validation=true) automáticamente
+await validateNewPedido(pedido.id, items, tipo, selectedForPedido, new Set(), 'selected');
+```
+
+### `retainIndices` vs `pausedIndices` — diferencia semántica
+
+Ambos retienen ítems, pero con destinos distintos:
+
+| Argumento | `from_validation` | Destino |
+|-----------|-------------------|---------|
+| `retainIndices` | `true` | Cola de pendientes del camarero (`/waiter/pendientes`) |
+| `pausedIndices` | `false` | Kitchen retenidos (`/waiter/kitchen` tab Retenidos) |
+
+**Regla**: cuando el camarero pausa un ítem en pendientes y luego lanza el pase, el ítem pausado debe ir a `retainIndices` (quedarse en pendientes), NO a `pausedIndices` (que lo enviaría a cocina). Esto se logra excluyendo los pausados de `selectedForPedido` y pasando un `Set` vacío como `paused`.
+
+### Flujo completo: lanzar pase con pausa
+
+```
+Camarero en /waiter/pendientes:
+  Pedido A — 2º pase — ítem X (comida), ítem Y (comida)
+  Camarero pausa ítem X (Pause)
+  Camarero pulsa "Lanzar 2º pase"
+
+processPaseItemsForPedido:
+  selectedForPedido = {Y}         ← X excluido (pausado)
+  validateNewPedido(..., selected={Y}, paused=Set(), mode='selected')
+    → retainIndices = [X.idx]      ← X no está en selected → retainIndices
+    → pausedIndices = []           ← paused vacío
+    → DB: X → { estado: 'retenido', from_validation: true }  (pendientes)
+    →     Y → sin row              (llega a cocina como 'pendiente')
+
+Resultado:
+  ✅ Ítem X permanece en /waiter/pendientes (from_validation=true)
+  ✅ Ítem Y va a /waiter/kitchen como pendiente
+  ❌ ANTES: X llegaba a kitchen como retenido (from_validation=false)
+```
+
+---
+
 ## Session Lifecycle
 
 ```
