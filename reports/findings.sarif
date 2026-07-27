@@ -1,0 +1,129 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "audit-tpv",
+          "version": "1.0.0",
+          "informationUri": "https://github.com/your-repo/multi-shop",
+          "rules": [
+            {
+              "id": "COMPLIANCE-001",
+              "name": "VeriFactuXmlSigningMissing",
+              "shortDescription": { "text": "VeriFactu XML signing no implementado" },
+              "fullDescription": { "text": "RD 1007/2023 §8 exige firma electrónica X.509 en registros de facturación. El sistema implementa hash chain y QR pero no XML signing ni envío a AEAT." },
+              "defaultConfiguration": { "level": "error" },
+              "properties": { "tags": ["compliance", "verifactu", "P1"] }
+            },
+            {
+              "id": "COMPLIANCE-002",
+              "name": "AuditLogNotAcid",
+              "shortDescription": { "text": "audit_log insert fuera de transacción" },
+              "fullDescription": { "text": "POST /api/tpv/cobro usa `void getAuditLogRepository().insert()` (fire & forget). Un fallo del insert de audit_log no revierte el cobro, dejando un cobro sin trail de auditoría." },
+              "defaultConfiguration": { "level": "warning" },
+              "properties": { "tags": ["compliance", "acid", "P2"] }
+            },
+            {
+              "id": "COMPLIANCE-003",
+              "name": "ElectronIpcNoValidation",
+              "shortDescription": { "text": "Handlers IPC sin validación runtime" },
+              "fullDescription": { "text": "Los handlers IPC en electron/main.ts no validan el tipo de los datos enviados por el renderer. Un renderer comprometido podría enviar datos malformados al proceso main." },
+              "defaultConfiguration": { "level": "warning" },
+              "properties": { "tags": ["security", "electron", "P2"] }
+            },
+            {
+              "id": "COMPLIANCE-004",
+              "name": "CascadeDeleteOnFiscalTable",
+              "shortDescription": { "text": "ON DELETE CASCADE en tpv_turnos.empresa_id" },
+              "fullDescription": { "text": "tpv_turnos.empresa_id tiene ON DELETE CASCADE. El trigger tpv_turno_no_delete bloquea el DELETE directo, pero si empresa se elimina el CASCADE podría ejecutarse en una ruta no controlada por el trigger." },
+              "defaultConfiguration": { "level": "note" },
+              "properties": { "tags": ["integrity", "database", "P3"] }
+            },
+            {
+              "id": "COMPLIANCE-005",
+              "name": "RgpdNoE2ETests",
+              "shortDescription": { "text": "Sin tests E2E para anonimización RGPD" },
+              "fullDescription": { "text": "La anonimización de clientes y la purga CRON tienen implementación pero no tienen tests E2E automatizados que verifiquen el comportamiento end-to-end." },
+              "defaultConfiguration": { "level": "note" },
+              "properties": { "tags": ["rgpd", "testing", "P3"] }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "COMPLIANCE-001",
+          "level": "error",
+          "message": { "text": "VeriFactu XML signing no implementado. RD 1007/2023 §8 exige firma electrónica X.509. Bloquea certificación." },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "src/app/api/tpv/cobro/route.ts" },
+                "region": { "startLine": 1 }
+              }
+            }
+          ],
+          "properties": { "priority": "P1", "risk": 25 }
+        },
+        {
+          "ruleId": "COMPLIANCE-002",
+          "level": "warning",
+          "message": { "text": "audit_log insert es fire & forget (void). Un cobro puede insertarse sin trail de auditoría si el insert falla." },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "src/app/api/tpv/cobro/route.ts" },
+                "region": { "startLine": 142 }
+              }
+            }
+          ],
+          "properties": { "priority": "P2", "risk": 8 }
+        },
+        {
+          "ruleId": "COMPLIANCE-003",
+          "level": "warning",
+          "message": { "text": "Handlers IPC en electron/main.ts no validan el tipo de los datos del renderer. Añadir z.parse() sobre el payload recibido." },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "electron/main.ts" },
+                "region": { "startLine": 1 }
+              }
+            }
+          ],
+          "properties": { "priority": "P2", "risk": 8 }
+        },
+        {
+          "ruleId": "COMPLIANCE-004",
+          "level": "note",
+          "message": { "text": "tpv_turnos.empresa_id tiene ON DELETE CASCADE. Considerar RESTRICT para mayor protección de integridad referencial." },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "supabase/migrations/20260702000001_tpv_turnos.sql" },
+                "region": { "startLine": 1 }
+              }
+            }
+          ],
+          "properties": { "priority": "P3", "risk": 4 }
+        },
+        {
+          "ruleId": "COMPLIANCE-005",
+          "level": "note",
+          "message": { "text": "No hay tests E2E para POST /api/admin/rgpd/anonimizar-cliente ni GET /api/cron/rgpd-purge." },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "e2e/compliance/" },
+                "region": { "startLine": 1 }
+              }
+            }
+          ],
+          "properties": { "priority": "P3", "risk": 6 }
+        }
+      ]
+    }
+  ]
+}

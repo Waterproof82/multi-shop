@@ -7,6 +7,7 @@ import { exec } from 'child_process';
 import Store from 'electron-store';
 import { listPrinters, printReceipt } from './printer/index';
 import type { ReceiptData } from './printer/receipt';
+import { z } from 'zod';
 
 interface StoreSchema {
   domain: string;
@@ -24,6 +25,52 @@ interface FiscalSnapshotPayload {
   numeroZ: number;
   [key: string]: unknown;
 }
+
+// ── IPC input schemas (GAP-003 — SIALTI runtime validation) ──────────────────
+
+const StoreSetSchema = z.object({
+  domain: z.string().min(1).max(253),
+  printerName: z.string().min(1).max(255),
+});
+
+const PrintReceiptSchema = z.object({
+  empresa: z.object({
+    nombre: z.string().max(200),
+    nif: z.string().max(20),
+    direccion: z.string().max(500),
+  }),
+  ticket: z.object({
+    serie: z.string().max(50),
+    fecha: z.string().min(10).max(60),
+    operador: z.string().max(200),
+  }),
+  items: z.array(z.object({
+    nombre: z.string().max(200),
+    cantidad: z.number().int().positive(),
+    precioUnitarioCents: z.number().int().min(0),
+    subtotalCents: z.number().int().min(0),
+  })),
+  totales: z.object({
+    baseImponibleCents: z.number().int().min(0),
+    tipoImpuesto: z.enum(['iva', 'igic']),
+    porcentajeImpuesto: z.number().min(0).max(100),
+    impuestoCents: z.number().int().min(0),
+    totalCents: z.number().int().min(0),
+  }),
+  aeatUrl: z.string().max(2048),
+  esCobro: z.boolean(),
+  rectificaNumero: z.string().max(50).optional(),
+});
+
+const EmpleadoIdSchema = z.string().uuid();
+
+const PinHashSchema = z.string().min(1).max(500);
+
+const FiscalSnapshotSchema = z.object({
+  empresaNombre: z.string().min(1).max(200),
+  aperturaAt: z.string().min(10).max(60),
+  numeroZ: z.number().int().positive(),
+}).passthrough();
 
 app.setName('Multisistema TPV');
 Menu.setApplicationMenu(null);
@@ -122,52 +169,65 @@ function registerGlobalShortcuts(): void {
 }
 
 function setupIpc(): void {
-  ipcMain.handle('store:set', (_event, data: { domain: string; printerName: string }) => {
-    store.set('domain', data.domain);
-    store.set('printerName', data.printerName);
-    void mainWindow.loadURL(`https://${data.domain}/tpv`);
+  ipcMain.handle('store:set', (_event, data: unknown) => {
+    const parsed = StoreSetSchema.safeParse(data);
+    if (!parsed.success) return { success: false, error: 'Datos de configuración inválidos' };
+    store.set('domain', parsed.data.domain);
+    store.set('printerName', parsed.data.printerName);
+    void mainWindow.loadURL(`https://${parsed.data.domain}/tpv`);
   });
 
   ipcMain.handle('printer:list', async () => {
     return listPrinters(mainWindow);
   });
 
-  ipcMain.handle('printer:print', async (_event, data: ReceiptData) => {
+  ipcMain.handle('printer:print', async (_event, data: unknown) => {
+    const parsed = PrintReceiptSchema.safeParse(data);
+    if (!parsed.success) return { success: false, error: 'Datos de ticket inválidos' };
     const printerName = store.get('printerName') as string | undefined;
     if (!printerName) {
       return { success: false, error: 'Impresora no configurada' };
     }
-    return printReceipt(printerName, data);
+    return printReceipt(printerName, parsed.data);
   });
 
-  ipcMain.handle('lc-pin:get', (_event, empleadoId: string) =>
-    pinStore.get(empleadoId),
-  );
-
-  ipcMain.handle('lc-pin:set', (_event, empleadoId: string, hash: string) => {
-    pinStore.set(empleadoId, hash);
+  ipcMain.handle('lc-pin:get', (_event, empleadoId: unknown) => {
+    const parsed = EmpleadoIdSchema.safeParse(empleadoId);
+    if (!parsed.success) return undefined;
+    return pinStore.get(parsed.data);
   });
 
-  ipcMain.handle('lc-pin:delete', (_event, empleadoId: string) => {
-    pinStore.delete(empleadoId);
+  ipcMain.handle('lc-pin:set', (_event, empleadoId: unknown, hash: unknown) => {
+    const idParsed = EmpleadoIdSchema.safeParse(empleadoId);
+    const hashParsed = PinHashSchema.safeParse(hash);
+    if (!idParsed.success || !hashParsed.success) return;
+    pinStore.set(idParsed.data, hashParsed.data);
   });
 
-  ipcMain.handle('fiscal:save-snapshot', async (_event, data: FiscalSnapshotPayload) => {
+  ipcMain.handle('lc-pin:delete', (_event, empleadoId: unknown) => {
+    const parsed = EmpleadoIdSchema.safeParse(empleadoId);
+    if (!parsed.success) return;
+    pinStore.delete(parsed.data);
+  });
+
+  ipcMain.handle('fiscal:save-snapshot', async (_event, data: unknown) => {
+    const parsed = FiscalSnapshotSchema.safeParse(data);
+    if (!parsed.success) return { success: false, error: 'Datos de snapshot inválidos' };
     try {
-      const slug = data.empresaNombre.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      const date = data.aperturaAt.slice(0, 10);
+      const slug = parsed.data.empresaNombre.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const date = parsed.data.aperturaAt.slice(0, 10);
       const dir = path.join(app.getPath('userData'), 'fiscal', slug);
       await fsPromises.mkdir(dir, { recursive: true });
-      const file = path.join(dir, `${date}-Z${data.numeroZ}.json`);
+      const file = path.join(dir, `${date}-Z${parsed.data.numeroZ}.json`);
 
       // Hash the full payload with a device-specific key (generated once on first launch)
       // This detects local tampering: any edit to the JSON will break the signature
       const signingKey = store.get('signingKey') as string;
-      const serialized = JSON.stringify(data, null, 2);
+      const serialized = JSON.stringify(parsed.data, null, 2);
       const integrityHash = crypto.createHmac('sha256', signingKey).update(serialized).digest('hex');
 
       const securePayload = {
-        ...data,
+        ...parsed.data,
         sialti_metadata: {
           secured_at: new Date().toISOString(),
           integrity_hash: integrityHash,

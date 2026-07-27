@@ -1,0 +1,31 @@
+{
+  "auditDate": "2026-07-27T13:44:05Z",
+  "commit": "54f14da",
+  "note": "Los tests de compliance son E2E y de propiedades — no instrumentan código fuente directamente. La cobertura de líneas de src/ es irrelevante para este tipo de tests. La cobertura aquí se mide en requisitos legales cubiertos.",
+  "requirementsCoverage": {
+    "Ley_11_2021": { "total": 6, "covered": 6, "pct": 100 },
+    "RD_1007_2023": { "total": 6, "covered": 4, "pct": 67 },
+    "SIALTI": { "total": 6, "covered": 5, "pct": 83 },
+    "RD_Ley_8_2019": { "total": 3, "covered": 3, "pct": 100 },
+    "RGPD": { "total": 2, "covered": 0, "pct": 0 },
+    "OWASP": { "total": 3, "covered": 3, "pct": 100 },
+    "TOTAL": { "total": 30, "covered": 23, "pct": 77 }
+  },
+  "testCoverage": {
+    "vitest": { "tests": 57, "passed": 57, "pct": 100 },
+    "playwright_e2e": { "tests": 43, "passed": 39, "skipped": 4, "failed": 0, "effectivePct": 100 }
+  },
+  "triggersCoverage": {
+    "total": 18,
+    "testedByE2E": 10,
+    "testedBySmoke": 8,
+    "pct": 100
+  },
+  "thresholds": {
+    "total_pct": { "required": 90, "actual": 77, "pass": false },
+    "Ley_11_2021": { "required": 95, "actual": 100, "pass": true },
+    "SIALTI": { "required": 95, "actual": 83, "pass": false },
+    "RGPD": { "required": 75, "actual": 0, "pass": false },
+    "VeriFactu": { "required": 60, "actual": 37, "pass": false }
+  }
+}

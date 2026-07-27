@@ -1,0 +1,120 @@
+name: Compliance
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'supabase/migrations/**'
+      - 'src/app/api/tpv/**'
+      - 'src/app/api/laborcontrol/**'
+      - 'src/app/api/admin/rgpd/**'
+      - 'electron/main.ts'
+      - 'tests/compliance/**'
+      - 'e2e/compliance/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - 'src/app/api/tpv/**'
+      - 'src/app/api/laborcontrol/**'
+      - 'src/app/api/admin/rgpd/**'
+      - 'electron/main.ts'
+      - 'tests/compliance/**'
+      - 'e2e/compliance/**'
+  # Allow manual runs for pre-certification audits
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Audit mode (audit | pre-certification)'
+        required: false
+        default: 'audit'
+
+jobs:
+  vitest-compliance:
+    name: Vitest — Unit compliance tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run compliance unit tests
+        run: pnpm test:compliance
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-compliance-results
+          path: coverage/
+          retention-days: 30
+
+  playwright-compliance:
+    name: Playwright — E2E compliance tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: vitest-compliance
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      PLAYWRIGHT_BASE_URL: ${{ secrets.PLAYWRIGHT_BASE_URL || 'http://localhost:3000' }}
+      # Service role key — required for DB-level trigger tests
+      PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run compliance E2E tests
+        run: npx playwright test e2e/compliance/ --reporter=list
+        continue-on-error: false
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-compliance-report
+          path: playwright-report/
+          retention-days: 30
+
+  compliance-gate:
+    name: Compliance gate
+    runs-on: ubuntu-latest
+    needs: [vitest-compliance, playwright-compliance]
+    if: always()
+    steps:
+      - name: Check compliance results
+        run: |
+          echo "Vitest: ${{ needs.vitest-compliance.result }}"
+          echo "Playwright: ${{ needs.playwright-compliance.result }}"
+          if [[ "${{ needs.vitest-compliance.result }}" != "success" ]]; then
+            echo "FAIL: Vitest compliance tests failed"
+            exit 1
+          fi
+          if [[ "${{ needs.playwright-compliance.result }}" != "success" ]]; then
+            echo "FAIL: Playwright compliance E2E tests failed"
+            exit 1
+          fi
+          echo "PASS: All compliance tests passed"

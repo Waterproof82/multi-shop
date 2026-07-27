@@ -6,11 +6,10 @@ import {
   validationErrorResponse,
   type AuthResult,
 } from '@/core/infrastructure/api/helpers';
-import { getTpvRepository, getAuditLogRepository } from '@/core/infrastructure/database';
+import { getTpvRepository } from '@/core/infrastructure/database';
 import { registrarCobroUseCase } from '@/core/application/use-cases/tpv/registrar-cobro.use-case';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { type TpvDetalleItem } from '@/core/domain/entities/tpv-types';
-import { resolveActor } from '@/core/infrastructure/api/audit-actor';
 import { resolveImpuestoPorcentaje } from '@/lib/tpv/impuesto';
 import { z } from 'zod';
 
@@ -137,19 +136,7 @@ export async function POST(req: NextRequest) {
     empleadoId,
   });
 
-  if (result.success) {
-    const actor = resolveActor(req);
-    void getAuditLogRepository().insert({
-      empresaId,
-      action: 'tpv.cobro.completar',
-      payload: {
-        turnoId: parsed.data.turnoId,
-        totalCents: parsed.data.importeCobradoCents,
-        metodo: parsed.data.metodoPago,
-      },
-      ...actor,
-    });
-  }
-
+  // audit_log insert is now handled atomically by the tpv_cobro_audit_trigger
+  // (AFTER INSERT on tpv_cobros — migration 20260728000002). No fire-and-forget needed.
   return handleResult(result);
 }

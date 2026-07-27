@@ -1,0 +1,118 @@
+{
+  "meta": {
+    "version": "0.4.0",
+    "commit": "54f14da4106cb40ff192043eb008ce5fad687846",
+    "commitShort": "54f14da",
+    "branch": "main",
+    "auditDate": "2026-07-27T13:44:05Z",
+    "skill": "audit-tpv@v1.0",
+    "mode": "pre-certification"
+  },
+  "inventory": {
+    "triggers": {
+      "total": 18,
+      "present": 18,
+      "absent": 0
+    },
+    "sqlFunctions": {
+      "total": 4,
+      "present": 4,
+      "absent": 0
+    },
+    "auditEndpoints": {
+      "total": 4,
+      "present": 4,
+      "absent": 0
+    }
+  },
+  "testResults": {
+    "vitest": {
+      "files": 8,
+      "tests": 57,
+      "passed": 57,
+      "failed": 0,
+      "duration_ms": 989
+    },
+    "playwright": {
+      "total": 43,
+      "passed": 39,
+      "skipped": 4,
+      "failed": 0,
+      "skippedReason": "PLAYWRIGHT_ADMIN_EMAIL / PLAYWRIGHT_ADMIN_PASSWORD not set"
+    }
+  },
+  "coverage": {
+    "total": 100,
+    "passed": 96,
+    "skipped": 4,
+    "failed": 0,
+    "passRate": "96%"
+  },
+  "complianceMetrics": {
+    "Ley_11_2021": { "total": 6, "covered": 6, "partial": 0, "gaps": 0, "pct": 100 },
+    "RD_1007_2023": { "total": 6, "covered": 4, "partial": 1, "gaps": 1, "pct": 67 },
+    "SIALTI": { "total": 6, "covered": 5, "partial": 1, "gaps": 0, "pct": 83 },
+    "RD_Ley_8_2019": { "total": 3, "covered": 3, "partial": 0, "gaps": 0, "pct": 100 },
+    "Art66_LGT": { "total": 2, "covered": 1, "partial": 1, "gaps": 0, "pct": 75 },
+    "RGPD": { "total": 2, "covered": 0, "partial": 2, "gaps": 0, "pct": 50 },
+    "OWASP": { "total": 3, "covered": 3, "partial": 0, "gaps": 0, "pct": 100 },
+    "TOTAL": { "total": 30, "covered": 23, "partial": 6, "gaps": 1, "pct": 77 }
+  },
+  "scores": {
+    "legal_compliance": 92,
+    "integrity": 85,
+    "security": 90,
+    "audit": 78,
+    "performance": 95,
+    "maintainability": 80,
+    "global": 86.7
+  },
+  "gaps": [
+    {
+      "id": "GAP-001",
+      "title": "VeriFactu XML signing + envío AEAT",
+      "norm": "RD 1007/2023",
+      "priority": "P1",
+      "risk": 25,
+      "blocker": true
+    },
+    {
+      "id": "GAP-002",
+      "title": "audit_log fire & forget — no ACID garantizado",
+      "norm": "Ley 11/2021 / SIALTI",
+      "priority": "P2",
+      "risk": 8,
+      "blocker": false
+    },
+    {
+      "id": "GAP-003",
+      "title": "Validación runtime en handlers IPC Electron",
+      "norm": "SIALTI",
+      "priority": "P2",
+      "risk": 8,
+      "blocker": false
+    },
+    {
+      "id": "GAP-004",
+      "title": "DPA con clientes restaurante",
+      "norm": "RGPD",
+      "priority": "P2",
+      "risk": 12,
+      "blocker": false
+    },
+    {
+      "id": "GAP-005",
+      "title": "CI/CD workflow compliance.yml",
+      "norm": "Buenas prácticas",
+      "priority": "P3",
+      "risk": 6,
+      "blocker": false
+    }
+  ],
+  "verdict": {
+    "status": "NO_LISTO",
+    "readyFor": ["Ley_11_2021", "RD_Ley_8_2019", "SIALTI_parcial"],
+    "notReadyFor": ["VeriFactu_completo"],
+    "blockers": ["GAP-001"]
+  }
+}
