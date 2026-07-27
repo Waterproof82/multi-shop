@@ -22,7 +22,7 @@ export function CobroTarjeta({
   onBack,
 }: Props) {
   return (
-    <div className="flex items-center justify-center w-full h-full">
+    <div className="flex items-start justify-center w-full h-full overflow-y-auto py-8">
       <div className="flex flex-col items-center gap-6 max-w-sm text-center">
         <span className="text-6xl">💳</span>
         <p className="text-4xl font-bold">{fmt(totalFinalCents)}</p>
