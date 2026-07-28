@@ -149,8 +149,8 @@ describe('Fuzz API Inputs — Zod validation (OWASP)', () => {
 
   it('Inputs válidos — schema cobro acepta correctamente', () => {
     const result = cobroSchema.safeParse({
-      turnoId:    '00000000-0000-0000-0000-000000000001',
-      pedidoId:   '00000000-0000-0000-0000-000000000002',
+      turnoId:    '12345678-1234-4234-a234-123456789012',
+      pedidoId:   '12345678-1234-4234-b234-123456789012',
       metodoPago: 'efectivo',
     });
     expect(result.success).toBe(true);

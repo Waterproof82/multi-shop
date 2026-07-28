@@ -53,7 +53,7 @@ describe('Hash Property Tests — fast-check (SHA-256)', () => {
           empresaId:   fc.uuid(),
           empleadoId:  fc.uuid(),
           tipo:        fc.constantFrom('entrada', 'salida'),
-          timestamp:   fc.date().map(d => d.toISOString()),
+          timestamp:   fc.integer({ min: 0, max: 4102444800000 }).map(ms => new Date(ms).toISOString()),
         }),
         fc.string({ minLength: 1 }),
         fc.string({ minLength: 1 }),
