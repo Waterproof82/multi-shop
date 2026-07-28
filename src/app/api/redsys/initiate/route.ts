@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
   }
 
   const parsed = initiateSchema.safeParse(body);
-  if (!parsed.success) return validationErrorResponse(parsed.error.errors[0].message);
+  if (!parsed.success) return validationErrorResponse(parsed.error.issues[0].message);
 
   const origin = request.nextUrl.origin;
   const lang = parsed.data.lang ?? 'es';

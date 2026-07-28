@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
   }
 
   const parsed = pinSchema.safeParse(body);
-  if (!parsed.success) return validationErrorResponse(parsed.error.errors[0].message);
+  if (!parsed.success) return validationErrorResponse(parsed.error.issues[0].message);
 
   const pinHash = await hashPin(parsed.data.pin, empresaId);
   const result = await getEmpresaRepository().updateWaiterPin(empresaId, pinHash);

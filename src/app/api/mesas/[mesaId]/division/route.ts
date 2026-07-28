@@ -33,7 +33,7 @@ export async function POST(
 
   const bodyParsed = bodySchema.safeParse(body);
   if (!bodyParsed.success) {
-    return NextResponse.json({ error: bodyParsed.error.errors[0].message }, { status: 400 });
+    return NextResponse.json({ error: bodyParsed.error.issues[0].message }, { status: 400 });
   }
 
   // Tenant isolation: derive empresa from domain (public route — proxy does not inject x-empresa-id)

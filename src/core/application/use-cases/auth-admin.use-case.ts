@@ -36,7 +36,7 @@ export class AuthAdminUseCase {
         success: false,
         error: {
           code: 'VALIDATION_ERROR',
-          message: parsed.error.errors[0].message,
+          message: parsed.error.issues[0].message,
           module: 'use-case',
           method: 'AuthAdminUseCase.login',
         },

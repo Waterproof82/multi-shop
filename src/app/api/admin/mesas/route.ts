@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
   }
 
   const parsed = createMesaSchema.safeParse(body);
-  if (!parsed.success) return validationErrorResponse(parsed.error.errors[0].message);
+  if (!parsed.success) return validationErrorResponse(parsed.error.issues[0].message);
 
   const result = await getMesaRepository().create(
     empresaId,

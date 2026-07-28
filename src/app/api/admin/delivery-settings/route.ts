@@ -30,7 +30,7 @@ export async function PUT(request: NextRequest) {
   }
 
   const parsed = UpdateDeliverySettingsDtoSchema.safeParse(body);
-  if (!parsed.success) return validationErrorResponse(parsed.error.errors[0].message);
+  if (!parsed.success) return validationErrorResponse(parsed.error.issues[0].message);
 
   const result = await updateDeliverySettingsUseCase(empresaId, parsed.data);
   return handleResult(result);

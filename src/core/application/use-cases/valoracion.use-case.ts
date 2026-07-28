@@ -18,7 +18,7 @@ export class ValoracionUseCase {
     try {
       const parsed = createSchema.safeParse(input);
       if (!parsed.success) {
-        return { success: false, error: { code: 'VALIDATION_ERROR', message: parsed.error.errors[0].message, module: 'use-case', method: 'ValoracionUseCase.create' } };
+        return { success: false, error: { code: 'VALIDATION_ERROR', message: parsed.error.issues[0].message, module: 'use-case', method: 'ValoracionUseCase.create' } };
       }
       return this.repo.create(parsed.data);
     } catch (e) {

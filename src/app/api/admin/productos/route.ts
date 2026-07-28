@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
   const parsed = createProductSchema.safeParse({ ...(body as Record<string, unknown>), empresaId });
 
   if (!parsed.success) {
-    return validationErrorResponse(parsed.error.errors[0].message);
+    return validationErrorResponse(parsed.error.issues[0].message);
   }
 
   const result = await getProductUseCase().create(parsed.data);
@@ -126,7 +126,7 @@ export async function PUT(request: NextRequest) {
   const parsed = updateProductSchema.safeParse(dataWithId);
 
   if (!parsed.success) {
-    return validationErrorResponse(parsed.error.errors[0].message);
+    return validationErrorResponse(parsed.error.issues[0].message);
   }
 
   const result = await getProductUseCase().update(idParsed.data.id, empresaId, parsed.data);

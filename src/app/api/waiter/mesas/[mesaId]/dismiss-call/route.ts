@@ -19,7 +19,7 @@ export async function POST(
 
   const { mesaId } = await params;
   const parsed = mesaIdSchema.safeParse(mesaId);
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
 
   const supabase = getSupabaseClient();
 

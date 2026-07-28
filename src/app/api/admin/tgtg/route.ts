@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 
   const parsed = createTgtgSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
+    return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
 
   const { hora_recogida_inicio, hora_recogida_fin, fecha_activacion, items } = parsed.data;

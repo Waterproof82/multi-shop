@@ -37,7 +37,7 @@ export async function PATCH(
 
   const parsedBody = bodySchema.safeParse(body);
   if (!parsedBody.success) {
-    return NextResponse.json({ error: parsedBody.error.errors[0].message }, { status: 400 });
+    return NextResponse.json({ error: parsedBody.error.issues[0].message }, { status: 400 });
   }
 
   const result = await updateCustomSelectionUseCase({

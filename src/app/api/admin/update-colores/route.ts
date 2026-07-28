@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
   const parsed = updateColoresSchema.safeParse(body);
 
   if (!parsed.success) {
-    return validationErrorResponse(parsed.error.errors[0].message);
+    return validationErrorResponse(parsed.error.issues[0].message);
   }
 
   const result = await getEmpresaUseCase().updateColores(empresaId, parsed.data.colores as EmpresaColores);

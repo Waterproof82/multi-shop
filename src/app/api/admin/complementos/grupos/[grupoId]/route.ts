@@ -25,7 +25,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
   const parsed = updateComplementoGrupoSchema.safeParse(updateData);
 
   if (!parsed.success) {
-    return validationErrorResponse(parsed.error.errors[0].message);
+    return validationErrorResponse(parsed.error.issues[0].message);
   }
 
   const result = await getComplementoGrupoUseCase().update(grupoId, empresaId, parsed.data);

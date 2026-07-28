@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
 
   const parsed = querySchema.safeParse(raw);
   if (!parsed.success) {
-    return validationErrorResponse(parsed.error.errors[0].message);
+    return validationErrorResponse(parsed.error.issues[0].message);
   }
 
   const result = await repo.getAnalytics({
