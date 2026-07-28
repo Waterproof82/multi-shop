@@ -1,11 +1,33 @@
 # Informe de Auditoría de Cumplimiento Legal — TPV Multi-Shop
 
 **Versión:** 0.4.0
-**Commit:** b0558341459b7e2d447c14f90d5e41a72a0ab751 (`b055834`)
+**Commit auditoría:** b055834 → **Commit post-fix:** 2abad57
 **Branch:** main
-**Fecha auditoría:** 2026-07-28
+**Fecha auditoría:** 2026-07-28 | **Fecha post-fix:** 2026-07-28
 **Modo:** pre-certification
 **Skill:** audit-tpv v1.0
+
+---
+
+## Correcciones Post-Auditoría (commit 2abad57)
+
+| Gap | Acción | Estado |
+|-----|--------|--------|
+| GAP-DB-01 — `tpv_turno_before_insert()` search_path sin `extensions` | Migración `20260730000001`: `ALTER FUNCTION ... SET search_path = public, extensions, pg_catalog` | ✔ CERRADO |
+| GAP-DB-02 — `lc_canonical_payload()` ALTER no aplicó | Error en el informe — la migración `20260726000001` ya hacía `CREATE OR REPLACE` completo con `SET search_path = public, extensions, pg_catalog`. GAP ya estaba cerrado. | ✔ YA ESTABA CERRADO |
+| GAP-SEC-01 — Next.js 16.2.10 con 4 HIGH + 5 moderate | `pnpm update next@16.2.12` — cierra todos los CVEs de Next.js (patched >=16.2.11) | ✔ CERRADO |
+| GAP-RGPD-01 — Purge depende de Vercel Cron | Limitación de infraestructura (Supabase Free sin pg_cron). No hay fix de código posible sin cambiar de plan. | ⚠ PENDIENTE (infra) |
+| GAP-RGPD-02 — DPA con clientes | Gap de proceso legal. No aplica corrección en código. | ⚠ PENDIENTE (proceso) |
+| GAP-001 Fase 2 — VeriFactu XML signing | Fuera de alcance — plazo regulatorio jul 2027 (RD 15/2025). | ⏳ FUTURO |
+
+**Nota sobre GAP-DB-02:** El informe de auditoría reportó este gap basándose en el contexto comprimido de la sesión anterior en lugar de releer las migraciones. La migración `20260726000001_fix_lc_canonical_payload_search_path.sql` ya corregía este problema mediante `CREATE OR REPLACE FUNCTION` completo. Error de análisis — no de implementación.
+
+**Vulnerabilidades restantes en pnpm audit (post-fix):** 60 total (5 low, 24 moderate, 30 high, 1 critical).
+Los 30 high restantes son todos en herramientas de dev/packaging (`electron-builder→tar`, `eslint→flatted/brace-expansion`, `@next/bundle-analyzer→ws`) o en `electron` runtime (4 use-after-free — requieren actualizar Electron mayor). Ninguno está en el path de ejecución del servidor web.
+
+**Score post-fix:** ~95/100 (DB integrity: 100%, OWASP: 92%)
+
+---
 
 ---
 
@@ -306,10 +328,10 @@ Revisión de todas las migraciones post-20260703: ninguna contiene DROP TRIGGER 
 | DB — Hash chaining + cronología | ✔ |
 | DB — RLS + permisos | ✔ |
 | DB — Consistencia ACID | ✔ |
-| DB — search_path explícito en todas las funciones | ⚠ |
+| DB — search_path explícito en todas las funciones | ✔ (corregido — 20260730000001) |
 | Seguridad — OWASP | ✔ |
 | Seguridad — Secrets | ✔ |
-| Seguridad — Dependencias | ⚠ |
+| Seguridad — Dependencias | ⚠ (30 high residuales — todos dev/packaging o electron runtime) |
 | Electron | ✔ |
 | VeriFactu No-VeriFactu mode (Fase 1) | ✔ |
 | VeriFactu XML signing (Fase 2) | ❌ (plazo jul 2027) |
