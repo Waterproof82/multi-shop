@@ -99,7 +99,7 @@ jobs:
           if [ -n "$(git status --porcelain)" ]; then
             git add .
             git commit -m "claude: resuelve #${ISSUE_NUMBER} - ${ISSUE_TITLE}"
-            git push origin "$BRANCH_NAME" --force
+            git push origin "$BRANCH_NAME" --force-with-lease
 
             PR_BODY="### 🤖 PR generado por Claude Agent
             
