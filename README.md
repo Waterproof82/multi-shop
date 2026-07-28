@@ -60,7 +60,10 @@ Software de caja para restaurantes y tiendas integrado en la misma plataforma. C
 - **Desglose de ítems en ticket** (`detalle_items JSONB` en `tpv_cobros`): cada cobro almacena nombre, cantidad y precio unitario de cada producto. Para cobros de mesa el servidor lo construye automáticamente desde `pedidos.detalle_pedido`; para mostrador lo envía el cliente desde el carrito. Inmutable una vez grabado (trigger extendido). El ticket rectificativo hereda los ítems del original. RD 1619/2012.
 - **Informe Z de cierre de turno**: al cerrar un turno se asigna automáticamente un `numero_z` secuencial por empresa (trigger BEFORE UPDATE con `pg_advisory_xact_lock` — sin race conditions ni saltos). Se abre un modal `InformeZModal` con el informe completo (totales, IVA, arqueo de caja, huella digital) y auto-print vía `window.print()`. Electron intercepta la llamada y la envía a la impresora configurada. El operador confirma antes de que la app redirija a la pantalla de apertura.
 - **Auditoría para inspectores**: `GET /api/tpv/audit/chain` verifica la cadena de hashes recomputando SHA-256 en Node.js; `GET /api/tpv/audit/export` descarga todos los cobros del período como JSON con cabecera `Content-Disposition: attachment`.
-- **Pantalla de conformidad legal** `/tpv/legal`: Declaración de Responsabilidad del fabricante (RD 1007/2023), versión del software, fecha de firma, serie del sistema, checklist de cumplimiento, y acceso a verificación de cadena y exportación.
+- **Pantalla de conformidad legal** `/tpv/legal`: Declaración de Responsabilidad del fabricante (RD 1007/2023), versión del software, fecha de firma, serie del sistema, checklist de cumplimiento con última purga RGPD, y acceso a verificación de cadena y exportación.
+- **VeriFactu — Modo No-VeriFactu** (Art. 12 RD 1007/2023): columna `verifactu_mode` por empresa (`no-verifactu` | `verifactu`). El trigger de inserción calcula y persiste `verifactu_qr_url` en cada cobro. El QR se imprime en el ticket para verificación AEAT. Fase 2 (XML signing + envío AEAT) prevista para jul 2027.
+- **DPA Art. 28 RGPD**: pantalla `/tpv/legal/dpa` con plantilla de Acuerdo de Tratamiento de Datos firmable, categorías de datos tratados y cláusulas de subencargados.
+- **RGPD accountability** (Art. 5.2): tabla `rgpd_purge_log` — cada ejecución del Vercel Cron mensual de purga de clientes queda registrada de forma inmutable (triggers NO UPDATE / NO DELETE). Accesible desde `/tpv/legal` para demostrar cumplimiento ante la AEPD.
 - **NIF/CIF de la empresa**: campo configurable desde el panel admin, incluido en el ticket de cobro y en el enlace de verificación AEAT.
 
 #### Analítica (Fase 2)
@@ -302,6 +305,7 @@ El TPV se distribuye también como **aplicación de escritorio nativa para Windo
 
 - **Debug log**: en cada arranque escribe `%AppData%\Multisistema TPV\tpv-update.log` con la versión actual, dominio configurado, respuesta de la API y resultado del chequeo de versión. Útil para diagnosticar por qué el popup de actualización no aparece.
 - **Impresión térmica nativa**: IPC renderer → main → `node-thermal-printer`. Nunca se accede a Node.js desde el renderer (preload con `contextIsolation`).
+- **Seguridad del renderer** (v1.1.0): `sandbox: true` en BrowserWindow — el renderer corre en sandbox OS-level. `contextIsolation: true` + `nodeIntegration: false` siempre activos. Todos los IPC handlers validan el payload con Zod antes de procesar (GAP-003 SIALTI).
 - **Atajos globales**: `Ctrl+Shift+R` abre el diálogo de reconfiguración del dominio. `F5` fuerza un reload de la webview.
 
 #### Proceso de build y release (Electron)
@@ -409,7 +413,8 @@ Ver `docs/context/fichaje-digital.md` para el mecanismo de fichaje en detalle.
 | Cloudflare R2 | — | Storage imágenes |
 | Tailwind CSS | 4.x | Estilos |
 | AWS SDK v3 | ^3.994 | Cliente S3/R2 |
-| Zod | 3.25.x | Validación schemas |
+| Zod | 4.4.x | Validación schemas |
+| Vitest | 4.x | Tests unitarios de compliance (fast-check property testing) |
 | jose | ^6.1.3 | JWT (sign + verify) |
 | Upstash Redis | — | Rate limiting + JWT revocation |
 | Brevo | — | Envío de emails |
@@ -418,9 +423,9 @@ Ver `docs/context/fichaje-digital.md` para el mecanismo de fichaje en detalle.
 | Glovo Business LaaS | — | Despacho de riders (DH On Demand Rider API) |
 | @zxing/browser | — | Decodificación QR in-app (iOS Safari + Android Chrome) |
 | Service Worker (vanilla) | — | Caching offline para `/waiter` — sin Workbox/Serwist |
-| Electron | 31.x | App de escritorio Windows (TPV portable con auto-update) |
-| electron-builder | 24.x | Packaging del exe portable para Windows |
-| electron-store | — | Persistencia de config local (dominio, impresora, clave firma) |
+| Electron | 39.x | App de escritorio Windows (TPV portable con auto-update) |
+| electron-builder | 26.x | Packaging del exe portable para Windows |
+| electron-store | 8.x (CJS) | Persistencia de config local (dominio, impresora, clave firma) |
 | node-thermal-printer | — | Impresión térmica nativa desde el proceso main de Electron |
 | Capacitor | — | App Android nativa para panel `/waiter` (PDAs de camarero) |
 
@@ -672,6 +677,8 @@ Documentación completa en [`docs/context/security.md`](docs/context/security.md
 | **URL schemes** | DTOs validan `https://` en fb, instagram, logo_url, url_mapa, foto_url, imagen_url |
 | **Error mapping** | `handleResult()` mapea error codes a HTTP status (400, 401, 404, 500) |
 | **Pedido atómico** | `get_next_pedido_number()` con mutex por tenant |
+| **Electron sandbox** | Renderer en sandbox OS-level (`sandbox: true` desde v1.1.0). `contextIsolation: true` + `nodeIntegration: false`. IPC handlers validan con Zod antes de procesar |
+| **Compliance tests** | 72 tests Vitest (hash chaining, HMAC, IVA, RGPD, fuzz inputs, secrets scan) + Playwright E2E de triggers DB. CI dedicado en `.github/workflows/compliance.yml` |
 
 ---
 
