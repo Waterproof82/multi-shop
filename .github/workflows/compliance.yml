@@ -21,6 +21,9 @@ on:
       - 'electron/main.ts'
       - 'tests/compliance/**'
       - 'e2e/compliance/**'
+  # Security advisor scan: runs nightly to catch drifts not introduced via migrations
+  schedule:
+    - cron: '0 3 * * 1'  # Lunes a las 03:00 UTC
   # Allow manual runs for pre-certification audits
   workflow_dispatch:
     inputs:
