@@ -255,7 +255,7 @@ function writeUpdateLog(msg: string): void {
     const dir = app.getPath('userData');
     const logPath = path.join(dir, 'tpv-update.log');
     appendFileSync(logPath, `[${new Date().toISOString()}] ${msg}\n`, 'utf-8');
-  } catch (e) {
+  } catch {
     // last-resort: write next to exe
     try {
       const exeDir = path.dirname(process.execPath);
