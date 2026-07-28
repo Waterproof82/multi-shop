@@ -17,10 +17,12 @@
 | GAP-DB-02 — `lc_canonical_payload()` ALTER no aplicó | Error en el informe — la migración `20260726000001` ya hacía `CREATE OR REPLACE` completo con `SET search_path = public, extensions, pg_catalog`. GAP ya estaba cerrado. | ✔ YA ESTABA CERRADO |
 | GAP-SEC-01 — Next.js 16.2.10 con 4 HIGH + 5 moderate | `pnpm update next@16.2.12` — cierra todos los CVEs de Next.js (patched >=16.2.11) | ✔ CERRADO |
 | GAP-RGPD-01 — Purge depende de Vercel Cron | Limitación de infraestructura (Supabase Free sin pg_cron). No hay fix de código posible sin cambiar de plan. | ⚠ PENDIENTE (infra) |
-| GAP-RGPD-02 — DPA con clientes | Gap de proceso legal. No aplica corrección en código. | ⚠ PENDIENTE (proceso) |
+| GAP-RGPD-02 — DPA con clientes | Error en el informe — `src/app/tpv/legal/dpa/page.tsx` implementa DPA completo Art. 28 RGPD accesible en `/tpv/legal/dpa`. Gap ya estaba cerrado. | ✔ YA ESTABA CERRADO |
 | GAP-001 Fase 2 — VeriFactu XML signing | Fuera de alcance — plazo regulatorio jul 2027 (RD 15/2025). | ⏳ FUTURO |
 
 **Nota sobre GAP-DB-02:** El informe de auditoría reportó este gap basándose en el contexto comprimido de la sesión anterior en lugar de releer las migraciones. La migración `20260726000001_fix_lc_canonical_payload_search_path.sql` ya corregía este problema mediante `CREATE OR REPLACE FUNCTION` completo. Error de análisis — no de implementación.
+
+**Nota sobre GAP-RGPD-02:** El informe reportó ausencia de DPA formal. Sin embargo, `src/app/tpv/legal/dpa/page.tsx` implementa un DPA completo conforme al Art. 28 RGPD, accesible en `/tpv/legal/dpa`, con partes, finalidades, subencargados, retención y firma. Error de análisis — la implementación existía desde antes de la auditoría.
 
 **Vulnerabilidades restantes en pnpm audit (post-fix):** 60 total (5 low, 24 moderate, 30 high, 1 critical).
 Los 30 high restantes son todos en herramientas de dev/packaging (`electron-builder→tar`, `eslint→flatted/brace-expansion`, `@next/bundle-analyzer→ws`) o en `electron` runtime (4 use-after-free — requieren actualizar Electron mayor). Ninguno está en el path de ejecución del servidor web.
@@ -83,8 +85,8 @@ Los 30 high restantes son todos en herramientas de dev/packaging (`electron-buil
 | Función | Estado |
 |---------|--------|
 | `tpv_cobro_before_insert()` | ✔ `search_path = public, extensions, pg_catalog` |
-| `tpv_turno_before_insert()` | ⚠ `search_path = public, pg_catalog` (sin `extensions` explícito) — GAP-DB-01 |
-| `lc_canonical_payload()` | ⚠ ALTER en 20260725000003 con firma incorrecta (12 params vs 13) — GAP-DB-02 |
+| `tpv_turno_before_insert()` | ✔ `search_path = public, extensions, pg_catalog` (corregido en `20260730000001`) |
+| `lc_canonical_payload()` | ✔ `CREATE OR REPLACE` completo con `SET search_path = public, extensions, pg_catalog` en `20260726000001` |
 | `get_mi_empresa_id()` | ✔ No usa pgcrypto |
 
 ### Endpoints de Auditoría
@@ -209,7 +211,7 @@ Revisión de todas las migraciones post-20260703: ninguna contiene DROP TRIGGER 
 | 25 | API verificación cadena fichajes | RD-Ley 8/2019 | ✔ | `laborcontrol-chain.spec.ts` |
 | 26 | Anonimización RGPD clientes | RGPD | ✔ | `rgpd-anonimizacion.spec.ts` |
 | 27 | Purga automática 5 años | Art. 66 LGT + RGPD | ⚠ | `rgpd-anonimizacion.spec.ts` |
-| 28 | DPA con clientes restaurante | RGPD | ⚠ | — (proceso manual) |
+| 28 | DPA con clientes restaurante | RGPD | ✔ | `src/app/tpv/legal/dpa/page.tsx` — `/tpv/legal/dpa` |
 | 29 | CSRF en rutas mutativas | OWASP | ✔ | `waiter-csrf.spec.ts` |
 | 30 | Tenant isolation RLS | OWASP | ✔ | `tpv-rls-multitenant.spec.ts` |
 | 31 | REVOKE EXECUTE FROM PUBLIC | Seguridad | ✔ | DB structural |
@@ -248,8 +250,8 @@ Revisión de todas las migraciones post-20260703: ninguna contiene DROP TRIGGER 
 | GAP-SEC-01 | OWASP | Next.js 16.2.10 proxy bypass HIGH. Actualizar. | 12 | P2 |
 | GAP-RGPD-01 | RGPD | Purge depende de Vercel Cron — sin pg_cron (plan Free). | 6 | P2 |
 | GAP-DB-01 | Seguridad | `tpv_turno_before_insert()` sin `extensions` en search_path explícito. | 2 | P3 |
-| GAP-DB-02 | Seguridad | `lc_canonical_payload()` ALTER con firma errónea — search_path no aplicó. | 2 | P3 |
-| GAP-RGPD-02 | RGPD | DPA con clientes restaurante sin documentación formal en sistema. | 6 | P3 |
+| GAP-DB-02 | Seguridad | FALSO POSITIVO — `lc_canonical_payload()` ya corregida en `20260726000001` con CREATE OR REPLACE completo. | — | CERRADO |
+| GAP-RGPD-02 | RGPD | FALSO POSITIVO — DPA Art. 28 RGPD implementado en `/tpv/legal/dpa` (`src/app/tpv/legal/dpa/page.tsx`). | — | CERRADO |
 | GAP-INV-01 | Docs | `tpv_cobro_audit_trigger` no estaba en Compliance Inventory. Corregido. | 1 | P4 |
 | GAP-INV-02 | Docs | Path inventory incorrecto para verify-chain. Corregido. | 1 | P4 |
 
@@ -311,7 +313,7 @@ Revisión de todas las migraciones post-20260703: ninguna contiene DROP TRIGGER 
 |-----------|:----------:|---------------|
 | Cumplimiento legal (Ley 11/2021 + SIALTI + RD-Ley 8/2019 + RD 1619/2012) | 100/100 | 24/24 requisitos cubiertos |
 | VeriFactu (RD 1007/2023) | 75/100 | Fase 1 completa; Fase 2 pendiente (plazo jul 2027) |
-| RGPD / LOPDGDD | 67/100 | Anonimización ✔; purge ⚠; DPA ⚠ |
+| RGPD / LOPDGDD | 83/100 | Anonimización ✔; DPA ✔ (`/tpv/legal/dpa`); purge ⚠ (Vercel Cron) |
 | Seguridad (OWASP) | 88/100 | Todos los controles OK; 34 high en deps pendiente |
 | Integridad DB | 98/100 | search_path implícito en 2 funciones (-2) |
 | Tests y Cobertura | 100/100 | 127/127 ✅; property-based + fuzz + E2E |
@@ -369,8 +371,9 @@ Revisión de todas las migraciones post-20260703: ninguna contiene DROP TRIGGER 
 │    [P1] GAP-001-P2: VeriFactu Fase 2 (XML+AEAT) — plazo jul 2027         │
 │    [P2] GAP-SEC-01: Actualizar Next.js (proxy bypass HIGH)                 │
 │    [P2] GAP-RGPD-01: Migrar purge a pg_cron (plan Pro) o cron dedicado   │
-│    [P3] GAP-DB-01/02: Corregir search_path en 2 funciones                 │
-│    [P3] GAP-RGPD-02: Formalizar DPA con clientes restaurante              │
+│    [P3] GAP-DB-01: CERRADO (migración 20260730000001)                      │
+│    [P3] GAP-DB-02: CERRADO (falso positivo — 20260726000001 ya aplicado)   │
+│    [P3] GAP-RGPD-02: CERRADO (falso positivo — DPA en /tpv/legal/dpa)     │
 └─────────────────────────────────────────────────────────────────────────────┘
 
 * RGPD al 67% no alcanza el umbral 75% pero no es bloqueante para
