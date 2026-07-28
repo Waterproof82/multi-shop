@@ -257,7 +257,7 @@ test.describe('Routing — con auth real (requiere PLAYWRIGHT_WAITER_PIN)', () =
         cookie: `waiter_token=${sessionWaiterToken}; csrf_token=${sessionCsrfCookie}`,
         'x-csrf-token': sessionCsrfToken,
       },
-      data: { pedidoId: '00000000-0000-0000-0000-000000000099', retainIndices: [0] },
+      data: { pedidoId: '00000000-0000-4000-8000-000000000099', retainIndices: [0] },
     });
     expect(res.status()).not.toBe(500);
     expect([404, 409]).toContain(res.status());

@@ -21,8 +21,9 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 
-# Env files
+# Env files — .env.example es seguro (solo placeholders) y debe commitearse
 .env*
+!.env.example
 
 # Editor
 .vscode/
