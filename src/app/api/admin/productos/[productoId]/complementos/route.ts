@@ -40,7 +40,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
   const parsed = setProductoGruposSchema.safeParse(body);
   if (!parsed.success) {
-    return validationErrorResponse(parsed.error.errors[0]?.message ?? 'Datos inválidos');
+    return validationErrorResponse(parsed.error.issues[0]?.message ?? 'Datos inválidos');
   }
 
   const result = await getComplementoGrupoUseCase().setProductoGrupos(productoId, parsed.data.grupoIds, empresaId);

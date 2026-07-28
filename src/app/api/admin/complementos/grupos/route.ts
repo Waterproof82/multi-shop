@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
   const parsed = createComplementoGrupoSchema.safeParse({ ...(body as Record<string, unknown>), empresaId });
 
   if (!parsed.success) {
-    return validationErrorResponse(parsed.error.errors[0].message);
+    return validationErrorResponse(parsed.error.issues[0].message);
   }
 
   const result = await getComplementoGrupoUseCase().create(parsed.data);

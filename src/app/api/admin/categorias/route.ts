@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
   const parsed = createCategorySchema.safeParse({ ...(body as Record<string, unknown>), empresaId });
 
   if (!parsed.success) {
-    return validationErrorResponse(parsed.error.errors[0].message);
+    return validationErrorResponse(parsed.error.issues[0].message);
   }
 
   const result = await getCategoryUseCase().create(parsed.data);
@@ -95,7 +95,7 @@ export async function PUT(request: NextRequest) {
   const parsed = updateCategorySchema.safeParse(updateData);
 
   if (!parsed.success) {
-    return validationErrorResponse(parsed.error.errors[0].message);
+    return validationErrorResponse(parsed.error.issues[0].message);
   }
 
   const result = await getCategoryUseCase().update(idParsed.data.id, empresaId, parsed.data);

@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   const parsed = getMesaSchema.safeParse({ token: searchParams.get('token') });
 
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
+    return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
 
   const rateLimited = await rateLimitMesaPolling(parsed.data.token);

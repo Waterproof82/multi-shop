@@ -47,7 +47,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
 
   const parsed = replaceRecetaSchema.safeParse(body);
   if (!parsed.success) {
-    return validationErrorResponse(parsed.error.errors[0].message);
+    return validationErrorResponse(parsed.error.issues[0].message);
   }
 
   const repo = getStockRepository();

@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
 
   const parsed = createIngredienteSchema.safeParse(body);
   if (!parsed.success) {
-    return validationErrorResponse(parsed.error.errors[0].message);
+    return validationErrorResponse(parsed.error.issues[0].message);
   }
 
   const repo = getStockRepository();

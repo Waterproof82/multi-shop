@@ -32,7 +32,7 @@ export async function POST(
 
   const bodyParsed = bodySchema.safeParse(body);
   if (!bodyParsed.success) {
-    return NextResponse.json({ error: bodyParsed.error.errors[0].message }, { status: 400 });
+    return NextResponse.json({ error: bodyParsed.error.issues[0].message }, { status: 400 });
   }
 
   const sesionResult = await getMesaSesionRepository().findActiveSesionByMesa(mesaParsed.data);
