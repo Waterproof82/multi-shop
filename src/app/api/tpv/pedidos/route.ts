@@ -5,7 +5,7 @@ import { requireAuth, requireRole, validationErrorResponse } from '@/core/infras
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 
 const itemSchema = z.object({
-  productId: z.string().uuid(),
+  productId: z.uuid(),
   nombre: z.string().min(1).max(200),
   precio: z.number().nonnegative(),
   cantidad: z.number().int().min(1).max(99),
@@ -14,7 +14,7 @@ const itemSchema = z.object({
 });
 
 const bodySchema = z.object({
-  mesaId: z.string().uuid(),
+  mesaId: z.uuid(),
   items: z.array(itemSchema).min(1).max(50),
   nota: z.string().max(500).optional(),
   pase: z.enum(['primer', 'segundo', 'postre']).optional(),

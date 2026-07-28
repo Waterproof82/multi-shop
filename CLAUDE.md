@@ -39,7 +39,16 @@ Todo el codebase usa `Result<T, AppError>`.
 - **PII:** Prohibido loguear emails/telefonos. Usar datos anonimizados.
 - **Secrets:** Lectura lazy via funciones (ej: `getTokenSecret()`), nunca constantes de modulo.
 - **CSRF:** Validado en proxy para metodos mutativos de admin, waiter y kitchen (`handleWaiterAuth`). Mismo patron double-submit cookie+header con `timingSafeEqual`.
-- **REVOKE SECURITY DEFINER:** Usar siempre `REVOKE EXECUTE FROM PUBLIC` (no `FROM anon`). Anon hereda de PUBLIC — revocar solo de anon no tiene efecto. Ver `docs/context/security.md`.
+- **REVOKE SECURITY DEFINER (CRITICO):** Toda funcion `SECURITY DEFINER` nueva DEBE incluir estos tres REVOKEs inmediatamente despues del `CREATE OR REPLACE`:
+  ```sql
+  REVOKE EXECUTE ON FUNCTION public.mi_funcion() FROM PUBLIC;
+  REVOKE EXECUTE ON FUNCTION public.mi_funcion() FROM anon;
+  REVOKE EXECUTE ON FUNCTION public.mi_funcion() FROM authenticated;
+  GRANT  EXECUTE ON FUNCTION public.mi_funcion() TO service_role;
+  ```
+  Sin esto, la funcion queda expuesta en `/rest/v1/rpc/mi_funcion` para cualquier usuario anonimo.
+  Excepcion unica: `get_mi_empresa_id()` necesita EXECUTE en `authenticated` para las RLS policies.
+  El test `e2e/compliance/supabase-security-definer.spec.ts` verifica esto automaticamente en CI.
 - **Particiones RLS:** Las tablas de particion NO heredan RLS del padre. Cada particion nueva necesita `ENABLE ROW LEVEL SECURITY` + policies propias. `lc_create_next_partition()` lo hace automaticamente.
 - **delete-all en produccion:** `DELETE /api/admin/pedidos/delete-all` tiene guard `NODE_ENV === 'production'` → 403. Nunca eliminar ese guard.
 - **E2E tests de seguridad:** `e2e/waiter-csrf.spec.ts` cubre CSRF + RLS. Ejecutar con `PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test e2e/`.
