@@ -1,12 +1,10 @@
 import { app, BrowserWindow, ipcMain, globalShortcut, Menu, dialog } from 'electron';
-import * as path from 'path';
-import { promises as fsPromises } from 'fs';
-import { appendFileSync } from 'fs';
-import * as crypto from 'crypto';
-import { exec } from 'child_process';
+import * as path from 'node:path';
+import { promises as fsPromises, appendFileSync } from 'node:fs';
+import * as crypto from 'node:crypto';
+import { exec } from 'node:child_process';
 import Store from 'electron-store';
 import { listPrinters, printReceipt } from './printer/index';
-import type { ReceiptData } from './printer/receipt';
 import { z } from 'zod';
 
 interface StoreSchema {
@@ -146,8 +144,7 @@ function blockDangerousShortcuts(): void {
     ];
 
     if (app.isPackaged) {
-      blocked.push({ key: 'I', control: true, shift: true });
-      blocked.push({ key: 'F12' });
+      blocked.push({ key: 'I', control: true, shift: true }, { key: 'F12' });
     }
 
     const isBlocked = blocked.some(
@@ -263,7 +260,7 @@ function writeUpdateLog(msg: string): void {
     try {
       const exeDir = path.dirname(process.execPath);
       appendFileSync(path.join(exeDir, 'tpv-update.log'), `[${new Date().toISOString()}] ${msg}\n`, 'utf-8');
-    } catch { /* ignore */ }
+    } catch { console.warn('TPV: fallback log write also failed'); }
   }
 }
 

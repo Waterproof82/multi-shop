@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { getAuthAdminUseCase } from '@/core/infrastructure/database';
 import { loginSchema } from '@/core/application/dtos/auth.dto';
 import { successResponse, validationErrorResponse, handleResult } from '@/core/infrastructure/api/helpers';
