@@ -12,6 +12,7 @@ export const dynamic = 'force-dynamic';
 
 type CobroCount = { count: number; integrity: 'ok' | 'empty' };
 type VerifactuMode = 'no-verifactu' | 'verifactu';
+type LastPurge = { executed_at: string; anonymized_count: number; status: string } | null;
 
 async function getVerifactuMode(empresaId: string): Promise<VerifactuMode> {
   try {
@@ -26,6 +27,21 @@ async function getVerifactuMode(empresaId: string): Promise<VerifactuMode> {
     return 'no-verifactu';
   } catch {
     return 'no-verifactu';
+  }
+}
+
+async function getLastPurge(): Promise<LastPurge> {
+  try {
+    const supabase = getSupabaseClient();
+    const { data } = await supabase
+      .from('rgpd_purge_log')
+      .select('executed_at, anonymized_count, status')
+      .order('executed_at', { ascending: false })
+      .limit(1)
+      .single();
+    return data as LastPurge;
+  } catch {
+    return null;
   }
 }
 
@@ -95,9 +111,9 @@ export default async function TpvLegalPage() {
 
   // Página accesible públicamente (sin auth) para inspectores de Hacienda — Art. 12 RD 1007/2023.
   // El contenido dinámico (stats, modo) solo se carga cuando hay sesión activa.
-  const [stats, verifactuMode] = empresaId
-    ? await Promise.all([getCobroStats(empresaId), getVerifactuMode(empresaId)])
-    : [{ count: 0, integrity: 'ok' as const }, 'no-verifactu' as const];
+  const [stats, verifactuMode, lastPurge] = empresaId
+    ? await Promise.all([getCobroStats(empresaId), getVerifactuMode(empresaId), getLastPurge()])
+    : [{ count: 0, integrity: 'ok' as const }, 'no-verifactu' as const, null];
   const now = new Date();
   const fechaHora = now.toLocaleString('es-ES', {
     dateStyle: 'long',
@@ -435,7 +451,11 @@ export default async function TpvLegalPage() {
           <CheckItem
             label="Retención y anonimización de datos personales"
             status="done"
-            detail="Vercel Cron mensual: anonimiza clientes con >5 años de inactividad. Derecho al olvido manual: POST /api/admin/rgpd/anonimizar-cliente"
+            detail={
+              lastPurge !== null
+                ? `Última purga: ${new Date(lastPurge.executed_at).toLocaleDateString('es-ES', { dateStyle: 'medium', timeZone: 'Europe/Madrid' })} · ${lastPurge.anonymized_count} registros · ${lastPurge.status === 'ok' ? '✓ OK' : '✗ Error'}. Derecho al olvido manual: POST /api/admin/rgpd/anonimizar-cliente`
+                : 'Vercel Cron: día 1 de cada mes, 03:00 UTC. Sin ejecuciones registradas aún. Derecho al olvido manual: POST /api/admin/rgpd/anonimizar-cliente'
+            }
           />
         </div>
 
