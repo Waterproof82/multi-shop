@@ -47,7 +47,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
   const parsed = updateEmpresaSchema.safeParse(body);
   if (!parsed.success) {
-    return validationErrorResponse(parsed.error.errors[0].message);
+    return validationErrorResponse(parsed.error.issues[0].message);
   }
 
   const result = await getSuperAdminUseCase().updateEmpresa(id, parsed.data);

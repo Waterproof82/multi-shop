@@ -1391,6 +1391,9 @@ export class SupabasePedidoRepository implements IPedidoRepository {
 
       // Fetch item estados (empty Map if no pedidos)
       const estadoMap = new Map<string, Map<number, ItemEstado>>();
+      // Items auto-retained back to the pendientes queue (from_validation=true) must
+      // be excluded from the kitchen result entirely — they are not kitchen work.
+      const pendientesRetainedSet = new Map<string, Set<number>>();
       if (pedidoIds.length > 0) {
         const { data: itemEstados, error: estadosError } = await this.supabase
           .from('pedido_item_estados')
@@ -1404,12 +1407,17 @@ export class SupabasePedidoRepository implements IPedidoRepository {
 
         for (const row of itemEstados ?? []) {
           const r = row as Record<string, unknown>;
-          // Skip from_validation=true: item auto-retained during pendientes validation,
-          // already back in the pendientes queue — not a kitchen-retained item.
-          if (r['from_validation'] === true) continue;
           const pid = r['pedido_id'] as string;
+          const idx = r['item_idx'] as number;
+          if (r['from_validation'] === true) {
+            // Item auto-retained during pendientes validation → back in pendientes queue.
+            // Track it so we can exclude it from the kitchen result below.
+            if (!pendientesRetainedSet.has(pid)) pendientesRetainedSet.set(pid, new Set());
+            pendientesRetainedSet.get(pid)!.add(idx);
+            continue;
+          }
           if (!estadoMap.has(pid)) estadoMap.set(pid, new Map());
-          estadoMap.get(pid)!.set(r['item_idx'] as number, r['estado'] as ItemEstado);
+          estadoMap.get(pid)!.set(idx, r['estado'] as ItemEstado);
         }
       }
 
@@ -1424,6 +1432,9 @@ export class SupabasePedidoRepository implements IPedidoRepository {
 
         items.forEach((item, idx) => {
           if (item['tipo_producto'] !== 'comida') return;
+          // Skip items auto-retained back to the pendientes queue — they are not
+          // kitchen work and must not appear in the kitchen view.
+          if (pendientesRetainedSet.get(pedidoId)?.has(idx)) return;
           const defaultEstado: ItemEstado = pedidoNivelEstado === 'retenido' ? 'retenido' : 'pendiente';
           const estado: ItemEstado = pedidoEstados.get(idx) ?? defaultEstado;
           const complements = item['complementos'] as Array<{ nombre?: string; name?: string }> | undefined;
@@ -1524,7 +1535,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           .from('pedidos')
           .select(`id, created_at, detalle_pedido, pase, mesa_id, mesas!inner(numero, nombre)`)
           .eq('empresa_id', empresaId)
-          .eq('estado', 'pendiente')
+          .in('estado', ['pendiente', 'anotado'])
           .in('id', [...retenidoMap.keys()])
           .order('created_at', { ascending: true });
         addValidatedRetenidos(mesaMap, (validatedPedidos ?? []) as Array<Record<string, unknown>>, retenidoMap);

@@ -102,10 +102,14 @@ Cuando admin hace un ajuste positivo desde `/api/admin/stock/ingredientes/[id]/a
 
 Componente `src/components/tpv/LowStockBadge.tsx`:
 - Fetchea `GET /api/tpv/stock/alerts` al montar y cada 3 minutos
+- Escucha `CustomEvent('low-stock-refresh')` en `window` para refrescar inmediatamente (sin esperar el intervalo)
 - Si hay alertas: badge ámbar clicable con modal de detalle (nombre, cantidad actual, umbral)
 - Si no hay alertas: renderiza `null`
 - Montado en `TpvHeader` (visible en todo el TPV) y en `CobroMetodoPropina` (pantalla de cobro)
 - Fetch silently fails — nunca bloquea UI
+
+**Disparadores del evento `low-stock-refresh`:**
+- `src/app/tpv/mermas/page.tsx` — tras registrar una merma con éxito
 
 ---
 

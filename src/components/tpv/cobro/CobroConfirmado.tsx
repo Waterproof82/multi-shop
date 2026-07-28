@@ -204,19 +204,19 @@ export function CobroConfirmado({
           </div>
         </div>
 
-        {/* AEAT verification URL */}
+        {/* AEAT verification URL — prefer persisted verifactuQrUrl from DB; fall back to client-computed */}
         {cobro !== null && empresaNif !== null && empresaNif !== '' && (
           <div className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-3 flex flex-col gap-1.5">
             <p className="text-[10px] font-bold text-[#6b7280] uppercase tracking-wider">
               Verificación AEAT
             </p>
             <a
-              href={buildAeatUrl(empresaNif, cobro)}
+              href={cobro.verifactuQrUrl ?? buildAeatUrl(empresaNif, cobro)}
               target="_blank"
               rel="noreferrer"
               className="text-xs text-[#2563eb] break-all hover:underline leading-relaxed"
             >
-              {buildAeatUrl(empresaNif, cobro)}
+              {cobro.verifactuQrUrl ?? buildAeatUrl(empresaNif, cobro)}
             </a>
           </div>
         )}

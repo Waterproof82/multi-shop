@@ -59,7 +59,7 @@ async function buildReceiptHtml(ticket: PrintTicket): Promise<string> {
   const dt = new Date(ticket.cobradoAt);
   const fecha = dt.toLocaleDateString('es-ES');
   const hora = dt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-  const serieNum = `${ticket.serie}-${String(ticket.numeroTicket).padStart(6, '0')}`;
+  const serieNum = `${ticket.serie}${String(ticket.numeroTicket).padStart(6, '0')}`;
   const cambio = ticket.metodoPago === 'efectivo'
     ? Math.max(0, ticket.entregadoCents - ticket.importeCobradoCents)
     : 0;

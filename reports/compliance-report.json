@@ -1,0 +1,78 @@
+{
+  "meta": {
+    "version": "0.4.0",
+    "commit": "b0558341459b7e2d447c14f90d5e41a72a0ab751",
+    "commitShort": "b055834",
+    "branch": "main",
+    "auditDate": "2026-07-28T07:28:05Z",
+    "mode": "pre-certification",
+    "skill": "audit-tpv v1.0"
+  },
+  "score": {
+    "total": 93.3,
+    "categories": {
+      "cumplimientoLegal": 100,
+      "verifactu": 75,
+      "rgpd": 67,
+      "seguridadOWASP": 88,
+      "integridadDB": 98,
+      "testsCoverage": 100,
+      "electron": 100
+    }
+  },
+  "coverage": {
+    "totalRequirements": 48,
+    "covered": 43,
+    "partial": 3,
+    "gaps": 2,
+    "percentageStrict": 89.6,
+    "percentageWeighted": 93.8,
+    "byNorm": {
+      "Ley_11_2021": { "total": 7, "covered": 7, "percentage": 100 },
+      "RD_1007_2023": { "total": 8, "covered": 6, "percentage": 75 },
+      "SIALTI": { "total": 8, "covered": 8, "percentage": 100 },
+      "RD_Ley_8_2019": { "total": 7, "covered": 7, "percentage": 100 },
+      "RD_1619_2012": { "total": 2, "covered": 2, "percentage": 100 },
+      "Art_66_LGT": { "total": 2, "covered": 2, "percentage": 100 },
+      "RGPD": { "total": 3, "covered": 1, "partial": 2, "percentage": 67 },
+      "OWASP_Seguridad": { "total": 8, "covered": 7, "partial": 1, "percentage": 88 },
+      "Electron": { "total": 3, "covered": 3, "percentage": 100 }
+    }
+  },
+  "tests": {
+    "vitest": { "files": 9, "tests": 72, "passed": 72, "failed": 0, "skipped": 0 },
+    "playwright": { "files": 14, "tests": 55, "passed": 55, "failed": 0, "skipped": 0 },
+    "total": { "files": 23, "tests": 127, "passed": 127, "failed": 0, "skipped": 0 }
+  },
+  "dictamen": {
+    "status": "LISTO_PARA_CERTIFICACION",
+    "bloqueantes": [],
+    "thresholds": {
+      "total": { "required": 90, "achieved": 93.8, "pass": true },
+      "ley11_2021": { "required": 95, "achieved": 100, "pass": true },
+      "sialti": { "required": 95, "achieved": 100, "pass": true },
+      "rgpd": { "required": 75, "achieved": 67, "pass": false, "bloqueante": false },
+      "verifactu": { "required": 60, "achieved": 75, "pass": true }
+    },
+    "gaps": [
+      { "id": "GAP-001-P2", "norma": "RD 1007/2023", "prioridad": "P1", "descripcion": "VeriFactu Fase 2: XML signing + envio AEAT. Plazo jul 2027." },
+      { "id": "GAP-SEC-01", "norma": "OWASP", "prioridad": "P2", "descripcion": "Next.js 16.2.10 proxy bypass HIGH en pnpm audit." },
+      { "id": "GAP-RGPD-01", "norma": "RGPD", "prioridad": "P2", "descripcion": "Purge automatica depende de Vercel Cron sin pg_cron (plan Free)." },
+      { "id": "GAP-DB-01", "norma": "Seguridad", "prioridad": "P3", "descripcion": "tpv_turno_before_insert() sin extensions en search_path explicito." },
+      { "id": "GAP-DB-02", "norma": "Seguridad", "prioridad": "P3", "descripcion": "lc_canonical_payload() ALTER no aplico — firma erronea en migracion." },
+      { "id": "GAP-RGPD-02", "norma": "RGPD", "prioridad": "P3", "descripcion": "DPA con clientes restaurante sin documentacion formal en sistema." }
+    ]
+  },
+  "triggers": {
+    "total": 19,
+    "fiscal": [
+      "tpv_cobro_hash_insert", "tpv_cobro_no_delete", "tpv_cobro_no_update_critical",
+      "tpv_cobro_audit_trigger", "tpv_turno_hash_insert", "tpv_turno_no_delete",
+      "tpv_turno_no_update_fields", "tpv_turno_assign_z", "tpv_turno_evento_no_delete",
+      "tpv_turno_evento_no_update", "tpv_turno_audit_trigger", "trigger_albaranes_immutable",
+      "trigger_albaranes_no_delete", "pedidos_no_delete", "lc_fichajes_chain_before",
+      "lc_fichajes_chain_verify", "lc_fichajes_immutable", "lc_chain_anchors_immutable",
+      "lc_audit_log_immutable"
+    ]
+  }
+}

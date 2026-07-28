@@ -10,6 +10,7 @@ import type { Language } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { formatPrice } from "@/lib/format-price";
 import { getWaiterMesa } from "@/components/waiter-login-form";
+import { fetchWithCsrf } from "@/lib/csrf-client";
 import { QRScannerGate, type QRGateState } from "@/components/qr-scanner-gate";
 import { GoogleReviewsWidget } from "@/components/google-reviews-widget";
 
@@ -1623,9 +1624,8 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
     if (!pendingDelete || deleting) return;
     setDeleting(true);
     try {
-      await fetch(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/orders/items`, {
+      await fetchWithCsrf(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/orders/items`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           nombre: pendingDelete.nombre,
           precio: pendingDelete.precio,
@@ -1643,7 +1643,7 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
     if (manualPaying) return;
     setManualPaying(true);
     try {
-      await fetch(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/manual-payment`, { method: 'POST' });
+      await fetchWithCsrf(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/manual-payment`, { method: 'POST' });
       await refresh();
     } finally {
       setManualPaying(false);

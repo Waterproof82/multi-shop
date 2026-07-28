@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
+import { fetchWithCsrf, ensureCsrfToken } from '@/lib/csrf-client';
 import { UtensilsCrossed, LogOut } from 'lucide-react';
 import type { ItemEstado } from '@/core/domain/repositories/IPedidoRepository';
 
@@ -278,6 +279,9 @@ export default function KitchenPage() {
   // Without this guard, React StrictMode (dev) runs the subscription effect twice: mount → cleanup
   // → mount. The second mount tries to re-subscribe to fixed broadcast channel names after
   // removeChannel() closed them, leaving the channels in a state where they never receive events.
+  // Ensure csrf_token cookie exists on mount so the first PATCH never fires without it.
+  useEffect(() => { void ensureCsrfToken(); }, []);
+
   // The waiterEmpresaId arrives after the async fetch, by which time StrictMode's second mount
   // has already run its early-return, so subscriptions are created exactly once.
   useEffect(() => {
@@ -369,9 +373,8 @@ export default function KitchenPage() {
   // ── Countdown ──────────────────────────────────────────────────────────────
 
   const applyItemListo = useCallback((pedidoId: string, itemIdx: number) => {
-    void fetch(`/api/kitchen/items/${encodeURIComponent(pedidoId)}/${itemIdx}/status`, {
+    void fetchWithCsrf(`/api/kitchen/items/${encodeURIComponent(pedidoId)}/${itemIdx}/status`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ estado: 'listo' }),
     }).then(r => {
       if (r.ok) setItems(prev => prev.filter(notMatchingItem(pedidoId, itemIdx)));
@@ -408,9 +411,8 @@ export default function KitchenPage() {
   // ── PATCH ──────────────────────────────────────────────────────────────────
 
   const patchEstado = useCallback(async (pedidoId: string, itemIdx: number, estado: ItemEstado) => {
-    const r = await fetch(`/api/kitchen/items/${encodeURIComponent(pedidoId)}/${itemIdx}/status`, {
+    const r = await fetchWithCsrf(`/api/kitchen/items/${encodeURIComponent(pedidoId)}/${itemIdx}/status`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ estado }),
     });
     if (r.ok) void fetchItems();

@@ -12,7 +12,7 @@ interface RecienteFichaje {
   timestampEvento:   string;
   timestampServidor: string;
 }
-import { getCsrfToken } from '@/lib/csrf-client';
+import { fetchWithCsrf, ensureCsrfToken } from '@/lib/csrf-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -171,13 +171,8 @@ export default function FichajesPage() {
   }, [empleadoId]);
 
   const markNotif = useCallback(async (id: string, estado: 'visto' | 'disputado') => {
-    const csrfToken = getCsrfToken();
-    const res = await fetch(`/api/laborcontrol/review-queue/${id}`, {
+    const res = await fetchWithCsrf(`/api/laborcontrol/review-queue/${id}`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
-      },
       body: JSON.stringify({ estado }),
     });
     if (res.ok) setNotifs(prev => prev.map(n => n.id === id ? { ...n, estado } : n));
@@ -194,14 +189,9 @@ export default function FichajesPage() {
     if (pin.length < 4) return;
     setKiosk({ phase: 'loading' });
 
-    const csrfToken = getCsrfToken();
     try {
-      const res = await fetch('/api/laborcontrol/fichaje/kiosk', {
+      const res = await fetchWithCsrf('/api/laborcontrol/fichaje/kiosk', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
-        },
         body: JSON.stringify({ pin }),
       });
       if (!res.ok) {
@@ -256,14 +246,9 @@ export default function FichajesPage() {
     }, ...prev]);
 
     // Confirm with server in background
-    const csrfToken = getCsrfToken();
     try {
-      const res = await fetch('/api/laborcontrol/fichaje/kiosk', {
+      const res = await fetchWithCsrf('/api/laborcontrol/fichaje/kiosk', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
-        },
         body: JSON.stringify({ pin, tipo }),
       });
 

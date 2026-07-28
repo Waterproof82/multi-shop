@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
   const parsed = createClienteSchema.safeParse({ ...(body as Record<string, unknown>), empresaId });
 
   if (!parsed.success) {
-    return validationErrorResponse(parsed.error.errors[0].message);
+    return validationErrorResponse(parsed.error.issues[0].message);
   }
 
   if (!parsed.data.nombre && !parsed.data.email && !parsed.data.telefono) {
@@ -62,7 +62,7 @@ export async function PATCH(request: NextRequest) {
   const parsed = updateClienteSchema.safeParse(body);
 
   if (!parsed.success) {
-    return validationErrorResponse(parsed.error.errors[0].message);
+    return validationErrorResponse(parsed.error.issues[0].message);
   }
 
   const { id, ...updateData } = parsed.data;

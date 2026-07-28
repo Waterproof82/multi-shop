@@ -1,6 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getClienteRepository } from '@/core/infrastructure/database';
 import { purgeExpiredClientesUseCase } from '@/core/application/use-cases/rgpd/purge-expired-clientes.use-case';
+import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
+
+async function logPurgeExecution(
+  anonymized_count: number,
+  status: 'ok' | 'error',
+  error_message?: string,
+): Promise<void> {
+  const supabase = getSupabaseClient();
+  await supabase.from('rgpd_purge_log').insert({
+    anonymized_count,
+    status,
+    error_message: error_message ?? null,
+    triggered_by: 'vercel-cron',
+  });
+}
 
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -14,8 +29,10 @@ export async function GET(req: NextRequest) {
   const result = await purgeExpiredClientesUseCase(repo);
 
   if (!result.success) {
+    await logPurgeExecution(0, 'error', result.error.message);
     return NextResponse.json({ error: result.error.message }, { status: 500 });
   }
 
+  await logPurgeExecution(result.data, 'ok');
   return NextResponse.json({ anonymized: result.data });
 }

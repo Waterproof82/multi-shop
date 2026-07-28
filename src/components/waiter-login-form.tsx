@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { UtensilsCrossed, KeyRound, Pause, ReceiptText, X, CheckSquare, ExternalLink, PlayCircle, BellRing } from "lucide-react";
 import { formatPrice } from "@/lib/format-price";
+import { fetchWithCsrf } from "@/lib/csrf-client";
 import type { MesaWithSession } from "@/core/domain/repositories/IMesaRepository";
 
 export const WAITER_MESA_KEY = "waiter_mesa";
@@ -390,17 +391,16 @@ export function WaiterLoginForm() {
         }
       });
 
-    // Listen to item-update broadcast so "Platos listos" badge updates when kitchen
-    // marks items as preparado — pedido_item_estados changes don't touch mesa_sesiones.
-    const broadcastChannel = supabase
-      .channel('waiter-items-update')
-      .on('broadcast', { event: 'item-update' }, debouncedRefresh)
-      .subscribe();
+    // Listen via the WaiterBanner-dispatched DOM event instead of subscribing to the
+    // Supabase broadcast channel directly. Both components use the same singleton client,
+    // so competing .channel('waiter-items-update') subscriptions silently drop each other.
+    // WaiterBanner already receives 'item-update' and re-dispatches as CustomEvent.
+    globalThis.addEventListener('waiter-realtime-update', debouncedRefresh);
 
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
+      globalThis.removeEventListener('waiter-realtime-update', debouncedRefresh);
       void supabase.removeChannel(channel);
-      void supabase.removeChannel(broadcastChannel);
     };
   }, [step, empresaId, refresh]);
 
@@ -468,7 +468,7 @@ export function WaiterLoginForm() {
           return;
         }
       }
-      await fetch(`/api/waiter/mesas/${encodeURIComponent(mesa.id)}/close`, { method: 'POST' });
+      await fetchWithCsrf(`/api/waiter/mesas/${encodeURIComponent(mesa.id)}/close`, { method: 'POST' });
       await refresh();
     } finally {
       setMesaLoading(null);
@@ -476,16 +476,15 @@ export function WaiterLoginForm() {
   }
 
   async function handleDismissCall(mesa: MesaWithSession) {
-    await fetch(`/api/waiter/mesas/${encodeURIComponent(mesa.id)}/dismiss-call`, { method: 'POST' });
+    await fetchWithCsrf(`/api/waiter/mesas/${encodeURIComponent(mesa.id)}/dismiss-call`, { method: 'POST' });
     await refresh();
   }
 
   async function handleViewTicket(mesa: MesaWithSession) {
     setMesaLoading(mesa.id);
     try {
-      const res = await fetch("/api/waiter/mesa", {
+      const res = await fetchWithCsrf("/api/waiter/mesa", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mesaNumero: mesa.numero }),
       });
       if (res.ok) {
@@ -501,7 +500,7 @@ export function WaiterLoginForm() {
   async function handleLaunchRetenidos(mesa: MesaWithSession) {
     setLaunching(true);
     try {
-      await fetch(`/api/waiter/kitchen/mesas/${encodeURIComponent(mesa.id)}/release-retenidos`, {
+      await fetchWithCsrf(`/api/waiter/kitchen/mesas/${encodeURIComponent(mesa.id)}/release-retenidos`, {
         method: 'POST',
       });
       await refresh();
@@ -516,9 +515,8 @@ export function WaiterLoginForm() {
     setError(null);
 
     try {
-      const res = await fetch("/api/waiter/mesa", {
+      const res = await fetchWithCsrf("/api/waiter/mesa", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mesaNumero: mesa.numero }),
       });
 

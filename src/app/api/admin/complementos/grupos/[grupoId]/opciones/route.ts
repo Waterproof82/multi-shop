@@ -25,7 +25,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   const parsed = createComplementoOpcionSchema.safeParse(body);
   if (!parsed.success) {
-    return validationErrorResponse(parsed.error.errors[0]?.message ?? 'Datos inválidos');
+    return validationErrorResponse(parsed.error.issues[0]?.message ?? 'Datos inválidos');
   }
 
   const result = await getComplementoGrupoUseCase().createOpcion({

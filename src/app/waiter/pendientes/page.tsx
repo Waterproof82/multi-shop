@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronDown, Table2, UtensilsCrossed, Wine, Pause, CheckCh
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
+import { fetchWithCsrf, ensureCsrfToken } from '@/lib/csrf-client';
 
 interface PendienteItem {
   idx: number;
@@ -79,9 +80,8 @@ function getMergedItems(mesa: PendienteMesa): MergedItem[] {
 }
 
 async function updateItemPase(pedidoId: string, itemIdx: number, pase: string | null): Promise<boolean> {
-  const r = await fetch(`/api/waiter/kitchen/items/${pedidoId}/${itemIdx}/status`, {
+  const r = await fetchWithCsrf(`/api/waiter/kitchen/items/${pedidoId}/${itemIdx}/status`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ pase }),
   });
   return r.ok;
@@ -125,16 +125,19 @@ async function releaseRetainedPedidoItems(
   const toRelease = items.filter(i => {
     if (i.tipo !== sendTipo) return false;
     const isSelected = selected.has(`${pedidoId}:${i.idx}`);
-    if (mode === 'selected' && !isSelected) return false;
-    if (paused.has(`${pedidoId}:${i.idx}`) && !isSelected) return false;
+    const isPaused = paused.has(`${pedidoId}:${i.idx}`);
+    // Paused items must also be released (to kitchen retenidos), not skipped.
+    if (mode === 'selected' && !isSelected && !isPaused) return false;
     return true;
   });
   const releasedIdx: number[] = [];
   for (const item of toRelease) {
-    const r = await fetch(`/api/waiter/kitchen/items/${pedidoId}/${item.idx}/status`, {
+    const isPaused = paused.has(`${pedidoId}:${item.idx}`);
+    const r = await fetchWithCsrf(`/api/waiter/kitchen/items/${pedidoId}/${item.idx}/status`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ estado: 'pendiente' }),
+      // Paused items → retenido (from_validation=false) → kitchen retenidos tab.
+      // Normal items → pendiente → kitchen main queue.
+      body: JSON.stringify({ estado: isPaused ? 'retenido' : 'pendiente' }),
     });
     if (r.ok) releasedIdx.push(item.idx);
   }
@@ -151,15 +154,14 @@ async function validateNewPedido(
 ): Promise<boolean> {
   const autoRetain = items.filter(i => i.tipo !== sendTipo).map(i => i.idx);
   const notSelectedOfTipo = mode === 'selected'
-    ? items.filter(i => i.tipo === sendTipo && !selected.has(`${pedidoId}:${i.idx}`)).map(i => i.idx)
+    ? items.filter(i => i.tipo === sendTipo && !selected.has(`${pedidoId}:${i.idx}`) && !paused.has(`${pedidoId}:${i.idx}`)).map(i => i.idx)
     : [];
   const retainIndices = [...new Set([...autoRetain, ...notSelectedOfTipo])];
   const pausedIndices = items
     .filter(i => i.tipo === sendTipo && paused.has(`${pedidoId}:${i.idx}`))
     .map(i => i.idx);
-  const r = await fetch('/api/waiter/pendientes/validate', {
+  const r = await fetchWithCsrf('/api/waiter/pendientes/validate', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ pedidoId, retainIndices, pausedIndices }),
   });
   return r.ok;
@@ -174,9 +176,8 @@ async function releaseSelectedPedidoItems(
   if (toRelease.length === 0) return [];
   const releasedIdx: number[] = [];
   for (const item of toRelease) {
-    const r = await fetch(`/api/waiter/kitchen/items/${pedidoId}/${item.idx}/status`, {
+    const r = await fetchWithCsrf(`/api/waiter/kitchen/items/${pedidoId}/${item.idx}/status`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ estado: 'pendiente' }),
     });
     if (r.ok) releasedIdx.push(item.idx);
@@ -194,9 +195,8 @@ async function validateBothTypesPedido(
   const pausedIndices = items
     .filter(i => i.tipo === 'comida' && paused.has(`${pedidoId}:${i.idx}`))
     .map(i => i.idx);
-  const r = await fetch('/api/waiter/pendientes/validate', {
+  const r = await fetchWithCsrf('/api/waiter/pendientes/validate', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ pedidoId, retainIndices: notSelected, pausedIndices }),
   });
   return r.ok;
@@ -446,6 +446,8 @@ export default function WaiterPendientesPage() {
     }
   }, [isTabVisible, waiterEmpresaId, fetchPendientes]);
 
+  useEffect(() => { void ensureCsrfToken(); }, []);
+
   useEffect(() => {
     const tick = setInterval(() => setMesas(p => [...p]), 1000);
     return () => clearInterval(tick);
@@ -525,7 +527,18 @@ export default function WaiterPendientesPage() {
             return released.length > 0 ? ([pedido.id, released] as const) : null;
           } else {
             const ok = await validateNewPedido(pedido.id, pedido.items, sendTipo, selected, paused, mode);
-            return ok ? ([pedido.id, pedido.items.map(i => i.idx)] as const) : null;
+            // Only remove sendTipo items that actually leave pendientes from local
+            // state. Items of the other tipo (retained with from_validation=true)
+            // and unselected/non-paused sendTipo items (mode='selected') stay in pendientes.
+            // Paused sendTipo items go to kitchen as retenido — also leave pendientes.
+            const sentIndices = pedido.items
+              .filter(i => {
+                if (i.tipo !== sendTipo) return false;
+                if (mode === 'selected' && !selected.has(`${pedido.id}:${i.idx}`) && !paused.has(`${pedido.id}:${i.idx}`)) return false;
+                return true;
+              })
+              .map(i => i.idx);
+            return ok && sentIndices.length > 0 ? ([pedido.id, sentIndices] as const) : null;
           }
         })
       );
@@ -623,9 +636,8 @@ export default function WaiterPendientesPage() {
         if (toCancel.length === 0) continue;
         const cancelledIdx: number[] = [];
         for (const item of toCancel) {
-          const r = await fetch(`/api/waiter/kitchen/items/${encodeURIComponent(pedido.id)}/${item.idx}/status`, {
+          const r = await fetchWithCsrf(`/api/waiter/kitchen/items/${encodeURIComponent(pedido.id)}/${item.idx}/status`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ estado: 'cancelado' }),
           });
           if (r.ok) cancelledIdx.push(item.idx);
@@ -670,17 +682,32 @@ export default function WaiterPendientesPage() {
       paseItemsForPedido: MergedItem[],
       mesaPaused: Set<string>
     ): Promise<number[]> => {
-      const selectedForPedido = new Set(paseItemsForPedido.map((i: MergedItem) => i.globalKey));
+      // Non-paused items → kitchen normally (selectedForPedido)
+      // Paused items → kitchen as retenido (pausedForPedido → pausedIndices → from_validation=false)
+      const selectedForPedido = new Set(
+        paseItemsForPedido
+          .filter((i: MergedItem) => !mesaPaused.has(i.globalKey))
+          .map((i: MergedItem) => i.globalKey)
+      );
+      const pausedForPedido = new Set(
+        paseItemsForPedido
+          .filter((i: MergedItem) => mesaPaused.has(i.globalKey))
+          .map((i: MergedItem) => i.globalKey)
+      );
+      if (selectedForPedido.size === 0 && pausedForPedido.size === 0) return [];
+
       const tiposInPase = [...new Set(paseItemsForPedido.map((i: MergedItem) => i.tipo))] as Array<'comida' | 'bebida'>;
       const removedIdxs: number[] = [];
 
       for (const tipo of tiposInPase) {
         if (pedido.validated) {
-          const released = await releaseRetainedPedidoItems(pedido.id, pedido.items, tipo, selectedForPedido, mesaPaused, 'selected');
+          const released = await releaseRetainedPedidoItems(pedido.id, pedido.items, tipo, selectedForPedido, pausedForPedido, 'selected');
           removedIdxs.push(...released);
         } else {
-          const ok = await validateNewPedido(pedido.id, pedido.items, tipo, selectedForPedido, mesaPaused, 'selected');
-          if (ok) removedIdxs.push(...pedido.items.filter((i: PendienteItem) => i.tipo === tipo).map((i: PendienteItem) => i.idx));
+          const ok = await validateNewPedido(pedido.id, pedido.items, tipo, selectedForPedido, pausedForPedido, 'selected');
+          if (ok) removedIdxs.push(...pedido.items.filter(
+            (i: PendienteItem) => i.tipo === tipo && (selectedForPedido.has(`${pedido.id}:${i.idx}`) || pausedForPedido.has(`${pedido.id}:${i.idx}`))
+          ).map((i: PendienteItem) => i.idx));
         }
       }
       return removedIdxs;
@@ -890,7 +917,7 @@ export default function WaiterPendientesPage() {
                   {/* Fila 1: timer + seleccionar/deseleccionar todos */}
                   <div className="flex items-center gap-2 px-3 py-2"
                     style={{ background: 'oklch(18% 0.03 252)', borderBottom: '1px solid oklch(35% 0.08 252 / 0.25)' }}>
-                    <span className="text-[10px] font-mono" style={{ color: TEXT_DIM }}>{formatTimer(elapsed)}</span>
+                    <span className="text-[10px] font-mono" style={{ color: TEXT_DIM }} suppressHydrationWarning>{formatTimer(elapsed)}</span>
                     <button
                       className="ml-auto text-[10px] px-2 py-0.5 rounded font-medium"
                       style={{
@@ -1024,7 +1051,8 @@ export default function WaiterPendientesPage() {
         const { mesaId, pase } = pendingLanzarPase;
         const mesa = mesas.find(m => m.mesaId === mesaId);
         const mergedItems = mesa ? getMergedItems(mesa) : [];
-        const count = mergedItems.filter(i => i.pase === pase).length;
+        const mesaPausedForDialog = pausedMap[mesaId] ?? new Set<string>();
+        const count = mergedItems.filter(i => i.pase === pase && !mesaPausedForDialog.has(i.globalKey)).length;
         const col = PASE_COLOR[pase];
         const displayLabel = mesa?.mesaNombre ?? String(mesa?.mesaNumero ?? '—');
         return (

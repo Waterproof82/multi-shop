@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { getAuthAdminUseCase } from '@/core/infrastructure/database';
@@ -12,6 +11,39 @@ import { FABRICANTE, TPV_VERSION, DECLARATION_DATE } from '@/lib/fabricante';
 export const dynamic = 'force-dynamic';
 
 type CobroCount = { count: number; integrity: 'ok' | 'empty' };
+type VerifactuMode = 'no-verifactu' | 'verifactu';
+type LastPurge = { executed_at: string; anonymized_count: number; status: string } | null;
+
+async function getVerifactuMode(empresaId: string): Promise<VerifactuMode> {
+  try {
+    const supabase = getSupabaseClient();
+    const { data } = await supabase
+      .from('empresas')
+      .select('verifactu_mode')
+      .eq('id', empresaId)
+      .single();
+    const mode = (data as Record<string, unknown> | null)?.verifactu_mode;
+    if (mode === 'verifactu') return 'verifactu';
+    return 'no-verifactu';
+  } catch {
+    return 'no-verifactu';
+  }
+}
+
+async function getLastPurge(): Promise<LastPurge> {
+  try {
+    const supabase = getSupabaseClient();
+    const { data } = await supabase
+      .from('rgpd_purge_log')
+      .select('executed_at, anonymized_count, status')
+      .order('executed_at', { ascending: false })
+      .limit(1)
+      .single();
+    return data as LastPurge;
+  } catch {
+    return null;
+  }
+}
 
 async function getCobroStats(empresaId: string): Promise<CobroCount> {
   try {
@@ -77,9 +109,11 @@ export default async function TpvLegalPage() {
     }
   }
 
-  if (!empresaId) redirect('/tpv/login');
-
-  const stats = await getCobroStats(empresaId);
+  // Página accesible públicamente (sin auth) para inspectores de Hacienda — Art. 12 RD 1007/2023.
+  // El contenido dinámico (stats, modo) solo se carga cuando hay sesión activa.
+  const [stats, verifactuMode, lastPurge] = empresaId
+    ? await Promise.all([getCobroStats(empresaId), getVerifactuMode(empresaId), getLastPurge()])
+    : [{ count: 0, integrity: 'ok' as const }, 'no-verifactu' as const, null];
   const now = new Date();
   const fechaHora = now.toLocaleString('es-ES', {
     dateStyle: 'long',
@@ -124,6 +158,12 @@ export default async function TpvLegalPage() {
             <span className={stats.integrity === 'ok' ? 'text-[#16a34a] font-semibold' : 'text-[#ef4444] font-semibold'}>
               {stats.integrity === 'ok' ? 'Verificada' : 'Error'}
             </span>
+            <span className="text-[#64748b]">Modalidad VeriFactu</span>
+            <span className="font-semibold text-[#16a34a]">
+              {verifactuMode === 'no-verifactu'
+                ? 'No-VeriFactu (Art. 12 RD 1007/2023)'
+                : 'VeriFactu (envío a AEAT)'}
+            </span>
           </div>
         </div>
 
@@ -137,8 +177,8 @@ export default async function TpvLegalPage() {
               Verificación de integridad, exportación de registros y enlace temporal para inspectores de la AEAT.
             </p>
           </div>
-          <LegalChainVerify />
-          <InspectorTokenGenerator />
+          {empresaId && <LegalChainVerify />}
+          {empresaId && <InspectorTokenGenerator />}
         </div>
 
         {/* Declaración de Responsabilidad */}
@@ -189,6 +229,52 @@ export default async function TpvLegalPage() {
           </div>
         </div>
 
+        {/* Declaración Modo No-VeriFactu (Art. 12 RD 1007/2023) */}
+        {/* TODO: Verificar wording exacto con Art. 12 RD 1007/2023 BOE antes de certificación */}
+        <div className="bg-white border border-[#e2e8f0] rounded-xl p-5 flex flex-col gap-4 shadow-sm">
+          <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">
+            Declaración — Modo No-VeriFactu (Art. 12 RD 1007/2023)
+          </p>
+          <div className="text-sm text-[#475569] leading-relaxed space-y-3">
+            <p>
+              El presente sistema de facturación opera en{' '}
+              <strong className="text-[#0f172a]">modo No-VeriFactu</strong> conforme al{' '}
+              <strong className="text-[#0f172a]">artículo 12 del Real Decreto 1007/2023</strong>.
+              En este modo, el sistema garantiza la inalterabilidad e integridad de los registros
+              de venta y genera en cada ticket un código QR verificable en la sede electrónica de
+              la AEAT, sin que sea preceptivo el envío telemático de registros a la Agencia
+              Tributaria en tiempo real.
+            </p>
+            <ul className="list-disc list-inside space-y-1 text-[#64748b] pl-2">
+              <li>
+                <strong className="text-[#475569]">Integridad mediante cadena de huellas:</strong>{' '}
+                cada registro de venta se encadena con SHA-256. Cadena verificable en{' '}
+                <a href="/api/tpv/audit/chain" className="text-[#2563eb] underline hover:no-underline">/api/tpv/audit/chain</a>.
+              </li>
+              <li>
+                <strong className="text-[#475569]">Código QR AEAT en cada justificante:</strong>{' '}
+                la URL de verificación AEAT se genera y almacena en el momento del cobro
+                (columna <span className="font-mono text-xs">tpv_cobros.verifactu_qr_url</span>).
+                Formato numserie: <span className="font-mono text-xs">T000001</span> (sin guión, Anexo II RD 1007/2023).
+              </li>
+              <li>
+                <strong className="text-[#475569]">Inalterabilidad:</strong>{' '}
+                los registros fiscales no pueden eliminarse ni modificarse tras su creación
+                (triggers de bloqueo a nivel PostgreSQL).
+              </li>
+              <li>
+                <strong className="text-[#475569]">Exportación para inspectores:</strong>{' '}
+                <a href="/api/tpv/audit/export" className="text-[#2563eb] underline hover:no-underline">/api/tpv/audit/export</a>{' '}
+                — JSON normalizado con cadena de hashes completa.
+              </li>
+            </ul>
+            <p className="text-[#94a3b8] text-xs border-t border-[#e2e8f0] pt-3 mt-2">
+              Fase 2 (envío VERI*FACTU a AEAT) pendiente — plazo obligatorio enero 2027
+              (grandes empresas) / julio 2027 (resto) conforme al RD 15/2025.
+            </p>
+          </div>
+        </div>
+
         {/* Compliance checklist */}
         <div className="bg-white border border-[#e2e8f0] rounded-xl p-5 flex flex-col gap-1 shadow-sm">
           <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-3">
@@ -234,9 +320,14 @@ export default async function TpvLegalPage() {
             detail="Columna rectifica_cobro_id en tpv_cobros — implementado"
           />
           <CheckItem
-            label="QR AEAT en pantalla de confirmación"
+            label="QR AEAT en pantalla de confirmación y ticket impreso"
             status="done"
-            detail="Generado automáticamente cuando la empresa tiene NIF configurado"
+            detail="URL persistida en tpv_cobros.verifactu_qr_url (trigger BEFORE INSERT). Numserie sin guión (T000042)"
+          />
+          <CheckItem
+            label="Declaración modo No-VeriFactu (Art. 12 RD 1007/2023)"
+            status="done"
+            detail="empresas.verifactu_mode = 'no-verifactu'. Sección de declaración en esta página"
           />
 
           <p className="text-[11px] font-semibold text-[#2563eb] uppercase tracking-wider mt-4 mb-1">
@@ -360,7 +451,11 @@ export default async function TpvLegalPage() {
           <CheckItem
             label="Retención y anonimización de datos personales"
             status="done"
-            detail="Vercel Cron mensual: anonimiza clientes con >5 años de inactividad. Derecho al olvido manual: POST /api/admin/rgpd/anonimizar-cliente"
+            detail={
+              lastPurge !== null
+                ? `Última purga: ${new Date(lastPurge.executed_at).toLocaleDateString('es-ES', { dateStyle: 'medium', timeZone: 'Europe/Madrid' })} · ${lastPurge.anonymized_count} registros · ${lastPurge.status === 'ok' ? '✓ OK' : '✗ Error'}. Derecho al olvido manual: POST /api/admin/rgpd/anonimizar-cliente`
+                : 'Vercel Cron: día 1 de cada mes, 03:00 UTC. Sin ejecuciones registradas aún. Derecho al olvido manual: POST /api/admin/rgpd/anonimizar-cliente'
+            }
           />
         </div>
 

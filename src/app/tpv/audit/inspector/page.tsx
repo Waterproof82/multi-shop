@@ -1,10 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 export default function InspectorPage() {
+  const searchParams = useSearchParams();
   const [token, setToken] = useState('');
   const [desde, setDesde] = useState('');
+
+  useEffect(() => {
+    const t = searchParams.get('token');
+    if (t) setToken(t);
+  }, [searchParams]);
   const [hasta, setHasta] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');

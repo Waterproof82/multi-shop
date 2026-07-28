@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Ingrediente, MotivoMerma } from '@/core/domain/entities/stock-types';
 import type { TpvTurno } from '@/core/domain/entities/tpv-types';
-import { getCsrfToken } from '@/lib/csrf-client';
+import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useTpvRol } from '@/lib/tpv-rol-ctx';
 
 
@@ -56,14 +56,9 @@ async function submitMerma(
     operadorNombre: string;
     notas?: string;
   },
-  csrfToken: string | null,
 ): Promise<{ ok: boolean; message?: string }> {
-  const res = await fetch('/api/tpv/stock/mermas', {
+  const res = await fetchWithCsrf('/api/tpv/stock/mermas', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
-    },
     body: JSON.stringify(payload),
   });
 
@@ -179,7 +174,6 @@ export default function MermasPage() {
     setErrorMsg('');
     setSuccess(false);
 
-    const csrfToken = getCsrfToken();
     const result = await submitMerma(
       {
         ingredienteId: form.ingredienteId,
@@ -189,7 +183,6 @@ export default function MermasPage() {
         operadorNombre: form.operadorNombre,
         notas: form.notas || undefined,
       },
-      csrfToken,
     );
 
     setLoading(false);
@@ -197,6 +190,7 @@ export default function MermasPage() {
     if (result.ok) {
       setSuccess(true);
       setForm(buildEmptyForm(turno.operadorNombre));
+      window.dispatchEvent(new CustomEvent('low-stock-refresh'));
     } else {
       setErrorMsg(result.message ?? 'Error al registrar la merma');
     }

@@ -90,7 +90,7 @@ export function CobroMetodoPropina({
   }
 
   return (
-    <div className="flex items-center justify-center w-full h-full gap-6 p-8">
+    <div className="flex items-start justify-center w-full h-full gap-6 p-8 overflow-y-auto">
       {/* Resumen lateral */}
       <div className="w-56 bg-white border border-[#e2e8f0] rounded-2xl p-5 flex flex-col gap-3 self-start shadow-sm">
         <p className="text-[10px] font-bold text-[#6b7280] uppercase tracking-wider">Resumen</p>

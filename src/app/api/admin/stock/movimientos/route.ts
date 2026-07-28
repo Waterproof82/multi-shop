@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
   });
 
   if (!parsed.success) {
-    return validationErrorResponse(parsed.error.errors[0].message);
+    return validationErrorResponse(parsed.error.issues[0].message);
   }
 
   const { page, limit, ingredienteId, startDate, endDate } = parsed.data;

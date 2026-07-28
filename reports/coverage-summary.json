@@ -1,0 +1,31 @@
+{
+  "auditDate": "2026-07-28T07:28:05Z",
+  "commit": "b055834",
+  "note": "Los tests de compliance son E2E y de propiedades — no instrumentan codigo fuente directamente. La cobertura de lineas de src/ es irrelevante para este tipo de tests. La cobertura aqui se mide en requisitos legales cubiertos.",
+  "requirementsCoverage": {
+    "total": 48,
+    "covered": 43,
+    "partial": 3,
+    "gaps": 2,
+    "percentageStrict": 89.6,
+    "percentageWeighted": 93.8
+  },
+  "testResults": {
+    "vitest": { "files": 9, "tests": 72, "passed": 72, "failed": 0 },
+    "playwright": { "files": 14, "tests": 55, "passed": 55, "failed": 0 },
+    "total": 127
+  },
+  "normCoverage": {
+    "Ley_11_2021": 100,
+    "RD_1007_2023": 75,
+    "SIALTI": 100,
+    "RD_Ley_8_2019": 100,
+    "RD_1619_2012": 100,
+    "Art_66_LGT": 100,
+    "RGPD": 67,
+    "OWASP_Seguridad": 88,
+    "Electron": 100
+  },
+  "globalScore": 93.3,
+  "dictamen": "LISTO_PARA_CERTIFICACION"
+}

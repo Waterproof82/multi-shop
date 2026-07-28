@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { StickyNote } from 'lucide-react';
 import type { PendingItem } from '@/hooks/tpv/useMesaActiva';
-import { getCsrfToken } from '@/lib/csrf-client';
+import { fetchWithCsrf } from '@/lib/csrf-client';
 
 interface Props {
   readonly sesionId: string | null;
@@ -169,9 +169,6 @@ export function NuevoPedidoPanel({
               onClick={async () => {
                 setSendError(null);
 
-                const csrfToken = getCsrfToken();
-                const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-                if (csrfToken) headers['x-csrf-token'] = csrfToken;
                 const body = JSON.stringify({
                   mesaId,
                   items: pendingItems.map(i => ({
@@ -193,7 +190,7 @@ export function NuevoPedidoPanel({
                   setPendingNota('');
                   setPendingPase('');
                   setDirectoACocina(false);
-                  void fetch('/api/tpv/pedidos', { method: 'POST', headers, body })
+                  void fetchWithCsrf('/api/tpv/pedidos', { method: 'POST', body })
                     .then(async res => {
                       if (!res.ok) {
                         const err = await res.json() as { error?: string };
@@ -207,7 +204,7 @@ export function NuevoPedidoPanel({
                 // Primer pedido: necesitamos el sesionId del server para la URL
                 setSending(true);
                 try {
-                  const res = await fetch('/api/tpv/pedidos', { method: 'POST', headers, body });
+                  const res = await fetchWithCsrf('/api/tpv/pedidos', { method: 'POST', body });
                   if (!res.ok) {
                     const err = await res.json() as { error?: string };
                     setSendError(err.error ?? 'Error al enviar el pedido');

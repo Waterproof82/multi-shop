@@ -54,7 +54,7 @@ export async function PATCH(request: NextRequest) {
   const parsed = updatePedidoSchema.safeParse(body);
 
   if (!parsed.success) {
-    return validationErrorResponse(parsed.error.errors[0].message);
+    return validationErrorResponse(parsed.error.issues[0].message);
   }
 
   const result = await getPedidoUseCase().updateStatus(parsed.data.id, empresaId, parsed.data.estado);

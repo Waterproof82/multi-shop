@@ -147,6 +147,119 @@ There is no `en_preparacion` or `preparado` state in bar. Items are either pendi
 
 ---
 
+## Trampas Críticas — Pendientes + Kitchen Routing
+
+### Pedido estado `anotado` en flujo mixto comida+bebida
+
+Cuando un camarero valida un pedido mixto (comida + bebida) desde `/waiter/pendientes`, el flujo es:
+
+1. `validate` mueve el pedido de `pendiente_validacion` → `pendiente`.
+2. Los ítems de bebida van al bar (`from_validation = false`).
+3. Los ítems de comida **retenidos** se marcan con `from_validation = true` — quedan visibles en `/waiter/pendientes` como "validated+retenido".
+4. Cuando el bar sirve **todas las bebidas** del pedido mixto, la bar page actualiza el estado del pedido a `anotado` (no `servido`) para que el cocinero siga viendo la comida.
+
+**Trampa**: `findPendientesValidacion` solo buscaba pedidos con `estado = 'pendiente'`. Después de que el bar sirvió las bebidas, el pedido pasa a `anotado` y la comida retenida desaparece de la vista del camarero.
+
+**Fix** (aplicado en `supabase-pedido.repository.ts`):
+```ts
+// ANTES (bug):
+.eq('estado', 'pendiente')
+
+// DESPUÉS (correcto):
+.in('estado', ['pendiente', 'anotado'])
+```
+
+**Regla**: toda función que busque pedidos con ítems retenidos en pendientes (`from_validation = true`) DEBE incluir `anotado` en el filtro de estado del pedido.
+
+### `from_validation` — significado del flag
+
+| Valor | Significado |
+|-------|-------------|
+| `false` | Ítem retenido intencionalmente en la cocina (cocinero pausó el ítem). Visible en `/waiter/kitchen` modo Retenidos. |
+| `true` | Ítem devuelto a la cola de pendientes del camarero. NO visible en kitchen. Visible en `/waiter/pendientes` como validated+retenido. |
+
+Nunca mezclar los dos significados. El flag `from_validation` se establece en el momento de la validación y no cambia.
+
+### Estado del pedido cuando hay comida retenida
+
+```
+pendiente_validacion  ← pedido creado, esperando validación del camarero
+       ↓ validate()
+    pendiente          ← bebidas van al bar; comida retenida en pendientes
+       ↓ bar sirve todas las bebidas del pedido mixto
+     anotado           ← comida sigue retenida en pendientes (from_validation=true)
+       ↓ camarero libera comida desde pendientes
+    pendiente          ← comida va a la cocina
+       ↓ cocina sirve
+     cerrado / servido
+```
+
+El ciclo `pendiente → anotado` es exclusivo de pedidos mixtos donde las bebidas se sirven antes que la comida sea liberada.
+
+---
+
+## Flujo de Pases y Pausa en `/waiter/pendientes`
+
+### Pases (primer / segundo / postre)
+
+Cada ítem en pendientes puede tener un `pase` asignado (`primer`, `segundo`, `postre`). El camarero puede lanzar todos los ítems de un pase de golpe con el botón **"Lanzar Xº pase"**.
+
+Lanzar un pase llama a `handleLanzarPase(mesaId, pase)`, que:
+1. Recoge todos los ítems del pase en la mesa via `getMergedItems`.
+2. Para cada pedido, llama a `processPaseItemsForPedido`.
+3. Actualiza el UI optimistamente eliminando los ítems enviados.
+
+### Pausa en pendientes — semántica del botón Pause
+
+El camarero puede marcar ítems individuales como **pausados** (icono `Pause`) en `/waiter/pendientes`. La pausa indica "envía este ítem a cocina como **retenido**" — es decir, el ítem irá al tab "Retenidos" de `/waiter/kitchen` y el cocinero lo verá como un ítem intencionalmente en espera.
+
+**Esto es diferente a "no enviar todavía"** — el ítem SÍ sale de pendientes, pero llega a cocina como retenido (no como pendiente normal).
+
+### `retainIndices` vs `pausedIndices` — diferencia semántica
+
+Ambos generan `estado='retenido'` en DB, pero con `from_validation` opuesto:
+
+| Argumento API | `from_validation` | Destino visible |
+|---------------|-------------------|-----------------|
+| `retainIndices` | `true` | Cola del camarero (`/waiter/pendientes`) — el camarero debe liberarlo |
+| `pausedIndices` | `false` | Kitchen retenidos (`/waiter/kitchen` tab Retenidos) — el cocinero lo ve |
+
+**Regla**: el botón `Pause` en `/waiter/pendientes` → `pausedIndices` → `from_validation=false` → kitchen retenidos. Los ítems que se quedan en pendientes (porque no están seleccionados NI pausados) → `retainIndices` → `from_validation=true`.
+
+### Flujo completo: lanzar pase con ítem pausado
+
+```
+Camarero en /waiter/pendientes:
+  Pedido A — 2º pase — ítem X (comida), ítem Y (comida)
+  Camarero pausa ítem X (icono Pause)
+  Camarero pulsa "Lanzar 2º pase"
+
+processPaseItemsForPedido:
+  selectedForPedido = {Y}          ← X excluido (está pausado)
+  pausedForPedido   = {X}          ← X va a pausedIndices
+
+  validateNewPedido(..., selected={Y}, paused={X}, mode='selected')
+    → retainIndices = []            ← ningún ítem sin seleccionar ni pausar
+    → pausedIndices = [X.idx]       ← X pausado → kitchen retenidos
+    → DB: X → { estado: 'retenido', from_validation: false }  (kitchen retenido)
+    →     Y → sin row               (llega a cocina como 'pendiente' normal)
+
+Resultado:
+  ✅ Ítem X va a /waiter/kitchen tab Retenidos (from_validation=false)
+  ✅ Ítem Y va a /waiter/kitchen como pendiente normal
+  ✅ Ambos desaparecen de /waiter/pendientes
+```
+
+### Trampas históricas (bugs ya resueltos)
+
+**Bug 1** (resuelto en commit 0dae005): `releaseRetainedPedidoItems` para pedidos ya validados (`pedido.validated=true`) excluía los ítems pausados con el filtro `mode='selected' && !isSelected`. Resultado: los ítems pausados se quedaban en pendientes en lugar de ir a kitchen retenidos. Fix: incluir ítems pausados en el filtro y llamar PATCH con `estado='retenido'` para ellos.
+
+**Bug 2** (resuelto en el mismo commit): en `handleConfirm` (pedidos no validados), `sentIndices` excluía ítems pausados. Resultado: el ítem pausado permanecía visible en el UI hasta que `fetchPendientes()` actualizaba el estado. Fix: incluir pausados en `sentIndices` para la eliminación optimista del UI.
+
+**Bug anterior** (resuelto antes de los anteriores): `processPaseItemsForPedido` incluía los pausados en `selectedForPedido` con `paused=Set()`. Resultado: los pausados caían en `retainIndices` → se quedaban en pendientes en vez de ir a kitchen retenidos.
+
+---
+
 ## Session Lifecycle
 
 ```

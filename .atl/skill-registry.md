@@ -75,3 +75,4 @@ Clean/Hexagonal: API Route (Zod) → Use Case → Repository (Supabase).
 | `sdd-apply` | Implement tasks |
 | `sdd-verify` | Validate implementation vs specs |
 | `sdd-archive` | Archive completed change |
+| `audit-tpv` | Auditoría de cumplimiento legal TPV (Ley 11/2021, VeriFactu, SIALTI, RGPD) — modos: audit, pre-certification, regression, ci |

@@ -39,7 +39,7 @@ export function CobroEfectivo({ totalFinalCents, loading, onConfirmar, onBack }:
   }
 
   return (
-    <div className="flex items-center justify-center w-full h-full gap-6 p-8">
+    <div className="flex items-start justify-center w-full h-full gap-6 p-8 overflow-y-auto">
       <div className="flex flex-col gap-4 flex-1 max-w-xs">
         <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-4">
           <p className="text-[10px] font-bold text-[#6b7280] uppercase tracking-wider mb-1">

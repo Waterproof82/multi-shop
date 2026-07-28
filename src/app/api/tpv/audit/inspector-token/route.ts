@@ -21,8 +21,7 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     token,
-    inspector_url: '/tpv/audit/inspector',
+    inspector_url: `/tpv/audit/inspector?token=${encodeURIComponent(token)}`,
     expires_in: '24h',
-    instructions: 'Entregue el token al inspector. Deberá acceder a /tpv/audit/inspector y pegarlo en el formulario para descargar los registros de cobros.',
   });
 }

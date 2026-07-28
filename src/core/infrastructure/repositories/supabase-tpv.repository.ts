@@ -297,6 +297,7 @@ export class SupabaseTpvRepository implements ITpvRepository {
           detalleItems: (row.detalle_items as TpvCobro['detalleItems']) ?? null,
           desgloseIva: mapDesgloseIva(row.desglose_iva),
           empleadoId: (row.empleado_id as string | null) ?? null,
+          verifactuQrUrl: (row.verifactu_qr_url as string | null) ?? null,
         },
       };
     } catch (e) {

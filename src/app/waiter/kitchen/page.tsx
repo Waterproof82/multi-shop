@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { useSearchParams } from 'next/navigation';
+import { fetchWithCsrf, ensureCsrfToken } from '@/lib/csrf-client';
 import { useLanguage, type Language } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import { UtensilsCrossed, ChevronLeft, ChevronDown, ChevronsUpDown, TimerOff, CheckCheck, PlayCircle, Pause, Table2, Trash2, Layers } from 'lucide-react';
@@ -278,6 +279,9 @@ export default function WaiterKitchenPage() {
     return () => document.removeEventListener('visibilitychange', onVis);
   }, []);
 
+  // Ensure csrf_token cookie exists on mount so the first PATCH never fires without it.
+  useEffect(() => { void ensureCsrfToken(); }, []);
+
   // Fetch empresaId on mount for tenant-scoped Realtime filter
   useEffect(() => {
     fetch('/api/waiter/me')
@@ -418,9 +422,8 @@ export default function WaiterKitchenPage() {
 
   const patchEstado = useCallback(async (pedidoId: string, itemIdx: number, estado: ItemEstado, applyOptimistic: () => void, rollback: () => void) => {
     applyOptimistic();
-    const r = await fetch(`/api/waiter/kitchen/items/${encodeURIComponent(pedidoId)}/${itemIdx}/status`, {
+    const r = await fetchWithCsrf(`/api/waiter/kitchen/items/${encodeURIComponent(pedidoId)}/${itemIdx}/status`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ estado }),
     });
     if (!r.ok) rollback();
@@ -585,9 +588,8 @@ export default function WaiterKitchenPage() {
     setServingMesas(prev => new Set(prev).add(mesaKey));
     try {
       await Promise.all(listosInMesa.map(item =>
-        fetch(`/api/waiter/kitchen/items/${encodeURIComponent(item.pedidoId)}/${item.itemIdx}/status`, {
+        fetchWithCsrf(`/api/waiter/kitchen/items/${encodeURIComponent(item.pedidoId)}/${item.itemIdx}/status`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ estado: 'servido' }),
         })
       ));
@@ -602,9 +604,8 @@ export default function WaiterKitchenPage() {
     setLiberatingMesas(prev => new Set(prev).add(mesaKey));
     try {
       await Promise.all(retenidos.map(item =>
-        fetch(`/api/waiter/kitchen/items/${encodeURIComponent(item.pedidoId)}/${item.itemIdx}/status`, {
+        fetchWithCsrf(`/api/waiter/kitchen/items/${encodeURIComponent(item.pedidoId)}/${item.itemIdx}/status`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ estado: 'pendiente' }),
         })
       ));
