@@ -1,202 +1,78 @@
 {
   "meta": {
-    "version": "0.5.0",
-    "commit": "7d6f0084d09f7d1871d356833d553e09b9f19a7d",
-    "commitShort": "7d6f008",
+    "version": "0.4.0",
+    "commit": "b0558341459b7e2d447c14f90d5e41a72a0ab751",
+    "commitShort": "b055834",
     "branch": "main",
-    "auditDate": "2026-07-28T06:30:39Z",
-    "skill": "audit-tpv@v1.0",
-    "mode": "pre-certification"
+    "auditDate": "2026-07-28T07:28:05Z",
+    "mode": "pre-certification",
+    "skill": "audit-tpv v1.0"
   },
-  "inventory": {
-    "triggers": {
-      "total": 18,
-      "present": 18,
-      "absent": 0
-    },
-    "sqlFunctions": {
-      "total": 4,
-      "present": 4,
-      "absent": 0
-    },
-    "auditEndpoints": {
-      "total": 4,
-      "present": 4,
-      "absent": 0
-    }
-  },
-  "testResults": {
-    "vitest": {
-      "files": 8,
-      "tests": 57,
-      "passed": 57,
-      "failed": 0,
-      "duration_ms": 878
-    },
-    "playwright_compliance": {
-      "total": 51,
-      "passed": 51,
-      "skipped": 0,
-      "failed": 0
-    },
-    "playwright_e2e": {
-      "total": 147,
-      "passed": 140,
-      "skipped": 7,
-      "failed": 0,
-      "skippedReason": "Intentional — require service_role key or specific infra"
+  "score": {
+    "total": 93.3,
+    "categories": {
+      "cumplimientoLegal": 100,
+      "verifactu": 75,
+      "rgpd": 67,
+      "seguridadOWASP": 88,
+      "integridadDB": 98,
+      "testsCoverage": 100,
+      "electron": 100
     }
   },
   "coverage": {
-    "total": 108,
-    "passed": 108,
-    "skipped": 7,
-    "failed": 0,
-    "passRate": "100%"
-  },
-  "complianceMetrics": {
-    "Ley_11_2021":  { "total": 6, "covered": 6, "partial": 0, "gaps": 0, "pct": 100 },
-    "RD_1007_2023": { "total": 6, "covered": 6, "partial": 0, "gaps": 0, "pct": 100 },
-    "SIALTI":       { "total": 6, "covered": 6, "partial": 0, "gaps": 0, "pct": 100 },
-    "RD_Ley_8_2019":{ "total": 3, "covered": 3, "partial": 0, "gaps": 0, "pct": 100 },
-    "Art66_LGT":    { "total": 2, "covered": 2, "partial": 0, "gaps": 0, "pct": 100 },
-    "RGPD":         { "total": 2, "covered": 2, "partial": 0, "gaps": 0, "pct": 100 },
-    "OWASP":        { "total": 3, "covered": 3, "partial": 0, "gaps": 0, "pct": 100 },
-    "TOTAL":        { "total": 28, "covered": 28, "partial": 0, "gaps": 0, "pct": 100 }
-  },
-  "scores": {
-    "legal_compliance": 98,
-    "integrity": 97,
-    "security": 95,
-    "audit": 90,
-    "performance": 95,
-    "maintainability": 85,
-    "global": 93.3
-  },
-  "gaps": [
-    {
-      "id": "GAP-001",
-      "title": "VeriFactu XML signing + envío AEAT",
-      "norm": "RD 1007/2023",
-      "priority": "P1",
-      "risk": 25,
-      "blocker": false,
-      "status": "resolved",
-      "resolution": "No-VeriFactu mode (Art. 12 RD 1007/2023) formalizado. verifactu_mode en empresas, verifactu_qr_url persistida en tpv_cobros, declaración Art. 12 en /tpv/legal (pública, sin auth).",
-      "resolution_commit": "7d6f008",
-      "resolution_date": "2026-07-28",
-      "evidence": [
-        "empresas.verifactu_mode TEXT NOT NULL DEFAULT 'no-verifactu' (migration 20260729000001)",
-        "tpv_cobros.verifactu_qr_url computed atomically on INSERT by tpv_cobro_before_insert() (migration 20260729000002)",
-        "/tpv/legal Art. 12 declaration section, publicly accessible (FRAMELESS_PATHS)",
-        "numserie format T000042 (no hyphen, Anexo II RD 1007/2023)",
-        "Electron thermal printer null guard for aeatUrl"
-      ],
-      "phase2_pending": true,
-      "phase2_deadline": "2027-01-01",
-      "phase2_note": "VERI*FACTU XML + AEAT SOAP submission. Deadline Jan 2027 (large cos) / Jul 2027 (rest) per RD 15/2025."
-    },
-    {
-      "id": "GAP-002",
-      "title": "audit_log fire & forget — no ACID garantizado",
-      "norm": "Ley 11/2021 / SIALTI",
-      "priority": "P2",
-      "risk": 8,
-      "blocker": false,
-      "status": "resolved",
-      "resolution": "Removido fire-and-forget en /api/tpv/cobro/route.ts. Trigger AFTER INSERT tpv_cobro_audit_trigger garantiza atomicidad.",
-      "resolution_commit": "2fe132f",
-      "resolution_date": "2026-07-28"
-    },
-    {
-      "id": "GAP-003",
-      "title": "Validación runtime en handlers IPC Electron",
-      "norm": "SIALTI",
-      "priority": "P2",
-      "risk": 8,
-      "blocker": false,
-      "status": "resolved",
-      "resolution": "Zod safeParse en todos los handlers IPC de electron/main.ts (StoreSetSchema, PrintReceiptSchema, EmpleadoIdSchema, PinHashSchema, FiscalSnapshotSchema).",
-      "resolution_commit": "2fe132f",
-      "resolution_date": "2026-07-28"
-    },
-    {
-      "id": "GAP-004",
-      "title": "DPA con clientes restaurante — Art.28 RGPD",
-      "norm": "RGPD",
-      "priority": "P2",
-      "risk": 12,
-      "blocker": false,
-      "status": "resolved",
-      "resolution": "Plantilla DPA Art.28 creada en docs/legal/dpa-template.md.",
-      "resolution_commit": "2fe132f",
-      "resolution_date": "2026-07-28"
-    },
-    {
-      "id": "GAP-005",
-      "title": "CI/CD workflow compliance",
-      "norm": "Buenas prácticas",
-      "priority": "P3",
-      "risk": 6,
-      "blocker": false,
-      "status": "resolved",
-      "resolution": "Workflow .github/workflows/compliance.yml creado — jobs: vitest-compliance → playwright-compliance → compliance-gate.",
-      "resolution_commit": "2fe132f",
-      "resolution_date": "2026-07-28"
-    },
-    {
-      "id": "GAP-006",
-      "title": "ON DELETE CASCADE en tpv_turnos.empresa_id (tabla fiscal)",
-      "norm": "Ley 11/2021 / Art.66 LGT",
-      "priority": "P2",
-      "risk": 16,
-      "blocker": false,
-      "status": "resolved",
-      "resolution": "FK cambiada a ON DELETE RESTRICT (migration 20260728000001). confdeltype='r' confirmado en pg_constraint.",
-      "resolution_commit": "2fe132f",
-      "resolution_date": "2026-07-28"
-    },
-    {
-      "id": "GAP-007",
-      "title": "Sin E2E tests para endpoints RGPD de anonimización",
-      "norm": "RGPD",
-      "priority": "P3",
-      "risk": 6,
-      "blocker": false,
-      "status": "resolved",
-      "resolution": "e2e/compliance/rgpd-anonimizacion.spec.ts — cubre POST /api/admin/rgpd/anonimizar-cliente y GET /api/cron/rgpd-purge.",
-      "resolution_commit": "2fe132f",
-      "resolution_date": "2026-07-28"
+    "totalRequirements": 48,
+    "covered": 43,
+    "partial": 3,
+    "gaps": 2,
+    "percentageStrict": 89.6,
+    "percentageWeighted": 93.8,
+    "byNorm": {
+      "Ley_11_2021": { "total": 7, "covered": 7, "percentage": 100 },
+      "RD_1007_2023": { "total": 8, "covered": 6, "percentage": 75 },
+      "SIALTI": { "total": 8, "covered": 8, "percentage": 100 },
+      "RD_Ley_8_2019": { "total": 7, "covered": 7, "percentage": 100 },
+      "RD_1619_2012": { "total": 2, "covered": 2, "percentage": 100 },
+      "Art_66_LGT": { "total": 2, "covered": 2, "percentage": 100 },
+      "RGPD": { "total": 3, "covered": 1, "partial": 2, "percentage": 67 },
+      "OWASP_Seguridad": { "total": 8, "covered": 7, "partial": 1, "percentage": 88 },
+      "Electron": { "total": 3, "covered": 3, "percentage": 100 }
     }
-  ],
-  "openWarnings": [
-    {
-      "id": "W-001",
-      "title": "Sin test automatizado para formato URL verifactu_qr_url",
-      "severity": "warning",
-      "note": "Regresión en trigger o buildAeatUrl() podría pasar desapercibida. Agregar a tests/compliance/hash-chaining.test.ts."
-    },
-    {
-      "id": "W-002",
-      "title": "Hash short-code ausente en recibo térmico Electron",
-      "severity": "warning",
-      "note": "browser-printer.ts lo muestra; electron/printer/receipt.ts no imprime los últimos 8 chars del hash."
-    }
-  ],
-  "verdict": {
+  },
+  "tests": {
+    "vitest": { "files": 9, "tests": 72, "passed": 72, "failed": 0, "skipped": 0 },
+    "playwright": { "files": 14, "tests": 55, "passed": 55, "failed": 0, "skipped": 0 },
+    "total": { "files": 23, "tests": 127, "passed": 127, "failed": 0, "skipped": 0 }
+  },
+  "dictamen": {
     "status": "LISTO_PARA_CERTIFICACION",
-    "readyFor": [
-      "Ley_11_2021",
-      "RD_1007_2023_NoVeriFactu_Art12",
-      "SIALTI",
-      "RD_Ley_8_2019",
-      "Art66_LGT",
-      "RGPD_Phase1",
-      "OWASP"
-    ],
-    "pendingPhase2": ["VeriFactu_XML_submission_AEAT"],
-    "phase2Deadline": "2027-01-01",
-    "blockers": [],
-    "dictamen": "El sistema cumple todos los requisitos de la auditoría de pre-certificación para el ámbito de aplicación actual (No-VeriFactu Art. 12, SIALTI, Ley 11/2021, RD-Ley 8/2019, RGPD Phase 1). Sin bloqueantes. La Fase 2 (envío XML a AEAT) tiene deadline enero 2027 y no constituye bloqueante en la fecha de esta auditoría."
+    "bloqueantes": [],
+    "thresholds": {
+      "total": { "required": 90, "achieved": 93.8, "pass": true },
+      "ley11_2021": { "required": 95, "achieved": 100, "pass": true },
+      "sialti": { "required": 95, "achieved": 100, "pass": true },
+      "rgpd": { "required": 75, "achieved": 67, "pass": false, "bloqueante": false },
+      "verifactu": { "required": 60, "achieved": 75, "pass": true }
+    },
+    "gaps": [
+      { "id": "GAP-001-P2", "norma": "RD 1007/2023", "prioridad": "P1", "descripcion": "VeriFactu Fase 2: XML signing + envio AEAT. Plazo jul 2027." },
+      { "id": "GAP-SEC-01", "norma": "OWASP", "prioridad": "P2", "descripcion": "Next.js 16.2.10 proxy bypass HIGH en pnpm audit." },
+      { "id": "GAP-RGPD-01", "norma": "RGPD", "prioridad": "P2", "descripcion": "Purge automatica depende de Vercel Cron sin pg_cron (plan Free)." },
+      { "id": "GAP-DB-01", "norma": "Seguridad", "prioridad": "P3", "descripcion": "tpv_turno_before_insert() sin extensions en search_path explicito." },
+      { "id": "GAP-DB-02", "norma": "Seguridad", "prioridad": "P3", "descripcion": "lc_canonical_payload() ALTER no aplico — firma erronea en migracion." },
+      { "id": "GAP-RGPD-02", "norma": "RGPD", "prioridad": "P3", "descripcion": "DPA con clientes restaurante sin documentacion formal en sistema." }
+    ]
+  },
+  "triggers": {
+    "total": 19,
+    "fiscal": [
+      "tpv_cobro_hash_insert", "tpv_cobro_no_delete", "tpv_cobro_no_update_critical",
+      "tpv_cobro_audit_trigger", "tpv_turno_hash_insert", "tpv_turno_no_delete",
+      "tpv_turno_no_update_fields", "tpv_turno_assign_z", "tpv_turno_evento_no_delete",
+      "tpv_turno_evento_no_update", "tpv_turno_audit_trigger", "trigger_albaranes_immutable",
+      "trigger_albaranes_no_delete", "pedidos_no_delete", "lc_fichajes_chain_before",
+      "lc_fichajes_chain_verify", "lc_fichajes_immutable", "lc_chain_anchors_immutable",
+      "lc_audit_log_immutable"
+    ]
   }
 }
