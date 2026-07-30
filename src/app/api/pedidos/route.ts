@@ -144,6 +144,14 @@ async function handleMesaOrder(empresa: EmpresaOrderData, data: MesaData, reques
 
   if (!pedidoResult.success) {
     const errorCode = pedidoResult.error.code;
+    // Trigger check_session_not_locked raises PAYMENT_IN_PROGRESS if pago_en_curso=true.
+    // This covers the sub-ms window where checkMesaPaymentLock read false but the lock committed.
+    if (pedidoResult.error.message?.includes('PAYMENT_IN_PROGRESS')) {
+      return NextResponse.json(
+        { error: 'Hay un pago en curso en esta mesa. Espera a que finalice.' },
+        { status: 423 }
+      );
+    }
     if (['PRODUCT_NOT_FOUND', 'INVALID_UUID'].includes(errorCode)) {
       return NextResponse.json({ error: pedidoResult.error.message }, { status: 400 });
     }

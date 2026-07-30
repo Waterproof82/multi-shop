@@ -168,7 +168,21 @@ export async function initiateRedsysMesaPaymentUseCase(
       }
     }
 
-    // Fetch all pedidos in the session
+    // For personalizado mode: compute confirmed custom payments so the RPC can calculate remaining.
+    const divisionTipo = s['division_tipo'] as string | null;
+    let serverPagadoCents = 0;
+    if (divisionTipo === 'personalizado') {
+      const { data: pagadoTurnos } = await supabase
+        .from('mesa_pagos_personalizados')
+        .select('importe_cents')
+        .eq('sesion_id', sesionId)
+        .eq('status', 'pagado');
+      serverPagadoCents = ((pagadoTurnos ?? []) as { importe_cents: number | null }[])
+        .reduce((acc, t) => acc + (t.importe_cents ?? 0), 0);
+    }
+
+    // For division: we still need pedidos to compute sessionTotalCents for the RPC call.
+    // For full payment: the RPC computes the total internally (atomic). We only need it for division.
     const { data: pedidos, error: pedidosError } = await supabase
       .from('pedidos')
       .select('id, total, numero_pedido')
@@ -191,44 +205,11 @@ export async function initiateRedsysMesaPaymentUseCase(
     const sessionTotal = rows.reduce((sum, p) => sum + Number(p.total), 0);
     const sessionTotalCents = Math.round(sessionTotal * 100);
 
-    // For personalizado mode: compute confirmed custom payments so we charge only what remains.
-    const divisionTipo = s['division_tipo'] as string | null;
-    let serverPagadoCents = 0;
-    if (divisionTipo === 'personalizado') {
-      const { data: pagadoTurnos } = await supabase
-        .from('mesa_pagos_personalizados')
-        .select('importe_cents')
-        .eq('sesion_id', sesionId)
-        .eq('status', 'pagado');
-      serverPagadoCents = ((pagadoTurnos ?? []) as { importe_cents: number | null }[])
-        .reduce((acc, t) => acc + (t.importe_cents ?? 0), 0);
-    }
-    // remainingCents = full total for regular payments, or (total - already paid) for personalizado
-    const remainingCents = Math.max(0, sessionTotalCents - serverPagadoCents);
-
-    // Guard against in-flight orders that committed after the client's last fetch.
-    // For personalizado the client sends the remaining amount as expectedTotalCents.
-    if (
-      input.expectedTotalCents !== undefined &&
-      Math.abs(remainingCents - input.expectedTotalCents) > 1
-    ) {
-      return {
-        success: false,
-        error: {
-          code: 'TOTAL_MISMATCH',
-          message: JSON.stringify({ newTotalCents: remainingCents }),
-          module: 'use-case',
-          method: 'initiateRedsysMesaPaymentUseCase',
-        },
-      };
-    }
-
-    // Use the highest numero_pedido as anchor for the payment ref
+    // Use the highest numero_pedido as anchor for the payment ref (division path only; full payment uses RPC).
     const maxNumeroPedido = rows.reduce(
       (max, p) => Math.max(max, Number(p.numero_pedido) || 0),
       0
     );
-    const anchorPedido = rows.find(p => Number(p.numero_pedido) === maxNumeroPedido) ?? rows[0];
     const paymentOrderRef = generatePaymentOrderRef(maxNumeroPedido || undefined);
 
     let amountCents: number;
@@ -281,25 +262,31 @@ export async function initiateRedsysMesaPaymentUseCase(
 
       amountCents = claimRow.amount_cents;
     } else {
-      // Full (non-division) payment: mark all pedidos as pending and set payment_order_ref
-      // on the anchor so the webhook can reconcile against pedidos as before.
-      // For personalizado mode remainingCents already has confirmed payments subtracted.
-      amountCents = remainingCents + propinaCents;
-      const pedidoIds = rows.map(p => p.id);
+      // Full (non-division) payment: single atomic RPC that:
+      //   1. FOR UPDATE on mesa_sesiones → serializes concurrent INSERTs in pedidos
+      //   2. Reads total safely (no in-flight order can slip in)
+      //   3. Validates expectedTotalCents mismatch
+      //   4. Marks all pedidos as pending + sets payment_order_ref on anchor
+      //   5. Sets pago_en_curso=true INSIDE the same transaction
+      // This closes the sub-ms race window between acquire_mesa_lock and the old 3-op sequence.
+      const { data: rpcData, error: rpcError } = await supabase.rpc(
+        'initiate_mesa_payment_atomic',
+        {
+          p_sesion_id:            sesionId,
+          p_empresa_id:           input.empresaId,
+          p_payment_order_ref:    paymentOrderRef,
+          p_expected_total_cents: input.expectedTotalCents ?? 0,
+          p_already_paid_cents:   serverPagadoCents,
+        }
+      );
 
-      const { error: updatePendingError } = await supabase
-        .from('pedidos')
-        .update({ payment_status: 'pending' })
-        .in('id', pedidoIds)
-        .eq('empresa_id', input.empresaId);
-
-      if (updatePendingError) {
+      if (rpcError) {
         await logger.logAndReturnError(
-          'DB_UPDATE_ERROR',
-          updatePendingError.message,
+          'DB_INSERT_ERROR',
+          rpcError.message,
           'use-case',
           'initiateRedsysMesaPaymentUseCase',
-          { details: { code: updatePendingError.code, sesionId } }
+          { details: { code: rpcError.code, sesionId } }
         );
         return {
           success: false,
@@ -312,33 +299,45 @@ export async function initiateRedsysMesaPaymentUseCase(
         };
       }
 
-      const { error: updateAnchorError } = await supabase
-        .from('pedidos')
-        .update({
-          payment_order_ref: paymentOrderRef,
-          payment_amount_cents: amountCents,
-        })
-        .eq('id', anchorPedido.id)
-        .eq('empresa_id', input.empresaId);
+      const rpcRow = (rpcData as { status: string; remaining_cents: number; anchor_pedido_id: string | null }[] | null)?.[0];
 
-      if (updateAnchorError) {
-        await logger.logAndReturnError(
-          'DB_UPDATE_ERROR',
-          updateAnchorError.message,
-          'use-case',
-          'initiateRedsysMesaPaymentUseCase',
-          { details: { code: updateAnchorError.code, pedidoId: anchorPedido.id } }
-        );
+      if (!rpcRow || rpcRow.status === 'no_orders') {
         return {
           success: false,
           error: {
-            code: 'DB_ERROR',
-            message: 'Error al iniciar pago de mesa',
+            code: 'NOT_FOUND',
+            message: 'No hay pedidos en la sesión activa',
             module: 'use-case',
             method: 'initiateRedsysMesaPaymentUseCase',
           },
         };
       }
+
+      if (rpcRow.status === 'tenant_mismatch') {
+        return {
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: 'No hay sesión activa para esta mesa',
+            module: 'use-case',
+            method: 'initiateRedsysMesaPaymentUseCase',
+          },
+        };
+      }
+
+      if (rpcRow.status === 'total_mismatch') {
+        return {
+          success: false,
+          error: {
+            code: 'TOTAL_MISMATCH',
+            message: JSON.stringify({ newTotalCents: rpcRow.remaining_cents }),
+            module: 'use-case',
+            method: 'initiateRedsysMesaPaymentUseCase',
+          },
+        };
+      }
+
+      amountCents = rpcRow.remaining_cents + propinaCents;
     }
 
     const formData = buildRedsysFormData(
@@ -359,15 +358,10 @@ export async function initiateRedsysMesaPaymentUseCase(
       }
     );
 
-    // Lock the session for full payments only — blocks new orders and concurrent initiations.
+    // Note: pago_en_curso is set INSIDE the initiate_mesa_payment_atomic RPC for full payments,
+    // ensuring it's committed atomically with the pedidos updates.
     // Division payments don't set this flag: each share is independent, concurrent payers
     // are allowed, and the waiter grid already shows "pagando" via divisionActiva.
-    if (!input.esDivision) {
-      await supabase
-        .from('mesa_sesiones')
-        .update({ pago_en_curso: true, pago_iniciado_en: new Date().toISOString() })
-        .eq('id', sesionId);
-    }
 
     // For division payments, return the paymentOrderRef so the client can store it
     // and release the pending slot if the user cancels or abandons the Redsys flow.
