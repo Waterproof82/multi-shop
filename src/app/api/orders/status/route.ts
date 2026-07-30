@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 });
   }
 
-  const { id, numero_pedido, estimated_minutes, estimated_ready_at, telegram_message_id, telegram_chat_id, items, tipo, estado, glovo_status, delivery_fee_cents } = result.data;
+  const { id, numero_pedido, estimated_minutes, estimated_ready_at, telegram_message_id, telegram_chat_id, items, tipo, estado, glovo_status, delivery_fee_cents, mesa_id, mesa_numero, mesa_nombre, sesion_id, google_reviews_url } = result.data;
 
   // If order is ready and has a pending Telegram message, edit it and clear the id (fire-and-forget)
   const isReady = estimated_ready_at && new Date(estimated_ready_at) <= new Date();
@@ -43,5 +43,5 @@ export async function GET(request: Request) {
     ]);
   }
 
-  return NextResponse.json({ numero_pedido, estimated_minutes, estimated_ready_at, items, tipo, estado, glovo_status, delivery_fee_cents });
+  return NextResponse.json({ numero_pedido, estimated_minutes, estimated_ready_at, items, tipo, estado, glovo_status, delivery_fee_cents, mesa_id, mesa_numero, mesa_nombre, sesion_id, google_reviews_url });
 }
