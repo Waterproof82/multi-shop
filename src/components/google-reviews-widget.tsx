@@ -11,6 +11,7 @@ interface GoogleReviewsWidgetProps {
   sesionId: string | null;
   googleReviewsUrl: string | null;
   lang: Language;
+  uniqueKey?: string;
 }
 
 function getRaterId(): string {
@@ -39,39 +40,44 @@ export function GoogleReviewsWidget({
   sesionId,
   googleReviewsUrl,
   lang,
+  uniqueKey,
 }: Readonly<GoogleReviewsWidgetProps>) {
   const [submitted, setSubmitted] = useState(false);
   const [submittedValue, setSubmittedValue] = useState<number>(0);
   const [submitting, setSubmitting] = useState(false);
   const raterIdRef = useRef<string | null>(null);
 
+  const effectiveKey = sesionId ?? uniqueKey ?? null;
+
   useEffect(() => {
-    if (!sesionId) return;
+    if (!effectiveKey) return;
     raterIdRef.current = getRaterId();
-    const stored = getStoredRating(sesionId);
+    const stored = getStoredRating(effectiveKey);
     if (stored !== null) {
       setSubmittedValue(stored);
       setSubmitted(true);
     }
-  }, [sesionId]);
+  }, [effectiveKey]);
 
-  if (!sesionId || !googleReviewsUrl) return null;
+  if (!effectiveKey || !googleReviewsUrl) return null;
 
   const handleChange = async (stars: number) => {
-    if (submitted || submitting || !sesionId || !raterIdRef.current) return;
+    if (submitted || submitting || !effectiveKey || !raterIdRef.current) return;
     setSubmitting(true);
     try {
-      await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/valoracion`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          estrellas: stars,
-          sesion_id: sesionId,
-          rater_id: raterIdRef.current,
-        }),
-      });
+      if (sesionId && mesaId) {
+        await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/valoracion`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            estrellas: stars,
+            sesion_id: sesionId,
+            rater_id: raterIdRef.current,
+          }),
+        });
+      }
       try {
-        localStorage.setItem(`valoracion_${sesionId}`, stars.toString());
+        localStorage.setItem(`valoracion_${effectiveKey}`, stars.toString());
       } catch { /* ignore */ }
       setSubmittedValue(stars);
       setSubmitted(true);

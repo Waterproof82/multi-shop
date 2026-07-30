@@ -669,7 +669,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     try {
       const { data, error } = await this.supabase
         .from('pedidos')
-        .select('id, numero_pedido, estimated_minutes, estimated_ready_at, telegram_message_id, detalle_pedido, estado, payment_status, glovo_status, mesa_id, delivery_fee_cents, mesas(numero, nombre), empresas(telegram_chat_id, tipo)')
+        .select('id, numero_pedido, estimated_minutes, estimated_ready_at, telegram_message_id, detalle_pedido, estado, payment_status, glovo_status, mesa_id, delivery_fee_cents, sesion_id, mesas(numero, nombre), empresas(telegram_chat_id, tipo, google_reviews_url)')
         .eq('tracking_token', token)
         .maybeSingle();
 
@@ -715,6 +715,8 @@ export class SupabasePedidoRepository implements IPedidoRepository {
           mesa_nombre: (mesaRaw?.['nombre'] as string | null) ?? null,
           delivery_fee_cents: (raw['delivery_fee_cents'] as number | null) ?? null,
           payment_status: (raw['payment_status'] as string | null) ?? null,
+          sesion_id: (raw['sesion_id'] as string | null) ?? null,
+          google_reviews_url: (empresa?.['google_reviews_url'] as string | null) ?? null,
           items: ((raw['detalle_pedido'] as { nombre: string; translations?: { en?: { name: string }; fr?: { name: string }; it?: { name: string }; de?: { name: string } }; cantidad: number; precio: number; complementos?: { nombre: string; precio: number }[] }[] | null) ?? []),
         },
       };

@@ -558,6 +558,59 @@ function shouldShowQrGate(
   return qrGateState !== null && mesaToken !== null && !isWaiterMode;
 }
 
+interface MesaOrderHandlers {
+  setSending: (b: boolean) => void;
+  closeCart: () => void;
+  setQrGateState: (s: QRGateState | null) => void;
+  clearCart: () => void;
+  setShowOrderToast: (b: boolean) => void;
+  setErrors: (e: { general: string }) => void;
+}
+
+async function executeMesaOrder(
+  mesaId: string,
+  isWaiterMode: boolean,
+  items: CartItem[],
+  language: Language,
+  handlers: MesaOrderHandlers,
+): Promise<void> {
+  let clientToken: string | null = null;
+  if (!isWaiterMode) {
+    const storedClientToken = getMesaClientToken(mesaId);
+    if (!storedClientToken || isMesaClientTokenExpired(storedClientToken.expiresAt)) {
+      handlers.closeCart();
+      handlers.setQrGateState('TOKEN_EXPIRED');
+      return;
+    }
+    clientToken = storedClientToken.token;
+  }
+
+  handlers.setSending(true);
+  try {
+    const result = await sendMesaOrderFlow(mesaId, clientToken, items, language);
+    if (result.ok && result.trackingToken) {
+      addTrackingToken(result.trackingToken);
+      handlers.clearCart();
+      handlers.closeCart();
+      handlers.setShowOrderToast(true);
+      setTimeout(() => handlers.setShowOrderToast(false), 2000);
+      window.dispatchEvent(new CustomEvent('mesa-order-placed'));
+    } else if (result.code === 'SESSION_CLOSED') {
+      handlers.closeCart();
+      handlers.setQrGateState('SESSION_CLOSED');
+    } else if (result.code === 'TOKEN_EXPIRED') {
+      handlers.closeCart();
+      handlers.setQrGateState('TOKEN_EXPIRED');
+    } else {
+      handlers.setErrors({ general: result.error || t('validationOrderError', language) });
+    }
+  } catch {
+    handlers.setErrors({ general: t('connectionError', language) });
+  } finally {
+    handlers.setSending(false);
+  }
+}
+
 function OrderToast({ show, language }: Readonly<{ show: boolean; language: Language }>) {
   if (!show) return null;
   return (
@@ -693,42 +746,9 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
 
     // Mesa mode: skip PII validation, use mesa submit path
     if (mesaToken) {
-      const mesaId = mesaInfo?.id ?? mesaToken;
-      let clientToken: string | null = null;
-      if (!isWaiterMode) {
-        const storedClientToken = getMesaClientToken(mesaId);
-        if (!storedClientToken || isMesaClientTokenExpired(storedClientToken.expiresAt)) {
-          closeCart();
-          setQrGateState('TOKEN_EXPIRED');
-          return;
-        }
-        clientToken = storedClientToken.token;
-      }
-
-      setSending(true);
-      try {
-        const result = await sendMesaOrderFlow(mesaId, clientToken, items, language);
-        if (result.ok && result.trackingToken) {
-          addTrackingToken(result.trackingToken);
-          clearCart();
-          closeCart();
-          setShowOrderToast(true);
-          setTimeout(() => setShowOrderToast(false), 2000);
-          window.dispatchEvent(new CustomEvent('mesa-order-placed'));
-        } else if (result.code === 'SESSION_CLOSED') {
-          closeCart();
-          setQrGateState('SESSION_CLOSED');
-        } else if (result.code === 'TOKEN_EXPIRED') {
-          closeCart();
-          setQrGateState('TOKEN_EXPIRED');
-        } else {
-          setErrors({ general: result.error || t('validationOrderError', language) });
-        }
-      } catch {
-        setErrors({ general: t('connectionError', language) });
-      } finally {
-        setSending(false);
-      }
+      await executeMesaOrder(mesaInfo?.id ?? mesaToken, isWaiterMode, items, language, {
+        setSending, closeCart, setQrGateState, clearCart, setShowOrderToast, setErrors,
+      });
       return;
     }
 
