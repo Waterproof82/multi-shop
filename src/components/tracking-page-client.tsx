@@ -6,6 +6,7 @@ import { Clock, CheckCircle, AlertCircle, ArrowLeft, Hourglass, ChefHat, Truck }
 import { getTrackingTokens, removeTrackingToken, isOrderExpired } from "@/lib/order-tracking";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
+import { GoogleReviewsWidget } from "@/components/google-reviews-widget";
 import { formatPrice } from "@/lib/format-price";
 
 interface OrderItem {
@@ -29,9 +30,12 @@ interface OrderStatus {
   tipo: string;
   estado: string;
   glovo_status: string | null;
+  mesa_id: string | null;
   mesa_numero: number | null;
   mesa_nombre: string | null;
   delivery_fee_cents: number | null;
+  sesion_id: string | null;
+  google_reviews_url: string | null;
 }
 
 interface TrackingPageClientProps {
@@ -66,9 +70,12 @@ function normalizeStatus(data: OrderStatus): OrderStatus {
     tipo: data.tipo ?? 'restaurante',
     estado: data.estado ?? 'pendiente',
     glovo_status: data.glovo_status ?? null,
+    mesa_id: data.mesa_id ?? null,
     mesa_numero: data.mesa_numero ?? null,
     mesa_nombre: data.mesa_nombre ?? null,
     delivery_fee_cents: data.delivery_fee_cents ?? null,
+    sesion_id: data.sesion_id ?? null,
+    google_reviews_url: data.google_reviews_url ?? null,
     items: (data.items ?? []).map(item => ({
       ...item,
       cantidad: Number(item.cantidad),
@@ -260,6 +267,7 @@ function getMesaNumberSuffix(mesaNumero: number | null, mesaNombre: string | nul
   return <> — {t('mesaLabel', lang)} {mesaNumero}{nameSuffix}</>;
 }
 
+
 function OrderCard({ order, language }: Readonly<{ order: OrderState; language: string }>) {
   const lang = language as Parameters<typeof t>[1];
   const { status } = order;
@@ -409,6 +417,13 @@ function PrimaryOrderView({ order, language, lang, primaryReady, primaryRemainin
           <p className="text-secondary-foreground">{getTiendaPrimaryMsg(status.estado, lang)}</p>
         </div>
         <ItemsList items={status.items} language={language} deliveryFeeCents={status.delivery_fee_cents} />
+        <GoogleReviewsWidget
+          mesaId=""
+          sesionId={null}
+          googleReviewsUrl={status.google_reviews_url}
+          lang={lang}
+          uniqueKey={order.token}
+        />
       </>
     );
   }
@@ -425,6 +440,13 @@ function PrimaryOrderView({ order, language, lang, primaryReady, primaryRemainin
           </p>
         </div>
         <ItemsList items={status.items} language={language} deliveryFeeCents={status.delivery_fee_cents} />
+        <GoogleReviewsWidget
+          mesaId={status.mesa_id ?? ''}
+          sesionId={status.sesion_id}
+          googleReviewsUrl={status.google_reviews_url}
+          lang={lang}
+          uniqueKey={order.token}
+        />
       </>
     );
   }
@@ -441,6 +463,13 @@ function PrimaryOrderView({ order, language, lang, primaryReady, primaryRemainin
           <p className="text-secondary-foreground">{t('trackingPickup', lang)}</p>
         </div>
         <ItemsList items={status.items} language={language} deliveryFeeCents={status.delivery_fee_cents} />
+        <GoogleReviewsWidget
+          mesaId=""
+          sesionId={null}
+          googleReviewsUrl={status.google_reviews_url}
+          lang={lang}
+          uniqueKey={order.token}
+        />
       </>
     );
   }
