@@ -22,154 +22,135 @@ export interface InitiateRedsysMesaPaymentInput {
   webhookUrl: string;
 }
 
+interface EmpresaCredentials {
+  effectiveMerchantCode: string;
+  effectiveSecretKey: string;
+  effectiveTerminal: string;
+  merchantName: string;
+}
+
+async function fetchEmpresaCredentials(
+  empresaId: string
+): Promise<Result<EmpresaCredentials, AppError>> {
+  const supabase = getSupabaseClient();
+  const { data: empresa, error } = await supabase
+    .from('empresas')
+    .select('nombre, redsys_merchant_code, redsys_terminal, redsys_secret_key, pagos_mesa_habilitados')
+    .eq('id', empresaId)
+    .single();
+
+  if (error || !empresa) {
+    return { success: false, error: { code: 'NOT_FOUND', message: 'Empresa not found', module: 'use-case', method: 'initiateRedsysMesaPaymentUseCase' } };
+  }
+
+  const e = empresa as Record<string, unknown>;
+  if (!e['pagos_mesa_habilitados']) {
+    return { success: false, error: { code: 'FORBIDDEN', message: 'Pagos en mesa no habilitados para esta empresa', module: 'use-case', method: 'initiateRedsysMesaPaymentUseCase' } };
+  }
+
+  const isDev = process.env.NODE_ENV !== 'production';
+  const effectiveMerchantCode = isDev ? '999008881' : ((e['redsys_merchant_code'] as string | null) ?? null);
+  const effectiveSecretKey    = isDev ? 'sq7HjrUOBfKmC576ILgskD5srU870gJ7' : ((e['redsys_secret_key'] as string | null) ?? null);
+  const effectiveTerminal     = isDev ? '001' : ((e['redsys_terminal'] as string | null) ?? '001');
+
+  if (!effectiveMerchantCode || !effectiveSecretKey) {
+    return { success: false, error: { ...DELIVERY_ERRORS.PAYMENT_NOT_CONFIGURED, module: 'use-case', method: 'initiateRedsysMesaPaymentUseCase' } };
+  }
+
+  return {
+    success: true,
+    data: {
+      effectiveMerchantCode,
+      effectiveSecretKey,
+      effectiveTerminal,
+      merchantName: (e['nombre'] as string | null) ?? 'Tienda',
+    },
+  };
+}
+
+interface SesionPaymentState {
+  sesionId: string;
+  divisionPersonas: number | null;
+  divisionPagosRealizados: number;
+  divisionBaseCents: number | null;
+  divisionTipo: string | null;
+  propinaCents: number;
+  pagoEnCurso: boolean;
+  pagoIniciadoEn: string | null;
+}
+
+async function fetchSesionState(
+  mesaId: string
+): Promise<Result<SesionPaymentState, AppError>> {
+  const supabase = getSupabaseClient();
+  const { data: sesion, error } = await supabase
+    .from('mesa_sesiones')
+    .select('id, empresa_id, division_personas, division_pagos_realizados, sesion_pagada, pago_en_curso, pago_iniciado_en, division_base_cents, division_tipo, propina_cents')
+    .eq('mesa_id', mesaId)
+    .is('cerrada_at', null)
+    .maybeSingle();
+
+  if (error || !sesion) {
+    return { success: false, error: { code: 'NOT_FOUND', message: 'No hay sesión activa para esta mesa', module: 'use-case', method: 'initiateRedsysMesaPaymentUseCase' } };
+  }
+
+  const s = sesion as Record<string, unknown>;
+  if ((s['sesion_pagada'] as boolean) ?? false) {
+    return { success: false, error: { code: 'ALREADY_PAID', message: 'Esta sesión ya está pagada', module: 'use-case', method: 'initiateRedsysMesaPaymentUseCase' } };
+  }
+
+  return {
+    success: true,
+    data: {
+      sesionId: s['id'] as string,
+      divisionPersonas: (s['division_personas'] as number | null) ?? null,
+      divisionPagosRealizados: (s['division_pagos_realizados'] as number) ?? 0,
+      divisionBaseCents: (s['division_base_cents'] as number | null) ?? null,
+      divisionTipo: (s['division_tipo'] as string | null) ?? null,
+      propinaCents: (s['propina_cents'] as number | null) ?? 0,
+      pagoEnCurso: (s['pago_en_curso'] as boolean) ?? false,
+      pagoIniciadoEn: (s['pago_iniciado_en'] as string | null) ?? null,
+    },
+  };
+}
+
+function checkPaymentLock(
+  esDivision: boolean,
+  state: SesionPaymentState
+): AppError | null {
+  // For division: guard against counter already complete.
+  const { divisionPersonas, divisionPagosRealizados, pagoEnCurso, pagoIniciadoEn } = state;
+  if (esDivision && divisionPersonas && divisionPagosRealizados >= divisionPersonas) {
+    return { code: 'ALREADY_PAID', message: 'Todos los pagos de la división ya han sido realizados', module: 'use-case', method: 'initiateRedsysMesaPaymentUseCase' };
+  }
+  // For full payment: reject if another payment is in progress (lock not expired, not in grace).
+  if (!esDivision) {
+    const GRACE_PERIOD_MS = 5 * 60 * 1000;
+    const lockAge = pagoIniciadoEn ? Date.now() - new Date(pagoIniciadoEn).getTime() : Infinity;
+    if (pagoEnCurso && lockAge < PAYMENT_LOCK_EXPIRY_MS && !(lockAge < GRACE_PERIOD_MS)) {
+      return { code: 'PAYMENT_IN_PROGRESS', message: 'Ya hay un pago en curso para esta mesa', module: 'use-case', method: 'initiateRedsysMesaPaymentUseCase' };
+    }
+  }
+  return null;
+}
+
 export async function initiateRedsysMesaPaymentUseCase(
   input: InitiateRedsysMesaPaymentInput
 ): Promise<Result<RedsysFormData, AppError>> {
   try {
-    const supabase = getSupabaseClient();
+    const credResult = await fetchEmpresaCredentials(input.empresaId);
+    if (!credResult.success) return credResult;
+    const { effectiveMerchantCode, effectiveSecretKey, effectiveTerminal, merchantName } = credResult.data;
 
-    // Fetch empresa credentials + payment flag
-    const { data: empresa, error: empresaError } = await supabase
-      .from('empresas')
-      .select('nombre, redsys_merchant_code, redsys_terminal, redsys_secret_key, pagos_mesa_habilitados')
-      .eq('id', input.empresaId)
-      .single();
+    const sesionResult = await fetchSesionState(input.mesaId);
+    if (!sesionResult.success) return sesionResult;
+    const { sesionId, divisionPersonas, divisionBaseCents, divisionTipo, propinaCents } = sesionResult.data;
 
-    if (empresaError || !empresa) {
-      return {
-        success: false,
-        error: {
-          code: 'NOT_FOUND',
-          message: 'Empresa not found',
-          module: 'use-case',
-          method: 'initiateRedsysMesaPaymentUseCase',
-        },
-      };
-    }
-
-    const e = empresa as Record<string, unknown>;
-
-    if (!e['pagos_mesa_habilitados']) {
-      return {
-        success: false,
-        error: {
-          code: 'FORBIDDEN',
-          message: 'Pagos en mesa no habilitados para esta empresa',
-          module: 'use-case',
-          method: 'initiateRedsysMesaPaymentUseCase',
-        },
-      };
-    }
-
-    const merchantCode = e['redsys_merchant_code'] as string | null;
-    const terminal = e['redsys_terminal'] as string | null;
-    const secretKey = e['redsys_secret_key'] as string | null;
-    const merchantName = (e['nombre'] as string | null) ?? 'Tienda';
-
-    // In development, always use Redsys public test credentials (override DB values).
-    // This ensures production credentials stored in DB are never sent to the test URL.
-    const isDev = process.env.NODE_ENV !== 'production';
-    const effectiveMerchantCode = isDev ? '999008881' : (merchantCode ?? null);
-    const effectiveSecretKey    = isDev ? 'sq7HjrUOBfKmC576ILgskD5srU870gJ7' : (secretKey ?? null);
-    const effectiveTerminal     = isDev ? '001' : (terminal ?? '001');
-
-    if (!effectiveMerchantCode || !effectiveSecretKey) {
-      return {
-        success: false,
-        error: {
-          ...DELIVERY_ERRORS.PAYMENT_NOT_CONFIGURED,
-          module: 'use-case',
-          method: 'initiateRedsysMesaPaymentUseCase',
-        },
-      };
-    }
-
-    // Find active sesion for the mesa (including division state + payment lock)
-    const { data: sesion, error: sesionError } = await supabase
-      .from('mesa_sesiones')
-      .select('id, empresa_id, division_personas, division_pagos_realizados, sesion_pagada, pago_en_curso, pago_iniciado_en, division_base_cents, division_tipo, propina_cents')
-      .eq('mesa_id', input.mesaId)
-      .is('cerrada_at', null)
-      .maybeSingle();
-
-    if (sesionError || !sesion) {
-      return {
-        success: false,
-        error: {
-          code: 'NOT_FOUND',
-          message: 'No hay sesión activa para esta mesa',
-          module: 'use-case',
-          method: 'initiateRedsysMesaPaymentUseCase',
-        },
-      };
-    }
-
-    const s = sesion as Record<string, unknown>;
-    const sesionId = s['id'] as string;
-    const divisionPersonas = (s['division_personas'] as number | null) ?? null;
-    const divisionPagosRealizados = (s['division_pagos_realizados'] as number) ?? 0;
-    const divisionBaseCents = (s['division_base_cents'] as number | null) ?? null;
-    const propinaCents = (s['propina_cents'] as number | null) ?? 0;
-    const sesionPagada = (s['sesion_pagada'] as boolean) ?? false;
-
-    // Reject if the session is already fully paid (covers both full and division payments,
-    // including manual payments registered by the waiter).
-    if (sesionPagada) {
-      return {
-        success: false,
-        error: {
-          code: 'ALREADY_PAID',
-          message: 'Esta sesión ya está pagada',
-          module: 'use-case',
-          method: 'initiateRedsysMesaPaymentUseCase',
-        },
-      };
-    }
-
-    // For division payments: also guard against the counter being already complete,
-    // which can happen if sesion_pagada hasn't propagated yet.
-    if (input.esDivision && divisionPersonas && divisionPagosRealizados >= divisionPersonas) {
-      return {
-        success: false,
-        error: {
-          code: 'ALREADY_PAID',
-          message: 'Todos los pagos de la división ya han sido realizados',
-          module: 'use-case',
-          method: 'initiateRedsysMesaPaymentUseCase',
-        },
-      };
-    }
-
-    // For full payments: reject if another payment is already in progress (lock not expired).
-    // Division payments skip this check — each share is independent and concurrent payers
-    // are allowed. The DB-level mesa_division_pagos table handles concurrency safely.
-    if (!input.esDivision) {
-      const pagoEnCurso = s['pago_en_curso'] as boolean;
-      const pagoIniciadoEn = s['pago_iniciado_en'] as string | null;
-      const LOCK_EXPIRY_MS = PAYMENT_LOCK_EXPIRY_MS;
-      // Grace period: the UI pre-locks when the user clicks "Pagar", then calls this
-      // use case after total verification. A fresh lock (< 5 min) = same client, let through.
-      const GRACE_PERIOD_MS = 5 * 60 * 1000;
-      const lockAge = pagoIniciadoEn
-        ? Date.now() - new Date(pagoIniciadoEn).getTime()
-        : Infinity;
-      const lockFresh = lockAge < LOCK_EXPIRY_MS;
-      const lockInGrace = lockAge < GRACE_PERIOD_MS;
-      if (pagoEnCurso && lockFresh && !lockInGrace) {
-        return {
-          success: false,
-          error: {
-            code: 'PAYMENT_IN_PROGRESS',
-            message: 'Ya hay un pago en curso para esta mesa',
-            module: 'use-case',
-            method: 'initiateRedsysMesaPaymentUseCase',
-          },
-        };
-      }
-    }
+    const lockError = checkPaymentLock(input.esDivision, sesionResult.data);
+    if (lockError) return { success: false, error: lockError };
 
     // For personalizado mode: compute confirmed custom payments so the RPC can calculate remaining.
-    const divisionTipo = s['division_tipo'] as string | null;
+    const supabase = getSupabaseClient();
     let serverPagadoCents = 0;
     if (divisionTipo === 'personalizado') {
       const { data: pagadoTurnos } = await supabase
