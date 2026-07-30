@@ -127,11 +127,122 @@ function checkPaymentLock(
   if (!esDivision) {
     const GRACE_PERIOD_MS = 5 * 60 * 1000;
     const lockAge = pagoIniciadoEn ? Date.now() - new Date(pagoIniciadoEn).getTime() : Infinity;
-    if (pagoEnCurso && lockAge < PAYMENT_LOCK_EXPIRY_MS && !(lockAge < GRACE_PERIOD_MS)) {
+    if (pagoEnCurso && lockAge < PAYMENT_LOCK_EXPIRY_MS && lockAge >= GRACE_PERIOD_MS) {
       return { code: 'PAYMENT_IN_PROGRESS', message: 'Ya hay un pago en curso para esta mesa', module: 'use-case', method: 'initiateRedsysMesaPaymentUseCase' };
     }
   }
   return null;
+}
+
+// Returns the sum of already-paid custom-turn amounts (personalizado mode only).
+async function fetchPagadoCents(
+  supabase: ReturnType<typeof getSupabaseClient>,
+  sesionId: string,
+  divisionTipo: string | null
+): Promise<number> {
+  if (divisionTipo !== 'personalizado') return 0;
+  const { data: pagadoTurnos } = await supabase
+    .from('mesa_pagos_personalizados')
+    .select('importe_cents')
+    .eq('sesion_id', sesionId)
+    .eq('status', 'pagado');
+  return ((pagadoTurnos ?? []) as { importe_cents: number | null }[])
+    .reduce((acc, t) => acc + (t.importe_cents ?? 0), 0);
+}
+
+interface PedidosData {
+  sessionTotalCents: number;
+  paymentOrderRef: string;
+}
+
+// Fetches pedidos for the session and computes total + payment order ref.
+async function fetchPedidosData(
+  supabase: ReturnType<typeof getSupabaseClient>,
+  sesionId: string,
+  empresaId: string
+): Promise<Result<PedidosData, AppError>> {
+  const { data: pedidos, error } = await supabase
+    .from('pedidos')
+    .select('id, total, numero_pedido')
+    .eq('sesion_id', sesionId)
+    .eq('empresa_id', empresaId);
+
+  if (error || !pedidos || pedidos.length === 0) {
+    return { success: false, error: { code: 'NOT_FOUND', message: 'No hay pedidos en la sesión activa', module: 'use-case', method: 'initiateRedsysMesaPaymentUseCase' } };
+  }
+
+  const rows = pedidos as { total: unknown; numero_pedido: unknown }[];
+  const sessionTotalCents = Math.round(rows.reduce((sum, p) => sum + Number(p.total), 0) * 100);
+  const maxNumeroPedido = rows.reduce((max, p) => Math.max(max, Number(p.numero_pedido) || 0), 0);
+  return { success: true, data: { sessionTotalCents, paymentOrderRef: generatePaymentOrderRef(maxNumeroPedido || undefined) } };
+}
+
+// Atomically claims a division slot and returns the amount for this payer.
+async function claimDivisionSlot(
+  supabase: ReturnType<typeof getSupabaseClient>,
+  sesionId: string,
+  empresaId: string,
+  paymentOrderRef: string,
+  totalWithTipCents: number
+): Promise<Result<number, AppError>> {
+  const { data: claimData, error: claimError } = await supabase
+    .rpc('claim_and_create_division_pago', {
+      p_sesion_id:           sesionId,
+      p_empresa_id:          empresaId,
+      p_payment_order_ref:   paymentOrderRef,
+      p_session_total_cents: totalWithTipCents,
+    });
+
+  if (claimError) {
+    await logger.logAndReturnError('DB_INSERT_ERROR', claimError.message, 'use-case', 'initiateRedsysMesaPaymentUseCase', { details: { code: claimError.code, sesionId } });
+    return { success: false, error: { code: 'DB_ERROR', message: 'Error al iniciar pago de división', module: 'use-case', method: 'initiateRedsysMesaPaymentUseCase' } };
+  }
+
+  const claimRow = (claimData as { claimed: boolean; amount_cents: number }[] | null)?.[0];
+  if (!claimRow?.claimed) {
+    return { success: false, error: { code: 'ALREADY_PAID', message: 'Todos los pagos de la división ya han sido realizados', module: 'use-case', method: 'initiateRedsysMesaPaymentUseCase' } };
+  }
+  return { success: true, data: claimRow.amount_cents };
+}
+
+// Runs the atomic full-payment RPC and returns remaining_cents + propina.
+// The RPC: FOR UPDATE → safe total read → mark pedidos pending → set pago_en_curso (all in one tx).
+async function initiateFullPayment(
+  supabase: ReturnType<typeof getSupabaseClient>,
+  sesionId: string,
+  empresaId: string,
+  paymentOrderRef: string,
+  expectedTotalCents: number,
+  alreadyPaidCents: number,
+  propinaCents: number
+): Promise<Result<number, AppError>> {
+  const { data: rpcData, error: rpcError } = await supabase.rpc(
+    'initiate_mesa_payment_atomic',
+    {
+      p_sesion_id:            sesionId,
+      p_empresa_id:           empresaId,
+      p_payment_order_ref:    paymentOrderRef,
+      p_expected_total_cents: expectedTotalCents,
+      p_already_paid_cents:   alreadyPaidCents,
+    }
+  );
+
+  if (rpcError) {
+    await logger.logAndReturnError('DB_INSERT_ERROR', rpcError.message, 'use-case', 'initiateRedsysMesaPaymentUseCase', { details: { code: rpcError.code, sesionId } });
+    return { success: false, error: { code: 'DB_ERROR', message: 'Error al iniciar pago de mesa', module: 'use-case', method: 'initiateRedsysMesaPaymentUseCase' } };
+  }
+
+  const rpcRow = (rpcData as { status: string; remaining_cents: number }[] | null)?.[0];
+  if (!rpcRow || rpcRow.status === 'no_orders') {
+    return { success: false, error: { code: 'NOT_FOUND', message: 'No hay pedidos en la sesión activa', module: 'use-case', method: 'initiateRedsysMesaPaymentUseCase' } };
+  }
+  if (rpcRow.status === 'tenant_mismatch') {
+    return { success: false, error: { code: 'NOT_FOUND', message: 'No hay sesión activa para esta mesa', module: 'use-case', method: 'initiateRedsysMesaPaymentUseCase' } };
+  }
+  if (rpcRow.status === 'total_mismatch') {
+    return { success: false, error: { code: 'TOTAL_MISMATCH', message: JSON.stringify({ newTotalCents: rpcRow.remaining_cents }), module: 'use-case', method: 'initiateRedsysMesaPaymentUseCase' } };
+  }
+  return { success: true, data: rpcRow.remaining_cents + propinaCents };
 }
 
 export async function initiateRedsysMesaPaymentUseCase(
@@ -149,194 +260,26 @@ export async function initiateRedsysMesaPaymentUseCase(
     const lockError = checkPaymentLock(input.esDivision, sesionResult.data);
     if (lockError) return { success: false, error: lockError };
 
-    // For personalizado mode: compute confirmed custom payments so the RPC can calculate remaining.
     const supabase = getSupabaseClient();
-    let serverPagadoCents = 0;
-    if (divisionTipo === 'personalizado') {
-      const { data: pagadoTurnos } = await supabase
-        .from('mesa_pagos_personalizados')
-        .select('importe_cents')
-        .eq('sesion_id', sesionId)
-        .eq('status', 'pagado');
-      serverPagadoCents = ((pagadoTurnos ?? []) as { importe_cents: number | null }[])
-        .reduce((acc, t) => acc + (t.importe_cents ?? 0), 0);
-    }
+    const serverPagadoCents = await fetchPagadoCents(supabase, sesionId, divisionTipo);
 
-    // For division: we still need pedidos to compute sessionTotalCents for the RPC call.
-    // For full payment: the RPC computes the total internally (atomic). We only need it for division.
-    const { data: pedidos, error: pedidosError } = await supabase
-      .from('pedidos')
-      .select('id, total, numero_pedido')
-      .eq('sesion_id', sesionId)
-      .eq('empresa_id', input.empresaId);
+    const pedidosResult = await fetchPedidosData(supabase, sesionId, input.empresaId);
+    if (!pedidosResult.success) return pedidosResult;
+    const { sessionTotalCents, paymentOrderRef } = pedidosResult.data;
 
-    if (pedidosError || !pedidos || pedidos.length === 0) {
-      return {
-        success: false,
-        error: {
-          code: 'NOT_FOUND',
-          message: 'No hay pedidos en la sesión activa',
-          module: 'use-case',
-          method: 'initiateRedsysMesaPaymentUseCase',
-        },
-      };
-    }
-
-    const rows = pedidos as { id: string; total: unknown; numero_pedido: unknown }[];
-    const sessionTotal = rows.reduce((sum, p) => sum + Number(p.total), 0);
-    const sessionTotalCents = Math.round(sessionTotal * 100);
-
-    // Use the highest numero_pedido as anchor for the payment ref (division path only; full payment uses RPC).
-    const maxNumeroPedido = rows.reduce(
-      (max, p) => Math.max(max, Number(p.numero_pedido) || 0),
-      0
-    );
-    const paymentOrderRef = generatePaymentOrderRef(maxNumeroPedido || undefined);
-
-    let amountCents: number;
-
+    let amountResult: Result<number, AppError>;
     if (input.esDivision && divisionPersonas && divisionPersonas > 1) {
-      // Atomically claim a slot and insert the mesa_division_pagos row.
-      // The RPC uses FOR UPDATE on mesa_sesiones to serialize concurrent payers:
-      // - checks active (non-failed) claims against division_personas
-      // - calculates this payer's share (last payer absorbs rounding gap)
-      // - inserts the row — all in one transaction, no race condition.
-      const { data: claimData, error: claimError } = await supabase
-        .rpc('claim_and_create_division_pago', {
-          p_sesion_id:           sesionId,
-          p_empresa_id:          input.empresaId,
-          p_payment_order_ref:   paymentOrderRef,
-          p_session_total_cents: (divisionBaseCents ?? sessionTotalCents) + propinaCents,
-        });
-
-      if (claimError) {
-        await logger.logAndReturnError(
-          'DB_INSERT_ERROR',
-          claimError.message,
-          'use-case',
-          'initiateRedsysMesaPaymentUseCase',
-          { details: { code: claimError.code, sesionId } }
-        );
-        return {
-          success: false,
-          error: {
-            code: 'DB_ERROR',
-            message: 'Error al iniciar pago de división',
-            module: 'use-case',
-            method: 'initiateRedsysMesaPaymentUseCase',
-          },
-        };
-      }
-
-      const claimRow = (claimData as { claimed: boolean; amount_cents: number }[] | null)?.[0];
-      if (!claimRow?.claimed) {
-        return {
-          success: false,
-          error: {
-            code: 'ALREADY_PAID',
-            message: 'Todos los pagos de la división ya han sido realizados',
-            module: 'use-case',
-            method: 'initiateRedsysMesaPaymentUseCase',
-          },
-        };
-      }
-
-      amountCents = claimRow.amount_cents;
+      // Atomically claim a division slot (FOR UPDATE in RPC serializes concurrent payers).
+      amountResult = await claimDivisionSlot(supabase, sesionId, input.empresaId, paymentOrderRef, (divisionBaseCents ?? sessionTotalCents) + propinaCents);
     } else {
-      // Full (non-division) payment: single atomic RPC that:
-      //   1. FOR UPDATE on mesa_sesiones → serializes concurrent INSERTs in pedidos
-      //   2. Reads total safely (no in-flight order can slip in)
-      //   3. Validates expectedTotalCents mismatch
-      //   4. Marks all pedidos as pending + sets payment_order_ref on anchor
-      //   5. Sets pago_en_curso=true INSIDE the same transaction
-      // This closes the sub-ms race window between acquire_mesa_lock and the old 3-op sequence.
-      const { data: rpcData, error: rpcError } = await supabase.rpc(
-        'initiate_mesa_payment_atomic',
-        {
-          p_sesion_id:            sesionId,
-          p_empresa_id:           input.empresaId,
-          p_payment_order_ref:    paymentOrderRef,
-          p_expected_total_cents: input.expectedTotalCents ?? 0,
-          p_already_paid_cents:   serverPagadoCents,
-        }
-      );
-
-      if (rpcError) {
-        await logger.logAndReturnError(
-          'DB_INSERT_ERROR',
-          rpcError.message,
-          'use-case',
-          'initiateRedsysMesaPaymentUseCase',
-          { details: { code: rpcError.code, sesionId } }
-        );
-        return {
-          success: false,
-          error: {
-            code: 'DB_ERROR',
-            message: 'Error al iniciar pago de mesa',
-            module: 'use-case',
-            method: 'initiateRedsysMesaPaymentUseCase',
-          },
-        };
-      }
-
-      const rpcRow = (rpcData as { status: string; remaining_cents: number; anchor_pedido_id: string | null }[] | null)?.[0];
-
-      if (!rpcRow || rpcRow.status === 'no_orders') {
-        return {
-          success: false,
-          error: {
-            code: 'NOT_FOUND',
-            message: 'No hay pedidos en la sesión activa',
-            module: 'use-case',
-            method: 'initiateRedsysMesaPaymentUseCase',
-          },
-        };
-      }
-
-      if (rpcRow.status === 'tenant_mismatch') {
-        return {
-          success: false,
-          error: {
-            code: 'NOT_FOUND',
-            message: 'No hay sesión activa para esta mesa',
-            module: 'use-case',
-            method: 'initiateRedsysMesaPaymentUseCase',
-          },
-        };
-      }
-
-      if (rpcRow.status === 'total_mismatch') {
-        return {
-          success: false,
-          error: {
-            code: 'TOTAL_MISMATCH',
-            message: JSON.stringify({ newTotalCents: rpcRow.remaining_cents }),
-            module: 'use-case',
-            method: 'initiateRedsysMesaPaymentUseCase',
-          },
-        };
-      }
-
-      amountCents = rpcRow.remaining_cents + propinaCents;
+      // Full payment: atomic RPC closes the sub-ms race window (acquire_mesa_lock → total read).
+      amountResult = await initiateFullPayment(supabase, sesionId, input.empresaId, paymentOrderRef, input.expectedTotalCents ?? 0, serverPagadoCents, propinaCents);
     }
+    if (!amountResult.success) return amountResult;
 
     const formData = buildRedsysFormData(
-      {
-        merchantCode: effectiveMerchantCode,
-        terminal: effectiveTerminal,
-        secretKey: effectiveSecretKey,
-      },
-      {
-        order: paymentOrderRef,
-        amountCents,
-        currency: '978',
-        transactionType: '0',
-        urlOk: input.urlOk,
-        urlKo: input.urlKo,
-        merchantName,
-        webhookUrl: input.webhookUrl,
-      }
+      { merchantCode: effectiveMerchantCode, terminal: effectiveTerminal, secretKey: effectiveSecretKey },
+      { order: paymentOrderRef, amountCents: amountResult.data, currency: '978', transactionType: '0', urlOk: input.urlOk, urlKo: input.urlKo, merchantName, webhookUrl: input.webhookUrl }
     );
 
     // Note: pago_en_curso is set INSIDE the initiate_mesa_payment_atomic RPC for full payments,
@@ -346,18 +289,10 @@ export async function initiateRedsysMesaPaymentUseCase(
 
     // For division payments, return the paymentOrderRef so the client can store it
     // and release the pending slot if the user cancels or abandons the Redsys flow.
-    const responseData = input.esDivision
-      ? { ...formData, paymentOrderRef }
-      : formData;
-
+    const responseData = input.esDivision ? { ...formData, paymentOrderRef } : formData;
     return { success: true, data: responseData };
   } catch (e) {
-    const appError = await logger.logFromCatch(
-      e,
-      'use-case',
-      'initiateRedsysMesaPaymentUseCase',
-      { empresaId: input.empresaId, details: { mesaId: input.mesaId } }
-    );
+    const appError = await logger.logFromCatch(e, 'use-case', 'initiateRedsysMesaPaymentUseCase', { empresaId: input.empresaId, details: { mesaId: input.mesaId } });
     return { success: false, error: appError };
   }
 }

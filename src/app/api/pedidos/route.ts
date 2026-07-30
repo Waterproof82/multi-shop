@@ -42,7 +42,10 @@ const defaultPedidoSchema = z.object({
   items: itemsSchema,
   total: z.number().min(0).max(100_000).optional(), // ignored — server recalculates
   nombre: z.string().min(2).max(100),
-  telefono: z.string().min(9).max(20).regex(/^\+?[0-9\s\-()+]+$/, { error: 'Formato de teléfono no válido' }),
+  telefono: z.string().min(9).max(20).refine(
+    v => /^\+?[0-9\s\-()+]+$/.test(v),
+    { message: 'Formato de teléfono no válido' }
+  ),
   email: z.string().email().optional().or(z.literal('')),
   idioma: z.enum(['es', 'en', 'fr', 'it', 'de']).optional(),
   codigoDescuento: z.string().max(30).optional(),
