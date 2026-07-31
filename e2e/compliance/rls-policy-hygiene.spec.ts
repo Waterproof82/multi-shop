@@ -54,6 +54,21 @@
  * = WITH CHECK(true) implícito). Los 4 verificados en vivo con objetos de
  * prueba descartables antes de confirmarlos como permanentes.
  *
+ * 2026-07-31 (auditoría externa, cuarta pasada — "¿el GRANT subyacente es
+ * necesario, no solo la policy que lo restringe?"): los 9 checks anteriores
+ * auditan la FORMA de las policies de RLS, no si el GRANT de tabla que hay
+ * debajo sigue siendo necesario. El fix de 20260731000017 (ALTER DEFAULT
+ * PRIVILEGES) solo evita que tablas NUEVAS nazcan expuestas — nunca tocó
+ * retroactivamente las 53 tablas que ya existían, que seguían con
+ * INSERT/UPDATE/DELETE/TRUNCATE de tabla completa otorgados a `anon` desde
+ * antes del bootstrap de este proyecto en el hosting gestionado de Supabase.
+ * Ninguna policy RESTRICTIVE, por bien escrita que esté, puede frenar
+ * TRUNCATE — RLS no se aplica a ese comando en Postgres. Se añadió
+ * `anon_write_grant` (20260731000019): sin whitelist, porque la arquitectura
+ * del proyecto es anon-solo-lectura / service_role-para-escrituras (ver
+ * security.md → "Row Level Security (RLS)") — no hay ninguna tabla donde
+ * `anon` deba tener estos 4 privilegios.
+ *
  * Requiere: NEXT_PUBLIC_SUPABASE_URL + PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY
  * (o SUPABASE_SERVICE_ROLE_KEY)
  */
@@ -74,7 +89,8 @@ type HygieneCheckName =
   | 'default_privileges_grant_anon'
   | 'security_definer_missing_search_path'
   | 'bypassrls_unexpected_role'
-  | 'insert_policy_missing_with_check';
+  | 'insert_policy_missing_with_check'
+  | 'anon_write_grant';
 
 interface HygieneViolation {
   check_name: HygieneCheckName;
@@ -271,6 +287,24 @@ test.describe('RLS Policy Hygiene — escaneo completo del schema (service_role)
       throw new Error(
         `SEGURIDAD: policies INSERT sin WITH CHECK explícito (equivale a WITH CHECK(true) — inserción sin restricción):\n${list}\n\n` +
           `Agregar WITH CHECK con la misma condición de tenant/rol que el resto de policies de la tabla.`
+      );
+    }
+    expect(violations).toHaveLength(0);
+  });
+
+  test('ninguna tabla otorga a anon INSERT/UPDATE/DELETE/TRUNCATE a nivel de tabla', async ({ request }) => {
+    const rows = await fetchHygieneRows(request);
+    if (!rows) return;
+    const violations = rows.filter(r => r.check_name === 'anon_write_grant');
+
+    if (violations.length > 0) {
+      const list = violations.map(v => `  - ${v.tablename} (${v.detail})`).join('\n');
+      throw new Error(
+        `SEGURIDAD: anon tiene privilegios de escritura de tabla que la arquitectura del proyecto nunca necesita ` +
+          `(anon = solo lectura vía RLS, service_role = todas las escrituras):\n${list}\n\n` +
+          `TRUNCATE es el caso crítico: ninguna policy RLS (RESTRICTIVE o no) puede frenarlo — es una limitación de ` +
+          `Postgres, no de esta app. Revocar con:\n` +
+          `  REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public.<tabla> FROM anon;`
       );
     }
     expect(violations).toHaveLength(0);
