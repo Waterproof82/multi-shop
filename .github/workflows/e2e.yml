@@ -1,0 +1,68 @@
+name: E2E
+
+# Runs the FULL e2e/ suite (waiter, kitchen, CSRF, DB smoke, etc.) — not just
+# e2e/compliance/, which has its own narrower, path-filtered workflow
+# (compliance.yml) for legal/fiscal-critical changes. This workflow has no
+# path filter: UI/API changes anywhere can affect these functional flows, so
+# it runs on every push/PR to main/develop, mirroring ci.yml's trigger.
+#
+# Tests that need extra credentials (PLAYWRIGHT_WAITER_PIN,
+# PLAYWRIGHT_ADMIN_EMAIL/PASSWORD, PLAYWRIGHT_WAITER_TOKEN) skip gracefully if
+# those secrets aren't configured in the repo — same behavior as running
+# locally without a full .env.local. Add them under
+# Settings > Secrets and variables > Actions to unlock that coverage in CI.
+
+on:
+  push:
+    branches: [main, develop]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+  pull_request:
+    branches: [main, develop]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+  workflow_dispatch:
+
+jobs:
+  playwright-e2e:
+    name: Playwright — Full E2E suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      PLAYWRIGHT_BASE_URL: https://mermelada-tomate.vercel.app
+      PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      PLAYWRIGHT_WAITER_PIN: ${{ secrets.PLAYWRIGHT_WAITER_PIN }}
+      PLAYWRIGHT_WAITER_TOKEN: ${{ secrets.PLAYWRIGHT_WAITER_TOKEN }}
+      PLAYWRIGHT_ADMIN_EMAIL: ${{ secrets.PLAYWRIGHT_ADMIN_EMAIL }}
+      PLAYWRIGHT_ADMIN_PASSWORD: ${{ secrets.PLAYWRIGHT_ADMIN_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run full E2E suite
+        run: npx playwright test e2e/ --reporter=list
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-e2e-report
+          path: playwright-report/
+          retention-days: 30

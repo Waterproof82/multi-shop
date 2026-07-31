@@ -305,7 +305,17 @@ export function WaiterBanner() {
       .channel(channelNameRef.current)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos', filter: `empresa_id=eq.${waiterEmpresaId}` }, triggerUpdate)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados', filter: `empresa_id=eq.${waiterEmpresaId}` }, triggerUpdate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'mesa_sesiones', filter: `empresa_id=eq.${waiterEmpresaId}` }, () => {
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('[Realtime] waiter-banner error:', status);
+        }
+      });
+
+    // mesa_sesiones no longer grants anon SELECT (RLS hardening) — postgres_changes
+    // never fires here. mesa_sesiones_notify_update broadcasts on this channel instead.
+    const broadcastMesaSesion = supabase
+      .channel('mesa-sesion-update')
+      .on('broadcast', { event: 'update' }, () => {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
           void fetchCounts();
@@ -315,7 +325,7 @@ export function WaiterBanner() {
       })
       .subscribe((status) => {
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('[Realtime] waiter-banner error:', status);
+          console.error('[Realtime] mesa-sesion-update broadcast error (banner):', status);
         }
       });
 
@@ -348,6 +358,7 @@ export function WaiterBanner() {
       void supabase.removeChannel(channel);
       void supabase.removeChannel(broadcastNewOrder);
       void supabase.removeChannel(broadcastItems);
+      void supabase.removeChannel(broadcastMesaSesion);
     };
   }, [isWaiter, mesaId, fetchLock, pathname, isTabVisible, waiterEmpresaId]);
 

@@ -93,17 +93,22 @@ export function MostradorClient({ initialMesa }: Readonly<Props>) {
       .on('broadcast', { event: 'item-update' }, refresh)
       .subscribe();
 
-    // postgres_changes on pedidos: catches estado changes (e.g. auto-cancel) that
-    // arrive after the transaction commits — more reliable than the async broadcast
-    // for the case where all items are cancelled from waiter pendientes.
+    // pedidos no longer grants anon SELECT (RLS hardening), so postgres_changes
+    // never fires here — the pedidos_notify_estado_update trigger broadcasts on
+    // 'pedido-estado-update' instead. That trigger only fires AFTER
+    // pedidos.estado actually changes within the transaction (e.g. once
+    // fn_auto_cancel_pedido_when_all_items_cancelled has run), preserving the
+    // same commit-safety property postgres_changes had — this is what avoids
+    // the item-update-vs-auto-cancel race documented in
+    // docs/context/realtime-channels.md (trampa #6). Public channel shared by
+    // every pedido in the company, so filter by sesionId client-side.
     const sesionId = mesa.sesionId;
     const chPedidos = supabase
-      .channel(`tpv-pedidos-${sesionId}`)
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `sesion_id=eq.${sesionId}` },
-        refresh
-      )
+      .channel('pedido-estado-update')
+      .on('broadcast', { event: 'update' }, (message: { payload: Record<string, unknown> }) => {
+        if (message.payload['sesionId'] !== sesionId) return;
+        refresh();
+      })
       .subscribe();
 
     return () => {
@@ -121,23 +126,22 @@ export function MostradorClient({ initialMesa }: Readonly<Props>) {
     const sesionId = mesa.sesionId;
     const mesaNumero = mesa.mesaNumero;
 
+    // mesa_sesiones no longer grants anon SELECT (RLS hardening), so postgres_changes
+    // never fires here — mesa_sesiones_notify_update broadcasts on 'mesa-sesion-update'
+    // instead (public channel shared by every mesa, filter by sesionId client-side).
     const ch = supabase
-      .channel(`tpv-sesion-close-${sesionId}`)
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'mesa_sesiones', filter: `id=eq.${sesionId}` },
-        (payload) => {
-          const row = payload.new as { cerrada_at: string | null; sesion_pagada: boolean };
-          if (row.cerrada_at) {
-            setExternalCobro(`La mesa ${mesaNumero} ha sido cobrada desde otro canal.`);
-            setIsSesionPagada(false);
-            setYaCobradoCents(0);
-            clearMesa();
-          } else if (row.sesion_pagada) {
-            setIsSesionPagada(true);
-          }
+      .channel('mesa-sesion-update')
+      .on('broadcast', { event: 'update' }, (message: { payload: Record<string, unknown> }) => {
+        if (message.payload['sesionId'] !== sesionId) return;
+        if (message.payload['cerradaAt']) {
+          setExternalCobro(`La mesa ${mesaNumero} ha sido cobrada desde otro canal.`);
+          setIsSesionPagada(false);
+          setYaCobradoCents(0);
+          clearMesa();
+        } else if (message.payload['sesionPagada']) {
+          setIsSesionPagada(true);
         }
-      )
+      })
       .subscribe();
 
     return () => { void supabase.removeChannel(ch); };

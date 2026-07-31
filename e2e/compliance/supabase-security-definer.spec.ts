@@ -52,6 +52,8 @@ const TRIGGER_FUNCTIONS_MUST_BE_BLOCKED = [
   'notify_waiter_new_order',
   'notify_waiter_order_validated',
   'push_on_new_order',
+  'notify_mesa_sesion_update',
+  'notify_pedido_estado_update',
 ] as const;
 
 // Funciones SECURITY DEFINER que exponen acceso a anon de forma INTENCIONAL.

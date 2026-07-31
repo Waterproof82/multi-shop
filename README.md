@@ -305,16 +305,23 @@ Ver [`docs/context/sentry-monitoring.md`](docs/context/sentry-monitoring.md).
 ## Comandos
 
 ```bash
-pnpm dev          # Desarrollo con Turbopack
-pnpm build        # Build de producción
-pnpm lint         # Linting
-pnpm db:smoke     # Smoke tests de funciones DB (obligatorio tras cada migración)
-pnpm e2e:db       # E2E smoke tests via Playwright
-pnpm e2e          # Suite E2E completa
+pnpm dev              # Desarrollo con Turbopack
+pnpm build            # Build de producción
+pnpm lint             # Linting
+pnpm typecheck        # Type check completo (tsc --noEmit)
+pnpm test:compliance  # Tests estáticos rápidos (Vitest) — secrets, patrones inseguros
+pnpm db:smoke         # Smoke tests de funciones DB (obligatorio tras cada migración)
+pnpm e2e:db           # E2E smoke tests via Playwright
+pnpm e2e              # Suite E2E completa
+npx playwright test e2e/compliance/  # Solo la suite de compliance (RLS, inalterabilidad, RGPD)
 
 # Setup R2 CORS (una sola vez)
 npx tsx scripts/setup-r2-cors.ts
 ```
+
+### Git hooks y CI
+
+`pnpm install` activa automáticamente los hooks de Husky: `pre-commit` corre lint+typecheck, `pre-push` corre la suite completa de compliance. GitHub Actions corre `ci.yml` (lint/typecheck/build), `compliance.yml` (tests legales/fiscales, path-filtered + nightly) y `e2e.yml` (suite E2E completa) en cada push/PR. Detalle completo en [`docs/context/testing-ci.md`](docs/context/testing-ci.md).
 
 ---
 
@@ -395,6 +402,7 @@ WAITER_PIN_PEPPER=
 | Documento | Contenido |
 |-----------|-----------|
 | [`docs/context/security.md`](docs/context/security.md) | Medidas de seguridad detalladas |
+| [`docs/context/testing-ci.md`](docs/context/testing-ci.md) | Suites de test, Husky hooks, workflows de CI |
 | [`docs/context/bbdd.md`](docs/context/bbdd.md) | Esquema completo de base de datos |
 | [`docs/tpv-legal-compliance.md`](docs/tpv-legal-compliance.md) | Checklist legal TPV (Ley Antifraude, VeriFactu, RGPD, PCI-DSS) |
 | [`docs/context/legal-compliance.md`](docs/context/legal-compliance.md) | Registro de leyes y normativas |

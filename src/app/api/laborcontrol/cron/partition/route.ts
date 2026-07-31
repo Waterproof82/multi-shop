@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getLcChainRepo } from '@/core/laborcontrol/infrastructure';
+import { verifyCronSecret } from '@/lib/cron-auth';
 
 // GET /api/laborcontrol/cron/partition
 // Vercel Cron job — creates next month's partition
 // Secured by CRON_SECRET
 export async function GET(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  const authHeader = req.headers.get('authorization');
-
-  if (!secret || authHeader !== `Bearer ${secret}`) {
+  if (!verifyCronSecret(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
