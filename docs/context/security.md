@@ -555,6 +555,7 @@ Al mismo tiempo se encontró un segundo patrón, más sutil, en `categorias`/`cl
 - `public_role_identity_scoped_fn` — una policy `roles:public` que llama `get_mi_empresa_id()` o `auth.uid()`
 - `public_role_blanket_true` — una policy `roles:public` con `USING`/`WITH CHECK (true)` fuera de la whitelist de catálogo público (`categorias`, `empresas`, `productos`). Cierra el mismo hueco que dejó "Public can select idioma": una RESTRICTIVE deny-all solo protege a `anon`, nunca a `authenticated` — este patrón puede filtrar PII cross-tenant a cualquier sesión autenticada sin que ninguna otra policy lo evite.
 - `rls_disabled` — una tabla de `public` sin RLS habilitado
+- `view_missing_security_invoker` — una `VIEW` (o vista materializada) sin `security_invoker = true`. Sin ese flag, la vista corre con los privilegios de quien la creó, no de quien la consulta — puede saltarse RLS de las tablas subyacentes por completo, el mismo riesgo que una función `SECURITY DEFINER` sin `REVOKE`. No hay vistas en `public` a día de hoy (verificado con una vista de prueba: el chequeo la detectó correctamente antes de eliminarla), pero queda activo para la primera que se cree sin que quien la escriba conozca esta trampa. Las vistas materializadas no tienen modo invoker — cualquiera expuesta a `anon`/`authenticated` cae aquí siempre.
 
 Cubierta por `e2e/compliance/rls-policy-hygiene.spec.ts` (corre en CI en cada push/PR que toque `supabase/migrations/**`, ver [`testing-ci.md`](./testing-ci.md)). Cualquier tabla nueva que reintroduzca alguno de estos dos patrones hace fallar el test — no hace falta acordarse de revisarlo a mano.
 
@@ -565,6 +566,16 @@ Escanea `information_schema.role_routine_grants` para **toda** función no-trigg
 **Incidente BAJA-01 follow-up (2026-07-31):** el audit de seguridad del 2026-07-30 (BAJA-01) ya había identificado y revocado `acquire_mesa_lock`, `claim_and_create_division_pago` y `claim_custom_turn` — funciones `SECURITY INVOKER` de la familia de pago por turnos personalizados, expuestas sin necesidad vía `/rest/v1/rpc/*`. Al ampliar el escaneo más allá de `SECURITY DEFINER`, aparecieron 6 funciones hermanas de la misma familia que esa pasada no cubrió: `cancel_custom_turn`, `commit_custom_payment`, `complete_custom_payment`, `switch_to_equal_split_remaining`, `update_custom_selection`, `get_next_pedido_number`. Verificado en vivo: el daño real ya estaba mitigado por RLS (RESTRICTIVE deny-all en `mesa_pagos_personalizados`/`mesa_item_pagos`/`mesa_sesiones`/`pedidos` — llamarlas como `anon` con un UUID real o falso devuelve el mismo `TURNO_NOT_FOUND`, sin distinguir), pero depender solo de RLS como única capa para un RPC de mutación de pagos directamente invocable es exactamente la exposición innecesaria que BAJA-01 ya había decidido cerrar. Las 6 se usan exclusivamente server-side con `service_role` (`src/core/application/use-cases/payment/*`) — revocadas con el mismo patrón.
 
 Cubierta por `e2e/compliance/supabase-security-definer.spec.ts` (capa 1: intento directo; capa 2: escaneo completo).
+
+### Superficies verificadas sin hallazgos (2026-07-31, segunda pasada)
+
+Tras encontrar el hueco de RPCs `SECURITY INVOKER` de arriba, se revisaron otras superficies del mismo tipo (¿qué otra cosa tiene un default inseguro que nadie audita sistemáticamente?) — resultado limpio, documentado para no repetir la revisión sin motivo:
+
+- **Vistas** (`CREATE VIEW`) — ninguna existe en `public` hoy. Ver `view_missing_security_invoker` más abajo: queda un chequeo permanente para la primera que se cree.
+- **Supabase Storage** — el bucket `app-releases` (distribución del APK Android) es privado, con una única policy en `storage.objects` scopeada a `service_role` para todos los comandos. `anon`/`authenticated` no tienen ninguna policy — deny-all por ausencia.
+- **Secuencias** — `pedidos_numero_pedido_seq`, `lc_fichajes_chain_seq`, `rgpd_purge_log_id_seq` tienen `USAGE` (no `SELECT`) para `anon`/`authenticated`. `USAGE` solo habilita `nextval()` para INSERTs propios — no permite leer el valor actual vía REST (PostgREST no expone secuencias como recurso). Sin riesgo de fuga de volumen de negocio.
+- **Schema `vault`** (Supabase Vault, secrets encriptados) — `anon`/`authenticated` no tienen ni `USAGE` sobre el schema, verificado con `has_schema_privilege`. Inaccesible por completo. No se usa en el proyecto actualmente.
+- **Funciones que referencian `auth.users`** — ninguna en `public`. Sin vector de fuga de emails de admins vía una función/vista intermedia.
 
 ### Lecturas públicas
 

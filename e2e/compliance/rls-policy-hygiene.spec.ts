@@ -32,6 +32,15 @@
  * service_role) y falla si CUALQUIER tabla del schema reintroduce alguno de
  * estos dos patrones, o si alguna tabla pierde RLS por completo.
  *
+ * 2026-07-31 (segunda pasada, tras encontrar 6 RPCs SECURITY INVOKER
+ * expuestas sin necesidad — ver supabase-security-definer.spec.ts): se
+ * añadió un 5º chequeo por la misma clase de problema en otro objeto de DB —
+ * una VIEW sin `security_invoker = true` corre con los privilegios de quien
+ * la creó, no de quien la consulta, pudiendo saltarse RLS igual que una
+ * función SECURITY DEFINER. No hay vistas en `public` hoy, pero el chequeo
+ * queda activo para la primera que se cree sin que quien la escriba sepa
+ * esta trampa.
+ *
  * Requiere: NEXT_PUBLIC_SUPABASE_URL + PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY
  * (o SUPABASE_SERVICE_ROLE_KEY)
  */
@@ -44,7 +53,12 @@ function serviceRoleKey(): string | undefined {
 function anonKey(): string | undefined { return process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY; }
 
 interface HygieneViolation {
-  check_name: 'permissive_anon_deny' | 'public_role_identity_scoped_fn' | 'public_role_blanket_true' | 'rls_disabled';
+  check_name:
+    | 'permissive_anon_deny'
+    | 'public_role_identity_scoped_fn'
+    | 'public_role_blanket_true'
+    | 'rls_disabled'
+    | 'view_missing_security_invoker';
   tablename: string;
   policyname: string | null;
   detail: string;
@@ -179,6 +193,38 @@ test.describe('RLS Policy Hygiene — escaneo completo del schema (service_role)
     if (violations.length > 0) {
       const list = violations.map(v => `  - ${v.tablename}`).join('\n');
       throw new Error(`SEGURIDAD: tablas sin RLS habilitado:\n${list}\n\nAplicar: ALTER TABLE public.<tabla> ENABLE ROW LEVEL SECURITY;`);
+    }
+    expect(violations).toHaveLength(0);
+  });
+
+  test('ninguna vista del schema public carece de security_invoker=true', async ({ request }) => {
+    const res = await request.post(`${supabaseUrl()}/rest/v1/rpc/check_rls_policy_hygiene`, {
+      headers: {
+        apikey: serviceRoleKey()!,
+        Authorization: `Bearer ${serviceRoleKey()!}`,
+        'Content-Type': 'application/json',
+      },
+      data: {},
+    });
+
+    if (res.status() === 404) {
+      test.skip(true, 'check_rls_policy_hygiene RPC no existe');
+      return;
+    }
+
+    expect(res.status()).toBe(200);
+    const rows = (await res.json()) as HygieneViolation[];
+    const violations = rows.filter(r => r.check_name === 'view_missing_security_invoker');
+
+    if (violations.length > 0) {
+      const list = violations.map(v => `  - ${v.tablename} (${v.detail})`).join('\n');
+      throw new Error(
+        `SEGURIDAD: vistas sin security_invoker=true:\n${list}\n\n` +
+          `Una vista sin security_invoker=true corre con los privilegios de quien la creó, no de quien la consulta — ` +
+          `puede saltarse RLS de las tablas subyacentes por completo, el mismo riesgo que una función SECURITY DEFINER. ` +
+          `Aplicar: ALTER VIEW public.<vista> SET (security_invoker = true); ` +
+          `(las vistas materializadas no tienen este modo — nunca deben exponerse a anon/authenticated si tocan datos sensibles).`
+      );
     }
     expect(violations).toHaveLength(0);
   });
