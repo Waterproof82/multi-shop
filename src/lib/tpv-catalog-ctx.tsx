@@ -97,7 +97,6 @@ export function TpvCatalogProvider({
   const instanceId = useId().replace(/:/g, '-');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const catalogChannelName = useRef(`tpv-catalog-${instanceId}`);
-  const mesasChannelName = useRef(`tpv-mesas-${instanceId}`);
 
   const refreshCatalog = useCallback(async () => {
     const res = await fetch('/api/tpv/catalog');
@@ -159,13 +158,13 @@ export function TpvCatalogProvider({
       }, scheduleCatalogRefresh)
       .subscribe();
 
+    // mesa_sesiones no longer grants anon SELECT (RLS hardening) — postgres_changes
+    // never fires here. mesa_sesiones_notify_update broadcasts on this channel instead.
+    // Channel name must match the trigger's topic exactly ('mesa-sesion-update') —
+    // for Broadcast, the channel name is the routing key, unlike postgres_changes filters.
     const mesasCh = supabase
-      .channel(mesasChannelName.current)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'mesa_sesiones',
-      }, () => { void refreshMesas(); })
+      .channel('mesa-sesion-update')
+      .on('broadcast', { event: 'update' }, () => { void refreshMesas(); })
       .subscribe();
 
     // postgres_changes on pedidos requires authenticated role — anon client never

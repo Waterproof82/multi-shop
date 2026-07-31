@@ -528,17 +528,34 @@ RLS está habilitado en todas las tablas de `public`. La app usa `service_role` 
 
 ### Políticas de denegación anónima (RESTRICTIVE)
 
-Las tablas sensibles tienen políticas `AS RESTRICTIVE FOR ALL TO anon USING (false)`. Las políticas RESTRICTIVE usan lógica AND — garantizan denegación incluso si otras políticas permissivas concedieran acceso:
+**Todas** las políticas `No direct anon access to <tabla>` / `No anon access to <tabla>` del schema `public` son `AS RESTRICTIVE FOR ALL TO anon USING (false)`. Las políticas RESTRICTIVE usan lógica AND contra el resto de políticas — garantizan denegación incluso si una política PERMISSIVE (`USING (true)` o similar) concediera acceso, sin importar en qué orden se evalúen ni qué se añada después.
 
-| Tabla | Política |
-|-------|---------|
-| `clientes` | `No direct anon access to clientes` — RESTRICTIVE |
-| `pedidos` | `No direct anon access to pedidos` — RESTRICTIVE |
-| `perfiles_admin` | `No direct anon access to perfiles_admin` — RESTRICTIVE |
-| `promociones` | `No direct anon access to promociones` — RESTRICTIVE |
-| `log_errors` | `No direct anon access to log_errors` — RESTRICTIVE |
+`clientes`, `pedidos`, `perfiles_admin`, `promociones` y `log_errors` ya eran RESTRICTIVE desde una auditoría anterior (rama `security/owasp-audit-july-2026`). El resto del schema (44 tablas más — `mesa_sesiones`, `pedido_item_estados`, `tpv_cobros`, `lc_fichajes*`, `empleados_tpv`, tablas de compras/proveedores, etc.) usaba PERMISSIVE hasta el 2026-07-31, tras un incidente que expuso el motivo: ver más abajo.
 
-> Estas políticas fueron convertidas de PERMISSIVE a RESTRICTIVE para garantizar que `anon` nunca acceda a estos datos, independientemente de otras políticas que puedan existir.
+### Incidente 2026-07-31 — fuga cross-tenant vía RLS PERMISSIVE + Realtime
+
+La migración `20260627000001_realtime_anon_select_policies.sql` añadió policies `USING (true)` para `anon` en `pedidos`, `mesa_sesiones` y `pedido_item_estados`, con la intención de que Realtime `postgres_changes` llegara a suscriptores `anon`. El problema: una policy RLS permisiva también abre la tabla a lectura directa vía PostgREST (`GET /rest/v1/pedidos?select=*`) — cualquiera con la `anon key` pública podía leer pedidos de **todas** las empresas (dirección de entrega, coordenadas GPS, contenido y total de cada pedido).
+
+`pedidos` tenía además, desde antes, una policy `"Anon puede leer pedido por tracking_token"` (`USING (tracking_token IS NOT NULL)`) — quedó neutralizada por la RESTRICTIVE deny-all al arreglar esto, y es código muerto: el tracking de pedidos siempre pasó por rutas server-side con `service_role`, nunca por REST directo con `anon`. Se dejó documentada, no se eliminó.
+
+Al mismo tiempo se encontró un segundo patrón, más sutil, en `categorias`/`clientes`/`empresas`/`mesas`/`pedidos`/`productos`: policies "Admin ..." con `roles: public` (que incluye `anon`) cuyo `USING`/`WITH CHECK` llama a `get_mi_empresa_id()` — función accesible solo por `authenticated`. Postgres evalúa **todas** las policies permisivas aplicables a un rol; al volverse `anon` elegible para esa evaluación (tras un cambio de GRANT en otro punto), la función lanzaba `permission denied` en vez de una denegación limpia. No era una fuga (el acceso seguía denegado), pero es un modo de fallo frágil y no determinista. Se corrigió re-escopeando esas policies a `TO authenticated` (su intención real). El mismo patrón, con `auth.uid()` en vez de `get_mi_empresa_id()`, apareció en `perfiles_admin`/`promociones` — `auth.uid()` no lanza error para `anon` (devuelve `NULL` limpio), así que ahí no había ni siquiera el riesgo de fallo frágil, pero se corrigió igual por consistencia.
+
+**Fix aplicado** (migraciones `20260731000002` a `20260731000012`):
+1. Mitigación táctica inmediata: `REVOKE`/`GRANT` de columna para restringir `anon` a las columnas mínimas necesarias en las 3 tablas.
+2. Migración de las señales de Realtime hacia `anon` de `postgres_changes` a **Broadcast** (`realtime.send()` desde triggers dedicados, payload mínimo sin PII) — ver [`realtime-channels.md`](./realtime-channels.md).
+3. Eliminación total de las 3 policies `USING (true)`.
+4. Re-escopeo de las 6+2 policies `roles:public` a `authenticated`.
+5. Conversión sistémica de las 46 policies "no anon access" restantes de PERMISSIVE a RESTRICTIVE en todo el schema — la corrección de la causa raíz, no solo de los síntomas encontrados.
+
+### Función de auditoría — `check_rls_policy_hygiene()`
+
+`SECURITY DEFINER`, solo accesible con `service_role` (mismo patrón que `check_security_definer_grants()` más abajo). Escanea `pg_policies` completo y devuelve violaciones de 3 tipos:
+
+- `permissive_anon_deny` — un "no anon access" que sea PERMISSIVE en vez de RESTRICTIVE
+- `public_role_identity_scoped_fn` — una policy `roles:public` que llama `get_mi_empresa_id()` o `auth.uid()`
+- `rls_disabled` — una tabla de `public` sin RLS habilitado
+
+Cubierta por `e2e/compliance/rls-policy-hygiene.spec.ts` (corre en CI en cada push/PR que toque `supabase/migrations/**`, ver [`testing-ci.md`](./testing-ci.md)). Cualquier tabla nueva que reintroduzca alguno de estos dos patrones hace fallar el test — no hace falta acordarse de revisarlo a mano.
 
 ### Lecturas públicas
 
@@ -646,6 +663,26 @@ El endpoint existe para conveniencia en desarrollo pero nunca debe ejecutarse en
 
 ---
 
+## CRON_SECRET — comparación en tiempo constante
+
+Todos los endpoints `GET /api/cron/*` y `GET /api/laborcontrol/cron/*` verifican el header `Authorization: Bearer <CRON_SECRET>` a través del helper compartido `verifyCronSecret()` en `src/lib/cron-auth.ts`, que usa `timingSafeEqual` en vez de comparación de string directa (`!==`). Comparar strings con `!==` filtra timing information proporcional a los bytes que coinciden — evitable a coste cero.
+
+```typescript
+export function verifyCronSecret(req: NextRequest): boolean {
+  const secret = process.env.CRON_SECRET;
+  const authHeader = req.headers.get('authorization');
+  if (!secret || !authHeader) return false;
+  const expected = Buffer.from(`Bearer ${secret}`);
+  const actual = Buffer.from(authHeader);
+  if (expected.length !== actual.length) return false;
+  return timingSafeEqual(expected, actual);
+}
+```
+
+El test estático `tests/compliance/cron-secret-timing-safe.test.ts` falla si algún endpoint nuevo lee `CRON_SECRET` sin pasar por este helper.
+
+---
+
 ## Tests E2E — suite de seguridad
 
 `e2e/waiter-csrf.spec.ts` — tests Playwright en modo API (sin browser) que verifican:
@@ -659,6 +696,10 @@ El endpoint existe para conveniencia en desarrollo pero nunca debe ejecutarse en
 | `POST /api/kitchen/*` → 401/403 | Kitchen hereda el guard |
 | RLS `lc_fichajes_2026_07` anon | PostgREST devuelve 0 filas o 404 |
 | RLS `lc_fichajes_2026_08` anon | PostgREST devuelve 0 filas o 404 |
+
+`e2e/compliance/anon-realtime-column-privileges.spec.ts` — verifica que `anon` nunca puede leer `select=*` ni columnas sensibles de `pedidos`/`mesa_sesiones`/`pedido_item_estados`, y que las columnas mínimas otorgadas siempre devuelven 0 filas (RLS). Regresión dedicada al incidente 2026-07-31 de más arriba.
+
+`e2e/compliance/rls-policy-hygiene.spec.ts` — escanea **todo** el schema (no solo las tablas del incidente) buscando los dos patrones RESTRICTIVE/`roles:public` descritos arriba. Ver detalle completo en [`testing-ci.md`](./testing-ci.md).
 
 Configuración en `playwright.config.ts`. Para ejecutar:
 
@@ -1050,5 +1091,5 @@ Lista de las 10 vulnerabilidades web más críticas publicada por la Open Web Ap
 | `unsafe-inline` en `style-src` | Low | Estándar para la mayoría de aplicaciones Next.js. Mejorable con style nonces si el framework lo soporta en el futuro. |
 | Order number gaps | Low | Si el INSERT falla tras `get_next_pedido_number`, el número se pierde. Operacionalmente menor, no es riesgo de seguridad. |
 | Rate limit por tenant en pedidos públicos | Low | La creación de pedidos y clientes usa rate limit por IP. Para tenants con mucho tráfico legítimo desde IPs compartidas (NAT corporativo), considerar rate limit compuesto `empresaId:ip`. |
-| Leaked password protection (Supabase Auth) | Info | Requiere plan Pro de Supabase. Aceptado como riesgo conocido — el login de admin usa `auth.users` gestionado internamente, no contraseñas de usuarios finales. Ver `openspec/changes/security-hardening/manual-steps.md` cuando se actualice al plan Pro. |
+| Leaked password protection (Supabase Auth) | Info | Requiere plan Pro de Supabase. Aceptado como riesgo conocido — el login de admin usa `auth.users` gestionado internamente, no contraseñas de usuarios finales. Activar en Dashboard → Auth → Policies cuando se actualice al plan Pro. |
 | `get_mi_empresa_id()` callable por authenticated | Info | Intencional — necesario para cláusulas USING de RLS policies. No es un vector de ataque: la función solo devuelve el empresaId del admin autenticado. |

@@ -1,21 +1,30 @@
 # Realtime Channels — Waiter System
 
+## Anon y RLS — regla de oro (desde 2026-07-31)
+
+`anon` **no tiene SELECT** sobre `pedidos`, `mesa_sesiones` ni `pedido_item_estados` — la deny-all de esas 3 tablas (y de las 44 restantes con datos no públicos) es `RESTRICTIVE`, así que `postgres_changes` **nunca** entrega eventos a un cliente `anon` para esas tablas, sin importar el `filter`. Ver [`security.md`](./security.md#incidente-2026-07-31--fuga-cross-tenant-vía-rls-permissive--realtime) para el porqué.
+
+**Toda señal de Realtime hacia un cliente `anon` en estas 3 tablas se hace exclusivamente vía Broadcast** (`realtime.send()` desde un trigger dedicado), nunca vía `postgres_changes`. Si necesitás que un componente reaccione a un cambio en `pedidos`/`mesa_sesiones`/`pedido_item_estados` y corre con `getSupabaseAnonClient()` o un cliente anon dedicado, el trigger de broadcast tiene que existir ya o crearse — no se puede resolver agregando una policy RLS permisiva a la tabla (eso es exactamente el bug de origen).
+
+Las suscripciones `postgres_changes` a estas 3 tablas que quedan en el código (WaiterBanner, `/kitchen`, `/waiter/kitchen`, `/waiter/bar`, `/waiter/pendientes`) son no-ops inofensivos para `anon` — nunca reciben nada, pero las señales que necesitan ya les llegan por Broadcast en paralelo (`waiter-new-order`, `waiter-items-update`). No es necesario eliminarlas activamente, pero tampoco agregar nuevas.
+
 ## Arquitectura de canales activa
 
 | Canal | Tipo | Tabla/evento | Quien escucha |
 |---|---|---|---|
-| `waiter-banner-{uid}` | postgres_changes | pedidos, pedido_item_estados, mesa_sesiones | WaiterBanner |
+| `waiter-banner-{uid}` | postgres_changes (no-op para anon, ver arriba) | pedidos, pedido_item_estados | WaiterBanner |
 | `waiter-new-order` | broadcast `new-order` | trigger notify_waiter_new_order (todos los INSERTs) | WaiterBanner, MostradorClient |
 | `waiter-new-order-kitchen` | broadcast `new-order` | trigger notify_waiter_new_order | WaiterKitchenPage |
 | `waiter-new-order-bar` | broadcast `new-order` | trigger notify_waiter_new_order | BarPage |
 | `waiter-items-update` | broadcast `item-update` | trigger notify_waiter_items_update + trigger pedidos_notify_item_update | WaiterBanner, BarPage, MostradorClient, TpvCatalogProvider |
-| `tpv-pedidos-{sesionId}` | postgres_changes | pedidos (UPDATE, filter sesion_id) | MostradorClient |
-| `tpv-sesion-close-{sesionId}` | postgres_changes | mesa_sesiones (UPDATE, filter id) | MostradorClient |
-| `waiter-kitchen-{uid}` | postgres_changes | pedido_item_estados, pedidos | WaiterKitchenPage |
-| `waiter-bar-{uid}` | postgres_changes | pedido_item_estados, pedidos | BarPage |
-| `waiter-pendientes-{uid}` | postgres_changes | pedidos, pedido_item_estados, mesa_sesiones | WaiterPendientesPage |
-| `waiter-login-mesas-{uid}` | postgres_changes | mesa_sesiones | WaiterLoginForm |
-| `kitchen-standalone` | postgres_changes | pedido_item_estados, pedidos | /kitchen page |
+| `mesa-sesion-update` | broadcast `update` | trigger notify_mesa_sesion_update (INSERT/UPDATE en mesa_sesiones) | WaiterBanner, ClientMenuPage, TpvCatalogProvider, MesaOrdersClient, MostradorClient |
+| `pedido-estado-update` | broadcast `update` | trigger notify_pedido_estado_update (UPDATE OF estado en pedidos) | MostradorClient |
+| `waiter-kitchen-{uid}` | postgres_changes (no-op para anon) | pedido_item_estados, pedidos | WaiterKitchenPage |
+| `waiter-bar-{uid}` | postgres_changes (no-op para anon) | pedido_item_estados, pedidos | BarPage |
+| `waiter-pendientes-{uid}` | postgres_changes (no-op para anon) | pedidos, pedido_item_estados | WaiterPendientesPage |
+| `kitchen-standalone` | postgres_changes (no-op para anon) | pedido_item_estados, pedidos | /kitchen page |
+
+> `waiter-login-mesas-{uid}` (postgres_changes en mesa_sesiones) se eliminó — `WaiterLoginForm` escucha el DOM relay `waiter-realtime-update` que dispara `WaiterBanner` en su lugar (evita competir por `mesa-sesion-update` en el cliente singleton, ver trampa #4).
 
 ## DOM relay: `waiter-realtime-update`
 
@@ -72,6 +81,14 @@ Cuando el camarero elimina items desde el ticket del waiter, `removeSessionItemU
 
 ### 6. Race condition broadcast vs. auto-cancel en MostradorClient
 
-`realtime.send()` dentro de un trigger de DB es asincronico: el broadcast `item-update` puede llegar al cliente antes de que la transaccion que cancela el pedido commitee. El refresh inmediato devuelve el pedido todavia activo.
+Cuando se cancela el último ítem de un pedido, dos triggers separados se disparan sobre el mismo evento de `pedido_item_estados`: `notify_waiter_items_update` (dispara `item-update` de inmediato) y `fn_auto_cancel_pedido_when_all_items_cancelled` (recién después actualiza `pedidos.estado = 'cancelado'`, dentro de la misma transacción). Si `MostradorClient` hace `refresh()` apenas recibe `item-update`, puede llegar a leer `pedidos` **antes** de que el `UPDATE estado` del segundo trigger haya corrido — el pedido sigue viéndose activo.
 
-**Fix:** `postgres_changes` en `pedidos` filtrado por `sesion_id` (canal `tpv-pedidos-{sesionId}`) en `MostradorClient`. Ese evento es transaccional y solo llega despues del commit completo.
+**Fix histórico (hasta 2026-07-31):** `postgres_changes` en `pedidos` filtrado por `sesion_id` (canal `tpv-pedidos-{sesionId}`) — CDC basado en WAL, solo entrega después del commit completo, así que llegaba después de que `fn_auto_cancel_pedido_when_all_items_cancelled` ya hubiera corrido.
+
+**Fix actual:** ese `postgres_changes` dejó de funcionar para `anon` cuando `pedidos` pasó a RESTRICTIVE deny-all (ver arriba). Se reemplazó por un trigger de broadcast dedicado — `notify_pedido_estado_update()`, `AFTER UPDATE OF estado ON pedidos` — que solo se dispara una vez que `pedidos.estado` ya cambió *dentro de la misma transacción* (es decir, después de que `fn_auto_cancel_pedido_when_all_items_cancelled` corrió), preservando la misma garantía de ordenamiento sin depender de RLS. Canal `pedido-estado-update`, filtrado por `sesionId` en el cliente. Mismo patrón aplicado a `tpv-sesion-close-{sesionId}` (ahora parte del payload de `mesa-sesion-update`, con `sesionId` y `cerradaAt` agregados).
+
+### 7. Canal de Broadcast = clave de ruteo, no identificador libre
+
+Para `postgres_changes`, el nombre pasado a `.channel(nombre)` es arbitrario — el ruteo real lo hace el `filter` sobre la tabla. Para Broadcast, el nombre del canal **es** la clave de ruteo: tiene que coincidir exactamente con el tercer argumento de `realtime.send(payload, event, topic, private)` en el trigger, o el cliente nunca recibe nada (sin error, sin warning — el canal simplemente queda mudo).
+
+Error cometido dos veces implementando el fix del incidente 2026-07-31: crear `.channel(`mesa-payment:${mesa}`)` o `.channel(`mesa-orders-broadcast-${mesaId}`)` (nombres únicos por instancia, el hábito correcto para `postgres_changes`) para escuchar un broadcast — nunca llegaba nada porque el trigger manda a `'mesa-sesion-update'` literal, no a esos nombres. Filtrar por mesa/sesión debe hacerse **dentro** del handler, leyendo el payload (`message.payload['mesaId'] !== mesaId`), no en el nombre del canal.

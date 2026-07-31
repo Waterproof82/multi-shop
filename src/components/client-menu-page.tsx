@@ -124,16 +124,17 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
+    // Channel name MUST match the topic the mesa_sesiones_notify_update trigger
+    // broadcasts to ('mesa-sesion-update') — for Realtime Broadcast routing, the
+    // channel name IS the routing key, unlike postgres_changes filters.
     const channel = supabase
-      .channel(`mesa-payment:${mesa}`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'mesa_sesiones',
-        filter: `mesa_id=eq.${mesa}`,
-      }, (payload: { new: Record<string, unknown> }) => {
-        const pagoEnCurso = payload.new['pago_en_curso'] === true;
-        const sesionPagada = payload.new['sesion_pagada'] === true;
+      .channel('mesa-sesion-update')
+      .on('broadcast', { event: 'update' }, (message: { payload: Record<string, unknown> }) => {
+        // Public broadcast channel — fired for every mesa in the company, so filter
+        // client-side to the mesa this component cares about.
+        if (message.payload['mesaId'] !== mesa) return;
+        const pagoEnCurso = message.payload['pagoEnCurso'] === true;
+        const sesionPagada = message.payload['sesionPagada'] === true;
         if (isWaiterMode) {
           if (pagoEnCurso || sesionPagada) {
             setWaiterMesaLocked(true);
