@@ -42,7 +42,7 @@ Los workflows de Playwright pasan `PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY`, `NEXT_
 
 Patrón establecido en el incidente RLS del 2026-07-31 (ver [`security.md`](./security.md)):
 
-1. **Si el chequeo necesita introspección SQL** (policies, grants, `pg_catalog`) que PostgREST no expone directo: crear una función `SECURITY DEFINER` en una migración que envuelva la query, con los 3 `REVOKE` + `GRANT TO service_role` de siempre (ver plantilla en `security.md` → "Funciones SECURITY DEFINER"). Ejemplos: `check_security_definer_grants()`, `check_rls_policy_hygiene()`.
+1. **Si el chequeo necesita introspección SQL** (policies, grants, `pg_catalog`) que PostgREST no expone directo: crear una función `SECURITY DEFINER` en una migración que envuelva la query, con los 3 `REVOKE` + `GRANT TO service_role` de siempre (ver plantilla en `security.md` → "Funciones SECURITY DEFINER"). Ejemplos: `check_public_function_grants()`, `check_rls_policy_hygiene()`.
 2. **El test Playwright** llama esa función vía `POST /rest/v1/rpc/<nombre>` con `PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY`, y agrega un test extra que confirma que la función **no** es callable con la `anon` key (200 = fallo crítico, la propia auditoría quedó expuesta).
 3. **Preferí un chequeo de todo el schema sobre uno tabla-por-tabla** cuando el patrón lo permita — un test que escanea `pg_policies`/`pg_proc` completo cubre tablas que todavía no existen; un test que lista 3 tablas a mano solo protege esas 3.
 4. Poné el archivo en `e2e/compliance/` — así queda cubierto automáticamente por `compliance.yml` (si toca paths relevantes) y por `e2e.yml` (siempre), sin tocar ningún workflow.

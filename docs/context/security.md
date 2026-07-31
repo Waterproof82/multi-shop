@@ -549,7 +549,7 @@ Al mismo tiempo se encontró un segundo patrón, más sutil, en `categorias`/`cl
 
 ### Función de auditoría — `check_rls_policy_hygiene()`
 
-`SECURITY DEFINER`, solo accesible con `service_role` (mismo patrón que `check_security_definer_grants()` más abajo). Escanea `pg_policies` completo y devuelve violaciones de 3 tipos:
+`SECURITY DEFINER`, solo accesible con `service_role` (mismo patrón que `check_public_function_grants()` más abajo). Escanea `pg_policies` completo y devuelve violaciones de 4 tipos:
 
 - `permissive_anon_deny` — un "no anon access" que sea PERMISSIVE en vez de RESTRICTIVE
 - `public_role_identity_scoped_fn` — una policy `roles:public` que llama `get_mi_empresa_id()` o `auth.uid()`
@@ -557,6 +557,14 @@ Al mismo tiempo se encontró un segundo patrón, más sutil, en `categorias`/`cl
 - `rls_disabled` — una tabla de `public` sin RLS habilitado
 
 Cubierta por `e2e/compliance/rls-policy-hygiene.spec.ts` (corre en CI en cada push/PR que toque `supabase/migrations/**`, ver [`testing-ci.md`](./testing-ci.md)). Cualquier tabla nueva que reintroduzca alguno de estos dos patrones hace fallar el test — no hace falta acordarse de revisarlo a mano.
+
+### Función de auditoría — `check_public_function_grants()`
+
+Escanea `information_schema.role_routine_grants` para **toda** función no-trigger del schema `public` (antes `check_security_definer_grants()`, que solo cubría `SECURITY DEFINER` — renombrada y ampliada el 2026-07-31). Las funciones de trigger quedan excluidas del escaneo: Postgres rechaza invocarlas fuera de un trigger sin importar el GRANT, así que no son explotables vía RPC.
+
+**Incidente BAJA-01 follow-up (2026-07-31):** el audit de seguridad del 2026-07-30 (BAJA-01) ya había identificado y revocado `acquire_mesa_lock`, `claim_and_create_division_pago` y `claim_custom_turn` — funciones `SECURITY INVOKER` de la familia de pago por turnos personalizados, expuestas sin necesidad vía `/rest/v1/rpc/*`. Al ampliar el escaneo más allá de `SECURITY DEFINER`, aparecieron 6 funciones hermanas de la misma familia que esa pasada no cubrió: `cancel_custom_turn`, `commit_custom_payment`, `complete_custom_payment`, `switch_to_equal_split_remaining`, `update_custom_selection`, `get_next_pedido_number`. Verificado en vivo: el daño real ya estaba mitigado por RLS (RESTRICTIVE deny-all en `mesa_pagos_personalizados`/`mesa_item_pagos`/`mesa_sesiones`/`pedidos` — llamarlas como `anon` con un UUID real o falso devuelve el mismo `TURNO_NOT_FOUND`, sin distinguir), pero depender solo de RLS como única capa para un RPC de mutación de pagos directamente invocable es exactamente la exposición innecesaria que BAJA-01 ya había decidido cerrar. Las 6 se usan exclusivamente server-side con `service_role` (`src/core/application/use-cases/payment/*`) — revocadas con el mismo patrón.
+
+Cubierta por `e2e/compliance/supabase-security-definer.spec.ts` (capa 1: intento directo; capa 2: escaneo completo).
 
 ### Lecturas públicas
 
