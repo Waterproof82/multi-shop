@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import {
   requireAuth,
+  requireRole,
   validationErrorResponse,
   handleResult,
   type AuthResult,
@@ -21,6 +22,9 @@ const schema = z.object({
 export async function POST(request: NextRequest) {
   const { empresaId, error: authError } = await requireAuth(request) as AuthResult;
   if (authError) return authError;
+
+  const roleError = requireRole(request, ['admin', 'superadmin']);
+  if (roleError) return roleError;
 
   let body: unknown;
   try {

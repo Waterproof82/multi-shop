@@ -35,16 +35,19 @@ export async function PATCH(
     return NextResponse.json({ error: bodyParsed.error.issues[0].message }, { status: 400 });
   }
 
-  // Tenant isolation: derive empresa from domain (public route — proxy does not inject x-empresa-id)
-  let empresaId = request.headers.get('x-empresa-id');
-  if (!empresaId) {
-    const domain = await getDomainFromHeaders();
-    const empresaResult = await getEmpresaPublicRepository().findByDomain(parseMainDomain(domain));
-    if (!empresaResult.success || !empresaResult.data) {
-      return NextResponse.json({ error: 'Tenant no identificado' }, { status: 400 });
-    }
-    empresaId = empresaResult.data.id;
+  // Tenant isolation: derive empresa from domain ONLY. This route is outside
+  // proxy.ts's auth-branch coverage (only /api/admin|waiter|kitchen|tpv|
+  // laborcontrol|superadmin get their x-empresa-id verified/overwritten by the
+  // proxy) — trusting a client-supplied x-empresa-id header here let any
+  // caller pass another tenant's empresa_id (publicly readable via
+  // /rest/v1/empresas) and pair it with a known mesaId to mutate that
+  // tenant's mesa. Domain is proxy-independent and not client-spoofable.
+  const domain = await getDomainFromHeaders();
+  const empresaResult = await getEmpresaPublicRepository().findByDomain(parseMainDomain(domain));
+  if (!empresaResult.success || !empresaResult.data) {
+    return NextResponse.json({ error: 'Tenant no identificado' }, { status: 400 });
   }
+  const empresaId = empresaResult.data.id;
 
   const supabase = getSupabaseClient();
 
