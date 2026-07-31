@@ -67,17 +67,27 @@ Toda migracion que cree una tabla nueva DEBE incluir estos tres bloques, en este
 ```sql
 ALTER TABLE public.mi_tabla ENABLE ROW LEVEL SECURITY;
 
+-- AS RESTRICTIVE, no PERMISSIVE (default): una policy RESTRICTIVE se combina
+-- con AND, así que ninguna policy permisiva añadida despues (por descuido o
+-- para Realtime) puede anularla. Este fue el bug raiz del incidente RLS del
+-- 2026-07-31 — ver docs/context/security.md.
 CREATE POLICY "No direct anon access to mi_tabla"
-  ON public.mi_tabla FOR ALL TO anon
+  ON public.mi_tabla AS RESTRICTIVE FOR ALL TO anon
   USING (false) WITH CHECK (false);
 
+-- TO authenticated explicito, NUNCA omitido (el default es `public`, que
+-- incluye anon). Con TO public + una llamada a get_mi_empresa_id() (funcion
+-- solo ejecutable por authenticated), anon puede volverse elegible para
+-- evaluar la policy y Postgres lanza "permission denied" en vez de negar
+-- limpiamente. Mismo incidente del 2026-07-31.
 CREATE POLICY "Admin ve mi_tabla"
-  ON public.mi_tabla FOR SELECT
+  ON public.mi_tabla FOR SELECT TO authenticated
   USING (empresa_id = get_mi_empresa_id());
--- ... INSERT / UPDATE / DELETE con mismo patron
+-- ... INSERT / UPDATE / DELETE con mismo patron (TO authenticated, WITH CHECK explicito en INSERT)
 ```
 
-### 2. GRANTs explícitos (obligatorio desde oct 2026 — Supabase Data API)
+### 2. GRANTs explícitos (obligatorio desde oct 2026 — Supabase Data API, y ahora tambien a nivel de DB)
+Desde el 2026-07-31, `public` ya NO otorga privilegios por defecto a `anon`/`authenticated` en tablas nuevas (`ALTER DEFAULT PRIVILEGES` revocado — ver `security.md`). Esto ya no es solo una buena práctica: sin este bloque, la tabla es **completamente inaccesible** para `authenticated`/`anon`, incluso con RLS bien configurado.
 ```sql
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.mi_tabla TO service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.mi_tabla TO authenticated;

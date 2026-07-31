@@ -567,6 +567,26 @@ Escanea `information_schema.role_routine_grants` para **toda** función no-trigg
 
 Cubierta por `e2e/compliance/supabase-security-definer.spec.ts` (capa 1: intento directo; capa 2: escaneo completo).
 
+### Causa raíz encontrada — `ALTER DEFAULT PRIVILEGES` en `public` (2026-07-31, tercera pasada)
+
+Tras el hallazgo de las 6 RPCs `SECURITY INVOKER` expuestas, la pregunta que realmente importaba no era "¿arreglé todas las instancias?" sino "¿qué mecanismo produce este patrón una y otra vez?". La respuesta: el schema `public` tenía `ALTER DEFAULT PRIVILEGES` configurado (por los roles `postgres` y `supabase_admin`, probablemente heredado del bootstrap del proyecto anterior a que Supabase hiciera obligatorios los grants explícitos en octubre de 2026) que otorgaba automáticamente a `anon`/`authenticated` **acceso completo a toda tabla, función o secuencia NUEVA** — `SELECT/INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER` en tablas, `EXECUTE` en funciones, `SELECT/UPDATE/USAGE` en secuencias.
+
+Esto explica el patrón detrás de **todos** los incidentes de hoy: cada tabla y función nueva nacía expuesta por defecto, y solo quedaba protegida si alguien se acordaba de revocarlo explícitamente. No es que el equipo se haya olvidado varias veces — es que el schema estaba configurado para que olvidarse fuera el comportamiento por defecto.
+
+**Fix** (migración `20260731000017`): `ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ... FROM anon, authenticated` en tablas, funciones y secuencias. `postgres` es el rol con el que corren todas las migraciones de este proyecto (CLI, MCP, editor SQL del dashboard) — verificado en vivo creando una tabla de prueba después del fix: heredó privilegios solo para `postgres`/`service_role`, ninguno para `anon`/`authenticated`. Cambia la postura de seguridad de raíz: de "inseguro por defecto, seguro si alguien se acuerda de revocar" a "sin acceso por defecto, accesible si alguien se acuerda de otorgar" — coincide exactamente con lo que el checklist de migraciones de `CLAUDE.md` ya asumía ("GRANTs explícitos obligatorio desde oct 2026") pero que hasta ahora no se cumplía a nivel de base de datos.
+
+**Limitación conocida:** los privilegios por defecto del rol `supabase_admin` sobre `public` **no se pudieron revocar** — `REVOKE`/`ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin` devuelve `permission denied` (`postgres` no es miembro de `supabase_admin` en el hosting gestionado de Supabase; ese rol es superusuario reservado para el bootstrapping interno de la plataforma). No es explotable en la práctica — ningún flujo de trabajo real del proyecto crea objetos como `supabase_admin` — pero queda documentado y en la whitelist del test (`INTENTIONAL_DEFAULT_PRIVILEGE_GRANTORS` en `rls-policy-hygiene.spec.ts`) en vez de ignorado silenciosamente. Si algún día se necesita cerrarlo del todo, requiere contactar soporte de Supabase o acceso a un rol con membresía en `supabase_admin`.
+
+Cubierto por el chequeo `default_privileges_grant_anon` de `check_rls_policy_hygiene()` — detecta si esto se vuelve a otorgar (por cualquier rol) sin que nadie tenga que acordarse de revisar `pg_default_acl` a mano.
+
+### Otros defaults inseguros de Postgres cubiertos (misma meta-revisión)
+
+La pregunta "¿qué otro objeto de Postgres tiene un default inseguro que nadie audita?" dio 3 hallazgos más, los 3 verificados en vivo con objetos de prueba descartables antes de confirmarlos como chequeos permanentes de `check_rls_policy_hygiene()`:
+
+- **`security_definer_missing_search_path`** — una función `SECURITY DEFINER` sin `SET search_path` es vulnerable a *schema hijacking*: un atacante con permiso de `CREATE` en algún schema del `search_path` del caller puede sombrear referencias sin cualificar que la función usa internamente, y ejecutar código propio con los privilegios elevados de la función. Limpio hoy — 0 funciones sin `search_path` en `public`.
+- **`bypassrls_unexpected_role`** — un rol con `rolbypassrls = true` se salta RLS por completo, sin importar cómo estén configuradas las policies. Limpio hoy — solo los roles estándar de Supabase (`service_role`, `supabase_admin`, `postgres`, etc.) lo tienen.
+- **`insert_policy_missing_with_check`** — una policy `FOR INSERT` sin `WITH CHECK` explícito equivale a `WITH CHECK (true)` — inserción sin ninguna restricción. Limpio hoy — 0 policies de este tipo.
+
 ### Superficies verificadas sin hallazgos (2026-07-31, segunda pasada)
 
 Tras encontrar el hueco de RPCs `SECURITY INVOKER` de arriba, se revisaron otras superficies del mismo tipo (¿qué otra cosa tiene un default inseguro que nadie audita sistemáticamente?) — resultado limpio, documentado para no repetir la revisión sin motivo:

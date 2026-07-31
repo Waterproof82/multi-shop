@@ -30,21 +30,34 @@
  * Este test corre el escaneo completo de pg_policies (via
  * check_rls_policy_hygiene(), función SECURITY DEFINER solo accesible con
  * service_role) y falla si CUALQUIER tabla del schema reintroduce alguno de
- * estos dos patrones, o si alguna tabla pierde RLS por completo.
+ * estos patrones.
  *
  * 2026-07-31 (segunda pasada, tras encontrar 6 RPCs SECURITY INVOKER
  * expuestas sin necesidad — ver supabase-security-definer.spec.ts): se
- * añadió un 5º chequeo por la misma clase de problema en otro objeto de DB —
- * una VIEW sin `security_invoker = true` corre con los privilegios de quien
- * la creó, no de quien la consulta, pudiendo saltarse RLS igual que una
- * función SECURITY DEFINER. No hay vistas en `public` hoy, pero el chequeo
- * queda activo para la primera que se cree sin que quien la escriba sepa
- * esta trampa.
+ * añadió `view_missing_security_invoker` por la misma clase de problema en
+ * otro objeto de DB — una VIEW sin `security_invoker = true` corre con los
+ * privilegios de quien la creó, pudiendo saltarse RLS igual que una función
+ * SECURITY DEFINER.
+ *
+ * 2026-07-31 (tercera pasada — meta-revisión "qué otro default inseguro no
+ * se audita sistemáticamente"): se encontró la causa raíz real detrás de
+ * todos los incidentes de hoy — ALTER DEFAULT PRIVILEGES en `public` (rol
+ * `postgres`) otorgaba automáticamente acceso completo a anon/authenticated
+ * en toda tabla/función/secuencia NUEVA. Corregido en
+ * 20260731000017 (verificado en vivo: una tabla de prueba creada después del
+ * fix no heredó ningún privilegio). Se añadieron 4 chequeos más:
+ * `default_privileges_grant_anon` (regresión de lo anterior — sigue
+ * detectando el residuo de `supabase_admin`, ver whitelist abajo),
+ * `security_definer_missing_search_path` (schema hijacking),
+ * `bypassrls_unexpected_role` (rol no estándar saltándose RLS por completo),
+ * `insert_policy_missing_with_check` (policy INSERT sin WITH CHECK explícito
+ * = WITH CHECK(true) implícito). Los 4 verificados en vivo con objetos de
+ * prueba descartables antes de confirmarlos como permanentes.
  *
  * Requiere: NEXT_PUBLIC_SUPABASE_URL + PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY
  * (o SUPABASE_SERVICE_ROLE_KEY)
  */
-import { test, expect } from '@playwright/test';
+import { test, expect, type APIRequestContext } from '@playwright/test';
 
 function supabaseUrl(): string | undefined { return process.env.NEXT_PUBLIC_SUPABASE_URL; }
 function serviceRoleKey(): string | undefined {
@@ -52,13 +65,19 @@ function serviceRoleKey(): string | undefined {
 }
 function anonKey(): string | undefined { return process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY; }
 
+type HygieneCheckName =
+  | 'permissive_anon_deny'
+  | 'public_role_identity_scoped_fn'
+  | 'public_role_blanket_true'
+  | 'rls_disabled'
+  | 'view_missing_security_invoker'
+  | 'default_privileges_grant_anon'
+  | 'security_definer_missing_search_path'
+  | 'bypassrls_unexpected_role'
+  | 'insert_policy_missing_with_check';
+
 interface HygieneViolation {
-  check_name:
-    | 'permissive_anon_deny'
-    | 'public_role_identity_scoped_fn'
-    | 'public_role_blanket_true'
-    | 'rls_disabled'
-    | 'view_missing_security_invoker';
+  check_name: HygieneCheckName;
   tablename: string;
   policyname: string | null;
   detail: string;
@@ -71,6 +90,37 @@ interface HygieneViolation {
 // clientes, see 20260731000007). Add here only for deliberately public reads.
 const INTENTIONAL_PUBLIC_TRUE_TABLES = new Set<string>(['categorias', 'empresas', 'productos']);
 
+// default_privileges_grant_anon rows where `policyname` holds the grantor
+// role name. `supabase_admin`-owned default ACLs on public grant anon/
+// authenticated on objects that role creates, but no part of this project's
+// actual migration workflow (Supabase CLI / MCP / dashboard SQL editor as
+// project owner) creates objects as supabase_admin — verified only
+// `postgres`-owned entries are load-bearing (a table created via the normal
+// workflow got zero anon/authenticated grants once the postgres-owned entry
+// was fixed). REVOKE on supabase_admin's entries returns permission denied
+// (postgres is not a member of supabase_admin in Supabase's managed
+// hosting) — not fixable from this project, tracked here instead of ignored.
+const INTENTIONAL_DEFAULT_PRIVILEGE_GRANTORS = new Set<string>(['supabase_admin']);
+
+async function fetchHygieneRows(request: APIRequestContext): Promise<HygieneViolation[] | null> {
+  const res = await request.post(`${supabaseUrl()}/rest/v1/rpc/check_rls_policy_hygiene`, {
+    headers: {
+      apikey: serviceRoleKey()!,
+      Authorization: `Bearer ${serviceRoleKey()!}`,
+      'Content-Type': 'application/json',
+    },
+    data: {},
+  });
+
+  if (res.status() === 404) {
+    test.skip(true, 'check_rls_policy_hygiene RPC no existe — ver supabase/migrations/2026073100000{9,17,18}_*.sql');
+    return null;
+  }
+
+  expect(res.status()).toBe(200);
+  return (await res.json()) as HygieneViolation[];
+}
+
 test.describe('RLS Policy Hygiene — escaneo completo del schema (service_role)', () => {
   test.beforeEach(() => {
     if (!supabaseUrl() || !serviceRoleKey()) {
@@ -79,22 +129,8 @@ test.describe('RLS Policy Hygiene — escaneo completo del schema (service_role)
   });
 
   test('ninguna tabla tiene un "no anon access" PERMISSIVE (debe ser RESTRICTIVE)', async ({ request }) => {
-    const res = await request.post(`${supabaseUrl()}/rest/v1/rpc/check_rls_policy_hygiene`, {
-      headers: {
-        apikey: serviceRoleKey()!,
-        Authorization: `Bearer ${serviceRoleKey()!}`,
-        'Content-Type': 'application/json',
-      },
-      data: {},
-    });
-
-    if (res.status() === 404) {
-      test.skip(true, 'check_rls_policy_hygiene RPC no existe — ver 20260731000009_rls_policy_hygiene_audit_fn.sql');
-      return;
-    }
-
-    expect(res.status()).toBe(200);
-    const rows = (await res.json()) as HygieneViolation[];
+    const rows = await fetchHygieneRows(request);
+    if (!rows) return;
     const violations = rows.filter(r => r.check_name === 'permissive_anon_deny');
 
     if (violations.length > 0) {
@@ -110,22 +146,8 @@ test.describe('RLS Policy Hygiene — escaneo completo del schema (service_role)
   });
 
   test('ninguna policy roles:public referencia get_mi_empresa_id() o auth.uid() (debe ser TO authenticated)', async ({ request }) => {
-    const res = await request.post(`${supabaseUrl()}/rest/v1/rpc/check_rls_policy_hygiene`, {
-      headers: {
-        apikey: serviceRoleKey()!,
-        Authorization: `Bearer ${serviceRoleKey()!}`,
-        'Content-Type': 'application/json',
-      },
-      data: {},
-    });
-
-    if (res.status() === 404) {
-      test.skip(true, 'check_rls_policy_hygiene RPC no existe');
-      return;
-    }
-
-    expect(res.status()).toBe(200);
-    const rows = (await res.json()) as HygieneViolation[];
+    const rows = await fetchHygieneRows(request);
+    if (!rows) return;
     const violations = rows.filter(r => r.check_name === 'public_role_identity_scoped_fn');
 
     if (violations.length > 0) {
@@ -139,22 +161,8 @@ test.describe('RLS Policy Hygiene — escaneo completo del schema (service_role)
   });
 
   test('ninguna policy roles:public con USING/WITH CHECK (true) fuera de la whitelist de catálogo público', async ({ request }) => {
-    const res = await request.post(`${supabaseUrl()}/rest/v1/rpc/check_rls_policy_hygiene`, {
-      headers: {
-        apikey: serviceRoleKey()!,
-        Authorization: `Bearer ${serviceRoleKey()!}`,
-        'Content-Type': 'application/json',
-      },
-      data: {},
-    });
-
-    if (res.status() === 404) {
-      test.skip(true, 'check_rls_policy_hygiene RPC no existe');
-      return;
-    }
-
-    expect(res.status()).toBe(200);
-    const rows = (await res.json()) as HygieneViolation[];
+    const rows = await fetchHygieneRows(request);
+    if (!rows) return;
     const violations = rows.filter(
       r => r.check_name === 'public_role_blanket_true' && !INTENTIONAL_PUBLIC_TRUE_TABLES.has(r.tablename)
     );
@@ -172,22 +180,8 @@ test.describe('RLS Policy Hygiene — escaneo completo del schema (service_role)
   });
 
   test('ninguna tabla del schema public tiene RLS deshabilitado', async ({ request }) => {
-    const res = await request.post(`${supabaseUrl()}/rest/v1/rpc/check_rls_policy_hygiene`, {
-      headers: {
-        apikey: serviceRoleKey()!,
-        Authorization: `Bearer ${serviceRoleKey()!}`,
-        'Content-Type': 'application/json',
-      },
-      data: {},
-    });
-
-    if (res.status() === 404) {
-      test.skip(true, 'check_rls_policy_hygiene RPC no existe');
-      return;
-    }
-
-    expect(res.status()).toBe(200);
-    const rows = (await res.json()) as HygieneViolation[];
+    const rows = await fetchHygieneRows(request);
+    if (!rows) return;
     const violations = rows.filter(r => r.check_name === 'rls_disabled');
 
     if (violations.length > 0) {
@@ -198,22 +192,8 @@ test.describe('RLS Policy Hygiene — escaneo completo del schema (service_role)
   });
 
   test('ninguna vista del schema public carece de security_invoker=true', async ({ request }) => {
-    const res = await request.post(`${supabaseUrl()}/rest/v1/rpc/check_rls_policy_hygiene`, {
-      headers: {
-        apikey: serviceRoleKey()!,
-        Authorization: `Bearer ${serviceRoleKey()!}`,
-        'Content-Type': 'application/json',
-      },
-      data: {},
-    });
-
-    if (res.status() === 404) {
-      test.skip(true, 'check_rls_policy_hygiene RPC no existe');
-      return;
-    }
-
-    expect(res.status()).toBe(200);
-    const rows = (await res.json()) as HygieneViolation[];
+    const rows = await fetchHygieneRows(request);
+    if (!rows) return;
     const violations = rows.filter(r => r.check_name === 'view_missing_security_invoker');
 
     if (violations.length > 0) {
@@ -224,6 +204,73 @@ test.describe('RLS Policy Hygiene — escaneo completo del schema (service_role)
           `puede saltarse RLS de las tablas subyacentes por completo, el mismo riesgo que una función SECURITY DEFINER. ` +
           `Aplicar: ALTER VIEW public.<vista> SET (security_invoker = true); ` +
           `(las vistas materializadas no tienen este modo — nunca deben exponerse a anon/authenticated si tocan datos sensibles).`
+      );
+    }
+    expect(violations).toHaveLength(0);
+  });
+
+  test('los privilegios por defecto de public no otorgan a anon/authenticated (fuera de la whitelist conocida)', async ({ request }) => {
+    const rows = await fetchHygieneRows(request);
+    if (!rows) return;
+    const violations = rows.filter(
+      r => r.check_name === 'default_privileges_grant_anon' && !INTENTIONAL_DEFAULT_PRIVILEGE_GRANTORS.has(r.policyname ?? '')
+    );
+
+    if (violations.length > 0) {
+      const list = violations.map(v => `  - grantor=${v.policyname} (${v.detail})`).join('\n');
+      throw new Error(
+        `SEGURIDAD: ALTER DEFAULT PRIVILEGES en public otorga a anon/authenticated — cualquier tabla/función/secuencia ` +
+          `NUEVA nace expuesta sin que nadie tenga que olvidarse de nada:\n${list}\n\n` +
+          `Aplicar (reemplazar <role> por el grantor listado arriba):\n` +
+          `  ALTER DEFAULT PRIVILEGES FOR ROLE <role> IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated;\n` +
+          `  ALTER DEFAULT PRIVILEGES FOR ROLE <role> IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM anon, authenticated;\n` +
+          `  ALTER DEFAULT PRIVILEGES FOR ROLE <role> IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon, authenticated;`
+      );
+    }
+    expect(violations).toHaveLength(0);
+  });
+
+  test('ninguna función SECURITY DEFINER de public carece de SET search_path', async ({ request }) => {
+    const rows = await fetchHygieneRows(request);
+    if (!rows) return;
+    const violations = rows.filter(r => r.check_name === 'security_definer_missing_search_path');
+
+    if (violations.length > 0) {
+      const list = violations.map(v => `  - ${v.tablename}()`).join('\n');
+      throw new Error(
+        `SEGURIDAD: funciones SECURITY DEFINER sin SET search_path (vulnerable a schema hijacking):\n${list}\n\n` +
+          `Agregar SET search_path = public, extensions, pg_catalog (o el que corresponda) a la definición de la función.`
+      );
+    }
+    expect(violations).toHaveLength(0);
+  });
+
+  test('ningún rol no estándar tiene BYPASSRLS', async ({ request }) => {
+    const rows = await fetchHygieneRows(request);
+    if (!rows) return;
+    const violations = rows.filter(r => r.check_name === 'bypassrls_unexpected_role');
+
+    if (violations.length > 0) {
+      const list = violations.map(v => `  - ${v.tablename}`).join('\n');
+      throw new Error(
+        `SEGURIDAD: roles con rolbypassrls=true fuera de los roles estándar de Supabase:\n${list}\n\n` +
+          `Un rol con BYPASSRLS ignora TODAS las policies de RLS, sin importar cómo estén configuradas. ` +
+          `Aplicar: ALTER ROLE <rol> NOBYPASSRLS; salvo que sea intencional (agregar a la whitelist del check si lo es).`
+      );
+    }
+    expect(violations).toHaveLength(0);
+  });
+
+  test('ninguna policy INSERT carece de WITH CHECK explícito', async ({ request }) => {
+    const rows = await fetchHygieneRows(request);
+    if (!rows) return;
+    const violations = rows.filter(r => r.check_name === 'insert_policy_missing_with_check');
+
+    if (violations.length > 0) {
+      const list = violations.map(v => `  - ${v.tablename}.${v.policyname}`).join('\n');
+      throw new Error(
+        `SEGURIDAD: policies INSERT sin WITH CHECK explícito (equivale a WITH CHECK(true) — inserción sin restricción):\n${list}\n\n` +
+          `Agregar WITH CHECK con la misma condición de tenant/rol que el resto de policies de la tabla.`
       );
     }
     expect(violations).toHaveLength(0);
