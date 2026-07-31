@@ -553,6 +553,7 @@ Al mismo tiempo se encontró un segundo patrón, más sutil, en `categorias`/`cl
 
 - `permissive_anon_deny` — un "no anon access" que sea PERMISSIVE en vez de RESTRICTIVE
 - `public_role_identity_scoped_fn` — una policy `roles:public` que llama `get_mi_empresa_id()` o `auth.uid()`
+- `public_role_blanket_true` — una policy `roles:public` con `USING`/`WITH CHECK (true)` fuera de la whitelist de catálogo público (`categorias`, `empresas`, `productos`). Cierra el mismo hueco que dejó "Public can select idioma": una RESTRICTIVE deny-all solo protege a `anon`, nunca a `authenticated` — este patrón puede filtrar PII cross-tenant a cualquier sesión autenticada sin que ninguna otra policy lo evite.
 - `rls_disabled` — una tabla de `public` sin RLS habilitado
 
 Cubierta por `e2e/compliance/rls-policy-hygiene.spec.ts` (corre en CI en cada push/PR que toque `supabase/migrations/**`, ver [`testing-ci.md`](./testing-ci.md)). Cualquier tabla nueva que reintroduzca alguno de estos dos patrones hace fallar el test — no hace falta acordarse de revisarlo a mano.

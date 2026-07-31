@@ -44,11 +44,18 @@ function serviceRoleKey(): string | undefined {
 function anonKey(): string | undefined { return process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY; }
 
 interface HygieneViolation {
-  check_name: 'permissive_anon_deny' | 'public_role_identity_scoped_fn' | 'rls_disabled';
+  check_name: 'permissive_anon_deny' | 'public_role_identity_scoped_fn' | 'public_role_blanket_true' | 'rls_disabled';
   tablename: string;
   policyname: string | null;
   detail: string;
 }
+
+// Tables where a `roles:public USING(true)` SELECT policy is intentional —
+// genuinely public storefront catalog data (menu browsing), never PII.
+// Any other roles:public + qual=true/with_check=true policy is a likely leak
+// (this is exactly the shape of the "Public can select idioma" leak on
+// clientes, see 20260731000007). Add here only for deliberately public reads.
+const INTENTIONAL_PUBLIC_TRUE_TABLES = new Set<string>(['categorias', 'empresas', 'productos']);
 
 test.describe('RLS Policy Hygiene — escaneo completo del schema (service_role)', () => {
   test.beforeEach(() => {
@@ -112,6 +119,39 @@ test.describe('RLS Policy Hygiene — escaneo completo del schema (service_role)
       throw new Error(
         `SEGURIDAD: policies con roles:public que llaman get_mi_empresa_id()/auth.uid() (funciones scopeadas a identidad, sin sentido para anon):\n${list}\n\n` +
           `Recrear la policy con TO authenticated en vez de public.`
+      );
+    }
+    expect(violations).toHaveLength(0);
+  });
+
+  test('ninguna policy roles:public con USING/WITH CHECK (true) fuera de la whitelist de catálogo público', async ({ request }) => {
+    const res = await request.post(`${supabaseUrl()}/rest/v1/rpc/check_rls_policy_hygiene`, {
+      headers: {
+        apikey: serviceRoleKey()!,
+        Authorization: `Bearer ${serviceRoleKey()!}`,
+        'Content-Type': 'application/json',
+      },
+      data: {},
+    });
+
+    if (res.status() === 404) {
+      test.skip(true, 'check_rls_policy_hygiene RPC no existe');
+      return;
+    }
+
+    expect(res.status()).toBe(200);
+    const rows = (await res.json()) as HygieneViolation[];
+    const violations = rows.filter(
+      r => r.check_name === 'public_role_blanket_true' && !INTENTIONAL_PUBLIC_TRUE_TABLES.has(r.tablename)
+    );
+
+    if (violations.length > 0) {
+      const list = violations.map(v => `  - ${v.tablename}.${v.policyname} (${v.detail})`).join('\n');
+      throw new Error(
+        `SEGURIDAD: policies roles:public con USING/WITH CHECK (true) fuera de la whitelist de catálogo público:\n${list}\n\n` +
+          `Una policy RESTRICTIVE para anon NO protege esto — solo restringe anon, no authenticated. ` +
+          `Si es una lectura pública legítima (catálogo), agregar la tabla a INTENTIONAL_PUBLIC_TRUE_TABLES en este archivo. ` +
+          `Si no, recrear la policy con TO authenticated y/o el scope de tenant que le falte.`
       );
     }
     expect(violations).toHaveLength(0);
