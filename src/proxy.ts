@@ -437,6 +437,13 @@ export async function proxy(request: NextRequest) {
     return handleTpvEmployeeAuth(request, origin);
   }
 
+  // Glovo manual dispatch — admin-only action. /api/glovo/webhook (HMAC-verified
+  // internally, called by Glovo's own servers) and /api/glovo/quote (public,
+  // domain-scoped) must stay outside this check.
+  if (path === '/api/glovo/order') {
+    return handleAdminAuth(request, origin);
+  }
+
   // Superadmin auth (protected routes)
   if (path.startsWith('/api/superadmin')) {
     const adminAuthResponse = await handleAdminAuth(request, origin);

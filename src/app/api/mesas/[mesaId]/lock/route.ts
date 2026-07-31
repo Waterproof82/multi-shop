@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
+import { getEmpresaPublicRepository } from '@/core/infrastructure/database';
+import { getDomainFromHeaders, parseMainDomain } from '@/lib/domain-utils';
 import { PAYMENT_LOCK_EXPIRY_MS } from '@/core/domain/constants/pedido';
 
 const mesaIdSchema = z.string().uuid();
@@ -13,6 +15,30 @@ async function getMesaId(params: Promise<{ mesaId: string }>) {
   return mesaIdSchema.safeParse(mesaId);
 }
 
+// Tenant isolation: derive empresa from domain ONLY — this route was missing
+// any tenant check at all (queried mesa_sesiones by mesa_id with no
+// empresa_id filter). Same class of cross-tenant IDOR as propina/division/
+// call-waiter: this route is outside proxy.ts's auth-branch coverage, so a
+// client-supplied header would never have been safe to trust here either.
+async function requireMesaInOwnTenant(mesaId: string): Promise<{ empresaId: string } | NextResponse> {
+  const domain = await getDomainFromHeaders();
+  const empresaResult = await getEmpresaPublicRepository().findByDomain(parseMainDomain(domain));
+  if (!empresaResult.success || !empresaResult.data) {
+    return NextResponse.json({ error: 'Tenant no identificado' }, { status: 400 });
+  }
+  const empresaId = empresaResult.data.id;
+
+  const { data: mesa } = await getSupabaseClient()
+    .from('mesas')
+    .select('id')
+    .eq('id', mesaId)
+    .eq('empresa_id', empresaId)
+    .single();
+  if (!mesa) return NextResponse.json({ error: 'Mesa no encontrada' }, { status: 404 });
+
+  return { empresaId };
+}
+
 /**
  * GET — return current lock status for this mesa (waiter use).
  */
@@ -22,6 +48,9 @@ export async function GET(
 ) {
   const parsed = await getMesaId(params);
   if (!parsed.success) return NextResponse.json({ error: 'Invalid mesaId' }, { status: 400 });
+
+  const tenantCheck = await requireMesaInOwnTenant(parsed.data);
+  if (tenantCheck instanceof NextResponse) return tenantCheck;
 
   const supabase = getSupabaseClient();
   const { data: row } = await supabase
@@ -52,6 +81,9 @@ export async function POST(
   const parsed = await getMesaId(params);
   if (!parsed.success) return NextResponse.json({ error: 'Invalid mesaId' }, { status: 400 });
 
+  const tenantCheck = await requireMesaInOwnTenant(parsed.data);
+  if (tenantCheck instanceof NextResponse) return tenantCheck;
+
   const supabase = getSupabaseClient();
 
   const { data: acquired, error } = await supabase.rpc('acquire_mesa_lock', {
@@ -78,6 +110,9 @@ export async function DELETE(
 ) {
   const parsed = await getMesaId(params);
   if (!parsed.success) return NextResponse.json({ error: 'Invalid mesaId' }, { status: 400 });
+
+  const tenantCheck = await requireMesaInOwnTenant(parsed.data);
+  if (tenantCheck instanceof NextResponse) return tenantCheck;
 
   const supabase = getSupabaseClient();
 

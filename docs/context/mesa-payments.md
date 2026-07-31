@@ -493,6 +493,97 @@ El único escenario donde esto podría fallar es una falla de infraestructura de
 
 ---
 
+## Atomicidad del Pago Completo (implementada 2026-07-30)
+
+### Ventana de race condition original
+
+Antes de la implementación atómica existía una ventana de microsegundos:
+
+```
+User B:  POST /api/pedidos → check JS: sin lock ✓ → INSERT pedidos (en vuelo)
+User A:  POST /lock → lock adquirido
+User A:  use case: SELECT pedidos ← B aún no commitó
+User B:  commit
+User A:  Redsys cobra el total sin incluir el pedido de B ← importe incorrecto
+```
+
+El `SELECT` del use case y el `INSERT` de B podían solaparse. El check de `pago_en_curso` en la capa JS no cerraba esta ventana porque el lock aún no era visible en la DB cuando B verificaba.
+
+### Por qué SERIALIZABLE no funciona aquí
+
+La solución intuitiva sería usar `SET default_transaction_isolation TO 'serializable'` en el RPC. Sin embargo, **SERIALIZABLE no resuelve el problema**. Postgres implementa aislamiento serializable mediante SSI. La regla del SSI es que **todas las transacciones que colisionan deben ejecutarse en SERIALIZABLE**. La transacción de `POST /api/pedidos` corre en `READ COMMITTED` (el default de Supabase/Postgres). Al no ser SERIALIZABLE, Postgres no comprueba ni respeta los predicate locks del RPC. El INSERT de User B entra silenciosamente y el RPC no aborta.
+
+### Solución: bloqueo pesimista sobre la fila padre
+
+La solución implementada usa **`FOR UPDATE` sobre `mesa_sesiones`**, aprovechando la FK de `pedidos → mesa_sesiones`:
+
+```
+RPC initiate_mesa_payment_atomic (User A):
+  1. SELECT ... FOR UPDATE sobre mesa_sesiones WHERE id = sesion_id
+     → la fila del padre queda bloqueada en modo exclusivo
+
+User B (INSERT pedidos):
+  → Postgres valida la FK pedidos.sesion_id → mesa_sesiones.id
+  → intenta adquirir FOR KEY SHARE sobre la fila del padre
+  → la fila ya está bloqueada FOR UPDATE por User A
+  → User B queda CONGELADO esperando
+
+RPC (User A, continúa):
+  2. SELECT pedidos (total seguro — User B no puede insertar)
+  3. UPDATE pedidos (payment_status='pending')
+  4. UPDATE mesa_sesiones SET pago_en_curso = true  ← DENTRO de la transacción
+  5. commit → libera el lock
+
+User B (se desbloquea):
+  → INSERT pedidos procede en READ COMMITTED
+  → TRIGGER check_session_not_locked: lee pago_en_curso = true
+  → RAISE EXCEPTION 'PAYMENT_IN_PROGRESS' → INSERT rechazado ✓
+```
+
+### Pieza 1 — Trigger `check_session_not_locked` (migración `20260730000002`)
+
+Función BEFORE INSERT sobre `pedidos`. Si `pago_en_curso = true` en `mesa_sesiones` para la sesión, lanza `RAISE EXCEPTION 'PAYMENT_IN_PROGRESS'`. Es la red de seguridad DB-level que actúa cuando el check JS de la capa de aplicación no es suficiente por timing.
+
+- La función tiene `SECURITY DEFINER` + `SET search_path = public, extensions, pg_catalog`
+- Revocado el acceso desde `PUBLIC`, `anon` y `authenticated`; `GRANT TO service_role`
+
+### Pieza 2 — RPC `initiate_mesa_payment_atomic` (migración `20260730000003`)
+
+Reemplaza las 3 operaciones separadas del use case (SELECT pedidos + UPDATE pedidos x2 + UPDATE mesa_sesiones) por una sola transacción atómica:
+
+1. `FOR UPDATE` sobre `mesa_sesiones` → serializa INSERTs concurrentes por FK lock
+2. `SELECT SUM(pedidos.total)` + `MAX(numero_pedido)` — lectura segura dentro del lock
+3. Validación de `expectedTotalCents` — retorna `total_mismatch` si difieren > 1 céntimo
+4. UPDATE todos los pedidos de la sesión a `payment_status = 'pending'`
+5. UPDATE pedido anchor con `payment_order_ref` y `payment_amount_cents`
+6. `UPDATE mesa_sesiones SET pago_en_curso = true` — DENTRO de la misma transacción
+
+Retorna `TABLE(status TEXT, remaining_cents INT, anchor_pedido_id UUID)` con uno de estos status:
+- `ok` — pago iniciado con éxito; `remaining_cents` = importe a cobrar (sin propina)
+- `total_mismatch` — el total cambió; `remaining_cents` = nuevo total para mostrar al usuario
+- `no_orders` — no hay pedidos en la sesión
+- `tenant_mismatch` — `empresa_id` no coincide con la sesión (aislamiento de tenant)
+
+### Pieza 3 — Cambios en `initiateRedsysMesaPaymentUseCase.ts`
+
+El bloque `else` (pago total) ya no hace SELECT/UPDATE directos. Llama al RPC atómico y mapea los status a los errores de dominio correspondientes. El `UPDATE mesa_sesiones SET pago_en_curso=true` posterior al RPC fue eliminado — ya ocurre DENTRO del RPC.
+
+### Pieza 4 — Captura de `PAYMENT_IN_PROGRESS` en `POST /api/pedidos`
+
+`POST /api/pedidos` mantiene el check JS de `pago_en_curso` como primera capa (evita el round-trip a la DB). Si el timing es muy ajustado y el INSERT llega a la DB, el trigger lanza `PAYMENT_IN_PROGRESS`. La route captura ese mensaje y devuelve 423 (solo si `message?.includes('PAYMENT_IN_PROGRESS')` — condición estricta para no enmascarar otros errores).
+
+### Hardening REST API (migración `20260730000004`)
+
+Revoca el acceso desde `PUBLIC`, `anon` y `authenticated` a tres RPCs que estaban innecesariamente expuestos vía `/rest/v1/rpc/*`:
+
+- `acquire_mesa_lock` — solo invocable por service_role
+- `claim_and_create_division_pago` — solo invocable por service_role
+- `claim_custom_turn` — solo invocable por service_role
+
+También añade **aislamiento de tenant** a `initiate_mesa_payment_atomic`: el `FOR UPDATE` incluye `AND empresa_id = p_empresa_id`. Si la sesión no existe, está cerrada, o pertenece a otra empresa, retorna `tenant_mismatch` en vez de silenciosamente operar sobre datos de otro tenant.
+
+---
+
 ## Posibles Mejoras Futuras
 
 - **Realtime en el waiter grid**: el grid del camarero usa polling. Añadir suscripción Realtime reduciría la latencia para detectar cambios de estado de mesas.
@@ -556,6 +647,9 @@ La notificación de Telegram solo se envía cuando `fullyPaid = true` (pago comp
 | `supabase/migrations/20260603000001_fix_get_mesas_with_sessions_total.sql` | Fix RPC: session_total desde SUM(pedidos) en vez de mesa_sesiones.total |
 | `supabase/migrations/20260610000001_get_mesas_with_sessions_division_activa.sql` | Añade `division_activa` al RPC get_mesas_with_sessions para el waiter grid |
 | `supabase/migrations/20260610000002_claim_and_create_division_pago.sql` | RPC atómico: reclama slot + inserta fila en mesa_division_pagos (FOR UPDATE) |
+| `supabase/migrations/20260730000002_trigger_prevent_order_during_payment.sql` | Trigger BEFORE INSERT en pedidos: rechaza INSERT si pago_en_curso=true (DB safety net) |
+| `supabase/migrations/20260730000003_initiate_mesa_payment_atomic.sql` | RPC initiate_mesa_payment_atomic: FOR UPDATE + total + pedidos + lock en una transacción |
+| `supabase/migrations/20260730000004_mesa_payments_hardening.sql` | REVOKE en acquire_mesa_lock / claim_and_create_division_pago / claim_custom_turn + tenant isolation en RPC |
 | `src/app/api/mesas/[mesaId]/division-slot/route.ts` | DELETE: libera slot pending al cancelar o abandonar el flujo de Redsys |
 | `src/core/application/use-cases/payment/initiateRedsysMesaPaymentUseCase.ts` | Use case de inicio de pago — lock solo para pago total, RPC atómico para división |
 | `src/core/application/use-cases/payment/processRedsysWebhookUseCase.ts` | Webhook — idempotencia atómica en Path 1 (división) + Path 2 (total) |

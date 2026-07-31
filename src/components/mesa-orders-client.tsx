@@ -1036,6 +1036,30 @@ function createMesaChannel(
   return () => { void supabase.removeChannel(channel); };
 }
 
+// mesa_sesiones has no anon SELECT grant (RLS hardening), so postgres_changes never
+// fires for it — the mesa_sesiones_notify_update DB trigger broadcasts on the
+// 'mesa-sesion-update' channel instead. Unlike postgres_changes, Broadcast routes by
+// channel name — it MUST be 'mesa-sesion-update' verbatim to match the trigger, it
+// cannot be an arbitrary per-component name. That channel is shared by every mesa in
+// the company, so filter by mesaId client-side.
+function createMesaBroadcastChannel(
+  mesaId: string,
+  callback: () => void,
+): (() => void) | undefined {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return undefined;
+  const supabase = createClient(url, key);
+  const channel = supabase
+    .channel('mesa-sesion-update')
+    .on('broadcast', { event: 'update' }, (message: { payload: Record<string, unknown> }) => {
+      if (message.payload['mesaId'] !== mesaId) return;
+      callback();
+    })
+    .subscribe();
+  return () => { void supabase.removeChannel(channel); };
+}
+
 function TipSelector({
   mesaId,
   propinaCents,
@@ -1285,8 +1309,11 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
 
   // Realtime: refresh immediately when the session row changes (division progress,
   // sesion_pagada, pago_en_curso). This eliminates the 10s polling gap for concurrent payers.
+  // mesa_sesiones no longer grants anon SELECT (RLS hardening), so postgres_changes never
+  // fires here — mesa_sesiones_notify_update broadcasts on 'mesa-sesion-update' instead.
+  // It's a public channel shared by every mesa, so filter by mesaId client-side.
   useEffect(() => {
-    return createMesaChannel(`mesa-orders-${mesaId}`, 'mesa_sesiones', 'UPDATE', `mesa_id=eq.${mesaId}`, () => { void refresh(); });
+    return createMesaBroadcastChannel(mesaId, () => { void refresh(); });
   }, [mesaId, refresh]);
 
   useEffect(() => {

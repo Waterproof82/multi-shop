@@ -159,7 +159,11 @@ Registro de jornada laboral con cumplimiento legal para el mercado español. Inm
 
 ### 🔒 Seguridad
 
-JWT + HttpOnly cookies, revocación en Redis (fail-closed), RBAC por rol (`admin | superadmin | encargado | cajero`), CSRF HMAC-SHA256 con `timingSafeEqual`, CSP con nonce criptográfico por request, rate limiting por IP y UUID, validación de precio server-side, aislamiento por tenant con RLS en Supabase (52 tablas, todas con policies).
+JWT + HttpOnly cookies, revocación en Redis (fail-closed), RBAC por rol (`admin | superadmin | encargado | cajero`), CSRF HMAC-SHA256 con `timingSafeEqual`, CSP con nonce criptográfico por request, rate limiting por IP y UUID, validación de precio server-side, aislamiento por tenant con RLS en Supabase (53 tablas, todas con policies).
+
+**Auditoría continua de RLS/GRANTs en Supabase**: la función `check_rls_policy_hygiene()` (`SECURITY DEFINER`, solo `service_role`) escanea el schema completo en cada push que toque `supabase/migrations/**` — 10 chequeos permanentes: policies "deny anon" mal escritas (PERMISSIVE en vez de RESTRICTIVE), policies `roles:public` que exponen funciones/columnas scopeadas a identidad, RLS deshabilitado, vistas sin `security_invoker`, privilegios por defecto inseguros, funciones `SECURITY DEFINER` sin `search_path`, roles con `BYPASSRLS`, policies `INSERT` sin `WITH CHECK`, y GRANTs de escritura a `anon` que la arquitectura nunca necesita (incluye `TRUNCATE`, el único privilegio que ninguna policy de RLS puede frenar). Corre en CI vía `e2e/compliance/rls-policy-hygiene.spec.ts` — ver [`testing-ci.md`](docs/context/testing-ci.md#cómo-agregar-un-test-de-regresión-de-seguridad-nuevo).
+
+**Aislamiento de tenant fuera de RLS**: las rutas API que resuelven el tenant server-side (`/api/mesas/*`, `/api/glovo/order`) derivan el `empresaId` **solo** por dominio o por sesión verificada — nunca confían en `x-empresa-id`/`x-admin-rol` del request salvo que la ruta esté cubierta por uno de los 6 prefijos que `proxy.ts` sanea explícitamente (`/api/admin|waiter|kitchen|tpv|laborcontrol|superadmin`). Regresión cubierta por `e2e/compliance/mesas-tenant-header-spoofing.spec.ts`.
 
 Ver [`docs/context/security.md`](docs/context/security.md) para detalle completo.
 
@@ -305,16 +309,23 @@ Ver [`docs/context/sentry-monitoring.md`](docs/context/sentry-monitoring.md).
 ## Comandos
 
 ```bash
-pnpm dev          # Desarrollo con Turbopack
-pnpm build        # Build de producción
-pnpm lint         # Linting
-pnpm db:smoke     # Smoke tests de funciones DB (obligatorio tras cada migración)
-pnpm e2e:db       # E2E smoke tests via Playwright
-pnpm e2e          # Suite E2E completa
+pnpm dev              # Desarrollo con Turbopack
+pnpm build            # Build de producción
+pnpm lint             # Linting
+pnpm typecheck        # Type check completo (tsc --noEmit)
+pnpm test:compliance  # Tests estáticos rápidos (Vitest) — secrets, patrones inseguros
+pnpm db:smoke         # Smoke tests de funciones DB (obligatorio tras cada migración)
+pnpm e2e:db           # E2E smoke tests via Playwright
+pnpm e2e              # Suite E2E completa
+npx playwright test e2e/compliance/  # Solo la suite de compliance (RLS, inalterabilidad, RGPD)
 
 # Setup R2 CORS (una sola vez)
 npx tsx scripts/setup-r2-cors.ts
 ```
+
+### Git hooks y CI
+
+`pnpm install` activa automáticamente los hooks de Husky: `pre-commit` corre lint+typecheck, `pre-push` corre la suite completa de compliance. GitHub Actions corre `ci.yml` (lint/typecheck/build), `compliance.yml` (tests legales/fiscales, path-filtered + nightly) y `e2e.yml` (suite E2E completa) en cada push/PR. Detalle completo en [`docs/context/testing-ci.md`](docs/context/testing-ci.md).
 
 ---
 
@@ -395,6 +406,7 @@ WAITER_PIN_PEPPER=
 | Documento | Contenido |
 |-----------|-----------|
 | [`docs/context/security.md`](docs/context/security.md) | Medidas de seguridad detalladas |
+| [`docs/context/testing-ci.md`](docs/context/testing-ci.md) | Suites de test, Husky hooks, workflows de CI |
 | [`docs/context/bbdd.md`](docs/context/bbdd.md) | Esquema completo de base de datos |
 | [`docs/tpv-legal-compliance.md`](docs/tpv-legal-compliance.md) | Checklist legal TPV (Ley Antifraude, VeriFactu, RGPD, PCI-DSS) |
 | [`docs/context/legal-compliance.md`](docs/context/legal-compliance.md) | Registro de leyes y normativas |

@@ -49,9 +49,22 @@ async function backupEmpresa(supabase: any, s3: S3Client, empresa: any, today: s
   }));
 }
 
+// Constant-time compare (bitwise XOR accumulator) — a plain !== leaks timing
+// information proportional to the number of matching leading bytes. Same
+// pattern already used by this project's Glovo webhook signature check.
+function timingSafeEqualStr(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
 Deno.serve(async (req: Request) => {
-  const authHeader = req.headers.get('Authorization');
-  if (authHeader !== `Bearer ${Deno.env.get('BACKUP_SECRET')}`) {
+  const authHeader = req.headers.get('Authorization') ?? '';
+  const expected = `Bearer ${Deno.env.get('BACKUP_SECRET') ?? ''}`;
+  if (!timingSafeEqualStr(authHeader, expected)) {
     return new Response('Unauthorized', { status: 401 });
   }
 

@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { UtensilsCrossed, KeyRound, Pause, ReceiptText, X, CheckSquare, ExternalLink, PlayCircle, BellRing } from "lucide-react";
 import { formatPrice } from "@/lib/format-price";
 import { fetchWithCsrf } from "@/lib/csrf-client";
@@ -355,7 +354,6 @@ export function WaiterLoginForm() {
   const [deferredMesa, setDeferredMesa] = useState<MesaWithSession | null>(null);
   const [launching, setLaunching] = useState(false);
   const llamadasRef = useRef<Set<string>>(new Set());
-  const channelNameRef = useRef(`waiter-login-mesas-${Math.random().toString(36).slice(2)}`);
 
   const refresh = useCallback(async () => {
     const data = await fetchMesas();
@@ -376,31 +374,24 @@ export function WaiterLoginForm() {
 
     void refresh();
 
-    const supabase = getSupabaseAnonClient();
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const debouncedRefresh = () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => { void refresh(); }, 100);
     };
-    const channel = supabase
-      .channel(channelNameRef.current)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'mesa_sesiones' }, debouncedRefresh)
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('[Realtime] waiter-login-mesas error:', status);
-        }
-      });
 
-    // Listen via the WaiterBanner-dispatched DOM event instead of subscribing to the
-    // Supabase broadcast channel directly. Both components use the same singleton client,
-    // so competing .channel('waiter-items-update') subscriptions silently drop each other.
-    // WaiterBanner already receives 'item-update' and re-dispatches as CustomEvent.
+    // mesa_sesiones no longer grants anon SELECT (RLS hardening), so postgres_changes
+    // never fires here anymore. We don't subscribe to the 'mesa-sesion-update' broadcast
+    // channel directly either — WaiterBanner (mounted on this same page) already does
+    // and both components share the same singleton client, so competing subscriptions to
+    // the same channel name would silently drop each other (same issue already solved for
+    // 'waiter-items-update' below). WaiterBanner re-dispatches every broadcast it receives
+    // as this DOM event.
     globalThis.addEventListener('waiter-realtime-update', debouncedRefresh);
 
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       globalThis.removeEventListener('waiter-realtime-update', debouncedRefresh);
-      void supabase.removeChannel(channel);
     };
   }, [step, empresaId, refresh]);
 

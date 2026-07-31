@@ -36,16 +36,15 @@ export async function POST(
     return NextResponse.json({ error: bodyParsed.error.issues[0].message }, { status: 400 });
   }
 
-  // Tenant isolation: derive empresa from domain (public route — proxy does not inject x-empresa-id)
-  let empresaId = request.headers.get('x-empresa-id');
-  if (!empresaId) {
-    const domain = await getDomainFromHeaders();
-    const empresaResult = await getEmpresaPublicRepository().findByDomain(parseMainDomain(domain));
-    if (!empresaResult.success || !empresaResult.data) {
-      return NextResponse.json({ error: 'Tenant no identificado' }, { status: 400 });
-    }
-    empresaId = empresaResult.data.id;
+  // Tenant isolation: derive empresa from domain ONLY — see propina/route.ts
+  // for why trusting a client-supplied x-empresa-id header here was a
+  // cross-tenant IDOR (this route is outside proxy.ts's auth-branch coverage).
+  const domain = await getDomainFromHeaders();
+  const empresaResult = await getEmpresaPublicRepository().findByDomain(parseMainDomain(domain));
+  if (!empresaResult.success || !empresaResult.data) {
+    return NextResponse.json({ error: 'Tenant no identificado' }, { status: 400 });
   }
+  const empresaId = empresaResult.data.id;
 
   const supabase = getSupabaseClient();
 
@@ -109,16 +108,15 @@ export async function DELETE(
   const rateLimited = await rateLimitPublic(request as Parameters<typeof rateLimitPublic>[0]);
   if (rateLimited) return rateLimited;
 
-  // Tenant isolation: derive empresa from domain (public route — proxy does not inject x-empresa-id)
-  let empresaId = request.headers.get('x-empresa-id');
-  if (!empresaId) {
-    const domain = await getDomainFromHeaders();
-    const empresaResult = await getEmpresaPublicRepository().findByDomain(parseMainDomain(domain));
-    if (!empresaResult.success || !empresaResult.data) {
-      return NextResponse.json({ error: 'Tenant no identificado' }, { status: 400 });
-    }
-    empresaId = empresaResult.data.id;
+  // Tenant isolation: derive empresa from domain ONLY — see propina/route.ts
+  // for why trusting a client-supplied x-empresa-id header here was a
+  // cross-tenant IDOR (this route is outside proxy.ts's auth-branch coverage).
+  const domain = await getDomainFromHeaders();
+  const empresaResult = await getEmpresaPublicRepository().findByDomain(parseMainDomain(domain));
+  if (!empresaResult.success || !empresaResult.data) {
+    return NextResponse.json({ error: 'Tenant no identificado' }, { status: 400 });
   }
+  const empresaId = empresaResult.data.id;
 
   const supabase = getSupabaseClient();
 

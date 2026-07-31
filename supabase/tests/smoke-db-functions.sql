@@ -12,7 +12,7 @@
 --
 -- Cómo ejecutar:
 --   pnpm db:smoke
---   (equivale a: supabase db execute --file supabase/tests/smoke-db-functions.sql)
+--   (equivale a: supabase db query --file supabase/tests/smoke-db-functions.sql --linked)
 -- ============================================================================
 
 DO $$

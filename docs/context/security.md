@@ -528,17 +528,94 @@ RLS está habilitado en todas las tablas de `public`. La app usa `service_role` 
 
 ### Políticas de denegación anónima (RESTRICTIVE)
 
-Las tablas sensibles tienen políticas `AS RESTRICTIVE FOR ALL TO anon USING (false)`. Las políticas RESTRICTIVE usan lógica AND — garantizan denegación incluso si otras políticas permissivas concedieran acceso:
+**Todas** las políticas `No direct anon access to <tabla>` / `No anon access to <tabla>` del schema `public` son `AS RESTRICTIVE FOR ALL TO anon USING (false)`. Las políticas RESTRICTIVE usan lógica AND contra el resto de políticas — garantizan denegación incluso si una política PERMISSIVE (`USING (true)` o similar) concediera acceso, sin importar en qué orden se evalúen ni qué se añada después.
 
-| Tabla | Política |
-|-------|---------|
-| `clientes` | `No direct anon access to clientes` — RESTRICTIVE |
-| `pedidos` | `No direct anon access to pedidos` — RESTRICTIVE |
-| `perfiles_admin` | `No direct anon access to perfiles_admin` — RESTRICTIVE |
-| `promociones` | `No direct anon access to promociones` — RESTRICTIVE |
-| `log_errors` | `No direct anon access to log_errors` — RESTRICTIVE |
+`clientes`, `pedidos`, `perfiles_admin`, `promociones` y `log_errors` ya eran RESTRICTIVE desde una auditoría anterior (rama `security/owasp-audit-july-2026`). El resto del schema (44 tablas más — `mesa_sesiones`, `pedido_item_estados`, `tpv_cobros`, `lc_fichajes*`, `empleados_tpv`, tablas de compras/proveedores, etc.) usaba PERMISSIVE hasta el 2026-07-31, tras un incidente que expuso el motivo: ver más abajo.
 
-> Estas políticas fueron convertidas de PERMISSIVE a RESTRICTIVE para garantizar que `anon` nunca acceda a estos datos, independientemente de otras políticas que puedan existir.
+### Incidente 2026-07-31 — fuga cross-tenant vía RLS PERMISSIVE + Realtime
+
+La migración `20260627000001_realtime_anon_select_policies.sql` añadió policies `USING (true)` para `anon` en `pedidos`, `mesa_sesiones` y `pedido_item_estados`, con la intención de que Realtime `postgres_changes` llegara a suscriptores `anon`. El problema: una policy RLS permisiva también abre la tabla a lectura directa vía PostgREST (`GET /rest/v1/pedidos?select=*`) — cualquiera con la `anon key` pública podía leer pedidos de **todas** las empresas (dirección de entrega, coordenadas GPS, contenido y total de cada pedido).
+
+`pedidos` tenía además, desde antes, una policy `"Anon puede leer pedido por tracking_token"` (`USING (tracking_token IS NOT NULL)`) — quedó neutralizada por la RESTRICTIVE deny-all al arreglar esto, y es código muerto: el tracking de pedidos siempre pasó por rutas server-side con `service_role`, nunca por REST directo con `anon`. Se dejó documentada, no se eliminó.
+
+Al mismo tiempo se encontró un segundo patrón, más sutil, en `categorias`/`clientes`/`empresas`/`mesas`/`pedidos`/`productos`: policies "Admin ..." con `roles: public` (que incluye `anon`) cuyo `USING`/`WITH CHECK` llama a `get_mi_empresa_id()` — función accesible solo por `authenticated`. Postgres evalúa **todas** las policies permisivas aplicables a un rol; al volverse `anon` elegible para esa evaluación (tras un cambio de GRANT en otro punto), la función lanzaba `permission denied` en vez de una denegación limpia. No era una fuga (el acceso seguía denegado), pero es un modo de fallo frágil y no determinista. Se corrigió re-escopeando esas policies a `TO authenticated` (su intención real). El mismo patrón, con `auth.uid()` en vez de `get_mi_empresa_id()`, apareció en `perfiles_admin`/`promociones` — `auth.uid()` no lanza error para `anon` (devuelve `NULL` limpio), así que ahí no había ni siquiera el riesgo de fallo frágil, pero se corrigió igual por consistencia.
+
+**Fix aplicado** (migraciones `20260731000002` a `20260731000012`):
+1. Mitigación táctica inmediata: `REVOKE`/`GRANT` de columna para restringir `anon` a las columnas mínimas necesarias en las 3 tablas.
+2. Migración de las señales de Realtime hacia `anon` de `postgres_changes` a **Broadcast** (`realtime.send()` desde triggers dedicados, payload mínimo sin PII) — ver [`realtime-channels.md`](./realtime-channels.md).
+3. Eliminación total de las 3 policies `USING (true)`.
+4. Re-escopeo de las 6+2 policies `roles:public` a `authenticated`.
+5. Conversión sistémica de las 46 policies "no anon access" restantes de PERMISSIVE a RESTRICTIVE en todo el schema — la corrección de la causa raíz, no solo de los síntomas encontrados.
+
+### Función de auditoría — `check_rls_policy_hygiene()`
+
+`SECURITY DEFINER`, solo accesible con `service_role` (mismo patrón que `check_public_function_grants()` más abajo). Escanea `pg_policies` completo y devuelve violaciones de 4 tipos:
+
+- `permissive_anon_deny` — un "no anon access" que sea PERMISSIVE en vez de RESTRICTIVE
+- `public_role_identity_scoped_fn` — una policy `roles:public` que llama `get_mi_empresa_id()` o `auth.uid()`
+- `public_role_blanket_true` — una policy `roles:public` con `USING`/`WITH CHECK (true)` fuera de la whitelist de catálogo público (`categorias`, `empresas`, `productos`). Cierra el mismo hueco que dejó "Public can select idioma": una RESTRICTIVE deny-all solo protege a `anon`, nunca a `authenticated` — este patrón puede filtrar PII cross-tenant a cualquier sesión autenticada sin que ninguna otra policy lo evite.
+- `rls_disabled` — una tabla de `public` sin RLS habilitado
+- `view_missing_security_invoker` — una `VIEW` (o vista materializada) sin `security_invoker = true`. Sin ese flag, la vista corre con los privilegios de quien la creó, no de quien la consulta — puede saltarse RLS de las tablas subyacentes por completo, el mismo riesgo que una función `SECURITY DEFINER` sin `REVOKE`. No hay vistas en `public` a día de hoy (verificado con una vista de prueba: el chequeo la detectó correctamente antes de eliminarla), pero queda activo para la primera que se cree sin que quien la escriba conozca esta trampa. Las vistas materializadas no tienen modo invoker — cualquiera expuesta a `anon`/`authenticated` cae aquí siempre.
+
+Cubierta por `e2e/compliance/rls-policy-hygiene.spec.ts` (corre en CI en cada push/PR que toque `supabase/migrations/**`, ver [`testing-ci.md`](./testing-ci.md)). Cualquier tabla nueva que reintroduzca alguno de estos dos patrones hace fallar el test — no hace falta acordarse de revisarlo a mano.
+
+### Función de auditoría — `check_public_function_grants()`
+
+Escanea `information_schema.role_routine_grants` para **toda** función no-trigger del schema `public` (antes `check_security_definer_grants()`, que solo cubría `SECURITY DEFINER` — renombrada y ampliada el 2026-07-31). Las funciones de trigger quedan excluidas del escaneo: Postgres rechaza invocarlas fuera de un trigger sin importar el GRANT, así que no son explotables vía RPC.
+
+**Incidente BAJA-01 follow-up (2026-07-31):** el audit de seguridad del 2026-07-30 (BAJA-01) ya había identificado y revocado `acquire_mesa_lock`, `claim_and_create_division_pago` y `claim_custom_turn` — funciones `SECURITY INVOKER` de la familia de pago por turnos personalizados, expuestas sin necesidad vía `/rest/v1/rpc/*`. Al ampliar el escaneo más allá de `SECURITY DEFINER`, aparecieron 6 funciones hermanas de la misma familia que esa pasada no cubrió: `cancel_custom_turn`, `commit_custom_payment`, `complete_custom_payment`, `switch_to_equal_split_remaining`, `update_custom_selection`, `get_next_pedido_number`. Verificado en vivo: el daño real ya estaba mitigado por RLS (RESTRICTIVE deny-all en `mesa_pagos_personalizados`/`mesa_item_pagos`/`mesa_sesiones`/`pedidos` — llamarlas como `anon` con un UUID real o falso devuelve el mismo `TURNO_NOT_FOUND`, sin distinguir), pero depender solo de RLS como única capa para un RPC de mutación de pagos directamente invocable es exactamente la exposición innecesaria que BAJA-01 ya había decidido cerrar. Las 6 se usan exclusivamente server-side con `service_role` (`src/core/application/use-cases/payment/*`) — revocadas con el mismo patrón.
+
+Cubierta por `e2e/compliance/supabase-security-definer.spec.ts` (capa 1: intento directo; capa 2: escaneo completo).
+
+**Limpieza de las 14 funciones de trigger excluidas del escaneo (auditoría externa, 2026-07-31):** el escaneo excluye a propósito las funciones `RETURNS TRIGGER` porque Postgres las rechaza si se invocan fuera de un trigger, sin importar el GRANT — no son explotables vía RPC. Aun así, 14 de ellas (`block_albaran_alteration`, `block_albaran_deletion`, `lc_fichajes_chain_verify_after`, `push_on_item_estado`, `push_on_pedido_validated`, `tpv_cobro_block_delete`, `tpv_turno_assign_numero_z`, `tpv_turno_auto_audit_events`, `tpv_turno_before_insert`, `tpv_turno_block_delete`, `tpv_turno_block_update_fields`, `tpv_turno_evento_block_delete`, `tpv_turno_evento_block_update`, `trigger_fn_recalcular_cmp`) tenían `EXECUTE` otorgado a `PUBLIC` (heredado por `anon`/`authenticated`) sin necesitarlo. Antes de revocarlo se verificó en vivo, con una tabla/función/trigger descartables dentro de una transacción con `ROLLBACK`, que Postgres **no** comprueba el privilegio `EXECUTE` del rol que dispara la sentencia al ejecutar un trigger — solo lo comprueba en invocación directa (que ya está bloqueada por otro motivo). Revocado en `20260731000020`. No se agregó un chequeo de regresión para esto: es higiene de mínimo privilegio sobre una ruta ya probada como no explotable, no una vulnerabilidad — mantener infraestructura de escaneo para un riesgo teórico y ya cerrado no se justifica.
+
+### Causa raíz encontrada — `ALTER DEFAULT PRIVILEGES` en `public` (2026-07-31, tercera pasada)
+
+Tras el hallazgo de las 6 RPCs `SECURITY INVOKER` expuestas, la pregunta que realmente importaba no era "¿arreglé todas las instancias?" sino "¿qué mecanismo produce este patrón una y otra vez?". La respuesta: el schema `public` tenía `ALTER DEFAULT PRIVILEGES` configurado (por los roles `postgres` y `supabase_admin`, probablemente heredado del bootstrap del proyecto anterior a que Supabase hiciera obligatorios los grants explícitos en octubre de 2026) que otorgaba automáticamente a `anon`/`authenticated` **acceso completo a toda tabla, función o secuencia NUEVA** — `SELECT/INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER` en tablas, `EXECUTE` en funciones, `SELECT/UPDATE/USAGE` en secuencias.
+
+Esto explica el patrón detrás de **todos** los incidentes de hoy: cada tabla y función nueva nacía expuesta por defecto, y solo quedaba protegida si alguien se acordaba de revocarlo explícitamente. No es que el equipo se haya olvidado varias veces — es que el schema estaba configurado para que olvidarse fuera el comportamiento por defecto.
+
+**Fix** (migración `20260731000017`): `ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ... FROM anon, authenticated` en tablas, funciones y secuencias. `postgres` es el rol con el que corren todas las migraciones de este proyecto (CLI, MCP, editor SQL del dashboard) — verificado en vivo creando una tabla de prueba después del fix: heredó privilegios solo para `postgres`/`service_role`, ninguno para `anon`/`authenticated`. Cambia la postura de seguridad de raíz: de "inseguro por defecto, seguro si alguien se acuerda de revocar" a "sin acceso por defecto, accesible si alguien se acuerda de otorgar" — coincide exactamente con lo que el checklist de migraciones de `CLAUDE.md` ya asumía ("GRANTs explícitos obligatorio desde oct 2026") pero que hasta ahora no se cumplía a nivel de base de datos.
+
+**Limitación conocida:** los privilegios por defecto del rol `supabase_admin` sobre `public` **no se pudieron revocar** — `REVOKE`/`ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin` devuelve `permission denied` (`postgres` no es miembro de `supabase_admin` en el hosting gestionado de Supabase; ese rol es superusuario reservado para el bootstrapping interno de la plataforma). No es explotable en la práctica — ningún flujo de trabajo real del proyecto crea objetos como `supabase_admin` — pero queda documentado y en la whitelist del test (`INTENTIONAL_DEFAULT_PRIVILEGE_GRANTORS` en `rls-policy-hygiene.spec.ts`) en vez de ignorado silenciosamente. Si algún día se necesita cerrarlo del todo, requiere contactar soporte de Supabase o acceso a un rol con membresía en `supabase_admin`.
+
+Cubierto por el chequeo `default_privileges_grant_anon` de `check_rls_policy_hygiene()` — detecta si esto se vuelve a otorgar (por cualquier rol) sin que nadie tenga que acordarse de revisar `pg_default_acl` a mano.
+
+### Otros defaults inseguros de Postgres cubiertos (misma meta-revisión)
+
+La pregunta "¿qué otro objeto de Postgres tiene un default inseguro que nadie audita?" dio 3 hallazgos más, los 3 verificados en vivo con objetos de prueba descartables antes de confirmarlos como chequeos permanentes de `check_rls_policy_hygiene()`:
+
+- **`security_definer_missing_search_path`** — una función `SECURITY DEFINER` sin `SET search_path` es vulnerable a *schema hijacking*: un atacante con permiso de `CREATE` en algún schema del `search_path` del caller puede sombrear referencias sin cualificar que la función usa internamente, y ejecutar código propio con los privilegios elevados de la función. Limpio hoy — 0 funciones sin `search_path` en `public`.
+- **`bypassrls_unexpected_role`** — un rol con `rolbypassrls = true` se salta RLS por completo, sin importar cómo estén configuradas las policies. Limpio hoy — solo los roles estándar de Supabase (`service_role`, `supabase_admin`, `postgres`, etc.) lo tienen.
+- **`insert_policy_missing_with_check`** — una policy `FOR INSERT` sin `WITH CHECK` explícito equivale a `WITH CHECK (true)` — inserción sin ninguna restricción. Limpio hoy — 0 policies de este tipo.
+
+### Cuarta pasada (auditoría externa, 2026-07-31) — GRANTs heredados en las 53 tablas ya existentes
+
+Una auditoría de seguridad externa hizo la pregunta que las tres pasadas anteriores no hicieron: *"¿el GRANT de tabla que hay debajo de cada policy sigue siendo necesario, o solo estamos auditando si la policy que lo restringe está bien escrita?"*. Los 9 checks de `check_rls_policy_hygiene()` hasta ese momento (`permissive_anon_deny`, `public_role_identity_scoped_fn`, `public_role_blanket_true`, `rls_disabled`, `view_missing_security_invoker`, `default_privileges_grant_anon`, `security_definer_missing_search_path`, `bypassrls_unexpected_role`, `insert_policy_missing_with_check`) auditan todos la **forma de las policies de RLS**. Ninguno pregunta si el **GRANT de tabla** subyacente debería existir.
+
+Verificado en vivo: las **53 tablas** de `public` tenían `anon` con `INSERT, UPDATE, DELETE, TRUNCATE` a nivel de tabla completa — herencia del mismo `ALTER DEFAULT PRIVILEGES` que motivó el fix de `20260731000017`. Ese fix revoca los privilegios por defecto para objetos **nuevos**, pero nunca tocó retroactivamente los GRANTs ya otorgados sobre tablas que existían antes de aplicarlo. El resultado: el fix cerró la fuga hacia adelante y dejó exactamente el mismo patrón sin corregir hacia atrás, en el 100% de las tablas preexistentes.
+
+**Por qué esto importa más que "RLS ya lo bloquea":** RLS en Postgres se aplica a `SELECT`/`INSERT`/`UPDATE`/`DELETE`. **`TRUNCATE` no está sujeto a ninguna policy**, `RESTRICTIVE` o no — es una limitación del motor, no un defecto de esta app. Los triggers de inalterabilidad (`pedidos_no_delete`, `tpv_cobro_no_delete`, `lc_fichajes_immutable`) tampoco lo capturan: están definidos `BEFORE DELETE`/`BEFORE UPDATE`, no `BEFORE TRUNCATE`. Es decir: de los cuatro privilegios revocados, tres (`INSERT`/`UPDATE`/`DELETE`) ya estaban neutralizados en la práctica por las policies `RESTRICTIVE "No direct anon access"` — pero `TRUNCATE` no tenía ninguna capa que lo frenara.
+
+**Explotabilidad verificada hoy:** ninguna. `anon`/`authenticated` tienen `rolcanlogin = false` (confirmado con `pg_roles`) — solo `authenticator` puede abrir sesión y hace `SET ROLE` según el JWT. PostgREST tampoco traduce ningún verbo HTTP a `TRUNCATE`. No hay ruta de red hoy. Pero es una violación de defensa en profundidad real y del propio checklist de migraciones de `CLAUDE.md` ("GRANT SELECT... TO anon <- solo si tabla publica") — y basta una función `SECURITY DEFINER` futura con SQL dinámico, o repetir el patrón de GRANTs en una tabla nueva sin pasar por el flujo estándar, para que dejara de ser teórico.
+
+**Fix** (`20260731000019`):
+1. `DO $$ ... $$` que recorre `pg_class` de `public` (tablas ordinarias y particionadas) y revoca `INSERT, UPDATE, DELETE, TRUNCATE` de `anon` en cada una — bucle dinámico, no lista de tablas hardcodeada, mismo criterio que el resto de checks de `check_rls_policy_hygiene()` (una tabla nueva queda cubierta sin tocar el código de nuevo).
+2. Nuevo check `anon_write_grant`, **sin whitelist**: la arquitectura del proyecto es `anon` = solo lectura vía RLS, `service_role` = todas las escrituras (ver "Row Level Security" más abajo) — no existe ninguna tabla donde `anon` deba tener estos 4 privilegios, a diferencia de `public_role_blanket_true` que sí tiene 3 tablas de catálogo público como excepción legítima.
+
+**Alcance deliberadamente limitado a `anon`:** `authenticated` no se tocó. El modelo de RLS del proyecto depende de que `authenticated` pueda hacer DML real bajo policies con scope de tenant (`empresa_id = get_mi_empresa_id()`), verificado extensamente en `pg_policies` — revocar ahí requiere su propia pasada de auditoría, no un revoke masivo el mismo día.
+
+Cubierto por el test `ninguna tabla otorga a anon INSERT/UPDATE/DELETE/TRUNCATE a nivel de tabla` en `rls-policy-hygiene.spec.ts`.
+
+### Superficies verificadas sin hallazgos (2026-07-31, segunda pasada)
+
+Tras encontrar el hueco de RPCs `SECURITY INVOKER` de arriba, se revisaron otras superficies del mismo tipo (¿qué otra cosa tiene un default inseguro que nadie audita sistemáticamente?) — resultado limpio, documentado para no repetir la revisión sin motivo:
+
+- **Vistas** (`CREATE VIEW`) — ninguna existe en `public` hoy. Ver `view_missing_security_invoker` más abajo: queda un chequeo permanente para la primera que se cree.
+- **Supabase Storage** — el bucket `app-releases` (distribución del APK Android) es privado, con una única policy en `storage.objects` scopeada a `service_role` para todos los comandos. `anon`/`authenticated` no tienen ninguna policy — deny-all por ausencia.
+- **Secuencias** — `pedidos_numero_pedido_seq`, `lc_fichajes_chain_seq`, `rgpd_purge_log_id_seq` tienen `USAGE` (no `SELECT`) para `anon`/`authenticated`. `USAGE` solo habilita `nextval()` para INSERTs propios — no permite leer el valor actual vía REST (PostgREST no expone secuencias como recurso). Sin riesgo de fuga de volumen de negocio.
+- **Schema `vault`** (Supabase Vault, secrets encriptados) — `anon`/`authenticated` no tienen ni `USAGE` sobre el schema, verificado con `has_schema_privilege`. Inaccesible por completo. No se usa en el proyecto actualmente.
+- **Funciones que referencian `auth.users`** — ninguna en `public`. Sin vector de fuga de emails de admins vía una función/vista intermedia.
 
 ### Lecturas públicas
 
@@ -646,6 +723,26 @@ El endpoint existe para conveniencia en desarrollo pero nunca debe ejecutarse en
 
 ---
 
+## CRON_SECRET — comparación en tiempo constante
+
+Todos los endpoints `GET /api/cron/*` y `GET /api/laborcontrol/cron/*` verifican el header `Authorization: Bearer <CRON_SECRET>` a través del helper compartido `verifyCronSecret()` en `src/lib/cron-auth.ts`, que usa `timingSafeEqual` en vez de comparación de string directa (`!==`). Comparar strings con `!==` filtra timing information proporcional a los bytes que coinciden — evitable a coste cero.
+
+```typescript
+export function verifyCronSecret(req: NextRequest): boolean {
+  const secret = process.env.CRON_SECRET;
+  const authHeader = req.headers.get('authorization');
+  if (!secret || !authHeader) return false;
+  const expected = Buffer.from(`Bearer ${secret}`);
+  const actual = Buffer.from(authHeader);
+  if (expected.length !== actual.length) return false;
+  return timingSafeEqual(expected, actual);
+}
+```
+
+El test estático `tests/compliance/cron-secret-timing-safe.test.ts` falla si algún endpoint nuevo lee `CRON_SECRET` sin pasar por este helper.
+
+---
+
 ## Tests E2E — suite de seguridad
 
 `e2e/waiter-csrf.spec.ts` — tests Playwright en modo API (sin browser) que verifican:
@@ -659,6 +756,10 @@ El endpoint existe para conveniencia en desarrollo pero nunca debe ejecutarse en
 | `POST /api/kitchen/*` → 401/403 | Kitchen hereda el guard |
 | RLS `lc_fichajes_2026_07` anon | PostgREST devuelve 0 filas o 404 |
 | RLS `lc_fichajes_2026_08` anon | PostgREST devuelve 0 filas o 404 |
+
+`e2e/compliance/anon-realtime-column-privileges.spec.ts` — verifica que `anon` nunca puede leer `select=*` ni columnas sensibles de `pedidos`/`mesa_sesiones`/`pedido_item_estados`, y que las columnas mínimas otorgadas siempre devuelven 0 filas (RLS). Regresión dedicada al incidente 2026-07-31 de más arriba.
+
+`e2e/compliance/rls-policy-hygiene.spec.ts` — escanea **todo** el schema (no solo las tablas del incidente) buscando los dos patrones RESTRICTIVE/`roles:public` descritos arriba. Ver detalle completo en [`testing-ci.md`](./testing-ci.md).
 
 Configuración en `playwright.config.ts`. Para ejecutar:
 
@@ -905,6 +1006,28 @@ Antes existía un fallback hardcodeado (`'default-pepper'`). El fallback se elim
 
 ---
 
+## Incidente 2026-07-31 (auditoría externa, pentest de código) — IDOR cross-tenant en `/api/mesas/*`
+
+Un pentest en vivo (headers falsificados contra la API real) más lectura de código encontró un hallazgo real en `src/app/api/mesas/[mesaId]/{propina,division,call-waiter}/route.ts`: el patrón `let empresaId = request.headers.get('x-empresa-id'); if (!empresaId) { /* derivar por dominio */ }` — comentado como "proxy does not inject x-empresa-id for this route" — **confiaba en el header del cliente cuando estaba presente**, y solo caía al dominio si estaba ausente. `proxy.ts` solo verifica/sobreescribe `x-empresa-id` para rutas bajo `/api/admin`, `/api/waiter`, `/api/kitchen`, `/api/tpv`, `/api/laborcontrol`, `/api/superadmin` — `/api/mesas/*` no está en esa lista, así que el header del cliente llegaba intacto al handler.
+
+Explotación: `empresas.id` es públicamente legible (`Publico ve empresas`, `qual: true`) via `/rest/v1/empresas`, así que un atacante que conociera el `mesaId` (UUID) de otro tenant podía enviar `x-empresa-id: <empresa_id real de esa tenant>` y pasar el chequeo `.eq('empresa_id', empresaId)` — porque el valor contra el que se compara también era el que el atacante eligió. Permitía mutar la propina, la división de cuenta o disparar una llamada de camarero falsa en la mesa de otra empresa. `lock/route.ts` (GET/POST/DELETE) no tenía **ningún** chequeo de tenant — ni siquiera el patrón con fallback, bastaba con conocer el `mesaId`.
+
+Un caso relacionado, mismo mecanismo: `POST /api/glovo/order` (despacho manual de Glovo) tampoco estaba cubierto por ningún branch de `proxy.ts` — `requireAuth()` ahí confiaba en headers sin ninguna verificación JWT.
+
+**Fix**:
+1. `propina`, `division`, `call-waiter`: se eliminó por completo la lectura de `x-empresa-id` — el tenant se deriva **solo** del dominio, que no es falsificable por el cliente (a diferencia de un header HTTP arbitrario).
+2. `lock/route.ts`: se añadió `requireMesaInOwnTenant()` (deriva por dominio + verifica `mesas.empresa_id`) antes de las 3 operaciones — no tenía ninguno.
+3. `proxy.ts`: nuevo branch `path === '/api/glovo/order'` → `handleAdminAuth` (scoped exacto, no afecta `/api/glovo/webhook` que se verifica por HMAC ni `/api/glovo/quote` que es público por diseño). Se añadió también `requireRole(['admin','superadmin'])` en el handler.
+4. `supabase/functions/tenant-backup/index.ts`: el compare del `BACKUP_SECRET` usaba `!==` directo (no timing-safe) — se cambió al mismo patrón XOR que ya usa el webhook de Glovo en este proyecto.
+
+Cubierto por `e2e/compliance/mesas-tenant-header-spoofing.spec.ts` — compara la respuesta de cada ruta con un `x-empresa-id` falsificado contra la respuesta sin header (deben ser idénticas), y confirma que `/api/glovo/order` ahora exige sesión admin real. Corre en CI vía `e2e.yml` (siempre) y `compliance.yml` (path filter ampliado con `src/proxy.ts`, `src/app/api/mesas/**`, `src/app/api/glovo/**`).
+
+**Lección para nuevas rutas fuera de `/api/admin|waiter|kitchen|tpv|laborcontrol|superadmin`**: si la ruta necesita identificar el tenant, derivarlo **solo** por dominio (`getDomainFromHeaders()` + `parseMainDomain()`) o por una sesión verificada explícitamente en el propio handler (como hacen `waiter/auth` o `tpv/empleados/login`) — nunca leer `x-empresa-id`/`x-admin-rol` de la request como si `proxy.ts` los hubiera saneado, sin confirmar primero que esa ruta está efectivamente dentro de uno de los 6 prefijos que el proxy cubre.
+
+**Nota sobre una hipótesis descartada durante esta auditoría**: en el mismo pentest se planteó inicialmente que `proxy.ts` no se registraba como middleware de Next.js (por no llamarse `middleware.ts`) y que por lo tanto ninguna ruta admin/waiter/tpv verificaba nada. Se refutó empíricamente antes de actuar sobre ella: `.next/server/middleware.js` existe compilado, la CSP de producción trae el nonce criptográfico que solo genera `proxy.ts` en runtime, y una petición real con `x-admin-rol: superadmin` falsificado contra `/api/admin/pedidos` en producción devolvió 401. El proyecto corre Next.js 16.2.12, que adoptó `proxy.ts` como el nombre de convención — la hipótesis partía de una convención de Next.js desactualizada. Documentado para que quede claro por qué no se tocó nada en esa dirección, pese a haber sido la alarma inicial.
+
+---
+
 ## Aislamiento de tenant en endpoints de mesa pública
 
 Las rutas `/api/mesas/[mesaId]/*` no tienen JWT de admin. El proxy inyecta `x-empresa-id` desde el dominio del tenant. Todas las mutaciones verifican que la mesa pertenece al tenant **antes de operar**:
@@ -1050,5 +1173,5 @@ Lista de las 10 vulnerabilidades web más críticas publicada por la Open Web Ap
 | `unsafe-inline` en `style-src` | Low | Estándar para la mayoría de aplicaciones Next.js. Mejorable con style nonces si el framework lo soporta en el futuro. |
 | Order number gaps | Low | Si el INSERT falla tras `get_next_pedido_number`, el número se pierde. Operacionalmente menor, no es riesgo de seguridad. |
 | Rate limit por tenant en pedidos públicos | Low | La creación de pedidos y clientes usa rate limit por IP. Para tenants con mucho tráfico legítimo desde IPs compartidas (NAT corporativo), considerar rate limit compuesto `empresaId:ip`. |
-| Leaked password protection (Supabase Auth) | Info | Requiere plan Pro de Supabase. Aceptado como riesgo conocido — el login de admin usa `auth.users` gestionado internamente, no contraseñas de usuarios finales. Ver `openspec/changes/security-hardening/manual-steps.md` cuando se actualice al plan Pro. |
+| Leaked password protection (Supabase Auth) | Info | Requiere plan Pro de Supabase. Aceptado como riesgo conocido — el login de admin usa `auth.users` gestionado internamente, no contraseñas de usuarios finales. Activar en Dashboard → Auth → Policies cuando se actualice al plan Pro. |
 | `get_mi_empresa_id()` callable por authenticated | Info | Intencional — necesario para cláusulas USING de RLS policies. No es un vector de ataque: la función solo devuelve el empresaId del admin autenticado. |

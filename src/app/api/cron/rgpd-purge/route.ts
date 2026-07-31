@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getClienteRepository } from '@/core/infrastructure/database';
 import { purgeExpiredClientesUseCase } from '@/core/application/use-cases/rgpd/purge-expired-clientes.use-case';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
+import { verifyCronSecret } from '@/lib/cron-auth';
 
 async function logPurgeExecution(
   anonymized_count: number,
@@ -18,10 +19,7 @@ async function logPurgeExecution(
 }
 
 export async function GET(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  const authHeader = req.headers.get('authorization');
-
-  if (!secret || authHeader !== `Bearer ${secret}`) {
+  if (!verifyCronSecret(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
