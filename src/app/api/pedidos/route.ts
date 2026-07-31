@@ -9,7 +9,7 @@ import { verifyWaiterToken } from '@/lib/waiter-auth';
 
 const itemsSchema = z.array(z.object({
   item: z.object({
-    id: z.string().uuid(),
+    id: z.uuid(),
     name: z.string().max(200),
     price: z.number().min(0).max(100_000),
     translations: z.object({
@@ -21,7 +21,7 @@ const itemsSchema = z.array(z.object({
   }),
   quantity: z.number().int().min(1).max(99),
   selectedComplements: z.array(z.object({
-    id: z.string().uuid(),
+    id: z.uuid(),
     name: z.string().max(200),
     price: z.number().min(0).max(100_000),
   })).max(20).optional(),
@@ -30,7 +30,7 @@ const itemsSchema = z.array(z.object({
 
 const mesaPedidoSchema = z.object({
   tipo: z.literal('mesa'),
-  mesa_id: z.string().uuid('El mesa_id debe ser un UUID válido'),
+  mesa_id: z.uuid({ error: 'El mesa_id debe ser un UUID válido' }),
   items: itemsSchema,
   idioma: z.enum(['es', 'en', 'fr', 'it', 'de']).optional(),
   initialEstado: z.enum(['pendiente', 'retenido']).optional(), // waiter-only field
@@ -42,7 +42,10 @@ const defaultPedidoSchema = z.object({
   items: itemsSchema,
   total: z.number().min(0).max(100_000).optional(), // ignored — server recalculates
   nombre: z.string().min(2).max(100),
-  telefono: z.string().min(9).max(20).regex(/^\+?[0-9\s\-()+]+$/, 'Formato de teléfono no válido'),
+  telefono: z.string().min(9).max(20).refine(
+    v => /^\+?[0-9\s\-()+]+$/.test(v),
+    { message: 'Formato de teléfono no válido' }
+  ),
   email: z.string().email().optional().or(z.literal('')),
   idioma: z.enum(['es', 'en', 'fr', 'it', 'de']).optional(),
   codigoDescuento: z.string().max(30).optional(),
@@ -99,6 +102,17 @@ async function isWaiterRequest(request: Request): Promise<boolean> {
   return payload !== null;
 }
 
+function resolveInitialEstado(
+  isWaiter: boolean,
+  data: MesaData,
+  empresa: EmpresaOrderData
+): 'pendiente' | 'retenido' | 'pendiente_validacion' {
+  if (isWaiter && data.initialEstado === 'retenido') return 'retenido';
+  if (isWaiter) return 'pendiente_validacion';
+  if (empresa.validacion_pedidos_habilitada) return 'pendiente_validacion';
+  return 'pendiente';
+}
+
 async function handleMesaOrder(empresa: EmpresaOrderData, data: MesaData, request: Request): Promise<NextResponse> {
   const isWaiter = await isWaiterRequest(request);
 
@@ -125,14 +139,7 @@ async function handleMesaOrder(empresa: EmpresaOrderData, data: MesaData, reques
 
   // Waiter: always goes through pendientes queue (pendiente_validacion), except explicit retenido.
   // Customer: pendiente_validacion when toggle is active, else pendiente.
-  let initialEstado: 'pendiente' | 'retenido' | 'pendiente_validacion' = 'pendiente';
-  if (isWaiter && data.initialEstado === 'retenido') {
-    initialEstado = 'retenido';
-  } else if (isWaiter) {
-    initialEstado = 'pendiente_validacion';
-  } else if (empresa.validacion_pedidos_habilitada) {
-    initialEstado = 'pendiente_validacion';
-  }
+  const initialEstado = resolveInitialEstado(isWaiter, data, empresa);
 
   const pedidoResult = await getPedidoUseCase().createMesaOrder(
     empresa.id,
@@ -144,6 +151,14 @@ async function handleMesaOrder(empresa: EmpresaOrderData, data: MesaData, reques
 
   if (!pedidoResult.success) {
     const errorCode = pedidoResult.error.code;
+    // Trigger check_session_not_locked raises PAYMENT_IN_PROGRESS if pago_en_curso=true.
+    // This covers the sub-ms window where checkMesaPaymentLock read false but the lock committed.
+    if (pedidoResult.error.message?.includes('PAYMENT_IN_PROGRESS')) {
+      return NextResponse.json(
+        { error: 'Hay un pago en curso en esta mesa. Espera a que finalice.' },
+        { status: 423 }
+      );
+    }
     if (['PRODUCT_NOT_FOUND', 'INVALID_UUID'].includes(errorCode)) {
       return NextResponse.json({ error: pedidoResult.error.message }, { status: 400 });
     }
