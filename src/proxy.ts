@@ -143,54 +143,6 @@ async function handleAdminAuth(request: NextRequest, origin: string | null): Pro
   }
 }
 
-async function handleCartAccessToken(url: URL, accessToken: string): Promise<NextResponse> {
-  const sanitizedToken = accessToken.replaceAll(/[^a-zA-Z0-9._-]/g, '');
-  const secretKey = process.env.CART_TOKEN_SECRET;
-
-  if (!secretKey) {
-    if (process.env.NODE_ENV === 'production') {
-      return new NextResponse('Server configuration error', { status: 500 });
-    }
-    return NextResponse.next();
-  }
-
-  try {
-    const secret = new TextEncoder().encode(secretKey);
-    // Require 'cart-access' audience to prevent token confusion with admin JWTs
-    const { payload } = await jwtVerify(sanitizedToken, secret, { audience: 'cart-access' });
-
-    // If the cart token has a jti, check revocation (fail-closed in prod).
-    // Cart tokens generated without jti are accepted today (short 15-min TTL);
-    // once generation includes jti this will revoke on-demand.
-    if (payload.jti && await isTokenRevoked(payload.jti)) {
-      url.searchParams.delete('access');
-      return NextResponse.redirect(url);
-    }
-
-    url.searchParams.delete('access');
-    const response = NextResponse.redirect(url);
-
-    let maxAge = 15 * 60;
-    if (payload?.exp) {
-      const now = Math.floor(Date.now() / 1000);
-      maxAge = Math.max(payload.exp - now, 0);
-    }
-
-    response.cookies.set('access_token', sanitizedToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-      maxAge,
-    });
-
-    return response;
-  } catch {
-    url.searchParams.delete('access');
-    return NextResponse.redirect(url);
-  }
-}
-
 function normalizeR2Origin(raw: string | undefined): string {
   if (!raw) return '';
   // Strip any existing protocol so we always produce a clean https:// origin
@@ -455,12 +407,6 @@ export async function proxy(request: NextRequest) {
       return addCorsHeaders(errorResponse('Acceso denegado', 403), origin);
     }
     return adminAuthResponse;
-  }
-
-  // Access token for cart
-  const accessToken = url.searchParams.get('access');
-  if (accessToken) {
-    return handleCartAccessToken(url, accessToken);
   }
 
   // Generate per-request nonce for CSP (HIGH-005)
