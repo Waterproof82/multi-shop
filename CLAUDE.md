@@ -51,6 +51,12 @@ Todo el codebase usa `Result<T, AppError>`.
   El test `e2e/compliance/supabase-security-definer.spec.ts` verifica esto automaticamente en CI.
 - **Particiones RLS:** Las tablas de particion NO heredan RLS del padre. Cada particion nueva necesita `ENABLE ROW LEVEL SECURITY` + policies propias. `lc_create_next_partition()` lo hace automaticamente.
 - **delete-all en produccion:** `DELETE /api/admin/pedidos/delete-all` tiene guard `NODE_ENV === 'production'` → 403. Nunca eliminar ese guard.
+- **`pedidos.es_prueba` (CRITICO):** unica excepcion al bloqueo de DELETE del Art.66 LGT. `pedidos_block_delete` solo deja borrar filas con `es_prueba = true` y sin cobros asociados, y registra cada borrado en `pedidos_prueba_purga_log` (solo insercion).
+  - El flag es **inmutable**: el trigger `pedidos_es_prueba_inmutable` bloquea cualquier UPDATE sobre esa columna. Sin eso, marcar un pedido facturado como prueba y borrarlo seria una puerta trasera al registro fiscal.
+  - **NUNCA exponer `es_prueba` en un DTO de Zod ni en un mapper de repositorio.** Si el cliente pudiera activarlo, seria un vector para sacar ingresos de los totales fiscales. Solo se fija en el INSERT con service_role (tests E2E).
+  - Los pedidos con el flag quedan excluidos de `get_pedido_stats_ano`. Purga en lote: `SELECT purge_pedidos_prueba(empresa_id)`.
+  - El test `e2e/compliance/pedidos-borrado-pruebas.spec.ts` verifica las barreras en CI.
+- **Tests E2E que insertan pedidos:** deben poner `es_prueba: true` en el INSERT y borrarlos en el teardown. Sin el flag las filas son imborrables y se acumulan en la tabla con retencion fiscal, inflando los conteos del dashboard (paso de verdad: 200 filas acumuladas duplicaban el numero de pedidos de julio 2026).
 - **E2E tests de seguridad:** `e2e/waiter-csrf.spec.ts` cubre CSRF + RLS. Ejecutar con `PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test e2e/`.
 
 ## Base de Datos (Trampas Comunes)
