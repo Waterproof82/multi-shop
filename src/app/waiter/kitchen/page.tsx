@@ -9,6 +9,7 @@ import { t } from '@/lib/translations';
 import { UtensilsCrossed, ChevronLeft, ChevronDown, ChevronsUpDown, TimerOff, CheckCheck, PlayCircle, Pause, Table2, Trash2, Layers } from 'lucide-react';
 import type { ItemEstado } from '@/core/domain/repositories/IPedidoRepository';
 import { loadKitchenSnapshot, saveKitchenSnapshot } from '@/lib/kitchen/kitchen-snapshot-db';
+import { useRealtimeDegraded } from '@/hooks/waiter/useRealtimeDegraded';
 
 /** Scope propio: la forma de KitchenItem difiere de la de /kitchen. */
 const SNAPSHOT_SCOPE = 'waiter-kitchen';
@@ -324,6 +325,10 @@ export default function WaiterKitchenPage() {
     });
   }, []);
 
+  // Detecta la caída de los canales y sondea mientras dure, sin tocar el ciclo
+  // de vida de las suscripciones.
+  const { realtimeDegraded, trackChannelStatus } = useRealtimeDegraded(fetchItems);
+
   useEffect(() => {
     if (!isTabVisible) return;
     if (!waiterEmpresaId) return;
@@ -342,11 +347,7 @@ export default function WaiterKitchenPage() {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => { void fetchItems(); }, 100);
       })
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('[Realtime] waiter-kitchen-items error:', status);
-        }
-      });
+      .subscribe((status) => trackChannelStatus(status, 'waiter-kitchen-items error'));
 
     // Broadcast channel — receives 'item-update' events from the DB trigger
     // (notify_waiter_items_update) whenever pedido_item_estados rows change.
@@ -357,11 +358,7 @@ export default function WaiterKitchenPage() {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => { void fetchItems(); }, 100);
       })
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('[Realtime] waiter-items-update broadcast error (kitchen):', status);
-        }
-      });
+      .subscribe((status) => trackChannelStatus(status, 'waiter-items-update broadcast error (kitchen)'));
 
     // Broadcast channel — receives 'new-order' events from notify_waiter_new_order
     // trigger for ALL pedido inserts (including waiter-placed estado='pendiente'/'retenido').
@@ -372,11 +369,7 @@ export default function WaiterKitchenPage() {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => { void fetchItems(); }, 100);
       })
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('[Realtime] waiter-new-order broadcast error (kitchen):', status);
-        }
-      });
+      .subscribe((status) => trackChannelStatus(status, 'waiter-new-order broadcast error (kitchen)'));
 
     // Re-fetch on app resume from background (visibilitychange relay from WaiterBanner).
     const onResumeRelay = () => { void fetchItems(); };
@@ -389,7 +382,7 @@ export default function WaiterKitchenPage() {
       void supabase.removeChannel(broadcastChannel);
       void supabase.removeChannel(newOrderChannel);
     };
-  }, [fetchItems, isTabVisible, waiterEmpresaId]);
+  }, [fetchItems, isTabVisible, waiterEmpresaId, trackChannelStatus]);
 
   // Re-fetch items when tab becomes visible again so stale data is refreshed immediately.
   useEffect(() => {
@@ -852,6 +845,15 @@ export default function WaiterKitchenPage() {
 
   return (
     <div className="min-h-screen" style={{ background: BG }}>
+      {realtimeDegraded && (
+        <output
+          aria-live="polite"
+          className="fixed top-0 left-0 right-0 z-30 px-4 py-1.5 text-center text-xs font-semibold"
+          style={{ background: 'oklch(30% 0.14 62)', color: 'oklch(85% 0.16 62)' }}
+        >
+          {t('realtimeReconnecting', lang)}
+        </output>
+      )}
       {/* Header */}
       <div
         ref={headerRef}

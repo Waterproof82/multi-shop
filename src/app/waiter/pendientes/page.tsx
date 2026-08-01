@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronDown, Table2, UtensilsCrossed, Wine, Pause, CheckCh
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
+import { useRealtimeDegraded } from '@/hooks/waiter/useRealtimeDegraded';
 import { fetchWithCsrf, ensureCsrfToken } from '@/lib/csrf-client';
 
 interface PendienteItem {
@@ -394,6 +395,19 @@ export default function WaiterPendientesPage() {
     } catch { /* ignore */ }
   }, []);
 
+  // Detecta la caída de los canales y sondea mientras dure, sin tocar el ciclo
+  // de vida de las suscripciones.
+  //
+  // El `pauseWhen` NO es opcional aquí: durante el validate loop, `confirmingRef`
+  // debe bloquear cualquier fetch, o se lee estado parcial entre iteraciones
+  // (trampa #3 de docs/context/realtime-channels.md). Sin este guard, el sondeo
+  // cada 15 s reintroduciría esa misma race por la puerta de atrás.
+  const isConfirming = useCallback(() => confirmingRef.current.size > 0, []);
+  const { realtimeDegraded, trackChannelStatus } = useRealtimeDegraded(
+    fetchPendientes,
+    { pauseWhen: isConfirming },
+  );
+
   useEffect(() => {
     if (!isTabVisible) return;
     if (!waiterEmpresaId) return;
@@ -411,11 +425,7 @@ export default function WaiterPendientesPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos', filter: `empresa_id=eq.${waiterEmpresaId}` }, trigger)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados', filter: `empresa_id=eq.${waiterEmpresaId}` }, trigger)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'mesa_sesiones', filter: `empresa_id=eq.${waiterEmpresaId}` }, trigger)
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('[Realtime] waiter-pendientes error:', status);
-        }
-      });
+      .subscribe((status) => trackChannelStatus(status, 'waiter-pendientes error'));
 
     // Fallback: WaiterBanner relays Realtime events via DOM for cases where
     // the direct postgres_changes subscription doesn't fire (known Supabase JS
@@ -436,7 +446,7 @@ export default function WaiterPendientesPage() {
       void supabase.removeChannel(channel);
       globalThis.removeEventListener('waiter-realtime-update', bannerRelay);
     };
-  }, [fetchPendientes, isTabVisible, waiterEmpresaId]);
+  }, [fetchPendientes, isTabVisible, waiterEmpresaId, trackChannelStatus]);
 
   // Re-fetch when tab becomes visible again so stale data is refreshed immediately.
   useEffect(() => {
@@ -765,6 +775,15 @@ export default function WaiterPendientesPage() {
 
   return (
     <div className="min-h-screen" style={{ background: BG }}>
+      {realtimeDegraded && (
+        <output
+          aria-live="polite"
+          className="fixed top-0 left-0 right-0 z-30 px-4 py-1.5 text-center text-xs font-semibold"
+          style={{ background: 'oklch(30% 0.14 62)', color: 'oklch(85% 0.16 62)' }}
+        >
+          {t('realtimeReconnecting', lang)}
+        </output>
+      )}
       <div className="fixed top-0 left-0 right-0 z-10 shadow-lg"
         style={{ background: 'oklch(17% 0.025 252)', borderBottom: '1px solid oklch(42% 0.10 252 / 0.35)' }}>
         <div className="flex h-11 items-center gap-3 px-4">

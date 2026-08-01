@@ -68,6 +68,7 @@ import { useLanguage, type Language } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import { getCsrfToken, ensureCsrfToken, fetchWithCsrf } from '@/lib/csrf-client';
 import { loadKitchenSnapshot, saveKitchenSnapshot } from '@/lib/kitchen/kitchen-snapshot-db';
+import { useRealtimeDegraded } from '@/hooks/waiter/useRealtimeDegraded';
 
 /** Scope propio: BarOrder no comparte forma con los items de cocina. */
 const SNAPSHOT_SCOPE = 'waiter-bar';
@@ -339,6 +340,10 @@ export default function BarPage() {
     });
   }, []);
 
+  // Detecta la caída de los canales y sondea mientras dure, sin tocar el ciclo
+  // de vida de las suscripciones.
+  const { realtimeDegraded, trackChannelStatus } = useRealtimeDegraded(fetchOrders);
+
   useEffect(() => {
     if (!isTabVisible) return;
     if (!waiterEmpresaId) return;
@@ -357,11 +362,7 @@ export default function BarPage() {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => { void fetchOrders(); }, 100);
       })
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('[Realtime] waiter-bar-items error:', status);
-        }
-      });
+      .subscribe((status) => trackChannelStatus(status, 'waiter-bar-items error'));
 
     // Broadcast channel — receives 'item-update' events from the DB trigger
     // (notify_waiter_items_update) whenever pedido_item_estados rows change.
@@ -372,11 +373,7 @@ export default function BarPage() {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => { void fetchOrders(); }, 100);
       })
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('[Realtime] waiter-items-update broadcast error (bar):', status);
-        }
-      });
+      .subscribe((status) => trackChannelStatus(status, 'waiter-items-update broadcast error (bar)'));
 
     // Broadcast channel — receives 'new-order' events from notify_waiter_new_order
     // trigger for ALL pedido inserts (including waiter-placed estado='pendiente'/'retenido').
@@ -387,11 +384,7 @@ export default function BarPage() {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => { void fetchOrders(); }, 100);
       })
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('[Realtime] waiter-new-order broadcast error (bar):', status);
-        }
-      });
+      .subscribe((status) => trackChannelStatus(status, 'waiter-new-order broadcast error (bar)'));
 
     // Re-fetch on app resume from background (visibilitychange relay from WaiterBanner).
     const onResumeRelay = () => { void fetchOrders(); };
@@ -404,7 +397,7 @@ export default function BarPage() {
       void supabase.removeChannel(broadcastChannel);
       void supabase.removeChannel(newOrderChannel);
     };
-  }, [fetchOrders, isTabVisible, waiterEmpresaId]);
+  }, [fetchOrders, isTabVisible, waiterEmpresaId, trackChannelStatus]);
 
   // Re-fetch orders when tab becomes visible again so stale data is refreshed immediately.
   useEffect(() => {
@@ -813,6 +806,15 @@ export default function BarPage() {
 
   return (
     <div className="min-h-screen" style={{ background: BG }}>
+      {realtimeDegraded && (
+        <output
+          aria-live="polite"
+          className="fixed top-0 left-0 right-0 z-30 px-4 py-1.5 text-center text-xs font-semibold"
+          style={{ background: 'oklch(30% 0.14 62)', color: 'oklch(85% 0.16 62)' }}
+        >
+          {t('realtimeReconnecting', lang)}
+        </output>
+      )}
       {/* Header */}
       <div ref={headerRef} className="fixed top-0 left-0 right-0 z-10 shadow-lg"
         style={{ background: 'oklch(17% 0.025 252)', borderBottom: '1px solid oklch(42% 0.10 252 / 0.35)' }}>

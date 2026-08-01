@@ -8,6 +8,7 @@ import { fetchWithCsrf, ensureCsrfToken } from '@/lib/csrf-client';
 import { UtensilsCrossed, LogOut } from 'lucide-react';
 import type { ItemEstado } from '@/core/domain/repositories/IPedidoRepository';
 import { loadKitchenSnapshot, saveKitchenSnapshot } from '@/lib/kitchen/kitchen-snapshot-db';
+import { useRealtimeDegraded } from '@/hooks/waiter/useRealtimeDegraded';
 
 /** Clave del snapshot local de esta vista. Cada pantalla tiene su propia forma
  *  de item, así que no comparten scope. */
@@ -288,6 +289,10 @@ export default function KitchenPage() {
     } catch { /* ignore */ }
   }, []);
 
+  // Detecta la caída de los canales y sondea mientras dure, sin tocar el ciclo
+  // de vida de las suscripciones.
+  const { realtimeDegraded, trackChannelStatus } = useRealtimeDegraded(fetchItems);
+
   // Hidratación cache-first: pinta el último listado conocido mientras el fetch
   // viaja, para que un arranque en frío con wifi lenta no muestre "sin pedidos"
   // (indistinguible de "no hay nada pendiente", el peor falso negativo en cocina).
@@ -348,30 +353,18 @@ export default function KitchenPage() {
       .channel(channelNameRef.current)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados', filter: `empresa_id=eq.${waiterEmpresaId}` }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos', filter: `empresa_id=eq.${waiterEmpresaId}` }, scheduleRefresh)
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('[Realtime] kitchen-standalone postgres_changes error:', status);
-        }
-      });
+      .subscribe((status) => trackChannelStatus(status, 'kitchen-standalone postgres_changes'));
 
     // Broadcast channels — fired by DB triggers
     const broadcastItems = supabase
       .channel('waiter-items-update')
       .on('broadcast', { event: 'item-update' }, scheduleRefresh)
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('[Realtime] kitchen waiter-items-update error:', status);
-        }
-      });
+      .subscribe((status) => trackChannelStatus(status, 'kitchen waiter-items-update'));
 
     const broadcastOrders = supabase
       .channel('waiter-new-order')
       .on('broadcast', { event: 'new-order' }, scheduleRefresh)
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('[Realtime] kitchen waiter-new-order error:', status);
-        }
-      });
+      .subscribe((status) => trackChannelStatus(status, 'kitchen waiter-new-order'));
 
     // DOM relay — fallback for when WaiterBanner (on waiter pages) dispatches this event
     const onRealtimeRelay = () => { void fetchItems(); };
@@ -384,10 +377,11 @@ export default function KitchenPage() {
       void supabase.removeChannel(broadcastItems);
       void supabase.removeChannel(broadcastOrders);
     };
-  }, [fetchItems, waiterEmpresaId]);
+  }, [fetchItems, waiterEmpresaId, trackChannelStatus]);
 
   // Keep the synchronous mirror in step with the rendered list.
   useEffect(() => { itemsRef.current = items; }, [items]);
+
 
   // Visual timer tick — no network calls
   useEffect(() => {
@@ -564,6 +558,15 @@ export default function KitchenPage() {
 
       {/* Header */}
       <div className="sticky top-0 z-20 flex flex-col" style={{ background: BG, borderBottom: '1px solid oklch(28% 0.06 252 / 0.5)' }}>
+      {realtimeDegraded && (
+        <output
+          aria-live="polite"
+          className="w-full px-4 py-2 text-center text-xs font-semibold"
+          style={{ background: 'oklch(30% 0.14 62)', color: 'oklch(85% 0.16 62)' }}
+        >
+          {t('realtimeReconnecting', lang)}
+        </output>
+      )}
       <div className="px-4 pt-4 pb-2 flex items-center gap-3 overflow-x-auto scrollbar-none" style={{ scrollbarWidth: 'none' }}>
         <div className="flex items-center justify-center w-9 h-9 rounded-xl" style={{ background: 'oklch(26% 0.12 252)' }}>
           <UtensilsCrossed className="w-5 h-5" style={{ color: 'oklch(72% 0.18 252)' }} />
