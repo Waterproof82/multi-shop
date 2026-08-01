@@ -1,4 +1,5 @@
 import type { MetodoPago } from '@/core/domain/entities/tpv-types';
+import { fetchWithCsrf } from '@/lib/csrf-client';
 
 const DB_NAME = 'tpv_offline';
 const STORE_NAME = 'cobros_queue';
@@ -68,4 +69,51 @@ export async function getQueueCount(): Promise<number> {
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
+}
+
+/** Guard de reentrada: el flush se dispara desde el header (siempre montado) y
+ *  desde CobroFlow. Sin esto, ambos podrían postear la misma entrada a la vez. */
+let flushInFlight: Promise<void> | null = null;
+
+/**
+ * Sube los cobros encolados offline y los borra de IndexedDB al confirmarse.
+ * Vive aquí y no en CobroFlow para que se pueda invocar desde cualquier punto
+ * de /tpv/*: antes solo corría si la pantalla de cobro estaba montada, así que
+ * un cobro hecho offline podía quedarse sin sincronizar hasta reabrirla.
+ */
+export async function flushOfflineQueue(): Promise<void> {
+  if (flushInFlight) return flushInFlight;
+  flushInFlight = (async () => {
+    const entries = await getOfflineQueue();
+    if (entries.length === 0) return;
+
+    const res = await fetchWithCsrf('/api/tpv/sync-offline', {
+      method: 'POST',
+      body: JSON.stringify({ entries }),
+    });
+    if (!res.ok) return;
+
+    const { results } = (await res.json()) as { results: { id: string; status: string }[] };
+    for (const r of results) {
+      if (r.status === 'ok' || r.status === 'revision') {
+        await removeFromQueue(r.id);
+      }
+    }
+  })().finally(() => { flushInFlight = null; });
+  return flushInFlight;
+}
+
+/**
+ * Pide al navegador que marque el almacenamiento como persistente (OFF-11).
+ * Sin esto, el WebView de Android puede evictar `tpv_offline` bajo presión de
+ * memoria y perder cobros encolados. Idempotente y seguro de llamar siempre.
+ */
+export async function requestPersistentStorage(): Promise<boolean> {
+  try {
+    if (!navigator.storage?.persist) return false;
+    if (await navigator.storage.persisted()) return true;
+    return await navigator.storage.persist();
+  } catch {
+    return false;
+  }
 }

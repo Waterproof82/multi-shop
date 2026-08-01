@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { Category, Product } from '@/core/domain/entities/types';
 import type { TpvTurno } from '@/core/domain/entities/tpv-types';
 import type { MesaWithSession } from '@/core/domain/repositories/IMesaRepository';
@@ -193,21 +193,35 @@ export function TpvCatalogProvider({
     };
   }, [empresaId, scheduleCatalogRefresh, refreshMesas]);
 
+  // Sin useMemo este objeto es nuevo en cada render, y como `mesas` se refresca
+  // con cada broadcast de pedido/item, todo el árbol TPV (Mostrador, MesasGrid,
+  // Historial) se re-renderiza en eventos que no le conciernen.
+  const value = useMemo<TpvCatalogContextValue>(() => ({
+    products,
+    categories,
+    tipoImpuesto,
+    porcentajeImpuesto,
+    turno,
+    setTurno,
+    mesas,
+    refreshMesas,
+    refreshCatalog,
+    complementoGruposByProductId,
+  }), [
+    products,
+    categories,
+    tipoImpuesto,
+    porcentajeImpuesto,
+    turno,
+    setTurno,
+    mesas,
+    refreshMesas,
+    refreshCatalog,
+    complementoGruposByProductId,
+  ]);
+
   return (
-    <TpvCatalogContext.Provider
-      value={{
-        products,
-        categories,
-        tipoImpuesto,
-        porcentajeImpuesto,
-        turno,
-        setTurno,
-        mesas,
-        refreshMesas,
-        refreshCatalog,
-        complementoGruposByProductId,
-      }}
-    >
+    <TpvCatalogContext.Provider value={value}>
       {children}
     </TpvCatalogContext.Provider>
   );
