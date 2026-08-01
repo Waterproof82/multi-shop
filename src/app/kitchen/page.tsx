@@ -254,6 +254,9 @@ export default function KitchenPage() {
   const [waiterEmpresaId, setWaiterEmpresaId] = useState<string | null>(null);
 
   const timersRef      = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
+  // Mirror síncrono de `items` — permite capturar el estado previo de un item
+  // para el rollback sin leer estado obsoleto desde un closure.
+  const itemsRef       = useRef<KitchenItem[]>([]);
   const pointerStartX  = useRef<number | null>(null);
   const swipingKey     = useRef<string | null>(null);
   const prevCountRef   = useRef<number | null>(null);
@@ -358,6 +361,9 @@ export default function KitchenPage() {
     };
   }, [fetchItems, waiterEmpresaId]);
 
+  // Keep the synchronous mirror in step with the rendered list.
+  useEffect(() => { itemsRef.current = items; }, [items]);
+
   // Visual timer tick — no network calls
   useEffect(() => {
     const tick = setInterval(() => setItems(p => [...p]), 1000);
@@ -372,14 +378,35 @@ export default function KitchenPage() {
 
   // ── Countdown ──────────────────────────────────────────────────────────────
 
+  // ── Local state helpers (optimistic updates) ───────────────────────────────
+
+  const setItemEstado = useCallback((pedidoId: string, itemIdx: number, estado: ItemEstado) => {
+    setItems(prev => prev.map(i =>
+      (i.pedidoId === pedidoId && i.itemIdx === itemIdx) ? { ...i, estado } : i
+    ));
+  }, []);
+
+  const removeItem = useCallback((pedidoId: string, itemIdx: number) => {
+    setItems(prev => prev.filter(notMatchingItem(pedidoId, itemIdx)));
+  }, []);
+
+  const addItemBackIfMissing = useCallback((item: KitchenItem) => {
+    setItems(prev => prev.some(i => i.pedidoId === item.pedidoId && i.itemIdx === item.itemIdx)
+      ? prev
+      : [...prev, item]);
+  }, []);
+
   const applyItemListo = useCallback((pedidoId: string, itemIdx: number) => {
+    // Optimista: el item desaparece al instante y solo vuelve si el PATCH falla.
+    const previous = itemsRef.current.find(i => i.pedidoId === pedidoId && i.itemIdx === itemIdx);
+    removeItem(pedidoId, itemIdx);
     void fetchWithCsrf(`/api/kitchen/items/${encodeURIComponent(pedidoId)}/${itemIdx}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ estado: 'listo' }),
-    }).then(r => {
-      if (r.ok) setItems(prev => prev.filter(notMatchingItem(pedidoId, itemIdx)));
-    });
-  }, []);
+    })
+      .then(r => { if (!r.ok && previous) addItemBackIfMissing(previous); })
+      .catch(() => { if (previous) addItemBackIfMissing(previous); });
+  }, [removeItem, addItemBackIfMissing]);
 
   const startCountdown = useCallback((pedidoId: string, itemIdx: number) => {
     const key = makeKey(pedidoId, itemIdx);
@@ -410,13 +437,23 @@ export default function KitchenPage() {
 
   // ── PATCH ──────────────────────────────────────────────────────────────────
 
+  /** Optimista: aplica el estado en local al instante y solo revierte si el
+   *  servidor rechaza o la red falla. Antes esperaba el PATCH y además
+   *  disparaba un GET completo, congelando el swipe durante dos roundtrips. */
   const patchEstado = useCallback(async (pedidoId: string, itemIdx: number, estado: ItemEstado) => {
-    const r = await fetchWithCsrf(`/api/kitchen/items/${encodeURIComponent(pedidoId)}/${itemIdx}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ estado }),
-    });
-    if (r.ok) void fetchItems();
-  }, [fetchItems]);
+    const previous = itemsRef.current.find(i => i.pedidoId === pedidoId && i.itemIdx === itemIdx);
+    const rollback = () => { if (previous) setItemEstado(pedidoId, itemIdx, previous.estado); };
+    setItemEstado(pedidoId, itemIdx, estado);
+    try {
+      const r = await fetchWithCsrf(`/api/kitchen/items/${encodeURIComponent(pedidoId)}/${itemIdx}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ estado }),
+      });
+      if (!r.ok) rollback();
+    } catch {
+      rollback();
+    }
+  }, [setItemEstado]);
 
   const confirmMergedAction = useCallback(async () => {
     if (!pendingMergedAction) return;

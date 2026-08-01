@@ -422,11 +422,17 @@ export default function WaiterKitchenPage() {
 
   const patchEstado = useCallback(async (pedidoId: string, itemIdx: number, estado: ItemEstado, applyOptimistic: () => void, rollback: () => void) => {
     applyOptimistic();
-    const r = await fetchWithCsrf(`/api/waiter/kitchen/items/${encodeURIComponent(pedidoId)}/${itemIdx}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ estado }),
-    });
-    if (!r.ok) rollback();
+    // fetchWithCsrf lanza si agota los reintentos (corte de red). Sin este
+    // try/catch el rollback nunca corre y la UI queda desincronizada de la DB.
+    try {
+      const r = await fetchWithCsrf(`/api/waiter/kitchen/items/${encodeURIComponent(pedidoId)}/${itemIdx}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ estado }),
+      });
+      if (!r.ok) rollback();
+    } catch {
+      rollback();
+    }
   }, []);
 
   const setItemEstado = useCallback((pedidoId: string, itemIdx: number, newEstado: ItemEstado) => {

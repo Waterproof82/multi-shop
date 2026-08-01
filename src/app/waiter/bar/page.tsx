@@ -473,6 +473,15 @@ export default function BarPage() {
 
   // ── Countdown ─────────────────────────────────────────────────────────────
 
+  /** Reverts the optimistic "servido" mark for one item key when its PATCH fails. */
+  const rollbackServedKey = useCallback((key: string) => {
+    const rolled = new Set(servedKeysRef.current);
+    rolled.delete(key);
+    persistServedKeys(rolled);
+    servedKeysRef.current = rolled;
+    setServedKeys(new Set(rolled));
+  }, []);
+
   /** Called once a single-item countdown reaches zero. Fires per-item PATCH
    *  and, if all bebidas in the order are now served, the order-level PATCH.
    *  Uses servedKeysRef directly (not a state-updater form) to keep nesting shallow. */
@@ -486,11 +495,15 @@ export default function BarPage() {
     servedKeysRef.current = next;
     setServedKeys(new Set(next));
 
-    // Per-item PATCH — always fires when a single item countdown completes
+    // Per-item PATCH — always fires when a single item countdown completes.
+    // Debe revertir la marca optimista si falla: sin esto el item aparece
+    // servido en pantalla mientras la DB sigue en el estado anterior.
     fetchWithCsrf(`/api/waiter/kitchen/items/${encodeURIComponent(orderId)}/${detallePedidoIdx}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ estado: 'servido' }),
-    }).catch(() => {});
+    })
+      .then(r => { if (!r.ok) rollbackServedKey(key); })
+      .catch(() => rollbackServedKey(key));
 
     const servedCount = [...next].filter(k => k.startsWith(`${orderId}:`)).length;
     if (servedCount < totalInOrder) return;
@@ -513,20 +526,10 @@ export default function BarPage() {
         servedKeysRef.current = cleaned;
         setServedKeys(new Set(cleaned));
       } else {
-        const rolled = new Set(servedKeysRef.current);
-        rolled.delete(key);
-        persistServedKeys(rolled);
-        servedKeysRef.current = rolled;
-        setServedKeys(new Set(rolled));
+        rollbackServedKey(key);
       }
-    }).catch(() => {
-      const rolled = new Set(servedKeysRef.current);
-      rolled.delete(key);
-      persistServedKeys(rolled);
-      servedKeysRef.current = rolled;
-      setServedKeys(new Set(rolled));
-    });
-  }, []);
+    }).catch(() => rollbackServedKey(key));
+  }, [rollbackServedKey]);
 
   const startCountdown = useCallback((flatItem: FlatBarItem) => {
     const key = flatItem.key;

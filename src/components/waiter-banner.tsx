@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { UtensilsCrossed, ArrowLeftRight, LogOut, X, ShoppingCart, ChevronDown, Circle, LockOpen, AlertTriangle, Wine, BellRing } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
@@ -137,6 +137,7 @@ async function applyWaiterMeResponse(
 
 export function WaiterBanner() {
   const pathname = usePathname();
+  const router = useRouter();
   const pathnameRef = useRef(pathname);
   pathnameRef.current = pathname;
   // Unique channel name per instance — avoids React StrictMode returning a stale
@@ -216,9 +217,21 @@ export function WaiterBanner() {
     if (!authChecked || isWaiter) return;
     if (!navigator.onLine) return;
     if (pathname.startsWith('/waiter/')) {
+      // Reload completo a propósito: es un fallo de auth, hay que descartar
+      // todo el estado de cliente, no solo cambiar de vista.
       globalThis.location.href = '/waiter';
     }
   }, [authChecked, isWaiter, pathname]);
+
+  // Prefetch de las vistas hermanas. El camarero alterna entre Cocina, Bar y
+  // Pendientes decenas de veces por turno; sin esto el RSC payload se pide
+  // recién en el tap, sobre wifi de restaurante o datos móviles (APK).
+  useEffect(() => {
+    if (!isWaiter) return;
+    router.prefetch('/waiter/kitchen');
+    router.prefetch('/waiter/bar');
+    router.prefetch('/waiter/pendientes');
+  }, [isWaiter, router]);
 
   useEffect(() => {
     const stored = getWaiterMesa();
@@ -405,6 +418,9 @@ export function WaiterBanner() {
       }
       saveWaiterMesa({ mesaId: mesa.id, mesaNumero: mesa.numero, mesaNombre: mesa.nombre });
       setDropdownOpen(false);
+      // Reload completo a propósito, NO router.push: al cambiar de mesa hay que
+      // remontar CartProvider. Con navegación cliente el carrito de la mesa
+      // anterior sobrevive y sus items se filtran a la mesa nueva.
       globalThis.location.href = `/?mesa=${mesa.id}`;
     } finally {
       setSwitchingId(null);
@@ -420,6 +436,7 @@ export function WaiterBanner() {
       const res = await fetchWithCsrf(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/close`, { method: "POST" });
       if (res.ok || res.status === 404) {
         clearWaiterMesa();
+        // Reload completo a propósito: cerrar mesa debe dejar el carrito vacío.
         globalThis.location.href = "/waiter";
       } else {
         setCloseError(t("waiterTableCloseError", lang));
@@ -519,7 +536,7 @@ export function WaiterBanner() {
       <ul className="py-1 max-h-64 overflow-y-auto">
         <li>
           <button
-            onClick={() => { setDropdownOpen(false); globalThis.location.href = "/waiter"; }}
+            onClick={() => { setDropdownOpen(false); router.push("/waiter"); }}
             className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-xs font-semibold transition-colors duration-100 border-b"
             style={{
               color: BTN_TABLE_TEXT,
@@ -665,7 +682,7 @@ export function WaiterBanner() {
           {/* Pendientes — visible only when there are items awaiting validation */}
           {counts && counts.pendientes > 0 && (
             <button
-              onClick={() => { globalThis.location.href = '/waiter/pendientes'; }}
+              onClick={() => { router.push('/waiter/pendientes'); }}
               className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px]"
               style={{ color: BTN_PENDIENTES_TEXT, backgroundColor: BTN_PENDIENTES_BG }}
               onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_PENDIENTES_HOVER)}
@@ -684,7 +701,7 @@ export function WaiterBanner() {
 
           {/* Kitchen — always visible for authenticated waiters */}
           <button
-            onClick={() => { globalThis.location.href = '/waiter/kitchen'; }}
+            onClick={() => { router.push('/waiter/kitchen'); }}
             className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px]"
             style={{ color: BTN_KITCHEN_TEXT, backgroundColor: BTN_KITCHEN_BG }}
             onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_KITCHEN_HOVER)}
@@ -703,7 +720,7 @@ export function WaiterBanner() {
 
           {/* Bar — always visible for authenticated waiters */}
           <button
-            onClick={() => { globalThis.location.href = '/waiter/bar'; }}
+            onClick={() => { router.push('/waiter/bar'); }}
             className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px]"
             style={{ color: BTN_BAR_TEXT, backgroundColor: BTN_BAR_BG }}
             onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_BAR_HOVER)}
@@ -862,7 +879,7 @@ export function WaiterBanner() {
           </DialogHeader>
           <div className="flex gap-2 mt-2">
             <Button variant="outline" className="flex-1" onClick={() => setCloseDialog(null)}>Volver</Button>
-            <Button className="flex-1" onClick={() => { setCloseDialog(null); globalThis.location.href = `/mesa/${mesaId}/orders`; }}>
+            <Button className="flex-1" onClick={() => { setCloseDialog(null); router.push(`/mesa/${mesaId}/orders`); }}>
               Ver ticket
             </Button>
           </div>
