@@ -69,6 +69,7 @@ import { t } from '@/lib/translations';
 import { getCsrfToken, ensureCsrfToken, fetchWithCsrf } from '@/lib/csrf-client';
 import { loadKitchenSnapshot, saveKitchenSnapshot } from '@/lib/kitchen/kitchen-snapshot-db';
 import { useRealtimeDegraded } from '@/hooks/waiter/useRealtimeDegraded';
+import { useCommandQueue } from '@/hooks/waiter/useCommandQueue';
 
 /** Scope propio: BarOrder no comparte forma con los items de cocina. */
 const SNAPSHOT_SCOPE = 'waiter-bar';
@@ -344,6 +345,10 @@ export default function BarPage() {
   // de vida de las suscripciones.
   const { realtimeDegraded, trackChannelStatus } = useRealtimeDegraded(fetchOrders);
 
+  // Cola offline de cambios de estado. Al vaciarse se resincroniza contra el
+  // servidor para adoptar el estado autoritativo.
+  const { pendingCount, enqueueItemStatus } = useCommandQueue(fetchOrders);
+
   useEffect(() => {
     if (!isTabVisible) return;
     if (!waiterEmpresaId) return;
@@ -508,15 +513,14 @@ export default function BarPage() {
     servedKeysRef.current = next;
     setServedKeys(new Set(next));
 
-    // Per-item PATCH — always fires when a single item countdown completes.
-    // Debe revertir la marca optimista si falla: sin esto el item aparece
-    // servido en pantalla mientras la DB sigue en el estado anterior.
-    fetchWithCsrf(`/api/waiter/kitchen/items/${encodeURIComponent(orderId)}/${detallePedidoIdx}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ estado: 'servido' }),
-    })
+    // Per-item PATCH. Se distingue el rechazo del servidor de la caída de red:
+    //   - respuesta no-ok  → el servidor rechaza la intención, se revierte
+    //   - excepción (red)  → la intención sigue siendo válida, se encola y se
+    //                        conserva la marca optimista hasta poder enviarla
+    const itemUrl = `/api/waiter/kitchen/items/${encodeURIComponent(orderId)}/${detallePedidoIdx}/status`;
+    fetchWithCsrf(itemUrl, { method: 'PATCH', body: JSON.stringify({ estado: 'servido' }) })
       .then(r => { if (!r.ok) rollbackServedKey(key); })
-      .catch(() => rollbackServedKey(key));
+      .catch(() => { void enqueueItemStatus(orderId, detallePedidoIdx, itemUrl, { estado: 'servido' }); });
 
     const servedCount = [...next].filter(k => k.startsWith(`${orderId}:`)).length;
     if (servedCount < totalInOrder) return;
@@ -542,7 +546,7 @@ export default function BarPage() {
         rollbackServedKey(key);
       }
     }).catch(() => rollbackServedKey(key));
-  }, [rollbackServedKey]);
+  }, [rollbackServedKey, enqueueItemStatus]);
 
   const startCountdown = useCallback((flatItem: FlatBarItem) => {
     const key = flatItem.key;
@@ -806,13 +810,15 @@ export default function BarPage() {
 
   return (
     <div className="min-h-screen" style={{ background: BG }}>
-      {realtimeDegraded && (
+      {(realtimeDegraded || pendingCount > 0) && (
         <output
           aria-live="polite"
           className="fixed top-0 left-0 right-0 z-30 px-4 py-1.5 text-center text-xs font-semibold"
           style={{ background: 'oklch(30% 0.14 62)', color: 'oklch(85% 0.16 62)' }}
         >
-          {t('realtimeReconnecting', lang)}
+          {pendingCount > 0
+            ? t('offlinePendingChanges', lang).replace('{n}', String(pendingCount))
+            : t('realtimeReconnecting', lang)}
         </output>
       )}
       {/* Header */}

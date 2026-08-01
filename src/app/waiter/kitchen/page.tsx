@@ -10,6 +10,7 @@ import { UtensilsCrossed, ChevronLeft, ChevronDown, ChevronsUpDown, TimerOff, Ch
 import type { ItemEstado } from '@/core/domain/repositories/IPedidoRepository';
 import { loadKitchenSnapshot, saveKitchenSnapshot } from '@/lib/kitchen/kitchen-snapshot-db';
 import { useRealtimeDegraded } from '@/hooks/waiter/useRealtimeDegraded';
+import { useCommandQueue } from '@/hooks/waiter/useCommandQueue';
 
 /** Scope propio: la forma de KitchenItem difiere de la de /kitchen. */
 const SNAPSHOT_SCOPE = 'waiter-kitchen';
@@ -329,6 +330,10 @@ export default function WaiterKitchenPage() {
   // de vida de las suscripciones.
   const { realtimeDegraded, trackChannelStatus } = useRealtimeDegraded(fetchItems);
 
+  // Cola offline de cambios de estado. Al vaciarse se resincroniza contra el
+  // servidor para adoptar el estado autoritativo.
+  const { pendingCount, enqueueItemStatus } = useCommandQueue(fetchItems);
+
   useEffect(() => {
     if (!isTabVisible) return;
     if (!waiterEmpresaId) return;
@@ -435,18 +440,19 @@ export default function WaiterKitchenPage() {
 
   const patchEstado = useCallback(async (pedidoId: string, itemIdx: number, estado: ItemEstado, applyOptimistic: () => void, rollback: () => void) => {
     applyOptimistic();
-    // fetchWithCsrf lanza si agota los reintentos (corte de red). Sin este
-    // try/catch el rollback nunca corre y la UI queda desincronizada de la DB.
+    const url = `/api/waiter/kitchen/items/${encodeURIComponent(pedidoId)}/${itemIdx}/status`;
     try {
-      const r = await fetchWithCsrf(`/api/waiter/kitchen/items/${encodeURIComponent(pedidoId)}/${itemIdx}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ estado }),
-      });
+      const r = await fetchWithCsrf(url, { method: 'PATCH', body: JSON.stringify({ estado }) });
+      // El servidor contestó y rechazó: la intención NO es válida, se revierte.
       if (!r.ok) rollback();
     } catch {
-      rollback();
+      // fetchWithCsrf lanza al agotar los reintentos, es decir, la petición no
+      // llegó a contestar. Aquí NO se revierte: la intención del cocinero sigue
+      // siendo válida, solo falta red. Se conserva el estado optimista y el
+      // cambio se aplica al reconectar.
+      await enqueueItemStatus(pedidoId, itemIdx, url, { estado });
     }
-  }, []);
+  }, [enqueueItemStatus]);
 
   const setItemEstado = useCallback((pedidoId: string, itemIdx: number, newEstado: ItemEstado) => {
     setItems(prev => prev.map(i =>
@@ -845,13 +851,15 @@ export default function WaiterKitchenPage() {
 
   return (
     <div className="min-h-screen" style={{ background: BG }}>
-      {realtimeDegraded && (
+      {(realtimeDegraded || pendingCount > 0) && (
         <output
           aria-live="polite"
           className="fixed top-0 left-0 right-0 z-30 px-4 py-1.5 text-center text-xs font-semibold"
           style={{ background: 'oklch(30% 0.14 62)', color: 'oklch(85% 0.16 62)' }}
         >
-          {t('realtimeReconnecting', lang)}
+          {pendingCount > 0
+            ? t('offlinePendingChanges', lang).replace('{n}', String(pendingCount))
+            : t('realtimeReconnecting', lang)}
         </output>
       )}
       {/* Header */}
