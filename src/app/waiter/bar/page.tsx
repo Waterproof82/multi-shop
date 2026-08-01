@@ -67,6 +67,10 @@ const COUNTDOWN_COLOR   = { bg: 'oklch(22% 0.16 148)', border: 'oklch(50% 0.26 1
 import { useLanguage, type Language } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import { getCsrfToken, ensureCsrfToken, fetchWithCsrf } from '@/lib/csrf-client';
+import { loadKitchenSnapshot, saveKitchenSnapshot } from '@/lib/kitchen/kitchen-snapshot-db';
+
+/** Scope propio: BarOrder no comparte forma con los items de cocina. */
+const SNAPSHOT_SCOPE = 'waiter-bar';
 
 interface BarOrder {
   id: string;
@@ -279,6 +283,8 @@ export default function BarPage() {
   // Refs for beforeunload — must be updated synchronously (useEffect is too late if user navigates immediately)
   const ordersRef              = useRef<BarOrder[]>([]);
   const servedKeysRef          = useRef<Set<string>>(new Set());
+  // Impide que la hidratación desde IndexedDB (asíncrona) pise datos frescos.
+  const hasServerDataRef       = useRef(false);
   // pendingCountdownsRef is updated directly in startCountdown/cancelCountdown — no React batching delay
   const pendingCountdownsRef   = useRef<Map<string, FlatBarItem>>(new Map());
   useEffect(() => { ordersRef.current     = orders;     }, [orders]);
@@ -314,9 +320,23 @@ export default function BarPage() {
       const r = await fetch('/api/waiter/bar/orders');
       if (r.ok) {
         const json = await r.json() as { orders: BarOrder[] };
-        setOrders(json.orders ?? []);
+        const incoming = json.orders ?? [];
+        hasServerDataRef.current = true;
+        setOrders(incoming);
+        void saveKitchenSnapshot(SNAPSHOT_SCOPE, incoming);
       }
     } catch { /* ignore */ }
+  }, []);
+
+  // Hidratación cache-first mientras viaja el primer fetch — ver
+  // lib/kitchen/kitchen-snapshot-db. El guard evita que esta lectura asíncrona
+  // de IndexedDB pise datos ya traídos por el servidor o por Realtime.
+  useEffect(() => {
+    void loadKitchenSnapshot<BarOrder>(SNAPSHOT_SCOPE).then(cached => {
+      if (!cached || cached.length === 0) return;
+      if (hasServerDataRef.current) return;
+      setOrders(cached);
+    });
   }, []);
 
   useEffect(() => {

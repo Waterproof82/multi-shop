@@ -7,6 +7,11 @@ import { t } from '@/lib/translations';
 import { fetchWithCsrf, ensureCsrfToken } from '@/lib/csrf-client';
 import { UtensilsCrossed, LogOut } from 'lucide-react';
 import type { ItemEstado } from '@/core/domain/repositories/IPedidoRepository';
+import { loadKitchenSnapshot, saveKitchenSnapshot } from '@/lib/kitchen/kitchen-snapshot-db';
+
+/** Clave del snapshot local de esta vista. Cada pantalla tiene su propia forma
+ *  de item, así que no comparten scope. */
+const SNAPSHOT_SCOPE = 'kitchen';
 
 interface KitchenItem {
   pedidoId: string;
@@ -257,6 +262,9 @@ export default function KitchenPage() {
   // Mirror síncrono de `items` — permite capturar el estado previo de un item
   // para el rollback sin leer estado obsoleto desde un closure.
   const itemsRef       = useRef<KitchenItem[]>([]);
+  // Marca que ya llegó al menos una respuesta del servidor: impide que la
+  // hidratación desde IndexedDB (asíncrona) pise datos más frescos.
+  const hasServerDataRef = useRef(false);
   const pointerStartX  = useRef<number | null>(null);
   const swipingKey     = useRef<string | null>(null);
   const prevCountRef   = useRef<number | null>(null);
@@ -274,8 +282,25 @@ export default function KitchenPage() {
       const activeCount = incoming.filter(i => i.estado === 'pendiente' || i.estado === 'en_preparacion').length;
       if (prevCountRef.current !== null && activeCount > prevCountRef.current) playBell();
       prevCountRef.current = activeCount;
+      hasServerDataRef.current = true;
       setItems(incoming);
+      void saveKitchenSnapshot(SNAPSHOT_SCOPE, incoming);
     } catch { /* ignore */ }
+  }, []);
+
+  // Hidratación cache-first: pinta el último listado conocido mientras el fetch
+  // viaja, para que un arranque en frío con wifi lenta no muestre "sin pedidos"
+  // (indistinguible de "no hay nada pendiente", el peor falso negativo en cocina).
+  //
+  // El guard es lo importante: esta lectura de IndexedDB es asíncrona y puede
+  // resolver DESPUÉS de que el servidor o un evento Realtime ya hayan traído
+  // datos frescos. Si eso pasa, se descarta — nunca pisa lo autoritativo.
+  useEffect(() => {
+    void loadKitchenSnapshot<KitchenItem>(SNAPSHOT_SCOPE).then(cached => {
+      if (!cached || cached.length === 0) return;
+      if (hasServerDataRef.current) return;
+      setItems(cached);
+    });
   }, []);
 
   // Fetch empresaId on mount — guards the Realtime subscription against StrictMode double-mount.

@@ -8,6 +8,10 @@ import { useLanguage, type Language } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import { UtensilsCrossed, ChevronLeft, ChevronDown, ChevronsUpDown, TimerOff, CheckCheck, PlayCircle, Pause, Table2, Trash2, Layers } from 'lucide-react';
 import type { ItemEstado } from '@/core/domain/repositories/IPedidoRepository';
+import { loadKitchenSnapshot, saveKitchenSnapshot } from '@/lib/kitchen/kitchen-snapshot-db';
+
+/** Scope propio: la forma de KitchenItem difiere de la de /kitchen. */
+const SNAPSHOT_SCOPE = 'waiter-kitchen';
 
 interface KitchenItem {
   pedidoId: string;
@@ -271,6 +275,8 @@ export default function WaiterKitchenPage() {
   const pointerStartX = useRef<number | null>(null);
   const swipingKey    = useRef<string | null>(null);
   const headerRef     = useRef<HTMLDivElement>(null);
+  // Impide que la hidratación desde IndexedDB (asíncrona) pise datos frescos.
+  const hasServerDataRef = useRef(false);
   const [headerHeight, setHeaderHeight] = useState(120);
   // Visibility lifecycle — disconnect Realtime when tab is hidden, reconnect on visible
   useEffect(() => {
@@ -299,9 +305,23 @@ export default function WaiterKitchenPage() {
       const r = await fetch('/api/waiter/kitchen/items');
       if (r.ok) {
         const json = await r.json() as { items: KitchenItem[] };
-        setItems(json.items ?? []);
+        const incoming = json.items ?? [];
+        hasServerDataRef.current = true;
+        setItems(incoming);
+        void saveKitchenSnapshot(SNAPSHOT_SCOPE, incoming);
       }
     } catch { /* ignore */ }
+  }, []);
+
+  // Hidratación cache-first mientras viaja el primer fetch — ver
+  // lib/kitchen/kitchen-snapshot-db. El guard evita que esta lectura asíncrona
+  // de IndexedDB pise datos ya traídos por el servidor o por Realtime.
+  useEffect(() => {
+    void loadKitchenSnapshot<KitchenItem>(SNAPSHOT_SCOPE).then(cached => {
+      if (!cached || cached.length === 0) return;
+      if (hasServerDataRef.current) return;
+      setItems(cached);
+    });
   }, []);
 
   useEffect(() => {
