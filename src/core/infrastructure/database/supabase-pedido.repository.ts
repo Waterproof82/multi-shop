@@ -145,6 +145,16 @@ function addValidatedRetenidos(
 
 const PEDIDO_ADMIN_SELECT = '*, clientes:cliente_id (nombre, email, telefono), mesas:mesa_id (numero, nombre), sesion:sesion_id (cerrada_at)';
 
+/** Forma del JSONB que devuelve la RPC `get_pedido_stats_ano`. */
+interface PedidoStatsAno {
+  totalAno: number;
+  pedidosHoy: number;
+  totalHoy: number;
+  pedidosAnterior: number;
+  ingresosAnterior: number;
+  topPlatosAno: Array<{ nombre: string; cantidad: number; total: number }>;
+}
+
 function pedidoEffectiveDateMs(p: Record<string, unknown>): number {
   const sesion = p['sesion'] as Record<string, unknown> | null;
   const d = (sesion?.['cerrada_at'] as string | null) ?? (p['created_at'] as string);
@@ -215,12 +225,6 @@ function sumTotal(list: Array<{ total?: number | null }>): number {
   return list.reduce((s, p) => s + (p.total || 0), 0);
 }
 
-function inDateRange(start: string, end: string) {
-  const s = new Date(start);
-  const e = new Date(end);
-  return (p: { created_at: string }) => new Date(p.created_at) >= s && new Date(p.created_at) <= e;
-}
-
 export class SupabasePedidoRepository implements IPedidoRepository {
   constructor(private readonly supabase: SupabaseClient) {}
 
@@ -241,14 +245,25 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     });
   }
 
-  async findAllByTenant(empresaId: string): Promise<Result<Pedido[]>> {
+  /**
+   * `limit` acota cuántos pedidos se traen (los más recientes primero).
+   * `pedidos` no se borra nunca — trigger `pedidos_no_delete`, Art. 66 LGT
+   * exige retención fiscal de 5 años — así que sin límite esta consulta crece
+   * de forma indefinida junto con la antigüedad del negocio. Se deja opcional
+   * para no cambiar el contrato de los llamadores que sí necesitan el listado
+   * completo; quien solo muestre un resumen debe pasar un límite explícito.
+   */
+  async findAllByTenant(empresaId: string, limit?: number): Promise<Result<Pedido[]>> {
     try {
+      let query = this.supabase
+        .from('pedidos')
+        .select(PEDIDO_ADMIN_SELECT)
+        .eq('empresa_id', empresaId)
+        .order('created_at', { ascending: false });
+      if (limit !== undefined) query = query.limit(limit);
+
       const [{ data, error }, openSesionIds] = await Promise.all([
-        this.supabase
-          .from('pedidos')
-          .select(PEDIDO_ADMIN_SELECT)
-          .eq('empresa_id', empresaId)
-          .order('created_at', { ascending: false }),
+        query,
         this.getOpenSesionIds(empresaId),
       ]);
 
@@ -578,7 +593,26 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       const mesAnteriorEnd   = new Date(añoAnterior, mesAnterior + 1, 0, 23, 59, 59).toISOString();
 
       const [yearRes, sesionesRes, nonMesaRes] = await Promise.all([
-        this.supabase.from('pedidos').select('*, clientes!inner(*)').eq('empresa_id', empresaId).gte('created_at', yearStart),
+        // Agregación anual delegada a la base (get_pedido_stats_ano).
+        //
+        // Antes esto era `select('*, clientes!inner(*)')`, con dos problemas:
+        // 1) El `!inner` no era decorativo: al ser INNER JOIN filtraba el
+        //    conjunto a los pedidos CON cliente registrado. En producción
+        //    descartaba el 94% (374 de 396 pedidos tienen cliente_id NULL), así
+        //    que totalAno y topPlatosAno se calculaban sobre una fracción del
+        //    negocio. Ahora la RPC cuenta todos los pedidos.
+        // 2) Traía el año completo de filas (con su JSONB) a Node para reducirlo
+        //    a seis números y un top-10. `pedidos` no se borra nunca (retención
+        //    fiscal 5 años), así que ese payload sólo crecía. La RPC devuelve
+        //    ~1 KB constante, sin importar el volumen histórico.
+        this.supabase.rpc('get_pedido_stats_ano', {
+          p_empresa_id:  empresaId,
+          p_year_start:  yearStart,
+          p_today_start: todayStart,
+          p_range_end:   monthEnd,
+          p_prev_start:  mesAnteriorStart,
+          p_prev_end:    mesAnteriorEnd,
+        }),
         this.supabase.from('mesa_sesiones').select('id, cerrada_at').eq('empresa_id', empresaId).gte('cerrada_at', monthStart).lte('cerrada_at', monthEnd),
         this.supabase.from('pedidos').select('id, total, tracking_token, origen, created_at, sesion_id, cliente_id, detalle_pedido').eq('empresa_id', empresaId).is('sesion_id', null).gte('created_at', monthStart).lte('created_at', monthEnd),
       ]);
@@ -596,7 +630,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener estadísticas', module: 'repository', method: 'getStats' } };
       }
 
-      const pedidosFiltrados = yearRes.data || [];
+      const statsAno = (yearRes.data ?? {}) as Partial<PedidoStatsAno>;
       const nonMesaMes = nonMesaRes.data ?? [];
       const sesionIds = (sesionesRes.data ?? []).map(s => (s as Record<string, unknown>)['id'] as string);
       const sesionDateMap = buildSesionDateMap(sesionesRes.data ?? []);
@@ -611,11 +645,12 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         mesaMesPedidos = mesaData ?? [];
       }
 
-      const pedidosHoyArr     = pedidosFiltrados.filter(inDateRange(todayStart, monthEnd));
-      const pedidosAnteriorArr = pedidosFiltrados.filter(inDateRange(mesAnteriorStart, mesAnteriorEnd));
-      const totalHoy  = sumTotal(pedidosHoyArr);
-      const totalAno  = sumTotal(pedidosFiltrados);
-      const ingresosAnterior = sumTotal(pedidosAnteriorArr);
+      const pedidosHoy       = Number(statsAno.pedidosHoy ?? 0);
+      const pedidosAnterior  = Number(statsAno.pedidosAnterior ?? 0);
+      const totalHoy         = Number(statsAno.totalHoy ?? 0);
+      const totalAno         = Number(statsAno.totalAno ?? 0);
+      const ingresosAnterior = Number(statsAno.ingresosAnterior ?? 0);
+      const topPlatosAno     = statsAno.topPlatosAno ?? [];
 
       const allPedidosMes = [...mesaMesPedidos, ...nonMesaMes];
       const recogidaMes   = nonMesaMes.filter(p => classifyNonMesaOrigen(p) === 'recogida');
@@ -623,7 +658,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       const webMes        = nonMesaMes.filter(p => classifyNonMesaOrigen(p) === 'web');
       const totalMes = sumTotal(allPedidosMes);
       const ticketMedio = allPedidosMes.length > 0 ? totalMes / allPedidosMes.length : 0;
-      const ticketMedioAnterior = pedidosAnteriorArr.length > 0 ? ingresosAnterior / pedidosAnteriorArr.length : 0;
+      const ticketMedioAnterior = pedidosAnterior > 0 ? ingresosAnterior / pedidosAnterior : 0;
 
       const pedidosPorDia = buildPedidosPorDia(mesaMesPedidos, nonMesaMes, sesionDateMap, daysInMonth);
 
@@ -635,19 +670,19 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       return {
         success: true,
         data: {
-          pedidosHoy: pedidosHoyArr.length,
+          pedidosHoy,
           pedidosMes: allPedidosMes.length,
           totalHoy,
           totalMes,
           totalAno,
           topPlatos: buildTopPlatosFromList(allPedidosMes),
-          topPlatosAno: buildTopPlatosFromList(pedidosFiltrados),
+          topPlatosAno,
           pedidosPorDia,
           clientesNuevos: clientesSet.size,
           clientesRecurrentes: 0,
           ticketMedio,
           ticketMedioAnterior,
-          pedidosAnterior: pedidosAnteriorArr.length,
+          pedidosAnterior,
           ingresosAnterior,
           byOrigen: {
             mesa:     { pedidos: mesaMesPedidos.length, total: sumTotal(mesaMesPedidos) },

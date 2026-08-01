@@ -102,7 +102,10 @@ export interface PendienteValidacionMesa {
 }
 
 export interface IPedidoRepository {
-  findAllByTenant(empresaId: string): Promise<Result<Pedido[]>>;
+  /** `limit` acota a los N pedidos más recientes. Omitirlo trae el histórico
+   *  completo, que crece sin techo: `pedidos` no admite DELETE (retención
+   *  fiscal de 5 años). Pasar límite explícito desde vistas de resumen. */
+  findAllByTenant(empresaId: string, limit?: number): Promise<Result<Pedido[]>>;
   findAllByTenantAndMonth(empresaId: string, mes: number, año: number): Promise<Result<Pedido[]>>;
   updateStatus(id: string, empresaId: string, estado: string): Promise<Result<void>>;
   delete(id: string, empresaId: string): Promise<Result<void>>;

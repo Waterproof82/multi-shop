@@ -271,9 +271,10 @@ export class PedidoUseCase {
     };
   }
 
-  async getAll(empresaId: string): Promise<Result<Pedido[]>> {
+  /** `limit` acota el histórico traído — ver findAllByTenant en el repositorio. */
+  async getAll(empresaId: string, limit?: number): Promise<Result<Pedido[]>> {
     try {
-      const result = await this.pedidoRepo.findAllByTenant(empresaId);
+      const result = await this.pedidoRepo.findAllByTenant(empresaId, limit);
       if (!result.success) {
         return { success: false, error: { ...result.error, method: 'PedidoUseCase.getAll' } };
       }
