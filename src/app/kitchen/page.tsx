@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
@@ -57,6 +57,12 @@ const EN_PREP_BORDER  = 'oklch(80% 0.32 142)'; // bright lime — overrides time
 
 const THRESHOLD         = 80;
 const COUNTDOWN_SECONDS = 5;
+
+/** Cadencia del reloj visual. Los contadores se muestran en minutos y las
+ *  bandas de color cambian a los 10/20/30/45/60 min, así que refrescar cada
+ *  segundo era 10 veces más de lo necesario para lo que se ve en pantalla.
+ *  La cuenta atrás de 5 s tiene su propio intervalo y no depende de este. */
+const CLOCK_TICK_MS = 10000;
 
 function makeKey(pedidoId: string, itemIdx: number) {
   return `${pedidoId}:${itemIdx}`;
@@ -258,6 +264,10 @@ export default function KitchenPage() {
   const [pendingMergedAction, setPendingMergedAction] = useState<{ items: KitchenItem[]; action: ItemEstado } | null>(null);
 
   const [waiterEmpresaId, setWaiterEmpresaId] = useState<string | null>(null);
+  // Contador del reloj visual. Su único cometido es provocar el repintado para
+  // refrescar tiempos y colores; deliberadamente NO forma parte de `items`,
+  // para que los agrupamientos memoizados no se invaliden en cada tick.
+  const [, setClockTick] = useState(0);
 
   const timersRef      = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
   // Mirror síncrono de `items` — permite capturar el estado previo de un item
@@ -383,9 +393,20 @@ export default function KitchenPage() {
   useEffect(() => { itemsRef.current = items; }, [items]);
 
 
-  // Visual timer tick — no network calls
+  // Reloj visual — refresca los colores y contadores por tiempo transcurrido.
+  //
+  // Antes esto hacía `setItems(p => [...p])`: creaba un array nuevo cada
+  // segundo solo para forzar el repintado, lo que invalidaba cualquier
+  // memoización posible sobre `items` y obligaba a reagrupar y reordenar la
+  // lista entera 60 veces por minuto, indefinidamente, en una tablet que está
+  // encendida todo el servicio.
+  //
+  // Ahora el reloj es un contador independiente: `items` solo cambia cuando
+  // cambian los datos de verdad, así que los agrupamientos memoizados de abajo
+  // sobreviven al tick. El repintado sigue ocurriendo porque el contador es
+  // estado del componente.
   useEffect(() => {
-    const tick = setInterval(() => setItems(p => [...p]), 1000);
+    const tick = setInterval(() => setClockTick(n => n + 1), CLOCK_TICK_MS);
     return () => clearInterval(tick);
   }, []);
 
@@ -548,8 +569,17 @@ export default function KitchenPage() {
 
   // ── Derived data ───────────────────────────────────────────────────────────
 
-  const activeItems = items.filter(i => i.estado === 'pendiente' || i.estado === 'en_preparacion');
-  const grouped     = (groupBy === 'mesa' ? groupByMesa(activeItems) : groupByPedido(activeItems)) as Map<string, AnyGroupValue>;
+  // Memoizados: el filtrado, el agrupamiento y el `.sort()` de groupByMesa solo
+  // se recalculan cuando cambian los datos o el criterio, no en cada tick del
+  // reloj. Es lo que hace que separar el reloj de `items` merezca la pena.
+  const activeItems = useMemo(
+    () => items.filter(i => i.estado === 'pendiente' || i.estado === 'en_preparacion'),
+    [items],
+  );
+  const grouped = useMemo(
+    () => (groupBy === 'mesa' ? groupByMesa(activeItems) : groupByPedido(activeItems)) as Map<string, AnyGroupValue>,
+    [activeItems, groupBy],
+  );
 
   // ── Render ─────────────────────────────────────────────────────────────────
 

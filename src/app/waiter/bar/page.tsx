@@ -32,7 +32,7 @@
  * sent when all bebidas in the order are covered (pending + already served).
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useMemo, useEffect, useRef, useState } from 'react';
 import { Wine, ChevronLeft, ChevronDown, ChevronsUpDown, Table2, CheckCheck, Trash2, Layers } from 'lucide-react';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 
@@ -70,6 +70,11 @@ import { getCsrfToken, ensureCsrfToken, fetchWithCsrf } from '@/lib/csrf-client'
 import { loadKitchenSnapshot, saveKitchenSnapshot } from '@/lib/kitchen/kitchen-snapshot-db';
 import { useRealtimeDegraded } from '@/hooks/waiter/useRealtimeDegraded';
 import { useCommandQueue } from '@/hooks/waiter/useCommandQueue';
+
+/** Cadencia del reloj visual. Los contadores se muestran en minutos y las
+ *  bandas de color cambian a los 10/20/30/45/60 min, asi que refrescar cada
+ *  segundo era 10 veces mas de lo necesario para lo que se ve en pantalla. */
+const CLOCK_TICK_MS = 10000;
 
 /** Scope propio: BarOrder no comparte forma con los items de cocina. */
 const SNAPSHOT_SCOPE = 'waiter-bar';
@@ -265,6 +270,10 @@ export default function BarPage() {
   const { language } = useLanguage();
   const lang = language;
   const [orders, setOrders]         = useState<BarOrder[]>([]);
+  // Contador del reloj visual. Su unico cometido es provocar el repintado para
+  // refrescar tiempos y colores; deliberadamente NO forma parte de los datos,
+  // para que los agrupamientos memoizados no se invaliden en cada tick.
+  const [, setClockTick] = useState(0);
   const [servedKeys, setServedKeys]  = useState<Set<string>>(loadServedKeys);
   const [countdowns, setCountdowns]  = useState<Record<string, number>>({});
   const [groupBy, setGroupBy]        = useState<'order' | 'mesa'>('order');
@@ -414,7 +423,7 @@ export default function BarPage() {
 
   // Trigger re-render every second so timers update without refetching
   useEffect(() => {
-    const tick = setInterval(() => setOrders(p => [...p]), 1000);
+    const tick = setInterval(() => setClockTick(n => n + 1), CLOCK_TICK_MS);
     return () => clearInterval(tick);
   }, []);
 
@@ -678,8 +687,10 @@ export default function BarPage() {
     }
   }, [countdowns, servedKeys, startCountdown]);
 
-  // Flatten orders into one card per drink item, excluding locally served ones
-  const flatItems: FlatBarItem[] = orders.flatMap(order =>
+  // Flatten orders into one card per drink item, excluding locally served ones.
+  // Memoizado: el aplanado recorría todos los pedidos y todos sus ítems en cada
+  // tick del reloj, indefinidamente, durante todo el servicio.
+  const flatItems: FlatBarItem[] = useMemo(() => orders.flatMap(order =>
     order.items.map((item, idx) => ({
       key:               `${order.id}:${item.detallePedidoIdx}`,
       orderId:           order.id,
@@ -695,13 +706,15 @@ export default function BarPage() {
       nota:              item.nota,
       hasComida:         order.hasComida,
     }))
-  ).filter(item => !servedKeys.has(item.key));
+  ).filter(item => !servedKeys.has(item.key)), [orders, servedKeys]);
 
   const hasAnyContent = flatItems.length > 0;
 
   // ── Derived data ──────────────────────────────────────────────────────────
-  const mesaGroups  = groupByMesa(flatItems);
-  const orderGroups = groupByOrder(flatItems);
+  // groupByMesa incluye un `.sort()`; memoizarlo evita reordenar la lista
+  // entera en cada tick del reloj.
+  const mesaGroups  = useMemo(() => groupByMesa(flatItems), [flatItems]);
+  const orderGroups = useMemo(() => groupByOrder(flatItems), [flatItems]);
   const allKeys     = groupBy === 'mesa'
     ? Array.from(mesaGroups.keys())
     : Array.from(orderGroups.keys());

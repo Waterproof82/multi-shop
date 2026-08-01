@@ -1,12 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useMemo, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronDown, Table2, UtensilsCrossed, Wine, Pause, CheckCheck, Trash2, Layers } from 'lucide-react';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import { useRealtimeDegraded } from '@/hooks/waiter/useRealtimeDegraded';
 import { fetchWithCsrf, ensureCsrfToken } from '@/lib/csrf-client';
+
+/** Cadencia del reloj visual. Los contadores se muestran en minutos y las
+ *  bandas de color cambian a los 10/20/30/45/60 min, asi que refrescar cada
+ *  segundo era 10 veces mas de lo necesario para lo que se ve en pantalla. */
+const CLOCK_TICK_MS = 10000;
 
 interface PendienteItem {
   idx: number;
@@ -352,6 +357,10 @@ export default function WaiterPendientesPage() {
   const [isTabVisible, setIsTabVisible] = useState(true);
   const [waiterEmpresaId, setWaiterEmpresaId] = useState<string | null>(null);
   const [mesas, setMesas] = useState<PendienteMesa[]>([]);
+  // Contador del reloj visual. Su unico cometido es provocar el repintado para
+  // refrescar tiempos y colores; deliberadamente NO forma parte de los datos,
+  // para que los agrupamientos memoizados no se invaliden en cada tick.
+  const [, setClockTick] = useState(0);
   // selectedMap: ítems marcados con ✓ (se incluirán en la confirmación selectiva)
   const [selectedMap, setSelectedMap] = useState<Record<string, Set<string>>>({});
   // pausedMap: ítems con pausa activa (se confirmarán como retenidos)
@@ -459,7 +468,7 @@ export default function WaiterPendientesPage() {
   useEffect(() => { void ensureCsrfToken(); }, []);
 
   useEffect(() => {
-    const tick = setInterval(() => setMesas(p => [...p]), 1000);
+    const tick = setInterval(() => setClockTick(n => n + 1), CLOCK_TICK_MS);
     return () => clearInterval(tick);
   }, []);
 

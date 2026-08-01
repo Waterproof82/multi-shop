@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useMemo, useEffect, useRef, useState } from 'react';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { useSearchParams } from 'next/navigation';
 import { fetchWithCsrf, ensureCsrfToken } from '@/lib/csrf-client';
@@ -11,6 +11,11 @@ import type { ItemEstado } from '@/core/domain/repositories/IPedidoRepository';
 import { loadKitchenSnapshot, saveKitchenSnapshot } from '@/lib/kitchen/kitchen-snapshot-db';
 import { useRealtimeDegraded } from '@/hooks/waiter/useRealtimeDegraded';
 import { useCommandQueue } from '@/hooks/waiter/useCommandQueue';
+
+/** Cadencia del reloj visual. Los contadores se muestran en minutos y las
+ *  bandas de color cambian a los 10/20/30/45/60 min, asi que refrescar cada
+ *  segundo era 10 veces mas de lo necesario para lo que se ve en pantalla. */
+const CLOCK_TICK_MS = 10000;
 
 /** Scope propio: la forma de KitchenItem difiere de la de /kitchen. */
 const SNAPSHOT_SCOPE = 'waiter-kitchen';
@@ -158,9 +163,6 @@ function makeKey(pedidoId: string, itemIdx: number) {
   return `${pedidoId}:${itemIdx}`;
 }
 
-function itemStateKey(item: KitchenItem) {
-  return `${item.pedidoId}:${item.itemIdx}`;
-}
 
 function getKitchenSortOrder(estado: string): number {
   if (estado === 'listo') return 0;
@@ -261,6 +263,10 @@ export default function WaiterKitchenPage() {
   const targetMesa = searchParams.get('mesa');
   const initialGroupBy = searchParams.get('groupBy') as 'order' | 'mesa' | 'listos' | 'retenidos' | null;
   const [items, setItems] = useState<KitchenItem[]>([]);
+  // Contador del reloj visual. Su unico cometido es provocar el repintado para
+  // refrescar tiempos y colores; deliberadamente NO forma parte de los datos,
+  // para que los agrupamientos memoizados no se invaliden en cada tick.
+  const [, setClockTick] = useState(0);
   const [groupBy, setGroupBy] = useState<'order' | 'mesa' | 'listos' | 'retenidos'>(
     initialGroupBy === 'retenidos' || initialGroupBy === 'listos' || initialGroupBy === 'mesa' ? initialGroupBy : 'order'
   );
@@ -398,7 +404,7 @@ export default function WaiterKitchenPage() {
   }, [isTabVisible, waiterEmpresaId, fetchItems]);
 
   useEffect(() => {
-    const tick = setInterval(() => setItems(p => [...p]), 1000);
+    const tick = setInterval(() => setClockTick(n => n + 1), CLOCK_TICK_MS);
     return () => clearInterval(tick);
   }, []);
 
@@ -603,45 +609,45 @@ export default function WaiterKitchenPage() {
 
   // ── Sections ───────────────────────────────────────────────────────────────
 
-  const nuevosItems   = items.filter(i => i.estado === 'pendiente' || i.estado === 'en_preparacion');
-  const listosItems   = items.filter(i => i.estado === 'listo');
-  const retenidoItems = items.filter(i => i.estado === 'retenido');
+  // Memoizados: estos tres filtros recorrían la lista entera en cada tick del
+  // reloj, además de en cada render por cualquier otro motivo. Ahora solo se
+  // recalculan cuando cambian los datos.
+  const nuevosItems   = useMemo(() => items.filter(i => i.estado === 'pendiente' || i.estado === 'en_preparacion'), [items]);
+  const listosItems   = useMemo(() => items.filter(i => i.estado === 'listo'), [items]);
+  const retenidoItems = useMemo(() => items.filter(i => i.estado === 'retenido'), [items]);
   const hasAny        = items.length > 0;
 
+  // Las acciones en lote pasan ahora por `patchEstado`, igual que el swipe
+  // individual. Antes esperaban a que resolvieran las N peticiones antes de
+  // tocar la UI, así que con una mesa de 6-8 platos el camarero veía el botón
+  // "procesando" durante el peor caso de latencia de todas ellas. Reutilizarlo
+  // además les da gratis el rollback por ítem y la cola offline.
   const handleTodosServidos = useCallback(async (mesaKey: string, listosInMesa: KitchenItem[]) => {
     if (listosInMesa.length === 0) return;
     setServingMesas(prev => new Set(prev).add(mesaKey));
     try {
-      await Promise.all(listosInMesa.map(item =>
-        fetchWithCsrf(`/api/waiter/kitchen/items/${encodeURIComponent(item.pedidoId)}/${item.itemIdx}/status`, {
-          method: 'PATCH',
-          body: JSON.stringify({ estado: 'servido' }),
-        })
-      ));
-      const doneKeys = new Set(listosInMesa.map(itemStateKey));
-      setItems(prev => prev.filter(i => !doneKeys.has(itemStateKey(i))));
+      await Promise.all(listosInMesa.map(item => patchEstado(
+        item.pedidoId, item.itemIdx, 'servido',
+        () => removeItem(item.pedidoId, item.itemIdx),
+        () => setItems(addItemBackIfMissing(item)),
+      )));
     } finally {
       setServingMesas(prev => { const next = new Set(prev); next.delete(mesaKey); return next; });
     }
-  }, []);
+  }, [patchEstado, removeItem]);
 
   const handleLiberarRetenidosMesa = useCallback(async (mesaKey: string, retenidos: KitchenItem[]) => {
     setLiberatingMesas(prev => new Set(prev).add(mesaKey));
     try {
-      await Promise.all(retenidos.map(item =>
-        fetchWithCsrf(`/api/waiter/kitchen/items/${encodeURIComponent(item.pedidoId)}/${item.itemIdx}/status`, {
-          method: 'PATCH',
-          body: JSON.stringify({ estado: 'pendiente' }),
-        })
-      ));
-      const retenidoKeys = new Set(retenidos.map(itemStateKey));
-      setItems(prev => prev.map(i =>
-        retenidoKeys.has(itemStateKey(i)) ? { ...i, estado: 'pendiente' } : i
-      ));
+      await Promise.all(retenidos.map(item => patchEstado(
+        item.pedidoId, item.itemIdx, 'pendiente',
+        () => setItemEstado(item.pedidoId, item.itemIdx, 'pendiente'),
+        () => setItemEstado(item.pedidoId, item.itemIdx, item.estado),
+      )));
     } finally {
       setLiberatingMesas(prev => { const next = new Set(prev); next.delete(mesaKey); return next; });
     }
-  }, []);
+  }, [patchEstado, setItemEstado]);
 
   const toggleMesaCollapse = useCallback((mesaKey: string) => {
     setCollapsedMesas(prev => {
