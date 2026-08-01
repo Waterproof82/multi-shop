@@ -231,27 +231,32 @@ export class SupabaseMesaRepository implements IMesaRepository {
         type PedidoRow = { id: string; sesion_id: string | null; mesa_id: string | null; estado: string; numero_pedido: number; detalle_pedido: unknown };
         type DetalleItem = { nombre: string; precio: number; cantidad: number; complementos?: Array<{ nombre: string; precio: number }>; translations?: Record<string, { name?: string }> };
 
-        // Primary query: pedidos linked via sesion_id
-        const { data: activeData } = await this.supabase
-          .from('pedidos')
-          .select('id, sesion_id, mesa_id, estado, numero_pedido, detalle_pedido')
-          .in('sesion_id', activeSesionIds)
-          .neq('estado', 'cerrado')
-          .neq('estado', 'cancelado');
-
         // Defensive fallback: pedidos with sesion_id = NULL that belong to an active mesa.
         // This can happen when open_mesa_sesion had a stale closed-session reference and
         // findActiveSesionByMesa returned null — the pedido was inserted with sesion_id = NULL.
         const activeMesaIds = rows
           .filter(r => r.sesion_id !== null)
           .map(r => r.id);
-        const { data: orphanData } = await this.supabase
-          .from('pedidos')
-          .select('id, sesion_id, mesa_id, estado, numero_pedido, detalle_pedido')
-          .in('mesa_id', activeMesaIds)
-          .is('sesion_id', null)
-          .neq('estado', 'cerrado')
-          .neq('estado', 'cancelado');
+
+        // Ambas consultas son independientes entre sí — en serie duplicaban la
+        // latencia de una función que alimenta mostrador y panel de camarero, y
+        // que se re-dispara con cada evento Realtime y en cada visibilitychange.
+        const [{ data: activeData }, { data: orphanData }] = await Promise.all([
+          // Primary query: pedidos linked via sesion_id
+          this.supabase
+            .from('pedidos')
+            .select('id, sesion_id, mesa_id, estado, numero_pedido, detalle_pedido')
+            .in('sesion_id', activeSesionIds)
+            .neq('estado', 'cerrado')
+            .neq('estado', 'cancelado'),
+          this.supabase
+            .from('pedidos')
+            .select('id, sesion_id, mesa_id, estado, numero_pedido, detalle_pedido')
+            .in('mesa_id', activeMesaIds)
+            .is('sesion_id', null)
+            .neq('estado', 'cerrado')
+            .neq('estado', 'cancelado'),
+        ]);
 
         // Build a mesa_id → sesion_id lookup for orphan resolution
         const mesaToSesion: Record<string, string> = {};
