@@ -89,6 +89,14 @@ documentación.
 - No se borra `CART_TOKEN_SECRET` de Vercel automáticamente — recordatorio
   manual al usuario al cerrar el cambio.
 
+## Adenda (post-implementación)
+
+La verificación final (Task 4) encontró que `.env.example` también tenía una
+línea `CART_TOKEN_SECRET=...` que este documento no había inventariado. Se
+eliminó en un commit de seguimiento (`chore(env): remove unused
+CART_TOKEN_SECRET from .env.example`). La lista de archivos en "Cambios" de
+este spec no era exhaustiva — quedó afuera un archivo real.
+
 ## Testing
 
 No existen tests que cubran este flujo (confirmado por búsqueda en `e2e/`),
