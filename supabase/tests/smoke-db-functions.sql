@@ -166,9 +166,47 @@ BEGIN
   END;
 
 
+  -- ── 7. Ninguna policy re-evalua auth.uid() por fila ───────────────────────
+  -- `auth.uid()` suelta dentro de una policy se evalua UNA VEZ POR FILA. Envuelta
+  -- en (SELECT ...) Postgres la promueve a InitPlan y la evalua una sola vez.
+  --
+  -- Este guard no esta aqui por las policies que ya existen —esas se corrigieron
+  -- en 20260803000002— sino por `lc_create_next_partition()`, que CREA policies
+  -- nuevas cada mes desde el cron. Si alguien edita ese generador y se deja la
+  -- forma sin envolver, el defecto vuelve solo, en silencio y de forma acumulativa:
+  -- una particion nueva con dos policies defectuosas cada mes.
+
+  DECLARE
+    r_pol   RECORD;
+    n_malas INT := 0;
+  BEGIN
+    FOR r_pol IN
+      SELECT tablename, policyname,
+             regexp_replace(
+               COALESCE(qual, '') || ' ' || COALESCE(with_check, ''),
+               '\(\s*SELECT\s+auth\.uid\(\)\s+AS\s+uid\)', '', 'g'
+             ) AS resto
+        FROM pg_policies
+       WHERE schemaname = 'public'
+    LOOP
+      IF r_pol.resto ~ 'auth\.uid\(\)' THEN
+        n_malas := n_malas + 1;
+        RAISE WARNING '[SMOKE FAIL] policy "%" en % usa auth.uid() sin envolver en (SELECT ...)',
+          r_pol.policyname, r_pol.tablename;
+      END IF;
+    END LOOP;
+
+    IF n_malas > 0 THEN
+      RAISE EXCEPTION '[SMOKE FAIL] % policy(s) re-evaluan auth.uid() por fila. Usar (SELECT auth.uid()). Si vienen de lc_create_next_partition(), corregir tambien el generador o volveran el mes que viene.', n_malas;
+    END IF;
+
+    RAISE NOTICE '[SMOKE OK] ninguna policy re-evalua auth.uid() por fila';
+  END;
+
+
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════';
-  RAISE NOTICE 'TODOS LOS SMOKE TESTS PASARON (6/6)';
+  RAISE NOTICE 'TODOS LOS SMOKE TESTS PASARON (7/7)';
   RAISE NOTICE '════════════════════════════════════════';
 
 END;

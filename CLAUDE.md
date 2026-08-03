@@ -92,6 +92,24 @@ CREATE POLICY "Admin ve mi_tabla"
 -- ... INSERT / UPDATE / DELETE con mismo patron (TO authenticated, WITH CHECK explicito en INSERT)
 ```
 
+**InitPlan — envolver SIEMPRE `auth.uid()` en `(SELECT ...)`:**
+Dentro de un `EXISTS` correlacionado (o de cualquier qual que el planificador no pueda
+promover), `auth.uid()` se evalua UNA VEZ POR FILA. Envuelta, Postgres la convierte en
+InitPlan y la evalua una sola vez para todo el plan:
+```sql
+-- MAL:  pa.id = auth.uid()
+-- BIEN: pa.id = (SELECT auth.uid())
+```
+Aplica igual a `get_mi_empresa_id()`, que ademas consulta `perfiles_admin` en cada
+evaluacion. Ojo: el advisor `auth_rls_initplan` de Supabase NO detecta las funciones
+envoltorio — solo matchea `auth.<fn>()` literal, asi que `get_mi_empresa_id()` sin
+envolver pasa desapercibida. El smoke test (seccion 7 de `smoke-db-functions.sql`)
+verifica el caso de `auth.uid()` en CI.
+
+**Si la policy la genera una funcion** (p. ej. `lc_create_next_partition()` crea las
+policies de cada particion nueva desde el cron): corregir el GENERADOR, no solo las
+policies existentes. Si no, el defecto vuelve solo cada mes.
+
 ### 2. GRANTs explícitos (obligatorio desde oct 2026 — Supabase Data API, y ahora tambien a nivel de DB)
 Desde el 2026-07-31, `public` ya NO otorga privilegios por defecto a `anon`/`authenticated` en tablas nuevas (`ALTER DEFAULT PRIVILEGES` revocado — ver `security.md`). Esto ya no es solo una buena práctica: sin este bloque, la tabla es **completamente inaccesible** para `authenticated`/`anon`, incluso con RLS bien configurado.
 ```sql
