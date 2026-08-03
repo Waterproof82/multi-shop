@@ -1,6 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Pedido, CartItem, PedidoItem, Result } from "@/core/domain/entities/types";
-import { IPedidoRepository, KitchenBarCounts, KitchenOrderItem, BarOrderItem, RetenidoItem, KitchenItemRecord, ItemEstado, PendienteValidacionMesa, PendienteValidacionItem } from "@/core/domain/repositories/IPedidoRepository";
+import { IPedidoRepository, WaiterBadgeCounts, KitchenOrderItem, BarOrderItem, RetenidoItem, KitchenItemRecord, ItemEstado, PendienteValidacionMesa, PendienteValidacionItem } from "@/core/domain/repositories/IPedidoRepository";
 import { logger } from "../logging/logger";
 
 type DeliveryData = {
@@ -1087,117 +1087,44 @@ export class SupabasePedidoRepository implements IPedidoRepository {
   }
 
   /**
-   * Returns live badge counts for the waiter banner (cocina + bebidas).
+   * Contadores del WaiterBanner en UNA sola consulta (RPC `get_waiter_badge_counts`).
    *
-   * Bebidas total = bebida items in pendiente orders that have NOT yet been
-   * marked `servido` in pedido_item_estados. This query is per-item (not per-order)
-   * so partial serving (e.g. 1 of 2 drinks) is reflected correctly.
+   * Sustituye a `countKitchenBarOrders` mas el conteo que la ruta derivaba de
+   * `findPendientesValidacion`. Juntos encadenaban hasta diez roundtrips — cada
+   * uno dependiente de los ids del anterior — y transportaban el `detalle_pedido`
+   * completo de todo el servicio para acabar devolviendo seis enteros. Es la ruta
+   * mas caliente del sistema: el banner la re-invoca en cada evento de Realtime.
    *
-   * Mixed orders (comida + bebida) are counted here for bebidas even though
-   * the parent pedido.estado remains `pendiente`; the bar page is responsible
-   * for PATCHing it to `anotado` once all bebidas are served.
+   * La agregacion vive ahora en SQL. La equivalencia detallada con la logica JS
+   * que sustituye esta documentada en la migracion
+   * `20260803000001_get_waiter_badge_counts_rpc.sql`.
    */
-  private tallyCocinaItems(items: KitchenItemRecord[]): { total: number; listos: number; retenidos: number } {
-    let total = 0;
-    let listos = 0;
-    let retenidos = 0;
-    for (const item of items) {
-      if (item.estado === 'pendiente' || item.estado === 'en_preparacion') total++;
-      else if (item.estado === 'listo')    listos++;
-      else if (item.estado === 'retenido') retenidos++;
-    }
-    return { total, listos, retenidos };
-  }
-
-  private async countBebidasTotal(sessionIds: string[]): Promise<Result<number>> {
-    const { data: pedidos, error: pedidosError } = await this.supabase
-      .from('pedidos')
-      .select('id, detalle_pedido, estado')
-      .in('sesion_id', sessionIds)
-      .eq('estado', 'pendiente');
-
-    if (pedidosError) {
-      await logger.logAndReturnError('DB_SELECT_ERROR', pedidosError.message, 'repository', 'SupabasePedidoRepository.countBebidasTotal', { details: { code: pedidosError.code } });
-      return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pedidos', module: 'repository', method: 'countBebidasTotal' } };
-    }
-
-    const pedidoRows = (pedidos ?? []) as Record<string, unknown>[];
-    const pedidoIdsWithBebida = pedidoRows
-      .filter(row => (row['detalle_pedido'] as Array<Record<string, unknown>>).some(i => i['tipo_producto'] === 'bebida'))
-      .map(row => row['id'] as string);
-
-    const estadoMap = new Map<string, Map<number, string>>();
-    const fromValidationSet = new Set<string>(); // "pedidoId:itemIdx" — back in pendientes queue
-    if (pedidoIdsWithBebida.length > 0) {
-      const { data: itemEstados } = await this.supabase
-        .from('pedido_item_estados')
-        .select('pedido_id, item_idx, estado, from_validation')
-        .in('pedido_id', pedidoIdsWithBebida);
-
-      for (const row of itemEstados ?? []) {
-        const r = row as Record<string, unknown>;
-        const pid = r['pedido_id'] as string;
-        const idx = r['item_idx'] as number;
-        if (r['from_validation'] === true) { fromValidationSet.add(`${pid}:${idx}`); continue; }
-        if (!estadoMap.has(pid)) estadoMap.set(pid, new Map());
-        estadoMap.get(pid)!.set(idx, r['estado'] as string);
-      }
-    }
-
-    let total = 0;
-    for (const pedido of pedidoRows) {
-      const items = (pedido['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
-      const pedidoId = pedido['id'] as string;
-      const pedidoEstados = estadoMap.get(pedidoId) ?? new Map();
-      items.forEach((item, idx) => {
-        if (
-          item['tipo_producto'] === 'bebida' &&
-          !fromValidationSet.has(`${pedidoId}:${idx}`) &&
-          pedidoEstados.get(idx) !== 'servido' &&
-          pedidoEstados.get(idx) !== 'cancelado'
-        ) total++;
-      });
-    }
-    return { success: true, data: total };
-  }
-
-  async countKitchenBarOrders(empresaId: string): Promise<Result<KitchenBarCounts>> {
+  async getWaiterBadgeCounts(empresaId: string): Promise<Result<WaiterBadgeCounts>> {
     try {
-      // Cocina counts: per-item estado from pedido_item_estados
-      const itemsResult = await this.fetchAllComidaItems(empresaId);
-      if (!itemsResult.success) return { success: false, error: itemsResult.error };
+      const { data, error } = await this.supabase.rpc('get_waiter_badge_counts', {
+        p_empresa_id: empresaId,
+      });
 
-      const cocina = this.tallyCocinaItems(itemsResult.data);
-
-      // Bar counts: pure bebida orders in pendiente state (unchanged)
-      const { data: activeSessions, error: sessionsError } = await this.supabase
-        .from('mesa_sesiones')
-        .select('id')
-        .eq('empresa_id', empresaId)
-        .is('cerrada_at', null);
-
-      if (sessionsError) {
-        await logger.logAndReturnError('DB_SELECT_ERROR', sessionsError.message, 'repository', 'SupabasePedidoRepository.countKitchenBarOrders', { details: { code: sessionsError.code, empresaId } });
-        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener sesiones activas', module: 'repository', method: 'countKitchenBarOrders' } };
+      if (error) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', error.message, 'repository', 'SupabasePedidoRepository.getWaiterBadgeCounts', { details: { code: error.code, empresaId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener conteos', module: 'repository', method: 'getWaiterBadgeCounts' } };
       }
 
-      const sessionIds = (activeSessions ?? []).map(s => (s as Record<string, unknown>).id as string);
-      let bebidasTotal = 0;
-      if (sessionIds.length > 0) {
-        const bebidasResult = await this.countBebidasTotal(sessionIds);
-        if (!bebidasResult.success) return { success: false, error: bebidasResult.error };
-        bebidasTotal = bebidasResult.data;
-      }
+      const row = (data ?? {}) as Record<string, unknown>;
+      const num = (key: string): number => Number(row[key] ?? 0);
 
       return {
         success: true,
         data: {
-          cocina: { total: cocina.total, listos: cocina.listos, retenidos: cocina.retenidos },
-          bebidas: { total: bebidasTotal, listos: 0, retenidos: 0 },
+          cocina: { total: num('cocinaTotal'), listos: num('cocinaListos'), retenidos: num('cocinaRetenidos') },
+          // El bar no distingue listos/retenidos: un item servido sale del conteo.
+          bebidas: { total: num('bebidasTotal'), listos: 0, retenidos: 0 },
+          pendientes: num('pendientes'),
+          llamadas: num('llamadas'),
         },
       };
     } catch (e) {
-      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.countKitchenBarOrders', { empresaId });
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.getWaiterBadgeCounts', { empresaId });
       return { success: false, error: appError };
     }
   }

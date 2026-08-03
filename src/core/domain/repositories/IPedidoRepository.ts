@@ -5,6 +5,12 @@ export interface KitchenBarCounts {
   bebidas: { total: number; listos: number; retenidos: number };
 }
 
+/** Todos los contadores del WaiterBanner, resueltos en una sola consulta. */
+export interface WaiterBadgeCounts extends KitchenBarCounts {
+  pendientes: number;
+  llamadas: number;
+}
+
 export interface KitchenOrderItem {
   id: string;
   numeroPedido: number;
@@ -148,7 +154,11 @@ export interface IPedidoRepository {
       estimated_delivery_fee_cents?: number;
     }
   ): Promise<Result<{ id: string; numero_pedido: number; total: number; trackingToken?: string }>>;
-  countKitchenBarOrders(empresaId: string): Promise<Result<KitchenBarCounts>>;
+  /**
+   * Contadores del WaiterBanner en un único roundtrip (RPC `get_waiter_badge_counts`).
+   * Es la ruta más caliente del sistema: se re-invoca en cada evento de Realtime.
+   */
+  getWaiterBadgeCounts(empresaId: string): Promise<Result<WaiterBadgeCounts>>;
   findKitchenOrders(empresaId: string): Promise<Result<KitchenOrderItem[]>>;
   findAllRetenidos(empresaId: string, tipo: 'comida' | 'bebida'): Promise<Result<RetenidoItem[]>>;
   findBarOrders(empresaId: string): Promise<Result<BarOrderItem[]>>;
