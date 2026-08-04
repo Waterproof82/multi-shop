@@ -7,6 +7,7 @@ import {
   enqueueCommand,
   flushCommandQueue,
   getQueuedCount,
+  isResumeSignal,
   itemStatusKey,
   type QueuedCommand,
 } from '@/lib/waiter/command-queue';
@@ -74,6 +75,36 @@ export function useCommandQueue(onFlushed?: () => void) {
     const id = setInterval(() => { void flush(); }, RETRY_INTERVAL_MS);
     return () => clearInterval(id);
   }, [pendingCount, isOnline, flush]);
+
+  // Vuelta al primer plano.
+  //
+  // Sin esto quedaba un agujero de hasta RETRY_INTERVAL_MS tras despertar el
+  // dispositivo, y es el agujero que MÁS se nota: con la pantalla apagada el
+  // navegador congela los timers de la página, así que el setInterval de arriba
+  // sencillamente no corre. El PDA del camarero pasa media jornada en ese estado
+  // — se marca un plato, se guarda el aparato en el bolsillo, se vuelve a sacar.
+  //
+  // Tampoco sirve apoyarse en el evento 'online': si la red nunca llegó a caerse
+  // del todo (el caso del AP asociado sin salida) ese evento no se dispara nunca.
+  //
+  // No se filtra por `pendingCount`: `flush` ya sale solo si la cola está vacía,
+  // y leerlo aquí obligaría a re-suscribir los listeners en cada cambio.
+  useEffect(() => {
+    function handleResume(event: Event) {
+      if (!isResumeSignal(event.type, document.visibilityState)) return;
+      // navigator.onLine miente en positivo, pero no en negativo: si dice que no
+      // hay red, no la hay. Ahorra un intento condenado al despertar sin cobertura.
+      if (!navigator.onLine) return;
+      void flush();
+    }
+
+    document.addEventListener('visibilitychange', handleResume);
+    window.addEventListener('pageshow', handleResume);
+    return () => {
+      document.removeEventListener('visibilitychange', handleResume);
+      window.removeEventListener('pageshow', handleResume);
+    };
+  }, [flush]);
 
   return { pendingCount, enqueueItemStatus, flush };
 }

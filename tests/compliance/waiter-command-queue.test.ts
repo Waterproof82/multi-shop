@@ -15,6 +15,7 @@ import { describe, it, expect } from 'vitest';
 import {
   shouldDropAfterResponse,
   isExpired,
+  isResumeSignal,
   itemStatusKey,
 } from '../../src/lib/waiter/command-queue';
 
@@ -62,6 +63,33 @@ describe('isExpired — comandos demasiado viejos', () => {
   it('el límite exacto todavía no expira', () => {
     const now = 1_000_000_000;
     expect(isExpired(now - HORA, now)).toBe(false);
+  });
+});
+
+describe('isResumeSignal — cuándo reintentar al volver al primer plano', () => {
+  // Con la pantalla apagada el navegador congela los timers de la página, así que
+  // el reintento periódico no corre. La vuelta al primer plano es la única señal
+  // fiable de "vuelvo a estar vivo" en el PDA del camarero.
+
+  it('vuelve visible: es el momento de vaciar la cola', () => {
+    expect(isResumeSignal('visibilitychange', 'visible')).toBe(true);
+  });
+
+  it('pasa a oculto: NO se envía nada', () => {
+    // Lanzar la petición aquí sería el peor momento posible — el dispositivo se
+    // está durmiendo y la radio está a punto de apagarse.
+    expect(isResumeSignal('visibilitychange', 'hidden')).toBe(false);
+  });
+
+  it('pageshow cuenta aunque la página esté visible: cubre el retorno desde bfcache', () => {
+    // En bfcache la página se reanuda SIN volver a montar, así que no pasa por el
+    // flush inicial. Sin este caso, un back/forward deja la cola sin tocar.
+    expect(isResumeSignal('pageshow', 'visible')).toBe(true);
+  });
+
+  it('ignora eventos ajenos al ciclo de vida', () => {
+    expect(isResumeSignal('focus', 'visible')).toBe(false);
+    expect(isResumeSignal('online', 'visible')).toBe(false);
   });
 });
 

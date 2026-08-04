@@ -147,6 +147,21 @@ export function isExpired(createdAt: number, now: number = Date.now()): boolean 
   return now - createdAt > MAX_AGE_MS;
 }
 
+/**
+ * ¿Este evento de ciclo de vida significa que la app VUELVE al primer plano?
+ *
+ * Importa distinguirlo porque `visibilitychange` se dispara en los dos sentidos.
+ * Reaccionar al 'hidden' lanzaría una petición justo cuando el dispositivo se
+ * está durmiendo: el peor momento posible, con la radio a punto de apagarse.
+ *
+ * `pageshow` entra porque cubre la restauración desde bfcache, donde la página
+ * se reanuda sin volver a montar y por tanto sin pasar por el flush inicial.
+ */
+export function isResumeSignal(eventType: string, visibilityState: string): boolean {
+  if (eventType === 'pageshow') return true;
+  return eventType === 'visibilitychange' && visibilityState === 'visible';
+}
+
 /** Guard de reentrada: el flush se dispara desde varios puntos (evento online,
  *  montaje, recuperación de Realtime) y no debe solaparse consigo mismo. */
 let flushInFlight: Promise<number> | null = null;
