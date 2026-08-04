@@ -35,7 +35,7 @@ import { DeliveryMethodSelector } from "@/components/DeliveryMethodSelector"
 import { formatPrice } from "@/lib/format-price"
 import { COUNTRY_CODES, DEFAULT_COUNTRY_CODE } from "@/core/domain/constants/country-codes"
 import { getTrackingTokens, addTrackingToken } from "@/lib/order-tracking";
-import { QRScannerGate, type QRGateState } from '@/components/qr-scanner-gate';
+import { QRScannerGate, type QRGateState } from '@/components/qr-scanner-gate-lazy';
 
 const MESA_CLIENT_TOKEN_KEY = (mesaId: string) => `mesa_token_${mesaId}`;
 

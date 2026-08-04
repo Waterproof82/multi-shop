@@ -11,7 +11,7 @@ import { t } from "@/lib/translations";
 import { formatPrice } from "@/lib/format-price";
 import { getWaiterMesa } from "@/components/waiter-login-form";
 import { fetchWithCsrf } from "@/lib/csrf-client";
-import { QRScannerGate, type QRGateState } from "@/components/qr-scanner-gate";
+import { QRScannerGate, type QRGateState } from "@/components/qr-scanner-gate-lazy";
 import { GoogleReviewsWidget } from "@/components/google-reviews-widget";
 
 interface OrderItem {
