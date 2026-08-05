@@ -7,8 +7,12 @@ import type { MesaWithSession } from '@/core/domain/repositories/IMesaRepository
 import type { ComplementoGrupo, ProductoComplementoAsignacion } from '@/core/domain/entities/complemento-types';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { saveCatalogToIDB, loadCatalogFromIDB } from '@/lib/tpv/tpv-catalog-db';
+import { mesaSesionChannel } from '@/lib/realtime-channels';
 
 interface TpvCatalogContextValue {
+  /** Tenant activo. Lo necesitan los consumidores que abren canales de Realtime
+   *  con scope de empresa — ver `mesaSesionChannel` en realtime-channels.ts. */
+  empresaId: string;
   products: Product[];
   categories: Category[];
   tipoImpuesto: 'iva' | 'igic';
@@ -22,6 +26,7 @@ interface TpvCatalogContextValue {
 }
 
 const TpvCatalogContext = createContext<TpvCatalogContextValue>({
+  empresaId: '',
   products: [],
   categories: [],
   tipoImpuesto: 'iva',
@@ -160,10 +165,11 @@ export function TpvCatalogProvider({
 
     // mesa_sesiones no longer grants anon SELECT (RLS hardening) — postgres_changes
     // never fires here. mesa_sesiones_notify_update broadcasts on this channel instead.
-    // Channel name must match the trigger's topic exactly ('mesa-sesion-update') —
-    // for Broadcast, the channel name is the routing key, unlike postgres_changes filters.
+    // El nombre debe coincidir EXACTAMENTE con el topic del trigger: en Broadcast
+    // el nombre del canal es la clave de enrutado, no hay `filter` como en
+    // postgres_changes. Por eso ambos lados lo construyen desde el mismo helper.
     const mesasCh = supabase
-      .channel('mesa-sesion-update')
+      .channel(mesaSesionChannel(empresaId))
       .on('broadcast', { event: 'update' }, () => { void refreshMesas(); })
       .subscribe();
 
@@ -197,6 +203,7 @@ export function TpvCatalogProvider({
   // con cada broadcast de pedido/item, todo el árbol TPV (Mostrador, MesasGrid,
   // Historial) se re-renderiza en eventos que no le conciernen.
   const value = useMemo<TpvCatalogContextValue>(() => ({
+    empresaId,
     products,
     categories,
     tipoImpuesto,
@@ -208,6 +215,7 @@ export function TpvCatalogProvider({
     refreshCatalog,
     complementoGruposByProductId,
   }), [
+    empresaId,
     products,
     categories,
     tipoImpuesto,

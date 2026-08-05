@@ -11,6 +11,7 @@ import { fetchWithCsrf } from "@/lib/csrf-client";
 import { useCart } from "@/lib/cart-context";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { mesaSesionChannel } from "@/lib/realtime-channels";
 
 const BG            = "oklch(17% 0.025 252)";
 const BORDER        = "oklch(42% 0.14 62 / 0.35)";
@@ -326,8 +327,10 @@ export function WaiterBanner() {
 
     // mesa_sesiones no longer grants anon SELECT (RLS hardening) — postgres_changes
     // never fires here. mesa_sesiones_notify_update broadcasts on this channel instead.
+    // El topic lleva scope de empresa: antes era global y este banner se despertaba
+    // a refrescar contadores por mesas de OTROS restaurantes. Ver realtime-channels.ts.
     const broadcastMesaSesion = supabase
-      .channel('mesa-sesion-update')
+      .channel(mesaSesionChannel(waiterEmpresaId))
       .on('broadcast', { event: 'update' }, () => {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
@@ -338,7 +341,7 @@ export function WaiterBanner() {
       })
       .subscribe((status) => {
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('[Realtime] mesa-sesion-update broadcast error (banner):', status);
+          console.error('[Realtime] mesa-sesion broadcast error (banner):', status);
         }
       });
 

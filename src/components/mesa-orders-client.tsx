@@ -13,6 +13,7 @@ import { getWaiterMesa } from "@/components/waiter-login-form";
 import { fetchWithCsrf } from "@/lib/csrf-client";
 import { QRScannerGate, type QRGateState } from "@/components/qr-scanner-gate-lazy";
 import { GoogleReviewsWidget } from "@/components/google-reviews-widget";
+import { mesaSesionChannel } from "@/lib/realtime-channels";
 
 interface OrderItem {
   nombre: string;
@@ -70,6 +71,9 @@ interface MesaSessionData {
 interface MesaInfo {
   numero: number;
   nombre: string | null;
+  /** Necesario para el canal de Realtime con scope de empresa. `/api/mesas` ya
+   *  lo devolvía; antes se descartaba al mapear la respuesta. */
+  empresaId: string;
 }
 
 type PendingAction = 'full' | 'division-modal' | 'division-pay';
@@ -1037,13 +1041,18 @@ function createMesaChannel(
 }
 
 // mesa_sesiones has no anon SELECT grant (RLS hardening), so postgres_changes never
-// fires for it — the mesa_sesiones_notify_update DB trigger broadcasts on the
-// 'mesa-sesion-update' channel instead. Unlike postgres_changes, Broadcast routes by
-// channel name — it MUST be 'mesa-sesion-update' verbatim to match the trigger, it
-// cannot be an arbitrary per-component name. That channel is shared by every mesa in
-// the company, so filter by mesaId client-side.
+// fires for it — el trigger mesa_sesiones_notify_update hace broadcast en su lugar.
+//
+// A diferencia de postgres_changes, Broadcast enruta POR NOMBRE DE CANAL: el nombre
+// no puede ser arbitrario por componente, tiene que coincidir carácter a carácter
+// con el que publica el trigger. Por eso ambos lados lo construyen igual —
+// `mesaSesionChannel()` aquí, la misma concatenación en el trigger.
+//
+// El topic lleva scope de empresa. Dentro de la empresa lo comparten todas las
+// mesas, así que sigue haciendo falta filtrar por mesaId en el cliente.
 function createMesaBroadcastChannel(
   mesaId: string,
+  empresaId: string,
   callback: () => void,
 ): (() => void) | undefined {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -1051,7 +1060,7 @@ function createMesaBroadcastChannel(
   if (!url || !key) return undefined;
   const supabase = createClient(url, key);
   const channel = supabase
-    .channel('mesa-sesion-update')
+    .channel(mesaSesionChannel(empresaId))
     .on('broadcast', { event: 'update' }, (message: { payload: Record<string, unknown> }) => {
       if (message.payload['mesaId'] !== mesaId) return;
       callback();
@@ -1310,11 +1319,15 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
   // Realtime: refresh immediately when the session row changes (division progress,
   // sesion_pagada, pago_en_curso). This eliminates the 10s polling gap for concurrent payers.
   // mesa_sesiones no longer grants anon SELECT (RLS hardening), so postgres_changes never
-  // fires here — mesa_sesiones_notify_update broadcasts on 'mesa-sesion-update' instead.
-  // It's a public channel shared by every mesa, so filter by mesaId client-side.
+  // fires here — mesa_sesiones_notify_update broadcasts instead, en un topic con scope
+  // de empresa. Se espera a tener `mesaInfo`: sin empresaId el nombre del canal sería
+  // otro y la suscripción se quedaría muda sin dar ningún error. Mientras tanto cubre
+  // el sondeo de arriba.
+  const mesaEmpresaId = mesaInfo?.empresaId;
   useEffect(() => {
-    return createMesaBroadcastChannel(mesaId, () => { void refresh(); });
-  }, [mesaId, refresh]);
+    if (!mesaEmpresaId) return;
+    return createMesaBroadcastChannel(mesaId, mesaEmpresaId, () => { void refresh(); });
+  }, [mesaId, mesaEmpresaId, refresh]);
 
   useEffect(() => {
     const sesionId = sessionData?.sesionId;
@@ -1457,8 +1470,8 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
   useEffect(() => {
     fetch(`/api/mesas?token=${encodeURIComponent(mesaId)}`)
       .then(r => r.ok ? r.json() : null)
-      .then((d: { numero: number; nombre: string | null } | null) => {
-        if (d) setMesaInfo({ numero: d.numero, nombre: d.nombre });
+      .then((d: { numero: number; nombre: string | null; empresa_id: string } | null) => {
+        if (d) setMesaInfo({ numero: d.numero, nombre: d.nombre, empresaId: d.empresa_id });
       })
       .catch(() => null);
   }, [mesaId]);

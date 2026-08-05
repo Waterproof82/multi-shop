@@ -381,7 +381,7 @@ export function WaiterLoginForm() {
     };
 
     // mesa_sesiones no longer grants anon SELECT (RLS hardening), so postgres_changes
-    // never fires here anymore. We don't subscribe to the 'mesa-sesion-update' broadcast
+    // never fires here anymore. We don't subscribe to the mesa-sesion broadcast
     // channel directly either — WaiterBanner (mounted on this same page) already does
     // and both components share the same singleton client, so competing subscriptions to
     // the same channel name would silently drop each other (same issue already solved for
