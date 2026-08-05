@@ -606,7 +606,7 @@ export default function TooGoodToGoPage() {
           {/* Pending campaigns section */}
           {pendingCampaigns.length > 0 && (
             <div className="space-y-3">
-              <button
+              <button type="button"
                 onClick={() => setPendingOpen(o => !o)}
                 aria-expanded={pendingOpen}
                 className="w-full flex items-center justify-between px-4 py-3 rounded-lg border border-[var(--campaign-pending-border)] bg-[var(--campaign-pending-bg)] hover:bg-[var(--campaign-pending-hover)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px]"
@@ -663,11 +663,11 @@ export default function TooGoodToGoPage() {
                                   <span className="text-xs text-muted-foreground whitespace-nowrap">{t("tgtgPickupTo", language)}:</span>
                                   <input type="time" value={editHoraFin} onChange={e => setEditHoraFin(e.target.value)} className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
                                 </label>
-                                <button onClick={() => handleSaveHoras(campaign.id)} disabled={savingHoras} aria-label={t("save", language)} className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 flex items-center gap-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 min-h-[44px]">
+                                <button type="button" onClick={() => handleSaveHoras(campaign.id)} disabled={savingHoras} aria-label={t("save", language)} className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 flex items-center gap-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 min-h-[44px]">
                                   {savingHoras ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
                                   {t("save", language)}
                                 </button>
-                                <button onClick={handleCancelEditHoras} disabled={savingHoras} aria-label={t("cancel", language)} className="h-8 px-2 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted flex items-center outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 min-h-[44px]">
+                                <button type="button" onClick={handleCancelEditHoras} disabled={savingHoras} aria-label={t("cancel", language)} className="h-8 px-2 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted flex items-center outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 min-h-[44px]">
                                   <X className="w-4 h-4" />
                                 </button>
                               </>
@@ -676,7 +676,7 @@ export default function TooGoodToGoPage() {
                                 <span className="text-xs flex items-center gap-1 text-muted-foreground">
                                   <Clock className="w-3.5 h-3.5" />{displayInicio} – {displayFin}
                                 </span>
-                                <button onClick={() => handleStartEditHoras(campaign)} aria-label={t("tgtgEditPickupHours", language)} className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center">
+                                <button type="button" onClick={() => handleStartEditHoras(campaign)} aria-label={t("tgtgEditPickupHours", language)} className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center">
                                   <Pencil className="w-3.5 h-3.5" />
                                 </button>
                               </>
@@ -688,7 +688,7 @@ export default function TooGoodToGoPage() {
                                 ? `No se puede eliminar: hay ${totalReservas} reserva${totalReservas > 1 ? 's' : ''} activa${totalReservas > 1 ? 's' : ''}`
                                 : 'Eliminar campaña';
                               return (
-                                <button
+                                <button type="button"
                                   onClick={() => !cannotDelete && handleDeleteCampaign(campaign.id)}
                                   disabled={deletingId === campaign.id || cannotDelete}
                                   aria-label={deleteTitle}
@@ -707,7 +707,7 @@ export default function TooGoodToGoPage() {
                           ))}
                         </div>
                         <div className="border-t pt-4">
-                          <button onClick={() => handleToggleAllReservas(campaign.id)} className="w-full flex items-center justify-between text-sm font-medium text-foreground hover:text-primary transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] px-1">
+                          <button type="button" onClick={() => handleToggleAllReservas(campaign.id)} className="w-full flex items-center justify-between text-sm font-medium text-foreground hover:text-primary transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] px-1">
                             <span className="flex items-center gap-2">
                               <ReceiptText className="w-4 h-4" />
                               {t("tgtgCouponsValidated", language)}
@@ -753,7 +753,7 @@ export default function TooGoodToGoPage() {
           {/* Active/sent campaigns section */}
           {sentCampaigns.length > 0 && (
             <div className="space-y-3">
-              <button
+              <button type="button"
                 onClick={() => setActiveOpen(o => !o)}
                 aria-expanded={activeOpen}
                 className="w-full flex items-center justify-between px-4 py-3 rounded-lg border border-[var(--campaign-active-border)] bg-[var(--campaign-active-bg)] hover:bg-[var(--campaign-active-hover)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px]"
@@ -799,7 +799,7 @@ export default function TooGoodToGoPage() {
                             <span className="text-xs flex items-center gap-1 text-muted-foreground" title="Emails enviados">
                               <Send className="w-3.5 h-3.5" />{campaign.numeroEnvios}
                             </span>
-                            <button
+                            <button type="button"
                               disabled
                               aria-label="No se puede eliminar una campaña ya enviada"
                               title="No se puede eliminar una campaña ya enviada"
@@ -815,7 +815,7 @@ export default function TooGoodToGoPage() {
                           ))}
                         </div>
                         <div className="border-t pt-4">
-                          <button onClick={() => handleToggleAllReservas(campaign.id)} className="w-full flex items-center justify-between text-sm font-medium text-foreground hover:text-primary transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] px-1">
+                          <button type="button" onClick={() => handleToggleAllReservas(campaign.id)} className="w-full flex items-center justify-between text-sm font-medium text-foreground hover:text-primary transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] px-1">
                             <span className="flex items-center gap-2">
                               <ReceiptText className="w-4 h-4" />
                               {t("tgtgCouponsValidated", language)}
@@ -893,7 +893,7 @@ export default function TooGoodToGoPage() {
                           </p>
                         </div>
                       </div>
-                      <button onClick={() => handleReutilizar(campaign)} className="flex-shrink-0 h-8 px-3 rounded-md border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] flex items-center gap-1.5">
+                      <button type="button" onClick={() => handleReutilizar(campaign)} className="flex-shrink-0 h-8 px-3 rounded-md border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] flex items-center gap-1.5">
                         <ReceiptText className="w-3.5 h-3.5" />
                         {t("tgtgReutilizar", language)}
                       </button>
@@ -1186,7 +1186,7 @@ function TgtgItemAdminCard({
           </div>
           {!closed && (
             <div className="flex items-center gap-2">
-              <button
+              <button type="button"
                 onClick={() => onAdjust(item.id, -1)}
                 disabled={adjusting || item.cuponesDisponibles <= 0}
                 aria-label="Reducir cupones"
@@ -1194,7 +1194,7 @@ function TgtgItemAdminCard({
               >
                 {adjusting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Minus className="w-4 h-4" />}
               </button>
-              <button
+              <button type="button"
                 onClick={() => onAdjust(item.id, 1)}
                 disabled={adjusting || item.cuponesDisponibles >= item.cuponesTotal}
                 aria-label="Aumentar cupones"
@@ -1206,7 +1206,7 @@ function TgtgItemAdminCard({
           )}
         </div>
 
-        <button
+        <button type="button"
           onClick={() => onToggleReservas(item.id)}
           className="w-full flex items-center justify-between text-sm text-muted-foreground hover:text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] px-1"
         >

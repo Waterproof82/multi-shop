@@ -23,7 +23,7 @@ export default function SuperAdminHeader({ adminName }: SuperAdminHeaderProps) {
           <span className="text-sm text-slate-300 hidden sm:inline">
             {adminName || 'Super Admin'}
           </span>
-          <button
+          <button type="button"
             onClick={handleLogout}
             aria-label="Cerrar sesión"
             className="min-h-[44px] min-w-[44px] flex items-center justify-center text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 rounded-md"

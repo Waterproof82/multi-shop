@@ -903,7 +903,7 @@ export default function WaiterKitchenPage() {
             const isActive = groupBy === mode;
             const label = mode === 'order' ? t('kitchenGroupByOrder', lang) : t('kitchenGroupByTable', lang);
             return (
-              <button
+              <button type="button"
                 key={mode}
                 onClick={() => setGroupBy(mode)}
                 className="rounded-lg px-4 py-2 text-xs font-semibold transition-colors"
@@ -929,7 +929,7 @@ export default function WaiterKitchenPage() {
               ? { background: 'oklch(26% 0.16 148)', color: 'oklch(80% 0.22 148)', border: '1px solid oklch(52% 0.26 148 / 0.7)' }
               : { background: 'oklch(24% 0.06 252)', color: TEXT_DIM, border: '1px solid oklch(48% 0.08 252 / 0.6)' };
             return (
-              <button
+              <button type="button"
                 key={mode}
                 onClick={() => setGroupBy(mode)}
                 className="rounded-lg px-4 py-2 text-xs font-semibold transition-colors"
@@ -951,7 +951,7 @@ export default function WaiterKitchenPage() {
             const mesaKeys = Array.from(groupByMesa(sourceItems).keys());
             const allCollapsed = mesaKeys.length > 0 && mesaKeys.every(k => collapsedMesas.has(k));
             return (
-              <button
+              <button type="button"
                 className="ml-auto rounded p-1 transition-colors"
                 style={{
                   background: allCollapsed ? 'oklch(30% 0.08 252)' : 'transparent',
@@ -1116,7 +1116,7 @@ export default function WaiterKitchenPage() {
                     className="flex items-center"
                     style={{ background: 'oklch(18% 0.03 252)', borderBottom: isCollapsed ? 'none' : '1px solid oklch(35% 0.08 252 / 0.4)' }}
                   >
-                    <button
+                    <button type="button"
                       className="flex flex-1 items-center gap-2 px-3 py-2.5 min-w-0"
                       style={{ background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
                       onClick={() => toggleMesaCollapse(mesaKey)}
@@ -1130,7 +1130,7 @@ export default function WaiterKitchenPage() {
                     </button>
                     <div className="flex items-center gap-2 pr-3 shrink-0">
                       {listosInMesa.length > 0 && (
-                        <button
+                        <button type="button"
                           onClick={() => void handleTodosServidos(mesaKey, listosInMesa)}
                           disabled={isServing}
                           title={t('kitchenTodosServidos', lang)}
@@ -1141,7 +1141,7 @@ export default function WaiterKitchenPage() {
                         </button>
                       )}
                       {retenidosInMesa.length > 0 && (
-                        <button
+                        <button type="button"
                           onClick={() => void handleLiberarRetenidosMesa(mesaKey, retenidosInMesa)}
                           disabled={isLiberating}
                           title={t('kitchenLiberarPedidos', lang)}
@@ -1151,7 +1151,7 @@ export default function WaiterKitchenPage() {
                           {isLiberating ? <span className="text-[10px]">…</span> : <PlayCircle className="w-4 h-4" />}
                         </button>
                       )}
-                      <button
+                      <button type="button"
                         onClick={() => setGroupedMesas(prev => {
                           const next = new Set(prev);
                           if (next.has(mesaKey)) next.delete(mesaKey); else next.add(mesaKey);
@@ -1205,7 +1205,7 @@ export default function WaiterKitchenPage() {
                         className="flex items-center"
                         style={{ background: 'oklch(18% 0.03 252)', borderBottom: isCollapsed ? 'none' : '1px solid oklch(35% 0.08 252 / 0.4)' }}
                       >
-                        <button
+                        <button type="button"
                           className="flex flex-1 items-center gap-2 px-3 py-2.5 min-w-0"
                           style={{ background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
                           onClick={() => toggleMesaCollapse(mesaKey)}
@@ -1218,7 +1218,7 @@ export default function WaiterKitchenPage() {
                           />
                         </button>
                         <div className="flex items-center gap-2 pr-3 shrink-0">
-                          <button
+                          <button type="button"
                             onClick={() => void handleTodosServidos(mesaKey, group.items)}
                             disabled={isServing}
                             title={t('kitchenTodosServidos', lang)}
@@ -1264,7 +1264,7 @@ export default function WaiterKitchenPage() {
                         className="flex items-center"
                         style={{ background: 'oklch(18% 0.03 252)', borderBottom: isCollapsed ? 'none' : '1px solid oklch(35% 0.08 252 / 0.4)' }}
                       >
-                        <button
+                        <button type="button"
                           className="flex flex-1 items-center gap-2 px-3 py-2 min-w-0"
                           style={{ background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
                           onClick={() => toggleMesaCollapse(mesaKey)}
@@ -1279,7 +1279,7 @@ export default function WaiterKitchenPage() {
                           />
                         </button>
                         <div className="flex items-center gap-2 pr-3 shrink-0">
-                          <button
+                          <button type="button"
                             onClick={() => void handleLiberarRetenidosMesa(mesaKey, group.items)}
                             disabled={isLiberating}
                             title={t('kitchenLiberarPedidos', lang)}
@@ -1331,14 +1331,14 @@ export default function WaiterKitchenPage() {
               </span>
             </div>
             <div className="flex gap-2">
-              <button
+              <button type="button"
                 onClick={() => setPendingRetain(null)}
                 className="flex-1 rounded-lg px-3 py-2 text-xs font-semibold"
                 style={{ background: 'oklch(22% 0.04 252)', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
               >
                 {t('kitchenCountdownCancel', lang)}
               </button>
-              <button
+              <button type="button"
                 onClick={() => void confirmRetain()}
                 className="flex-1 rounded-lg px-3 py-2 text-xs font-semibold"
                 style={{ background: 'oklch(26% 0.16 35)', color: 'oklch(82% 0.22 35)', border: '1px solid oklch(50% 0.28 35 / 0.6)' }}
@@ -1385,14 +1385,14 @@ export default function WaiterKitchenPage() {
               </div>
             </div>
             <div className="flex gap-2">
-              <button
+              <button type="button"
                 onClick={() => setPendingCancel(null)}
                 className="flex-1 rounded-lg px-3 py-2 text-xs font-semibold"
                 style={{ background: 'oklch(20% 0.04 252)', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
               >
                 {t('kitchenCountdownCancel', lang)}
               </button>
-              <button
+              <button type="button"
                 onClick={() => void confirmCancel()}
                 className="flex-1 rounded-lg px-3 py-2 text-xs font-semibold flex items-center justify-center gap-1.5"
                 style={{ background: 'oklch(28% 0.24 25)', color: 'oklch(82% 0.24 25)', border: '1px solid oklch(50% 0.30 25 / 0.6)' }}
@@ -1442,14 +1442,14 @@ export default function WaiterKitchenPage() {
                 </span>
               </div>
               <div className="flex gap-2">
-                <button
+                <button type="button"
                   onClick={() => setPendingMergedWaiterAction(null)}
                   className="flex-1 rounded-lg px-3 py-2 text-xs font-semibold"
                   style={{ background: 'oklch(20% 0.04 252)', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
                 >
                   {t('kitchenCountdownCancel', lang)}
                 </button>
-                <button
+                <button type="button"
                   onClick={() => void confirmMergedWaiterAction()}
                   className="flex-1 rounded-lg px-3 py-2 text-xs font-semibold"
                   style={{ background: 'oklch(26% 0.14 252)', color: TEXT_MAIN, border: '1px solid oklch(50% 0.14 252 / 0.6)' }}

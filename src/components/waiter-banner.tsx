@@ -538,7 +538,7 @@ export function WaiterBanner() {
     return (
       <ul className="py-1 max-h-64 overflow-y-auto">
         <li>
-          <button
+          <button type="button"
             onClick={() => { setDropdownOpen(false); router.push("/waiter"); }}
             className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-xs font-semibold transition-colors duration-100 border-b"
             style={{
@@ -559,7 +559,7 @@ export function WaiterBanner() {
           const busy   = switchingId === mesa.id;
           return (
             <li key={mesa.id}>
-              <button
+              <button type="button"
                 onClick={() => handleSelectTable(mesa)}
                 disabled={busy}
                 className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-xs transition-colors duration-100 disabled:opacity-60"
@@ -618,7 +618,7 @@ export function WaiterBanner() {
             </div>
           )}
           {hasMesa ? (
-            <button
+            <button type="button"
               className="flex items-center gap-1.5 min-w-0 rounded-md px-2 py-1 transition-colors duration-150"
               style={{ backgroundColor: 'oklch(22% 0.06 148 / 0.5)', border: '1px solid oklch(45% 0.18 148 / 0.4)' }}
               onClick={() => { globalThis.location.href = `/?mesa=${mesaId ?? ''}`; }}
@@ -641,7 +641,7 @@ export function WaiterBanner() {
 
           {/* Cart — only when mesa selected and not on waiter/kitchen/bar pages */}
           {hasMesa && pathname !== '/waiter' && pathname !== '/waiter/pendientes' && pathname !== '/waiter/kitchen' && pathname !== '/waiter/bar' && (
-            <button
+            <button type="button"
               onClick={openCart}
               className="relative flex items-center justify-center rounded-md p-2.5 transition-colors duration-150 min-h-[40px] min-w-[40px]"
               style={{ color: BTN_CART_TEXT, backgroundColor: BTN_CART_BG }}
@@ -684,7 +684,7 @@ export function WaiterBanner() {
 
           {/* Pendientes — visible only when there are items awaiting validation */}
           {counts && counts.pendientes > 0 && (
-            <button
+            <button type="button"
               onClick={() => { router.push('/waiter/pendientes'); }}
               className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px]"
               style={{ color: BTN_PENDIENTES_TEXT, backgroundColor: BTN_PENDIENTES_BG }}
@@ -703,7 +703,7 @@ export function WaiterBanner() {
           )}
 
           {/* Kitchen — always visible for authenticated waiters */}
-          <button
+          <button type="button"
             onClick={() => { router.push('/waiter/kitchen'); }}
             className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px]"
             style={{ color: BTN_KITCHEN_TEXT, backgroundColor: BTN_KITCHEN_BG }}
@@ -722,7 +722,7 @@ export function WaiterBanner() {
           </button>
 
           {/* Bar — always visible for authenticated waiters */}
-          <button
+          <button type="button"
             onClick={() => { router.push('/waiter/bar'); }}
             className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px]"
             style={{ color: BTN_BAR_TEXT, backgroundColor: BTN_BAR_BG }}
@@ -742,7 +742,7 @@ export function WaiterBanner() {
 
           {/* Change table — dropdown trigger */}
           <div className="relative" ref={dropdownRef}>
-            <button
+            <button type="button"
               onClick={handleToggleDropdown}
               className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px]"
               style={{ color: BTN_TABLE_TEXT, backgroundColor: BTN_TABLE_BG }}
@@ -771,7 +771,7 @@ export function WaiterBanner() {
 
           {/* Unlock payment — visible only when pago_en_curso */}
           {pagoEnCurso && (
-            <button
+            <button type="button"
               onClick={handleUnlockPayment}
               disabled={unlocking}
               className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px] disabled:opacity-40"
@@ -787,7 +787,7 @@ export function WaiterBanner() {
 
           {/* Close table — only when mesa selected */}
           {hasMesa && (
-            <button
+            <button type="button"
               onClick={handleCloseTable}
               disabled={closing}
               className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px] disabled:opacity-40"
@@ -802,7 +802,7 @@ export function WaiterBanner() {
           )}
 
           {/* Logout */}
-          <button
+          <button type="button"
             onClick={handleLogout}
             className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px]"
             style={{ color: BTN_EXIT_TEXT, backgroundColor: BTN_EXIT_BG }}

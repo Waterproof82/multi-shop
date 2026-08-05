@@ -180,7 +180,7 @@ function CountdownCard({ item, remaining, lang, onCancelCountdown }: Readonly<Co
           {item.complementos && <span className="text-[10px]" style={{ color: 'oklch(78% 0.03 252)' }}>({item.complementos})</span>}
           {item.nota && <span className="text-xs font-medium italic block mt-0.5 px-1.5 py-0.5 rounded" style={{ color: 'oklch(88% 0.18 85)', background: 'oklch(28% 0.12 85 / 0.45)' }}>✎ {item.nota}</span>}
         </div>
-        <button className="rounded px-2 py-1 text-[10px] font-bold shrink-0"
+        <button type="button" className="rounded px-2 py-1 text-[10px] font-bold shrink-0"
           style={{ background: 'oklch(26% 0.08 25)', color: 'oklch(75% 0.18 25)' }}
           onClick={() => onCancelCountdown(item.pedidoId, item.itemIdx)}>
           {t('kitchenCountdownCancel', lang)}
@@ -788,14 +788,14 @@ export default function KitchenPage() {
               </span>
             </div>
             <div className="flex gap-2">
-              <button
+              <button type="button"
                 onClick={() => setPendingMergedAction(null)}
                 className="flex-1 rounded-lg px-3 py-2 text-xs font-semibold"
                 style={{ background: 'oklch(20% 0.04 252)', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
               >
                 {t('kitchenCountdownCancel', lang)}
               </button>
-              <button
+              <button type="button"
                 onClick={() => void confirmMergedAction()}
                 className="flex-1 rounded-lg px-3 py-2 text-xs font-semibold"
                 style={{

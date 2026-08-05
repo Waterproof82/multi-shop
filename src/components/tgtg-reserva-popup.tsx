@@ -270,7 +270,7 @@ function TgtgReservaPopupInner() {
             <span className="font-semibold text-foreground text-sm">TooGoodToGo</span>
           </div>
           <div className="flex items-center gap-2">
-            <button
+            <button type="button"
               onClick={handleDismiss}
               aria-label={t("tgtgCancelButton", effectiveLang)}
               className="p-1 rounded-full text-muted-foreground hover:text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center"

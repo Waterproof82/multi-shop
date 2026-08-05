@@ -701,7 +701,7 @@ function EmptyCartContent({ language, shouldReduceMotion, closeCart }: Readonly<
         <p className="text-base font-medium text-foreground">{t("emptyCart", language)}</p>
         <p className="text-sm text-muted-foreground mt-1 max-w-[240px]">{t("addDishesToStart", language)}</p>
       </div>
-      <button
+      <button type="button"
         onClick={() => {
           closeCart();
           document.getElementById('menu')?.scrollIntoView({ behavior: shouldReduceMotion ? 'auto' : 'smooth' });
@@ -1066,7 +1066,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
               <p className="text-base font-medium text-foreground">{t("emptyCart", language)}</p>
               <p className="text-sm text-muted-foreground mt-1 max-w-[240px]">{t("addDishesToStart", language)}</p>
             </div>
-            <button
+            <button type="button"
               onClick={() => {
                 closeCart();
                 document.getElementById('menu')?.scrollIntoView({ behavior: shouldReduceMotion ? 'auto' : 'smooth' });

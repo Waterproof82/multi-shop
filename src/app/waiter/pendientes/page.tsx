@@ -882,7 +882,7 @@ export default function WaiterPendientesPage() {
                         );
                       })}
                       {allSelected && cocinaItems.length > 0 && barItems.length > 0 && (
-                        <button
+                        <button type="button"
                           onClick={() => void handleConfirmBoth(mesa.mesaId)}
                           disabled={isConfirming}
                           className="flex items-center gap-1 rounded-lg px-3 py-2.5 text-xs font-semibold disabled:opacity-50"
@@ -893,7 +893,7 @@ export default function WaiterPendientesPage() {
                         </button>
                       )}
                       {hasSelCocina && (
-                        <button
+                        <button type="button"
                           onClick={() => void handleConfirm(mesa.mesaId, 'comida', 'selected')}
                           disabled={isConfirming}
                           className="flex items-center gap-1 rounded-lg px-3 py-2.5 text-xs font-semibold disabled:opacity-50"
@@ -903,7 +903,7 @@ export default function WaiterPendientesPage() {
                         </button>
                       )}
                       {hasSelBar && (
-                        <button
+                        <button type="button"
                           onClick={() => void handleConfirm(mesa.mesaId, 'bebida', 'selected')}
                           disabled={isConfirming}
                           className="flex items-center gap-1 rounded-lg px-3 py-2.5 text-xs font-semibold disabled:opacity-50"
@@ -912,7 +912,7 @@ export default function WaiterPendientesPage() {
                           <Wine className="w-3.5 h-3.5 shrink-0" />
                         </button>
                       )}
-                      <button
+                      <button type="button"
                         onClick={() => setGroupedMesas(prev => { const next = new Set(prev); if (next.has(mesa.mesaId)) { next.delete(mesa.mesaId); } else { next.add(mesa.mesaId); } return next; })}
                         title="Agrupar ítems"
                         className="flex items-center justify-center rounded-lg"
@@ -920,7 +920,7 @@ export default function WaiterPendientesPage() {
                       >
                         <Layers className="w-3.5 h-3.5" />
                       </button>
-                      <button
+                      <button type="button"
                         onClick={() => setCollapsedMesas(prev => { const next = new Set(prev); if (next.has(mesa.mesaId)) { next.delete(mesa.mesaId); } else { next.add(mesa.mesaId); } return next; })}
                         title={isCollapsed ? 'Expandir' : 'Contraer'}
                         className="flex items-center justify-center rounded-lg"
@@ -929,7 +929,7 @@ export default function WaiterPendientesPage() {
                         <ChevronDown className="w-3.5 h-3.5 transition-transform" style={{ transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }} />
                       </button>
                       {selected.size > 0 && (
-                        <button
+                        <button type="button"
                           onClick={() => setPendingDelete(mesa.mesaId)}
                           disabled={isConfirming}
                           className="flex items-center justify-center rounded-lg disabled:opacity-50"
@@ -946,7 +946,7 @@ export default function WaiterPendientesPage() {
                   <div className="flex items-center gap-2 px-3 py-2"
                     style={{ background: 'oklch(18% 0.03 252)', borderBottom: '1px solid oklch(35% 0.08 252 / 0.25)' }}>
                     <span className="text-[10px] font-mono" style={{ color: TEXT_DIM }} suppressHydrationWarning>{formatTimer(elapsed)}</span>
-                    <button
+                    <button type="button"
                       className="ml-auto text-[10px] px-2 py-0.5 rounded font-medium"
                       style={{
                         background: allSelected ? 'oklch(26% 0.12 148)' : 'oklch(20% 0.05 252)',
@@ -965,7 +965,7 @@ export default function WaiterPendientesPage() {
                       <div className="flex items-center gap-2 px-3 py-1.5"
                         style={{ background: 'oklch(17% 0.025 252)', borderBottom: '1px solid oklch(35% 0.08 252 / 0.4)' }}>
                         {cocinaItems.length > 0 && (
-                          <button
+                          <button type="button"
                             className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded font-medium"
                             style={{
                               background: allCocina ? 'oklch(26% 0.12 148)' : 'oklch(20% 0.05 252)',
@@ -978,7 +978,7 @@ export default function WaiterPendientesPage() {
                           </button>
                         )}
                         {barItems.length > 0 && (
-                          <button
+                          <button type="button"
                             className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded font-medium"
                             style={{
                               background: allBar ? 'oklch(22% 0.10 252)' : 'oklch(20% 0.05 252)',
@@ -1115,14 +1115,14 @@ export default function WaiterPendientesPage() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <button
+                <button type="button"
                   onClick={() => setPendingLanzarPase(null)}
                   className="flex-1 rounded-lg px-3 py-2.5 text-xs font-semibold"
                   style={{ background: 'oklch(20% 0.04 252)', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
                 >
                   Cancelar
                 </button>
-                <button
+                <button type="button"
                   onClick={() => { setPendingLanzarPase(null); void handleLanzarPase(mesaId, pase); }}
                   className="flex-1 rounded-lg px-3 py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5"
                   style={{ background: col.bg, color: col.text, border: `2px solid ${col.border}` }}
@@ -1174,14 +1174,14 @@ export default function WaiterPendientesPage() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <button
+                <button type="button"
                   onClick={() => setPendingDelete(null)}
                   className="flex-1 rounded-lg px-3 py-2.5 text-xs font-semibold"
                   style={{ background: 'oklch(20% 0.04 252)', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
                 >
                   {t('kitchenCountdownCancel', lang)}
                 </button>
-                <button
+                <button type="button"
                   onClick={() => void handleDeleteSelected(pendingDelete)}
                   className="flex-1 rounded-lg px-3 py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5"
                   style={{ background: 'oklch(30% 0.28 25)', color: 'oklch(88% 0.26 25)', border: '2px solid oklch(52% 0.32 25 / 0.7)' }}

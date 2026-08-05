@@ -275,7 +275,7 @@ export default function MesasPage() {
                         <code className="text-xs text-cyan-300 bg-cyan-500/10 px-2 py-1 rounded font-mono truncate max-w-[220px]">
                           /?mesa={mesa.id}
                         </code>
-                        <button
+                        <button type="button"
                           onClick={() => handleCopy(mesa.id)}
                           className="p-1.5 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
                           aria-label="Copiar URL"
@@ -287,7 +287,7 @@ export default function MesasPage() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         {mesa.sesionId && (
-                          <button
+                          <button type="button"
                             onClick={() => setCloseConfirm({ show: true, mesa })}
                             className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-amber-400 hover:bg-amber-500/10 rounded-sm"
                             aria-label={`Cerrar sesión de mesa ${mesa.numero}`}
@@ -296,7 +296,7 @@ export default function MesasPage() {
                             <XCircle className="w-4 h-4" />
                           </button>
                         )}
-                        <button
+                        <button type="button"
                           onClick={() => setDeleteConfirm({ show: true, id: mesa.id, numero: mesa.numero })}
                           className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-destructive hover:bg-destructive/10 rounded-sm"
                           aria-label={`Eliminar mesa ${mesa.numero}`}
@@ -433,14 +433,14 @@ export default function MesasPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex gap-3 justify-end">
-            <button
+            <button type="button"
               onClick={() => setCloseConfirm({ show: false, mesa: null })}
               className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg"
               disabled={closing}
             >
               Cancelar
             </button>
-            <button
+            <button type="button"
               onClick={confirmCloseSession}
               disabled={closing}
               className="px-4 py-2 bg-amber-600 text-white hover:bg-amber-500 rounded-lg disabled:opacity-50"
@@ -466,14 +466,14 @@ export default function MesasPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex gap-3 justify-end">
-            <button
+            <button type="button"
               onClick={() => setDeleteConfirm({ show: false, id: null, numero: null })}
               className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg"
               disabled={deleting}
             >
               Cancelar
             </button>
-            <button
+            <button type="button"
               onClick={confirmDelete}
               disabled={deleting}
               className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg disabled:opacity-50"

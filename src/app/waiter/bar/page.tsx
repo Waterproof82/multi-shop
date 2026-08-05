@@ -199,7 +199,7 @@ function renderMergedCardInner(
         <div className="flex-1 min-w-0">
           <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{merged.totalCantidad}× {merged.nombre}</span>
         </div>
-        <button className="rounded px-2 py-1 text-[10px] font-bold shrink-0"
+        <button type="button" className="rounded px-2 py-1 text-[10px] font-bold shrink-0"
           style={{ background: 'oklch(26% 0.08 25)', color: 'oklch(75% 0.18 25)' }}
           onClick={() => merged.items.forEach(i => cancelCountdown(i.key))}>
           {t('kitchenCountdownCancel', lang)}
@@ -761,7 +761,7 @@ export default function BarPage() {
               <div className="flex-1 min-w-0">
                 <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{flatItem.cantidad}× {flatItem.nombre}</span>
               </div>
-              <button className="rounded px-2 py-1 text-[10px] font-bold shrink-0"
+              <button type="button" className="rounded px-2 py-1 text-[10px] font-bold shrink-0"
                 style={{ background: 'oklch(26% 0.08 25)', color: 'oklch(75% 0.18 25)' }}
                 onClick={() => cancelCountdown(flatItem.key)}>
                 {t('kitchenCountdownCancel', lang)}
@@ -862,7 +862,7 @@ export default function BarPage() {
             const isActive = groupBy === mode;
             const label = mode === 'order' ? t('kitchenGroupByOrder', lang) : t('kitchenGroupByTable', lang);
             return (
-              <button key={mode} onClick={() => setGroupBy(mode)}
+              <button type="button" key={mode} onClick={() => setGroupBy(mode)}
                 className="rounded-lg px-4 py-2 text-xs font-semibold transition-colors"
                 style={isActive ? { background: 'oklch(32% 0.10 252)', color: TEXT_MAIN, border: '1px solid oklch(50% 0.10 252 / 0.6)' }
                   : { background: 'transparent', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.4)' }}>
@@ -871,7 +871,7 @@ export default function BarPage() {
             );
           })}
           {groupBy === 'mesa' && (
-            <button
+            <button type="button"
               className="ml-auto rounded p-1 transition-colors"
               style={{ background: allCollapsed ? 'oklch(30% 0.08 252)' : 'transparent', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.4)' }}
               onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(allKeys))}
@@ -894,13 +894,13 @@ export default function BarPage() {
                 {t('barServeAllConfirmMsg', lang)}
               </p>
               <div className="flex gap-2">
-                <button
+                <button type="button"
                   className="flex-1 rounded-lg py-2 text-xs font-semibold"
                   style={{ background: 'oklch(22% 0.04 252)', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
                   onClick={() => setPendingServeAll(null)}>
                   {t('kitchenCountdownCancel', lang)}
                 </button>
-                <button
+                <button type="button"
                   className="flex-1 rounded-lg py-2 text-xs font-semibold"
                   style={{ background: 'oklch(22% 0.10 148)', color: 'oklch(74% 0.20 148)', border: '1px solid oklch(46% 0.22 148 / 0.6)' }}
                   onClick={() => handleServeAllMesa(mesaItems)}>
@@ -950,14 +950,14 @@ export default function BarPage() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <button
+                <button type="button"
                   onClick={() => setPendingBarCancel(null)}
                   className="flex-1 rounded-lg px-3 py-2.5 text-xs font-semibold"
                   style={{ background: 'oklch(20% 0.04 252)', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
                 >
                   {t('kitchenCountdownCancel', lang)}
                 </button>
-                <button
+                <button type="button"
                   onClick={handleBarCancel}
                   className="flex-1 rounded-lg px-3 py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5"
                   style={{ background: 'oklch(30% 0.28 25)', color: 'oklch(88% 0.26 25)', border: '2px solid oklch(52% 0.32 25 / 0.7)' }}
@@ -1014,7 +1014,7 @@ export default function BarPage() {
                   <div
                     className="flex items-center"
                     style={{ background: 'oklch(18% 0.03 252)', borderBottom: isCollapsed ? 'none' : '1px solid oklch(35% 0.08 252 / 0.4)' }}>
-                    <button
+                    <button type="button"
                       className="flex flex-1 items-center gap-2 px-3 py-2.5 min-w-0"
                       style={{ background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
                       onClick={() => toggleCollapse(mesaKey)}>
@@ -1023,7 +1023,7 @@ export default function BarPage() {
                       <ChevronDown className="w-4 h-4 shrink-0 ml-auto" style={{ color: TEXT_DIM, transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }} />
                     </button>
                     <div className="flex items-center gap-2 pr-3 shrink-0">
-                      <button
+                      <button type="button"
                         onClick={() => setGroupedMesas(prev => {
                           const n = new Set(prev);
                           if (n.has(mesaKey)) n.delete(mesaKey); else n.add(mesaKey);
@@ -1039,7 +1039,7 @@ export default function BarPage() {
                         }}>
                         <Layers className="w-3.5 h-3.5" />
                       </button>
-                      <button
+                      <button type="button"
                         onClick={() => setPendingServeAll(mesaKey)}
                         title={t('barServeAllConfirmYes', lang)}
                         className="flex items-center justify-center rounded-lg"
