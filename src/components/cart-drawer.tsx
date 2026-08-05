@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useMemo, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, Check, Gift, UtensilsCrossed } from "lucide-react"
 import { useReducedMotion } from "framer-motion"
@@ -36,6 +36,7 @@ import { formatPrice } from "@/lib/format-price"
 import { COUNTRY_CODES, DEFAULT_COUNTRY_CODE } from "@/core/domain/constants/country-codes"
 import { getTrackingTokens, addTrackingToken } from "@/lib/order-tracking";
 import { QRScannerGate, type QRGateState } from '@/components/qr-scanner-gate-lazy';
+import { IDEMPOTENCY_HEADER, buildIdempotencyKey } from "@/lib/idempotency";
 
 const MESA_CLIENT_TOKEN_KEY = (mesaId: string) => `mesa_token_${mesaId}`;
 
@@ -70,13 +71,54 @@ function getMesaClientToken(mesaId: string): { token: string; expiresAt: string 
 
 type DeliveryMethod = 'recogida' | 'delivery' | null;
 
-// Helper: send standard (non-mesa) order and return response data
-async function sendStandardOrderFlow(payload: Record<string, unknown>) {
-  const res = await fetch('/api/pedidos', {
+/**
+ * Clave de idempotencia del intento en curso.
+ *
+ * `current()` la crea perezosamente y la MANTIENE entre reintentos: es
+ * justamente eso lo que hace que volver a pulsar "Hacer pedido" tras una red
+ * colgada devuelva el pedido original en vez de crear un segundo.
+ * `reset()` la tira al confirmar, para que el siguiente pedido estrene clave.
+ */
+export interface AttemptKey {
+  current: () => string;
+  renew: () => void;
+  reset: () => void;
+}
+
+/**
+ * POST del pedido con clave de idempotencia, absorbiendo el 409.
+ *
+ * El 409 significa "esa clave ya se usó con otro contenido", y ocurre en un
+ * caso completamente legítimo: el envío falló, el usuario corrigió el teléfono
+ * o cambió una cantidad, y volvió a darle. El cuerpo ya no es el mismo pedido,
+ * así que el servidor —con razón— se niega a tratarlo como reenvío.
+ *
+ * Renovar la clave y repetir UNA vez resuelve ese caso sin que el usuario vea
+ * nada. Es preferible a intentar detectar en el cliente qué campos entran en la
+ * huella: esa lista se desincronizaría del servidor a la primera que alguien
+ * añadiera un campo al pedido.
+ */
+async function postPedido(
+  body: unknown,
+  headers: Record<string, string>,
+  attemptKey: AttemptKey,
+  sufijo: string | null | undefined,
+): Promise<Response> {
+  const send = () => fetch('/api/pedidos', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    headers: { ...headers, [IDEMPOTENCY_HEADER]: buildIdempotencyKey(attemptKey.current(), sufijo) },
+    body: JSON.stringify(body),
   });
+
+  const res = await send();
+  if (res.status !== 409) return res;
+  attemptKey.renew();
+  return send();
+}
+
+// Helper: send standard (non-mesa) order and return response data
+async function sendStandardOrderFlow(payload: Record<string, unknown>, attemptKey: AttemptKey) {
+  const res = await postPedido(payload, { 'Content-Type': 'application/json' }, attemptKey, null);
   const data = await res.json().catch(() => ({}));
   return { ok: res.ok, data };
 }
@@ -202,25 +244,30 @@ async function sendMesaOrderFlow(
   clientToken: string | null,
   items: CartItem[],
   language: Language,
+  attemptKey: AttemptKey,
 ): Promise<{ ok: boolean; trackingToken?: string; pedidoId?: string; error?: string | null; code?: string | null }> {
   if (items.length === 0) return { ok: false };
 
-  const orderHeaders: HeadersInit = { 'Content-Type': 'application/json', ...(clientToken ? { 'Authorization': `Bearer ${clientToken}` } : {}) };
+  const orderHeaders: Record<string, string> = { 'Content-Type': 'application/json', ...(clientToken ? { 'Authorization': `Bearer ${clientToken}` } : {}) };
   const orderGroups = Array.from(groupItemsByPase(items).entries());
   const [firstGroup, ...restGroups] = orderGroups;
   const [firstPase, firstGroupItems] = firstGroup!;
 
-  const res = await fetch('/api/pedidos', {
-    method: 'POST',
-    headers: orderHeaders,
-    body: JSON.stringify({
+  // Un envío con varios pases crea una comanda por pase. Todas pertenecen al
+  // mismo intento del usuario, así que comparten clave base y se distinguen por
+  // el sufijo del pase — estable entre reintentos, que es lo que importa.
+  const res = await postPedido(
+    {
       tipo: 'mesa',
       mesa_id: mesaId,
       ...(firstPase ? { pase: firstPase } : {}),
       items: firstGroupItems.map(mapCartItemPayload),
       idioma: language,
-    }),
-  });
+    },
+    orderHeaders,
+    attemptKey,
+    firstPase,
+  );
 
   if (res.status === 401) {
     const body = await res.json().catch(() => ({}));
@@ -249,11 +296,12 @@ async function sendMesaOrderFlow(
     }
 
     const extraFetches = restGroups.map(([pase, groupItems]) =>
-      fetch('/api/pedidos', {
-        method: 'POST',
-        headers: orderHeaders,
-        body: JSON.stringify({ tipo: 'mesa', mesa_id: mesaId, ...(pase ? { pase } : {}), items: groupItems.map(mapCartItemPayload), idioma: language }),
-      }).catch(() => null)
+      postPedido(
+        { tipo: 'mesa', mesa_id: mesaId, ...(pase ? { pase } : {}), items: groupItems.map(mapCartItemPayload), idioma: language },
+        orderHeaders,
+        attemptKey,
+        pase,
+      ).catch(() => null)
     );
 
     await Promise.all(extraFetches);
@@ -391,8 +439,9 @@ async function processStandardOrderResponse(
     setTelefono: (s: string) => void;
     setEmail: (s: string) => void;
     router: any;
-    sendStandardOrderFlow: (payload: Record<string, unknown>) => Promise<{ ok: boolean; data: any }>;
+    sendStandardOrderFlow: (payload: Record<string, unknown>, attemptKey: AttemptKey) => Promise<{ ok: boolean; data: any }>;
     setSending: (b: boolean) => void;
+    attemptKey: AttemptKey;
   }
 ): Promise<void> {
   const {
@@ -417,6 +466,7 @@ async function processStandardOrderResponse(
     router,
     sendStandardOrderFlow,
     setSending,
+    attemptKey,
   } = opts;
 
   setSending(true);
@@ -431,12 +481,16 @@ async function processStandardOrderResponse(
       estimatedFeeCents,
     });
 
-    const { ok, data } = await sendStandardOrderFlow(payload);
+    const { ok, data } = await sendStandardOrderFlow(payload, attemptKey);
 
     if (!ok) {
       setErrors({ general: data.error || t('validationOrderError', language) });
       return;
     }
+
+    // Confirmado: la clave del intento se descarta para que el siguiente pedido
+    // no se confunda con un reenvío de este. Ver `AttemptKey`.
+    attemptKey.reset();
 
     // Requires payment redirect
     if (data.trackingToken && data.pedidoId && requiresRedsysRedirect(pagosPickupHabilitados, deliveryMethod, isRestaurant)) {
@@ -565,6 +619,7 @@ interface MesaOrderHandlers {
   clearCart: () => void;
   setShowOrderToast: (b: boolean) => void;
   setErrors: (e: { general: string }) => void;
+  attemptKey: AttemptKey;
 }
 
 async function executeMesaOrder(
@@ -587,8 +642,12 @@ async function executeMesaOrder(
 
   handlers.setSending(true);
   try {
-    const result = await sendMesaOrderFlow(mesaId, clientToken, items, language);
+    const result = await sendMesaOrderFlow(mesaId, clientToken, items, language, handlers.attemptKey);
     if (result.ok && result.trackingToken) {
+      // El pedido está confirmado: la clave del intento ya cumplió su función y
+      // se descarta. Si no se descartara, el SIGUIENTE pedido de esta mesa
+      // reutilizaría la clave y el servidor lo tomaría por un reenvío.
+      handlers.attemptKey.reset();
       addTrackingToken(result.trackingToken);
       handlers.clearCart();
       handlers.closeCart();
@@ -688,6 +747,15 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
   const [qrGateState, setQrGateState] = useState<QRGateState | null>(null);
   const [showOrderToast, setShowOrderToast] = useState(false);
 
+  // Clave de idempotencia del intento en curso. Va en un ref y no en estado
+  // porque cambiarla no debe repintar nada — solo la leen los envíos.
+  const attemptKeyRef = useRef<string | null>(null);
+  const attemptKey = useMemo<AttemptKey>(() => ({
+    current: () => (attemptKeyRef.current ??= crypto.randomUUID()),
+    renew: () => { attemptKeyRef.current = crypto.randomUUID(); },
+    reset: () => { attemptKeyRef.current = null; },
+  }), []);
+
 
 
   // Detect ?mesa= param (client-side only, SSR safe)
@@ -747,7 +815,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     // Mesa mode: skip PII validation, use mesa submit path
     if (mesaToken) {
       await executeMesaOrder(mesaInfo?.id ?? mesaToken, isWaiterMode, items, language, {
-        setSending, closeCart, setQrGateState, clearCart, setShowOrderToast, setErrors,
+        setSending, closeCart, setQrGateState, clearCart, setShowOrderToast, setErrors, attemptKey,
       });
       return;
     }
@@ -796,8 +864,9 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
       router,
       sendStandardOrderFlow,
       setSending,
+      attemptKey,
     });
-  }, [mesaToken, mesaInfo, isWaiterMode, nombre, telefono, countryCode, email, deliveryMethod, deliveryAddress, deliveryPostalCode, deliveryLatitude, deliveryLongitude, isRestaurant, pagosPickupHabilitados, items, language, discountCode, estimatedFeeCents, clearCart, closeCart, router]);
+  }, [mesaToken, mesaInfo, isWaiterMode, nombre, telefono, countryCode, email, deliveryMethod, deliveryAddress, deliveryPostalCode, deliveryLatitude, deliveryLongitude, isRestaurant, pagosPickupHabilitados, items, language, discountCode, estimatedFeeCents, clearCart, closeCart, router, attemptKey]);
 
 // Signal "Activa" state: when a real customer (non-waiter) adds their first item
   useEffect(() => {

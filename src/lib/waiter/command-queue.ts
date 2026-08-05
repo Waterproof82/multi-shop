@@ -14,10 +14,16 @@
  * una red inestable, e indistinguible desde el cliente de "no llegó nunca".
  *
  * Los PATCH de estado de ítem cumplen: fijar `estado = 'servido'` dos veces deja
- * el mismo resultado que hacerlo una. Un `POST /api/pedidos` NO cumple: cada
- * reenvío crea una comanda nueva. Por eso los pedidos no se encolan aquí — sin
- * una clave de idempotencia aceptada por el servidor, reintentar convertiría una
- * comanda perdida en una comanda duplicada, que es un problema peor.
+ * el mismo resultado que hacerlo una. `POST /api/pedidos` no cumplía por sí solo
+ * —cada reenvío creaba una comanda nueva— y por eso los pedidos quedaron fuera
+ * de esta cola. Desde `src/lib/idempotency.ts` la ruta SÍ acepta una clave de
+ * reintento, así que el impedimento técnico ya no existe.
+ *
+ * Aun así los pedidos siguen sin encolarse aquí, y ahora por una razón de
+ * servicio y no de mecánica: reproducir una comanda MINUTOS después, sin nadie
+ * mirando, manda comida a una mesa que puede haberse levantado. El reintento de
+ * un pedido se hace en primer plano, con el usuario delante — que es lo que hace
+ * `postPedido` en `cart-drawer.tsx`.
  *
  * ── COLAPSADO POR DESTINO ───────────────────────────────────────────────────
  * Al encolar se reemplaza cualquier comando pendiente con la misma `key`. Esto

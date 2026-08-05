@@ -2,6 +2,7 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { Pedido, CartItem, PedidoItem, Result } from "@/core/domain/entities/types";
 import { IPedidoRepository, WaiterBadgeCounts, KitchenOrderItem, BarOrderItem, RetenidoItem, KitchenItemRecord, ItemEstado, PendienteValidacionMesa, PendienteValidacionItem } from "@/core/domain/repositories/IPedidoRepository";
 import { logger } from "../logging/logger";
+import { IDEMPOTENCY_REPLAY_CODE } from "@/core/domain/constants/pedido";
 
 type DeliveryData = {
   origen?: string;
@@ -11,6 +12,19 @@ type DeliveryData = {
   longitude_entrega?: number;
   estimated_delivery_fee_cents?: number;
 };
+
+/**
+ * `unique_violation` de Postgres. Lo lanza `idx_pedidos_idempotency_key` cuando
+ * dos envíos con la misma clave llegan a la vez y ambos superan la comprobación
+ * previa. No es un fallo: significa que el otro envío ya creó el pedido.
+ */
+const PG_UNIQUE_VIOLATION = '23505';
+
+function applyIdempotency(payload: Record<string, unknown>, idempotency?: { key: string; fingerprint: string }): void {
+  if (!idempotency) return;
+  payload.idempotency_key = idempotency.key;
+  payload.idempotency_fingerprint = idempotency.fingerprint;
+}
 
 function applyDeliveryFields(payload: Record<string, unknown>, d: DeliveryData): void {
   if (d.origen) payload.origen = d.origen;
@@ -472,6 +486,55 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     }
   }
 
+  /**
+   * Busca el pedido creado previamente con esta clave de idempotencia.
+   *
+   * Devuelve `null` cuando la clave no se ha usado nunca — que es el caso
+   * normal. El `idempotency_fingerprint` viaja de vuelta para que la capa
+   * superior compruebe que el cuerpo entrante es realmente el mismo pedido
+   * antes de devolver su `tracking_token`.
+   */
+  async findByIdempotencyKey(
+    empresaId: string,
+    key: string
+  ): Promise<Result<{ id: string; numero_pedido: number; total: number; tracking_token: string | null; fingerprint: string | null } | null>> {
+    try {
+      const { data, error } = await this.supabase
+        .from('pedidos')
+        .select('id, numero_pedido, total, tracking_token, idempotency_fingerprint')
+        .eq('empresa_id', empresaId)
+        .eq('idempotency_key', key)
+        .maybeSingle();
+
+      if (error) {
+        await logger.logAndReturnError(
+          'DB_QUERY_ERROR',
+          error.message,
+          'repository',
+          'SupabasePedidoRepository.findByIdempotencyKey',
+          { empresaId, details: { code: error.code } }
+        );
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al verificar la clave de idempotencia', module: 'repository', method: 'findByIdempotencyKey' } };
+      }
+      if (!data) return { success: true, data: null };
+
+      const row = data as Record<string, unknown>;
+      return {
+        success: true,
+        data: {
+          id: row['id'] as string,
+          numero_pedido: row['numero_pedido'] as number,
+          total: row['total'] as number,
+          tracking_token: (row['tracking_token'] as string | null) ?? null,
+          fingerprint: (row['idempotency_fingerprint'] as string | null) ?? null,
+        },
+      };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findByIdempotencyKey', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
   async create(
     empresaId: string,
     clienteId: string | null,
@@ -486,7 +549,8 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       latitude_entrega?: number;
       longitude_entrega?: number;
       estimated_delivery_fee_cents?: number;
-    }
+    },
+    idempotency?: { key: string; fingerprint: string }
   ): Promise<Result<{ id: string; numero_pedido: number; total: number; trackingToken?: string }>> {
     try {
       // Atomically generate next order number using a DB function with row-level lock
@@ -534,6 +598,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       }
 
       if (deliveryData) applyDeliveryFields(insertPayload, deliveryData);
+      applyIdempotency(insertPayload, idempotency);
 
       const { data: pedido, error } = await this.supabase
         .from('pedidos')
@@ -542,6 +607,12 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         .single();
 
       if (error) {
+        // Carrera con otro envío de la misma clave: el pedido ya existe. No se
+        // registra como error porque no lo es — el resultado que el cliente
+        // espera está en la base, solo hay que ir a leerlo.
+        if (error.code === PG_UNIQUE_VIOLATION && idempotency) {
+          return { success: false, error: { code: IDEMPOTENCY_REPLAY_CODE, message: 'Pedido ya creado con esta clave', module: 'repository', method: 'create' } };
+        }
         await logger.logAndReturnError(
           'DB_INSERT_ERROR',
           error.message,
@@ -771,6 +842,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     initialEstado?: 'pendiente' | 'retenido' | 'pendiente_validacion';
     nota?: string;
     pase?: string | null;
+    idempotency?: { key: string; fingerprint: string };
   }): Promise<Result<{ id: string; numero_pedido: number; tracking_token: string }>> {
     try {
       const { data: nextNum, error: rpcError } = await this.supabase
@@ -812,6 +884,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         ...(params.nota ? { nota: params.nota } : {}),
         ...(params.pase ? { pase: params.pase } : {}),
       };
+      applyIdempotency(insertPayload, params.idempotency);
 
       const { data: pedido, error } = await this.supabase
         .from('pedidos')
@@ -820,6 +893,10 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         .single();
 
       if (error) {
+        // Ver el comentario equivalente en `create`: colisión de clave = ya existe.
+        if (error.code === PG_UNIQUE_VIOLATION && params.idempotency) {
+          return { success: false, error: { code: IDEMPOTENCY_REPLAY_CODE, message: 'Pedido ya creado con esta clave', module: 'repository', method: 'createMesaOrder' } };
+        }
         await logger.logAndReturnError(
           'DB_INSERT_ERROR',
           error.message,

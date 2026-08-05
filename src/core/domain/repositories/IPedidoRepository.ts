@@ -127,6 +127,7 @@ export interface IPedidoRepository {
     initialEstado?: 'pendiente' | 'retenido' | 'pendiente_validacion';
     nota?: string;
     pase?: string | null;
+    idempotency?: { key: string; fingerprint: string };
   }): Promise<Result<{ id: string; numero_pedido: number; tracking_token: string }>>;
   updateItemPase(empresaId: string, pedidoId: string, itemIdx: number, pase: string | null): Promise<Result<void>>;
   findEstimatedReadyAtById(pedidoId: string): Promise<Result<string | null>>;
@@ -152,8 +153,18 @@ export interface IPedidoRepository {
       latitude_entrega?: number;
       longitude_entrega?: number;
       estimated_delivery_fee_cents?: number;
-    }
+    },
+    idempotency?: { key: string; fingerprint: string }
   ): Promise<Result<{ id: string; numero_pedido: number; total: number; trackingToken?: string }>>;
+  /**
+   * Pedido creado previamente con esta clave de idempotencia, o `null`.
+   * La huella vuelve para que la capa superior verifique que el cuerpo entrante
+   * es el mismo pedido antes de devolverle su `tracking_token`.
+   */
+  findByIdempotencyKey(
+    empresaId: string,
+    key: string
+  ): Promise<Result<{ id: string; numero_pedido: number; total: number; tracking_token: string | null; fingerprint: string | null } | null>>;
   /**
    * Contadores del WaiterBanner en un único roundtrip (RPC `get_waiter_badge_counts`).
    * Es la ruta más caliente del sistema: se re-invoca en cada evento de Realtime.
