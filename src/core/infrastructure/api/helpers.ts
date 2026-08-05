@@ -78,7 +78,7 @@ export function handleResultWithStatus<T>(result: Result<T>, successStatus = 200
   return errorResponse(result.error.message, errorCodeToStatus(result.error.code));
 }
 
-const empresaIdSchema = z.string().uuid();
+const empresaIdSchema = z.uuid();
 
 /**
  * Unified admin context resolver — call this at the top of every admin route handler.

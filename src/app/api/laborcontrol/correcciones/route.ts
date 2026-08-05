@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { resolveAdminContextWithEmpresa, requireRole, handleResult } from '@/core/infrastructure/api/helpers';
 import { getLcRegistrarCorreccionUseCase } from '@/core/laborcontrol/infrastructure';
 import { CorreccionBodySchema } from '@/core/laborcontrol/application/dtos/correccion.dto';
+import { z } from 'zod';
 
 // POST /api/laborcontrol/correcciones
 // Auth: requireRole admin | encargado
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest) {
 
   const parsed = CorreccionBodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json({ error: z.flattenError(parsed.error) }, { status: 400 });
   }
 
   const uc = getLcRegistrarCorreccionUseCase();

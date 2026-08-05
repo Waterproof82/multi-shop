@@ -7,7 +7,7 @@ import { type TpvDetalleItem } from '@/core/domain/entities/tpv-types';
 import { resolveActor } from '@/core/infrastructure/api/audit-actor';
 
 const schema = z.object({
-  cobroId: z.string().uuid(),
+  cobroId: z.uuid(),
 });
 
 type CobrosRow = {

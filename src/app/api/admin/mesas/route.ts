@@ -9,7 +9,7 @@ const createMesaSchema = z.object({
 });
 
 const deleteMesaSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
 });
 
 export async function GET(request: NextRequest) {
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 }
 
 const closeSesionSchema = z.object({
-  sesionId: z.string().uuid(),
+  sesionId: z.uuid(),
 });
 
 export async function PATCH(request: NextRequest) {

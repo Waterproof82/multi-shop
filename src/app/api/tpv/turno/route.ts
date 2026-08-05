@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
 
   const parsed = AbrirSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json({ error: z.flattenError(parsed.error) }, { status: 400 });
   }
 
   const result = await abrirTurnoUseCase(repo, {

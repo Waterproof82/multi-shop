@@ -10,11 +10,11 @@ import { escapeHtml } from '@/lib/html-utils';
 
 const createPromocionSchema = z.object({
   texto_promocion: z.string().min(1, 'El texto de promoción es requerido').max(1000),
-  imagen_url: z.string().url().refine(
+  imagen_url: z.url().refine(
     (url) => url.startsWith('https://'),
     { message: 'imagen_url must use HTTPS' }
   ).optional().nullable(),
-  fecha_fin: z.string().datetime({ offset: true }),
+  fecha_fin: z.iso.datetime({ offset: true }),
 });
 
 export async function GET(request: NextRequest) {

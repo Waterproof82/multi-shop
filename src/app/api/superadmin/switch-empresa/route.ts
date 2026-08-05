@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const rawEmpresaId = searchParams.get('empresaId');
-  const parsed = z.string().uuid().safeParse(rawEmpresaId);
+  const parsed = z.uuid().safeParse(rawEmpresaId);
 
   if (!parsed.success) {
     return NextResponse.redirect(new URL('/superadmin', request.url));

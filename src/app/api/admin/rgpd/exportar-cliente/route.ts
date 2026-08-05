@@ -9,7 +9,7 @@ import { exportarClienteUseCase } from '@/core/application/use-cases/rgpd/export
 import { z } from 'zod';
 
 const QuerySchema = z.object({
-  clienteId: z.string().uuid(),
+  clienteId: z.uuid(),
 });
 
 export async function GET(req: NextRequest) {

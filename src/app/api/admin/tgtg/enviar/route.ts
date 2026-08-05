@@ -10,7 +10,7 @@ import { generateReservaToken } from '@/lib/reserva-token';
 import type { TgtgItem } from '@/core/domain/entities/types';
 
 const enviarSchema = z.object({
-  promoIds: z.array(z.string().uuid()).min(1).max(10),
+  promoIds: z.array(z.uuid()).min(1).max(10),
 });
 
 // Textos del email por idioma

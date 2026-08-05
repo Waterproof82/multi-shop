@@ -4,8 +4,8 @@ import type { Result, AppError } from '@/core/domain/entities/types';
 import type { AlbaranCompra } from '@/core/domain/entities/compras-types';
 
 const schema = z.object({
-  proveedorId: z.string().uuid(),
-  pedidoCompraId: z.string().uuid().optional(),
+  proveedorId: z.uuid(),
+  pedidoCompraId: z.uuid().optional(),
   numeroAlbaran: z.string().min(1).max(100),
   notas: z.string().max(1000).optional(),
 });

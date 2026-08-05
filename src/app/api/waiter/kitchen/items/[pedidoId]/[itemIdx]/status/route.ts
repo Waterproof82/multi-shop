@@ -30,7 +30,7 @@ export async function PATCH(
 
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Estado inválido', details: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json({ error: 'Estado inválido', details: z.flattenError(parsed.error) }, { status: 400 });
   }
 
   const { estado, pase } = parsed.data;

@@ -4,10 +4,10 @@ import { Result, Valoracion, ValoracionStats } from '@/core/domain/entities/type
 import { logger } from '@/core/infrastructure/logging/logger';
 
 const createSchema = z.object({
-  empresaId: z.string().uuid(),
-  mesaId: z.string().uuid().nullable(),
-  mesaSesionId: z.string().uuid().nullable(),
-  raterId: z.string().uuid(),
+  empresaId: z.uuid(),
+  mesaId: z.uuid().nullable(),
+  mesaSesionId: z.uuid().nullable(),
+  raterId: z.uuid(),
   estrellas: z.number().min(0.5).max(5).multipleOf(0.5),
 });
 

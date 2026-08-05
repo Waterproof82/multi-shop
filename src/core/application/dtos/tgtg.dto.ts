@@ -29,9 +29,9 @@ export const createTgtgSchema = z.object({
 });
 
 export const claimCuponSchema = z.object({
-  itemId: z.string().uuid(),
-  tgtgPromoId: z.string().uuid(),
-  email: z.string().email().max(255),
+  itemId: z.uuid(),
+  tgtgPromoId: z.uuid(),
+  email: z.email().max(255),
   token: z.string().min(10).max(500),
 });
 

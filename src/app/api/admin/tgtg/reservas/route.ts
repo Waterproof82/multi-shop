@@ -5,7 +5,7 @@ import { resolveAdminContextWithEmpresa } from '@/core/infrastructure/api/helper
 import { logApiError } from '@/core/infrastructure/api/api-logger';
 
 const querySchema = z.object({
-  tgtgPromoId: z.string().uuid(),
+  tgtgPromoId: z.uuid(),
 });
 
 export async function GET(request: NextRequest) {

@@ -5,7 +5,7 @@ import { rateLimitLogin } from '@/core/infrastructure/api/rate-limit';
 import { validationErrorResponse } from '@/core/infrastructure/api/helpers';
 
 const setupSchema = z.object({
-  email: z.string().email('Email inválido').max(254, 'Email demasiado largo'),
+  email: z.email('Email inválido').max(254, 'Email demasiado largo'),
   password: z.string().min(1).max(128, 'Contraseña demasiado larga'),
 });
 

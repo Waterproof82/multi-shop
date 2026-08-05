@@ -10,8 +10,8 @@ const TipoContratoEnum = z.enum([
 ]);
 
 export const CreatePerfilLaboralSchema = z.object({
-  empleadoId:           z.string().uuid(),
-  centroId:             z.string().uuid(),
+  empleadoId:           z.uuid(),
+  centroId:             z.uuid(),
   jornadaTeoricaHoras:  z.number().positive().max(168),
   tipoContrato:         TipoContratoEnum,
   tiempoParcial:        z.boolean().default(false),

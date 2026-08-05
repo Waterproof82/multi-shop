@@ -6,7 +6,7 @@ import { getSupabaseClient } from '@/core/infrastructure/database/supabase-clien
 import { getDomainFromHeaders, parseMainDomain } from '@/lib/domain-utils';
 import { PAYMENT_LOCK_EXPIRY_MS } from '@/core/domain/constants/pedido';
 
-const mesaIdSchema = z.string().uuid();
+const mesaIdSchema = z.uuid();
 const bodySchema = z.object({
   numPersonas: z.number().int().min(2).max(20),
 });

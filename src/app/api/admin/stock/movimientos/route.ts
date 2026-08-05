@@ -19,7 +19,7 @@ function parseTipo(value: string | null): TipoMovimiento | undefined {
 const querySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
-  ingredienteId: z.string().uuid().optional(),
+  ingredienteId: z.uuid().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
 });

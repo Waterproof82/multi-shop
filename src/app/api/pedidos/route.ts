@@ -48,7 +48,7 @@ const defaultPedidoSchema = z.object({
     v => /^\+?[0-9\s\-()+]+$/.test(v),
     { message: 'Formato de teléfono no válido' }
   ),
-  email: z.string().email().optional().or(z.literal('')),
+  email: z.email().optional().or(z.literal('')),
   idioma: z.enum(['es', 'en', 'fr', 'it', 'de']).optional(),
   codigoDescuento: z.string().max(30).optional(),
   // Delivery fields (restaurant only)

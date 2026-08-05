@@ -4,7 +4,7 @@ import { getMesaUseCase, getMesaSesionUseCase } from '@/core/infrastructure/data
 import { rateLimitMesaPolling } from '@/core/infrastructure/api/rate-limit';
 
 const getMesaSchema = z.object({
-  token: z.string().uuid('El token debe ser un UUID válido'),
+  token: z.uuid('El token debe ser un UUID válido'),
 });
 
 export async function GET(request: Request) {

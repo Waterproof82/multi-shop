@@ -50,12 +50,12 @@ function buildDetalleItems(
 }
 
 const CobroSchema = z.object({
-  sesionId: z.string().uuid(),
+  sesionId: z.uuid(),
   metodoPago: z.enum(['efectivo', 'tarjeta']),
   importeCobradoCents: z.number().int().positive(),
   propinaCents: z.number().int().min(0),
   descuentoCents: z.number().int().min(0).optional().default(0),
-  turnoId: z.string().uuid(),
+  turnoId: z.uuid(),
   ivaPorcentaje: z.number().min(0).max(100).optional().default(10),
   cerrarSesion: z.boolean().optional().default(true),
   detalleItems: z.array(z.object({
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
 
   const parsed = CobroSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json({ error: z.flattenError(parsed.error) }, { status: 400 });
   }
 
   let detalleItems = parsed.data.detalleItems;

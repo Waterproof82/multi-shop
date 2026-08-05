@@ -3,11 +3,11 @@ import { z } from 'zod';
 import { getMesaSesionRepository, getValoracionUseCase } from '@/core/infrastructure/database';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 
-const mesaIdSchema = z.string().uuid();
+const mesaIdSchema = z.uuid();
 const bodySchema = z.object({
   estrellas: z.number().min(0.5).max(5).multipleOf(0.5),
-  sesion_id: z.string().uuid(),
-  rater_id: z.string().uuid(),
+  sesion_id: z.uuid(),
+  rater_id: z.uuid(),
 });
 
 export async function POST(

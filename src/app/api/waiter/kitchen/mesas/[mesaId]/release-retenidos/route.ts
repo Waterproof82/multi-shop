@@ -4,7 +4,7 @@ import { getSupabaseClient } from '@/core/infrastructure/database/supabase-clien
 
 export const dynamic = 'force-dynamic';
 
-const mesaIdSchema = z.string().uuid('mesaId debe ser un UUID válido');
+const mesaIdSchema = z.uuid('mesaId debe ser un UUID válido');
 
 export async function POST(
   request: NextRequest,

@@ -4,7 +4,7 @@ import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 import { initiateCustomTurnUseCase } from '@/core/application/use-cases/payment/initiateCustomTurnUseCase';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 
-const mesaIdSchema = z.string().uuid();
+const mesaIdSchema = z.uuid();
 
 export async function POST(
   request: Request,

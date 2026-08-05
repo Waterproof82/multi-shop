@@ -5,7 +5,7 @@ import { getMesaOrdersUseCase, MESA_TENANT_MISMATCH } from '@/core/application/u
 import { getEmpresaPublicRepository } from '@/core/infrastructure/database';
 import { getDomainFromHeaders, parseMainDomain } from '@/lib/domain-utils';
 
-const mesaIdSchema = z.string().uuid('El mesaId debe ser un UUID válido');
+const mesaIdSchema = z.uuid('El mesaId debe ser un UUID válido');
 
 export async function GET(
   request: Request,
