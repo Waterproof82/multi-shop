@@ -162,8 +162,6 @@ async function handleMesaOrder(
   const pedidoResult = await getPedidoUseCase().createMesaOrder(
     empresa.id,
     { items: data.items, mesa_id: data.mesa_id, idioma: data.idioma, pase: data.pase },
-    mesaResult.data.numero,
-    mesaResult.data.nombre,
     initialEstado,
     idempotency
   );

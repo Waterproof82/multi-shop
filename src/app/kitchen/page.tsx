@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, useReducer } from 'react';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
@@ -267,7 +267,7 @@ export default function KitchenPage() {
   // Contador del reloj visual. Su único cometido es provocar el repintado para
   // refrescar tiempos y colores; deliberadamente NO forma parte de `items`,
   // para que los agrupamientos memoizados no se invaliden en cada tick.
-  const [, setClockTick] = useState(0);
+  const [, tickClock] = useReducer((n: number) => n + 1, 0);
 
   const timersRef      = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
   // Mirror síncrono de `items` — permite capturar el estado previo de un item
@@ -406,7 +406,7 @@ export default function KitchenPage() {
   // sobreviven al tick. El repintado sigue ocurriendo porque el contador es
   // estado del componente.
   useEffect(() => {
-    const tick = setInterval(() => setClockTick(n => n + 1), CLOCK_TICK_MS);
+    const tick = setInterval(tickClock, CLOCK_TICK_MS);
     return () => clearInterval(tick);
   }, []);
 

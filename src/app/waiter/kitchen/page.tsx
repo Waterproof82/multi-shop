@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useEffect, useRef, useState } from 'react';
+import { useCallback, useMemo, useEffect, useRef, useState, useReducer } from 'react';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { useSearchParams } from 'next/navigation';
 import { fetchWithCsrf, ensureCsrfToken } from '@/lib/csrf-client';
@@ -266,7 +266,7 @@ export default function WaiterKitchenPage() {
   // Contador del reloj visual. Su unico cometido es provocar el repintado para
   // refrescar tiempos y colores; deliberadamente NO forma parte de los datos,
   // para que los agrupamientos memoizados no se invaliden en cada tick.
-  const [, setClockTick] = useState(0);
+  const [, tickClock] = useReducer((n: number) => n + 1, 0);
   const [groupBy, setGroupBy] = useState<'order' | 'mesa' | 'listos' | 'retenidos'>(
     initialGroupBy === 'retenidos' || initialGroupBy === 'listos' || initialGroupBy === 'mesa' ? initialGroupBy : 'order'
   );
@@ -404,7 +404,7 @@ export default function WaiterKitchenPage() {
   }, [isTabVisible, waiterEmpresaId, fetchItems]);
 
   useEffect(() => {
-    const tick = setInterval(() => setClockTick(n => n + 1), CLOCK_TICK_MS);
+    const tick = setInterval(tickClock, CLOCK_TICK_MS);
     return () => clearInterval(tick);
   }, []);
 

@@ -32,7 +32,7 @@
  * sent when all bebidas in the order are covered (pending + already served).
  */
 
-import { useCallback, useMemo, useEffect, useRef, useState } from 'react';
+import { useCallback, useMemo, useEffect, useRef, useState, useReducer } from 'react';
 import { Wine, ChevronLeft, ChevronDown, ChevronsUpDown, Table2, CheckCheck, Trash2, Layers } from 'lucide-react';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 
@@ -273,7 +273,7 @@ export default function BarPage() {
   // Contador del reloj visual. Su unico cometido es provocar el repintado para
   // refrescar tiempos y colores; deliberadamente NO forma parte de los datos,
   // para que los agrupamientos memoizados no se invaliden en cada tick.
-  const [, setClockTick] = useState(0);
+  const [, tickClock] = useReducer((n: number) => n + 1, 0);
   const [servedKeys, setServedKeys]  = useState<Set<string>>(loadServedKeys);
   const [countdowns, setCountdowns]  = useState<Record<string, number>>({});
   const [groupBy, setGroupBy]        = useState<'order' | 'mesa'>('order');
@@ -423,7 +423,7 @@ export default function BarPage() {
 
   // Trigger re-render every second so timers update without refetching
   useEffect(() => {
-    const tick = setInterval(() => setClockTick(n => n + 1), CLOCK_TICK_MS);
+    const tick = setInterval(tickClock, CLOCK_TICK_MS);
     return () => clearInterval(tick);
   }, []);
 

@@ -46,7 +46,6 @@ const BTN_UNLOCK_TEXT  = "oklch(75% 0.20 40)";
 
 // Llamadas — golden amber
 const BTN_LLAMADAS_BG    = "oklch(22% 0.12 55)";
-const BTN_LLAMADAS_HOVER = "oklch(28% 0.17 55)";
 const BTN_LLAMADAS_TEXT  = "oklch(82% 0.24 55)";
 
 // Pendientes — warm red/orange
@@ -68,7 +67,6 @@ const BTN_BAR_TEXT  = "oklch(68% 0.14 252)";
 const DD_BG        = "oklch(19% 0.025 252)";
 const DD_BORDER    = "oklch(38% 0.10 252 / 0.5)";
 const DD_ITEM_HV   = "oklch(24% 0.035 252)";
-const DD_ITEM_ACT  = "oklch(22% 0.06 255 / 0.6)";
 
 interface Mesa {
   id: string;

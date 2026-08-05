@@ -85,7 +85,7 @@ const SortIndicator = ({ field, currentField, direction }: { field: keyof Produc
 };
 
 export default function ProductosPage() {
-  const { empresaId, empresaSlug, overrideEmpresaId, empresaTipo } = useAdmin();
+  const { empresaId, overrideEmpresaId, empresaTipo } = useAdmin();
   const { language } = useLanguage();
   const effectiveEmpresaId = overrideEmpresaId || empresaId;
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -706,7 +706,6 @@ export default function ProductosPage() {
         onToggleTranslations={() => setShowTranslations(!showTranslations)}
         saving={saving}
         onSubmit={handleSubmit}
-        empresaSlug={empresaSlug}
         empresaTipo={empresaTipo}
       />
 

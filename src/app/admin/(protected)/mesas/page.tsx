@@ -84,7 +84,7 @@ export default function MesasPage() {
 
   useEffect(() => { void fetchMesas(); }, [fetchMesas]);
 
-  const handleAdd = async (e: React.FormEvent) => {
+  const handleAdd = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setAddError('');
     const num = parseInt(numero, 10);
@@ -156,7 +156,7 @@ export default function MesasPage() {
     }
   };
 
-  const handleSavePin = async (e: React.FormEvent) => {
+  const handleSavePin = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setPinError('');
     setPinSuccess(false);

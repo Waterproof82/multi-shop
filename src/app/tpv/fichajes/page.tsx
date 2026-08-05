@@ -12,7 +12,7 @@ interface RecienteFichaje {
   timestampEvento:   string;
   timestampServidor: string;
 }
-import { fetchWithCsrf, ensureCsrfToken } from '@/lib/csrf-client';
+import { fetchWithCsrf } from '@/lib/csrf-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,15 +69,6 @@ const TIPO_DOT: Record<string, string> = {
   correccion:   'bg-[#94a3b8]',
 };
 
-function getDateRange(): { from: string; to: string } {
-  const today = new Date();
-  const from  = new Date(today);
-  from.setDate(today.getDate() - 30);
-  return {
-    from: from.toISOString().slice(0, 10),
-    to:   today.toISOString().slice(0, 10),
-  };
-}
 
 function formatEvent(ts: Date | string): string {
   return new Date(ts).toLocaleString('es-ES', {
@@ -99,7 +90,6 @@ export default function FichajesPage() {
   // Session
   const [sessionLoading, setSessionLoading] = useState(true);
   const [empleadoId, setEmpleadoId]         = useState<string | null>(null);
-  const [empleadoNombre, setEmpleadoNombre] = useState<string | null>(null);
 
   // Kiosk
   const [pin, setPin]     = useState('');
@@ -143,7 +133,6 @@ export default function FichajesPage() {
       if (!data.rol) { router.push('/tpv/login'); return; }
       if (data.isEmployeeSession && data.empleadoId) {
         setEmpleadoId(data.empleadoId);
-        setEmpleadoNombre(data.nombre ?? null);
       }
       setSessionLoading(false);
     })();
@@ -216,7 +205,7 @@ export default function FichajesPage() {
     }
   }, [pin]);
 
-  const handleLookup = useCallback((e: React.FormEvent) => {
+  const handleLookup = useCallback((e: React.SyntheticEvent) => {
     e.preventDefault();
     void doLookup();
   }, [doLookup]);

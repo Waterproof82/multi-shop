@@ -217,8 +217,6 @@ export async function POST(req: NextRequest) {
       nota,
       pase,
     },
-    mesa.numero,
-    mesa.nombre ?? null,
     initialEstado
   );
 

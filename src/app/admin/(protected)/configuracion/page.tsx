@@ -66,13 +66,10 @@ export default async function ConfiguracionPage() {
     descripcion_de: empresaData?.descripcion?.de || '',
   };
 
-  const empresaSlug = empresaData?.dominio || empresaId;
-
   return (
     <ConfiguracionPageClient
       empresaNombre={empresaData?.nombre ?? ''}
       empresaId={empresaId}
-      empresaSlug={empresaSlug}
       empresaDatos={empresaDatos}
       empresaApariencia={empresaApariencia}
       colores={empresaData?.colores ?? null}

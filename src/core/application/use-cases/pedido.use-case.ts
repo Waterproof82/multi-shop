@@ -542,7 +542,7 @@ export class PedidoUseCase {
     idempotency?: IdempotencyContext
   ): Promise<Result<{ id: string; numero_pedido: number; total: number; trackingToken?: string }>> {
     try {
-      // Step 0: Reenvío del mismo pedido. Va ANTES de todo lo demás a propósito.
+      // Step 0: Reenvío del mismo pedido. Va ANTES que el resto, a propósito.
       // Los pasos que siguen no son repetibles: `findOrCreateCliente` toca PII y
       // `applyDiscount` consume el código de descuento. Reintentar sin este corte
       // devolvía CODE_ALREADY_USED — un 400 al comensal cuyo pedido SÍ había
@@ -685,11 +685,14 @@ export class PedidoUseCase {
    * Create a mesa order — no cliente required, no PII collected.
    * In-app kitchen/bar replaces Telegram notifications for mesa orders.
    */
+  // `mesaNumero` y `mesaNombre` estuvieron aquí hasta que las notificaciones de
+  // Telegram para mesa se sustituyeron por cocina/bar en la propia app. Desde
+  // entonces ningún paso los leía: la comanda se ata a la mesa por `mesa_id`.
+  // Un parámetro que nadie usa miente sobre lo que la función necesita, así que
+  // se quitan en vez de silenciarlos con un guion bajo.
   async createMesaOrder(
     empresaId: string,
     data: CreateMesaPedidoDTO,
-    mesaNumero: number,
-    mesaNombre: string | null,
     initialEstado: 'pendiente' | 'retenido' | 'pendiente_validacion' = 'pendiente',
     idempotency?: IdempotencyContext
   ): Promise<Result<{ id: string; numero_pedido: number; total: number; trackingToken: string }>> {

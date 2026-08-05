@@ -1241,7 +1241,11 @@ function getStoredPaymentLock(mesaId: string): boolean {
   catch { return false; }
 }
 
-export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId: string; isWaiter?: boolean }>) {
+// Sin prop `isWaiter`: el componente ya lo resuelve solo, comparando la mesa
+// guardada del camarero con la actual (`esSesionDeCamarero`, más abajo). El prop
+// que llegaba desde el servidor no lo leía nadie, así que quitarlo no cambia el
+// comportamiento — solo deja de prometer algo que no se cumplía.
+export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
   const { language } = useLanguage();
   const lang = language;
   const { gateState, handleTokenIssued } = useMesaToken(mesaId);

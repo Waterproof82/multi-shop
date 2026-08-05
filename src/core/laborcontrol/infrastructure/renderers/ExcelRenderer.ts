@@ -158,7 +158,7 @@ export async function renderFichajesExcel(
     sheet.getColumn(1).numFmt = 'dd/mm/yyyy hh:mm:ss';
     sheet.getColumn(3).numFmt = 'dd/mm/yyyy hh:mm:ss';
 
-    await sheet.commit();
+    sheet.commit();
   }
 
   await wb.commit();

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useReducer } from 'react';
 import { ChevronLeft, ChevronDown, Table2, UtensilsCrossed, Wine, Pause, CheckCheck, Trash2, Layers } from 'lucide-react';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { useLanguage } from '@/lib/language-context';
@@ -360,7 +360,7 @@ export default function WaiterPendientesPage() {
   // Contador del reloj visual. Su unico cometido es provocar el repintado para
   // refrescar tiempos y colores; deliberadamente NO forma parte de los datos,
   // para que los agrupamientos memoizados no se invaliden en cada tick.
-  const [, setClockTick] = useState(0);
+  const [, tickClock] = useReducer((n: number) => n + 1, 0);
   // selectedMap: ítems marcados con ✓ (se incluirán en la confirmación selectiva)
   const [selectedMap, setSelectedMap] = useState<Record<string, Set<string>>>({});
   // pausedMap: ítems con pausa activa (se confirmarán como retenidos)
@@ -468,7 +468,7 @@ export default function WaiterPendientesPage() {
   useEffect(() => { void ensureCsrfToken(); }, []);
 
   useEffect(() => {
-    const tick = setInterval(() => setClockTick(n => n + 1), CLOCK_TICK_MS);
+    const tick = setInterval(tickClock, CLOCK_TICK_MS);
     return () => clearInterval(tick);
   }, []);
 

@@ -1,4 +1,4 @@
-import { IClienteRepository, CreateClienteData, UpdateClienteData } from "@/core/domain/repositories/IClienteRepository";
+import { IClienteRepository } from "@/core/domain/repositories/IClienteRepository";
 import { Cliente, Result } from "@/core/domain/entities/types";
 import { CreateClienteDTO, UpdateClienteDTO } from "@/core/application/dtos/cliente.dto";
 import { logger } from "@/core/infrastructure/logging/logger";

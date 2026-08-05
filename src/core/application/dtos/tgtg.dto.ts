@@ -4,7 +4,6 @@ const tgtgItemSchema = z.object({
   titulo: z.string().min(1).max(200),
   descripcion: z.string().max(500).optional().nullable(),
   imagen_url: z
-    .string()
     .url()
     .refine((url) => url.startsWith('https://'), { message: 'imagen_url must use HTTPS' })
     .optional()

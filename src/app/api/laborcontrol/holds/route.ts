@@ -5,8 +5,8 @@ import { z } from 'zod';
 
 const CreateHoldSchema = z.object({
   empleadoId:  z.uuid().optional(),
-  fechaInicio: z.string().date(),
-  fechaFin:    z.string().date(),
+  fechaInicio: z.iso.date(),
+  fechaFin:    z.iso.date(),
   motivo:      z.string().min(1).max(500),
 });
 
