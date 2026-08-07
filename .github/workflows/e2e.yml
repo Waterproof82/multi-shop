@@ -6,11 +6,26 @@ name: E2E
 # path filter: UI/API changes anywhere can affect these functional flows, so
 # it runs on every push/PR to main/develop, mirroring ci.yml's trigger.
 #
-# Tests that need extra credentials (PLAYWRIGHT_WAITER_PIN,
-# PLAYWRIGHT_ADMIN_EMAIL/PASSWORD, PLAYWRIGHT_WAITER_TOKEN) skip gracefully if
-# those secrets aren't configured in the repo — same behavior as running
-# locally without a full .env.local. Add them under
-# Settings > Secrets and variables > Actions to unlock that coverage in CI.
+# ── CONTRA QUÉ SE EJECUTA ────────────────────────────────────────────────────
+# En un PULL REQUEST, contra la preview que Vercel construye para ESE PR.
+# En un PUSH a main/develop, contra el despliegue de producción.
+#
+# La distinción es la razón de ser de este workflow. Antes apuntaba siempre a la
+# URL fija de producción, así que en un PR interrogaba el sitio YA DESPLEGADO en
+# vez del código propuesto: la suite pasaba en verde aunque el PR estuviera
+# completamente roto. Era monitorización disfrazada de puerta de calidad.
+#
+# No se construye la app aquí porque no se puede: `validateEnv()` exige
+# ACCESS_TOKEN_SECRET, CSRF_HMAC_SECRET y CART_TOKEN_SECRET, que no están entre
+# los secrets del repositorio. La preview de Vercel sí los tiene, así que se
+# reutiliza en vez de duplicar la configuración.
+#
+# ── COBERTURA QUE FALTA ──────────────────────────────────────────────────────
+# Los tests que necesitan credenciales (PLAYWRIGHT_WAITER_PIN,
+# PLAYWRIGHT_ADMIN_EMAIL/PASSWORD, PLAYWRIGHT_WAITER_TOKEN) se SALTAN si esos
+# secrets no existen — y a día de hoy NO existen en este repositorio. Es decir:
+# en CI solo corren las pruebas sin autenticar. Añadirlos en
+# Settings > Secrets and variables > Actions desbloquea el resto.
 
 on:
   push:
@@ -29,11 +44,10 @@ jobs:
   playwright-e2e:
     name: Playwright — Full E2E suite
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-      PLAYWRIGHT_BASE_URL: https://mermelada-tomate.vercel.app
       PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       PLAYWRIGHT_WAITER_PIN: ${{ secrets.PLAYWRIGHT_WAITER_PIN }}
       PLAYWRIGHT_WAITER_TOKEN: ${{ secrets.PLAYWRIGHT_WAITER_TOKEN }}
@@ -41,6 +55,16 @@ jobs:
       PLAYWRIGHT_ADMIN_PASSWORD: ${{ secrets.PLAYWRIGHT_ADMIN_PASSWORD }}
     steps:
       - uses: actions/checkout@v7
+
+      # En un PR, espera a que Vercel termine la preview de ESTE commit y coge
+      # su URL. Sin esto, los tests interrogarían producción y darían verde
+      # aunque el PR estuviera roto.
+      - name: Resolver la URL a probar
+        id: destino
+        uses: ./.github/actions/resolver-url-a-probar
+        with:
+          url-produccion: https://mermelada-tomate.vercel.app
+          token: ${{ github.token }}
 
       - uses: pnpm/action-setup@v6
         with:
@@ -57,6 +81,8 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run full E2E suite
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ steps.destino.outputs.url }}
         run: npx playwright test e2e/ --reporter=list
 
       - name: Upload Playwright report
