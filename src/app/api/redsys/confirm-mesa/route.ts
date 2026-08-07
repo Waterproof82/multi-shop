@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import {
   decodificarParametros,
   processRedsysWebhookUseCase,
 } from '@/core/application/use-cases/payment/processRedsysWebhookUseCase';
+import {
+  leerParametrosRedsys,
+  resolverEmpresaDeLaOrden,
+  sonParametrosCompletos,
+  type ParametrosRedsys,
+} from '@/core/infrastructure/api/redsys-request';
 
 /**
  * Vuelta del navegador tras pagar (URLOK de Redsys).
@@ -17,38 +22,17 @@ import {
  * Por eso todo el procesado es idempotente y, pase lo que pase, se redirige.
  */
 
-/** Tablas donde puede estar registrada una orden de pago, en orden de búsqueda. */
-const TABLAS_CON_ORDEN = ['pedidos', 'mesa_division_pagos', 'mesa_pagos_personalizados'] as const;
+async function aplicarCobroSiProcede(params: ParametrosRedsys): Promise<void> {
+  if (!sonParametrosCompletos(params)) return;
 
-/**
- * Empresa a la que pertenece la orden.
- *
- * Hay tres tipos de cobro y cada uno se registra en su tabla: pedido completo,
- * división de cuenta y turno personalizado. Se prueban en ese orden hasta dar
- * con la orden; sin `empresa_id` no se puede verificar la firma y no hay nada
- * que procesar.
- */
-async function resolverEmpresaDeLaOrden(dsOrder: string): Promise<string | null> {
-  const supabase = getSupabaseClient();
+  const decodificado = decodificarParametros(params.dsParameters);
+  if (!decodificado) return;
 
-  for (const tabla of TABLAS_CON_ORDEN) {
-    const { data } = await supabase
-      .from(tabla)
-      .select('empresa_id')
-      .eq('payment_order_ref', dsOrder)
-      .maybeSingle();
+  const empresaId = await resolverEmpresaDeLaOrden(decodificado.dsOrder);
+  if (!empresaId) return;
 
-    const empresaId = (data as Record<string, unknown> | null)?.['empresa_id'] as string | undefined;
-    if (empresaId) return empresaId;
-  }
-
-  return null;
-}
-
-interface ParametrosRedsys {
-  dsParameters: string | null;
-  dsSignature: string | null;
-  dsSignatureVersion: string | null;
+  // Idempotente: el webhook puede haberlo procesado ya.
+  await processRedsysWebhookUseCase({ ...params, empresaId });
 }
 
 /**
@@ -72,38 +56,13 @@ async function procesarYRedirigir(
   return NextResponse.redirect(new URL(redirectTo, origin));
 }
 
-async function aplicarCobroSiProcede({ dsParameters, dsSignature, dsSignatureVersion }: ParametrosRedsys): Promise<void> {
-  if (!dsParameters || !dsSignature || !dsSignatureVersion) return;
-
-  const decodificado = decodificarParametros(dsParameters);
-  if (!decodificado) return;
-
-  const empresaId = await resolverEmpresaDeLaOrden(decodificado.dsOrder);
-  if (!empresaId) return;
-
-  // Idempotente: el webhook puede haberlo procesado ya.
-  await processRedsysWebhookUseCase({ dsParameters, dsSignature, dsSignatureVersion, empresaId });
-}
-
 /** Producción: POST con el cuerpo form-encoded. */
 export async function POST(request: NextRequest) {
-  const redirectTo = request.nextUrl.searchParams.get('redirect') ?? '/';
-  let params: ParametrosRedsys = { dsParameters: null, dsSignature: null, dsSignatureVersion: null };
-
-  try {
-    if ((request.headers.get('content-type') ?? '').includes('application/x-www-form-urlencoded')) {
-      const cuerpo = new URLSearchParams(await request.text());
-      params = {
-        dsParameters: cuerpo.get('Ds_MerchantParameters'),
-        dsSignature: cuerpo.get('Ds_Signature'),
-        dsSignatureVersion: cuerpo.get('Ds_SignatureVersion'),
-      };
-    }
-  } catch {
-    // Cuerpo ilegible: se redirige igual y el webhook se encarga.
-  }
-
-  return procesarYRedirigir(params, redirectTo, request.nextUrl.origin);
+  return procesarYRedirigir(
+    await leerParametrosRedsys(request),
+    request.nextUrl.searchParams.get('redirect') ?? '/',
+    request.nextUrl.origin,
+  );
 }
 
 /** Simulador de desarrollo: GET con los parámetros en la query. */

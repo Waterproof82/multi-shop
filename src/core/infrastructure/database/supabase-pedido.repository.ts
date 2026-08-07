@@ -26,6 +26,93 @@ function applyIdempotency(payload: Record<string, unknown>, idempotency?: { key:
   payload.idempotency_fingerprint = idempotency.fingerprint;
 }
 
+type FilaEstadoItem = { pedido_id: string; item_idx: number; estado: string; from_validation: boolean };
+
+interface EstadosDeCocina {
+  /** Estado explícito de cada ítem, por pedido. */
+  porPedido: Map<string, Map<number, ItemEstado>>;
+  /**
+   * Ítems devueltos a la cola de pendientes durante la validación.
+   *
+   * `from_validation = true` significa que el camarero los retuvo desde
+   * pendientes, así que NO son trabajo de cocina y deben desaparecer de su
+   * vista. Si aparecieran, el cocinero prepararía platos que el camarero acaba
+   * de apartar.
+   */
+  retenidosEnValidacion: Map<string, Set<number>>;
+}
+
+function separarEstadosDeItems(filas: FilaEstadoItem[]): EstadosDeCocina {
+  const porPedido = new Map<string, Map<number, ItemEstado>>();
+  const retenidosEnValidacion = new Map<string, Set<number>>();
+
+  for (const fila of filas) {
+    if (fila.from_validation) {
+      if (!retenidosEnValidacion.has(fila.pedido_id)) retenidosEnValidacion.set(fila.pedido_id, new Set());
+      retenidosEnValidacion.get(fila.pedido_id)!.add(fila.item_idx);
+      continue;
+    }
+    if (!porPedido.has(fila.pedido_id)) porPedido.set(fila.pedido_id, new Map());
+    porPedido.get(fila.pedido_id)!.set(fila.item_idx, fila.estado as ItemEstado);
+  }
+
+  return { porPedido, retenidosEnValidacion };
+}
+
+const esComida = (item: Record<string, unknown>) => item['tipo_producto'] === 'comida';
+
+/** Convierte una línea de `detalle_pedido` en un registro para la vista de cocina. */
+function aRegistroDeCocina(
+  fila: Record<string, unknown>,
+  item: Record<string, unknown>,
+  idx: number,
+  estado: ItemEstado,
+): KitchenItemRecord {
+  const mesa = (fila['mesas'] as Record<string, unknown>) ?? {};
+  const complementos = item['complementos'] as Array<{ nombre?: string; name?: string }> | undefined;
+
+  return {
+    pedidoId: fila['id'] as string,
+    numeroPedido: fila['numero_pedido'] as number,
+    itemIdx: idx,
+    nombre: (item['nombre'] as string) ?? '',
+    cantidad: item['cantidad'] as number,
+    complementos: complementos?.map(c => c.nombre ?? c.name).filter(Boolean).join(', '),
+    nota: (item['nota'] as string | undefined) || undefined,
+    estado,
+    mesaNumero: (mesa['numero'] as number) ?? null,
+    mesaNombre: (mesa['nombre'] as string | null) ?? null,
+    createdAt: fila['created_at'] as string,
+    // El pase del ítem manda sobre el del pedido: un plato puede moverse de
+    // pase sin arrastrar a toda la comanda.
+    pase: (item['pase'] as string | null) ?? (fila['pase'] as string | null) ?? null,
+  };
+}
+
+/** Aplana las comandas en ítems de comida, cada uno con su estado efectivo. */
+function aplanarItemsDeCocina(
+  pedidos: Array<Record<string, unknown>>,
+  estados: EstadosDeCocina,
+): KitchenItemRecord[] {
+  const registros: KitchenItemRecord[] = [];
+
+  for (const fila of pedidos) {
+    const pedidoId = fila['id'] as string;
+    const items = (fila['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
+    const explicitos = estados.porPedido.get(pedidoId) ?? new Map<number, ItemEstado>();
+    const apartados = estados.retenidosEnValidacion.get(pedidoId);
+    // Estado que hereda el ítem cuando no tiene uno propio.
+    const heredado: ItemEstado = fila['estado'] === 'retenido' ? 'retenido' : 'pendiente';
+
+    items.forEach((item, idx) => {
+      if (!esComida(item) || apartados?.has(idx)) return;
+      registros.push(aRegistroDeCocina(fila, item, idx, explicitos.get(idx) ?? heredado));
+    });
+  }
+
+  return registros;
+}
+
 function applyDeliveryFields(payload: Record<string, unknown>, d: DeliveryData): void {
   if (d.origen) payload.origen = d.origen;
   if (d.direccion_entrega) payload.direccion_entrega = d.direccion_entrega;
@@ -1423,80 +1510,27 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pedidos', module: 'repository', method: 'fetchAllComidaItems' } };
       }
 
-      const pedidoIds = (orders ?? [])
-        .filter(o => {
-          const items = (o as Record<string, unknown>)['detalle_pedido'] as Array<Record<string, unknown>>;
-          return items.some(i => i['tipo_producto'] === 'comida');
-        })
-        .map(o => (o as Record<string, unknown>)['id'] as string);
+      const filas = (orders ?? []) as Array<Record<string, unknown>>;
+      const conComida = filas.filter(f =>
+        ((f['detalle_pedido'] as Array<Record<string, unknown>>) ?? []).some(esComida),
+      );
 
-      // Fetch item estados (empty Map if no pedidos)
-      const estadoMap = new Map<string, Map<number, ItemEstado>>();
-      // Items auto-retained back to the pendientes queue (from_validation=true) must
-      // be excluded from the kitchen result entirely — they are not kitchen work.
-      const pendientesRetainedSet = new Map<string, Set<number>>();
-      if (pedidoIds.length > 0) {
+      let estados: EstadosDeCocina = { porPedido: new Map(), retenidosEnValidacion: new Map() };
+      if (conComida.length > 0) {
         const { data: itemEstados, error: estadosError } = await this.supabase
           .from('pedido_item_estados')
           .select('pedido_id, item_idx, estado, from_validation')
-          .in('pedido_id', pedidoIds);
+          .in('pedido_id', conComida.map(f => f['id'] as string));
 
         if (estadosError) {
           await logger.logAndReturnError('DB_SELECT_ERROR', estadosError.message, 'repository', 'SupabasePedidoRepository.fetchAllComidaItems', { details: { code: estadosError.code, empresaId } });
           return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener estados de ítems', module: 'repository', method: 'fetchAllComidaItems' } };
         }
 
-        for (const row of itemEstados ?? []) {
-          const r = row as Record<string, unknown>;
-          const pid = r['pedido_id'] as string;
-          const idx = r['item_idx'] as number;
-          if (r['from_validation'] === true) {
-            // Item auto-retained during pendientes validation → back in pendientes queue.
-            // Track it so we can exclude it from the kitchen result below.
-            if (!pendientesRetainedSet.has(pid)) pendientesRetainedSet.set(pid, new Set());
-            pendientesRetainedSet.get(pid)!.add(idx);
-            continue;
-          }
-          if (!estadoMap.has(pid)) estadoMap.set(pid, new Map());
-          estadoMap.get(pid)!.set(idx, r['estado'] as ItemEstado);
-        }
+        estados = separarEstadosDeItems((itemEstados ?? []) as FilaEstadoItem[]);
       }
 
-      const result: KitchenItemRecord[] = [];
-      for (const order of orders ?? []) {
-        const row = order as Record<string, unknown>;
-        const items = (row['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
-        const mesaData = row['mesas'] as Record<string, unknown> ?? {};
-        const pedidoId = row['id'] as string;
-        const pedidoEstados = estadoMap.get(pedidoId) ?? new Map<number, ItemEstado>();
-        const pedidoNivelEstado = row['estado'] as string;
-
-        items.forEach((item, idx) => {
-          if (item['tipo_producto'] !== 'comida') return;
-          // Skip items auto-retained back to the pendientes queue — they are not
-          // kitchen work and must not appear in the kitchen view.
-          if (pendientesRetainedSet.get(pedidoId)?.has(idx)) return;
-          const defaultEstado: ItemEstado = pedidoNivelEstado === 'retenido' ? 'retenido' : 'pendiente';
-          const estado: ItemEstado = pedidoEstados.get(idx) ?? defaultEstado;
-          const complements = item['complementos'] as Array<{ nombre?: string; name?: string }> | undefined;
-          result.push({
-            pedidoId,
-            numeroPedido: row['numero_pedido'] as number,
-            itemIdx: idx,
-            nombre: (item['nombre'] as string) ?? '',
-            cantidad: item['cantidad'] as number,
-            complementos: complements?.map(c => c.nombre ?? c.name).filter(Boolean).join(', '),
-            nota: (item['nota'] as string | undefined) || undefined,
-            estado,
-            mesaNumero: (mesaData['numero'] as number) ?? null,
-            mesaNombre: (mesaData['nombre'] as string | null) ?? null,
-            createdAt: row['created_at'] as string,
-            pase: (item['pase'] as string | null) ?? (row['pase'] as string | null) ?? null,
-          });
-        });
-      }
-
-      return { success: true, data: result };
+      return { success: true, data: aplanarItemsDeCocina(filas, estados) };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.fetchAllComidaItems', { empresaId });
       return { success: false, error: appError };
