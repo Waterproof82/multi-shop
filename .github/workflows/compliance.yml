@@ -89,6 +89,7 @@ jobs:
         with:
           url-produccion: https://mermelada-tomate.vercel.app
           token: ${{ github.token }}
+          secreto-bypass: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
       - uses: pnpm/action-setup@v6
         with:
@@ -107,6 +108,7 @@ jobs:
       - name: Run compliance E2E tests
         env:
           PLAYWRIGHT_BASE_URL: ${{ steps.destino.outputs.url }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: npx playwright test e2e/compliance/ --reporter=list
         continue-on-error: false
 

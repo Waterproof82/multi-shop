@@ -10,6 +10,12 @@ inputs:
   token:
     description: Token de GitHub con permiso de lectura sobre deployments.
     required: true
+  secreto-bypass:
+    description: >
+      Secreto de "Protection Bypass for Automation" de Vercel. Sin él, una
+      preview protegida devuelve 401 a todo y los tests no llegan a la app.
+    required: false
+    default: ''
   minutos-de-espera:
     description: Cuánto esperar a que Vercel publique la preview.
     required: false
@@ -32,6 +38,7 @@ runs:
         ES_PR: ${{ github.event_name == 'pull_request' }}
         URL_PRODUCCION: ${{ inputs.url-produccion }}
         MINUTOS: ${{ inputs.minutos-de-espera }}
+        SECRETO_BYPASS: ${{ inputs.secreto-bypass }}
       run: |
         set -euo pipefail
 
@@ -57,6 +64,25 @@ runs:
 
           if [ -n "$url" ]; then
             echo "Preview lista: $url"
+
+            # Comprobar que se puede ATRAVESAR, no solo que existe. Si Vercel
+            # Authentication está activa y no hay secreto de bypass, el edge
+            # responde 401 a todo — y lo peor es que muchos tests pasarían por
+            # el motivo equivocado (los que solo comprueban «devuelve 401»).
+            respuesta=$(curl -s --max-time 20 \
+              ${SECRETO_BYPASS:+-H "x-vercel-protection-bypass: $SECRETO_BYPASS"} \
+              "$url/api/waiter/me" || true)
+
+            if printf '%s' "$respuesta" | grep -q 'Protected deployment'; then
+              echo "::error::La preview está protegida por Vercel Authentication y no se puede atravesar." >&2
+              echo "::error::Para arreglarlo: Vercel → Project Settings → Deployment Protection →" >&2
+              echo "::error::  'Protection Bypass for Automation' → generar el secreto." >&2
+              echo "::error::Luego GitHub → Settings → Secrets and variables → Actions →" >&2
+              echo "::error::  nuevo secret VERCEL_AUTOMATION_BYPASS_SECRET con ese valor." >&2
+              echo "::error::Sin eso los tests no llegan a la app, y algunos pasarían en falso." >&2
+              exit 1
+            fi
+
             echo "url=$url" >> "$GITHUB_OUTPUT"
             exit 0
           fi
