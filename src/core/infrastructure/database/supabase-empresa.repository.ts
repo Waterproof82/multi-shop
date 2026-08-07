@@ -4,6 +4,7 @@ import { IEmpresaRepository, UpdateEmpresaData } from "@/core/domain/repositorie
 import { SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "../logging/logger";
 import { extractSlugFromBaseDomain, isBaseDomain } from "@/lib/domain-utils";
+import { camposPresentes, camposTextoPresentes } from "./update-payload";
 
 /**
  * Campos de texto: una cadena vacía se guarda como NULL.
@@ -39,16 +40,10 @@ const CAMPOS_DIRECTOS = [
  * borrar lo que no venía en el formulario.
  */
 export function construirPayloadEmpresa(data: UpdateEmpresaData): Record<string, unknown> {
-  const payload: Record<string, unknown> = {};
-
-  for (const campo of CAMPOS_TEXTO) {
-    if (data[campo] !== undefined) payload[campo] = data[campo] || null;
-  }
-  for (const campo of CAMPOS_DIRECTOS) {
-    if (data[campo] !== undefined) payload[campo] = data[campo];
-  }
-
-  return payload;
+  return {
+    ...camposTextoPresentes(data, CAMPOS_TEXTO),
+    ...camposPresentes(data, CAMPOS_DIRECTOS),
+  };
 }
 
 export class SupabaseEmpresaRepository implements IEmpresaRepository {

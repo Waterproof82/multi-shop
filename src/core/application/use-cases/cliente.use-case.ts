@@ -8,6 +8,26 @@ function anonymizeEmail(email: string): string {
   return `${local.substring(0, 2)}***@${domain ?? '***'}`;
 }
 
+/**
+ * Fusiona los datos entrantes con la ficha que ya existe.
+ *
+ * Lo entrante manda, pero SOLO si viene: lo que no llega en esta petición se
+ * conserva. Es la diferencia entre actualizar una ficha y machacarla — un
+ * pedido de mesa, por ejemplo, no trae dirección, y sin este `??` se la borraría
+ * a un cliente que sí la tenía guardada.
+ */
+export function fusionarCliente(
+  entrantes: Partial<Pick<Cliente, 'nombre' | 'email' | 'telefono' | 'direccion'>>,
+  existente: Cliente,
+): Partial<UpdateClienteDTO> {
+  return {
+    nombre: entrantes.nombre ?? existente.nombre,
+    email: entrantes.email ?? existente.email,
+    telefono: entrantes.telefono ?? existente.telefono,
+    direccion: entrantes.direccion ?? existente.direccion,
+  };
+}
+
 export class ClienteUseCase {
   constructor(private readonly clienteRepo: IClienteRepository) {}
 
@@ -48,52 +68,55 @@ export class ClienteUseCase {
    * Priority: telefono match first, then email match.
    * Returns { data, isUpdate } to indicate whether it was an update or creation.
    */
+  /**
+   * Busca por un identificador y, si hay ficha, la actualiza fusionando datos.
+   *
+   * Devuelve `null` cuando no hay coincidencia, para que quien llama siga
+   * probando el siguiente identificador.
+   */
+  private async fusionarSiExiste(
+    valor: string | null | undefined,
+    buscar: (v: string, empresaId: string) => Promise<Result<Cliente | null>>,
+    data: CreateClienteDTO,
+  ): Promise<Result<{ cliente: Cliente; isUpdate: boolean }> | null> {
+    if (!valor) return null;
+
+    const encontrado = await buscar(valor, data.empresaId);
+    if (!encontrado.success) {
+      return { success: false, error: { ...encontrado.error, method: 'ClienteUseCase.createOrUpdate' } };
+    }
+    if (!encontrado.data) return null;
+
+    const actualizado = await this.clienteRepo.update(encontrado.data.id, data.empresaId, fusionarCliente(data, encontrado.data));
+    if (!actualizado.success) {
+      return { success: false, error: { ...actualizado.error, method: 'ClienteUseCase.createOrUpdate' } };
+    }
+    return { success: true, data: { cliente: actualizado.data, isUpdate: true } };
+  }
+
   async createOrUpdate(data: CreateClienteDTO): Promise<Result<{ cliente: Cliente; isUpdate: boolean }>> {
     try {
-      // 1. Look up by telefono (primary identifier)
-      if (data.telefono) {
-        const byPhone = await this.clienteRepo.findByTelefono(data.telefono, data.empresaId);
-        if (!byPhone.success) {
-          return { success: false, error: { ...byPhone.error, method: 'ClienteUseCase.createOrUpdate' } };
-        }
-        if (byPhone.data) {
-          const updateResult = await this.clienteRepo.update(byPhone.data.id, data.empresaId, {
-            nombre: data.nombre ?? byPhone.data.nombre,
-            email: data.email ?? byPhone.data.email,
-            direccion: data.direccion ?? byPhone.data.direccion,
-          });
-          if (!updateResult.success) {
-            return { success: false, error: { ...updateResult.error, method: 'ClienteUseCase.createOrUpdate' } };
-          }
-          return { success: true, data: { cliente: updateResult.data, isUpdate: true } };
-        }
-      }
+      // El teléfono manda: es el identificador primario del cliente. El email
+      // solo se consulta si no hubo ficha con ese teléfono.
+      const porTelefono = await this.fusionarSiExiste(
+        data.telefono,
+        (v, empresaId) => this.clienteRepo.findByTelefono(v, empresaId),
+        data,
+      );
+      if (porTelefono) return porTelefono;
 
-      // 2. Look up by email (secondary identifier)
-      if (data.email) {
-        const byEmail = await this.clienteRepo.findByEmail(data.email, data.empresaId);
-        if (!byEmail.success) {
-          return { success: false, error: { ...byEmail.error, method: 'ClienteUseCase.createOrUpdate' } };
-        }
-        if (byEmail.data) {
-          const updateResult = await this.clienteRepo.update(byEmail.data.id, data.empresaId, {
-            nombre: data.nombre ?? byEmail.data.nombre,
-            telefono: data.telefono ?? byEmail.data.telefono,
-            direccion: data.direccion ?? byEmail.data.direccion,
-          });
-          if (!updateResult.success) {
-            return { success: false, error: { ...updateResult.error, method: 'ClienteUseCase.createOrUpdate' } };
-          }
-          return { success: true, data: { cliente: updateResult.data, isUpdate: true } };
-        }
-      }
+      const porEmail = await this.fusionarSiExiste(
+        data.email,
+        (v, empresaId) => this.clienteRepo.findByEmail(v, empresaId),
+        data,
+      );
+      if (porEmail) return porEmail;
 
-      // 3. No match found — create new client
-      const createResult = await this.clienteRepo.create(data);
-      if (!createResult.success) {
-        return { success: false, error: { ...createResult.error, method: 'ClienteUseCase.createOrUpdate' } };
+      const creado = await this.clienteRepo.create(data);
+      if (!creado.success) {
+        return { success: false, error: { ...creado.error, method: 'ClienteUseCase.createOrUpdate' } };
       }
-      return { success: true, data: { cliente: createResult.data, isUpdate: false } };
+      return { success: true, data: { cliente: creado.data, isUpdate: false } };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'use-case', 'ClienteUseCase.createOrUpdate', { empresaId: data.empresaId });
       return { success: false, error: appError };

@@ -66,6 +66,74 @@ const CobroSchema = z.object({
   })).optional(),
 });
 
+/** IVA por defecto si la empresa no lo tiene configurado. */
+const IMPUESTO_POR_DEFECTO = 10;
+
+/** Tasa de impuesto de cada producto, cuando tiene override propio. */
+async function cargarOverridesDeImpuesto(
+  supabase: ReturnType<typeof getSupabaseClient>,
+  productoIds: string[],
+): Promise<Map<string, number | null>> {
+  if (productoIds.length === 0) return new Map();
+
+  const { data } = await supabase
+    .from('productos')
+    .select('id, porcentaje_impuesto_override')
+    .in('id', productoIds);
+
+  const overrides = new Map<string, number | null>();
+  for (const p of (data ?? []) as { id: string; porcentaje_impuesto_override: number | null }[]) {
+    overrides.set(p.id, p.porcentaje_impuesto_override ?? null);
+  }
+  return overrides;
+}
+
+/**
+ * Reconstruye el desglose fiscal a partir de las comandas de la sesión.
+ *
+ * Solo se usa cuando el cliente no lo manda —cobro de una mesa desde el TPV,
+ * donde el importe sale de lo pedido, no de un ticket compuesto a mano—.
+ *
+ * IMPORTA QUE SALGA COMPLETO: cada línea debe llevar su `impuestoPorcentaje`.
+ * Si falta, el trigger de la base recurre a la tasa global de la empresa como
+ * respaldo heredado, y un producto con IVA reducido se factura al general.
+ */
+async function reconstruirDetalleDeSesion(
+  sesionId: string | undefined,
+  empresaId: string,
+): Promise<ReturnType<typeof buildDetalleItems> | undefined> {
+  if (!sesionId) return undefined;
+
+  const supabase = getSupabaseClient();
+  const [{ data: pedidos }, { data: empresaRow }] = await Promise.all([
+    supabase
+      .from('pedidos')
+      .select('detalle_pedido')
+      .eq('sesion_id', sesionId)
+      .neq('estado', 'cancelado'),
+    supabase
+      .from('empresas')
+      .select('porcentaje_impuesto')
+      .eq('id', empresaId)
+      .maybeSingle(),
+  ]);
+
+  if (!pedidos || pedidos.length === 0) return undefined;
+
+  const rawPedidos = pedidos as RawPedido[];
+  const productoIds = [...new Set(
+    rawPedidos
+      .flatMap(p => (p.detalle_pedido ?? []).map(i => i.producto_id))
+      .filter((id): id is string => Boolean(id)),
+  )];
+
+  return buildDetalleItems(
+    rawPedidos,
+    await cargarOverridesDeImpuesto(supabase, productoIds),
+    (empresaRow as { porcentaje_impuesto: number | null } | null)?.porcentaje_impuesto ?? IMPUESTO_POR_DEFECTO,
+  );
+}
+
 export async function POST(req: NextRequest) {
   const { empresaId, error: authError } = (await requireAuth(req)) as AuthResult;
   if (authError) return authError;
@@ -87,42 +155,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: z.flattenError(parsed.error) }, { status: 400 });
   }
 
-  let detalleItems = parsed.data.detalleItems;
-  if (!detalleItems && parsed.data.sesionId) {
-    const supabase = getSupabaseClient();
-    const [{ data: pedidos }, { data: empresaRow }] = await Promise.all([
-      supabase
-        .from('pedidos')
-        .select('detalle_pedido')
-        .eq('sesion_id', parsed.data.sesionId)
-        .neq('estado', 'cancelado'),
-      supabase
-        .from('empresas')
-        .select('porcentaje_impuesto')
-        .eq('id', empresaId)
-        .maybeSingle(),
-    ]);
-    if (pedidos && pedidos.length > 0) {
-      const rawPedidos = pedidos as RawPedido[];
-      const empresaPorcentaje = (empresaRow as { porcentaje_impuesto: number | null } | null)?.porcentaje_impuesto ?? 10;
-      const productoIds = [...new Set(
-        rawPedidos
-          .flatMap(p => (p.detalle_pedido ?? []).map(i => i.producto_id))
-          .filter((id): id is string => Boolean(id)),
-      )];
-      const overrideMap = new Map<string, number | null>();
-      if (productoIds.length > 0) {
-        const { data: productosData } = await supabase
-          .from('productos')
-          .select('id, porcentaje_impuesto_override')
-          .in('id', productoIds);
-        for (const p of (productosData ?? []) as { id: string; porcentaje_impuesto_override: number | null }[]) {
-          overrideMap.set(p.id, p.porcentaje_impuesto_override ?? null);
-        }
-      }
-      detalleItems = buildDetalleItems(rawPedidos, overrideMap, empresaPorcentaje);
-    }
-  }
+  const detalleItems = parsed.data.detalleItems
+    ?? await reconstruirDetalleDeSesion(parsed.data.sesionId, empresaId);
 
   const empleadoId =
     req.headers.get('x-employee-id') ?? req.headers.get('x-admin-id') ?? null;

@@ -2,6 +2,22 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { ICategoryRepository, CreateCategoryData, UpdateCategoryData } from "@/core/domain/repositories/ICategoryRepository";
 import { Category, Result } from "@/core/domain/entities/types";
 import { logger } from "../logging/logger";
+import { camposPresentes } from "./update-payload";
+
+/**
+ * Campos actualizables de una categoría.
+ *
+ * Todos viajan tal cual. `complemento_obligatorio` es booleano y
+ * `categoria_complemento_de` / `categoria_padre_id` admiten `null` explícito
+ * para desvincular: convertir lo falsy a NULL aquí rompería lo primero y no
+ * aportaría nada a lo segundo.
+ */
+const CAMPOS_CATEGORIA = [
+  'nombre_es', 'nombre_en', 'nombre_fr', 'nombre_it', 'nombre_de',
+  'descripcion_es', 'descripcion_en', 'descripcion_fr', 'descripcion_it', 'descripcion_de',
+  'orden', 'categoria_complemento_de', 'complemento_obligatorio',
+  'categoria_padre_id', 'tipo_producto',
+] as const satisfies ReadonlyArray<keyof UpdateCategoryData>;
 
 export class SupabaseCategoryRepository implements ICategoryRepository {
   constructor(private readonly supabase: SupabaseClient) {}
@@ -123,23 +139,7 @@ export class SupabaseCategoryRepository implements ICategoryRepository {
 
   async update(id: string, empresaId: string, data: Partial<UpdateCategoryData>): Promise<Result<Category>> {
     try {
-      const updatePayload: Record<string, unknown> = {};
-
-      if (data.nombre_es !== undefined) updatePayload.nombre_es = data.nombre_es;
-      if (data.nombre_en !== undefined) updatePayload.nombre_en = data.nombre_en;
-      if (data.nombre_fr !== undefined) updatePayload.nombre_fr = data.nombre_fr;
-      if (data.nombre_it !== undefined) updatePayload.nombre_it = data.nombre_it;
-      if (data.nombre_de !== undefined) updatePayload.nombre_de = data.nombre_de;
-      if (data.descripcion_es !== undefined) updatePayload.descripcion_es = data.descripcion_es;
-      if (data.descripcion_en !== undefined) updatePayload.descripcion_en = data.descripcion_en;
-      if (data.descripcion_fr !== undefined) updatePayload.descripcion_fr = data.descripcion_fr;
-      if (data.descripcion_it !== undefined) updatePayload.descripcion_it = data.descripcion_it;
-      if (data.descripcion_de !== undefined) updatePayload.descripcion_de = data.descripcion_de;
-      if (data.orden !== undefined) updatePayload.orden = data.orden;
-      if (data.categoria_complemento_de !== undefined) updatePayload.categoria_complemento_de = data.categoria_complemento_de;
-      if (data.complemento_obligatorio !== undefined) updatePayload.complemento_obligatorio = data.complemento_obligatorio;
-      if (data.categoria_padre_id !== undefined) updatePayload.categoria_padre_id = data.categoria_padre_id;
-      if (data.tipo_producto !== undefined) updatePayload.tipo_producto = data.tipo_producto;
+      const updatePayload = camposPresentes(data, CAMPOS_CATEGORIA);
 
       const { data: updated, error } = await this.supabase
         .from("categorias")
