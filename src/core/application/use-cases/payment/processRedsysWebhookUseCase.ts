@@ -31,7 +31,7 @@ const noVerificado: Salida = { success: true, data: { verified: false } };
  * cosas significa que no se puede identificar el cobro, así que no hay nada que
  * hacer salvo responder 200 y olvidarlo.
  */
-function decodificarParametros(dsParameters: string): { dsOrder: string; dsResponse?: string } | null {
+export function decodificarParametros(dsParameters: string): { dsOrder: string; dsResponse?: string } | null {
   let params: Record<string, unknown>;
   try {
     params = JSON.parse(Buffer.from(dsParameters, 'base64').toString('utf8')) as Record<string, unknown>;
