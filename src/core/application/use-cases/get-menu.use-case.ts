@@ -3,9 +3,83 @@ import type { ICategoryRepository } from "@/core/domain/repositories/ICategoryRe
 import type { IComplementoGrupoRepository } from '@/core/domain/repositories/IComplementoGrupoRepository';
 import type { MenuCategoryVM } from "@/core/application/dtos/menu-view-model";
 import type { Category, Product } from "@/core/domain/entities/types";
-import type { ComplementoGrupo } from '@/core/domain/entities/complemento-types';
+import type { ComplementoGrupo, ProductoComplementoAsignacion } from '@/core/domain/entities/complemento-types';
 import { MenuMapper } from "@/core/application/mappers/menu.mapper";
 import { logger } from "@/core/infrastructure/logging/logger";
+
+/**
+ * Grupos de complementos de cada producto, en el orden en que deben mostrarse.
+ *
+ * El orden sale de `asignacion.orden`, no del orden en que la base devuelva las
+ * filas: es lo que decide si al cliente le aparece primero "Punto de la carne" o
+ * "Guarnición", y eso lo configura el restaurante.
+ */
+export function agruparComplementosPorProducto(
+  asignaciones: ProductoComplementoAsignacion[],
+  grupos: ComplementoGrupo[],
+): Map<string, ComplementoGrupo[]> {
+  const gruposPorId = new Map(grupos.map(g => [g.id, g]));
+  const porProducto = new Map<string, ComplementoGrupo[]>();
+
+  for (const asignacion of [...asignaciones].sort((a, b) => a.orden - b.orden)) {
+    const grupo = gruposPorId.get(asignacion.grupoId);
+    if (!grupo) continue;
+    porProducto.set(asignacion.productoId, [...(porProducto.get(asignacion.productoId) ?? []), grupo]);
+  }
+
+  return porProducto;
+}
+
+/**
+ * Lo que aporta cada categoría-complemento a su categoría padre.
+ *
+ * En el sistema legacy una categoría entera puede ser "los complementos de otra"
+ * (`categoriaComplementoDe`). De ahí salen cuatro cosas distintas indexadas por
+ * la categoría padre, y recorrer la lista cuatro veces por separado era parte de
+ * lo que hinchaba este caso de uso.
+ */
+interface IndiceComplementos {
+  productos: Map<string, Product[]>;
+  obligatorio: Map<string, boolean>;
+  nombre: Map<string, string>;
+  traducciones: Map<string, Category['translations']>;
+}
+
+export function indexarCategoriasComplemento(
+  categoriasComplemento: Category[],
+  productos: Product[],
+): IndiceComplementos {
+  const indice: IndiceComplementos = {
+    productos: new Map(), obligatorio: new Map(), nombre: new Map(), traducciones: new Map(),
+  };
+
+  for (const categoria of categoriasComplemento) {
+    const padreId = categoria.categoriaComplementoDe;
+    if (!padreId) continue;
+
+    // Solo productos activos: un complemento desactivado no debe poder pedirse.
+    const suyos = productos.filter(p => p.categoriaId === categoria.id && p.activo);
+    indice.productos.set(padreId, [...(indice.productos.get(padreId) ?? []), ...suyos]);
+
+    indice.obligatorio.set(padreId, categoria.complementoObligatorio);
+    if (categoria.nombre) indice.nombre.set(padreId, categoria.nombre);
+    if (categoria.translations) indice.traducciones.set(padreId, categoria.translations);
+  }
+
+  return indice;
+}
+
+/** Agrupa por clave, conservando el orden de entrada dentro de cada grupo. */
+function agruparPor<T>(elementos: T[], clave: (e: T) => string): Map<string, T[]> {
+  const mapa = new Map<string, T[]>();
+  for (const elemento of elementos) {
+    const k = clave(elemento);
+    mapa.set(k, [...(mapa.get(k) ?? []), elemento]);
+  }
+  return mapa;
+}
+
+const porOrden = (a: Category, b: Category) => (a.orden || 0) - (b.orden || 0);
 
 export class GetMenuUseCase {
   constructor(
@@ -14,146 +88,88 @@ export class GetMenuUseCase {
     private readonly complementoRepo: IComplementoGrupoRepository,
   ) {}
 
+  /**
+   * Grupos de complementos del sistema nuevo (`complemento_grupos`).
+   *
+   * Si cualquiera de las dos consultas falla se devuelve un mapa vacío en lugar
+   * de propagar el error: sin complementos la carta se sirve igual, y un fallo
+   * aquí no debe dejar al cliente sin poder pedir.
+   */
+  private async cargarComplementos(empresaId: string, productos: Product[]): Promise<Map<string, ComplementoGrupo[]>> {
+    const idsActivos = productos.filter(p => p.activo).map(p => p.id);
+
+    const [asignaciones, grupos] = await Promise.all([
+      this.complementoRepo.findAssignmentsByProductos(idsActivos, empresaId),
+      this.complementoRepo.findAllByTenant(empresaId),
+    ]);
+
+    if (!asignaciones.success || !grupos.success) return new Map();
+    return agruparComplementosPorProducto(asignaciones.data, grupos.data);
+  }
+
+  private async registrarFallo(empresaId: string, mensaje: string, code: string, metodo: string): Promise<void> {
+    await logger.logAndReturnError(
+      'USE_CASE_ERROR',
+      mensaje,
+      'use-case',
+      'GetMenuUseCase.execute',
+      { empresaId, details: { code, method: metodo } },
+    );
+  }
+
+  /**
+   * Carta pública de la empresa: categorías con sus productos, subcategorías y
+   * complementos, listas para pintar.
+   */
   async execute(empresaId: string): Promise<{ data?: MenuCategoryVM[]; error?: string }> {
     try {
-      const [productsResult, categoriesResult] = await Promise.all([
+      const [productos, categorias] = await Promise.all([
         this.productRepo.findAllByTenant(empresaId),
         this.categoryRepo.findAllByTenant(empresaId),
       ]);
 
-      // Handle product errors
-      if (!productsResult.success) {
-        await logger.logAndReturnError(
-          'USE_CASE_ERROR',
-          productsResult.error.message,
-          'use-case',
-          'GetMenuUseCase.execute',
-          { empresaId, details: { code: productsResult.error.code, method: 'productRepo.findAllByTenant' } }
-        );
-        return { error: productsResult.error.message };
+      if (!productos.success) {
+        await this.registrarFallo(empresaId, productos.error.message, productos.error.code, 'productRepo.findAllByTenant');
+        return { error: productos.error.message };
+      }
+      if (!categorias.success) {
+        await this.registrarFallo(empresaId, categorias.error.message, categorias.error.code, 'categoryRepo.findAllByTenant');
+        return { error: categorias.error.message };
       }
 
-      // Handle category errors
-      if (!categoriesResult.success) {
-        await logger.logAndReturnError(
-          'USE_CASE_ERROR',
-          categoriesResult.error.message,
-          'use-case',
-          'GetMenuUseCase.execute',
-          { empresaId, details: { code: categoriesResult.error.code, method: 'categoryRepo.findAllByTenant' } }
-        );
-        return { error: categoriesResult.error.message };
-      }
+      const gruposPorProducto = await this.cargarComplementos(empresaId, productos.data);
 
-      const products = productsResult.data;
-      const categories = categoriesResult.data;
+      const complementos = indexarCategoriasComplemento(
+        categorias.data.filter(c => c.categoriaComplementoDe),
+        productos.data,
+      );
 
-      // Fetch complement groups for all active products
-      const activeProductIds = products
-        .filter(p => p.activo)
-        .map(p => p.id);
+      const principales = categorias.data.filter(c => !c.categoriaComplementoDe);
+      const padres = principales.filter(c => !c.categoriaPadreId).sort(porOrden);
+      const subcategorias = agruparPor(
+        principales.filter(c => c.categoriaPadreId).sort(porOrden),
+        c => c.categoriaPadreId!,
+      );
+      const categoriasPorId = new Map(categorias.data.map(c => [c.id, c]));
 
-      const [assignmentsResult, gruposResult] = await Promise.all([
-        this.complementoRepo.findAssignmentsByProductos(activeProductIds, empresaId),
-        this.complementoRepo.findAllByTenant(empresaId),
-      ]);
+      const menu = padres.map(padre => MenuMapper.toCategoryVM(
+        padre,
+        productos.data,
+        subcategorias.get(padre.id) ?? [],
+        complementos.productos.get(padre.id) ?? [],
+        complementos.obligatorio.get(padre.id) ?? false,
+        categoriasPorId,
+        productos.data,
+        complementos.nombre.get(padre.id),
+        complementos.traducciones.get(padre.id),
+        gruposPorProducto,
+      ));
 
-      // Build map: productoId -> ComplementoGrupo[] ordered by assignment orden
-      const complementoGruposByProductId = new Map<string, ComplementoGrupo[]>();
-      if (assignmentsResult.success && gruposResult.success) {
-        const gruposById = new Map(gruposResult.data.map(g => [g.id, g]));
-        const sorted = [...assignmentsResult.data].sort((a, b) => a.orden - b.orden);
-        for (const asig of sorted) {
-          const grupo = gruposById.get(asig.grupoId);
-          if (!grupo) continue;
-          const arr = complementoGruposByProductId.get(asig.productoId) ?? [];
-          arr.push(grupo);
-          complementoGruposByProductId.set(asig.productoId, arr);
-        }
-      }
-
-      const mainCategories = categories.filter((cat) => !cat.categoriaComplementoDe);
-      const complementCategories = categories.filter((cat) => cat.categoriaComplementoDe);
-
-      // Map of complements by parent category
-      const complementsByCategoryId = new Map<string, Product[]>();
-      for (const compCat of complementCategories) {
-        const parentId = compCat.categoriaComplementoDe!;
-        const compProducts = products.filter((p) => p.categoriaId === compCat.id && p.activo);
-        if (!complementsByCategoryId.has(parentId)) {
-          complementsByCategoryId.set(parentId, []);
-        }
-        complementsByCategoryId.get(parentId)!.push(...compProducts);
-      }
-
-      // Map of required_complement by parent category
-      const complementoObligatorioMap = new Map<string, boolean>();
-      // Map of complement category name by parent category
-      const complementCategoryNameMap = new Map<string, string>();
-      // Map of complement category translations by parent category
-      const complementCategoryTranslationsMap = new Map<string, Category['translations']>();
-      for (const compCat of complementCategories) {
-        if (compCat.categoriaComplementoDe) {
-          complementoObligatorioMap.set(compCat.categoriaComplementoDe, compCat.complementoObligatorio);
-          if (compCat.nombre) {
-            complementCategoryNameMap.set(compCat.categoriaComplementoDe, compCat.nombre);
-          }
-          if (compCat.translations) {
-            complementCategoryTranslationsMap.set(compCat.categoriaComplementoDe, compCat.translations);
-          }
-        }
-      }
-
-      // Separate parent categories from subcategories
-      const parentCategories = mainCategories.filter((cat) => !cat.categoriaPadreId);
-      const subCategories = mainCategories.filter((cat) => cat.categoriaPadreId);
-
-      parentCategories.sort((a, b) => (a.orden || 0) - (b.orden || 0));
-      subCategories.sort((a, b) => (a.orden || 0) - (b.orden || 0));
-
-      // Map of subcategories by parent
-      const subcategoriesByParent = new Map<string, Category[]>();
-      for (const subCat of subCategories) {
-        const parentId = subCat.categoriaPadreId!;
-        if (!subcategoriesByParent.has(parentId)) {
-          subcategoriesByParent.set(parentId, []);
-        }
-        subcategoriesByParent.get(parentId)!.push(subCat);
-      }
-
-      // Map of all categories by ID
-      const categoriesById = new Map<string, Category>();
-      for (const cat of categories) {
-        categoriesById.set(cat.id, cat);
-      }
-
-      // Delegate mapping to MenuMapper
-      const menu: MenuCategoryVM[] = parentCategories.map((parentCat) => {
-        const childSubcategories = subcategoriesByParent.get(parentCat.id) || [];
-        const categoryComplements = complementsByCategoryId.get(parentCat.id) || [];
-        const requiresComplement = complementoObligatorioMap.get(parentCat.id) || false;
-        const complementCategoryName = complementCategoryNameMap.get(parentCat.id);
-        const complementCategoryTranslations = complementCategoryTranslationsMap.get(parentCat.id);
-
-        return MenuMapper.toCategoryVM(
-          parentCat,
-          products,
-          childSubcategories,
-          categoryComplements,
-          requiresComplement,
-          categoriesById,
-          products,
-          complementCategoryName,
-          complementCategoryTranslations,
-          complementoGruposByProductId,
-        );
-      });
-
-      return { data: menu.filter((cat) => cat.items.length > 0) };
+      // Una categoría sin nada que ofrecer no se pinta: dejaría un encabezado
+      // vacío en la carta del cliente.
+      return { data: menu.filter(categoria => categoria.items.length > 0) };
     } catch (e) {
-      const appError = await logger.logFromCatch(e, 'use-case', 'GetMenuUseCase.execute', {
-        empresaId,
-      });
+      const appError = await logger.logFromCatch(e, 'use-case', 'GetMenuUseCase.execute', { empresaId });
       return { error: appError.message };
     }
   }
