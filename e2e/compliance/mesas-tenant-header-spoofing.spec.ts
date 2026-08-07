@@ -72,7 +72,7 @@ test.describe('Mesa routes — x-empresa-id header must never affect tenant reso
   });
 
   test.afterEach(async () => {
-    await request.dispose();
+    await request?.dispose();
   });
 
   test('GET lock: spoofed x-empresa-id da el mismo resultado que sin header', async () => {
