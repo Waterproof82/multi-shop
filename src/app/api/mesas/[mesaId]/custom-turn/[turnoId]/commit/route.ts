@@ -5,8 +5,8 @@ import { commitCustomPaymentUseCase } from '@/core/application/use-cases/payment
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 
 const paramsSchema = z.object({
-  mesaId:  z.string().uuid(),
-  turnoId: z.string().uuid(),
+  mesaId:  z.uuid(),
+  turnoId: z.uuid(),
 });
 
 export async function POST(

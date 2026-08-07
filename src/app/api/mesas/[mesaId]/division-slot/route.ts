@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 
-const mesaIdSchema = z.string().uuid();
+const mesaIdSchema = z.uuid();
 const bodySchema = z.object({
   paymentOrderRef: z.string().min(1).max(50),
 });

@@ -5,11 +5,11 @@ import { resolveAdminContextWithEmpresa, successResponse, validationErrorRespons
 import { PEDIDO_ESTADOS } from '@/core/domain/constants/pedido';
 
 const pedidoIdSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
 });
 
 const updatePedidoSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   estado: z.enum(PEDIDO_ESTADOS),
 });
 

@@ -9,6 +9,7 @@ import { NuevoPedidoPanel } from './NuevoPedidoPanel';
 import { MenuPanel } from './MenuPanel';
 import { MesasGrid } from './MesasGrid';
 import { useTpvAcciones } from '@/lib/tpv-acciones-ctx';
+import { mesaSesionChannel } from '@/lib/realtime-channels';
 
 export interface ExistingOrder {
   id: string;
@@ -34,7 +35,7 @@ interface Props {
 }
 
 export function MostradorClient({ initialMesa }: Readonly<Props>) {
-  const { turno, products, categories, tipoImpuesto, porcentajeImpuesto } = useTpvCatalog();
+  const { turno, products, categories, tipoImpuesto, porcentajeImpuesto, empresaId } = useTpvCatalog();
   const { mesa, addItem, removeItem, clearPending, clearMesa, refreshOrders, updatePendingNota } = useMesaActiva(initialMesa);
   const { registerRefresh, setHasPendingItems } = useTpvAcciones();
   const [yaCobradoCents, setYaCobradoCents] = useState(0);
@@ -127,10 +128,11 @@ export function MostradorClient({ initialMesa }: Readonly<Props>) {
     const mesaNumero = mesa.mesaNumero;
 
     // mesa_sesiones no longer grants anon SELECT (RLS hardening), so postgres_changes
-    // never fires here — mesa_sesiones_notify_update broadcasts on 'mesa-sesion-update'
-    // instead (public channel shared by every mesa, filter by sesionId client-side).
+    // never fires here — mesa_sesiones_notify_update broadcasts instead. El topic
+    // lleva scope de empresa (ver realtime-channels.ts); dentro de la empresa lo
+    // comparten todas las mesas, así que sigue filtrándose por sesionId.
     const ch = supabase
-      .channel('mesa-sesion-update')
+      .channel(mesaSesionChannel(empresaId))
       .on('broadcast', { event: 'update' }, (message: { payload: Record<string, unknown> }) => {
         if (message.payload['sesionId'] !== sesionId) return;
         if (message.payload['cerradaAt']) {
@@ -145,7 +147,7 @@ export function MostradorClient({ initialMesa }: Readonly<Props>) {
       .subscribe();
 
     return () => { void supabase.removeChannel(ch); };
-  }, [mesa.sesionId, mesa.mesaNumero, clearMesa]);
+  }, [mesa.sesionId, mesa.mesaNumero, clearMesa, empresaId]);
 
   if (!turno) return null;
 

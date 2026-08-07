@@ -1,11 +1,11 @@
 import { z } from "zod";
 
 // Validates a URL accepting only https:// scheme to prevent javascript: and http: URIs
-const httpsUrl = z.string().url().refine(val => val.startsWith('https://'), { message: 'URL must use https://' });
-const httpsUrlMax500 = z.string().max(500).url().refine(val => val.startsWith('https://'), { message: 'URL must use https://' });
+const httpsUrl = z.url().refine(val => val.startsWith('https://'), { message: 'URL must use https://' });
+const httpsUrlMax500 = z.url().max(500).refine(val => val.startsWith('https://'), { message: 'URL must use https://' });
 
 export const updateEmpresaSchema = z.object({
-  email_notification: z.string().email().max(254).optional().or(z.literal('')),
+  email_notification: z.email().max(254).optional().or(z.literal('')),
   telefono_whatsapp: z.string().max(30).regex(/^\+?[0-9\s\-()+]+$/).optional().or(z.literal('')).optional(),
   fb: httpsUrl.optional().or(z.literal('')),
   instagram: httpsUrl.optional().or(z.literal('')),
@@ -35,7 +35,7 @@ export const updateEmpresaSchema = z.object({
   mesas_habilitadas: z.boolean().optional(),
   validacion_pedidos_habilitada: z.boolean().optional(),
   delivery_habilitado: z.boolean().optional(),
-  google_reviews_url: z.string().url().nullable().optional(),
+  google_reviews_url: z.url().nullable().optional(),
 });
 
 export type UpdateEmpresaDTO = z.infer<typeof updateEmpresaSchema>;

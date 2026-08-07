@@ -19,7 +19,7 @@ export function TurnoAbrirForm({ defaultOperador = '' }: Props) {
   const isReadOnly = defaultOperador.length > 0;
   const canSubmit = operador.trim().length >= 2 && !loading;
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.SyntheticEvent) {
     e.preventDefault();
     if (!canSubmit) return;
     setLoading(true);

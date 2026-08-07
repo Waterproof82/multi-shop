@@ -377,7 +377,7 @@ function StatsHeader({ language, meses, mesActual, añoActual, esMesActual, onMo
           <p className="text-slate-300 text-sm mt-1">{t("statsSubtitle", lang)}</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <button type="button"
             onClick={() => onMonthChange(-1)}
             aria-label={t("previousMonth", lang)}
             className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-slate-300 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2"
@@ -389,7 +389,7 @@ function StatsHeader({ language, meses, mesActual, añoActual, esMesActual, onMo
               {meses[mesActual]} {añoActual}
             </span>
           </div>
-          <button
+          <button type="button"
             onClick={() => onMonthChange(1)}
             disabled={esMesActual}
             aria-label={t("nextMonth", lang)}

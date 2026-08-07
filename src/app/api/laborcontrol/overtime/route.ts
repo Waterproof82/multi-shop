@@ -5,9 +5,9 @@ import { logger } from '@/core/infrastructure/logging/logger';
 import { z } from 'zod';
 
 const QuerySchema = z.object({
-  from: z.string().date(),
-  to:   z.string().date(),
-  empleadoId: z.string().uuid().optional(),
+  from: z.iso.date(),
+  to:   z.iso.date(),
+  empleadoId: z.uuid().optional(),
 });
 
 // GET /api/laborcontrol/overtime?from=YYYY-MM-DD&to=YYYY-MM-DD

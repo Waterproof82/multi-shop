@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Settings, Lock } from 'lucide-react';
 import { useOnlineStatus } from '@/hooks/tpv/useOnlineStatus';
-import { getQueueCount } from '@/lib/tpv/offline-queue';
+import { getQueueCount, flushOfflineQueue, requestPersistentStorage } from '@/lib/tpv/offline-queue';
 import { LowStockBadge } from '@/components/tpv/LowStockBadge';
 import { useTpvRol, useTpvIsEmployeeSession } from '@/lib/tpv-rol-ctx';
 import { fetchWithCsrf } from '@/lib/csrf-client';
@@ -54,10 +54,23 @@ export function TpvHeader({ empresaNombre }: Readonly<Props>) {
     ...(showGear ? [{ label: '📋 Jornada', href: '/tpv/jornada', activePrefix: '/tpv/jornada' }] : []),
   ];
 
+  // Pedir storage persistente una vez: evita que el WebView Android eviccione
+  // la cola de cobros offline bajo presión de memoria.
+  useEffect(() => { void requestPersistentStorage(); }, []);
+
+  // El header está montado en todo /tpv/*, así que es el punto correcto para
+  // vaciar la cola al recuperar conexión: antes solo ocurría dentro de la
+  // pantalla de cobro, dejando cobros sin subir si el cajero navegaba a otra vista.
   useEffect(() => {
-    getQueueCount()
-      .then(setPendingCount)
-      .catch(() => { /* IndexedDB not available */ });
+    if (!isOnline) {
+      getQueueCount().then(setPendingCount).catch(() => { /* IndexedDB not available */ });
+      return;
+    }
+    flushOfflineQueue()
+      .catch(() => { /* se reintenta en el próximo cambio de conectividad */ })
+      .finally(() => {
+        getQueueCount().then(setPendingCount).catch(() => { /* IndexedDB not available */ });
+      });
   }, [isOnline]);
 
   async function handleLock() {

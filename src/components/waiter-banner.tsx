@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { UtensilsCrossed, ArrowLeftRight, LogOut, X, ShoppingCart, ChevronDown, Circle, LockOpen, AlertTriangle, Wine, BellRing } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
@@ -11,6 +11,7 @@ import { fetchWithCsrf } from "@/lib/csrf-client";
 import { useCart } from "@/lib/cart-context";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { mesaSesionChannel } from "@/lib/realtime-channels";
 
 const BG            = "oklch(17% 0.025 252)";
 const BORDER        = "oklch(42% 0.14 62 / 0.35)";
@@ -45,7 +46,6 @@ const BTN_UNLOCK_TEXT  = "oklch(75% 0.20 40)";
 
 // Llamadas — golden amber
 const BTN_LLAMADAS_BG    = "oklch(22% 0.12 55)";
-const BTN_LLAMADAS_HOVER = "oklch(28% 0.17 55)";
 const BTN_LLAMADAS_TEXT  = "oklch(82% 0.24 55)";
 
 // Pendientes — warm red/orange
@@ -67,7 +67,6 @@ const BTN_BAR_TEXT  = "oklch(68% 0.14 252)";
 const DD_BG        = "oklch(19% 0.025 252)";
 const DD_BORDER    = "oklch(38% 0.10 252 / 0.5)";
 const DD_ITEM_HV   = "oklch(24% 0.035 252)";
-const DD_ITEM_ACT  = "oklch(22% 0.06 255 / 0.6)";
 
 interface Mesa {
   id: string;
@@ -137,6 +136,7 @@ async function applyWaiterMeResponse(
 
 export function WaiterBanner() {
   const pathname = usePathname();
+  const router = useRouter();
   const pathnameRef = useRef(pathname);
   pathnameRef.current = pathname;
   // Unique channel name per instance — avoids React StrictMode returning a stale
@@ -216,9 +216,21 @@ export function WaiterBanner() {
     if (!authChecked || isWaiter) return;
     if (!navigator.onLine) return;
     if (pathname.startsWith('/waiter/')) {
+      // Reload completo a propósito: es un fallo de auth, hay que descartar
+      // todo el estado de cliente, no solo cambiar de vista.
       globalThis.location.href = '/waiter';
     }
   }, [authChecked, isWaiter, pathname]);
+
+  // Prefetch de las vistas hermanas. El camarero alterna entre Cocina, Bar y
+  // Pendientes decenas de veces por turno; sin esto el RSC payload se pide
+  // recién en el tap, sobre wifi de restaurante o datos móviles (APK).
+  useEffect(() => {
+    if (!isWaiter) return;
+    router.prefetch('/waiter/kitchen');
+    router.prefetch('/waiter/bar');
+    router.prefetch('/waiter/pendientes');
+  }, [isWaiter, router]);
 
   useEffect(() => {
     const stored = getWaiterMesa();
@@ -313,8 +325,10 @@ export function WaiterBanner() {
 
     // mesa_sesiones no longer grants anon SELECT (RLS hardening) — postgres_changes
     // never fires here. mesa_sesiones_notify_update broadcasts on this channel instead.
+    // El topic lleva scope de empresa: antes era global y este banner se despertaba
+    // a refrescar contadores por mesas de OTROS restaurantes. Ver realtime-channels.ts.
     const broadcastMesaSesion = supabase
-      .channel('mesa-sesion-update')
+      .channel(mesaSesionChannel(waiterEmpresaId))
       .on('broadcast', { event: 'update' }, () => {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
@@ -325,7 +339,7 @@ export function WaiterBanner() {
       })
       .subscribe((status) => {
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('[Realtime] mesa-sesion-update broadcast error (banner):', status);
+          console.error('[Realtime] mesa-sesion broadcast error (banner):', status);
         }
       });
 
@@ -405,6 +419,9 @@ export function WaiterBanner() {
       }
       saveWaiterMesa({ mesaId: mesa.id, mesaNumero: mesa.numero, mesaNombre: mesa.nombre });
       setDropdownOpen(false);
+      // Reload completo a propósito, NO router.push: al cambiar de mesa hay que
+      // remontar CartProvider. Con navegación cliente el carrito de la mesa
+      // anterior sobrevive y sus items se filtran a la mesa nueva.
       globalThis.location.href = `/?mesa=${mesa.id}`;
     } finally {
       setSwitchingId(null);
@@ -420,6 +437,7 @@ export function WaiterBanner() {
       const res = await fetchWithCsrf(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/close`, { method: "POST" });
       if (res.ok || res.status === 404) {
         clearWaiterMesa();
+        // Reload completo a propósito: cerrar mesa debe dejar el carrito vacío.
         globalThis.location.href = "/waiter";
       } else {
         setCloseError(t("waiterTableCloseError", lang));
@@ -518,8 +536,8 @@ export function WaiterBanner() {
     return (
       <ul className="py-1 max-h-64 overflow-y-auto">
         <li>
-          <button
-            onClick={() => { setDropdownOpen(false); globalThis.location.href = "/waiter"; }}
+          <button type="button"
+            onClick={() => { setDropdownOpen(false); router.push("/waiter"); }}
             className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-xs font-semibold transition-colors duration-100 border-b"
             style={{
               color: BTN_TABLE_TEXT,
@@ -539,7 +557,7 @@ export function WaiterBanner() {
           const busy   = switchingId === mesa.id;
           return (
             <li key={mesa.id}>
-              <button
+              <button type="button"
                 onClick={() => handleSelectTable(mesa)}
                 disabled={busy}
                 className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-xs transition-colors duration-100 disabled:opacity-60"
@@ -598,7 +616,7 @@ export function WaiterBanner() {
             </div>
           )}
           {hasMesa ? (
-            <button
+            <button type="button"
               className="flex items-center gap-1.5 min-w-0 rounded-md px-2 py-1 transition-colors duration-150"
               style={{ backgroundColor: 'oklch(22% 0.06 148 / 0.5)', border: '1px solid oklch(45% 0.18 148 / 0.4)' }}
               onClick={() => { globalThis.location.href = `/?mesa=${mesaId ?? ''}`; }}
@@ -621,7 +639,7 @@ export function WaiterBanner() {
 
           {/* Cart — only when mesa selected and not on waiter/kitchen/bar pages */}
           {hasMesa && pathname !== '/waiter' && pathname !== '/waiter/pendientes' && pathname !== '/waiter/kitchen' && pathname !== '/waiter/bar' && (
-            <button
+            <button type="button"
               onClick={openCart}
               className="relative flex items-center justify-center rounded-md p-2.5 transition-colors duration-150 min-h-[40px] min-w-[40px]"
               style={{ color: BTN_CART_TEXT, backgroundColor: BTN_CART_BG }}
@@ -664,8 +682,8 @@ export function WaiterBanner() {
 
           {/* Pendientes — visible only when there are items awaiting validation */}
           {counts && counts.pendientes > 0 && (
-            <button
-              onClick={() => { globalThis.location.href = '/waiter/pendientes'; }}
+            <button type="button"
+              onClick={() => { router.push('/waiter/pendientes'); }}
               className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px]"
               style={{ color: BTN_PENDIENTES_TEXT, backgroundColor: BTN_PENDIENTES_BG }}
               onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_PENDIENTES_HOVER)}
@@ -683,8 +701,8 @@ export function WaiterBanner() {
           )}
 
           {/* Kitchen — always visible for authenticated waiters */}
-          <button
-            onClick={() => { globalThis.location.href = '/waiter/kitchen'; }}
+          <button type="button"
+            onClick={() => { router.push('/waiter/kitchen'); }}
             className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px]"
             style={{ color: BTN_KITCHEN_TEXT, backgroundColor: BTN_KITCHEN_BG }}
             onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_KITCHEN_HOVER)}
@@ -702,8 +720,8 @@ export function WaiterBanner() {
           </button>
 
           {/* Bar — always visible for authenticated waiters */}
-          <button
-            onClick={() => { globalThis.location.href = '/waiter/bar'; }}
+          <button type="button"
+            onClick={() => { router.push('/waiter/bar'); }}
             className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px]"
             style={{ color: BTN_BAR_TEXT, backgroundColor: BTN_BAR_BG }}
             onMouseEnter={e => (e.currentTarget.style.backgroundColor = BTN_BAR_HOVER)}
@@ -722,7 +740,7 @@ export function WaiterBanner() {
 
           {/* Change table — dropdown trigger */}
           <div className="relative" ref={dropdownRef}>
-            <button
+            <button type="button"
               onClick={handleToggleDropdown}
               className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px]"
               style={{ color: BTN_TABLE_TEXT, backgroundColor: BTN_TABLE_BG }}
@@ -751,7 +769,7 @@ export function WaiterBanner() {
 
           {/* Unlock payment — visible only when pago_en_curso */}
           {pagoEnCurso && (
-            <button
+            <button type="button"
               onClick={handleUnlockPayment}
               disabled={unlocking}
               className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px] disabled:opacity-40"
@@ -767,7 +785,7 @@ export function WaiterBanner() {
 
           {/* Close table — only when mesa selected */}
           {hasMesa && (
-            <button
+            <button type="button"
               onClick={handleCloseTable}
               disabled={closing}
               className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px] disabled:opacity-40"
@@ -782,7 +800,7 @@ export function WaiterBanner() {
           )}
 
           {/* Logout */}
-          <button
+          <button type="button"
             onClick={handleLogout}
             className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 min-h-[40px]"
             style={{ color: BTN_EXIT_TEXT, backgroundColor: BTN_EXIT_BG }}
@@ -862,7 +880,7 @@ export function WaiterBanner() {
           </DialogHeader>
           <div className="flex gap-2 mt-2">
             <Button variant="outline" className="flex-1" onClick={() => setCloseDialog(null)}>Volver</Button>
-            <Button className="flex-1" onClick={() => { setCloseDialog(null); globalThis.location.href = `/mesa/${mesaId}/orders`; }}>
+            <Button className="flex-1" onClick={() => { setCloseDialog(null); router.push(`/mesa/${mesaId}/orders`); }}>
               Ver ticket
             </Button>
           </div>

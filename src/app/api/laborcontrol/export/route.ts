@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { resolveAdminContextWithEmpresa, requireRole } from '@/core/infrastructure/api/helpers';
 import { getLcGenerarExportUseCase } from '@/core/laborcontrol/infrastructure';
 import { ExportQuerySchema } from '@/core/laborcontrol/application/dtos/export.dto';
+import { z } from 'zod';
 
 // GET /api/laborcontrol/export?tipo=pdf|excel&from=YYYY-MM-DD&to=YYYY-MM-DD&...
 // Streams PDF or Excel file
@@ -21,7 +22,7 @@ export async function GET(req: NextRequest) {
     incluirPausas: sp.get('incluirPausas') ?? 'true',
   });
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json({ error: z.flattenError(parsed.error) }, { status: 400 });
   }
 
   const uc = getLcGenerarExportUseCase();

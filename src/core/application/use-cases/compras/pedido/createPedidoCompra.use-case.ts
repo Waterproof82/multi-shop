@@ -4,9 +4,9 @@ import type { Result, AppError } from '@/core/domain/entities/types';
 import type { PedidoCompra } from '@/core/domain/entities/compras-types';
 
 const schema = z.object({
-  proveedorId: z.string().uuid(),
+  proveedorId: z.uuid(),
   notas: z.string().max(1000).optional(),
-  fechaEntregaEstimada: z.string().datetime({ offset: true }).optional().or(
+  fechaEntregaEstimada: z.iso.datetime({ offset: true }).optional().or(
     z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   ),
 });

@@ -6,7 +6,7 @@ import type { FacturaProveedor } from '@/core/domain/entities/compras-types';
 
 const schema = z.object({
   metodoPago: z.enum(['pagado_caja', 'pagado_banco']),
-  turnoId: z.string().uuid().optional(),
+  turnoId: z.uuid().optional(),
 });
 
 export async function registrarPagoFacturaUseCase(

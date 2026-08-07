@@ -67,7 +67,7 @@ export function TurnoCerrarForm({ turno, stats, mesasAbiertas, isBlindClose, emp
     Math.round((new Date().getTime() - apertura.getTime()) / 60_000)
   );
 
-  async function handleCierre(e: React.FormEvent) {
+  async function handleCierre(e: React.SyntheticEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);

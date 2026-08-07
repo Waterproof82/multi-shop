@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 
 const schema = z.object({
-  mesaId: z.string().uuid(),
+  mesaId: z.uuid(),
   redirect: z.string().default('/'),
 });
 

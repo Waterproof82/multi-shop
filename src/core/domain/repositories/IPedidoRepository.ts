@@ -5,6 +5,12 @@ export interface KitchenBarCounts {
   bebidas: { total: number; listos: number; retenidos: number };
 }
 
+/** Todos los contadores del WaiterBanner, resueltos en una sola consulta. */
+export interface WaiterBadgeCounts extends KitchenBarCounts {
+  pendientes: number;
+  llamadas: number;
+}
+
 export interface KitchenOrderItem {
   id: string;
   numeroPedido: number;
@@ -102,7 +108,10 @@ export interface PendienteValidacionMesa {
 }
 
 export interface IPedidoRepository {
-  findAllByTenant(empresaId: string): Promise<Result<Pedido[]>>;
+  /** `limit` acota a los N pedidos más recientes. Omitirlo trae el histórico
+   *  completo, que crece sin techo: `pedidos` no admite DELETE (retención
+   *  fiscal de 5 años). Pasar límite explícito desde vistas de resumen. */
+  findAllByTenant(empresaId: string, limit?: number): Promise<Result<Pedido[]>>;
   findAllByTenantAndMonth(empresaId: string, mes: number, año: number): Promise<Result<Pedido[]>>;
   updateStatus(id: string, empresaId: string, estado: string): Promise<Result<void>>;
   delete(id: string, empresaId: string): Promise<Result<void>>;
@@ -118,6 +127,7 @@ export interface IPedidoRepository {
     initialEstado?: 'pendiente' | 'retenido' | 'pendiente_validacion';
     nota?: string;
     pase?: string | null;
+    idempotency?: { key: string; fingerprint: string };
   }): Promise<Result<{ id: string; numero_pedido: number; tracking_token: string }>>;
   updateItemPase(empresaId: string, pedidoId: string, itemIdx: number, pase: string | null): Promise<Result<void>>;
   findEstimatedReadyAtById(pedidoId: string): Promise<Result<string | null>>;
@@ -143,9 +153,23 @@ export interface IPedidoRepository {
       latitude_entrega?: number;
       longitude_entrega?: number;
       estimated_delivery_fee_cents?: number;
-    }
+    },
+    idempotency?: { key: string; fingerprint: string }
   ): Promise<Result<{ id: string; numero_pedido: number; total: number; trackingToken?: string }>>;
-  countKitchenBarOrders(empresaId: string): Promise<Result<KitchenBarCounts>>;
+  /**
+   * Pedido creado previamente con esta clave de idempotencia, o `null`.
+   * La huella vuelve para que la capa superior verifique que el cuerpo entrante
+   * es el mismo pedido antes de devolverle su `tracking_token`.
+   */
+  findByIdempotencyKey(
+    empresaId: string,
+    key: string
+  ): Promise<Result<{ id: string; numero_pedido: number; total: number; tracking_token: string | null; fingerprint: string | null } | null>>;
+  /**
+   * Contadores del WaiterBanner en un único roundtrip (RPC `get_waiter_badge_counts`).
+   * Es la ruta más caliente del sistema: se re-invoca en cada evento de Realtime.
+   */
+  getWaiterBadgeCounts(empresaId: string): Promise<Result<WaiterBadgeCounts>>;
   findKitchenOrders(empresaId: string): Promise<Result<KitchenOrderItem[]>>;
   findAllRetenidos(empresaId: string, tipo: 'comida' | 'bebida'): Promise<Result<RetenidoItem[]>>;
   findBarOrders(empresaId: string): Promise<Result<BarOrderItem[]>>;

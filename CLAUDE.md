@@ -51,6 +51,12 @@ Todo el codebase usa `Result<T, AppError>`.
   El test `e2e/compliance/supabase-security-definer.spec.ts` verifica esto automaticamente en CI.
 - **Particiones RLS:** Las tablas de particion NO heredan RLS del padre. Cada particion nueva necesita `ENABLE ROW LEVEL SECURITY` + policies propias. `lc_create_next_partition()` lo hace automaticamente.
 - **delete-all en produccion:** `DELETE /api/admin/pedidos/delete-all` tiene guard `NODE_ENV === 'production'` → 403. Nunca eliminar ese guard.
+- **`pedidos.es_prueba` (CRITICO):** unica excepcion al bloqueo de DELETE del Art.66 LGT. `pedidos_block_delete` solo deja borrar filas con `es_prueba = true` y sin cobros asociados, y registra cada borrado en `pedidos_prueba_purga_log` (solo insercion).
+  - El flag es **inmutable**: el trigger `pedidos_es_prueba_inmutable` bloquea cualquier UPDATE sobre esa columna. Sin eso, marcar un pedido facturado como prueba y borrarlo seria una puerta trasera al registro fiscal.
+  - **NUNCA exponer `es_prueba` en un DTO de Zod ni en un mapper de repositorio.** Si el cliente pudiera activarlo, seria un vector para sacar ingresos de los totales fiscales. Solo se fija en el INSERT con service_role (tests E2E).
+  - Los pedidos con el flag quedan excluidos de `get_pedido_stats_ano`. Purga en lote: `SELECT purge_pedidos_prueba(empresa_id)`.
+  - El test `e2e/compliance/pedidos-borrado-pruebas.spec.ts` verifica las barreras en CI.
+- **Tests E2E que insertan pedidos:** deben poner `es_prueba: true` en el INSERT y borrarlos en el teardown. Sin el flag las filas son imborrables y se acumulan en la tabla con retencion fiscal, inflando los conteos del dashboard (paso de verdad: 200 filas acumuladas duplicaban el numero de pedidos de julio 2026).
 - **E2E tests de seguridad:** `e2e/waiter-csrf.spec.ts` cubre CSRF + RLS. Ejecutar con `PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test e2e/`.
 
 ## Base de Datos (Trampas Comunes)
@@ -85,6 +91,24 @@ CREATE POLICY "Admin ve mi_tabla"
   USING (empresa_id = get_mi_empresa_id());
 -- ... INSERT / UPDATE / DELETE con mismo patron (TO authenticated, WITH CHECK explicito en INSERT)
 ```
+
+**InitPlan — envolver SIEMPRE `auth.uid()` en `(SELECT ...)`:**
+Dentro de un `EXISTS` correlacionado (o de cualquier qual que el planificador no pueda
+promover), `auth.uid()` se evalua UNA VEZ POR FILA. Envuelta, Postgres la convierte en
+InitPlan y la evalua una sola vez para todo el plan:
+```sql
+-- MAL:  pa.id = auth.uid()
+-- BIEN: pa.id = (SELECT auth.uid())
+```
+Aplica igual a `get_mi_empresa_id()`, que ademas consulta `perfiles_admin` en cada
+evaluacion. Ojo: el advisor `auth_rls_initplan` de Supabase NO detecta las funciones
+envoltorio — solo matchea `auth.<fn>()` literal, asi que `get_mi_empresa_id()` sin
+envolver pasa desapercibida. El smoke test (seccion 7 de `smoke-db-functions.sql`)
+verifica el caso de `auth.uid()` en CI.
+
+**Si la policy la genera una funcion** (p. ej. `lc_create_next_partition()` crea las
+policies de cada particion nueva desde el cron): corregir el GENERADOR, no solo las
+policies existentes. Si no, el defecto vuelve solo cada mes.
 
 ### 2. GRANTs explícitos (obligatorio desde oct 2026 — Supabase Data API, y ahora tambien a nivel de DB)
 Desde el 2026-07-31, `public` ya NO otorga privilegios por defecto a `anon`/`authenticated` en tablas nuevas (`ALTER DEFAULT PRIVILEGES` revocado — ver `security.md`). Esto ya no es solo una buena práctica: sin este bloque, la tabla es **completamente inaccesible** para `authenticated`/`anon`, incluso con RLS bien configurado.

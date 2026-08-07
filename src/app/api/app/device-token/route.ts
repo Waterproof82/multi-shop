@@ -6,7 +6,7 @@ import { rateLimitLogin } from '@/core/infrastructure/api/rate-limit';
 const schema = z.object({
   fcm_token: z.string().min(1).max(500),
   role: z.enum(['waiter', 'kitchen']),
-  empresa_id: z.string().uuid(),
+  empresa_id: z.uuid(),
 });
 
 // Public endpoint — called from the local Capacitor setup page where

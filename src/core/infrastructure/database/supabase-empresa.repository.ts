@@ -4,6 +4,47 @@ import { IEmpresaRepository, UpdateEmpresaData } from "@/core/domain/repositorie
 import { SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "../logging/logger";
 import { extractSlugFromBaseDomain, isBaseDomain } from "@/lib/domain-utils";
+import { camposPresentes, camposTextoPresentes } from "./update-payload";
+
+/**
+ * Campos de texto: una cadena vacía se guarda como NULL.
+ *
+ * El formulario de admin manda `''` cuando el usuario borra un campo, y guardar
+ * la cadena vacía dejaría `fb: ''` en vez de "sin Facebook" — que luego pinta un
+ * enlace roto en el pie de la web pública.
+ */
+const CAMPOS_TEXTO = [
+  'email_notification', 'telefono_whatsapp', 'fb', 'instagram', 'url_mapa',
+  'direccion', 'nif', 'razon_social', 'logo_url', 'url_image', 'banner_fit',
+  'descripcion_es', 'descripcion_en', 'descripcion_fr', 'descripcion_it', 'descripcion_de',
+] as const satisfies ReadonlyArray<keyof UpdateEmpresaData>;
+
+/**
+ * Campos que viajan TAL CUAL, sin convertir lo falsy a NULL.
+ *
+ * Esta es la distinción que importa de toda la función: `false` y `0` son
+ * valores legítimos aquí. Un `|| null` sobre `mostrar_promociones: false` lo
+ * convertiría en NULL, y la columna volvería a su DEFAULT — es decir, apagar el
+ * interruptor lo dejaría encendido. Lo mismo con un descuento del 0%.
+ */
+const CAMPOS_DIRECTOS = [
+  'tipo_impuesto', 'porcentaje_impuesto', 'mostrar_logo', 'validacion_pedidos_habilitada',
+  'mostrar_promociones', 'mostrar_tgtg', 'descuento_bienvenida_activo',
+  'descuento_bienvenida_porcentaje', 'descuento_bienvenida_duracion', 'tipo',
+] as const satisfies ReadonlyArray<keyof UpdateEmpresaData>;
+
+/**
+ * Payload de UPDATE con solo los campos presentes.
+ *
+ * `undefined` significa "no lo toques": una actualización parcial no puede
+ * borrar lo que no venía en el formulario.
+ */
+export function construirPayloadEmpresa(data: UpdateEmpresaData): Record<string, unknown> {
+  return {
+    ...camposTextoPresentes(data, CAMPOS_TEXTO),
+    ...camposPresentes(data, CAMPOS_DIRECTOS),
+  };
+}
 
 export class SupabaseEmpresaRepository implements IEmpresaRepository {
   constructor(private readonly supabase: SupabaseClient) {}
@@ -78,34 +119,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
 
   async update(empresaId: string, data: UpdateEmpresaData): Promise<Result<void>> {
     try {
-      const updatePayload: Record<string, unknown> = {};
-      if (data.email_notification !== undefined) updatePayload.email_notification = data.email_notification || null;
-      if (data.telefono_whatsapp !== undefined) updatePayload.telefono_whatsapp = data.telefono_whatsapp || null;
-      if (data.fb !== undefined) updatePayload.fb = data.fb || null;
-      if (data.instagram !== undefined) updatePayload.instagram = data.instagram || null;
-      if (data.url_mapa !== undefined) updatePayload.url_mapa = data.url_mapa || null;
-      if (data.direccion !== undefined) updatePayload.direccion = data.direccion || null;
-      if (data.nif !== undefined) updatePayload.nif = data.nif || null;
-      if (data.razon_social !== undefined) updatePayload.razon_social = data.razon_social || null;
-      if (data.tipo_impuesto !== undefined) updatePayload.tipo_impuesto = data.tipo_impuesto;
-      if (data.porcentaje_impuesto !== undefined) updatePayload.porcentaje_impuesto = data.porcentaje_impuesto;
-      if (data.logo_url !== undefined) updatePayload.logo_url = data.logo_url || null;
-      if (data.mostrar_logo !== undefined) updatePayload.mostrar_logo = data.mostrar_logo;
-      if (data.url_image !== undefined) updatePayload.url_image = data.url_image || null;
-      if (data.banner_fit !== undefined) updatePayload.banner_fit = data.banner_fit || null;
-      if (data.descripcion_es !== undefined) updatePayload.descripcion_es = data.descripcion_es || null;
-      if (data.descripcion_en !== undefined) updatePayload.descripcion_en = data.descripcion_en || null;
-      if (data.descripcion_fr !== undefined) updatePayload.descripcion_fr = data.descripcion_fr || null;
-      if (data.descripcion_it !== undefined) updatePayload.descripcion_it = data.descripcion_it || null;
-      if (data.descripcion_de !== undefined) updatePayload.descripcion_de = data.descripcion_de || null;
-      // Boolean fields: must NOT use `|| null` — false is a valid value and must reach the DB.
-      if (data.validacion_pedidos_habilitada !== undefined) updatePayload.validacion_pedidos_habilitada = data.validacion_pedidos_habilitada;
-      if (data.mostrar_promociones !== undefined) updatePayload.mostrar_promociones = data.mostrar_promociones;
-      if (data.mostrar_tgtg !== undefined) updatePayload.mostrar_tgtg = data.mostrar_tgtg;
-      if (data.descuento_bienvenida_activo !== undefined) updatePayload.descuento_bienvenida_activo = data.descuento_bienvenida_activo;
-      if (data.descuento_bienvenida_porcentaje !== undefined) updatePayload.descuento_bienvenida_porcentaje = data.descuento_bienvenida_porcentaje;
-      if (data.descuento_bienvenida_duracion !== undefined) updatePayload.descuento_bienvenida_duracion = data.descuento_bienvenida_duracion;
-      if (data.tipo !== undefined) updatePayload.tipo = data.tipo;
+      const updatePayload = construirPayloadEmpresa(data);
 
       const { error } = await this.supabase
         .from('empresas')

@@ -11,8 +11,9 @@ import { t } from "@/lib/translations";
 import { formatPrice } from "@/lib/format-price";
 import { getWaiterMesa } from "@/components/waiter-login-form";
 import { fetchWithCsrf } from "@/lib/csrf-client";
-import { QRScannerGate, type QRGateState } from "@/components/qr-scanner-gate";
+import { QRScannerGate, type QRGateState } from "@/components/qr-scanner-gate-lazy";
 import { GoogleReviewsWidget } from "@/components/google-reviews-widget";
+import { mesaSesionChannel } from "@/lib/realtime-channels";
 
 interface OrderItem {
   nombre: string;
@@ -70,6 +71,9 @@ interface MesaSessionData {
 interface MesaInfo {
   numero: number;
   nombre: string | null;
+  /** Necesario para el canal de Realtime con scope de empresa. `/api/mesas` ya
+   *  lo devolvía; antes se descartaba al mapear la respuesta. */
+  empresaId: string;
 }
 
 type PendingAction = 'full' | 'division-modal' | 'division-pay';
@@ -392,7 +396,7 @@ function DivisionTypeModal({
           {t("mesaDivisionTypeTitle", lang)}
         </h2>
         <div className="flex flex-col gap-3">
-          <button
+          <button type="button"
             onClick={pagoEnCurso ? undefined : onSelectEqual}
             disabled={pagoEnCurso}
             className="flex flex-col items-start rounded-xl border border-[#e8e0d8] bg-[#f8f4ef] p-4 text-left active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">
@@ -401,13 +405,13 @@ function DivisionTypeModal({
               {pagoEnCurso ? t("mesaPagoEnCurso", lang) : t("mesaDivisionTypeEqualDesc", lang)}
             </span>
           </button>
-          <button onClick={onSelectCustom}
+          <button type="button" onClick={onSelectCustom}
             className="flex flex-col items-start rounded-xl border border-[#1a1612] bg-[#1a1612] p-4 text-left active:scale-[0.98]">
             <span className="font-semibold text-white">{t("mesaDivisionTypeCustom", lang)}</span>
             <span className="text-sm text-[#c8b99a]">{t("mesaDivisionTypeCustomDesc", lang)}</span>
           </button>
         </div>
-        <button onClick={onClose} className="mt-4 w-full py-2 text-sm text-[#8a7d6b]">
+        <button type="button" onClick={onClose} className="mt-4 w-full py-2 text-sm text-[#8a7d6b]">
           {t("cancel", lang)}
         </button>
       </div>
@@ -438,7 +442,7 @@ function CustomItemRow({
         </p>
       </div>
       <div className="flex items-center gap-1 ml-4 rounded-2xl border border-[#e8e0d8] bg-white p-1">
-        <button
+        <button type="button"
           onClick={() => onChangeUnidades(Math.max(0, unidadesSeleccionadas - 1))}
           disabled={unidadesSeleccionadas === 0}
           className="flex h-9 w-9 items-center justify-center rounded-xl transition-colors disabled:opacity-25 active:bg-[#f0ede8]"
@@ -449,7 +453,7 @@ function CustomItemRow({
         <span className="w-8 text-center text-sm font-bold tabular-nums" style={{ color: "#1a1612" }}>
           {unidadesSeleccionadas}
         </span>
-        <button
+        <button type="button"
           onClick={() => onChangeUnidades(Math.min(disponibles, unidadesSeleccionadas + 1))}
           disabled={unidadesSeleccionadas >= disponibles}
           className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#1a1612] text-white transition-colors disabled:opacity-25 active:bg-[#3a3128]"
@@ -726,7 +730,7 @@ function CustomSelectionView({
           <span>{t("mesaCustomSubtotal", lang)}</span>
           <span className="font-semibold text-[#1a1612]">{formatPrice(subtotalCents / 100, "EUR", lang)}</span>
         </div>
-        <button onClick={() => { void handlePay(); }}
+        <button type="button" onClick={() => { void handlePay(); }}
           disabled={subtotalCents === 0 || committing}
           className="w-full rounded-xl bg-[#1a1612] py-4 text-sm font-semibold text-white disabled:opacity-40">
           {committing
@@ -735,7 +739,7 @@ function CustomSelectionView({
               ? `Registrar como pagado · ${formatPrice(subtotalCents / 100, "EUR", lang)}`
               : t("mesaCustomPay", lang).replace("{amount}", formatPrice(subtotalCents / 100, "EUR", lang))}
         </button>
-        <button onClick={() => { void handleCancel(); }} disabled={cancelling}
+        <button type="button" onClick={() => { void handleCancel(); }} disabled={cancelling}
           className="w-full rounded-xl border border-[#d0c8bc] py-3 text-sm font-medium text-[#5a4f45] bg-white active:bg-[#f0ede8] disabled:opacity-40">
           {cancelling ? t("loading", lang) : t("mesaCustomCancel", lang)}
         </button>
@@ -820,7 +824,7 @@ function RemainingItemsActions({
     <div className="flex flex-col min-h-screen bg-[#f0ede8]">
       {/* Header */}
       <div className="sticky top-0 z-10 flex items-center gap-3 bg-[#f0ede8] px-4 pt-5 pb-3 border-b border-[#e8e0d8]">
-        <button onClick={onBack} className="flex h-9 w-9 items-center justify-center rounded-full bg-white border border-[#e8e0d8] active:bg-[#f0ede8]">
+        <button type="button" onClick={onBack} className="flex h-9 w-9 items-center justify-center rounded-full bg-white border border-[#e8e0d8] active:bg-[#f0ede8]">
           <ArrowLeft size={16} strokeWidth={2} style={{ color: "#1a1612" }} />
         </button>
         <div className="flex-1 min-w-0">
@@ -886,7 +890,7 @@ function RemainingItemsActions({
 
       {/* Actions */}
       <div className="sticky bottom-0 bg-[#f0ede8] border-t border-[#e8e0d8] px-4 py-4">
-        <button
+        <button type="button"
           onClick={onBack}
           className="w-full rounded-2xl py-4 text-sm font-bold tracking-widest uppercase text-white active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
           style={{ backgroundColor: "#1a1612", fontFamily: "monospace" }}
@@ -1037,13 +1041,18 @@ function createMesaChannel(
 }
 
 // mesa_sesiones has no anon SELECT grant (RLS hardening), so postgres_changes never
-// fires for it — the mesa_sesiones_notify_update DB trigger broadcasts on the
-// 'mesa-sesion-update' channel instead. Unlike postgres_changes, Broadcast routes by
-// channel name — it MUST be 'mesa-sesion-update' verbatim to match the trigger, it
-// cannot be an arbitrary per-component name. That channel is shared by every mesa in
-// the company, so filter by mesaId client-side.
+// fires for it — el trigger mesa_sesiones_notify_update hace broadcast en su lugar.
+//
+// A diferencia de postgres_changes, Broadcast enruta POR NOMBRE DE CANAL: el nombre
+// no puede ser arbitrario por componente, tiene que coincidir carácter a carácter
+// con el que publica el trigger. Por eso ambos lados lo construyen igual —
+// `mesaSesionChannel()` aquí, la misma concatenación en el trigger.
+//
+// El topic lleva scope de empresa. Dentro de la empresa lo comparten todas las
+// mesas, así que sigue haciendo falta filtrar por mesaId en el cliente.
 function createMesaBroadcastChannel(
   mesaId: string,
+  empresaId: string,
   callback: () => void,
 ): (() => void) | undefined {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -1051,7 +1060,7 @@ function createMesaBroadcastChannel(
   if (!url || !key) return undefined;
   const supabase = createClient(url, key);
   const channel = supabase
-    .channel('mesa-sesion-update')
+    .channel(mesaSesionChannel(empresaId))
     .on('broadcast', { event: 'update' }, (message: { payload: Record<string, unknown> }) => {
       if (message.payload['mesaId'] !== mesaId) return;
       callback();
@@ -1232,7 +1241,11 @@ function getStoredPaymentLock(mesaId: string): boolean {
   catch { return false; }
 }
 
-export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId: string; isWaiter?: boolean }>) {
+// Sin prop `isWaiter`: el componente ya lo resuelve solo, comparando la mesa
+// guardada del camarero con la actual (`esSesionDeCamarero`, más abajo). El prop
+// que llegaba desde el servidor no lo leía nadie, así que quitarlo no cambia el
+// comportamiento — solo deja de prometer algo que no se cumplía.
+export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
   const { language } = useLanguage();
   const lang = language;
   const { gateState, handleTokenIssued } = useMesaToken(mesaId);
@@ -1310,11 +1323,15 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
   // Realtime: refresh immediately when the session row changes (division progress,
   // sesion_pagada, pago_en_curso). This eliminates the 10s polling gap for concurrent payers.
   // mesa_sesiones no longer grants anon SELECT (RLS hardening), so postgres_changes never
-  // fires here — mesa_sesiones_notify_update broadcasts on 'mesa-sesion-update' instead.
-  // It's a public channel shared by every mesa, so filter by mesaId client-side.
+  // fires here — mesa_sesiones_notify_update broadcasts instead, en un topic con scope
+  // de empresa. Se espera a tener `mesaInfo`: sin empresaId el nombre del canal sería
+  // otro y la suscripción se quedaría muda sin dar ningún error. Mientras tanto cubre
+  // el sondeo de arriba.
+  const mesaEmpresaId = mesaInfo?.empresaId;
   useEffect(() => {
-    return createMesaBroadcastChannel(mesaId, () => { void refresh(); });
-  }, [mesaId, refresh]);
+    if (!mesaEmpresaId) return;
+    return createMesaBroadcastChannel(mesaId, mesaEmpresaId, () => { void refresh(); });
+  }, [mesaId, mesaEmpresaId, refresh]);
 
   useEffect(() => {
     const sesionId = sessionData?.sesionId;
@@ -1457,8 +1474,8 @@ export function MesaOrdersClient({ mesaId, isWaiter = false }: Readonly<{ mesaId
   useEffect(() => {
     fetch(`/api/mesas?token=${encodeURIComponent(mesaId)}`)
       .then(r => r.ok ? r.json() : null)
-      .then((d: { numero: number; nombre: string | null } | null) => {
-        if (d) setMesaInfo({ numero: d.numero, nombre: d.nombre });
+      .then((d: { numero: number; nombre: string | null; empresa_id: string } | null) => {
+        if (d) setMesaInfo({ numero: d.numero, nombre: d.nombre, empresaId: d.empresa_id });
       })
       .catch(() => null);
   }, [mesaId]);

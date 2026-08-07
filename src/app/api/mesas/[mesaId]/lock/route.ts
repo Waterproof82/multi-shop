@@ -5,7 +5,7 @@ import { getEmpresaPublicRepository } from '@/core/infrastructure/database';
 import { getDomainFromHeaders, parseMainDomain } from '@/lib/domain-utils';
 import { PAYMENT_LOCK_EXPIRY_MS } from '@/core/domain/constants/pedido';
 
-const mesaIdSchema = z.string().uuid();
+const mesaIdSchema = z.uuid();
 const LOCK_EXPIRY_MS = PAYMENT_LOCK_EXPIRY_MS;
 
 type LockRow = { pago_en_curso: boolean; pago_iniciado_en: string | null } | null;

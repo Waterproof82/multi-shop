@@ -29,7 +29,7 @@ export function ExitConfirmation() {
     if (!isMobile || isCartOpen) return;
 
     // Manejar el evento popstate para detectar cuando el usuario toca "atrás"
-    const handlePopState = (event: PopStateEvent) => {
+    const handlePopState = () => {
       // Si no hay estado de carrito, preguntamos si quiere salir
       // Usamos confirm() nativo ya que es lo único que funciona confiablemente
       if (!window.history.state || window.history.state.cartOpen !== true) {

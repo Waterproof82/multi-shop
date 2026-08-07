@@ -1,6 +1,5 @@
 import { randomBytes, createHmac, timingSafeEqual } from 'crypto';
 
-const CSRF_COOKIE_NAME = 'csrf_token';
 
 /**
  * Returns the CSRF HMAC secret, throwing at runtime if the env var is missing.

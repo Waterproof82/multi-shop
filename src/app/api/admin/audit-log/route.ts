@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
   const searchParams = Object.fromEntries(request.nextUrl.searchParams.entries());
   const parsed = querySchema.safeParse(searchParams);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json({ error: z.flattenError(parsed.error) }, { status: 400 });
   }
 
   const { page, limit, action, actorTipo, from, to } = parsed.data;

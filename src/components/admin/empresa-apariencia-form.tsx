@@ -12,14 +12,6 @@ import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import { useAdmin } from '@/lib/admin-context';
 
-const IDIOMAS = [
-  { key: 'es', label: 'Español' },
-  { key: 'en', label: 'English' },
-  { key: 'fr', label: 'Français' },
-  { key: 'it', label: 'Italiano' },
-  { key: 'de', label: 'Deutsch' },
-] as const;
-
 interface EmpresaAparienciaFormProps {
   readonly initialData: {
     logo_url: string | null;
@@ -32,7 +24,6 @@ interface EmpresaAparienciaFormProps {
     descripcion_it: string;
     descripcion_de: string;
   };
-  readonly empresaSlug: string;
 }
 
 async function saveEmpresa(data: Partial<UpdateEmpresaDTO>, empresaId: string) {
@@ -43,7 +34,7 @@ async function saveEmpresa(data: Partial<UpdateEmpresaDTO>, empresaId: string) {
   return res.ok;
 }
 
-export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaAparienciaFormProps) {
+export function EmpresaAparienciaForm({ initialData }: EmpresaAparienciaFormProps) {
   const { language } = useLanguage();
   const { overrideEmpresaId, empresaId: defaultEmpresaId } = useAdmin();
   const efectivoEmpresaId = overrideEmpresaId || defaultEmpresaId;
@@ -140,7 +131,6 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
           value={formData.logo_url ?? ''}
           onChange={handleLogoChange}
           label=""
-          empresaSlug={empresaSlug}
           previewClassName="relative group rounded-lg overflow-hidden border aspect-square w-48 max-w-48"
         />
         <p className="text-xs text-muted-foreground mt-1">
@@ -179,7 +169,6 @@ export function EmpresaAparienciaForm({ initialData, empresaSlug }: EmpresaApari
           value={formData.url_image ?? ''}
           onChange={handleImageChange}
           label=""
-          empresaSlug={empresaSlug}
           previewClassName="relative group rounded-lg overflow-hidden border w-full aspect-video max-h-48"
           isBannerImage
         />

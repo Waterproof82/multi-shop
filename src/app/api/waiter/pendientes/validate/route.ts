@@ -6,7 +6,7 @@ import { resolveActor } from '@/core/infrastructure/api/audit-actor';
 export const dynamic = 'force-dynamic';
 
 const bodySchema = z.object({
-  pedidoId: z.string().uuid(),
+  pedidoId: z.uuid(),
   retainIndices: z.array(z.number().int().min(0)).max(50).default([]),
   pausedIndices: z.array(z.number().int().min(0)).max(50).default([]),
 });

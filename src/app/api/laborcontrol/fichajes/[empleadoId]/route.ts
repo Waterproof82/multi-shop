@@ -4,8 +4,8 @@ import { getLcObtenerMisFichajesUseCase } from '@/core/laborcontrol/infrastructu
 import { z } from 'zod';
 
 const QuerySchema = z.object({
-  from: z.string().date(),
-  to:   z.string().date(),
+  from: z.iso.date(),
+  to:   z.iso.date(),
 });
 
 // GET /api/laborcontrol/fichajes/[empleadoId]?from=YYYY-MM-DD&to=YYYY-MM-DD

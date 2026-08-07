@@ -1,7 +1,8 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Pedido, CartItem, PedidoItem, Result } from "@/core/domain/entities/types";
-import { IPedidoRepository, KitchenBarCounts, KitchenOrderItem, BarOrderItem, RetenidoItem, KitchenItemRecord, ItemEstado, PendienteValidacionMesa, PendienteValidacionItem } from "@/core/domain/repositories/IPedidoRepository";
+import { IPedidoRepository, WaiterBadgeCounts, KitchenOrderItem, BarOrderItem, RetenidoItem, KitchenItemRecord, ItemEstado, PendienteValidacionMesa, PendienteValidacionItem } from "@/core/domain/repositories/IPedidoRepository";
 import { logger } from "../logging/logger";
+import { IDEMPOTENCY_REPLAY_CODE } from "@/core/domain/constants/pedido";
 
 type DeliveryData = {
   origen?: string;
@@ -11,6 +12,106 @@ type DeliveryData = {
   longitude_entrega?: number;
   estimated_delivery_fee_cents?: number;
 };
+
+/**
+ * `unique_violation` de Postgres. Lo lanza `idx_pedidos_idempotency_key` cuando
+ * dos envíos con la misma clave llegan a la vez y ambos superan la comprobación
+ * previa. No es un fallo: significa que el otro envío ya creó el pedido.
+ */
+const PG_UNIQUE_VIOLATION = '23505';
+
+function applyIdempotency(payload: Record<string, unknown>, idempotency?: { key: string; fingerprint: string }): void {
+  if (!idempotency) return;
+  payload.idempotency_key = idempotency.key;
+  payload.idempotency_fingerprint = idempotency.fingerprint;
+}
+
+type FilaEstadoItem = { pedido_id: string; item_idx: number; estado: string; from_validation: boolean };
+
+interface EstadosDeCocina {
+  /** Estado explícito de cada ítem, por pedido. */
+  porPedido: Map<string, Map<number, ItemEstado>>;
+  /**
+   * Ítems devueltos a la cola de pendientes durante la validación.
+   *
+   * `from_validation = true` significa que el camarero los retuvo desde
+   * pendientes, así que NO son trabajo de cocina y deben desaparecer de su
+   * vista. Si aparecieran, el cocinero prepararía platos que el camarero acaba
+   * de apartar.
+   */
+  retenidosEnValidacion: Map<string, Set<number>>;
+}
+
+function separarEstadosDeItems(filas: FilaEstadoItem[]): EstadosDeCocina {
+  const porPedido = new Map<string, Map<number, ItemEstado>>();
+  const retenidosEnValidacion = new Map<string, Set<number>>();
+
+  for (const fila of filas) {
+    if (fila.from_validation) {
+      if (!retenidosEnValidacion.has(fila.pedido_id)) retenidosEnValidacion.set(fila.pedido_id, new Set());
+      retenidosEnValidacion.get(fila.pedido_id)!.add(fila.item_idx);
+      continue;
+    }
+    if (!porPedido.has(fila.pedido_id)) porPedido.set(fila.pedido_id, new Map());
+    porPedido.get(fila.pedido_id)!.set(fila.item_idx, fila.estado as ItemEstado);
+  }
+
+  return { porPedido, retenidosEnValidacion };
+}
+
+const esComida = (item: Record<string, unknown>) => item['tipo_producto'] === 'comida';
+
+/** Convierte una línea de `detalle_pedido` en un registro para la vista de cocina. */
+function aRegistroDeCocina(
+  fila: Record<string, unknown>,
+  item: Record<string, unknown>,
+  idx: number,
+  estado: ItemEstado,
+): KitchenItemRecord {
+  const mesa = (fila['mesas'] as Record<string, unknown>) ?? {};
+  const complementos = item['complementos'] as Array<{ nombre?: string; name?: string }> | undefined;
+
+  return {
+    pedidoId: fila['id'] as string,
+    numeroPedido: fila['numero_pedido'] as number,
+    itemIdx: idx,
+    nombre: (item['nombre'] as string) ?? '',
+    cantidad: item['cantidad'] as number,
+    complementos: complementos?.map(c => c.nombre ?? c.name).filter(Boolean).join(', '),
+    nota: (item['nota'] as string | undefined) || undefined,
+    estado,
+    mesaNumero: (mesa['numero'] as number) ?? null,
+    mesaNombre: (mesa['nombre'] as string | null) ?? null,
+    createdAt: fila['created_at'] as string,
+    // El pase del ítem manda sobre el del pedido: un plato puede moverse de
+    // pase sin arrastrar a toda la comanda.
+    pase: (item['pase'] as string | null) ?? (fila['pase'] as string | null) ?? null,
+  };
+}
+
+/** Aplana las comandas en ítems de comida, cada uno con su estado efectivo. */
+function aplanarItemsDeCocina(
+  pedidos: Array<Record<string, unknown>>,
+  estados: EstadosDeCocina,
+): KitchenItemRecord[] {
+  const registros: KitchenItemRecord[] = [];
+
+  for (const fila of pedidos) {
+    const pedidoId = fila['id'] as string;
+    const items = (fila['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
+    const explicitos = estados.porPedido.get(pedidoId) ?? new Map<number, ItemEstado>();
+    const apartados = estados.retenidosEnValidacion.get(pedidoId);
+    // Estado que hereda el ítem cuando no tiene uno propio.
+    const heredado: ItemEstado = fila['estado'] === 'retenido' ? 'retenido' : 'pendiente';
+
+    items.forEach((item, idx) => {
+      if (!esComida(item) || apartados?.has(idx)) return;
+      registros.push(aRegistroDeCocina(fila, item, idx, explicitos.get(idx) ?? heredado));
+    });
+  }
+
+  return registros;
+}
 
 function applyDeliveryFields(payload: Record<string, unknown>, d: DeliveryData): void {
   if (d.origen) payload.origen = d.origen;
@@ -145,6 +246,16 @@ function addValidatedRetenidos(
 
 const PEDIDO_ADMIN_SELECT = '*, clientes:cliente_id (nombre, email, telefono), mesas:mesa_id (numero, nombre), sesion:sesion_id (cerrada_at)';
 
+/** Forma del JSONB que devuelve la RPC `get_pedido_stats_ano`. */
+interface PedidoStatsAno {
+  totalAno: number;
+  pedidosHoy: number;
+  totalHoy: number;
+  pedidosAnterior: number;
+  ingresosAnterior: number;
+  topPlatosAno: Array<{ nombre: string; cantidad: number; total: number }>;
+}
+
 function pedidoEffectiveDateMs(p: Record<string, unknown>): number {
   const sesion = p['sesion'] as Record<string, unknown> | null;
   const d = (sesion?.['cerrada_at'] as string | null) ?? (p['created_at'] as string);
@@ -215,12 +326,6 @@ function sumTotal(list: Array<{ total?: number | null }>): number {
   return list.reduce((s, p) => s + (p.total || 0), 0);
 }
 
-function inDateRange(start: string, end: string) {
-  const s = new Date(start);
-  const e = new Date(end);
-  return (p: { created_at: string }) => new Date(p.created_at) >= s && new Date(p.created_at) <= e;
-}
-
 export class SupabasePedidoRepository implements IPedidoRepository {
   constructor(private readonly supabase: SupabaseClient) {}
 
@@ -241,14 +346,25 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     });
   }
 
-  async findAllByTenant(empresaId: string): Promise<Result<Pedido[]>> {
+  /**
+   * `limit` acota cuántos pedidos se traen (los más recientes primero).
+   * `pedidos` no se borra nunca — trigger `pedidos_no_delete`, Art. 66 LGT
+   * exige retención fiscal de 5 años — así que sin límite esta consulta crece
+   * de forma indefinida junto con la antigüedad del negocio. Se deja opcional
+   * para no cambiar el contrato de los llamadores que sí necesitan el listado
+   * completo; quien solo muestre un resumen debe pasar un límite explícito.
+   */
+  async findAllByTenant(empresaId: string, limit?: number): Promise<Result<Pedido[]>> {
     try {
+      let query = this.supabase
+        .from('pedidos')
+        .select(PEDIDO_ADMIN_SELECT)
+        .eq('empresa_id', empresaId)
+        .order('created_at', { ascending: false });
+      if (limit !== undefined) query = query.limit(limit);
+
       const [{ data, error }, openSesionIds] = await Promise.all([
-        this.supabase
-          .from('pedidos')
-          .select(PEDIDO_ADMIN_SELECT)
-          .eq('empresa_id', empresaId)
-          .order('created_at', { ascending: false }),
+        query,
         this.getOpenSesionIds(empresaId),
       ]);
 
@@ -457,6 +573,55 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     }
   }
 
+  /**
+   * Busca el pedido creado previamente con esta clave de idempotencia.
+   *
+   * Devuelve `null` cuando la clave no se ha usado nunca — que es el caso
+   * normal. El `idempotency_fingerprint` viaja de vuelta para que la capa
+   * superior compruebe que el cuerpo entrante es realmente el mismo pedido
+   * antes de devolver su `tracking_token`.
+   */
+  async findByIdempotencyKey(
+    empresaId: string,
+    key: string
+  ): Promise<Result<{ id: string; numero_pedido: number; total: number; tracking_token: string | null; fingerprint: string | null } | null>> {
+    try {
+      const { data, error } = await this.supabase
+        .from('pedidos')
+        .select('id, numero_pedido, total, tracking_token, idempotency_fingerprint')
+        .eq('empresa_id', empresaId)
+        .eq('idempotency_key', key)
+        .maybeSingle();
+
+      if (error) {
+        await logger.logAndReturnError(
+          'DB_QUERY_ERROR',
+          error.message,
+          'repository',
+          'SupabasePedidoRepository.findByIdempotencyKey',
+          { empresaId, details: { code: error.code } }
+        );
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al verificar la clave de idempotencia', module: 'repository', method: 'findByIdempotencyKey' } };
+      }
+      if (!data) return { success: true, data: null };
+
+      const row = data as Record<string, unknown>;
+      return {
+        success: true,
+        data: {
+          id: row['id'] as string,
+          numero_pedido: row['numero_pedido'] as number,
+          total: row['total'] as number,
+          tracking_token: (row['tracking_token'] as string | null) ?? null,
+          fingerprint: (row['idempotency_fingerprint'] as string | null) ?? null,
+        },
+      };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.findByIdempotencyKey', { empresaId });
+      return { success: false, error: appError };
+    }
+  }
+
   async create(
     empresaId: string,
     clienteId: string | null,
@@ -471,7 +636,8 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       latitude_entrega?: number;
       longitude_entrega?: number;
       estimated_delivery_fee_cents?: number;
-    }
+    },
+    idempotency?: { key: string; fingerprint: string }
   ): Promise<Result<{ id: string; numero_pedido: number; total: number; trackingToken?: string }>> {
     try {
       // Atomically generate next order number using a DB function with row-level lock
@@ -519,6 +685,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       }
 
       if (deliveryData) applyDeliveryFields(insertPayload, deliveryData);
+      applyIdempotency(insertPayload, idempotency);
 
       const { data: pedido, error } = await this.supabase
         .from('pedidos')
@@ -527,6 +694,12 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         .single();
 
       if (error) {
+        // Carrera con otro envío de la misma clave: el pedido ya existe. No se
+        // registra como error porque no lo es — el resultado que el cliente
+        // espera está en la base, solo hay que ir a leerlo.
+        if (error.code === PG_UNIQUE_VIOLATION && idempotency) {
+          return { success: false, error: { code: IDEMPOTENCY_REPLAY_CODE, message: 'Pedido ya creado con esta clave', module: 'repository', method: 'create' } };
+        }
         await logger.logAndReturnError(
           'DB_INSERT_ERROR',
           error.message,
@@ -578,7 +751,26 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       const mesAnteriorEnd   = new Date(añoAnterior, mesAnterior + 1, 0, 23, 59, 59).toISOString();
 
       const [yearRes, sesionesRes, nonMesaRes] = await Promise.all([
-        this.supabase.from('pedidos').select('*, clientes!inner(*)').eq('empresa_id', empresaId).gte('created_at', yearStart),
+        // Agregación anual delegada a la base (get_pedido_stats_ano).
+        //
+        // Antes esto era `select('*, clientes!inner(*)')`, con dos problemas:
+        // 1) El `!inner` no era decorativo: al ser INNER JOIN filtraba el
+        //    conjunto a los pedidos CON cliente registrado. En producción
+        //    descartaba el 94% (374 de 396 pedidos tienen cliente_id NULL), así
+        //    que totalAno y topPlatosAno se calculaban sobre una fracción del
+        //    negocio. Ahora la RPC cuenta todos los pedidos.
+        // 2) Traía el año completo de filas (con su JSONB) a Node para reducirlo
+        //    a seis números y un top-10. `pedidos` no se borra nunca (retención
+        //    fiscal 5 años), así que ese payload sólo crecía. La RPC devuelve
+        //    ~1 KB constante, sin importar el volumen histórico.
+        this.supabase.rpc('get_pedido_stats_ano', {
+          p_empresa_id:  empresaId,
+          p_year_start:  yearStart,
+          p_today_start: todayStart,
+          p_range_end:   monthEnd,
+          p_prev_start:  mesAnteriorStart,
+          p_prev_end:    mesAnteriorEnd,
+        }),
         this.supabase.from('mesa_sesiones').select('id, cerrada_at').eq('empresa_id', empresaId).gte('cerrada_at', monthStart).lte('cerrada_at', monthEnd),
         this.supabase.from('pedidos').select('id, total, tracking_token, origen, created_at, sesion_id, cliente_id, detalle_pedido').eq('empresa_id', empresaId).is('sesion_id', null).gte('created_at', monthStart).lte('created_at', monthEnd),
       ]);
@@ -596,7 +788,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener estadísticas', module: 'repository', method: 'getStats' } };
       }
 
-      const pedidosFiltrados = yearRes.data || [];
+      const statsAno = (yearRes.data ?? {}) as Partial<PedidoStatsAno>;
       const nonMesaMes = nonMesaRes.data ?? [];
       const sesionIds = (sesionesRes.data ?? []).map(s => (s as Record<string, unknown>)['id'] as string);
       const sesionDateMap = buildSesionDateMap(sesionesRes.data ?? []);
@@ -611,11 +803,12 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         mesaMesPedidos = mesaData ?? [];
       }
 
-      const pedidosHoyArr     = pedidosFiltrados.filter(inDateRange(todayStart, monthEnd));
-      const pedidosAnteriorArr = pedidosFiltrados.filter(inDateRange(mesAnteriorStart, mesAnteriorEnd));
-      const totalHoy  = sumTotal(pedidosHoyArr);
-      const totalAno  = sumTotal(pedidosFiltrados);
-      const ingresosAnterior = sumTotal(pedidosAnteriorArr);
+      const pedidosHoy       = Number(statsAno.pedidosHoy ?? 0);
+      const pedidosAnterior  = Number(statsAno.pedidosAnterior ?? 0);
+      const totalHoy         = Number(statsAno.totalHoy ?? 0);
+      const totalAno         = Number(statsAno.totalAno ?? 0);
+      const ingresosAnterior = Number(statsAno.ingresosAnterior ?? 0);
+      const topPlatosAno     = statsAno.topPlatosAno ?? [];
 
       const allPedidosMes = [...mesaMesPedidos, ...nonMesaMes];
       const recogidaMes   = nonMesaMes.filter(p => classifyNonMesaOrigen(p) === 'recogida');
@@ -623,7 +816,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       const webMes        = nonMesaMes.filter(p => classifyNonMesaOrigen(p) === 'web');
       const totalMes = sumTotal(allPedidosMes);
       const ticketMedio = allPedidosMes.length > 0 ? totalMes / allPedidosMes.length : 0;
-      const ticketMedioAnterior = pedidosAnteriorArr.length > 0 ? ingresosAnterior / pedidosAnteriorArr.length : 0;
+      const ticketMedioAnterior = pedidosAnterior > 0 ? ingresosAnterior / pedidosAnterior : 0;
 
       const pedidosPorDia = buildPedidosPorDia(mesaMesPedidos, nonMesaMes, sesionDateMap, daysInMonth);
 
@@ -635,19 +828,19 @@ export class SupabasePedidoRepository implements IPedidoRepository {
       return {
         success: true,
         data: {
-          pedidosHoy: pedidosHoyArr.length,
+          pedidosHoy,
           pedidosMes: allPedidosMes.length,
           totalHoy,
           totalMes,
           totalAno,
           topPlatos: buildTopPlatosFromList(allPedidosMes),
-          topPlatosAno: buildTopPlatosFromList(pedidosFiltrados),
+          topPlatosAno,
           pedidosPorDia,
           clientesNuevos: clientesSet.size,
           clientesRecurrentes: 0,
           ticketMedio,
           ticketMedioAnterior,
-          pedidosAnterior: pedidosAnteriorArr.length,
+          pedidosAnterior,
           ingresosAnterior,
           byOrigen: {
             mesa:     { pedidos: mesaMesPedidos.length, total: sumTotal(mesaMesPedidos) },
@@ -736,6 +929,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
     initialEstado?: 'pendiente' | 'retenido' | 'pendiente_validacion';
     nota?: string;
     pase?: string | null;
+    idempotency?: { key: string; fingerprint: string };
   }): Promise<Result<{ id: string; numero_pedido: number; tracking_token: string }>> {
     try {
       const { data: nextNum, error: rpcError } = await this.supabase
@@ -777,6 +971,7 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         ...(params.nota ? { nota: params.nota } : {}),
         ...(params.pase ? { pase: params.pase } : {}),
       };
+      applyIdempotency(insertPayload, params.idempotency);
 
       const { data: pedido, error } = await this.supabase
         .from('pedidos')
@@ -785,6 +980,10 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         .single();
 
       if (error) {
+        // Ver el comentario equivalente en `create`: colisión de clave = ya existe.
+        if (error.code === PG_UNIQUE_VIOLATION && params.idempotency) {
+          return { success: false, error: { code: IDEMPOTENCY_REPLAY_CODE, message: 'Pedido ya creado con esta clave', module: 'repository', method: 'createMesaOrder' } };
+        }
         await logger.logAndReturnError(
           'DB_INSERT_ERROR',
           error.message,
@@ -1052,117 +1251,44 @@ export class SupabasePedidoRepository implements IPedidoRepository {
   }
 
   /**
-   * Returns live badge counts for the waiter banner (cocina + bebidas).
+   * Contadores del WaiterBanner en UNA sola consulta (RPC `get_waiter_badge_counts`).
    *
-   * Bebidas total = bebida items in pendiente orders that have NOT yet been
-   * marked `servido` in pedido_item_estados. This query is per-item (not per-order)
-   * so partial serving (e.g. 1 of 2 drinks) is reflected correctly.
+   * Sustituye a `countKitchenBarOrders` mas el conteo que la ruta derivaba de
+   * `findPendientesValidacion`. Juntos encadenaban hasta diez roundtrips — cada
+   * uno dependiente de los ids del anterior — y transportaban el `detalle_pedido`
+   * completo de todo el servicio para acabar devolviendo seis enteros. Es la ruta
+   * mas caliente del sistema: el banner la re-invoca en cada evento de Realtime.
    *
-   * Mixed orders (comida + bebida) are counted here for bebidas even though
-   * the parent pedido.estado remains `pendiente`; the bar page is responsible
-   * for PATCHing it to `anotado` once all bebidas are served.
+   * La agregacion vive ahora en SQL. La equivalencia detallada con la logica JS
+   * que sustituye esta documentada en la migracion
+   * `20260803000001_get_waiter_badge_counts_rpc.sql`.
    */
-  private tallyCocinaItems(items: KitchenItemRecord[]): { total: number; listos: number; retenidos: number } {
-    let total = 0;
-    let listos = 0;
-    let retenidos = 0;
-    for (const item of items) {
-      if (item.estado === 'pendiente' || item.estado === 'en_preparacion') total++;
-      else if (item.estado === 'listo')    listos++;
-      else if (item.estado === 'retenido') retenidos++;
-    }
-    return { total, listos, retenidos };
-  }
-
-  private async countBebidasTotal(sessionIds: string[]): Promise<Result<number>> {
-    const { data: pedidos, error: pedidosError } = await this.supabase
-      .from('pedidos')
-      .select('id, detalle_pedido, estado')
-      .in('sesion_id', sessionIds)
-      .eq('estado', 'pendiente');
-
-    if (pedidosError) {
-      await logger.logAndReturnError('DB_SELECT_ERROR', pedidosError.message, 'repository', 'SupabasePedidoRepository.countBebidasTotal', { details: { code: pedidosError.code } });
-      return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pedidos', module: 'repository', method: 'countBebidasTotal' } };
-    }
-
-    const pedidoRows = (pedidos ?? []) as Record<string, unknown>[];
-    const pedidoIdsWithBebida = pedidoRows
-      .filter(row => (row['detalle_pedido'] as Array<Record<string, unknown>>).some(i => i['tipo_producto'] === 'bebida'))
-      .map(row => row['id'] as string);
-
-    const estadoMap = new Map<string, Map<number, string>>();
-    const fromValidationSet = new Set<string>(); // "pedidoId:itemIdx" — back in pendientes queue
-    if (pedidoIdsWithBebida.length > 0) {
-      const { data: itemEstados } = await this.supabase
-        .from('pedido_item_estados')
-        .select('pedido_id, item_idx, estado, from_validation')
-        .in('pedido_id', pedidoIdsWithBebida);
-
-      for (const row of itemEstados ?? []) {
-        const r = row as Record<string, unknown>;
-        const pid = r['pedido_id'] as string;
-        const idx = r['item_idx'] as number;
-        if (r['from_validation'] === true) { fromValidationSet.add(`${pid}:${idx}`); continue; }
-        if (!estadoMap.has(pid)) estadoMap.set(pid, new Map());
-        estadoMap.get(pid)!.set(idx, r['estado'] as string);
-      }
-    }
-
-    let total = 0;
-    for (const pedido of pedidoRows) {
-      const items = (pedido['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
-      const pedidoId = pedido['id'] as string;
-      const pedidoEstados = estadoMap.get(pedidoId) ?? new Map();
-      items.forEach((item, idx) => {
-        if (
-          item['tipo_producto'] === 'bebida' &&
-          !fromValidationSet.has(`${pedidoId}:${idx}`) &&
-          pedidoEstados.get(idx) !== 'servido' &&
-          pedidoEstados.get(idx) !== 'cancelado'
-        ) total++;
-      });
-    }
-    return { success: true, data: total };
-  }
-
-  async countKitchenBarOrders(empresaId: string): Promise<Result<KitchenBarCounts>> {
+  async getWaiterBadgeCounts(empresaId: string): Promise<Result<WaiterBadgeCounts>> {
     try {
-      // Cocina counts: per-item estado from pedido_item_estados
-      const itemsResult = await this.fetchAllComidaItems(empresaId);
-      if (!itemsResult.success) return { success: false, error: itemsResult.error };
+      const { data, error } = await this.supabase.rpc('get_waiter_badge_counts', {
+        p_empresa_id: empresaId,
+      });
 
-      const cocina = this.tallyCocinaItems(itemsResult.data);
-
-      // Bar counts: pure bebida orders in pendiente state (unchanged)
-      const { data: activeSessions, error: sessionsError } = await this.supabase
-        .from('mesa_sesiones')
-        .select('id')
-        .eq('empresa_id', empresaId)
-        .is('cerrada_at', null);
-
-      if (sessionsError) {
-        await logger.logAndReturnError('DB_SELECT_ERROR', sessionsError.message, 'repository', 'SupabasePedidoRepository.countKitchenBarOrders', { details: { code: sessionsError.code, empresaId } });
-        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener sesiones activas', module: 'repository', method: 'countKitchenBarOrders' } };
+      if (error) {
+        await logger.logAndReturnError('DB_SELECT_ERROR', error.message, 'repository', 'SupabasePedidoRepository.getWaiterBadgeCounts', { details: { code: error.code, empresaId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener conteos', module: 'repository', method: 'getWaiterBadgeCounts' } };
       }
 
-      const sessionIds = (activeSessions ?? []).map(s => (s as Record<string, unknown>).id as string);
-      let bebidasTotal = 0;
-      if (sessionIds.length > 0) {
-        const bebidasResult = await this.countBebidasTotal(sessionIds);
-        if (!bebidasResult.success) return { success: false, error: bebidasResult.error };
-        bebidasTotal = bebidasResult.data;
-      }
+      const row = (data ?? {}) as Record<string, unknown>;
+      const num = (key: string): number => Number(row[key] ?? 0);
 
       return {
         success: true,
         data: {
-          cocina: { total: cocina.total, listos: cocina.listos, retenidos: cocina.retenidos },
-          bebidas: { total: bebidasTotal, listos: 0, retenidos: 0 },
+          cocina: { total: num('cocinaTotal'), listos: num('cocinaListos'), retenidos: num('cocinaRetenidos') },
+          // El bar no distingue listos/retenidos: un item servido sale del conteo.
+          bebidas: { total: num('bebidasTotal'), listos: 0, retenidos: 0 },
+          pendientes: num('pendientes'),
+          llamadas: num('llamadas'),
         },
       };
     } catch (e) {
-      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.countKitchenBarOrders', { empresaId });
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.getWaiterBadgeCounts', { empresaId });
       return { success: false, error: appError };
     }
   }
@@ -1384,80 +1510,27 @@ export class SupabasePedidoRepository implements IPedidoRepository {
         return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener pedidos', module: 'repository', method: 'fetchAllComidaItems' } };
       }
 
-      const pedidoIds = (orders ?? [])
-        .filter(o => {
-          const items = (o as Record<string, unknown>)['detalle_pedido'] as Array<Record<string, unknown>>;
-          return items.some(i => i['tipo_producto'] === 'comida');
-        })
-        .map(o => (o as Record<string, unknown>)['id'] as string);
+      const filas = (orders ?? []) as Array<Record<string, unknown>>;
+      const conComida = filas.filter(f =>
+        ((f['detalle_pedido'] as Array<Record<string, unknown>>) ?? []).some(esComida),
+      );
 
-      // Fetch item estados (empty Map if no pedidos)
-      const estadoMap = new Map<string, Map<number, ItemEstado>>();
-      // Items auto-retained back to the pendientes queue (from_validation=true) must
-      // be excluded from the kitchen result entirely — they are not kitchen work.
-      const pendientesRetainedSet = new Map<string, Set<number>>();
-      if (pedidoIds.length > 0) {
+      let estados: EstadosDeCocina = { porPedido: new Map(), retenidosEnValidacion: new Map() };
+      if (conComida.length > 0) {
         const { data: itemEstados, error: estadosError } = await this.supabase
           .from('pedido_item_estados')
           .select('pedido_id, item_idx, estado, from_validation')
-          .in('pedido_id', pedidoIds);
+          .in('pedido_id', conComida.map(f => f['id'] as string));
 
         if (estadosError) {
           await logger.logAndReturnError('DB_SELECT_ERROR', estadosError.message, 'repository', 'SupabasePedidoRepository.fetchAllComidaItems', { details: { code: estadosError.code, empresaId } });
           return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener estados de ítems', module: 'repository', method: 'fetchAllComidaItems' } };
         }
 
-        for (const row of itemEstados ?? []) {
-          const r = row as Record<string, unknown>;
-          const pid = r['pedido_id'] as string;
-          const idx = r['item_idx'] as number;
-          if (r['from_validation'] === true) {
-            // Item auto-retained during pendientes validation → back in pendientes queue.
-            // Track it so we can exclude it from the kitchen result below.
-            if (!pendientesRetainedSet.has(pid)) pendientesRetainedSet.set(pid, new Set());
-            pendientesRetainedSet.get(pid)!.add(idx);
-            continue;
-          }
-          if (!estadoMap.has(pid)) estadoMap.set(pid, new Map());
-          estadoMap.get(pid)!.set(idx, r['estado'] as ItemEstado);
-        }
+        estados = separarEstadosDeItems((itemEstados ?? []) as FilaEstadoItem[]);
       }
 
-      const result: KitchenItemRecord[] = [];
-      for (const order of orders ?? []) {
-        const row = order as Record<string, unknown>;
-        const items = (row['detalle_pedido'] as Array<Record<string, unknown>>) ?? [];
-        const mesaData = row['mesas'] as Record<string, unknown> ?? {};
-        const pedidoId = row['id'] as string;
-        const pedidoEstados = estadoMap.get(pedidoId) ?? new Map<number, ItemEstado>();
-        const pedidoNivelEstado = row['estado'] as string;
-
-        items.forEach((item, idx) => {
-          if (item['tipo_producto'] !== 'comida') return;
-          // Skip items auto-retained back to the pendientes queue — they are not
-          // kitchen work and must not appear in the kitchen view.
-          if (pendientesRetainedSet.get(pedidoId)?.has(idx)) return;
-          const defaultEstado: ItemEstado = pedidoNivelEstado === 'retenido' ? 'retenido' : 'pendiente';
-          const estado: ItemEstado = pedidoEstados.get(idx) ?? defaultEstado;
-          const complements = item['complementos'] as Array<{ nombre?: string; name?: string }> | undefined;
-          result.push({
-            pedidoId,
-            numeroPedido: row['numero_pedido'] as number,
-            itemIdx: idx,
-            nombre: (item['nombre'] as string) ?? '',
-            cantidad: item['cantidad'] as number,
-            complementos: complements?.map(c => c.nombre ?? c.name).filter(Boolean).join(', '),
-            nota: (item['nota'] as string | undefined) || undefined,
-            estado,
-            mesaNumero: (mesaData['numero'] as number) ?? null,
-            mesaNombre: (mesaData['nombre'] as string | null) ?? null,
-            createdAt: row['created_at'] as string,
-            pase: (item['pase'] as string | null) ?? (row['pase'] as string | null) ?? null,
-          });
-        });
-      }
-
-      return { success: true, data: result };
+      return { success: true, data: aplanarItemsDeCocina(filas, estados) };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabasePedidoRepository.fetchAllComidaItems', { empresaId });
       return { success: false, error: appError };

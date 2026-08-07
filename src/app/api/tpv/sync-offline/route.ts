@@ -12,15 +12,15 @@ import { z } from 'zod';
 
 const EntrySchema = z.object({
   id: z.string().max(64),
-  sesionId: z.string().uuid(),
+  sesionId: z.uuid(),
   mesaNumero: z.number().int().positive(),
   metodoPago: z.enum(['efectivo', 'tarjeta']),
   importeCobradoCents: z.number().int().positive(),
   propinaCents: z.number().int().min(0),
   descuentoCents: z.number().int().min(0).default(0),
   operadorNombre: z.string().max(100),
-  turnoId: z.string().uuid(),
-  empresaId: z.string().uuid(),
+  turnoId: z.uuid(),
+  empresaId: z.uuid(),
   ivaPorcentaje: z.number().min(0).max(30).default(10),
   ts: z.number(),
 });
@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
 
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json({ error: z.flattenError(parsed.error) }, { status: 400 });
   }
 
   const results: SyncResult[] = [];
