@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Image from 'next/image';
+import { ImagenSubida as Image } from './ui/imagen-subida';
 import { StarRating } from './star-rating';
 import type { Language } from '@/lib/language-context';
 import { t } from '@/lib/translations';

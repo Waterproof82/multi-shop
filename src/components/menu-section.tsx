@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, memo, useCallback, useEffect, useRef } from "react"
-import Image from "next/image"
+import { ImagenSubida as Image } from './ui/imagen-subida';
 import { motion } from "framer-motion"
 import { ChevronRight } from "lucide-react"
 import { Badge } from "@/components/ui/badge"

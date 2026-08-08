@@ -1,7 +1,7 @@
 "use client"
 
 import { motion, useReducedMotion } from "framer-motion"
-import Image from "next/image"
+import { ImagenSubida as Image } from './ui/imagen-subida';
 import { useLanguage } from "@/lib/language-context"
 import { t } from "@/lib/translations"
 import type { EmpresaPublic } from "@/core/domain/entities/types"

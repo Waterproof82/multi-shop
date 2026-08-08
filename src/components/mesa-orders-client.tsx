@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
-import Image from "next/image";
+import { ImagenSubida as Image } from './ui/imagen-subida';
 import { ArrowLeft, CreditCard, Receipt, Users, ShieldCheck, Plus, Minus, X, SplitSquareVertical } from "lucide-react";
 import Link from "next/link";
 import { useLanguage } from "@/lib/language-context";

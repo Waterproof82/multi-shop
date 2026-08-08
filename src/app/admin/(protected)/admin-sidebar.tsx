@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import { ImagenSubida as Image } from '../../../components/ui/imagen-subida';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Package, Tags, LogOut, Menu, X, ShoppingCart,

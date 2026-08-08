@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
+import { ImagenSubida as Image } from '../../components/ui/imagen-subida';
 import { Building2, Globe, MapPin, Image as ImageIcon, FileText, Share2, ExternalLink, FileSearch, ChevronDown, ChevronRight } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { PillSwitch } from '@/components/ui/pill-switch';

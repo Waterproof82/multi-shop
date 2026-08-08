@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
+import { ImagenSubida as Image } from '../../../../components/ui/imagen-subida';
 import {
   Users, Mail, FileText, Send, CheckCircle, Image as ImageIcon, Loader2,
 } from 'lucide-react';
