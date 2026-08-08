@@ -42,6 +42,19 @@ name: E2E
 #
 # ── COBERTURA QUE AÚN FALTA ──────────────────────────────────────────────────
 # `CRON_SECRET` no está definido: desbloquea un test de la purga RGPD.
+#
+# SIN DIAGNOSTICAR: ~10 tests que dependen del login de admin (db-smoke suite 3,
+# tpv-acid, tpv-chain-verify) siguen saltándose contra la preview aunque
+# PLAYWRIGHT_ADMIN_EMAIL y PLAYWRIGHT_ADMIN_PASSWORD SÍ están definidos.
+# `/api/admin/login` no resuelve el tenant por dominio, así que la explicación
+# de los 55 flujos de camarero NO aplica aquí — la causa es otra y está por
+# encontrar. Sospecha principal: el rate limit de Upstash, que en un despliegue
+# de preview puede no tener `UPSTASH_REDIS_REST_URL` configurada.
+#
+# Para diagnosticarlo hace falta llamar a la preview con la cabecera de bypass
+# y mirar qué devuelve `/api/admin/login`. Contra el entorno de pruebas (push a
+# main) esos tests sí corren, así que la cobertura no se pierde: solo llega más
+# tarde.
 
 on:
   push:
