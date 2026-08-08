@@ -15,9 +15,13 @@ name: E2E
 #   PULL REQUEST → preview efímera de Vercel → ~143 de 209 tests.
 #     Aislado y seguro: cada PR tiene su despliegue y no pisa a nadie.
 #
-#   PUSH a main/develop → despliegue del entorno de pruebas → los 209.
-#     Se espera a que Vercel publique ESE commit antes de arrancar; si no, el
-#     job probaría el despliegue anterior.
+#   PUSH a main/develop → alias del entorno de pruebas → los 209.
+#     Se espera a que el despliegue de ESE commit termine, y solo entonces se
+#     prueba el ALIAS. Es la clave: el alias ya apunta a este commit, y su
+#     hostname SÍ está dado de alta en `empresas.dominio`, así que la
+#     multi-tenencia resuelve y la suite entera corre. Probar la URL efímera
+#     del despliegue ejercitaría el mismo código pero perdería la mitad de los
+#     tests — que es exactamente lo que pasaba antes de este arreglo.
 #
 # POR QUÉ EN UN PR NO CORREN LOS 209
 # El tenant se resuelve por HOSTNAME: `parseMainDomain()` → `findByDomain()`,
@@ -92,6 +96,7 @@ jobs:
         id: destino
         uses: ./.github/actions/resolver-url-a-probar
         with:
+          url-entorno: https://mermelada-tomate.vercel.app
           token: ${{ github.token }}
           secreto-bypass: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
