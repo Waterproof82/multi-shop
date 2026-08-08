@@ -12,6 +12,7 @@
  * Requiere: PLAYWRIGHT_ADMIN_EMAIL + PLAYWRIGHT_ADMIN_PASSWORD
  */
 import { test, expect, type APIRequestContext } from '@playwright/test';
+import { nuevoContexto } from '../helpers/contexto';
 
 const DUMMY_UUID = '00000000-0000-0000-0000-000000000099';
 
@@ -24,7 +25,7 @@ test.describe('TPV ACID — atomicidad transaccional (Ley 11/2021)', () => {
 
   test.beforeAll(async ({ playwright, baseURL }) => {
     if (!adminEmail() || !adminPassword()) return;
-    request = await playwright.request.newContext({ baseURL });
+    request = await nuevoContexto(playwright, baseURL);
     const res = await request.post('/api/admin/login', {
       data: { email: adminEmail()!, password: adminPassword()! },
     });

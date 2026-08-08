@@ -24,6 +24,7 @@
 
 import { randomUUID } from 'crypto';
 import { test, expect, type APIRequestContext } from '@playwright/test';
+import { nuevoContexto } from './helpers/contexto';
 
 // ── Auth compartida entre suites ──────────────────────────────────────────────
 
@@ -44,7 +45,7 @@ test.beforeAll(async ({ playwright, baseURL }) => {
   const pin = process.env.PLAYWRIGHT_WAITER_PIN;
   if (!pin) return;
 
-  const ctx = await playwright.request.newContext({ baseURL });
+  const ctx = await nuevoContexto(playwright, baseURL);
 
   // 1. CSRF token (endpoint público)
   const csrfRes = await ctx.get('/api/admin/login');
@@ -81,7 +82,7 @@ test.describe('Routing — auth barrier (sin vars de entorno)', () => {
   let request: APIRequestContext;
 
   test.beforeEach(async ({ playwright, baseURL }) => {
-    request = await playwright.request.newContext({ baseURL });
+    request = await nuevoContexto(playwright, baseURL);
   });
   test.afterEach(async () => { await request.dispose(); });
 
@@ -175,7 +176,7 @@ test.describe('Routing — con auth real (requiere PLAYWRIGHT_WAITER_PIN)', () =
   let request: APIRequestContext;
 
   test.beforeEach(async ({ playwright, baseURL }) => {
-    request = await playwright.request.newContext({ baseURL });
+    request = await nuevoContexto(playwright, baseURL);
   });
   test.afterEach(async () => { await request.dispose(); });
 
@@ -292,7 +293,7 @@ test.describe('Bug A+B regression — from_validation=true routing (requiere PIN
   test.beforeAll(async ({ playwright, baseURL }) => {
     if (!sessionWaiterToken || !sessionEmpresaId || !supabaseUrl || !serviceRoleKey) return;
 
-    const appCtx = await playwright.request.newContext({ baseURL });
+    const appCtx = await nuevoContexto(playwright, baseURL);
     const dbCtx  = await playwright.request.newContext({ baseURL: supabaseUrl });
 
     try {
@@ -361,7 +362,7 @@ test.describe('Bug A+B regression — from_validation=true routing (requiere PIN
   });
 
   test.beforeEach(async ({ playwright, baseURL }) => {
-    request = await playwright.request.newContext({ baseURL });
+    request = await nuevoContexto(playwright, baseURL);
   });
   test.afterEach(async () => { await request.dispose(); });
 
@@ -433,7 +434,7 @@ test.describe('Bug C regression — comida retenida con pedido en estado anotado
   test.beforeAll(async ({ playwright, baseURL }) => {
     if (!sessionWaiterToken || !sessionEmpresaId || !supabaseUrl || !serviceRoleKey) return;
 
-    const appCtx = await playwright.request.newContext({ baseURL });
+    const appCtx = await nuevoContexto(playwright, baseURL);
     const dbCtx  = await playwright.request.newContext({ baseURL: supabaseUrl });
 
     try {
@@ -502,7 +503,7 @@ test.describe('Bug C regression — comida retenida con pedido en estado anotado
   });
 
   test.beforeEach(async ({ playwright, baseURL }) => {
-    request = await playwright.request.newContext({ baseURL });
+    request = await nuevoContexto(playwright, baseURL);
   });
   test.afterEach(async () => { await request.dispose(); });
 
@@ -597,7 +598,7 @@ test.describe('Suite 5 — lanzar pase + pausa: retainIndices vs pausedIndices (
   test.beforeAll(async ({ playwright, baseURL }) => {
     if (!sessionWaiterToken || !sessionEmpresaId || !supabaseUrl || !serviceRoleKey) return;
 
-    const appCtx = await playwright.request.newContext({ baseURL });
+    const appCtx = await nuevoContexto(playwright, baseURL);
     const dbCtx  = await playwright.request.newContext({ baseURL: supabaseUrl });
 
     try {
@@ -701,7 +702,7 @@ test.describe('Suite 5 — lanzar pase + pausa: retainIndices vs pausedIndices (
   });
 
   test.beforeEach(async ({ playwright, baseURL }) => {
-    request = await playwright.request.newContext({ baseURL });
+    request = await nuevoContexto(playwright, baseURL);
   });
   test.afterEach(async () => { await request.dispose(); });
 

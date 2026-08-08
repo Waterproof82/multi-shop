@@ -15,6 +15,7 @@
  * en el beforeAll. Sin PIN, se omiten con skip.
  */
 import { test, expect, type APIRequestContext } from '@playwright/test';
+import { nuevoContexto } from './helpers/contexto';
 
 // Ruta waiter que existe y acepta POST (validar pedido)
 const WAITER_POST_URL = '/api/waiter/pedidos/validate';
@@ -29,7 +30,7 @@ test.describe('Waiter CSRF protection', () => {
     const pin = process.env.PLAYWRIGHT_WAITER_PIN;
     if (!pin) return;
 
-    const ctx = await playwright.request.newContext({ baseURL });
+    const ctx = await nuevoContexto(playwright, baseURL);
     const res = await ctx.post('/api/waiter/auth', { data: { pin } });
     if (res.ok()) {
       const raw = res.headers()['set-cookie'] ?? '';
@@ -40,7 +41,7 @@ test.describe('Waiter CSRF protection', () => {
   });
 
   test.beforeEach(async ({ playwright, baseURL }) => {
-    request = await playwright.request.newContext({ baseURL });
+    request = await nuevoContexto(playwright, baseURL);
   });
 
   test.afterEach(async () => {
