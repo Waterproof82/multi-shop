@@ -200,13 +200,21 @@ Tras CADA `supabase db push` o `supabase migration up`:
 - **`delivery_habilitado`** en `empresas` (DEFAULT `false`): activa "Zona de entrega" en sidebar. Controlable desde superadmin.
 - Mesas / Pagos Mesa / Validacion solo se muestran para `tipo === 'restaurante'`.
 
-## Service Worker PWA — Trampas Criticas
+## Offline, Resiliencia y UI Optimista — Trampas Criticas
 
-> Ver doc completo: `docs/context/pwa-offline-system.md`
+> Ver doc completo: `docs/context/offline-y-resiliencia.md`
+> (service worker en detalle: `docs/context/pwa-offline-system.md`)
 
+- **`fetch()` solo falla rapido cuando NO hay red.** Con red DEGRADADA —WiFi asociado sin salida, 4G a una raya— se queda colgado. Es el origen de casi todo el diseno offline de esta app.
+- **UI optimista (`patchEstado`)**: ante error del SERVIDOR se hace rollback (la intencion no era valida); ante fallo de RED **no se revierte** y se encola (la intencion sigue siendo valida). Confundir ambos obliga al cocinero a repetir la accion.
+- **Cola offline: solo comandos IDEMPOTENTES.** Los pedidos NO se encolan aunque ya exista clave de idempotencia — reproducir una comanda minutos despues manda comida a una mesa que puede haberse levantado.
+- **Colapso por `key`**: reproducir estados desordenados dejaria el item en el estado equivocado.
+- **Con la pantalla apagada los timers se congelan.** Sincronizar solo con `setInterval` deja un agujero; hay que escuchar `visibilitychange` + `pageshow`, filtrando el sentido (`isResumeSignal`).
+- **`navigator.onLine` miente en positivo, no en negativo.** Sirve para evitar un intento condenado, no para confiar en que hay red.
+- **Background Sync API no existe en el WebView de Android** (donde vive el APK de Capacitor) ni es fiable en Electron. Evaluada y descartada.
 - `public/sw.js` es plain JS, scope `/waiter`. Solo se registra en produccion.
-- **`navigator.onLine` guard obligatorio** en `WaiterBanner` — sin el, un `Failed to fetch` offline expulsa al camarero.
 - **`/api/*` es NetworkOnly siempre** — nunca cachear auth ni datos de pedidos.
+- **`NetworkFirst` con timeout de 3s** en `/waiter/*` y `bell.mp3`. Sin el, red degradada = pantalla en blanco.
 
 ## SEO Multi-Tenant
 

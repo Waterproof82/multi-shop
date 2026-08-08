@@ -1,5 +1,32 @@
 # Testing & CI
 
+> **Contexto de por qué la suite creció de 10 a 25 ficheros en agosto de 2026:**
+> ver [`offline-y-resiliencia.md`](./offline-y-resiliencia.md), sección 5. En
+> resumen: `vitest` no resolvía el alias `@/`, así que **ningún test podía
+> importar `src/core`**. Toda la capa de aplicación e infraestructura era
+> intesteable — no por decisión, por el runner.
+
+## Contra qué corre el E2E (importante)
+
+`PLAYWRIGHT_BASE_URL` **ya no apunta a una URL fija**. Antes lo hacía, y eso
+significaba que en un pull request la suite interrogaba el sitio **ya
+desplegado** en vez del código propuesto: pasaba en verde aunque el PR estuviera
+roto.
+
+| Evento | Contra qué | Tests que corren |
+|---|---|---|
+| Pull request | preview efímera de ESE commit | ~143 de 214 |
+| Push a `main`/`develop` | alias del entorno, tras confirmar el despliegue | ~205 de 214 |
+
+La diferencia no es arbitraria: el tenant se resuelve por **hostname**, y una
+preview tiene un host efímero que no está en `empresas.dominio`. Sin tenant, los
+flujos con sesión de camarero no pueden correr. Detalle completo en la cabecera
+de `.github/workflows/e2e.yml`.
+
+**Las PRs de Dependabot omiten el E2E a propósito**: GitHub no les entrega los
+secrets del repositorio (van a un almacén aparte), y rellenarlo sería dar la
+`service_role` key a código de dependencias sin revisar.
+
 ## Suites de test
 
 | Comando | Motor | Qué cubre | Requiere |

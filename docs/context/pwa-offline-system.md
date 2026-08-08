@@ -1,5 +1,15 @@
 # PWA & Service Worker — Waiter Panel
 
+> Este documento cubre **el service worker**. Para la estrategia offline
+> completa —UI optimista, cola de comandos, idempotencia de pedidos y
+> resiliencia de Realtime— ver
+> [`offline-y-resiliencia.md`](./offline-y-resiliencia.md).
+>
+> Cambio relevante (ago 2026): el `NetworkFirst` de `/waiter/*` y `bell.mp3`
+> lleva **timeout de 3 s**. Sin él, la red degradada —WiFi asociado sin salida—
+> dejaba la pantalla en blanco: `fetch()` solo falla rápido cuando NO hay red,
+> no cuando está mala.
+
 ## What this system does (and what it doesn't)
 
 The Service Worker for `/waiter` provides **performance and resilience against brief connection drops**. It does NOT enable true offline functionality.
