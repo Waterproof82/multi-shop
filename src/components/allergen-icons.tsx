@@ -1,3 +1,4 @@
+import { cn } from '@/lib/utils';
 import { t } from '@/lib/translations';
 import type { translations } from '@/lib/translations';
 import type { Language } from '@/lib/language-context';
@@ -238,7 +239,7 @@ export function AllergenBadges({
 }: Readonly<{ alergenos?: string[]; className?: string }>): React.ReactElement | null {
   if (!alergenos?.length) return null;
   return (
-    <div className={`flex flex-wrap gap-1${className ? ` ${className}` : ''}`}>
+    <div className={cn('flex flex-wrap gap-1', className)}>
       {alergenos.map((a) => (
         <AllergenIcon
           key={a}
