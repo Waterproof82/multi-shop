@@ -20,12 +20,29 @@ name: E2E
 # los secrets del repositorio. La preview de Vercel sí los tiene, así que se
 # reutiliza en vez de duplicar la configuración.
 #
-# ── COBERTURA QUE FALTA ──────────────────────────────────────────────────────
-# Los tests que necesitan credenciales (PLAYWRIGHT_WAITER_PIN,
-# PLAYWRIGHT_ADMIN_EMAIL/PASSWORD, PLAYWRIGHT_WAITER_TOKEN) se SALTAN si esos
-# secrets no existen — y a día de hoy NO existen en este repositorio. Es decir:
-# en CI solo corren las pruebas sin autenticar. Añadirlos en
-# Settings > Secrets and variables > Actions desbloquea el resto.
+# ── COBERTURA QUE FALTA, Y POR QUÉ ───────────────────────────────────────────
+# Contra la preview corren ~143 de los 209 tests. Los ~66 restantes se saltan
+# por dos motivos distintos, y solo uno se arregla con secrets:
+#
+# 1. FALTA `PLAYWRIGHT_ADMIN_EMAIL` (~10 tests). Los specs comprueban email Y
+#    contraseña; con solo la contraseña se saltan igual. Afecta a db-smoke,
+#    rgpd-anonimizacion, tpv-acid, tpv-chain-verify y tpv-export-integrity.
+#    Se arregla añadiéndolo en Settings > Secrets and variables > Actions.
+#    Lo mismo con CRON_SECRET, que desbloquea un test de la purga RGPD.
+#
+# 2. EL TENANT SE RESUELVE POR HOSTNAME (~55 tests). `parseMainDomain()` →
+#    `findByDomain()`: la empresa sale del dominio de la petición. Una preview
+#    tiene un host efímero (`multi-shop-<hash>-<team>.vercel.app`) que NO está
+#    registrado en `empresas.dominio`, así que no hay tenant, el login del
+#    camarero falla y se saltan todos los flujos con sesión.
+#
+#    Esto NO se arregla con secrets: es consecuencia de que la multi-tenencia
+#    sea por dominio. La solución de verdad es un entorno de staging con un
+#    hostname FIJO dado de alta como dominio de una empresa de pruebas, y
+#    apuntar ahí en vez de a la preview efímera.
+#
+#    Mientras tanto, esos 55 solo se ejercitan corriendo la suite en local
+#    contra producción, que es lo que hace `.env.local`.
 
 on:
   push:
