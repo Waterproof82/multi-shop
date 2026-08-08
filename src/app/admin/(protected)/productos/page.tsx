@@ -85,7 +85,7 @@ const SortIndicator = ({ field, currentField, direction }: { field: keyof Produc
 };
 
 export default function ProductosPage() {
-  const { empresaId, empresaSlug, overrideEmpresaId, empresaTipo } = useAdmin();
+  const { empresaId, overrideEmpresaId, empresaTipo } = useAdmin();
   const { language } = useLanguage();
   const effectiveEmpresaId = overrideEmpresaId || empresaId;
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -447,7 +447,7 @@ export default function ProductosPage() {
                   {t("image", language)}
                 </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase" aria-sort={getAriaSortValue('titulo_es')}>
-                  <button 
+                  <button type="button" 
                     className="flex items-center gap-1 hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm px-1"
                     onClick={() => handleSort('titulo_es')}
                   >
@@ -456,7 +456,7 @@ export default function ProductosPage() {
                   </button>
                 </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase" aria-sort={getAriaSortValue('precio')}>
-                  <button 
+                  <button type="button" 
                     className="flex items-center gap-1 hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm px-1"
                     onClick={() => handleSort('precio')}
                   >
@@ -465,7 +465,7 @@ export default function ProductosPage() {
                   </button>
                 </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase" aria-sort={getAriaSortValue('categoria')}>
-                  <button
+                  <button type="button"
                     className="flex items-center gap-1 hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm px-1"
                     onClick={() => handleSort('categoria')}
                   >
@@ -479,7 +479,7 @@ export default function ProductosPage() {
                   </th>
                 )}
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase" aria-sort={getAriaSortValue('activo')}>
-                  <button 
+                  <button type="button" 
                     className="flex items-center gap-1 hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm px-1"
                     onClick={() => handleSort('activo')}
                   >
@@ -563,7 +563,7 @@ export default function ProductosPage() {
                     </td>
                   )}
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <button
+                    <button type="button"
                       onClick={() => toggleActivo(prod)}
                       aria-label={`${prod.activo ? t("inactive", language) : t("active", language)} ${prod.titulo_es}`}
                       className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
@@ -576,14 +576,14 @@ export default function ProductosPage() {
                     </button>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
-                    <button
+                    <button type="button"
                       onClick={() => openEditModal(prod)}
                       className="p-2 text-primary hover:text-primary/80 mr-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
                       aria-label={`${t("edit", language)} ${prod.titulo_es}`}
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
-                    <button
+                    <button type="button"
                       onClick={() => handleDeleteProduct(prod.id)}
                       className="p-2 text-destructive hover:text-destructive/80 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
                       aria-label={`${t("delete", language)} ${prod.titulo_es}`}
@@ -651,14 +651,14 @@ export default function ProductosPage() {
                       <p className="text-sm text-muted-foreground">{getCategoriaNombre(prod.categoria_id)}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button
+                      <button type="button"
                         onClick={() => openEditModal(prod)}
                         className="p-1.5 min-h-[44px] min-w-[44px] flex items-center justify-center text-primary hover:bg-primary/10 dark:hover:bg-primary/20 rounded outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         aria-label={`${t("edit", language)} ${prod.titulo_es}`}
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
-                      <button
+                      <button type="button"
                         onClick={() => handleDeleteProduct(prod.id)}
                         className="p-1.5 min-h-[44px] min-w-[44px] flex items-center justify-center text-destructive hover:bg-destructive/10 rounded outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         aria-label={`${t("delete", language)} ${prod.titulo_es}`}
@@ -669,7 +669,7 @@ export default function ProductosPage() {
                   </div>
                   <div className="mt-2 flex items-center justify-between">
                     <span className="text-sm font-medium text-foreground">{formatPrice(prod.precio, 'EUR', language)}</span>
-                    <button
+                    <button type="button"
                       onClick={(e) => { e.stopPropagation(); toggleActivo(prod); }}
                       className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
                         prod.activo
@@ -706,7 +706,6 @@ export default function ProductosPage() {
         onToggleTranslations={() => setShowTranslations(!showTranslations)}
         saving={saving}
         onSubmit={handleSubmit}
-        empresaSlug={empresaSlug}
         empresaTipo={empresaTipo}
       />
 

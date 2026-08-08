@@ -15,31 +15,25 @@ let loggerInstance: ErrorLogger | null = null;
  */
 export class ErrorLogger {
   private readonly repository: SupabaseLogErrorRepository | null;
-  private readonly supabaseAvailable: boolean;
 
   constructor() {
     // Only try to initialize Supabase on server-side
     if (globalThis.window !== undefined) {
       this.repository = null;
-      this.supabaseAvailable = false;
       return;
     }
 
     let repository: SupabaseLogErrorRepository | null = null;
-    let supabaseAvailable = false;
 
     try {
       const supabase = getSupabaseClient();
       repository = new SupabaseLogErrorRepository(supabase);
-      supabaseAvailable = true;
     } catch (error) {
       console.warn('[ERROR_LOGGER] Supabase not configured, logging to console only:', error);
       repository = null;
-      supabaseAvailable = false;
     }
 
     this.repository = repository;
-    this.supabaseAvailable = supabaseAvailable;
   }
 
   /**

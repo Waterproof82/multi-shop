@@ -1,6 +1,6 @@
 import { ICodigoDescuentoRepository } from '@/core/domain/repositories/ICodigoDescuentoRepository';
 import { IEmpresaRepository } from '@/core/domain/repositories/IEmpresaRepository';
-import { CodigoDescuento, Result } from '@/core/domain/entities/types';
+import { Result } from '@/core/domain/entities/types';
 import { logger } from '@/core/infrastructure/logging/logger';
 import { sendEmail } from '@/lib/brevo-email';
 import { escapeHtml } from '@/lib/html-utils';

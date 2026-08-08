@@ -11,6 +11,11 @@ import { ScrollOnMount } from '@/components/scroll-on-mount';
 
 export const dynamic = 'force-dynamic';
 
+/** Holgura sobre los 5 que se pintan: `findAllByTenant` descarta después los
+ *  pedidos de sesiones de mesa aún abiertas, así que pedir justo 5 podría
+ *  dejar la lista corta. */
+const DASHBOARD_RECENT_PEDIDOS_LIMIT = 50;
+
 export default async function AdminDashboard() {
   const cookieStore = await cookies();
   const token = cookieStore.get('admin_token')?.value;
@@ -57,7 +62,11 @@ export default async function AdminDashboard() {
 
   const [menuResult, pedidosResult, statsResult, promosResult, tgtgResult] = await Promise.all([
     getMenuUseCase().execute(empresaId),
-    getPedidoUseCase().getAll(empresaId),
+    // El dashboard solo renderiza los 5 pedidos más recientes (ver
+    // `recentOrders` en admin-dashboard-client). Traer el histórico completo
+    // aquí hacía crecer esta carga con cada pedido acumulado del negocio.
+    // El margen sobre 5 cubre el filtrado posterior de sesiones abiertas.
+    getPedidoUseCase().getAll(empresaId, DASHBOARD_RECENT_PEDIDOS_LIMIT),
     getPedidoUseCase().getStats(empresaId, new Date().getMonth(), new Date().getFullYear()),
     mostrarPromociones ? getPromocionUseCase().getAll(empresaId) : Promise.resolve(emptyPromos),
     mostrarTgtg ? getTgtgUseCase().getAllRecent(empresaId) : Promise.resolve(emptyTgtg),

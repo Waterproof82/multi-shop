@@ -4,8 +4,8 @@ import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 import { completeCustomPaymentUseCase } from '@/core/application/use-cases/payment/completeCustomPaymentUseCase';
 
 const paramsSchema = z.object({
-  mesaId:  z.string().uuid(),
-  turnoId: z.string().uuid(),
+  mesaId:  z.uuid(),
+  turnoId: z.uuid(),
 });
 
 export async function POST(

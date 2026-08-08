@@ -3,9 +3,28 @@ import { IClienteRepository } from "@/core/domain/repositories/IClienteRepositor
 import { IProductRepository } from "@/core/domain/repositories/IProductRepository";
 import { ICodigoDescuentoRepository } from "@/core/domain/repositories/ICodigoDescuentoRepository";
 import { IMesaSesionRepository } from "@/core/domain/repositories/IMesaSesionRepository";
-import { Pedido, Result } from "@/core/domain/entities/types";
+import { AppError, Pedido, Result } from "@/core/domain/entities/types";
 import { logger } from "@/core/infrastructure/logging/logger";
+import { IDEMPOTENCY_REPLAY_CODE } from "@/core/domain/constants/pedido";
 import { sendTelegramWithInlineButtons, sendTelegramWithQuickReplies } from '@/core/infrastructure/services/telegram.service';
+
+/**
+ * Clave de reintento + huella del contenido. Ver `src/lib/idempotency.ts`.
+ * La construye la capa de API a partir de la cabecera y del cuerpo ya validado;
+ * nunca llega desde el cuerpo de la petición.
+ */
+export interface IdempotencyContext {
+  key: string;
+  fingerprint: string;
+}
+
+/**
+ * Misma clave, contenido distinto. Es un error del cliente, no del servidor: o
+ * reutilizó una clave por descuido o alguien está intentando reproducir la
+ * petición de otro para quedarse con su `tracking_token`. La API lo traduce a
+ * 409, que es la semántica estándar de `Idempotency-Key`.
+ */
+export const IDEMPOTENCY_MISMATCH_CODE = 'IDEMPOTENCY_MISMATCH';
 
 export interface CreatePedidoDTO {
   items: {
@@ -271,9 +290,10 @@ export class PedidoUseCase {
     };
   }
 
-  async getAll(empresaId: string): Promise<Result<Pedido[]>> {
+  /** `limit` acota el histórico traído — ver findAllByTenant en el repositorio. */
+  async getAll(empresaId: string, limit?: number): Promise<Result<Pedido[]>> {
     try {
-      const result = await this.pedidoRepo.findAllByTenant(empresaId);
+      const result = await this.pedidoRepo.findAllByTenant(empresaId, limit);
       if (!result.success) {
         return { success: false, error: { ...result.error, method: 'PedidoUseCase.getAll' } };
       }
@@ -420,6 +440,96 @@ export class PedidoUseCase {
   }
 
   /**
+   * ¿Esta clave de idempotencia ya creó un pedido?
+   *
+   * Devuelve `null` cuando no —el caso normal, un envío nuevo— y el pedido
+   * original cuando sí. Devolverlo tal cual es lo que convierte un reenvío en
+   * una operación inocua: el cliente recibe el mismo número, el mismo total y
+   * el mismo `tracking_token` que la primera vez, y la cocina no ve nada.
+   *
+   * Si la clave coincide pero la huella no, corta con `IDEMPOTENCY_MISMATCH`.
+   * Ese caso NO puede devolver el pedido encontrado: sería entregar el
+   * `tracking_token` de un pedido ajeno a quien acertó la clave.
+   */
+  private async findIdempotentReplay(
+    empresaId: string,
+    idempotency: IdempotencyContext
+  ): Promise<Result<{ id: string; numero_pedido: number; total: number; tracking_token: string | null } | null>> {
+    const existing = await this.pedidoRepo.findByIdempotencyKey(empresaId, idempotency.key);
+    if (!existing.success) return { success: false, error: existing.error };
+    if (!existing.data) return { success: true, data: null };
+
+    if (existing.data.fingerprint !== idempotency.fingerprint) {
+      return {
+        success: false,
+        error: {
+          code: IDEMPOTENCY_MISMATCH_CODE,
+          message: 'La clave de idempotencia ya se usó con un pedido distinto',
+          module: 'use-case',
+          method: 'findIdempotentReplay',
+        },
+      };
+    }
+    return { success: true, data: existing.data };
+  }
+
+  /**
+   * Atajo para las rutas de creación: devuelve la respuesta ya resuelta cuando
+   * el envío es un reenvío (o cuando la clave choca), y `null` cuando hay que
+   * seguir adelante y crear el pedido de verdad.
+   */
+  private async shortCircuitOnReplay(
+    empresaId: string,
+    idempotency: IdempotencyContext | undefined
+  ): Promise<Result<{ id: string; numero_pedido: number; total: number; trackingToken?: string }> | null> {
+    if (!idempotency) return null;
+    const replay = await this.findIdempotentReplay(empresaId, idempotency);
+    if (!replay.success) return { success: false, error: replay.error };
+    if (!replay.data) return null;
+    const { id, numero_pedido, total, tracking_token } = replay.data;
+    return { success: true, data: { id, numero_pedido, total, trackingToken: tracking_token ?? undefined } };
+  }
+
+  /**
+   * Traduce el fallo del INSERT. La colisión de clave no es un error: significa
+   * que el envío gemelo ganó la carrera, así que se relee su pedido. Cualquier
+   * otro código se propaga tal cual.
+   */
+  private async mapCreateFailure(
+    error: AppError,
+    empresaId: string,
+    idempotency: IdempotencyContext | undefined
+  ): Promise<Result<{ id: string; numero_pedido: number; total: number; trackingToken?: string }>> {
+    if (idempotency && error.code === IDEMPOTENCY_REPLAY_CODE) {
+      return this.resolveReplayAfterRace(empresaId, idempotency);
+    }
+    return { success: false, error };
+  }
+
+  /**
+   * Resolución de la carrera: el índice único rechazó nuestro INSERT porque el
+   * envío gemelo ya había creado el pedido. Se relee y se devuelve.
+   *
+   * Si la relectura no encuentra nada, algo no cuadra —la fila existía hace un
+   * instante— y se devuelve error en vez de inventarse una respuesta.
+   */
+  private async resolveReplayAfterRace(
+    empresaId: string,
+    idempotency: IdempotencyContext
+  ): Promise<Result<{ id: string; numero_pedido: number; total: number; trackingToken?: string }>> {
+    const resolved = await this.shortCircuitOnReplay(empresaId, idempotency);
+    return resolved ?? {
+      success: false,
+      error: {
+        code: 'DB_ERROR',
+        message: 'No se pudo resolver el pedido tras una colisión de clave',
+        module: 'use-case',
+        method: 'resolveReplayAfterRace',
+      },
+    };
+  }
+
+  /**
    * Create new order - uses helper methods to reduce complexity
    */
   async create(
@@ -428,9 +538,18 @@ export class PedidoUseCase {
     empresaTipo: string = 'tienda',
     telegramChatId: string | null = null,
     esPedidos: boolean = false,
-    pagosPickupHabilitados: boolean = false
+    pagosPickupHabilitados: boolean = false,
+    idempotency?: IdempotencyContext
   ): Promise<Result<{ id: string; numero_pedido: number; total: number; trackingToken?: string }>> {
     try {
+      // Step 0: Reenvío del mismo pedido. Va ANTES que el resto, a propósito.
+      // Los pasos que siguen no son repetibles: `findOrCreateCliente` toca PII y
+      // `applyDiscount` consume el código de descuento. Reintentar sin este corte
+      // devolvía CODE_ALREADY_USED — un 400 al comensal cuyo pedido SÍ había
+      // entrado. Salir aquí también evita duplicar el aviso de Telegram.
+      const replayed = await this.shortCircuitOnReplay(empresaId, idempotency);
+      if (replayed) return replayed;
+
       // Step 1: Find or create client
       const clienteResult = await this.findOrCreateCliente(
         empresaId,
@@ -494,10 +613,11 @@ export class PedidoUseCase {
         finalTotal,
         discountData,
         trackingToken,
-        this.buildOrigenPayload(data, isDelivery)
+        this.buildOrigenPayload(data, isDelivery),
+        idempotency
       );
       if (!pedidoResult.success) {
-        return { success: false, error: pedidoResult.error };
+        return this.mapCreateFailure(pedidoResult.error, empresaId, idempotency);
       }
 
       // Step 5: Mark discount code as used
@@ -525,17 +645,63 @@ export class PedidoUseCase {
   }
 
   /**
+   * Igual que `shortCircuitOnReplay`, pero para la ruta de mesa, donde el
+   * `trackingToken` no es opcional: es lo que el comensal usa para seguir su
+   * comanda, y devolver la respuesta sin él sería peor que fallar.
+   */
+  private async shortCircuitMesaReplay(
+    empresaId: string,
+    idempotency: IdempotencyContext | undefined
+  ): Promise<Result<{ id: string; numero_pedido: number; total: number; trackingToken: string }> | null> {
+    const replayed = await this.shortCircuitOnReplay(empresaId, idempotency);
+    if (!replayed) return null;
+    if (!replayed.success) return { success: false, error: replayed.error };
+    const { trackingToken } = replayed.data;
+    if (!trackingToken) {
+      // Toda comanda de mesa nace con token (el repositorio lo exige), así que
+      // llegar aquí significa que la fila está corrupta. Mejor decirlo.
+      return {
+        success: false,
+        error: { code: 'DB_ERROR', message: 'Pedido de mesa sin tracking_token', module: 'use-case', method: 'createMesaOrder' },
+      };
+    }
+    return { success: true, data: { ...replayed.data, trackingToken } };
+  }
+
+  /** Contraparte de `mapCreateFailure` para la ruta de mesa. */
+  private async mapMesaCreateFailure(
+    error: AppError,
+    empresaId: string,
+    idempotency: IdempotencyContext | undefined
+  ): Promise<Result<{ id: string; numero_pedido: number; total: number; trackingToken: string }>> {
+    if (idempotency && error.code === IDEMPOTENCY_REPLAY_CODE) {
+      const resolved = await this.shortCircuitMesaReplay(empresaId, idempotency);
+      if (resolved) return resolved;
+    }
+    return { success: false, error };
+  }
+
+  /**
    * Create a mesa order — no cliente required, no PII collected.
    * In-app kitchen/bar replaces Telegram notifications for mesa orders.
    */
+  // `mesaNumero` y `mesaNombre` estuvieron aquí hasta que las notificaciones de
+  // Telegram para mesa se sustituyeron por cocina/bar en la propia app. Desde
+  // entonces ningún paso los leía: la comanda se ata a la mesa por `mesa_id`.
+  // Un parámetro que nadie usa miente sobre lo que la función necesita, así que
+  // se quitan en vez de silenciarlos con un guion bajo.
   async createMesaOrder(
     empresaId: string,
     data: CreateMesaPedidoDTO,
-    mesaNumero: number,
-    mesaNombre: string | null,
-    initialEstado: 'pendiente' | 'retenido' | 'pendiente_validacion' = 'pendiente'
+    initialEstado: 'pendiente' | 'retenido' | 'pendiente_validacion' = 'pendiente',
+    idempotency?: IdempotencyContext
   ): Promise<Result<{ id: string; numero_pedido: number; total: number; trackingToken: string }>> {
     try {
+      // Step 0: reenvío del mismo pedido — ver el comentario equivalente en `create`.
+      // Aquí importa además porque `openSesion` reabriría la sesión de la mesa.
+      const replayed = await this.shortCircuitMesaReplay(empresaId, idempotency);
+      if (replayed) return replayed;
+
       // Step 1: Validate products and calculate server total
       const priceResult = await this.validateProductPrices(empresaId, data.items);
       if (!priceResult.success) {
@@ -577,9 +743,10 @@ export class PedidoUseCase {
         initialEstado,
         nota: data.nota,
         pase: data.pase ?? null,
+        idempotency,
       });
       if (!pedidoResult.success) {
-        return { success: false, error: pedidoResult.error };
+        return this.mapMesaCreateFailure(pedidoResult.error, empresaId, idempotency);
       }
 
       return {

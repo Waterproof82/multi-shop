@@ -9,7 +9,7 @@ import {
 } from '@/core/infrastructure/api/helpers';
 import { getAnalyticsUseCase } from '@/core/infrastructure/database';
 
-const uuidSchema = z.string().uuid();
+const uuidSchema = z.uuid();
 
 export async function GET(
   request: NextRequest,

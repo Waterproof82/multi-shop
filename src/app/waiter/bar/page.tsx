@@ -32,7 +32,7 @@
  * sent when all bebidas in the order are covered (pending + already served).
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useMemo, useEffect, useRef, useState, useReducer } from 'react';
 import { Wine, ChevronLeft, ChevronDown, ChevronsUpDown, Table2, CheckCheck, Trash2, Layers } from 'lucide-react';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 
@@ -67,6 +67,17 @@ const COUNTDOWN_COLOR   = { bg: 'oklch(22% 0.16 148)', border: 'oklch(50% 0.26 1
 import { useLanguage, type Language } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import { getCsrfToken, ensureCsrfToken, fetchWithCsrf } from '@/lib/csrf-client';
+import { loadKitchenSnapshot, saveKitchenSnapshot } from '@/lib/kitchen/kitchen-snapshot-db';
+import { useRealtimeDegraded } from '@/hooks/waiter/useRealtimeDegraded';
+import { useCommandQueue } from '@/hooks/waiter/useCommandQueue';
+
+/** Cadencia del reloj visual. Los contadores se muestran en minutos y las
+ *  bandas de color cambian a los 10/20/30/45/60 min, asi que refrescar cada
+ *  segundo era 10 veces mas de lo necesario para lo que se ve en pantalla. */
+const CLOCK_TICK_MS = 10000;
+
+/** Scope propio: BarOrder no comparte forma con los items de cocina. */
+const SNAPSHOT_SCOPE = 'waiter-bar';
 
 interface BarOrder {
   id: string;
@@ -188,7 +199,7 @@ function renderMergedCardInner(
         <div className="flex-1 min-w-0">
           <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{merged.totalCantidad}× {merged.nombre}</span>
         </div>
-        <button className="rounded px-2 py-1 text-[10px] font-bold shrink-0"
+        <button type="button" className="rounded px-2 py-1 text-[10px] font-bold shrink-0"
           style={{ background: 'oklch(26% 0.08 25)', color: 'oklch(75% 0.18 25)' }}
           onClick={() => merged.items.forEach(i => cancelCountdown(i.key))}>
           {t('kitchenCountdownCancel', lang)}
@@ -259,6 +270,10 @@ export default function BarPage() {
   const { language } = useLanguage();
   const lang = language;
   const [orders, setOrders]         = useState<BarOrder[]>([]);
+  // Contador del reloj visual. Su unico cometido es provocar el repintado para
+  // refrescar tiempos y colores; deliberadamente NO forma parte de los datos,
+  // para que los agrupamientos memoizados no se invaliden en cada tick.
+  const [, tickClock] = useReducer((n: number) => n + 1, 0);
   const [servedKeys, setServedKeys]  = useState<Set<string>>(loadServedKeys);
   const [countdowns, setCountdowns]  = useState<Record<string, number>>({});
   const [groupBy, setGroupBy]        = useState<'order' | 'mesa'>('order');
@@ -279,6 +294,8 @@ export default function BarPage() {
   // Refs for beforeunload — must be updated synchronously (useEffect is too late if user navigates immediately)
   const ordersRef              = useRef<BarOrder[]>([]);
   const servedKeysRef          = useRef<Set<string>>(new Set());
+  // Impide que la hidratación desde IndexedDB (asíncrona) pise datos frescos.
+  const hasServerDataRef       = useRef(false);
   // pendingCountdownsRef is updated directly in startCountdown/cancelCountdown — no React batching delay
   const pendingCountdownsRef   = useRef<Map<string, FlatBarItem>>(new Map());
   useEffect(() => { ordersRef.current     = orders;     }, [orders]);
@@ -314,10 +331,32 @@ export default function BarPage() {
       const r = await fetch('/api/waiter/bar/orders');
       if (r.ok) {
         const json = await r.json() as { orders: BarOrder[] };
-        setOrders(json.orders ?? []);
+        const incoming = json.orders ?? [];
+        hasServerDataRef.current = true;
+        setOrders(incoming);
+        void saveKitchenSnapshot(SNAPSHOT_SCOPE, incoming);
       }
     } catch { /* ignore */ }
   }, []);
+
+  // Hidratación cache-first mientras viaja el primer fetch — ver
+  // lib/kitchen/kitchen-snapshot-db. El guard evita que esta lectura asíncrona
+  // de IndexedDB pise datos ya traídos por el servidor o por Realtime.
+  useEffect(() => {
+    void loadKitchenSnapshot<BarOrder>(SNAPSHOT_SCOPE).then(cached => {
+      if (!cached || cached.length === 0) return;
+      if (hasServerDataRef.current) return;
+      setOrders(cached);
+    });
+  }, []);
+
+  // Detecta la caída de los canales y sondea mientras dure, sin tocar el ciclo
+  // de vida de las suscripciones.
+  const { realtimeDegraded, trackChannelStatus } = useRealtimeDegraded(fetchOrders);
+
+  // Cola offline de cambios de estado. Al vaciarse se resincroniza contra el
+  // servidor para adoptar el estado autoritativo.
+  const { pendingCount, enqueueItemStatus } = useCommandQueue(fetchOrders);
 
   useEffect(() => {
     if (!isTabVisible) return;
@@ -337,11 +376,7 @@ export default function BarPage() {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => { void fetchOrders(); }, 100);
       })
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('[Realtime] waiter-bar-items error:', status);
-        }
-      });
+      .subscribe((status) => trackChannelStatus(status, 'waiter-bar-items error'));
 
     // Broadcast channel — receives 'item-update' events from the DB trigger
     // (notify_waiter_items_update) whenever pedido_item_estados rows change.
@@ -352,11 +387,7 @@ export default function BarPage() {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => { void fetchOrders(); }, 100);
       })
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('[Realtime] waiter-items-update broadcast error (bar):', status);
-        }
-      });
+      .subscribe((status) => trackChannelStatus(status, 'waiter-items-update broadcast error (bar)'));
 
     // Broadcast channel — receives 'new-order' events from notify_waiter_new_order
     // trigger for ALL pedido inserts (including waiter-placed estado='pendiente'/'retenido').
@@ -367,11 +398,7 @@ export default function BarPage() {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => { void fetchOrders(); }, 100);
       })
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('[Realtime] waiter-new-order broadcast error (bar):', status);
-        }
-      });
+      .subscribe((status) => trackChannelStatus(status, 'waiter-new-order broadcast error (bar)'));
 
     // Re-fetch on app resume from background (visibilitychange relay from WaiterBanner).
     const onResumeRelay = () => { void fetchOrders(); };
@@ -384,7 +411,7 @@ export default function BarPage() {
       void supabase.removeChannel(broadcastChannel);
       void supabase.removeChannel(newOrderChannel);
     };
-  }, [fetchOrders, isTabVisible, waiterEmpresaId]);
+  }, [fetchOrders, isTabVisible, waiterEmpresaId, trackChannelStatus]);
 
   // Re-fetch orders when tab becomes visible again so stale data is refreshed immediately.
   useEffect(() => {
@@ -396,7 +423,7 @@ export default function BarPage() {
 
   // Trigger re-render every second so timers update without refetching
   useEffect(() => {
-    const tick = setInterval(() => setOrders(p => [...p]), 1000);
+    const tick = setInterval(tickClock, CLOCK_TICK_MS);
     return () => clearInterval(tick);
   }, []);
 
@@ -473,6 +500,15 @@ export default function BarPage() {
 
   // ── Countdown ─────────────────────────────────────────────────────────────
 
+  /** Reverts the optimistic "servido" mark for one item key when its PATCH fails. */
+  const rollbackServedKey = useCallback((key: string) => {
+    const rolled = new Set(servedKeysRef.current);
+    rolled.delete(key);
+    persistServedKeys(rolled);
+    servedKeysRef.current = rolled;
+    setServedKeys(new Set(rolled));
+  }, []);
+
   /** Called once a single-item countdown reaches zero. Fires per-item PATCH
    *  and, if all bebidas in the order are now served, the order-level PATCH.
    *  Uses servedKeysRef directly (not a state-updater form) to keep nesting shallow. */
@@ -486,11 +522,14 @@ export default function BarPage() {
     servedKeysRef.current = next;
     setServedKeys(new Set(next));
 
-    // Per-item PATCH — always fires when a single item countdown completes
-    fetchWithCsrf(`/api/waiter/kitchen/items/${encodeURIComponent(orderId)}/${detallePedidoIdx}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ estado: 'servido' }),
-    }).catch(() => {});
+    // Per-item PATCH. Se distingue el rechazo del servidor de la caída de red:
+    //   - respuesta no-ok  → el servidor rechaza la intención, se revierte
+    //   - excepción (red)  → la intención sigue siendo válida, se encola y se
+    //                        conserva la marca optimista hasta poder enviarla
+    const itemUrl = `/api/waiter/kitchen/items/${encodeURIComponent(orderId)}/${detallePedidoIdx}/status`;
+    fetchWithCsrf(itemUrl, { method: 'PATCH', body: JSON.stringify({ estado: 'servido' }) })
+      .then(r => { if (!r.ok) rollbackServedKey(key); })
+      .catch(() => { void enqueueItemStatus(orderId, detallePedidoIdx, itemUrl, { estado: 'servido' }); });
 
     const servedCount = [...next].filter(k => k.startsWith(`${orderId}:`)).length;
     if (servedCount < totalInOrder) return;
@@ -513,20 +552,10 @@ export default function BarPage() {
         servedKeysRef.current = cleaned;
         setServedKeys(new Set(cleaned));
       } else {
-        const rolled = new Set(servedKeysRef.current);
-        rolled.delete(key);
-        persistServedKeys(rolled);
-        servedKeysRef.current = rolled;
-        setServedKeys(new Set(rolled));
+        rollbackServedKey(key);
       }
-    }).catch(() => {
-      const rolled = new Set(servedKeysRef.current);
-      rolled.delete(key);
-      persistServedKeys(rolled);
-      servedKeysRef.current = rolled;
-      setServedKeys(new Set(rolled));
-    });
-  }, []);
+    }).catch(() => rollbackServedKey(key));
+  }, [rollbackServedKey, enqueueItemStatus]);
 
   const startCountdown = useCallback((flatItem: FlatBarItem) => {
     const key = flatItem.key;
@@ -658,8 +687,10 @@ export default function BarPage() {
     }
   }, [countdowns, servedKeys, startCountdown]);
 
-  // Flatten orders into one card per drink item, excluding locally served ones
-  const flatItems: FlatBarItem[] = orders.flatMap(order =>
+  // Flatten orders into one card per drink item, excluding locally served ones.
+  // Memoizado: el aplanado recorría todos los pedidos y todos sus ítems en cada
+  // tick del reloj, indefinidamente, durante todo el servicio.
+  const flatItems: FlatBarItem[] = useMemo(() => orders.flatMap(order =>
     order.items.map((item, idx) => ({
       key:               `${order.id}:${item.detallePedidoIdx}`,
       orderId:           order.id,
@@ -675,13 +706,15 @@ export default function BarPage() {
       nota:              item.nota,
       hasComida:         order.hasComida,
     }))
-  ).filter(item => !servedKeys.has(item.key));
+  ).filter(item => !servedKeys.has(item.key)), [orders, servedKeys]);
 
   const hasAnyContent = flatItems.length > 0;
 
   // ── Derived data ──────────────────────────────────────────────────────────
-  const mesaGroups  = groupByMesa(flatItems);
-  const orderGroups = groupByOrder(flatItems);
+  // groupByMesa incluye un `.sort()`; memoizarlo evita reordenar la lista
+  // entera en cada tick del reloj.
+  const mesaGroups  = useMemo(() => groupByMesa(flatItems), [flatItems]);
+  const orderGroups = useMemo(() => groupByOrder(flatItems), [flatItems]);
   const allKeys     = groupBy === 'mesa'
     ? Array.from(mesaGroups.keys())
     : Array.from(orderGroups.keys());
@@ -728,7 +761,7 @@ export default function BarPage() {
               <div className="flex-1 min-w-0">
                 <span className="text-xs font-bold" style={{ color: TEXT_MAIN }}>{flatItem.cantidad}× {flatItem.nombre}</span>
               </div>
-              <button className="rounded px-2 py-1 text-[10px] font-bold shrink-0"
+              <button type="button" className="rounded px-2 py-1 text-[10px] font-bold shrink-0"
                 style={{ background: 'oklch(26% 0.08 25)', color: 'oklch(75% 0.18 25)' }}
                 onClick={() => cancelCountdown(flatItem.key)}>
                 {t('kitchenCountdownCancel', lang)}
@@ -790,6 +823,17 @@ export default function BarPage() {
 
   return (
     <div className="min-h-screen" style={{ background: BG }}>
+      {(realtimeDegraded || pendingCount > 0) && (
+        <output
+          aria-live="polite"
+          className="fixed top-0 left-0 right-0 z-30 px-4 py-1.5 text-center text-xs font-semibold"
+          style={{ background: 'oklch(30% 0.14 62)', color: 'oklch(85% 0.16 62)' }}
+        >
+          {pendingCount > 0
+            ? t('offlinePendingChanges', lang).replace('{n}', String(pendingCount))
+            : t('realtimeReconnecting', lang)}
+        </output>
+      )}
       {/* Header */}
       <div ref={headerRef} className="fixed top-0 left-0 right-0 z-10 shadow-lg"
         style={{ background: 'oklch(17% 0.025 252)', borderBottom: '1px solid oklch(42% 0.10 252 / 0.35)' }}>
@@ -818,7 +862,7 @@ export default function BarPage() {
             const isActive = groupBy === mode;
             const label = mode === 'order' ? t('kitchenGroupByOrder', lang) : t('kitchenGroupByTable', lang);
             return (
-              <button key={mode} onClick={() => setGroupBy(mode)}
+              <button type="button" key={mode} onClick={() => setGroupBy(mode)}
                 className="rounded-lg px-4 py-2 text-xs font-semibold transition-colors"
                 style={isActive ? { background: 'oklch(32% 0.10 252)', color: TEXT_MAIN, border: '1px solid oklch(50% 0.10 252 / 0.6)' }
                   : { background: 'transparent', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.4)' }}>
@@ -827,7 +871,7 @@ export default function BarPage() {
             );
           })}
           {groupBy === 'mesa' && (
-            <button
+            <button type="button"
               className="ml-auto rounded p-1 transition-colors"
               style={{ background: allCollapsed ? 'oklch(30% 0.08 252)' : 'transparent', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.4)' }}
               onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(allKeys))}
@@ -850,13 +894,13 @@ export default function BarPage() {
                 {t('barServeAllConfirmMsg', lang)}
               </p>
               <div className="flex gap-2">
-                <button
+                <button type="button"
                   className="flex-1 rounded-lg py-2 text-xs font-semibold"
                   style={{ background: 'oklch(22% 0.04 252)', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
                   onClick={() => setPendingServeAll(null)}>
                   {t('kitchenCountdownCancel', lang)}
                 </button>
-                <button
+                <button type="button"
                   className="flex-1 rounded-lg py-2 text-xs font-semibold"
                   style={{ background: 'oklch(22% 0.10 148)', color: 'oklch(74% 0.20 148)', border: '1px solid oklch(46% 0.22 148 / 0.6)' }}
                   onClick={() => handleServeAllMesa(mesaItems)}>
@@ -906,14 +950,14 @@ export default function BarPage() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <button
+                <button type="button"
                   onClick={() => setPendingBarCancel(null)}
                   className="flex-1 rounded-lg px-3 py-2.5 text-xs font-semibold"
                   style={{ background: 'oklch(20% 0.04 252)', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
                 >
                   {t('kitchenCountdownCancel', lang)}
                 </button>
-                <button
+                <button type="button"
                   onClick={handleBarCancel}
                   className="flex-1 rounded-lg px-3 py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5"
                   style={{ background: 'oklch(30% 0.28 25)', color: 'oklch(88% 0.26 25)', border: '2px solid oklch(52% 0.32 25 / 0.7)' }}
@@ -970,7 +1014,7 @@ export default function BarPage() {
                   <div
                     className="flex items-center"
                     style={{ background: 'oklch(18% 0.03 252)', borderBottom: isCollapsed ? 'none' : '1px solid oklch(35% 0.08 252 / 0.4)' }}>
-                    <button
+                    <button type="button"
                       className="flex flex-1 items-center gap-2 px-3 py-2.5 min-w-0"
                       style={{ background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
                       onClick={() => toggleCollapse(mesaKey)}>
@@ -979,7 +1023,7 @@ export default function BarPage() {
                       <ChevronDown className="w-4 h-4 shrink-0 ml-auto" style={{ color: TEXT_DIM, transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }} />
                     </button>
                     <div className="flex items-center gap-2 pr-3 shrink-0">
-                      <button
+                      <button type="button"
                         onClick={() => setGroupedMesas(prev => {
                           const n = new Set(prev);
                           if (n.has(mesaKey)) n.delete(mesaKey); else n.add(mesaKey);
@@ -995,7 +1039,7 @@ export default function BarPage() {
                         }}>
                         <Layers className="w-3.5 h-3.5" />
                       </button>
-                      <button
+                      <button type="button"
                         onClick={() => setPendingServeAll(mesaKey)}
                         title={t('barServeAllConfirmYes', lang)}
                         className="flex items-center justify-center rounded-lg"

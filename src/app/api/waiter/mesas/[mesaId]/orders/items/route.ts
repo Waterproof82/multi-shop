@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { getMesaSesionRepository } from '@/core/infrastructure/database';
 import { removeSessionItemUseCase } from '@/core/application/use-cases/mesa/removeSessionItemUseCase';
 
-const mesaIdSchema = z.string().uuid();
+const mesaIdSchema = z.uuid();
 
 const bodySchema = z.object({
   nombre: z.string().min(1).max(200),

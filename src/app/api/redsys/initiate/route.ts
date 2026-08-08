@@ -7,7 +7,7 @@ import { getEmpresaPublicRepository } from '@/core/infrastructure/database';
 import { initiateRedsysPaymentUseCase } from '@/core/application/use-cases/payment/initiateRedsysPaymentUseCase';
 
 const initiateSchema = z.object({
-  pedidoId: z.string().uuid(),
+  pedidoId: z.uuid(),
   lang: z.enum(['es', 'en', 'fr', 'it', 'de']).optional(),
 });
 

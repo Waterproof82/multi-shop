@@ -4,6 +4,157 @@ import { IMesaRepository, Mesa, MesaWithSession } from '@/core/domain/repositori
 import { logger } from '../logging/logger';
 import type { DeferredItem } from '@/core/domain/repositories/IMesaSesionRepository';
 
+// ── findAllWithSession: tipos y helpers ──────────────────────────────────────
+
+/** Fila de `get_mesas_with_sessions`: mesa más los flags de su sesión abierta. */
+type MesaSesionRow = {
+  id: string; empresa_id: string; numero: number; nombre: string | null;
+  sesion_id: string | null; sesion_pagada: boolean; pago_en_curso: boolean;
+  session_total: number; cliente_activo: boolean; division_activa: boolean; llamada_activa: boolean;
+};
+
+type PedidoRow = {
+  id: string; sesion_id: string | null; mesa_id: string | null;
+  estado: string; numero_pedido: number; detalle_pedido: unknown;
+};
+
+type DetalleItem = {
+  nombre: string; precio: number; cantidad: number;
+  complementos?: Array<{ nombre: string; precio: number }>;
+  translations?: Record<string, { name?: string }>;
+};
+
+/** Comanda ya resuelta a una sesión concreta. */
+type PedidoDeSesion = { sesionId: string; numeroPedido: number; estado: string; detalle: DetalleItem[] };
+
+/**
+ * Reparte las comandas por sesión.
+ *
+ * `mesaToSesion` sirve para rescatar las HUÉRFANAS: pedidos con `sesion_id`
+ * NULL que sí pertenecen a una mesa con sesión abierta. Ocurría cuando
+ * `open_mesa_sesion` arrastraba la referencia a una sesión ya cerrada. Sin este
+ * rescate la mesa aparece vacía teniendo comandas en cocina.
+ *
+ * Una huérfana cuya mesa tampoco tiene sesión se descarta: no hay dónde contarla.
+ */
+function indexarPedidosPorSesion(
+  pedidos: PedidoRow[],
+  mesaToSesion: Record<string, string>,
+): { countBySesion: Record<string, number>; porPedido: Record<string, PedidoDeSesion> } {
+  const countBySesion: Record<string, number> = {};
+  const porPedido: Record<string, PedidoDeSesion> = {};
+
+  for (const p of pedidos) {
+    const sesionId = p.sesion_id ?? (p.mesa_id ? mesaToSesion[p.mesa_id] : null);
+    if (!sesionId) continue;
+
+    countBySesion[sesionId] = (countBySesion[sesionId] ?? 0) + 1;
+    porPedido[p.id] = {
+      sesionId,
+      numeroPedido: p.numero_pedido,
+      estado: p.estado,
+      detalle: (p.detalle_pedido as DetalleItem[]) ?? [],
+    };
+  }
+
+  return { countBySesion, porPedido };
+}
+
+type EstadoItemRow = { pedido_id: string; item_idx: number; estado: string; from_validation: boolean };
+
+/**
+ * Estados por ítem, agrupados por comanda.
+ *
+ * Se incluyen TODOS, también los de `from_validation = true`: un ítem que pasó
+ * por la cola de validación sigue pudiendo estar 'listo' en cocina, y excluirlo
+ * dejaría platos terminados sin avisar al camarero. No aparecerán como
+ * retenidos porque su estado ya nunca vuelve a ser 'retenido'.
+ */
+function agruparEstadosPorPedido(filas: EstadoItemRow[]): Map<string, Map<number, string>> {
+  const mapa = new Map<string, Map<number, string>>();
+  for (const fila of filas) {
+    if (!mapa.has(fila.pedido_id)) mapa.set(fila.pedido_id, new Map());
+    mapa.get(fila.pedido_id)!.set(fila.item_idx, fila.estado);
+  }
+  return mapa;
+}
+
+function aItemDiferido(item: DetalleItem): DeferredItem {
+  return {
+    itemId: `${item.nombre}-${item.precio}`,
+    itemName: item.nombre,
+    price: item.precio,
+    quantity: item.cantidad,
+    selectedComplements: item.complementos?.map(c => ({ id: c.nombre, name: c.nombre, price: c.precio })),
+    translations: item.translations as Record<string, { name: string }> | undefined,
+  };
+}
+
+/**
+ * Deriva, por sesión, qué comandas tienen algo listo para servir y qué ítems
+ * quedaron retenidos.
+ *
+ * El estado EFECTIVO de un ítem es el suyo propio si existe en
+ * `pedido_item_estados`, y si no el que hereda del pedido. Confundir ambos hace
+ * que platos retenidos se muestren como pendientes, o al revés.
+ */
+function derivarEstadoDeSesiones(
+  porPedido: Record<string, PedidoDeSesion>,
+  estadosPorPedido: Map<string, Map<number, string>>,
+): { preparadoBySesion: Record<string, number[]>; retenidoBySesion: Record<string, DeferredItem[]> } {
+  const preparadoBySesion: Record<string, number[]> = {};
+  const retenidoBySesion: Record<string, DeferredItem[]> = {};
+
+  for (const [pedidoId, pedido] of Object.entries(porPedido)) {
+    const estados = estadosPorPedido.get(pedidoId) ?? new Map<number, string>();
+    const heredado = pedido.estado === 'retenido' ? 'retenido' : 'pendiente';
+
+    if ([...estados.values()].includes('listo')) {
+      const numeros = preparadoBySesion[pedido.sesionId] ?? [];
+      if (!numeros.includes(pedido.numeroPedido)) numeros.push(pedido.numeroPedido);
+      preparadoBySesion[pedido.sesionId] = numeros;
+    }
+
+    const retenidos = pedido.detalle.filter((_, idx) => (estados.get(idx) ?? heredado) === 'retenido');
+    if (retenidos.length > 0) {
+      retenidoBySesion[pedido.sesionId] = [
+        ...(retenidoBySesion[pedido.sesionId] ?? []),
+        ...retenidos.map(aItemDiferido),
+      ];
+    }
+  }
+
+  return { preparadoBySesion, retenidoBySesion };
+}
+
+interface EstadoDeSesiones {
+  countBySesion: Record<string, number>;
+  preparadoBySesion: Record<string, number[]>;
+  retenidoBySesion: Record<string, DeferredItem[]>;
+}
+
+const SIN_SESIONES: EstadoDeSesiones = { countBySesion: {}, preparadoBySesion: {}, retenidoBySesion: {} };
+
+function mapearMesa(row: MesaSesionRow, estado: EstadoDeSesiones): MesaWithSession {
+  const sesionId = row.sesion_id ?? null;
+  return {
+    id: row.id,
+    empresaId: row.empresa_id,
+    numero: row.numero,
+    nombre: row.nombre ?? null,
+    sesionId,
+    activeOrderCount: sesionId ? (estado.countBySesion[sesionId] ?? 0) : 0,
+    sessionTotal: Number(row.session_total),
+    sesionPagada: row.sesion_pagada ?? false,
+    pagoEnCurso: row.pago_en_curso ?? false,
+    divisionActiva: row.division_activa ?? false,
+    itemsDiferidos: sesionId ? (estado.retenidoBySesion[sesionId] ?? []) : [],
+    clienteActivo: row.cliente_activo ?? false,
+    preparadoPedidoNumbers: sesionId ? (estado.preparadoBySesion[sesionId] ?? []) : [],
+    llamadaActiva: row.llamada_activa ?? false,
+  };
+}
+
 export class SupabaseMesaRepository implements IMesaRepository {
   constructor(private readonly supabase: SupabaseClient) {}
 
@@ -194,153 +345,85 @@ export class SupabaseMesaRepository implements IMesaRepository {
     }
   }
 
+  /** Comandas activas de las sesiones abiertas, incluidas las huerfanas. */
+  private async cargarPedidosActivos(sesionIds: string[], mesaIds: string[]): Promise<PedidoRow[]> {
+    // Las dos consultas son independientes entre si — en serie duplicaban la
+    // latencia de una funcion que alimenta mostrador y panel de camarero, y que
+    // se re-dispara con cada evento Realtime y en cada visibilitychange.
+    const [{ data: porSesion }, { data: huerfanos }] = await Promise.all([
+      this.supabase
+        .from('pedidos')
+        .select('id, sesion_id, mesa_id, estado, numero_pedido, detalle_pedido')
+        .in('sesion_id', sesionIds)
+        .neq('estado', 'cerrado')
+        .neq('estado', 'cancelado'),
+      this.supabase
+        .from('pedidos')
+        .select('id, sesion_id, mesa_id, estado, numero_pedido, detalle_pedido')
+        .in('mesa_id', mesaIds)
+        .is('sesion_id', null)
+        .neq('estado', 'cerrado')
+        .neq('estado', 'cancelado'),
+    ]);
+
+    return [...(porSesion ?? []), ...(huerfanos ?? [])] as PedidoRow[];
+  }
+
+  private async cargarEstadosDeItems(pedidoIds: string[]): Promise<Map<string, Map<number, string>>> {
+    if (pedidoIds.length === 0) return new Map();
+    const { data } = await this.supabase
+      .from('pedido_item_estados')
+      .select('pedido_id, item_idx, estado, from_validation')
+      .in('pedido_id', pedidoIds);
+    return agruparEstadosPorPedido((data ?? []) as EstadoItemRow[]);
+  }
+
+  /** Cruce de comandas y estados por item para las sesiones abiertas. */
+  private async resolverEstadoDeSesiones(rows: MesaSesionRow[]): Promise<EstadoDeSesiones> {
+    const conSesion = rows.filter(r => r.sesion_id !== null);
+    if (conSesion.length === 0) return SIN_SESIONES;
+
+    const pedidos = await this.cargarPedidosActivos(
+      conSesion.map(r => r.sesion_id as string),
+      conSesion.map(r => r.id),
+    );
+
+    const mesaToSesion: Record<string, string> = {};
+    for (const r of conSesion) mesaToSesion[r.id] = r.sesion_id as string;
+
+    const { countBySesion, porPedido } = indexarPedidosPorSesion(pedidos, mesaToSesion);
+    const estados = await this.cargarEstadosDeItems(Object.keys(porPedido));
+
+    return { countBySesion, ...derivarEstadoDeSesiones(porPedido, estados) };
+  }
+
+  /**
+   * Mesas con el estado de su sesion abierta: cuantas comandas activas tienen,
+   * cuales estan listas para servir y que items quedaron retenidos.
+   *
+   * Es una de las rutas mas calientes del sistema: alimenta el mostrador del TPV
+   * y el panel de mesas, y se re-dispara con cada evento de Realtime.
+   */
   async findAllWithSession(empresaId: string): Promise<Result<MesaWithSession[]>> {
     try {
-      // Step 1: fetch mesas + session flags via RPC (single LEFT JOIN — avoids PostgREST FK embed ambiguity)
-      type RpcRow = {
-        id: string; empresa_id: string; numero: number; nombre: string | null;
-        sesion_id: string | null; sesion_pagada: boolean; pago_en_curso: boolean;
-        session_total: number; cliente_activo: boolean; division_activa: boolean; llamada_activa: boolean;
-      };
-      const { data: rpcData, error: rpcError } = await this.supabase
+      const { data, error } = await this.supabase
         .rpc('get_mesas_with_sessions', { p_empresa_id: empresaId });
 
-      if (rpcError) {
+      if (error) {
         await logger.logAndReturnError(
           'DB_SELECT_ERROR',
-          rpcError.message,
+          error.message,
           'repository',
           'SupabaseMesaRepository.findAllWithSession',
-          { empresaId, details: { code: rpcError.code } }
+          { empresaId, details: { code: error.code } }
         );
         return { success: false, error: { code: 'DB_ERROR', message: 'Error al obtener mesas con sesión', module: 'repository', method: 'findAllWithSession' } };
       }
 
-      const rows = (rpcData ?? []) as RpcRow[];
-      const activeSesionIds = rows
-        .map(r => r.sesion_id)
-        .filter((id): id is string => id !== null);
+      const rows = (data ?? []) as MesaSesionRow[];
+      const estado = await this.resolverEstadoDeSesiones(rows);
 
-      // Step 2: count active (non-cerrado) pedidos per session
-      // + collect pedido numbers that have at least one item in 'listo' state (per-item kitchen state)
-      // + collect retenido pedido items (replaces the dropped items_diferidos JSONB column)
-      const countBySesion: Record<string, number> = {};
-      const preparadoBySesion: Record<string, number[]> = {};
-      const retenidoBySesion: Record<string, DeferredItem[]> = {};
-      if (activeSesionIds.length > 0) {
-        type PedidoRow = { id: string; sesion_id: string | null; mesa_id: string | null; estado: string; numero_pedido: number; detalle_pedido: unknown };
-        type DetalleItem = { nombre: string; precio: number; cantidad: number; complementos?: Array<{ nombre: string; precio: number }>; translations?: Record<string, { name?: string }> };
-
-        // Primary query: pedidos linked via sesion_id
-        const { data: activeData } = await this.supabase
-          .from('pedidos')
-          .select('id, sesion_id, mesa_id, estado, numero_pedido, detalle_pedido')
-          .in('sesion_id', activeSesionIds)
-          .neq('estado', 'cerrado')
-          .neq('estado', 'cancelado');
-
-        // Defensive fallback: pedidos with sesion_id = NULL that belong to an active mesa.
-        // This can happen when open_mesa_sesion had a stale closed-session reference and
-        // findActiveSesionByMesa returned null — the pedido was inserted with sesion_id = NULL.
-        const activeMesaIds = rows
-          .filter(r => r.sesion_id !== null)
-          .map(r => r.id);
-        const { data: orphanData } = await this.supabase
-          .from('pedidos')
-          .select('id, sesion_id, mesa_id, estado, numero_pedido, detalle_pedido')
-          .in('mesa_id', activeMesaIds)
-          .is('sesion_id', null)
-          .neq('estado', 'cerrado')
-          .neq('estado', 'cancelado');
-
-        // Build a mesa_id → sesion_id lookup for orphan resolution
-        const mesaToSesion: Record<string, string> = {};
-        for (const r of rows) {
-          if (r.sesion_id) mesaToSesion[r.id] = r.sesion_id;
-        }
-
-        const pedidoIdToSesion: Record<string, { sesionId: string; numeroPedido: number; estado: string; detalle: DetalleItem[] }> = {};
-
-        const allPedidos = [...(activeData ?? []), ...(orphanData ?? [])] as PedidoRow[];
-        for (const p of allPedidos) {
-          const sid = p.sesion_id ?? (p.mesa_id ? mesaToSesion[p.mesa_id] : null);
-          if (!sid) continue;
-          countBySesion[sid] = (countBySesion[sid] ?? 0) + 1;
-          pedidoIdToSesion[p.id] = {
-            sesionId: sid,
-            numeroPedido: p.numero_pedido,
-            estado: p.estado,
-            detalle: (p.detalle_pedido as DetalleItem[]) ?? [],
-          };
-        }
-
-        // Check pedido_item_estados for 'listo' and 'retenido' items
-        const pedidoIds = Object.keys(pedidoIdToSesion);
-        if (pedidoIds.length > 0) {
-          const { data: itemEstados } = await this.supabase
-            .from('pedido_item_estados')
-            .select('pedido_id, item_idx, estado, from_validation')
-            .in('pedido_id', pedidoIds);
-
-          // Build per-pedido estado override map (all items, regardless of from_validation).
-          // from_validation=true items that are still in the kitchen can be 'listo' — they must
-          // appear in the listo check. They won't appear as retenidos because their estado is
-          // never 'retenido' once they've gone through the validation queue.
-          const estadoMap = new Map<string, Map<number, string>>();
-          for (const row of (itemEstados ?? []) as { pedido_id: string; item_idx: number; estado: string; from_validation: boolean }[]) {
-            if (!estadoMap.has(row.pedido_id)) estadoMap.set(row.pedido_id, new Map());
-            estadoMap.get(row.pedido_id)!.set(row.item_idx, row.estado);
-          }
-
-          for (const [pid, { sesionId, numeroPedido, estado: pedidoEstado, detalle }] of Object.entries(pedidoIdToSesion)) {
-            const overrides = estadoMap.get(pid) ?? new Map<number, string>();
-            const defaultEstado = pedidoEstado === 'retenido' ? 'retenido' : 'pendiente';
-
-            // Listo check
-            if ([...overrides.values()].some(e => e === 'listo')) {
-              const nums = preparadoBySesion[sesionId] ?? [];
-              if (!nums.includes(numeroPedido)) nums.push(numeroPedido);
-              preparadoBySesion[sesionId] = nums;
-            }
-
-            // Retenido items (per-item effective estado)
-            detalle.forEach((item, idx) => {
-              const efectiveEstado = overrides.get(idx) ?? defaultEstado;
-              if (efectiveEstado === 'retenido') {
-                const deferredItem: DeferredItem = {
-                  itemId: `${item.nombre}-${item.precio}`,
-                  itemName: item.nombre,
-                  price: item.precio,
-                  quantity: item.cantidad,
-                  selectedComplements: item.complementos?.map(c => ({ id: c.nombre, name: c.nombre, price: c.precio })),
-                  translations: item.translations as Record<string, { name: string }> | undefined,
-                };
-                retenidoBySesion[sesionId] = [...(retenidoBySesion[sesionId] ?? []), deferredItem];
-              }
-            });
-          }
-        }
-      }
-
-      return {
-        success: true,
-        data: rows.map(row => ({
-          id: row.id,
-          empresaId: row.empresa_id,
-          numero: row.numero,
-          nombre: row.nombre ?? null,
-          sesionId: row.sesion_id ?? null,
-          activeOrderCount: row.sesion_id ? (countBySesion[row.sesion_id] ?? 0) : 0,
-          sessionTotal: Number(row.session_total),
-          sesionPagada: row.sesion_pagada ?? false,
-          pagoEnCurso: row.pago_en_curso ?? false,
-          divisionActiva: row.division_activa ?? false,
-          itemsDiferidos: row.sesion_id ? (retenidoBySesion[row.sesion_id] ?? []) : [],
-          clienteActivo: row.cliente_activo ?? false,
-          preparadoPedidoNumbers: row.sesion_id ? (preparadoBySesion[row.sesion_id] ?? []) : [],
-          llamadaActiva: row.llamada_activa ?? false,
-        })),
-      };
+      return { success: true, data: rows.map(row => mapearMesa(row, estado)) };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'repository', 'SupabaseMesaRepository.findAllWithSession', { empresaId });
       return { success: false, error: appError };

@@ -588,7 +588,7 @@ export function TrackingPageClient({ token, initialStatus }: Readonly<TrackingPa
   return (
     <div className="flex flex-col gap-8">
       {/* Volver al inicio */}
-      <button
+      <button type="button"
         onClick={() => router.push('/')}
         className="self-start flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors duration-150 min-h-[44px] -mt-4"
       >

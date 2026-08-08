@@ -411,7 +411,7 @@ export function AdminSidebar({ empresaId: _empresaId }: Readonly<AdminSidebarPro
         ) : (
           <h1 className="text-lg font-bold text-white">{t('administration', language)}</h1>
         )}
-        <button
+        <button type="button"
           onClick={() => setIsOpen(!isOpen)}
           className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
           aria-label={isOpen ? t('closeMenu', language) : t('openMenu', language)}

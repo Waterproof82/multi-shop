@@ -136,7 +136,7 @@ function TipoSelector({ empresaId, tipo, totalMesas, onTipoChange }: TipoSelecto
   return (
     <div className="flex flex-col items-center gap-1.5">
       <div className="flex items-center gap-1">
-        <button
+        <button type="button"
           onClick={() => void handleChange('tienda')}
           disabled={saving}
           className={`px-2 py-1 text-xs rounded-l-full border transition-colors disabled:opacity-50 ${
@@ -147,7 +147,7 @@ function TipoSelector({ empresaId, tipo, totalMesas, onTipoChange }: TipoSelecto
         >
           Tienda
         </button>
-        <button
+        <button type="button"
           onClick={() => void handleChange('restaurante')}
           disabled={saving}
           className={`px-2 py-1 text-xs rounded-r-full border transition-colors disabled:opacity-50 ${

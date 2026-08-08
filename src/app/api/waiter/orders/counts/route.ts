@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPedidoRepository } from '@/core/infrastructure/database';
-import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,26 +9,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 
-  const supabase = getSupabaseClient();
-
-  const [result, pendientesResult, llamadasResult] = await Promise.all([
-    getPedidoRepository().countKitchenBarOrders(empresaId),
-    getPedidoRepository().findPendientesValidacion(empresaId),
-    supabase
-      .from('mesa_sesiones')
-      .select('id', { count: 'exact', head: true })
-      .eq('empresa_id', empresaId)
-      .eq('llamada_activa', true)
-      .is('cerrada_at', null),
-  ]);
+  // Un unico roundtrip: cocina, bebidas, pendientes y llamadas se agregan en SQL.
+  // El WaiterBanner llama a esta ruta en cada evento de Realtime, asi que su coste
+  // marca el ritmo de todo el panel.
+  const result = await getPedidoRepository().getWaiterBadgeCounts(empresaId);
 
   if (!result.success) {
     return NextResponse.json({ error: 'Error al obtener conteos' }, { status: 500 });
   }
 
-  const pendientesCount = pendientesResult.success
-    ? pendientesResult.data.reduce((s, m) => s + m.pedidos.reduce((sp, p) => sp + p.items.length, 0), 0)
-    : 0;
-
-  return NextResponse.json({ ...result.data, pendientes: pendientesCount, llamadas: llamadasResult.count ?? 0 });
+  return NextResponse.json(result.data);
 }

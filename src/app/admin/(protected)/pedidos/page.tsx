@@ -183,7 +183,7 @@ function renderEstadoBadge(
   }
 
   return (
-    <button
+    <button type="button"
       onClick={(e) => { e.stopPropagation(); onUpdate(pedido.id, siguienteEstado); }}
       aria-label={`${label} — ${t('edit', language)}`}
       className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
@@ -502,7 +502,7 @@ export default function PedidosPage() {
       {/* Month selector */}
       <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-2xl p-4 shadow-2xl">
         <div className="flex items-center justify-center gap-4">
-          <button
+          <button type="button"
             onClick={() => cambiarMes(-1)}
             className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2"
             aria-label="Mes anterior"
@@ -514,7 +514,7 @@ export default function PedidosPage() {
               {meses[selectedMonth.mes]} {selectedMonth.año}
             </span>
             {!esMesActual && (
-              <button
+              <button type="button"
                 onClick={() => setSelectedMonth({ mes: new Date().getMonth(), año: new Date().getFullYear() })}
                 className="block text-xs text-cyan-400 hover:text-cyan-300 underline mx-auto mt-1 transition-colors"
               >
@@ -522,7 +522,7 @@ export default function PedidosPage() {
               </button>
             )}
           </div>
-          <button
+          <button type="button"
             onClick={() => cambiarMes(1)}
             disabled={esMesActual}
             className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -535,7 +535,7 @@ export default function PedidosPage() {
 
       {isSuperAdmin && pedidos.length > 0 && (
         <div className="flex justify-end">
-          <button
+          <button type="button"
             onClick={openDeleteAllDialog}
             className="inline-flex items-center gap-2 px-4 py-2 bg-red-600/80 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2"
           >
@@ -566,7 +566,7 @@ export default function PedidosPage() {
             <thead className="bg-muted">
               <tr>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={getAriaSortValue(sortField, 'numero_pedido', sortDirection)}>
-                  <button
+                  <button type="button"
                     onClick={() => handleSort('numero_pedido')}
                     className="flex items-center gap-1 rounded-sm px-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
@@ -575,7 +575,7 @@ export default function PedidosPage() {
                   </button>
                 </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={getAriaSortValue(sortField, 'origen', sortDirection)}>
-                  <button
+                  <button type="button"
                     onClick={() => handleSort('origen')}
                     className="flex items-center gap-1 rounded-sm px-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
@@ -590,7 +590,7 @@ export default function PedidosPage() {
                   {t("phone", language)}
                 </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={getAriaSortValue(sortField, 'total', sortDirection)}>
-                  <button
+                  <button type="button"
                     onClick={() => handleSort('total')}
                     className="flex items-center gap-1 rounded-sm px-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
@@ -599,7 +599,7 @@ export default function PedidosPage() {
                   </button>
                 </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={getAriaSortValue(sortField, 'estado', sortDirection)}>
-                  <button
+                  <button type="button"
                     onClick={() => handleSort('estado')}
                     className="flex items-center gap-1 rounded-sm px-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
@@ -608,7 +608,7 @@ export default function PedidosPage() {
                   </button>
                 </th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider" aria-sort={getAriaSortValue(sortField, 'created_at', sortDirection)}>
-                  <button
+                  <button type="button"
                     onClick={() => handleSort('created_at')}
                     className="flex items-center gap-1 rounded-sm px-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
@@ -661,7 +661,7 @@ export default function PedidosPage() {
                         }, language)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <button
+                        <button type="button"
                           onClick={(e) => { e.stopPropagation(); deletePedido(pedido.id, pedido.numero_pedido); }}
                           className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-destructive hover:bg-destructive/10 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           aria-label={t("deleteOrder", language)}
@@ -764,13 +764,13 @@ function DeleteOrderDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="flex gap-3 justify-end">
-          <button
+          <button type="button"
             onClick={onClose}
             className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
           >
             {t("cancel", language)}
           </button>
-          <button
+          <button type="button"
             onClick={onConfirm}
             className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
           >
@@ -837,14 +837,14 @@ function DeleteAllOrdersDialog({
             />
           </div>
           <div className="flex gap-3 justify-end">
-            <button
+            <button type="button"
               onClick={onClose}
               className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
               disabled={isDeleting}
             >
               {t("cancel", language)}
             </button>
-            <button
+            <button type="button"
               onClick={onConfirm}
               disabled={!isValidated || isDeleting}
               className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm disabled:opacity-50 disabled:cursor-not-allowed"

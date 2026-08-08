@@ -7,8 +7,7 @@ import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useOnlineStatus } from '@/hooks/tpv/useOnlineStatus';
 import {
   enqueueOfflineCobro,
-  getOfflineQueue,
-  removeFromQueue,
+  flushOfflineQueue,
   type OfflineCobroEntry,
 } from '@/lib/tpv/offline-queue';
 import { CobroMetodoPropina } from './CobroMetodoPropina';
@@ -34,25 +33,6 @@ interface Props {
 }
 
 type Step = 'metodo' | 'efectivo' | 'tarjeta' | 'confirmado';
-
-async function flushOfflineQueue(): Promise<void> {
-  const entries = await getOfflineQueue();
-  if (entries.length === 0) return;
-
-  const res = await fetchWithCsrf('/api/tpv/sync-offline', {
-    method: 'POST',
-    body: JSON.stringify({ entries }),
-  });
-
-  if (!res.ok) return;
-
-  const { results } = (await res.json()) as { results: { id: string; status: string }[] };
-  for (const r of results) {
-    if (r.status === 'ok' || r.status === 'revision') {
-      await removeFromQueue(r.id);
-    }
-  }
-}
 
 export function CobroFlow({
   sesionId,

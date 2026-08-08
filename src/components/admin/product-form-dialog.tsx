@@ -285,7 +285,6 @@ interface ProductFormDialogProps {
   onToggleTranslations: () => void;
   saving: boolean;
   onSubmit: (e: React.SyntheticEvent) => void;
-  empresaSlug: string;
   empresaTipo?: 'restaurante' | 'tienda' | null;
 }
 
@@ -300,7 +299,6 @@ export function ProductFormDialog({
   onToggleTranslations,
   saving,
   onSubmit,
-  empresaSlug,
   empresaTipo,
 }: Readonly<ProductFormDialogProps>) {
   const { language } = useLanguage();
@@ -416,7 +414,6 @@ export function ProductFormDialog({
                 objectFit={formData.foto_object_fit}
                 onObjectFitChange={(fit) => onFormChange({ ...formData, foto_object_fit: fit })}
                 label={t("productImage", language)}
-                empresaSlug={empresaSlug}
                 helpText={t("productImageHelp", language)}
               />
             </div>

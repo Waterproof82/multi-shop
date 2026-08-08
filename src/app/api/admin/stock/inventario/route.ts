@@ -4,7 +4,7 @@ import { resolveAdminContext, validationErrorResponse } from '@/core/infrastruct
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 
 const itemSchema = z.object({
-  ingredienteId: z.string().uuid(),
+  ingredienteId: z.uuid(),
   cantidadReal: z.number().min(0),
 });
 

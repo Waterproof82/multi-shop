@@ -409,7 +409,7 @@ export default function ClientesPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex justify-center">
-                        <button
+                        <button type="button"
                           onClick={() => handleTogglePromociones(cliente)}
                           role="switch"
                           aria-checked={!!cliente.aceptar_promociones}
@@ -427,7 +427,7 @@ export default function ClientesPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <button
+                      <button type="button"
                         onClick={() => openEditModal(cliente)}
                         className="p-2 hover:bg-muted rounded-lg transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
                         title={t("edit", language)}
@@ -446,7 +446,7 @@ export default function ClientesPage() {
                       </a>
                     </td>
                     <td className="px-4 py-3">
-                      <button
+                      <button type="button"
                         onClick={() => void handleAnonimizarCliente(cliente)}
                         disabled={!!cliente.anonimizado_en}
                         className="p-2 hover:bg-orange-500/10 rounded-lg transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
@@ -456,7 +456,7 @@ export default function ClientesPage() {
                       </button>
                     </td>
                     <td className="px-4 py-3">
-                      <button
+                      <button type="button"
                         onClick={() => handleDeleteCliente(cliente)}
                         className="p-2 hover:bg-destructive/10 rounded-lg transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
                         title={t("delete", language)}

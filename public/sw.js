@@ -44,6 +44,88 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// --- NetworkFirst con timeout ---
+//
+// PROBLEMA QUE RESUELVE
+// `fetch()` no falla rápido cuando la red está degradada, solo cuando está
+// AUSENTE. El caso malo del comedor no es quedarse sin cobertura: es el WiFi
+// asociado pero sin salida real, o el 4G a una raya al fondo del local. Ahí el
+// fetch no rechaza — se queda colgado decenas de segundos hasta que expira el
+// timeout del sistema. Y durante toda esa espera el camarero mira una pantalla
+// en blanco TENIENDO una copia perfectamente buena en caché.
+//
+// Sin timeout, `.catch()` nunca llega a ejecutarse en ese escenario: la caché
+// solo se usaba cuando la red fallaba de golpe, que es justo el caso fácil.
+//
+// 3 segundos: por encima de lo que tarda una respuesta sana en 4G y por debajo
+// del umbral en el que alguien con una bandeja en la mano vuelve a pulsar.
+const NETWORK_TIMEOUT_MS = 3000;
+const TIMEOUT = Symbol('network-timeout');
+
+function debeCachearse(url, response) {
+  // Guardamos en caché solo si:
+  //   A) Es una ruta /waiter/* AND la respuesta es text/html válido
+  //      (filtra redirects y respuestas inesperadas de Next.js).
+  //   B) Es un asset no-HTML como bell.mp3 (audio/mpeg) → status 200 basta.
+  // Nota: NO previene "zombie HTML" de error boundaries (retornan 200
+  // text/html igualmente), pero NetworkFirst lo mitiga: la caché
+  // se sobreescribe en el siguiente request exitoso con red disponible.
+  if (response.status !== 200) return false;
+
+  const contentType = response.headers.get('content-type') ?? '';
+  // Cache both the initial HTML page load AND the RSC payloads that
+  // Next.js App Router fetches during client-side navigation (text/x-component).
+  // Without caching RSC payloads, offline navigation between /waiter/* pages
+  // fails with a blank screen even though the HTML shell is cached.
+  const isWaiterHtml =
+    url.pathname.startsWith('/waiter') &&
+    (contentType.includes('text/html') || contentType.includes('text/x-component'));
+  const isNonWaiterAsset = !url.pathname.startsWith('/waiter'); // bell.mp3
+
+  return isWaiterHtml || isNonWaiterAsset;
+}
+
+function networkFirstConTimeout(request, url) {
+  // La petición de red NO se aborta cuando vence el timeout. Se la deja seguir
+  // a propósito: aunque sirvamos la copia de caché, cuando la respuesta llegue
+  // refrescará la caché para la próxima navegación.
+  const red = fetch(request).then((response) => {
+    if (debeCachearse(url, response)) {
+      const clone = response.clone();
+      caches.open(CACHE_NAME).then((cache) => {
+        cache.put(request, clone);
+      });
+    }
+    return response;
+  });
+
+  const reloj = new Promise((resolve) => {
+    setTimeout(() => resolve(TIMEOUT), NETWORK_TIMEOUT_MS);
+  });
+
+  // Un fallo rápido de red se trata igual que un timeout: ambos van a la caché.
+  // El .catch() sobre `red` deja además la rechazada como manejada, así que no
+  // se dispara un unhandledrejection cuando gana el reloj.
+  return Promise.race([red.catch(() => TIMEOUT), reloj]).then((ganador) => {
+    if (ganador !== TIMEOUT) return ganador;
+
+    return caches.match(request).then((cached) => {
+      if (cached) return cached;
+
+      // Sin copia en caché, rendirse a los 3 s sería PEOR que esperar: la red
+      // puede estar simplemente lenta y responder al cuarto segundo. Servir aquí
+      // /waiter/offline convertiría una carga lenta en una pantalla de error.
+      // Solo se cae al fallback si la red termina fallando de verdad.
+      return red.catch(() =>
+        caches.match(request).then(
+          // /waiter/offline está garantizado en caché desde el evento install.
+          (c) => c ?? caches.match('/waiter/offline')
+        )
+      );
+    });
+  });
+}
+
 // --- Fetch ---
 self.addEventListener('fetch', (event) => {
   // Salvaguarda crítica: Cache API solo acepta GET.
@@ -83,42 +165,7 @@ self.addEventListener('fetch', (event) => {
   // NetworkFirst para navegación /waiter/* y assets estáticos del panel.
   // Incluye bell.mp3 para notificaciones de sonido offline.
   if (url.pathname.startsWith('/waiter') || url.pathname === '/bell.mp3') {
-    event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          // Guardamos en caché solo si:
-          //   A) Es una ruta /waiter/* AND la respuesta es text/html válido
-          //      (filtra redirects y respuestas inesperadas de Next.js).
-          //   B) Es un asset no-HTML como bell.mp3 (audio/mpeg) → status 200 basta.
-          // Condición: status 200 AND (es text/html OR no es ruta /waiter).
-          // Nota: NO previene "zombie HTML" de error boundaries (retornan 200
-          // text/html igualmente), pero NetworkFirst lo mitiga: la caché
-          // se sobreescribe en el siguiente request exitoso con red disponible.
-          const contentType = response.headers.get('content-type') ?? '';
-          // Cache both the initial HTML page load AND the RSC payloads that
-          // Next.js App Router fetches during client-side navigation (text/x-component).
-          // Without caching RSC payloads, offline navigation between /waiter/* pages
-          // fails with a blank screen even though the HTML shell is cached.
-          const isWaiterHtml =
-            url.pathname.startsWith('/waiter') &&
-            (contentType.includes('text/html') || contentType.includes('text/x-component'));
-          const isNonWaiterAsset = !url.pathname.startsWith('/waiter'); // bell.mp3
-
-          if (response.status === 200 && (isWaiterHtml || isNonWaiterAsset)) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, clone);
-            });
-          }
-          return response;
-        })
-        .catch(() =>
-          caches.match(event.request).then(
-            // /waiter/offline está garantizado en caché desde el evento install.
-            (cached) => cached ?? caches.match('/waiter/offline')
-          )
-        )
-    );
+    event.respondWith(networkFirstConTimeout(event.request, url));
   }
 
   // Resto de recursos (menú público, admin, etc.): sin interceptar.

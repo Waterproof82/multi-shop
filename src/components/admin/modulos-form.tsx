@@ -9,7 +9,6 @@ import { useAdmin } from '@/lib/admin-context';
 import { PillSwitch } from '@/components/ui/pill-switch';
 
 interface ModulosFormProps {
-  readonly empresaId: string;
   readonly mostrarPromociones: boolean;
   readonly mostrarTgtg: boolean;
 }
@@ -54,7 +53,7 @@ function ModuloToggle({ icon: Icon, label, description, checked, disabled, onCha
   );
 }
 
-export function ModulosForm({ empresaId, mostrarPromociones: initialPromo, mostrarTgtg: initialTgtg }: ModulosFormProps) {
+export function ModulosForm({ mostrarPromociones: initialPromo, mostrarTgtg: initialTgtg }: ModulosFormProps) {
   const { language } = useLanguage();
   const { overrideEmpresaId } = useAdmin();
   const [mostrarPromociones, setMostrarPromociones] = useState(initialPromo);

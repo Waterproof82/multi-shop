@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getMesaSesionUseCase } from '@/core/infrastructure/database';
 
-const mesaIdSchema = z.string().uuid('El mesaId debe ser un UUID válido');
+const mesaIdSchema = z.uuid('El mesaId debe ser un UUID válido');
 
 export async function POST(
   request: NextRequest,

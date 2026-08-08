@@ -62,7 +62,7 @@ export function EmpleadosTpvPanel({ empresaId: _empresaId }: Props) {
     void loadEmpleados();
   }, []);
 
-  async function handleCreate(e: React.FormEvent) {
+  async function handleCreate(e: React.SyntheticEvent) {
     e.preventDefault();
     if (saving) return;
     setSaving(true);

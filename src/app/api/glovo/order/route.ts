@@ -11,7 +11,7 @@ import { getSupabaseClient } from '@/core/infrastructure/database/supabase-clien
 import { createGlovoOrderUseCase } from '@/core/application/use-cases/glovo/createGlovoOrderUseCase';
 
 const schema = z.object({
-  pedidoId: z.string().uuid(),
+  pedidoId: z.uuid(),
 });
 
 /**

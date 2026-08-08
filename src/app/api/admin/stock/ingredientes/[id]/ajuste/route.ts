@@ -12,7 +12,7 @@ import { resolveActor } from '@/core/infrastructure/api/audit-actor';
 const ajusteSchema = z.object({
   delta: z.number().refine((v) => v !== 0, { message: 'El delta no puede ser cero' }),
   tipo: z.enum(['entrada', 'ajuste']).default('ajuste'),
-  turnoId: z.string().uuid().optional(),
+  turnoId: z.uuid().optional(),
 });
 
 type RouteContext = { params: Promise<{ id: string }> };

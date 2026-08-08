@@ -390,14 +390,14 @@ export default function CategoriasPage() {
                       : '—'}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
-                    <button
+                    <button type="button"
                       onClick={() => openEditModal(cat)}
                       aria-label={`${t("edit", language)} ${cat.nombre_es}`}
                       className="p-2 text-cyan-400 hover:text-cyan-300 mr-1 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center transition-colors"
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
-                    <button
+                    <button type="button"
                       onClick={() => handleDelete(cat.id)}
                       aria-label={`${t("delete", language)} ${cat.nombre_es}`}
                       className="p-2 text-red-400 hover:text-red-300 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center transition-colors"
@@ -443,14 +443,14 @@ export default function CategoriasPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button
+                  <button type="button"
                     onClick={() => openEditModal(cat)}
                     aria-label={`${t("edit", language)} ${cat.nombre_es}`}
                     className="p-2 text-cyan-400 hover:bg-cyan-500/20 dark:hover:bg-cyan-500/20 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
                   >
                     <Pencil className="h-4 w-4" />
                   </button>
-                  <button
+                  <button type="button"
                     onClick={() => handleDelete(cat.id)}
                     aria-label={`${t("delete", language)} ${cat.nombre_es}`}
                     className="p-2 text-red-400 hover:bg-red-500/20 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"

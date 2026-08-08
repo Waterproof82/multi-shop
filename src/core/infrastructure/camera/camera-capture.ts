@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 
 export interface CameraCaptureOptions {
   /** Quality of the captured image (0-1) */
@@ -44,8 +44,6 @@ export function useCameraCapture(): UseCameraCaptureReturn {
     error: null,
   });
   const [isCapturing, setIsCapturing] = useState(false);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
 
   // Verificar si la API de MediaDevices está disponible y soporta getUserMedia
   const isSupported = typeof window !== 'undefined' && 

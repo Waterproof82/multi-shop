@@ -3,9 +3,9 @@ import { z } from "zod";
 const idiomaSchema = z.enum(['es', 'en', 'fr', 'it', 'de']).optional().nullable();
 
 export const createClienteSchema = z.object({
-  empresaId: z.string().uuid(),
+  empresaId: z.uuid(),
   nombre: z.string().max(200).optional().nullable(),
-  email: z.string().email().optional().nullable().or(z.literal('')),
+  email: z.email().optional().nullable().or(z.literal('')),
   telefono: z.string().min(7).max(30).regex(/^\+?[0-9\s\-()+]+$/).optional().nullable(),
   direccion: z.string().max(500).optional().nullable(),
   idioma: idiomaSchema,
@@ -13,9 +13,9 @@ export const createClienteSchema = z.object({
 
 // Update schema - does not require empresaId
 export const updateClienteSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   nombre: z.string().max(200).optional().nullable(),
-  email: z.string().email().optional().nullable().or(z.literal('')),
+  email: z.email().optional().nullable().or(z.literal('')),
   telefono: z.string().min(7).max(30).regex(/^\+?[0-9\s\-()+]+$/).optional().nullable(),
   direccion: z.string().max(500).optional().nullable(),
   aceptar_promociones: z.boolean().optional().nullable(),
@@ -23,7 +23,7 @@ export const updateClienteSchema = z.object({
 });
 
 export const clienteIdSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
 });
 
 export type CreateClienteDTO = z.infer<typeof createClienteSchema>;

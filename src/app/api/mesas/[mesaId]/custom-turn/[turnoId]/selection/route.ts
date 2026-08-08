@@ -4,12 +4,12 @@ import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 import { updateCustomSelectionUseCase } from '@/core/application/use-cases/payment/updateCustomSelectionUseCase';
 
 const paramsSchema = z.object({
-  mesaId:  z.string().uuid(),
-  turnoId: z.string().uuid(),
+  mesaId:  z.uuid(),
+  turnoId: z.uuid(),
 });
 
 const selectionItemSchema = z.object({
-  pedido_id: z.string().uuid(),
+  pedido_id: z.uuid(),
   item_idx:  z.number().int().min(0),
   unidades:  z.number().int().min(1),
 });

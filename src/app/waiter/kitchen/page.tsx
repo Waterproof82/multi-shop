@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useMemo, useEffect, useRef, useState, useReducer } from 'react';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { useSearchParams } from 'next/navigation';
 import { fetchWithCsrf, ensureCsrfToken } from '@/lib/csrf-client';
@@ -8,6 +8,17 @@ import { useLanguage, type Language } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import { UtensilsCrossed, ChevronLeft, ChevronDown, ChevronsUpDown, TimerOff, CheckCheck, PlayCircle, Pause, Table2, Trash2, Layers } from 'lucide-react';
 import type { ItemEstado } from '@/core/domain/repositories/IPedidoRepository';
+import { loadKitchenSnapshot, saveKitchenSnapshot } from '@/lib/kitchen/kitchen-snapshot-db';
+import { useRealtimeDegraded } from '@/hooks/waiter/useRealtimeDegraded';
+import { useCommandQueue } from '@/hooks/waiter/useCommandQueue';
+
+/** Cadencia del reloj visual. Los contadores se muestran en minutos y las
+ *  bandas de color cambian a los 10/20/30/45/60 min, asi que refrescar cada
+ *  segundo era 10 veces mas de lo necesario para lo que se ve en pantalla. */
+const CLOCK_TICK_MS = 10000;
+
+/** Scope propio: la forma de KitchenItem difiere de la de /kitchen. */
+const SNAPSHOT_SCOPE = 'waiter-kitchen';
 
 interface KitchenItem {
   pedidoId: string;
@@ -152,9 +163,6 @@ function makeKey(pedidoId: string, itemIdx: number) {
   return `${pedidoId}:${itemIdx}`;
 }
 
-function itemStateKey(item: KitchenItem) {
-  return `${item.pedidoId}:${item.itemIdx}`;
-}
 
 function getKitchenSortOrder(estado: string): number {
   if (estado === 'listo') return 0;
@@ -255,6 +263,10 @@ export default function WaiterKitchenPage() {
   const targetMesa = searchParams.get('mesa');
   const initialGroupBy = searchParams.get('groupBy') as 'order' | 'mesa' | 'listos' | 'retenidos' | null;
   const [items, setItems] = useState<KitchenItem[]>([]);
+  // Contador del reloj visual. Su unico cometido es provocar el repintado para
+  // refrescar tiempos y colores; deliberadamente NO forma parte de los datos,
+  // para que los agrupamientos memoizados no se invaliden en cada tick.
+  const [, tickClock] = useReducer((n: number) => n + 1, 0);
   const [groupBy, setGroupBy] = useState<'order' | 'mesa' | 'listos' | 'retenidos'>(
     initialGroupBy === 'retenidos' || initialGroupBy === 'listos' || initialGroupBy === 'mesa' ? initialGroupBy : 'order'
   );
@@ -271,6 +283,8 @@ export default function WaiterKitchenPage() {
   const pointerStartX = useRef<number | null>(null);
   const swipingKey    = useRef<string | null>(null);
   const headerRef     = useRef<HTMLDivElement>(null);
+  // Impide que la hidratación desde IndexedDB (asíncrona) pise datos frescos.
+  const hasServerDataRef = useRef(false);
   const [headerHeight, setHeaderHeight] = useState(120);
   // Visibility lifecycle — disconnect Realtime when tab is hidden, reconnect on visible
   useEffect(() => {
@@ -299,10 +313,32 @@ export default function WaiterKitchenPage() {
       const r = await fetch('/api/waiter/kitchen/items');
       if (r.ok) {
         const json = await r.json() as { items: KitchenItem[] };
-        setItems(json.items ?? []);
+        const incoming = json.items ?? [];
+        hasServerDataRef.current = true;
+        setItems(incoming);
+        void saveKitchenSnapshot(SNAPSHOT_SCOPE, incoming);
       }
     } catch { /* ignore */ }
   }, []);
+
+  // Hidratación cache-first mientras viaja el primer fetch — ver
+  // lib/kitchen/kitchen-snapshot-db. El guard evita que esta lectura asíncrona
+  // de IndexedDB pise datos ya traídos por el servidor o por Realtime.
+  useEffect(() => {
+    void loadKitchenSnapshot<KitchenItem>(SNAPSHOT_SCOPE).then(cached => {
+      if (!cached || cached.length === 0) return;
+      if (hasServerDataRef.current) return;
+      setItems(cached);
+    });
+  }, []);
+
+  // Detecta la caída de los canales y sondea mientras dure, sin tocar el ciclo
+  // de vida de las suscripciones.
+  const { realtimeDegraded, trackChannelStatus } = useRealtimeDegraded(fetchItems);
+
+  // Cola offline de cambios de estado. Al vaciarse se resincroniza contra el
+  // servidor para adoptar el estado autoritativo.
+  const { pendingCount, enqueueItemStatus } = useCommandQueue(fetchItems);
 
   useEffect(() => {
     if (!isTabVisible) return;
@@ -322,11 +358,7 @@ export default function WaiterKitchenPage() {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => { void fetchItems(); }, 100);
       })
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('[Realtime] waiter-kitchen-items error:', status);
-        }
-      });
+      .subscribe((status) => trackChannelStatus(status, 'waiter-kitchen-items error'));
 
     // Broadcast channel — receives 'item-update' events from the DB trigger
     // (notify_waiter_items_update) whenever pedido_item_estados rows change.
@@ -337,11 +369,7 @@ export default function WaiterKitchenPage() {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => { void fetchItems(); }, 100);
       })
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('[Realtime] waiter-items-update broadcast error (kitchen):', status);
-        }
-      });
+      .subscribe((status) => trackChannelStatus(status, 'waiter-items-update broadcast error (kitchen)'));
 
     // Broadcast channel — receives 'new-order' events from notify_waiter_new_order
     // trigger for ALL pedido inserts (including waiter-placed estado='pendiente'/'retenido').
@@ -352,11 +380,7 @@ export default function WaiterKitchenPage() {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => { void fetchItems(); }, 100);
       })
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('[Realtime] waiter-new-order broadcast error (kitchen):', status);
-        }
-      });
+      .subscribe((status) => trackChannelStatus(status, 'waiter-new-order broadcast error (kitchen)'));
 
     // Re-fetch on app resume from background (visibilitychange relay from WaiterBanner).
     const onResumeRelay = () => { void fetchItems(); };
@@ -369,7 +393,7 @@ export default function WaiterKitchenPage() {
       void supabase.removeChannel(broadcastChannel);
       void supabase.removeChannel(newOrderChannel);
     };
-  }, [fetchItems, isTabVisible, waiterEmpresaId]);
+  }, [fetchItems, isTabVisible, waiterEmpresaId, trackChannelStatus]);
 
   // Re-fetch items when tab becomes visible again so stale data is refreshed immediately.
   useEffect(() => {
@@ -380,7 +404,7 @@ export default function WaiterKitchenPage() {
   }, [isTabVisible, waiterEmpresaId, fetchItems]);
 
   useEffect(() => {
-    const tick = setInterval(() => setItems(p => [...p]), 1000);
+    const tick = setInterval(tickClock, CLOCK_TICK_MS);
     return () => clearInterval(tick);
   }, []);
 
@@ -422,12 +446,19 @@ export default function WaiterKitchenPage() {
 
   const patchEstado = useCallback(async (pedidoId: string, itemIdx: number, estado: ItemEstado, applyOptimistic: () => void, rollback: () => void) => {
     applyOptimistic();
-    const r = await fetchWithCsrf(`/api/waiter/kitchen/items/${encodeURIComponent(pedidoId)}/${itemIdx}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ estado }),
-    });
-    if (!r.ok) rollback();
-  }, []);
+    const url = `/api/waiter/kitchen/items/${encodeURIComponent(pedidoId)}/${itemIdx}/status`;
+    try {
+      const r = await fetchWithCsrf(url, { method: 'PATCH', body: JSON.stringify({ estado }) });
+      // El servidor contestó y rechazó: la intención NO es válida, se revierte.
+      if (!r.ok) rollback();
+    } catch {
+      // fetchWithCsrf lanza al agotar los reintentos, es decir, la petición no
+      // llegó a contestar. Aquí NO se revierte: la intención del cocinero sigue
+      // siendo válida, solo falta red. Se conserva el estado optimista y el
+      // cambio se aplica al reconectar.
+      await enqueueItemStatus(pedidoId, itemIdx, url, { estado });
+    }
+  }, [enqueueItemStatus]);
 
   const setItemEstado = useCallback((pedidoId: string, itemIdx: number, newEstado: ItemEstado) => {
     setItems(prev => prev.map(i =>
@@ -578,45 +609,45 @@ export default function WaiterKitchenPage() {
 
   // ── Sections ───────────────────────────────────────────────────────────────
 
-  const nuevosItems   = items.filter(i => i.estado === 'pendiente' || i.estado === 'en_preparacion');
-  const listosItems   = items.filter(i => i.estado === 'listo');
-  const retenidoItems = items.filter(i => i.estado === 'retenido');
+  // Memoizados: estos tres filtros recorrían la lista entera en cada tick del
+  // reloj, además de en cada render por cualquier otro motivo. Ahora solo se
+  // recalculan cuando cambian los datos.
+  const nuevosItems   = useMemo(() => items.filter(i => i.estado === 'pendiente' || i.estado === 'en_preparacion'), [items]);
+  const listosItems   = useMemo(() => items.filter(i => i.estado === 'listo'), [items]);
+  const retenidoItems = useMemo(() => items.filter(i => i.estado === 'retenido'), [items]);
   const hasAny        = items.length > 0;
 
+  // Las acciones en lote pasan ahora por `patchEstado`, igual que el swipe
+  // individual. Antes esperaban a que resolvieran las N peticiones antes de
+  // tocar la UI, así que con una mesa de 6-8 platos el camarero veía el botón
+  // "procesando" durante el peor caso de latencia de todas ellas. Reutilizarlo
+  // además les da gratis el rollback por ítem y la cola offline.
   const handleTodosServidos = useCallback(async (mesaKey: string, listosInMesa: KitchenItem[]) => {
     if (listosInMesa.length === 0) return;
     setServingMesas(prev => new Set(prev).add(mesaKey));
     try {
-      await Promise.all(listosInMesa.map(item =>
-        fetchWithCsrf(`/api/waiter/kitchen/items/${encodeURIComponent(item.pedidoId)}/${item.itemIdx}/status`, {
-          method: 'PATCH',
-          body: JSON.stringify({ estado: 'servido' }),
-        })
-      ));
-      const doneKeys = new Set(listosInMesa.map(itemStateKey));
-      setItems(prev => prev.filter(i => !doneKeys.has(itemStateKey(i))));
+      await Promise.all(listosInMesa.map(item => patchEstado(
+        item.pedidoId, item.itemIdx, 'servido',
+        () => removeItem(item.pedidoId, item.itemIdx),
+        () => setItems(addItemBackIfMissing(item)),
+      )));
     } finally {
       setServingMesas(prev => { const next = new Set(prev); next.delete(mesaKey); return next; });
     }
-  }, []);
+  }, [patchEstado, removeItem]);
 
   const handleLiberarRetenidosMesa = useCallback(async (mesaKey: string, retenidos: KitchenItem[]) => {
     setLiberatingMesas(prev => new Set(prev).add(mesaKey));
     try {
-      await Promise.all(retenidos.map(item =>
-        fetchWithCsrf(`/api/waiter/kitchen/items/${encodeURIComponent(item.pedidoId)}/${item.itemIdx}/status`, {
-          method: 'PATCH',
-          body: JSON.stringify({ estado: 'pendiente' }),
-        })
-      ));
-      const retenidoKeys = new Set(retenidos.map(itemStateKey));
-      setItems(prev => prev.map(i =>
-        retenidoKeys.has(itemStateKey(i)) ? { ...i, estado: 'pendiente' } : i
-      ));
+      await Promise.all(retenidos.map(item => patchEstado(
+        item.pedidoId, item.itemIdx, 'pendiente',
+        () => setItemEstado(item.pedidoId, item.itemIdx, 'pendiente'),
+        () => setItemEstado(item.pedidoId, item.itemIdx, item.estado),
+      )));
     } finally {
       setLiberatingMesas(prev => { const next = new Set(prev); next.delete(mesaKey); return next; });
     }
-  }, []);
+  }, [patchEstado, setItemEstado]);
 
   const toggleMesaCollapse = useCallback((mesaKey: string) => {
     setCollapsedMesas(prev => {
@@ -826,6 +857,17 @@ export default function WaiterKitchenPage() {
 
   return (
     <div className="min-h-screen" style={{ background: BG }}>
+      {(realtimeDegraded || pendingCount > 0) && (
+        <output
+          aria-live="polite"
+          className="fixed top-0 left-0 right-0 z-30 px-4 py-1.5 text-center text-xs font-semibold"
+          style={{ background: 'oklch(30% 0.14 62)', color: 'oklch(85% 0.16 62)' }}
+        >
+          {pendingCount > 0
+            ? t('offlinePendingChanges', lang).replace('{n}', String(pendingCount))
+            : t('realtimeReconnecting', lang)}
+        </output>
+      )}
       {/* Header */}
       <div
         ref={headerRef}
@@ -861,7 +903,7 @@ export default function WaiterKitchenPage() {
             const isActive = groupBy === mode;
             const label = mode === 'order' ? t('kitchenGroupByOrder', lang) : t('kitchenGroupByTable', lang);
             return (
-              <button
+              <button type="button"
                 key={mode}
                 onClick={() => setGroupBy(mode)}
                 className="rounded-lg px-4 py-2 text-xs font-semibold transition-colors"
@@ -887,7 +929,7 @@ export default function WaiterKitchenPage() {
               ? { background: 'oklch(26% 0.16 148)', color: 'oklch(80% 0.22 148)', border: '1px solid oklch(52% 0.26 148 / 0.7)' }
               : { background: 'oklch(24% 0.06 252)', color: TEXT_DIM, border: '1px solid oklch(48% 0.08 252 / 0.6)' };
             return (
-              <button
+              <button type="button"
                 key={mode}
                 onClick={() => setGroupBy(mode)}
                 className="rounded-lg px-4 py-2 text-xs font-semibold transition-colors"
@@ -909,7 +951,7 @@ export default function WaiterKitchenPage() {
             const mesaKeys = Array.from(groupByMesa(sourceItems).keys());
             const allCollapsed = mesaKeys.length > 0 && mesaKeys.every(k => collapsedMesas.has(k));
             return (
-              <button
+              <button type="button"
                 className="ml-auto rounded p-1 transition-colors"
                 style={{
                   background: allCollapsed ? 'oklch(30% 0.08 252)' : 'transparent',
@@ -1074,7 +1116,7 @@ export default function WaiterKitchenPage() {
                     className="flex items-center"
                     style={{ background: 'oklch(18% 0.03 252)', borderBottom: isCollapsed ? 'none' : '1px solid oklch(35% 0.08 252 / 0.4)' }}
                   >
-                    <button
+                    <button type="button"
                       className="flex flex-1 items-center gap-2 px-3 py-2.5 min-w-0"
                       style={{ background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
                       onClick={() => toggleMesaCollapse(mesaKey)}
@@ -1088,7 +1130,7 @@ export default function WaiterKitchenPage() {
                     </button>
                     <div className="flex items-center gap-2 pr-3 shrink-0">
                       {listosInMesa.length > 0 && (
-                        <button
+                        <button type="button"
                           onClick={() => void handleTodosServidos(mesaKey, listosInMesa)}
                           disabled={isServing}
                           title={t('kitchenTodosServidos', lang)}
@@ -1099,7 +1141,7 @@ export default function WaiterKitchenPage() {
                         </button>
                       )}
                       {retenidosInMesa.length > 0 && (
-                        <button
+                        <button type="button"
                           onClick={() => void handleLiberarRetenidosMesa(mesaKey, retenidosInMesa)}
                           disabled={isLiberating}
                           title={t('kitchenLiberarPedidos', lang)}
@@ -1109,7 +1151,7 @@ export default function WaiterKitchenPage() {
                           {isLiberating ? <span className="text-[10px]">…</span> : <PlayCircle className="w-4 h-4" />}
                         </button>
                       )}
-                      <button
+                      <button type="button"
                         onClick={() => setGroupedMesas(prev => {
                           const next = new Set(prev);
                           if (next.has(mesaKey)) next.delete(mesaKey); else next.add(mesaKey);
@@ -1163,7 +1205,7 @@ export default function WaiterKitchenPage() {
                         className="flex items-center"
                         style={{ background: 'oklch(18% 0.03 252)', borderBottom: isCollapsed ? 'none' : '1px solid oklch(35% 0.08 252 / 0.4)' }}
                       >
-                        <button
+                        <button type="button"
                           className="flex flex-1 items-center gap-2 px-3 py-2.5 min-w-0"
                           style={{ background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
                           onClick={() => toggleMesaCollapse(mesaKey)}
@@ -1176,7 +1218,7 @@ export default function WaiterKitchenPage() {
                           />
                         </button>
                         <div className="flex items-center gap-2 pr-3 shrink-0">
-                          <button
+                          <button type="button"
                             onClick={() => void handleTodosServidos(mesaKey, group.items)}
                             disabled={isServing}
                             title={t('kitchenTodosServidos', lang)}
@@ -1222,7 +1264,7 @@ export default function WaiterKitchenPage() {
                         className="flex items-center"
                         style={{ background: 'oklch(18% 0.03 252)', borderBottom: isCollapsed ? 'none' : '1px solid oklch(35% 0.08 252 / 0.4)' }}
                       >
-                        <button
+                        <button type="button"
                           className="flex flex-1 items-center gap-2 px-3 py-2 min-w-0"
                           style={{ background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
                           onClick={() => toggleMesaCollapse(mesaKey)}
@@ -1237,7 +1279,7 @@ export default function WaiterKitchenPage() {
                           />
                         </button>
                         <div className="flex items-center gap-2 pr-3 shrink-0">
-                          <button
+                          <button type="button"
                             onClick={() => void handleLiberarRetenidosMesa(mesaKey, group.items)}
                             disabled={isLiberating}
                             title={t('kitchenLiberarPedidos', lang)}
@@ -1289,14 +1331,14 @@ export default function WaiterKitchenPage() {
               </span>
             </div>
             <div className="flex gap-2">
-              <button
+              <button type="button"
                 onClick={() => setPendingRetain(null)}
                 className="flex-1 rounded-lg px-3 py-2 text-xs font-semibold"
                 style={{ background: 'oklch(22% 0.04 252)', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
               >
                 {t('kitchenCountdownCancel', lang)}
               </button>
-              <button
+              <button type="button"
                 onClick={() => void confirmRetain()}
                 className="flex-1 rounded-lg px-3 py-2 text-xs font-semibold"
                 style={{ background: 'oklch(26% 0.16 35)', color: 'oklch(82% 0.22 35)', border: '1px solid oklch(50% 0.28 35 / 0.6)' }}
@@ -1343,14 +1385,14 @@ export default function WaiterKitchenPage() {
               </div>
             </div>
             <div className="flex gap-2">
-              <button
+              <button type="button"
                 onClick={() => setPendingCancel(null)}
                 className="flex-1 rounded-lg px-3 py-2 text-xs font-semibold"
                 style={{ background: 'oklch(20% 0.04 252)', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
               >
                 {t('kitchenCountdownCancel', lang)}
               </button>
-              <button
+              <button type="button"
                 onClick={() => void confirmCancel()}
                 className="flex-1 rounded-lg px-3 py-2 text-xs font-semibold flex items-center justify-center gap-1.5"
                 style={{ background: 'oklch(28% 0.24 25)', color: 'oklch(82% 0.24 25)', border: '1px solid oklch(50% 0.30 25 / 0.6)' }}
@@ -1400,14 +1442,14 @@ export default function WaiterKitchenPage() {
                 </span>
               </div>
               <div className="flex gap-2">
-                <button
+                <button type="button"
                   onClick={() => setPendingMergedWaiterAction(null)}
                   className="flex-1 rounded-lg px-3 py-2 text-xs font-semibold"
                   style={{ background: 'oklch(20% 0.04 252)', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
                 >
                   {t('kitchenCountdownCancel', lang)}
                 </button>
-                <button
+                <button type="button"
                   onClick={() => void confirmMergedWaiterAction()}
                   className="flex-1 rounded-lg px-3 py-2 text-xs font-semibold"
                   style={{ background: 'oklch(26% 0.14 252)', color: TEXT_MAIN, border: '1px solid oklch(50% 0.14 252 / 0.6)' }}

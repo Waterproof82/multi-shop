@@ -20,7 +20,7 @@ export function KitchenPinGate({ children }: Readonly<{ children: React.ReactNod
       .finally(() => setChecking(false));
   }, []);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.SyntheticEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);

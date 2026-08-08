@@ -8,9 +8,16 @@ import { escapeHtml } from '@/lib/html-utils';
 import { generateUnsubscribeToken } from '@/lib/unsubscribe-token';
 import { generateReservaToken } from '@/lib/reserva-token';
 import type { TgtgItem } from '@/core/domain/entities/types';
+import {
+  construirAsunto,
+  construirTextoPlano,
+  construirUrlBaja,
+  construirUrlReserva,
+  resolverBaseUrl,
+} from '@/lib/tgtg/campaign-email';
 
 const enviarSchema = z.object({
-  promoIds: z.array(z.string().uuid()).min(1).max(10),
+  promoIds: z.array(z.uuid()).min(1).max(10),
 });
 
 // Textos del email por idioma
@@ -179,26 +186,229 @@ function buildTgtgEmailHtml(params: {
 </html>`;
 }
 
+/** Destinatario del boletín de promociones. */
+type Destinatario = { email: string; nombre: string | null; idioma: string | null };
+
+/** Campaña validada y lista para componer, antes de personalizar por destinatario. */
+type CampanaBase = {
+  promoId: string;
+  horaInicio: string;
+  horaFin: string;
+  fechaActivacion: string;
+  items: TgtgItem[];
+};
+
+/**
+ * Resultado de un paso que puede cortar la petición.
+ *
+ * Las rutas devuelven `NextResponse`, así que un helper que valide algo tiene
+ * que poder decir "toma la respuesta ya hecha" o "toma el dato". Sin esto, cada
+ * comprobación tendría que quedarse dentro del handler y volveríamos al mismo
+ * bloque de 170 líneas.
+ */
+type PasoRuta<T> = { corte: NextResponse } | { valor: T };
+
+/** Tope de destinatarios por envío. Brevo cobra por correo y esto es un botón. */
+const MAX_DESTINATARIOS = 500;
+
+async function leerPromoIds(request: NextRequest): Promise<PasoRuta<string[]>> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return { corte: NextResponse.json({ error: 'Invalid request body' }, { status: 400 }) };
+  }
+
+  const parsed = enviarSchema.safeParse(body);
+  if (!parsed.success) {
+    return { corte: NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 }) };
+  }
+  return { valor: parsed.data.promoIds };
+}
+
+/**
+ * Valida cada campaña pedida y reúne los destinatarios.
+ *
+ * `sendCampaignEmails` es quien decide si una campaña puede enviarse; aquí solo
+ * se traduce su negativa al status HTTP que corresponde. Basta que una falle
+ * para abortar el lote entero: enviar la mitad dejaría al admin sin saber cuáles
+ * salieron.
+ */
+async function prepararCampanas(
+  empresaId: string,
+  promoIds: string[],
+): Promise<PasoRuta<{ destinatarios: Destinatario[]; campanas: CampanaBase[] }>> {
+  const recientes = await getTgtgUseCase().getAllRecent(empresaId);
+  if (!recientes.success) {
+    return { corte: NextResponse.json({ error: 'Error al obtener campañas' }, { status: 500 }) };
+  }
+  const itemsPorPromo = new Map(recientes.data.map(d => [d.promo.id, d.items]));
+
+  let destinatarios: Destinatario[] = [];
+  const campanas: CampanaBase[] = [];
+
+  for (const promoId of promoIds) {
+    const envio = await getTgtgUseCase().sendCampaignEmails(empresaId, promoId);
+    if (!envio.success) {
+      return { corte: NextResponse.json({ error: envio.error.message }, { status: statusDeError(envio.error.code) }) };
+    }
+
+    // La lista de suscritos es la misma para todas las campañas de la empresa.
+    if (destinatarios.length === 0) destinatarios = envio.data.emailTargets;
+
+    campanas.push({
+      promoId,
+      horaInicio: envio.data.promo.horaRecogidaInicio.slice(0, 5),
+      horaFin: envio.data.promo.horaRecogidaFin.slice(0, 5),
+      fechaActivacion: envio.data.promo.fechaActivacion,
+      items: itemsPorPromo.get(promoId) ?? [],
+    });
+  }
+
+  return { valor: { destinatarios, campanas } };
+}
+
+function statusDeError(code: string): number {
+  if (code === 'NOT_FOUND') return 404;
+  if (code === 'ALREADY_SENT') return 409;
+  return 400;
+}
+
+function validarDestinatarios(destinatarios: Destinatario[]): NextResponse | null {
+  if (destinatarios.length === 0) {
+    return NextResponse.json({ error: 'No hay clientes suscritos a promociones' }, { status: 400 });
+  }
+  if (destinatarios.length > MAX_DESTINATARIOS) {
+    return NextResponse.json(
+      { error: `Demasiados destinatarios (${destinatarios.length}). Límite: ${MAX_DESTINATARIOS}` },
+      { status: 400 },
+    );
+  }
+  return null;
+}
+
+/** Campañas con el enlace de reserva ya personalizado para este destinatario. */
+function personalizarCampanas(
+  campanas: CampanaBase[],
+  baseUrl: string,
+  email: string,
+  lang: string,
+): Array<CampanaBase & { items: Array<TgtgItem & { reservaUrl: string }> }> {
+  return campanas.map(campana => ({
+    ...campana,
+    items: campana.items.map(item => ({
+      ...item,
+      reservaUrl: construirUrlReserva({
+        baseUrl,
+        itemId: item.id,
+        promoId: campana.promoId,
+        email,
+        token: generateReservaToken(email, item.id, campana.promoId),
+        lang,
+      }),
+    })),
+  }));
+}
+
+interface ContextoEnvio {
+  empresaId: string;
+  empresaNombre: string;
+  empresaLogoUrl: string;
+  senderEmail: string;
+  baseUrl: string;
+  campanas: CampanaBase[];
+}
+
+/**
+ * Envía el correo a cada destinatario.
+ *
+ * Un fallo NO interrumpe el bucle: si el servidor de correo rechaza una
+ * dirección concreta, el resto del boletín debe salir igual. Se guarda el
+ * primer error para devolverlo como aviso junto al recuento de enviados.
+ */
+async function enviarACadaDestinatario(
+  destinatarios: Destinatario[],
+  ctx: ContextoEnvio,
+): Promise<{ emailsSent: number; emailError: string | null }> {
+  let emailsSent = 0;
+  let emailError: string | null = null;
+
+  for (const destinatario of destinatarios) {
+    try {
+      const lang = destinatario.idioma || 'es';
+      const campanas = personalizarCampanas(ctx.campanas, ctx.baseUrl, destinatario.email, lang);
+      const textos = TGTG_EMAIL_TEXTS[lang] || TGTG_EMAIL_TEXTS.es;
+
+      await sendEmail({
+        to: [destinatario.email],
+        subject: construirAsunto(lang, campanas),
+        htmlContent: buildTgtgEmailHtml({
+          empresaLogoUrl: ctx.empresaLogoUrl,
+          empresaNombre: ctx.empresaNombre,
+          campaigns: campanas,
+          baseUrl: ctx.baseUrl,
+          empresaId: ctx.empresaId,
+          recipientEmail: destinatario.email,
+          lang,
+        }),
+        textContent: construirTextoPlano({
+          empresaNombre: ctx.empresaNombre,
+          campanas,
+          textos,
+          locale: getLocaleForLang(lang),
+          urlBaja: construirUrlBaja(ctx.baseUrl, destinatario.email, ctx.empresaId),
+        }),
+        senderName: ctx.empresaNombre,
+        senderEmail: ctx.senderEmail,
+      });
+      emailsSent++;
+    } catch (sendErr) {
+      await logApiError('Send TGTG email failed', sendErr, 'POST');
+      emailError ??= sendErr instanceof Error ? sendErr.message : 'Error al enviar email';
+    }
+  }
+
+  return { emailsSent, emailError };
+}
+
+/**
+ * Marca las campañas como enviadas.
+ *
+ * Solo si salió al menos un correo: marcarlas tras un fallo total dejaría al
+ * admin sin poder reintentar, porque `sendCampaignEmails` rechaza las ya
+ * enviadas con ALREADY_SENT.
+ */
+async function marcarComoEnviadas(
+  empresaId: string,
+  campanas: CampanaBase[],
+  emailsSent: number,
+): Promise<Array<{ id: string; emailEnviado: boolean; numeroEnvios: number }>> {
+  if (emailsSent === 0) return [];
+
+  const actualizadas: Array<{ id: string; emailEnviado: boolean; numeroEnvios: number }> = [];
+  for (const campana of campanas) {
+    const marcada = await getTgtgUseCase().markEmailSent(empresaId, campana.promoId, emailsSent);
+    if (marcada.success) {
+      actualizadas.push({
+        id: marcada.data.id,
+        emailEnviado: marcada.data.emailEnviado,
+        numeroEnvios: marcada.data.numeroEnvios,
+      });
+    }
+  }
+  return actualizadas;
+}
+
 export async function POST(request: NextRequest) {
   const ctx = await resolveAdminContextWithEmpresa(request);
   if (ctx.error) return ctx.error;
   const { empresaId } = ctx;
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
-  }
+  const promoIds = await leerPromoIds(request);
+  if ('corte' in promoIds) return promoIds.corte;
 
-  const parsed = enviarSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
-  }
-
-  const { promoIds } = parsed.data;
-
-  // Fail fast — without this secret token generation will throw for every recipient
+  // Falla pronto: sin este secreto, generar el token reventaría en CADA
+  // destinatario, después de haber marcado campañas y consumido cuota de envío.
   if (!process.env.RESERVA_HMAC_SECRET) {
     return NextResponse.json({ error: 'RESERVA_HMAC_SECRET no está configurado en el servidor' }, { status: 500 });
   }
@@ -210,135 +420,28 @@ export async function POST(request: NextRequest) {
     }
     const empresa = empresaResult.data;
 
-    // Fetch all recent campaigns once and index by id
-    const allRecentResult = await getTgtgUseCase().getAllRecent(empresaId);
-    if (!allRecentResult.success) {
-      return NextResponse.json({ error: 'Error al obtener campañas' }, { status: 500 });
-    }
-    const recentByPromoId = new Map(allRecentResult.data.map(d => [d.promo.id, d]));
+    const preparacion = await prepararCampanas(empresaId, promoIds.valor);
+    if ('corte' in preparacion) return preparacion.corte;
+    const { destinatarios, campanas } = preparacion.valor;
 
-    // Validate each requested promo
-    let emailTargets: Array<{ email: string; nombre: string | null; idioma: string | null }> = [];
-    const campaignsToSend: Array<{ promoId: string; horaInicio: string; horaFin: string; fechaActivacion: string; items: TgtgItem[] }> = [];
-
-    for (const promoId of promoIds) {
-      const sendResult = await getTgtgUseCase().sendCampaignEmails(empresaId, promoId);
-      if (!sendResult.success) {
-        const status = sendResult.error.code === 'NOT_FOUND' ? 404 : sendResult.error.code === 'ALREADY_SENT' ? 409 : 400;
-        return NextResponse.json({ error: sendResult.error.message }, { status });
-      }
-      if (emailTargets.length === 0) {
-        emailTargets = sendResult.data.emailTargets;
-      }
-      const found = recentByPromoId.get(promoId);
-      campaignsToSend.push({
-        promoId,
-        horaInicio: sendResult.data.promo.horaRecogidaInicio.slice(0, 5),
-        horaFin: sendResult.data.promo.horaRecogidaFin.slice(0, 5),
-        fechaActivacion: sendResult.data.promo.fechaActivacion,
-        items: found ? found.items : [],
-      });
-    }
-
-    if (emailTargets.length === 0) {
-      return NextResponse.json({ error: 'No hay clientes suscritos a promociones' }, { status: 400 });
-    }
-
-    const MAX_EMAIL_RECIPIENTS = 500;
-    if (emailTargets.length > MAX_EMAIL_RECIPIENTS) {
-      return NextResponse.json({ error: `Demasiados destinatarios (${emailTargets.length}). Límite: ${MAX_EMAIL_RECIPIENTS}` }, { status: 400 });
-    }
+    const rechazo = validarDestinatarios(destinatarios);
+    if (rechazo) return rechazo;
 
     const senderEmail = empresa.emailNotification || process.env.BREVO_DEFAULT_SENDER_EMAIL;
     if (!senderEmail) {
       return NextResponse.json({ error: 'Email remitente no configurado' }, { status: 500 });
     }
 
-    const requestOrigin = new URL(request.url).origin;
-    // Validate dominio is a safe hostname before using it in email URLs.
-    // A malicious value could inject content into HTML href attributes.
-    const dominioSafe = empresa.dominio && /^[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,}$/.test(empresa.dominio);
-    const baseUrl = dominioSafe ? `https://${empresa.dominio}` : requestOrigin;
+    const { emailsSent, emailError } = await enviarACadaDestinatario(destinatarios, {
+      empresaId,
+      empresaNombre: empresa.nombre || 'Empresa',
+      empresaLogoUrl: empresa.logoUrl || '',
+      senderEmail,
+      baseUrl: resolverBaseUrl(empresa.dominio, new URL(request.url).origin),
+      campanas,
+    });
 
-    let emailsSent = 0;
-    let emailError: string | null = null;
-
-    for (const target of emailTargets) {
-      try {
-        const lang = target.idioma || 'es';
-        const campaigns = campaignsToSend.map((c) => ({
-          promoId: c.promoId,
-          horaInicio: c.horaInicio,
-          horaFin: c.horaFin,
-          fechaActivacion: c.fechaActivacion,
-          items: c.items.map((item) => {
-            const token = generateReservaToken(target.email, item.id, c.promoId);
-            return {
-              ...item,
-              reservaUrl: `${baseUrl}/?tgtg=confirm&itemId=${encodeURIComponent(item.id)}&promoId=${encodeURIComponent(c.promoId)}&email=${encodeURIComponent(target.email)}&token=${encodeURIComponent(token)}&lang=${encodeURIComponent(lang)}`,
-            };
-          }),
-        }));
-
-        const subjects: Record<string, { single: string; multiple: string }> = {
-          es: { single: `¡Ofertas TooGoodToGo! Recogida ${campaigns[0].horaInicio}–${campaigns[0].horaFin}`, multiple: `¡${campaigns.length} campañas TooGoodToGo disponibles hoy!` },
-          en: { single: `TooGoodToGo offers! Pickup ${campaigns[0].horaInicio}–${campaigns[0].horaFin}`, multiple: `¡${campaigns.length} TooGoodToGo campaigns available today!` },
-          fr: { single: `Offres TooGoodToGo! Retrait ${campaigns[0].horaInicio}–${campaigns[0].horaFin}`, multiple: `¡${campaigns.length} campagnes TooGoodToGo disponibles aujourd'hui!` },
-          it: { single: `Offerte TooGoodToGo! Ritiro ${campaigns[0].horaInicio}–${campaigns[0].horaFin}`, multiple: `¡${campaigns.length} campagne TooGoodToGo disponibili oggi!` },
-          de: { single: `TooGoodToGo Angebote! Abholung ${campaigns[0].horaInicio}–${campaigns[0].horaFin}`, multiple: `¡${campaigns.length} TooGoodToGo-Kampagnen heute verfügbar!` },
-        };
-        const subjectText = subjects[lang] || subjects.es;
-        const subject = campaigns.length === 1 ? subjectText.single : subjectText.multiple;
-
-        const texts = TGTG_EMAIL_TEXTS[lang] || TGTG_EMAIL_TEXTS.es;
-        const locale = getLocaleForLang(lang);
-        const plainLines: string[] = [`${empresa.nombre || 'Empresa'} — ${texts.title}`, ''];
-        for (const c of campaigns) {
-          const dateLabel = new Date(c.fechaActivacion + 'T00:00:00').toLocaleDateString(locale, { weekday: 'long', day: '2-digit', month: 'long' });
-          plainLines.push(`${dateLabel} | ${texts.pickupTime}: ${c.horaInicio}–${c.horaFin}`);
-          for (const item of c.items) {
-            plainLines.push(`  - ${item.titulo}: €${Number(item.precioDescuento).toFixed(2)} (${item.cuponesDisponibles} ${texts.disponible})`);
-            plainLines.push(`    ${item.reservaUrl}`);
-          }
-          plainLines.push('');
-        }
-        plainLines.push(`${baseUrl}/api/unsubscribe?email=${encodeURIComponent(target.email)}&empresa=${empresaId}&action=baja`);
-
-        await sendEmail({
-          to: [target.email],
-          subject,
-          htmlContent: buildTgtgEmailHtml({
-            empresaLogoUrl: empresa.logoUrl || '',
-            empresaNombre: empresa.nombre || 'Empresa',
-            campaigns,
-            baseUrl,
-            empresaId: empresaId,
-            recipientEmail: target.email,
-            lang,
-          }),
-          textContent: plainLines.join('\n'),
-          senderName: empresa.nombre || 'Promociones',
-          senderEmail,
-        });
-        emailsSent++;
-      } catch (sendErr) {
-        await logApiError('Send TGTG email failed', sendErr, 'POST');
-        if (!emailError) {
-          emailError = sendErr instanceof Error ? sendErr.message : 'Error al enviar email';
-        }
-      }
-    }
-
-    // Mark all promos as sent — only if at least one email was delivered
-    const updatedPromos: Array<{ id: string; emailEnviado: boolean; numeroEnvios: number }> = [];
-    if (emailsSent > 0) {
-      for (const c of campaignsToSend) {
-        const markResult = await getTgtgUseCase().markEmailSent(empresaId, c.promoId, emailsSent);
-        if (markResult.success) {
-          updatedPromos.push({ id: markResult.data.id, emailEnviado: markResult.data.emailEnviado, numeroEnvios: markResult.data.numeroEnvios });
-        }
-      }
-    }
+    const updatedPromos = await marcarComoEnviadas(empresaId, campanas, emailsSent);
 
     if (emailError) {
       await logApiError('TGTG emails partial error', new Error(emailError), 'POST');

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const createComplementoGrupoSchema = z.object({
-  empresaId: z.string().uuid(),
+  empresaId: z.uuid(),
   nombre_es: z.string().min(1).max(200),
   nombre_en: z.string().max(200).nullable().optional(),
   nombre_fr: z.string().max(200).nullable().optional(),
@@ -27,7 +27,7 @@ export const createComplementoOpcionSchema = z.object({
 export const updateComplementoOpcionSchema = createComplementoOpcionSchema.partial();
 
 export const setProductoGruposSchema = z.object({
-  grupoIds: z.array(z.string().uuid()),
+  grupoIds: z.array(z.uuid()),
 });
 
 export type CreateComplementoGrupoDTO = z.infer<typeof createComplementoGrupoSchema>;

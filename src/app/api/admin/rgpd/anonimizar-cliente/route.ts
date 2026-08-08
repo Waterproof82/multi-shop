@@ -11,7 +11,7 @@ import { anonimizarClienteUseCase } from '@/core/application/use-cases/rgpd/anon
 import { z } from 'zod';
 
 const AnonimizarSchema = z.object({
-  clienteId: z.string().uuid(),
+  clienteId: z.uuid(),
 });
 
 export async function POST(req: NextRequest) {
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
 
   const parsed = AnonimizarSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json({ error: z.flattenError(parsed.error) }, { status: 400 });
   }
 
   const repo = getClienteRepository();

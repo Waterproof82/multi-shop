@@ -24,6 +24,7 @@
 
 import { randomUUID } from 'crypto';
 import { test, expect, type APIRequestContext } from '@playwright/test';
+import { nuevoContexto } from './helpers/contexto';
 
 // ── Auth compartida entre suites ──────────────────────────────────────────────
 
@@ -44,7 +45,7 @@ test.beforeAll(async ({ playwright, baseURL }) => {
   const pin = process.env.PLAYWRIGHT_WAITER_PIN;
   if (!pin) return;
 
-  const ctx = await playwright.request.newContext({ baseURL });
+  const ctx = await nuevoContexto(playwright, baseURL);
 
   // 1. CSRF token (endpoint público)
   const csrfRes = await ctx.get('/api/admin/login');
@@ -81,7 +82,7 @@ test.describe('Routing — auth barrier (sin vars de entorno)', () => {
   let request: APIRequestContext;
 
   test.beforeEach(async ({ playwright, baseURL }) => {
-    request = await playwright.request.newContext({ baseURL });
+    request = await nuevoContexto(playwright, baseURL);
   });
   test.afterEach(async () => { await request.dispose(); });
 
@@ -175,7 +176,7 @@ test.describe('Routing — con auth real (requiere PLAYWRIGHT_WAITER_PIN)', () =
   let request: APIRequestContext;
 
   test.beforeEach(async ({ playwright, baseURL }) => {
-    request = await playwright.request.newContext({ baseURL });
+    request = await nuevoContexto(playwright, baseURL);
   });
   test.afterEach(async () => { await request.dispose(); });
 
@@ -292,7 +293,7 @@ test.describe('Bug A+B regression — from_validation=true routing (requiere PIN
   test.beforeAll(async ({ playwright, baseURL }) => {
     if (!sessionWaiterToken || !sessionEmpresaId || !supabaseUrl || !serviceRoleKey) return;
 
-    const appCtx = await playwright.request.newContext({ baseURL });
+    const appCtx = await nuevoContexto(playwright, baseURL);
     const dbCtx  = await playwright.request.newContext({ baseURL: supabaseUrl });
 
     try {
@@ -315,6 +316,7 @@ test.describe('Bug A+B regression — from_validation=true routing (requiere PIN
           total: 0,
           mesa_id: mesaId,
           estado: 'pendiente',
+          es_prueba: true,
           detalle_pedido: [
             { nombre: '__test_comida__', cantidad: 1, precio: 0, tipo_producto: 'comida' },
           ],
@@ -346,10 +348,12 @@ test.describe('Bug A+B regression — from_validation=true routing (requiere PIN
     if (!testPedidoId || !supabaseUrl || !serviceRoleKey) return;
 
     const dbCtx = await playwright.request.newContext({ baseURL: supabaseUrl });
-    // Cleanup: mover a 'cancelado' (DELETE bloqueado por trigger pedidos_no_delete LGT art.66)
-    await dbCtx.patch(`/rest/v1/pedidos?id=eq.${testPedidoId}`, {
+    // Cleanup: DELETE real. El pedido se inserto con es_prueba=true, el unico caso
+    // que el trigger pedidos_block_delete permite borrar, dejando traza en
+    // pedidos_prueba_purga_log. Antes solo se podia mover a 'cancelado', asi que
+    // las filas se acumulaban para siempre en una tabla con retencion fiscal.
+    await dbCtx.delete(`/rest/v1/pedidos?id=eq.${testPedidoId}`, {
       headers: { ...supabaseHeaders(), Prefer: '' },
-      data: { estado: 'cancelado' },
     });
     await dbCtx.delete(`/rest/v1/pedido_item_estados?pedido_id=eq.${testPedidoId}`, {
       headers: { ...supabaseHeaders(), Prefer: '' },
@@ -358,7 +362,7 @@ test.describe('Bug A+B regression — from_validation=true routing (requiere PIN
   });
 
   test.beforeEach(async ({ playwright, baseURL }) => {
-    request = await playwright.request.newContext({ baseURL });
+    request = await nuevoContexto(playwright, baseURL);
   });
   test.afterEach(async () => { await request.dispose(); });
 
@@ -430,7 +434,7 @@ test.describe('Bug C regression — comida retenida con pedido en estado anotado
   test.beforeAll(async ({ playwright, baseURL }) => {
     if (!sessionWaiterToken || !sessionEmpresaId || !supabaseUrl || !serviceRoleKey) return;
 
-    const appCtx = await playwright.request.newContext({ baseURL });
+    const appCtx = await nuevoContexto(playwright, baseURL);
     const dbCtx  = await playwright.request.newContext({ baseURL: supabaseUrl });
 
     try {
@@ -453,6 +457,7 @@ test.describe('Bug C regression — comida retenida con pedido en estado anotado
           total: 0,
           mesa_id: mesaId,
           estado: 'anotado',
+          es_prueba: true,
           detalle_pedido: [
             { nombre: '__test_comida_anotado__', cantidad: 1, precio: 0, tipo_producto: 'comida' },
           ],
@@ -484,9 +489,12 @@ test.describe('Bug C regression — comida retenida con pedido en estado anotado
     if (!testPedidoId || !supabaseUrl || !serviceRoleKey) return;
 
     const dbCtx = await playwright.request.newContext({ baseURL: supabaseUrl });
-    await dbCtx.patch(`/rest/v1/pedidos?id=eq.${testPedidoId}`, {
+    // Cleanup: DELETE real. El pedido se inserto con es_prueba=true, el unico caso
+    // que el trigger pedidos_block_delete permite borrar, dejando traza en
+    // pedidos_prueba_purga_log. Antes solo se podia mover a 'cancelado', asi que
+    // las filas se acumulaban para siempre en una tabla con retencion fiscal.
+    await dbCtx.delete(`/rest/v1/pedidos?id=eq.${testPedidoId}`, {
       headers: { ...supabaseHeaders(), Prefer: '' },
-      data: { estado: 'cancelado' },
     });
     await dbCtx.delete(`/rest/v1/pedido_item_estados?pedido_id=eq.${testPedidoId}`, {
       headers: { ...supabaseHeaders(), Prefer: '' },
@@ -495,7 +503,7 @@ test.describe('Bug C regression — comida retenida con pedido en estado anotado
   });
 
   test.beforeEach(async ({ playwright, baseURL }) => {
-    request = await playwright.request.newContext({ baseURL });
+    request = await nuevoContexto(playwright, baseURL);
   });
   test.afterEach(async () => { await request.dispose(); });
 
@@ -590,7 +598,7 @@ test.describe('Suite 5 — lanzar pase + pausa: retainIndices vs pausedIndices (
   test.beforeAll(async ({ playwright, baseURL }) => {
     if (!sessionWaiterToken || !sessionEmpresaId || !supabaseUrl || !serviceRoleKey) return;
 
-    const appCtx = await playwright.request.newContext({ baseURL });
+    const appCtx = await nuevoContexto(playwright, baseURL);
     const dbCtx  = await playwright.request.newContext({ baseURL: supabaseUrl });
 
     try {
@@ -612,6 +620,7 @@ test.describe('Suite 5 — lanzar pase + pausa: retainIndices vs pausedIndices (
           total: 0,
           mesa_id: mesaId,
           estado: 'pendiente_validacion',
+          es_prueba: true,
           detalle_pedido: [
             { nombre: '__test_pase_retain__', cantidad: 1, precio: 0, tipo_producto: 'comida' },
           ],
@@ -629,6 +638,7 @@ test.describe('Suite 5 — lanzar pase + pausa: retainIndices vs pausedIndices (
           total: 0,
           mesa_id: mesaId,
           estado: 'pendiente_validacion',
+          es_prueba: true,
           detalle_pedido: [
             { nombre: '__test_pase_paused__', cantidad: 1, precio: 0, tipo_producto: 'comida' },
           ],
@@ -649,6 +659,7 @@ test.describe('Suite 5 — lanzar pase + pausa: retainIndices vs pausedIndices (
           mesa_id: mesaId,
           estado: 'pendiente',
           validated_at: new Date().toISOString(),
+          es_prueba: true,
           detalle_pedido: [
             { nombre: '__test_release_paused__', cantidad: 1, precio: 0, tipo_producto: 'comida' },
           ],
@@ -679,9 +690,9 @@ test.describe('Suite 5 — lanzar pase + pausa: retainIndices vs pausedIndices (
     if (!supabaseUrl || !serviceRoleKey) return;
     const dbCtx = await playwright.request.newContext({ baseURL: supabaseUrl });
     for (const id of [pedidoRetainId, pedidoPausedId, pedidoValidatedPausedId].filter(Boolean)) {
-      await dbCtx.patch(`/rest/v1/pedidos?id=eq.${id}`, {
+      // DELETE real: insertados con es_prueba=true (ver pedidos_block_delete)
+      await dbCtx.delete(`/rest/v1/pedidos?id=eq.${id}`, {
         headers: { ...supabaseHeaders(), Prefer: '' },
-        data: { estado: 'cancelado' },
       });
       await dbCtx.delete(`/rest/v1/pedido_item_estados?pedido_id=eq.${id}`, {
         headers: { ...supabaseHeaders(), Prefer: '' },
@@ -691,7 +702,7 @@ test.describe('Suite 5 — lanzar pase + pausa: retainIndices vs pausedIndices (
   });
 
   test.beforeEach(async ({ playwright, baseURL }) => {
-    request = await playwright.request.newContext({ baseURL });
+    request = await nuevoContexto(playwright, baseURL);
   });
   test.afterEach(async () => { await request.dispose(); });
 

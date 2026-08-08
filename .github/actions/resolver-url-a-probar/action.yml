@@ -1,0 +1,121 @@
+name: Resolver la URL a probar
+description: >
+  Devuelve la URL contra la que correr Playwright, garantizando siempre que
+  corresponde a ESTE commit. En un pull request, la preview efímera. En un push,
+  el alias estable del entorno — pero solo tras comprobar que el despliegue de
+  este commit ha terminado, que es lo que garantiza que el alias ya apunta ahí.
+
+inputs:
+  url-entorno:
+    description: >
+      Alias estable del entorno (p. ej. https://mermelada-tomate.vercel.app).
+      Solo se usa en push, y solo tras confirmar el despliegue de este commit.
+      Debe estar dado de alta en `empresas.dominio`: sin eso la multi-tenencia
+      por dominio no resuelve y los flujos con sesión se saltan.
+    required: true
+  token:
+    description: Token de GitHub con permiso de lectura sobre deployments.
+    required: true
+  secreto-bypass:
+    description: >
+      Secreto de "Protection Bypass for Automation" de Vercel. Sin él, una
+      preview protegida devuelve 401 a todo y los tests no llegan a la app.
+    required: false
+    default: ''
+  minutos-de-espera:
+    description: Cuánto esperar a que Vercel publique el despliegue.
+    required: false
+    default: '10'
+
+outputs:
+  url:
+    description: URL contra la que ejecutar los tests.
+    value: ${{ steps.resolver.outputs.url }}
+
+runs:
+  using: composite
+  steps:
+    - id: resolver
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        REPO: ${{ github.repository }}
+        SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        ES_PR: ${{ github.event_name == 'pull_request' }}
+        URL_ENTORNO: ${{ inputs.url-entorno }}
+        MINUTOS: ${{ inputs.minutos-de-espera }}
+        SECRETO_BYPASS: ${{ inputs.secreto-bypass }}
+      run: |
+        set -euo pipefail
+
+        if [ "$ES_PR" = "true" ]; then
+          echo "Pull request → se espera la preview de Vercel para $SHA"
+        else
+          echo "Push → se espera el despliegue de $SHA para poder probar $URL_ENTORNO"
+        fi
+
+        # Vercel publica cada despliegue como un deployment de GitHub. Se sondea
+        # porque una construcción en frío tarda varios minutos y este job puede
+        # arrancar antes de que Vercel haya terminado.
+        url_despliegue=""
+        intentos=$(( MINUTOS * 6 ))
+        for intento in $(seq 1 "$intentos"); do
+          for id in $(gh api "repos/$REPO/deployments?sha=$SHA&per_page=100" --jq '.[].id'); do
+            encontrada=$(gh api "repos/$REPO/deployments/$id/statuses?per_page=100" \
+              --jq 'map(select(.state == "success" and .environment_url != null)) | .[0].environment_url // empty')
+            if [ -n "$encontrada" ]; then url_despliegue="$encontrada"; break; fi
+          done
+          [ -n "$url_despliegue" ] && break
+
+          echo "  intento $intento/$intentos — despliegue aún no listo, reintentando en 10s"
+          sleep 10
+        done
+
+        if [ -z "$url_despliegue" ]; then
+          # Fallar es lo correcto. Caer a una URL fija sin haber comprobado el
+          # despliegue devolvería un verde sobre código que no es el de este
+          # commit — exactamente lo que esta acción existe para evitar.
+          echo "::error::No se resolvió ningún despliegue de Vercel para $SHA tras $MINUTOS minutos." >&2
+          echo "::error::No se cae a una URL fija a propósito: probar un despliegue que no es el de" >&2
+          echo "::error::este commit daría un verde que no significa nada." >&2
+          exit 1
+        fi
+
+        # AQUÍ ESTÁ LA DIFERENCIA ENTRE LOS DOS NIVELES.
+        #
+        # En un PR se prueba la URL efímera: es la única que existe para ese
+        # código y no pisa a nadie. A cambio su hostname no está en
+        # `empresas.dominio`, así que la multi-tenencia por dominio no resuelve
+        # y los flujos con sesión se saltan.
+        #
+        # En un push se prueba el ALIAS del entorno. El despliegue ya terminó
+        # —acabamos de comprobarlo—, así que el alias apunta a este commit, y
+        # además es un hostname dado de alta como empresa: la suite entera puede
+        # correr. Usar aquí la URL efímera probaría el mismo código pero perdería
+        # la mitad de los tests, que es justo lo que pasaba antes.
+        if [ "$ES_PR" = "true" ]; then
+          url="$url_despliegue"
+        else
+          url="$URL_ENTORNO"
+          echo "Despliegue de $SHA confirmado ($url_despliegue) → se prueba el alias $url"
+        fi
+
+        # Comprobar que se puede ATRAVESAR, no solo que responde. Si Vercel
+        # Authentication está activa y no hay secreto de bypass, el edge devuelve
+        # 401 a todo — y lo peor es que muchos tests pasarían por el motivo
+        # equivocado (los que solo comprueban «devuelve 401»).
+        respuesta=$(curl -s --max-time 20 \
+          ${SECRETO_BYPASS:+-H "x-vercel-protection-bypass: $SECRETO_BYPASS"} \
+          "$url/api/waiter/me" || true)
+
+        if printf '%s' "$respuesta" | grep -q 'Protected deployment'; then
+          echo "::error::El despliegue está protegido por Vercel Authentication y no se puede atravesar." >&2
+          echo "::error::Para arreglarlo: Vercel → Project Settings → Deployment Protection →" >&2
+          echo "::error::  'Protection Bypass for Automation' → generar el secreto." >&2
+          echo "::error::Luego GitHub → Settings → Secrets and variables → Actions →" >&2
+          echo "::error::  nuevo secret VERCEL_AUTOMATION_BYPASS_SECRET con ese valor." >&2
+          echo "::error::Sin eso los tests no llegan a la app, y algunos pasarían en falso." >&2
+          exit 1
+        fi
+
+        echo "url=$url" >> "$GITHUB_OUTPUT"

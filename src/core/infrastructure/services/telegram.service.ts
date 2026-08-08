@@ -1,4 +1,4 @@
-import { Pedido, PedidoItem } from '@/core/domain/entities/types';
+import { Pedido } from '@/core/domain/entities/types';
 import { Result, AppError } from '@/core/domain/entities/types';
 import { logger } from '@/core/infrastructure/logging/logger';
 
