@@ -129,6 +129,17 @@ Usar siempre en RLS policies para aislar datos por empresa.
 - **I18n:** Usar `t()` de `@/lib/translations` para TODO el texto de UI.
 - **Imagenes:** Usar `ImageUploader` (auto-optimiza WebP). `object-contain` por defecto.
 
+## Imagenes — Trampas Criticas
+
+> Ver doc completo: `docs/context/imagenes.md`
+
+- **NUNCA `import Image from 'next/image'` para pintar salida de `ImageUploader`.** Usar `ImagenSubida` (`src/components/ui/imagen-subida.tsx`).
+  `optimizeImage()` ya reescala a **480x480 WebP q0.8** antes de subir. `next/image` con `sizes` en `vw` pide los 8 anchos de dispositivo por defecto (640-3840), **todos MAYORES que el original**: 8 transformaciones facturadas por foto para producir 8 imagenes peores. Con 38 fotos, una sola carga en frio = ~300 transformaciones (aviso de Vercel al 75% de 5.000, agosto 2026).
+- **No hace falta trafico real para gastarlas**: basta un bot rastreando (`robots.ts` permite `/`), que expire la cache de imagen (4 h en Next 16) o un dia de muchos despliegues.
+- **Se pierde en silencio**: el autocompletado ofrece `next/image` primero, y reintroducirlo no rompe nada visible — solo la factura. Lo cubre `tests/compliance/imagenes-sin-doble-optimizacion.test.ts` (29 casos). **Si creas una pantalla nueva que pinta subidas, anadela a esa lista.**
+- **Excepcion**: imagenes que NO pasan por `ImageUploader` (terceros, APIs externas, originales grandes) si deben usar `next/image` normal.
+- El banner se pinta como `backgroundImage` en CSS (`hero-banner.tsx`), no con `next/image` — no aplica.
+
 ## Comandos Utiles
 - Dev: `pnpm dev`
 - Build: `pnpm build` (Ignorar "Skipping validation of types")
