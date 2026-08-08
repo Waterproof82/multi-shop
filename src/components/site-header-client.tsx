@@ -1,7 +1,7 @@
 "use client";
 
 import { ShoppingCart, BellRing } from "lucide-react";
-import Image from "next/image";
+import { ImagenSubida as Image } from './ui/imagen-subida';
 import { Button } from "@/components/ui/button";
 import { LanguageSelector } from "@/components/language-selector";
 import { t } from "@/lib/translations";

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import Image from 'next/image';
+import { ImagenSubida as Image } from '../../../../components/ui/imagen-subida';
 import { Plus, Pencil, Trash2, Image as ImageIcon, Search, ArrowUpDown, ArrowUp, ArrowDown, Package, Star, Video, UtensilsCrossed, GlassWater } from 'lucide-react';
 
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.avif'];

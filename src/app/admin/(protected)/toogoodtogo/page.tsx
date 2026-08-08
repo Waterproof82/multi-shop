@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import Image from 'next/image';
+import { ImagenSubida as Image } from '../../../../components/ui/imagen-subida';
 import {
   Users, Send, CheckCircle, Image as ImageIcon, Loader2,
   ShoppingBag, Plus, Trash2, Minus, ChevronDown, ChevronUp, Clock, CalendarOff, Calendar, Pencil, X, ReceiptText, AlertTriangle,

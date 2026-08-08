@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import Image from 'next/image';
+import { ImagenSubida as Image } from './imagen-subida';
 import { Upload, Loader2, Pencil, Trash2, Camera, ChevronDown, Maximize2 } from 'lucide-react';
 import { getCsrfToken } from '@/lib/csrf-client';
 import { useLanguage } from '@/lib/language-context';

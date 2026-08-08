@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
+import { ImagenSubida as Image } from '../ui/imagen-subida';
 import type { Product, Category } from '@/core/domain/entities/types';
 import type { PendingItem } from '@/hooks/tpv/useMesaActiva';
 import type { ComplementoGrupo } from '@/core/domain/entities/complemento-types';
