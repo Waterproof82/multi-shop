@@ -18,9 +18,15 @@ import { SpeedInsights } from '@vercel/speed-insights/next';
  * `document.createElement('script')` desde código cliente, es decir, desde el
  * bundle de Next que ya va firmado con nonce. `strict-dynamic` existe justo para
  * eso: propaga la confianza al script inyectado por un script de confianza.
- * Los beacons van a `/_vercel/*`, mismo origen, cubiertos por `connect-src 'self'`.
  *
  * Ninguno de los dos paquetes acepta prop `nonce` — no la necesitan.
+ *
+ * OJO AL DEPURAR: Vercel NO sirve estos scripts desde `/_vercel/...`, sino desde
+ * una ruta con hash aleatorio (`/5abac44c889a4880/script.js`) para esquivar
+ * bloqueadores. Buscar `_vercel` en el panel de red da CERO resultados y parece
+ * que la analitica no carga, cuando si lo hace. El patron estable es
+ * `/<hash>/script.js` y los beacons `/<hash>/view`, `/<hash>/vitals`. Siguen
+ * siendo MISMO ORIGEN, asi que `connect-src 'self'` los cubre igual.
  *
  * FILTRO 1 — NAVEGADORES AUTOMATIZADOS (aplica a los dos)
  * La suite E2E corre contra el alias de producción en cada push a `main`. Con el
