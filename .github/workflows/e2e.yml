@@ -6,43 +6,42 @@ name: E2E
 # path filter: UI/API changes anywhere can affect these functional flows, so
 # it runs on every push/PR to main/develop, mirroring ci.yml's trigger.
 #
-# ── CONTRA QUÉ SE EJECUTA ────────────────────────────────────────────────────
-# En un PULL REQUEST, contra la preview que Vercel construye para ESE PR.
-# En un PUSH a main/develop, contra el despliegue de producción.
+# ── UNA PUERTA DE DOS NIVELES ────────────────────────────────────────────────
+# En los dos casos se prueba el despliegue de ESTE commit, nunca una URL fija.
+# Antes había una URL fija de producción, así que en un PR la suite interrogaba
+# el sitio YA DESPLEGADO en vez del código propuesto: pasaba en verde aunque el
+# PR estuviera completamente roto. Era monitorización disfrazada de puerta.
 #
-# La distinción es la razón de ser de este workflow. Antes apuntaba siempre a la
-# URL fija de producción, así que en un PR interrogaba el sitio YA DESPLEGADO en
-# vez del código propuesto: la suite pasaba en verde aunque el PR estuviera
-# completamente roto. Era monitorización disfrazada de puerta de calidad.
+#   PULL REQUEST → preview efímera de Vercel → ~143 de 209 tests.
+#     Aislado y seguro: cada PR tiene su despliegue y no pisa a nadie.
 #
-# No se construye la app aquí porque no se puede: `validateEnv()` exige
+#   PUSH a main/develop → despliegue del entorno de pruebas → los 209.
+#     Se espera a que Vercel publique ESE commit antes de arrancar; si no, el
+#     job probaría el despliegue anterior.
+#
+# POR QUÉ EN UN PR NO CORREN LOS 209
+# El tenant se resuelve por HOSTNAME: `parseMainDomain()` → `findByDomain()`,
+# la empresa sale del dominio de la petición. Una preview tiene un host efímero
+# (`multi-shop-<hash>-<team>.vercel.app`) que NO está en `empresas.dominio`, así
+# que no hay tenant, el login del camarero falla, y los ~55 flujos con sesión se
+# saltan. No es un fallo del CI: es consecuencia de que la multi-tenencia sea
+# por dominio, y no se arregla con secrets.
+#
+# Tampoco se puede falsear la cabecera `Host`: Vercel enruta con ella, así que
+# mandarla apuntando al entorno de pruebas devolvería ese despliegue en vez de
+# la preview — exactamente lo que se quiere evitar.
+#
+# Por eso la cobertura completa vive en el push posterior al merge, contra un
+# hostname fijo que sí está dado de alta como dominio de empresa.
+#
+# ── LO QUE NO SE CONSTRUYE AQUÍ, Y POR QUÉ ───────────────────────────────────
+# Sería más autónomo levantar la app en CI, pero `validateEnv()` exige
 # ACCESS_TOKEN_SECRET, CSRF_HMAC_SECRET y CART_TOKEN_SECRET, que no están entre
-# los secrets del repositorio. La preview de Vercel sí los tiene, así que se
-# reutiliza en vez de duplicar la configuración.
+# los secrets del repositorio: la app se negaría a arrancar. Vercel sí los
+# tiene, así que se reutiliza su despliegue en vez de duplicar configuración.
 #
-# ── COBERTURA QUE FALTA, Y POR QUÉ ───────────────────────────────────────────
-# Contra la preview corren ~143 de los 209 tests. Los ~66 restantes se saltan
-# por dos motivos distintos, y solo uno se arregla con secrets:
-#
-# 1. FALTA `PLAYWRIGHT_ADMIN_EMAIL` (~10 tests). Los specs comprueban email Y
-#    contraseña; con solo la contraseña se saltan igual. Afecta a db-smoke,
-#    rgpd-anonimizacion, tpv-acid, tpv-chain-verify y tpv-export-integrity.
-#    Se arregla añadiéndolo en Settings > Secrets and variables > Actions.
-#    Lo mismo con CRON_SECRET, que desbloquea un test de la purga RGPD.
-#
-# 2. EL TENANT SE RESUELVE POR HOSTNAME (~55 tests). `parseMainDomain()` →
-#    `findByDomain()`: la empresa sale del dominio de la petición. Una preview
-#    tiene un host efímero (`multi-shop-<hash>-<team>.vercel.app`) que NO está
-#    registrado en `empresas.dominio`, así que no hay tenant, el login del
-#    camarero falla y se saltan todos los flujos con sesión.
-#
-#    Esto NO se arregla con secrets: es consecuencia de que la multi-tenencia
-#    sea por dominio. La solución de verdad es un entorno de staging con un
-#    hostname FIJO dado de alta como dominio de una empresa de pruebas, y
-#    apuntar ahí en vez de a la preview efímera.
-#
-#    Mientras tanto, esos 55 solo se ejercitan corriendo la suite en local
-#    contra producción, que es lo que hace `.env.local`.
+# ── COBERTURA QUE AÚN FALTA ──────────────────────────────────────────────────
+# `CRON_SECRET` no está definido: desbloquea un test de la purga RGPD.
 
 on:
   push:
@@ -80,7 +79,6 @@ jobs:
         id: destino
         uses: ./.github/actions/resolver-url-a-probar
         with:
-          url-produccion: https://mermelada-tomate.vercel.app
           token: ${{ github.token }}
           secreto-bypass: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 

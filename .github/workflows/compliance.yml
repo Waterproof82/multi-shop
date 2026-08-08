@@ -87,7 +87,6 @@ jobs:
         id: destino
         uses: ./.github/actions/resolver-url-a-probar
         with:
-          url-produccion: https://mermelada-tomate.vercel.app
           token: ${{ github.token }}
           secreto-bypass: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 

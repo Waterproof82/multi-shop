@@ -1,12 +1,11 @@
 name: Resolver la URL a probar
 description: >
-  Devuelve la URL contra la que deben correr los tests de Playwright: la preview
-  de Vercel del PR, o producción en un push a rama protegida.
+  Devuelve la URL del despliegue de Vercel correspondiente a ESTE commit: la
+  preview en un pull request, o el despliegue del entorno de pruebas en un push.
+  Nunca una URL fija: probar un despliegue que no es el de este commit daría un
+  verde que no significa nada.
 
 inputs:
-  url-produccion:
-    description: URL del despliegue de producción, para los push a rama protegida.
-    required: true
   token:
     description: Token de GitHub con permiso de lectura sobre deployments.
     required: true
@@ -17,7 +16,7 @@ inputs:
     required: false
     default: ''
   minutos-de-espera:
-    description: Cuánto esperar a que Vercel publique la preview.
+    description: Cuánto esperar a que Vercel publique el despliegue.
     required: false
     default: '10'
 
@@ -34,21 +33,25 @@ runs:
       env:
         GH_TOKEN: ${{ inputs.token }}
         REPO: ${{ github.repository }}
-        SHA: ${{ github.event.pull_request.head.sha }}
+        SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         ES_PR: ${{ github.event_name == 'pull_request' }}
-        URL_PRODUCCION: ${{ inputs.url-produccion }}
         MINUTOS: ${{ inputs.minutos-de-espera }}
         SECRETO_BYPASS: ${{ inputs.secreto-bypass }}
       run: |
         set -euo pipefail
 
+        # En un push a rama protegida se espera al despliegue de ESE commit
+        # antes de probar. Sin la espera, el job arrancaría contra el despliegue
+        # ANTERIOR y daría un verde sobre código que ya no es el que hay.
+        #
+        # La suite completa solo puede correr aquí: el entorno de pruebas tiene
+        # un hostname FIJO dado de alta en `empresas.dominio`, y sin eso la
+        # multi-tenencia por dominio no resuelve (ver la cabecera de e2e.yml).
         if [ "$ES_PR" != "true" ]; then
-          echo "Push a rama protegida → se prueba producción."
-          echo "url=$URL_PRODUCCION" >> "$GITHUB_OUTPUT"
-          exit 0
+          echo "Push a rama protegida → se espera el despliegue de $SHA"
+        else
+          echo "Pull request → se espera la preview de Vercel para $SHA"
         fi
-
-        echo "Pull request → se espera la preview de Vercel para $SHA"
 
         # Vercel publica cada preview como un deployment de GitHub. Se sondea
         # porque una construcción en frío tarda varios minutos y este job puede
@@ -63,7 +66,7 @@ runs:
           done
 
           if [ -n "$url" ]; then
-            echo "Preview lista: $url"
+            echo "Despliegue listo: $url"
 
             # Comprobar que se puede ATRAVESAR, no solo que existe. Si Vercel
             # Authentication está activa y no hay secreto de bypass, el edge
@@ -87,13 +90,14 @@ runs:
             exit 0
           fi
 
-          echo "  intento $intento/$intentos — preview aún no lista, reintentando en 10s"
+          echo "  intento $intento/$intentos — despliegue aún no listo, reintentando en 10s"
           sleep 10
         done
 
         # Fallar es lo correcto. Caer a producción devolvería exactamente el
         # verde falso que esta acción existe para eliminar: los tests pasarían
         # interrogando el sitio desplegado, no el código propuesto.
-        echo "::error::No se resolvió la preview de Vercel para $SHA tras $MINUTOS minutos." >&2
-        echo "::error::Los E2E NO caen a producción a propósito: ese verde no significaría nada." >&2
+        echo "::error::No se resolvió ningún despliegue de Vercel para $SHA tras $MINUTOS minutos." >&2
+        echo "::error::No se cae a una URL fija a propósito: probar un despliegue que no es el de" >&2
+        echo "::error::este commit daría un verde que no significa nada." >&2
         exit 1
