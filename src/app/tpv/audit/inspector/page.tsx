@@ -31,7 +31,8 @@ export default function InspectorPage() {
       if (desde) params.set('desde', desde);
       if (hasta) params.set('hasta', hasta);
 
-      const url = `/api/tpv/audit/export${params.size > 0 ? `?${params.toString()}` : ''}`;
+      const consulta = params.size > 0 ? `?${params.toString()}` : '';
+      const url = `/api/tpv/audit/export${consulta}`;
 
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token.trim()}` },
