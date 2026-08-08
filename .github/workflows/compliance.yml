@@ -71,6 +71,8 @@ jobs:
   playwright-compliance:
     name: Playwright — E2E compliance tests
     runs-on: ubuntu-latest
+    # Sin secrets no puede correr — ver la nota al final del fichero.
+    if: github.actor != 'dependabot[bot]'
     timeout-minutes: 20
     needs: vitest-compliance
     env:
@@ -142,3 +144,18 @@ jobs:
             exit 1
           fi
           echo "PASS: All compliance tests passed"
+
+# ── POR QUÉ ESTE JOB NO CORRE EN LAS PRs DE DEPENDABOT ───────────────────────
+# GitHub NO entrega los secrets del repositorio a los workflows disparados por
+# Dependabot: van a un almacén aparte, que aquí está vacío a propósito. Llegan
+# todos en blanco y el job no puede ni resolver la preview.
+#
+# Y está bien que sea así. Una PR de Dependabot ejecuta "pnpm install" con una
+# versión de dependencia que nadie ha revisado, y sus scripts de postinstall
+# corren en el runner. Darles la service_role key y las credenciales de admin
+# sería exactamente el agujero que esa separación existe para tapar.
+#
+# Un bump de versión se valida de sobra con Build, Lint & Type Check y los tests
+# unitarios, que sí corren. Y la suite E2E completa pasa igualmente tras el
+# merge, en el push a main contra el entorno de pruebas: si un bump rompe algo
+# en tiempo de ejecución, ahí se ve antes de que llegue a ningún cliente.
