@@ -44,6 +44,8 @@
     "@supabase/supabase-js": "^2.112.1",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.36.3",
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
     "@zxing/browser": "^0.2.0",
     "autoprefixer": "^10.4.20",
     "bcryptjs": "^3.0.3",
