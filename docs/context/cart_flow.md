@@ -261,11 +261,12 @@ numero_pedidos      INTEGER DEFAULT 0
 
 ---
 
-## Legacy: Token JWT de Acceso
+## Legacy: Token JWT de Acceso (eliminado)
 
-El proxy (`src/proxy.ts`) aún soporta un flujo legacy con tokens JWT:
-- URL: `https://tudominio.com/?access=TOKEN_JWT`
-- Establece cookie `access_token` (HttpOnly, 15 min)
-- Script: `scripts/generate-token.ts`
-
-Este flujo **ya no controla la visibilidad del carrito** — el subdominio es el mecanismo activo.
+El proxy (`src/proxy.ts`) soportaba un flujo legacy con tokens JWT
+(`?access=TOKEN_JWT` → cookie `access_token`), usado originalmente por un
+script de desarrollo local (`scripts/generate-token.ts`, eliminado en
+`625883d`) para desbloquear el carrito antes de que existiera la detección
+de subdominio. Sin generador ni consumidores reales, se eliminó el 2026-08-01.
+Ver `docs/superpowers/specs/2026-08-01-cart-access-token-removal-design.md`
+para el historial completo.

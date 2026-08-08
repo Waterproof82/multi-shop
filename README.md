@@ -342,7 +342,6 @@ ACCESS_TOKEN_SECRET=          # openssl rand -hex 32
 
 # CSRF + Carrito + Unsubscribe
 CSRF_HMAC_SECRET=
-CART_TOKEN_SECRET=
 UNSUBSCRIBE_HMAC_SECRET=
 
 # Rate Limiting + JWT Revocation (Upstash Redis)
