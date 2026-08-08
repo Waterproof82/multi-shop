@@ -1,4 +1,5 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
+import { nuevoContexto } from '../helpers/contexto';
 
 /**
  * Los interruptores de configuración de empresa deben poder APAGARSE.
@@ -77,7 +78,7 @@ test.describe('Empresa — los interruptores se pueden apagar', () => {
   test.beforeAll(async ({ playwright, baseURL }) => {
     if (motivoParaSaltar()) return;
 
-    request = await playwright.request.newContext({ baseURL });
+    request = await nuevoContexto(playwright, baseURL);
 
     const login = await request.post('/api/admin/login', {
       data: { email: adminEmail()!, password: adminPassword()! },
