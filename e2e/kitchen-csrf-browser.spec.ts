@@ -24,6 +24,7 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { nuevoContexto } from './helpers/contexto';
 
 const DUMMY_UUID = '00000000-0000-0000-0000-000000000099';
 
@@ -34,7 +35,7 @@ test.describe.serial('Kitchen CSRF — browser client flow', () => {
     const pin = process.env.PLAYWRIGHT_WAITER_PIN;
     if (!pin) return;
 
-    const ctx = await playwright.request.newContext({ baseURL });
+    const ctx = await nuevoContexto(playwright, baseURL);
     const authRes = await ctx.post('/api/waiter/auth', { data: { pin } });
     if (authRes.ok()) {
       const raw = authRes.headers()['set-cookie'] ?? '';

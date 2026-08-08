@@ -37,6 +37,7 @@
  */
 
 import { test, expect, type APIRequestContext } from '@playwright/test';
+import { nuevoContexto } from './helpers/contexto';
 
 // ── constantes ────────────────────────────────────────────────────────────────
 
@@ -65,7 +66,7 @@ test.beforeAll(async ({ playwright, baseURL }) => {
   const pin = process.env.PLAYWRIGHT_WAITER_PIN;
   if (!pin) return; // Suites B y C se saltan — suite A siempre corre
 
-  const ctx = await playwright.request.newContext({ baseURL });
+  const ctx = await nuevoContexto(playwright, baseURL);
 
   // 1. Obtener csrf_token (endpoint público, no requiere auth)
   const csrfRes = await ctx.get('/api/admin/login');
@@ -171,7 +172,7 @@ test.describe('Kitchen/Bar — A: sin waiter_token', () => {
   let request: APIRequestContext;
 
   test.beforeEach(async ({ playwright, baseURL }) => {
-    request = await playwright.request.newContext({ baseURL });
+    request = await nuevoContexto(playwright, baseURL);
   });
 
   test.afterEach(async () => {
@@ -210,7 +211,7 @@ test.describe('Kitchen/Bar — GET exentas de CSRF', () => {
   let request: APIRequestContext;
 
   test.beforeEach(async ({ playwright, baseURL }) => {
-    request = await playwright.request.newContext({ baseURL });
+    request = await nuevoContexto(playwright, baseURL);
   });
 
   test.afterEach(async () => {
@@ -234,7 +235,7 @@ test.describe('Kitchen/Bar — B: waiter_token OK, sin csrf_token', () => {
   let request: APIRequestContext;
 
   test.beforeEach(async ({ playwright, baseURL }) => {
-    request = await playwright.request.newContext({ baseURL });
+    request = await nuevoContexto(playwright, baseURL);
   });
 
   test.afterEach(async () => {
@@ -298,7 +299,7 @@ test.describe('Kitchen/Bar — C: waiter_token OK, csrf inválido', () => {
   let request: APIRequestContext;
 
   test.beforeEach(async ({ playwright, baseURL }) => {
-    request = await playwright.request.newContext({ baseURL });
+    request = await nuevoContexto(playwright, baseURL);
   });
 
   test.afterEach(async () => {
@@ -372,7 +373,7 @@ test.describe('Kitchen/Bar — D: waiter_token OK, csrf correcto', () => {
   let request: APIRequestContext;
 
   test.beforeEach(async ({ playwright, baseURL }) => {
-    request = await playwright.request.newContext({ baseURL });
+    request = await nuevoContexto(playwright, baseURL);
   });
 
   test.afterEach(async () => {

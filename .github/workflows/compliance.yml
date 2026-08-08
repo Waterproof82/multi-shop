@@ -76,11 +76,22 @@ jobs:
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-      PLAYWRIGHT_BASE_URL: https://mermelada-tomate.vercel.app
       # Service role key — required for DB-level trigger tests
       PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      PLAYWRIGHT_ADMIN_EMAIL: ${{ secrets.PLAYWRIGHT_ADMIN_EMAIL }}
+      PLAYWRIGHT_ADMIN_PASSWORD: ${{ secrets.PLAYWRIGHT_ADMIN_PASSWORD }}
+      PLAYWRIGHT_WAITER_PIN: ${{ secrets.PLAYWRIGHT_WAITER_PIN }}
     steps:
       - uses: actions/checkout@v7
+
+      # Mismo motivo que en e2e.yml: en un PR hay que interrogar la preview de
+      # ESE commit, no el sitio ya desplegado.
+      - name: Resolver la URL a probar
+        id: destino
+        uses: ./.github/actions/resolver-url-a-probar
+        with:
+          token: ${{ github.token }}
+          secreto-bypass: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
       - uses: pnpm/action-setup@v6
         with:
@@ -97,6 +108,9 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run compliance E2E tests
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ steps.destino.outputs.url }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: npx playwright test e2e/compliance/ --reporter=list
         continue-on-error: false
 

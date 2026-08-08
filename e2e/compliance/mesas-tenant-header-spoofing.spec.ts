@@ -30,6 +30,7 @@
  * (to fetch a real mesaId — no hardcoded fixture needed) and PLAYWRIGHT_BASE_URL.
  */
 import { test, expect, type APIRequestContext } from '@playwright/test';
+import { nuevoContexto } from '../helpers/contexto';
 
 function supabaseUrl(): string | undefined { return process.env.NEXT_PUBLIC_SUPABASE_URL; }
 function serviceRoleKey(): string | undefined {
@@ -68,7 +69,7 @@ test.describe('Mesa routes — x-empresa-id header must never affect tenant reso
     if (!mesaId) {
       test.skip(true, 'No hay ninguna mesa en la tabla mesas para probar');
     }
-    request = await playwright.request.newContext({ baseURL });
+    request = await nuevoContexto(playwright, baseURL);
   });
 
   test.afterEach(async () => {
