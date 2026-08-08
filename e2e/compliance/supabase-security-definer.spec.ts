@@ -53,7 +53,7 @@ function anonKey(): string | undefined {
 function serviceRoleKey(): string | undefined {
   return (
     process.env.PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY ??
-    process.env.SUPABASE_SERVICE_ROLE_KEY
+    process.env.PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY
   );
 }
 

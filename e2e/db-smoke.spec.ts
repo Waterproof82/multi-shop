@@ -27,6 +27,7 @@
  */
 
 import { test, expect, type APIRequestContext } from '@playwright/test';
+import { nuevoContexto } from './helpers/contexto';
 
 // ── env helpers ───────────────────────────────────────────────────────────────
 
@@ -37,7 +38,9 @@ function supabaseUrl(): string | undefined {
 }
 
 function serviceRoleKey(): string | undefined {
-  return process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // Los workflows exportan el nombre con prefijo; .env.local suele traer el
+  // corto. Aceptar los dos evita que estas pruebas se salten en CI en silencio.
+  return process.env.PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
 }
 
 
@@ -49,7 +52,7 @@ test.describe('DB smoke — auth barrier (sin credenciales)', () => {
   let request: APIRequestContext;
 
   test.beforeEach(async ({ playwright, baseURL }) => {
-    request = await playwright.request.newContext({ baseURL });
+    request = await nuevoContexto(playwright, baseURL);
   });
 
   test.afterEach(async () => {
@@ -199,7 +202,7 @@ test.describe('DB smoke — full API path (login automático)', () => {
   test.beforeAll(async ({ playwright, baseURL }) => {
     if (!adminEmail() || !adminPassword()) return;
 
-    request = await playwright.request.newContext({ baseURL });
+    request = await nuevoContexto(playwright, baseURL);
 
     // Login: las cookies admin_token + csrf_token se guardan en el context automáticamente
     const loginRes = await request.post('/api/admin/login', {
