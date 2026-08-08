@@ -222,6 +222,12 @@ function turnoLabel(t: TurnoOption): string {
   return `${apertura}–${cierre} · ${t.operadorNombre}`;
 }
 
+function mesaLabel(p: PedidoRow): string {
+  if (p.mesaNumero === null) return 'Sin mesa';
+  if (!p.mesaNombre) return `Mesa ${p.mesaNumero}`;
+  return `Mesa ${p.mesaNumero} · ${p.mesaNombre}`;
+}
+
 export function HistorialClient({ pedidos, cobros, turnoAperturaAt, tipoImpuesto, turnos, turnoId }: Readonly<Props>) {
   const router = useRouter();
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -342,9 +348,6 @@ export function HistorialClient({ pedidos, cobros, turnoAperturaAt, tipoImpuesto
             {pedidos.map(p => {
               const isExpanded = expanded === p.id;
               const color = ESTADO_COLOR[p.estado] ?? '#64748b';
-              const mesaLabel = p.mesaNumero !== null
-                ? `Mesa ${p.mesaNumero}${p.mesaNombre ? ` · ${p.mesaNombre}` : ''}`
-                : 'Sin mesa';
 
               return (
                 <div
@@ -365,7 +368,7 @@ export function HistorialClient({ pedidos, cobros, turnoAperturaAt, tipoImpuesto
                     </span>
 
                     <span className="text-sm text-[#0f172a] font-medium flex-1 truncate">
-                      {mesaLabel}
+                      {mesaLabel(p)}
                     </span>
 
                     <span
