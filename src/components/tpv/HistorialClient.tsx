@@ -90,6 +90,30 @@ function fmtDate(iso: string): string {
 
 type Tab = 'pedidos' | 'cobros';
 
+/** Referencia visible de un ticket: `SERIE-000123`. */
+function refTicket(serie: string, numeroTicket: number): string {
+  return `${serie}-${String(numeroTicket).padStart(6, '0')}`;
+}
+
+/**
+ * Ticket que anula un rectificativo, o `null` si no hay ninguno.
+ *
+ * El original puede no estar en la lista que se muestra: si se cobro en otro
+ * turno, solo llega denormalizado en `originalTicket`. De ahi los dos caminos
+ * y el sufijo, que existe para que el cajero no busque en vano un ticket que
+ * no va a encontrar en esta pantalla.
+ */
+function etiquetaOriginal(c: CobroRow, cobros: readonly CobroRow[]): string | null {
+  if (c.rectificaCobroId !== null) {
+    const enLista = cobros.find(o => o.id === c.rectificaCobroId);
+    if (enLista) return refTicket(enLista.serie, enLista.numeroTicket);
+  }
+  if (c.originalTicket) {
+    return `${refTicket(c.originalTicket.serie, c.originalTicket.numeroTicket)} (otro turno)`;
+  }
+  return null;
+}
+
 function CobrosList({ cobros }: Readonly<{ cobros: CobroRow[] }>) {
   const router = useRouter();
   const [rectificando, setRectificando] = useState<string | null>(null);
@@ -139,19 +163,12 @@ function CobrosList({ cobros }: Readonly<{ cobros: CobroRow[] }>) {
         const importe = c.importeCobradoCents / 100;
         const isNegative = importe < 0;
 
-        const originalEnLista = isRectificativo
-          ? cobros.find(o => o.id === c.rectificaCobroId) ?? null
-          : null;
-        const originalLabel = originalEnLista
-          ? `${originalEnLista.serie}-${String(originalEnLista.numeroTicket).padStart(6, '0')}`
-          : c.originalTicket
-          ? `${c.originalTicket.serie}-${String(c.originalTicket.numeroTicket).padStart(6, '0')} (otro turno)`
-          : null;
+        const originalLabel = etiquetaOriginal(c, cobros);
 
         return (
           <div key={c.id} className="bg-white border border-[#e2e8f0] rounded-xl px-4 py-3 flex items-center gap-4 shadow-sm">
             <span className="font-mono text-xs text-[#64748b] w-20 shrink-0">
-              {c.serie}-{String(c.numeroTicket).padStart(6, '0')}
+              {refTicket(c.serie, c.numeroTicket)}
             </span>
             <span className="text-xs text-[#64748b] shrink-0 w-10">
               {fmtTime(c.cobradoAt)}
