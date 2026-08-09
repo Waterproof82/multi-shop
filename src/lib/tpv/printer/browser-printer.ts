@@ -1,5 +1,6 @@
 import QRCode from 'qrcode';
 import type { PrintTicket, PrintTicketDesgloseItem, ThermalPrinter } from './types';
+import { numserieAeat } from '../ticket-ref';
 
 function fmt(cents: number): string {
   return (cents / 100).toLocaleString('es-ES', { minimumFractionDigits: 2 }) + ' \u20ac';
@@ -59,7 +60,8 @@ async function buildReceiptHtml(ticket: PrintTicket): Promise<string> {
   const dt = new Date(ticket.cobradoAt);
   const fecha = dt.toLocaleDateString('es-ES');
   const hora = dt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-  const serieNum = `${ticket.serie}${String(ticket.numeroTicket).padStart(6, '0')}`;
+  // Sin guion: alimenta el bloque del QR de la AEAT. Ver `ticket-ref.ts`.
+  const serieNum = numserieAeat(ticket.serie, ticket.numeroTicket);
   const cambio = ticket.metodoPago === 'efectivo'
     ? Math.max(0, ticket.entregadoCents - ticket.importeCobradoCents)
     : 0;

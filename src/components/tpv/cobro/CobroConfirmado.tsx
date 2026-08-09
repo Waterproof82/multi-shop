@@ -3,6 +3,7 @@
 import type { MetodoPago, TpvCobro } from '@/core/domain/entities/tpv-types';
 import { usePrinter } from '@/hooks/tpv/usePrinter';
 import type { PrintTicket } from '@/lib/tpv/printer';
+import { numserieAeat, refTicketVisible } from '@/lib/tpv/ticket-ref';
 
 interface Props {
   readonly totalFinalCents: number;
@@ -32,8 +33,12 @@ function buildAeatUrl(nif: string, cobro: TpvCobro): string {
   const [yyyy, mm, dd] = cobro.cobradoAt.slice(0, 10).split('-');
   const fecha = `${dd}-${mm}-${yyyy}`;
   const importe = (cobro.importeCobradoCents / 100).toFixed(2);
-  const serie = `${cobro.serie}${String(cobro.numeroTicket).padStart(6, '0')}`;
-  const params = new URLSearchParams({ nif, numserie: serie, fecha, importe });
+  const params = new URLSearchParams({
+    nif,
+    numserie: numserieAeat(cobro.serie, cobro.numeroTicket),
+    fecha,
+    importe,
+  });
   return `https://www2.agenciatributaria.gob.es/wlpl/TIKE-CONT/ValidarQR?${params.toString()}`;
 }
 
@@ -121,7 +126,7 @@ export function CobroConfirmado({
         {cobro !== null && (
           <div className="w-full flex items-center justify-between px-1">
             <span className="text-xs text-[#6b7280]">
-              Ticket {cobro.serie}-{String(cobro.numeroTicket).padStart(6, '0')}
+              Ticket {refTicketVisible(cobro.serie, cobro.numeroTicket)}
             </span>
             <span className="text-xs font-mono text-[#4b5563]" title="Hash de integridad">
               #{cobro.hash.slice(0, 8)}
