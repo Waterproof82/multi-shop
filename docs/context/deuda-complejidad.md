@@ -2,13 +2,14 @@
 
 Estado a 2026-08-09.
 
-**2 funciones** siguen por encima del umbral de complejidad cognitiva 15 (regla
+**1 función** sigue por encima del umbral de complejidad cognitiva 15 (regla
 SonarQube S3776), de las 15 que había al empezar. Se cerraron el bloque backend,
-`proxy.ts`, y doce componentes de React en agosto de 2026 — la última,
-`mesa-orders-client` (78, la peor del repo).
+`proxy.ts`, y trece componentes de React en agosto de 2026 — entre ellos
+`mesa-orders-client` (78, la peor del repo) y `cart-drawer`, que llevaba dos
+intentos fallidos.
 
-Ninguna está bloqueada: el harness de React existe (ver más abajo). **La de
-`waiter/bar` pide sesión propia**, y el porqué está al final del documento.
+La que queda, `waiter/bar`, **pide sesión propia**, y el porqué está al final del
+documento.
 
 ---
 
@@ -73,6 +74,10 @@ Dos detalles que no son evidentes y cambian cómo se lee la salida:
   ternarios NO cuentan para el componente. Al contar candidatos a mano, descartar
   todo lo que esté dentro de un callback: en `mesa-orders-client` eran 47
   ternarios en bruto y solo ~18 contaban.
+- **Un ternario anidado paga el nivel: a profundidad 3 cuesta 3 puntos, no 1.**
+  Es lo que hace que un componente con un solo `a ? (…) : (…)` gordo marque 17.
+  **Busca ternarios profundos antes que bloques grandes** — `cart-drawer` estuvo
+  dos intentos atascada por buscar lo segundo.
 
 > **Cuidado al medir por trozos.** Recortar un fichero y medir la diferencia
 > parece que atribuye complejidad a cada zona, y no es fiable: en
@@ -286,7 +291,6 @@ de la función que se elige.
 
 ```
 21  src/app/waiter/bar/page.tsx:441              DELICADA — beforeunload offline
-17  src/components/cart-drawer.tsx:1004          intentada, NO conseguida
 ```
 
 Y una deuda de diseño que este refactor dejó anotada en vez de resolver: la
@@ -313,20 +317,33 @@ de ir a buscarlos.**
 5. **Empieza midiendo con umbral 0** para saber dónde está repartida. Ahorra
    justo el trabajo que no sirve.
 
-### `cart-drawer.tsx` — intentada y atascada en 17
+### `cart-drawer.tsx` — de 17 a 3 (2026-08-09)
 
-Bajó de 19 extrayendo seis piezas (`DiscountSection`, `TotalsSection`,
-`FieldError`, `detectMesaFromUrl`, `validarCodigoDescuento`,
-`camposTrasCambioDeEntrega`) y ahí se quedó.
+Dos intentos anteriores la dejaron atascada en 17, y este documento decía que lo
+que quedaba "está repartido por el cuerpo del componente, no en un bloque
+extraíble". **Era falso, y el diagnóstico se hizo sin la herramienta correcta.**
 
-Lo que queda **está repartido por el cuerpo del componente** —guardas de envío,
-estados de descuento, flujo de delivery—, no en un bloque extraíble. Sacar trozos
-sueltos movería el número sin mejorar nada, que es exactamente lo que no se busca
-aquí.
+Todo estaba en un sitio: `mesaToken ? (distintivo) : (formulario de datos)`, con
+el formulario entero en la rama negativa. Los cuatro `errors.X ? … : …` de dentro
+quedaban a dos y tres niveles de anidamiento, **y a esa profundidad un ternario
+cuesta 3 puntos, no 1**. Una sola extracción se llevó catorce.
 
-Antes de reintentarlo: medir con umbral 0 y comprobar que sigue siendo así. Si el
-único camino es partir el componente en dos por responsabilidad (carrito vs.
-datos de entrega), eso es un cambio de diseño y merece su propio PR.
+La lección no es sobre este fichero. Los dos intentos anteriores buscaban *bloques
+grandes* que extraer; lo que había que buscar era **ternarios profundos**. Un
+ternario anidado a nivel 3 pesa lo mismo que tres sueltos, y ocupa una línea.
+
+Y la separación que salió es exactamente la que este documento predijo a ciegas
+—carrito contra datos de entrega—, solo que no era un cambio de diseño caro: era
+un componente, `DatosDelComensal`.
+
+**Lo que apareció al sacarlo.** La condición no era de maquetación: **en modo
+mesa no se recogen datos personales**, porque la mesa ya identifica el pedido.
+Eso es RGPD, no presentación. Invertirla no rompe nada visible y pone la tienda a
+pedir nombre, teléfono y correo a gente sentada en una mesa. Congelado en
+`tests/ui/datos-del-comensal.test.tsx`, cuyo primer bloque comprueba **ausencia**
+de campos — que es justo lo que ningún test de "se ve bien" comprueba nunca.
+
+Los 12 tests están verificados por mutación: invirtiendo la condición fallan 11.
 
 ### La delicada que queda — leer esto antes de tocarla
 
