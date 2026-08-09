@@ -14,6 +14,7 @@ import { fetchWithCsrf } from "@/lib/csrf-client";
 import { QRScannerGate, type QRGateState } from "@/components/qr-scanner-gate-lazy";
 import { GoogleReviewsWidget } from "@/components/google-reviews-widget";
 import { mesaSesionChannel } from "@/lib/realtime-channels";
+import { vistaParaMesa, type VistaMesa } from "@/lib/mesa/vista-mesa";
 
 interface OrderItem {
   nombre: string;
@@ -1036,25 +1037,6 @@ function shouldClearActiveTurno(ct: CustomTurno | null | undefined): boolean {
   return !ct || ct.status === 'pagado' || ct.status === 'cancelado';
 }
 
-function isInSelectionTurn(activeTurnoId: string | null, ct: CustomTurno | null | undefined): boolean {
-  return !!activeTurnoId && ct?.id === activeTurnoId && ct?.status === 'en_seleccion';
-}
-
-function isInPaymentTurn(activeTurnoId: string | null, ct: CustomTurno | null | undefined): boolean {
-  return !!activeTurnoId && ct?.id === activeTurnoId && ct?.status === 'en_pago';
-}
-
-function isWaitingForOtherTurn(ct: CustomTurno | null | undefined, activeTurnoId: string | null): boolean {
-  return (ct?.status === 'en_seleccion' || ct?.status === 'en_pago') && !activeTurnoId;
-}
-
-function shouldShowRemainingActions(sessionData: MesaSessionData | null, hidingRemainingActions: boolean): boolean {
-  return sessionData?.divisionTipo === 'personalizado'
-    && !sessionData.customTurno
-    && !sessionData.sesionPagada
-    && !hidingRemainingActions;
-}
-
 function createMesaChannel(
   channelName: string,
   table: string,
@@ -1272,6 +1254,95 @@ function getStoredMismatch(mesaId: string): { oldTotal: number; newTotal: number
 function getStoredPaymentLock(mesaId: string): boolean {
   try { return sessionStorage.getItem(`mesa-lock-${mesaId}`) === 'true'; }
   catch { return false; }
+}
+
+/**
+ * Las cuatro pantallas de esta ruta que NO son la cuenta.
+ *
+ * Vivian dentro de `MesaOrdersClient` como cuatro `if (...) return <Vista/>`.
+ * Sacarlas separa dos trabajos que no tienen por que estar juntos: decidir en
+ * que estado esta la mesa (ahora en `@/lib/mesa/vista-mesa`, probado aparte) y
+ * pintar el estado que toque (aqui).
+ */
+function VistaDeTurno({
+  vista, sessionData, activeTurnoId, mesaId, lang, isWaiterMode, cancellingCustomTurn,
+  onCancelSeleccion, onPagoManual, onCancelarTurno, onVolverDeRestantes,
+}: Readonly<{
+  vista: Exclude<VistaMesa, 'ticket'>;
+  sessionData: MesaSessionData | null;
+  activeTurnoId: string | null;
+  mesaId: string;
+  lang: Parameters<typeof t>[1];
+  isWaiterMode: boolean;
+  cancellingCustomTurn: boolean;
+  onCancelSeleccion: () => void;
+  onPagoManual: () => Promise<void>;
+  onCancelarTurno: () => void;
+  onVolverDeRestantes: () => void;
+}>) {
+  // Las cuatro reglas de `vistaParaMesa` leen la sesion, asi que sin sesion la
+  // vista siempre es 'ticket' y aqui no se llega. TypeScript no puede saberlo.
+  if (!sessionData) return null;
+
+  if (vista === 'esperando-turno-ajeno') {
+    return (
+      <div className="min-h-screen bg-[#f0ede8]">
+        <CustomWaitingView lang={lang} />
+      </div>
+    );
+  }
+
+  // Esperando el webhook de Redsys. Los efectos de bfcache y de montaje ya han
+  // limpiado este estado si el comensal volvio atras sin pagar; el boton de
+  // cancelar es la salida de emergencia del caso raro de recarga completa, donde
+  // esos efectos corren antes de que el sondeo refleje la cancelacion.
+  if (vista === 'esperando-cobro-propio') {
+    return (
+      <div className="min-h-screen bg-[#f0ede8] flex flex-col items-center justify-center gap-4 px-6 py-16 text-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#1a1612] border-t-transparent" />
+        <p className="font-medium text-[#1a1612]">{t("mesaPagoEnCurso", lang)}</p>
+        <button
+          type="button"
+          onClick={onCancelarTurno}
+          disabled={cancellingCustomTurn}
+          className="mt-2 text-xs underline disabled:opacity-50"
+          style={{ color: '#8a7560' }}
+        >
+          {cancellingCustomTurn ? t('loading', lang) : t('cancel', lang)}
+        </button>
+      </div>
+    );
+  }
+
+  // Este comensal tiene el turno: elige sus items. El camarero llega aqui
+  // tambien, pero registra el cobro a mano en vez de ir a Redsys.
+  if (vista === 'seleccion-personalizada') {
+    const redsysUrl = process.env.NEXT_PUBLIC_REDSYS_URL ?? 'https://sis-t.redsys.es:25443/sis/realizarPago';
+    return (
+      <CustomSelectionView
+        orders={sessionData.orders}
+        itemsPagados={sessionData.itemsPagados ?? []}
+        turnoId={activeTurnoId!}
+        mesaId={mesaId}
+        lang={lang}
+        isWaiterMode={isWaiterMode}
+        onCancelled={onCancelSeleccion}
+        onCommitted={isWaiterMode ? undefined : (formData) => { submitRedsysForm(formData, redsysUrl); }}
+        onPaid={isWaiterMode ? onPagoManual : undefined}
+      />
+    );
+  }
+
+  return (
+    <RemainingItemsActions
+      orders={sessionData.orders}
+      itemsPagados={sessionData.itemsPagados ?? []}
+      total={Math.max(0, sessionData.total - (sessionData.pagadoCents ?? 0) / 100)}
+      lang={lang}
+      sesionPagada={sessionData.sesionPagada ?? false}
+      onBack={onVolverDeRestantes}
+    />
+  );
 }
 
 // Sin prop `isWaiter`: el componente ya lo resuelve solo, comparando la mesa
@@ -1777,78 +1848,39 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
 
   const manualPayLabel = getManualPayLabel(manualPaying, division, sessionData?.divisionTipo, sessionData?.customTurno, lang);
 
-  // Custom selection: this user holds the lock.
-  // Customer → Redsys payment. Waiter → manual registration.
-  if (sessionData && isInSelectionTurn(activeTurnoId, sessionData.customTurno)) {
-    const redsysUrl = process.env.NEXT_PUBLIC_REDSYS_URL ?? 'https://sis-t.redsys.es:25443/sis/realizarPago';
+  // Cuatro de las cinco pantallas de esta ruta no son la cuenta. Cual toca es
+  // una decision pura y con nombre (`@/lib/mesa/vista-mesa`); pintarla es de
+  // `VistaDeTurno`. Aqui solo queda el reparto.
+  const vista = vistaParaMesa({
+    sesion: sessionData,
+    activeTurnoId,
+    esModoCamarero: isWaiterMode,
+    ocultandoAccionesRestantes: hidingRemainingActions,
+  });
+
+  if (vista !== 'ticket') {
     return (
-      <CustomSelectionView
-        orders={sessionData.orders}
-        itemsPagados={sessionData.itemsPagados ?? []}
-        turnoId={activeTurnoId!}
+      <VistaDeTurno
+        vista={vista}
+        sessionData={sessionData}
+        activeTurnoId={activeTurnoId}
         mesaId={mesaId}
         lang={lang}
         isWaiterMode={isWaiterMode}
-        onCancelled={() => {
+        cancellingCustomTurn={cancellingCustomTurn}
+        onCancelSeleccion={() => {
           setActiveTurnoId(null);
           if (!isWaiterMode) setHidingRemainingActions(true);
           try { sessionStorage.removeItem(`mesa-custom-turno-${mesaId}`); } catch { /* ignore */ }
           void refresh();
         }}
-        onCommitted={isWaiterMode ? undefined : (formData) => {
-          submitRedsysForm(formData, redsysUrl);
-        }}
-        onPaid={isWaiterMode ? async () => {
+        onPagoManual={async () => {
           await handleManualPayment();
           setActiveTurnoId(null);
           try { sessionStorage.removeItem(`mesa-custom-turno-${mesaId}`); } catch { /* ignore */ }
-        } : undefined}
-      />
-    );
-  }
-
-  // Own turn in payment: waiting for Redsys webhook to confirm the payment.
-  // If the user pressed back from Redsys without completing payment the bfcache
-  // and mount effects above will have already cleared this state. The cancel button
-  // below is a last-resort escape for the rare full-reload case where those effects
-  // run before the server poll reflects the cancellation.
-  if (!isWaiterMode && sessionData && isInPaymentTurn(activeTurnoId, sessionData.customTurno)) {
-    return (
-      <div className="min-h-screen bg-[#f0ede8] flex flex-col items-center justify-center gap-4 px-6 py-16 text-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#1a1612] border-t-transparent" />
-        <p className="font-medium text-[#1a1612]">{t("mesaPagoEnCurso", lang)}</p>
-        <button
-          type="button"
-          onClick={() => { void cancelCustomTurn(); }}
-          disabled={cancellingCustomTurn}
-          className="mt-2 text-xs underline disabled:opacity-50"
-          style={{ color: '#8a7560' }}
-        >
-          {cancellingCustomTurn ? t('loading', lang) : t('cancel', lang)}
-        </button>
-      </div>
-    );
-  }
-
-  // Waiting: someone else holds the lock (selecting or paying) — skip for waiter
-  if (!isWaiterMode && isWaitingForOtherTurn(sessionData?.customTurno, activeTurnoId)) {
-    return (
-      <div className="min-h-screen bg-[#f0ede8]">
-        <CustomWaitingView lang={lang} />
-      </div>
-    );
-  }
-
-  // Between turns: personalizado mode, no active lock, not fully paid — skip for waiter
-  if (!isWaiterMode && sessionData && shouldShowRemainingActions(sessionData, hidingRemainingActions)) {
-    return (
-      <RemainingItemsActions
-        orders={sessionData.orders}
-        itemsPagados={sessionData.itemsPagados ?? []}
-        total={Math.max(0, sessionData.total - (sessionData.pagadoCents ?? 0) / 100)}
-        lang={lang}
-        sesionPagada={sessionData.sesionPagada ?? false}
-        onBack={() => { setHidingRemainingActions(true); setShowDivisionTypeModal(true); }}
+        }}
+        onCancelarTurno={() => { void cancelCustomTurn(); }}
+        onVolverDeRestantes={() => { setHidingRemainingActions(true); setShowDivisionTypeModal(true); }}
       />
     );
   }
