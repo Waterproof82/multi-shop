@@ -1001,6 +1001,142 @@ function construirPayloadEstandar(datos: {
   };
 }
 
+/** En modo mesa no se piden datos personales: la mesa ya identifica al pedido. */
+function DistintivoDeMesa({ mesaInfo, mesaError, language }: Readonly<{
+  mesaInfo: MesaInfo | null;
+  mesaError: boolean;
+  language: Parameters<typeof t>[1];
+}>) {
+  return (
+    <div className="mb-3">
+      <div className="flex items-center gap-2 rounded-lg bg-primary/10 border border-primary/20 px-3 py-2.5 min-h-[44px]">
+        <UtensilsCrossed className="size-4 text-primary shrink-0" aria-hidden="true" />
+        <span className="font-semibold text-primary text-sm">
+          {mesaBadgeLabel(mesaInfo, mesaError, t('mesaLabel', language))}
+        </span>
+      </div>
+      {mesaError && (
+        <p role="alert" className="text-xs text-muted-foreground mt-1 ml-1">
+          {t('mesaLabel', language)}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A quien se le entrega el pedido. Son dos cosas distintas segun el canal: con
+ * mesa basta el distintivo, sin mesa hay que pedir nombre, telefono y correo.
+ *
+ * Estaba dentro de `CartDrawer` como un ternario con el formulario entero en la
+ * rama negativa, asi que cada `errors.X ? ... : ...` de dentro contaba con dos y
+ * tres niveles de anidamiento. Ahi vivia la mayor parte de la complejidad del
+ * componente: no era el carrito, eran los datos de entrega.
+ */
+export function DatosDelComensal({
+  mesaToken, mesaInfo, mesaError, language,
+  nombre, telefono, email, countryCode, errors,
+  onNombre, onTelefono, onEmail, onCountryCode,
+}: Readonly<{
+  mesaToken: string | null;
+  mesaInfo: MesaInfo | null;
+  mesaError: boolean;
+  language: Parameters<typeof t>[1];
+  nombre: string;
+  telefono: string;
+  email: string;
+  countryCode: string;
+  errors: { nombre?: string; telefono?: string };
+  onNombre: (valor: string) => void;
+  onTelefono: (valor: string) => void;
+  onEmail: (valor: string) => void;
+  onCountryCode: (valor: string) => void;
+}>) {
+  if (mesaToken) {
+    return <DistintivoDeMesa mesaInfo={mesaInfo} mesaError={mesaError} language={language} />;
+  }
+
+  return (
+    <div className="space-y-3 mb-3">
+      <div>
+        <label htmlFor="cart-nombre" className="text-xs font-medium text-muted-foreground ml-4 mb-1 block">{t("placeholderName", language)}</label>
+        <div className="flex items-center gap-2">
+          <User className="size-4 text-muted-foreground shrink-0" aria-hidden="true" />
+          <Input
+            id="cart-nombre"
+            type="text"
+            placeholder={t("placeholderName", language)}
+            value={nombre}
+            onChange={(e) => onNombre(e.target.value)}
+            className={`h-9 ${errors.nombre ? 'border-destructive' : ''}`}
+            maxLength={100}
+            autoComplete="name"
+            aria-describedby={errors.nombre ? "nombre-error" : undefined}
+            aria-invalid={!!errors.nombre}
+          />
+        </div>
+        <FieldError id="nombre-error" message={errors.nombre} className="text-xs text-destructive mt-1 ml-4" />
+      </div>
+      <div>
+        <label htmlFor="cart-telefono" className="text-xs font-medium text-muted-foreground ml-4 mb-1 block">{t("placeholderPhone", language)}</label>
+        <div className="flex items-center gap-2">
+          <Phone className="size-4 text-muted-foreground shrink-0" aria-hidden="true" />
+          <div className="flex gap-1 flex-1">
+            <Select value={countryCode} onValueChange={onCountryCode}>
+              <SelectTrigger id="country-code-select" className="h-9 w-[90px] shrink-0 text-xs px-2" aria-labelledby="country-code-label">
+                <SelectValue />
+              </SelectTrigger>
+              <span id="country-code-label" className="sr-only">{t("countryCode", language)}</span>
+              <SelectContent>
+                {COUNTRY_CODES.map((cc) => (
+                  <SelectItem key={cc.code} value={cc.code}>
+                    <span className="flex items-center gap-1">
+                      <span>{cc.flag}</span>
+                      <span>+{cc.dialCode}</span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              id="cart-telefono"
+              type="tel"
+              placeholder={t("phonePlaceholder", language)}
+              value={telefono}
+              onChange={(e) => onTelefono(e.target.value.replaceAll(/\D/g, '').slice(0, 15))}
+              className={`h-9 flex-1 ${errors.telefono ? 'border-destructive' : ''}`}
+              maxLength={15}
+              autoComplete="tel-national"
+              aria-describedby={errors.telefono ? "telefono-error" : undefined}
+              aria-invalid={!!errors.telefono}
+            />
+          </div>
+        </div>
+        <FieldError id="telefono-error" message={errors.telefono} className="text-xs text-destructive mt-1 ml-4" />
+      </div>
+      <div>
+        <label htmlFor="cart-email" className="text-xs font-medium text-muted-foreground ml-4 mb-1 block">{t("placeholderEmail", language)}</label>
+        <div className="flex items-center gap-2">
+          <Mail className="size-4 text-muted-foreground shrink-0" aria-hidden="true" />
+          <Input
+            id="cart-email"
+            type="email"
+            placeholder={t("placeholderEmail", language)}
+            value={email}
+            onChange={(e) => onEmail(e.target.value)}
+            className="h-9"
+            maxLength={100}
+            autoComplete="email"
+          />
+        </div>
+        <p className="text-xs mt-1 ml-4 text-primary font-medium flex items-center gap-1">
+          {t("promoMessage", language)} <Gift className="size-3.5" />
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = false, deliveryHabilitado = false }: Readonly<CartDrawerProps>) {
   const {
     items,
@@ -1385,101 +1521,21 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
             </ul>
 
             <div className="mt-auto shrink-0 border-t border-border pt-3 pb-4 bg-background">
-              {mesaToken ? (
-                /* Mesa mode: show table badge instead of PII form */
-                <div className="mb-3">
-                  <div className="flex items-center gap-2 rounded-lg bg-primary/10 border border-primary/20 px-3 py-2.5 min-h-[44px]">
-                    <UtensilsCrossed className="size-4 text-primary shrink-0" aria-hidden="true" />
-                    <span className="font-semibold text-primary text-sm">
-                      {mesaBadgeLabel(mesaInfo, mesaError, t('mesaLabel', language))}
-                    </span>
-                  </div>
-                  {mesaError && (
-                    <p role="alert" className="text-xs text-muted-foreground mt-1 ml-1">
-                      {t('mesaLabel', language)}
-                    </p>
-                  )}
-                </div>
-              ) : (
-                /* Standard mode: PII form */
-                <div className="space-y-3 mb-3">
-                  <div>
-                    <label htmlFor="cart-nombre" className="text-xs font-medium text-muted-foreground ml-4 mb-1 block">{t("placeholderName", language)}</label>
-                    <div className="flex items-center gap-2">
-                      <User className="size-4 text-muted-foreground shrink-0" aria-hidden="true" />
-                      <Input
-                        id="cart-nombre"
-                        type="text"
-                        placeholder={t("placeholderName", language)}
-                        value={nombre}
-                        onChange={(e) => { setNombre(e.target.value); setErrors(prev => ({ ...prev, nombre: undefined })); }}
-                        className={`h-9 ${errors.nombre ? 'border-destructive' : ''}`}
-                        maxLength={100}
-                        autoComplete="name"
-                        aria-describedby={errors.nombre ? "nombre-error" : undefined}
-                        aria-invalid={!!errors.nombre}
-                      />
-                    </div>
-                    <FieldError id="nombre-error" message={errors.nombre} className="text-xs text-destructive mt-1 ml-4" />
-                  </div>
-                  <div>
-                    <label htmlFor="cart-telefono" className="text-xs font-medium text-muted-foreground ml-4 mb-1 block">{t("placeholderPhone", language)}</label>
-                    <div className="flex items-center gap-2">
-                      <Phone className="size-4 text-muted-foreground shrink-0" aria-hidden="true" />
-                      <div className="flex gap-1 flex-1">
-                        <Select value={countryCode} onValueChange={setCountryCode}>
-                          <SelectTrigger id="country-code-select" className="h-9 w-[90px] shrink-0 text-xs px-2" aria-labelledby="country-code-label">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <span id="country-code-label" className="sr-only">{t("countryCode", language)}</span>
-                          <SelectContent>
-                            {COUNTRY_CODES.map((cc) => (
-                              <SelectItem key={cc.code} value={cc.code}>
-                                <span className="flex items-center gap-1">
-                                  <span>{cc.flag}</span>
-                                  <span>+{cc.dialCode}</span>
-                                </span>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Input
-                          id="cart-telefono"
-                          type="tel"
-                          placeholder={t("phonePlaceholder", language)}
-                          value={telefono}
-                          onChange={(e) => { const val = e.target.value.replaceAll(/\D/g, '').slice(0, 15); setTelefono(val); setErrors(prev => ({ ...prev, telefono: undefined })); }}
-                          className={`h-9 flex-1 ${errors.telefono ? 'border-destructive' : ''}`}
-                          maxLength={15}
-                          autoComplete="tel-national"
-                          aria-describedby={errors.telefono ? "telefono-error" : undefined}
-                          aria-invalid={!!errors.telefono}
-                        />
-                      </div>
-                    </div>
-                    <FieldError id="telefono-error" message={errors.telefono} className="text-xs text-destructive mt-1 ml-4" />
-                  </div>
-                  <div>
-                    <label htmlFor="cart-email" className="text-xs font-medium text-muted-foreground ml-4 mb-1 block">{t("placeholderEmail", language)}</label>
-                    <div className="flex items-center gap-2">
-                      <Mail className="size-4 text-muted-foreground shrink-0" aria-hidden="true" />
-                      <Input
-                        id="cart-email"
-                        type="email"
-                        placeholder={t("placeholderEmail", language)}
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="h-9"
-                        maxLength={100}
-                        autoComplete="email"
-                      />
-                    </div>
-                    <p className="text-xs mt-1 ml-4 text-primary font-medium flex items-center gap-1">
-                      {t("promoMessage", language)} <Gift className="size-3.5" />
-                    </p>
-                  </div>
-                </div>
-              )}
+              <DatosDelComensal
+                mesaToken={mesaToken}
+                mesaInfo={mesaInfo}
+                mesaError={mesaError}
+                language={language}
+                nombre={nombre}
+                telefono={telefono}
+                email={email}
+                countryCode={countryCode}
+                errors={errors}
+                onNombre={(valor) => { setNombre(valor); setErrors(prev => ({ ...prev, nombre: undefined })); }}
+                onTelefono={(valor) => { setTelefono(valor); setErrors(prev => ({ ...prev, telefono: undefined })); }}
+                onEmail={setEmail}
+                onCountryCode={setCountryCode}
+              />
 
               {/* Delivery method selector — only for restaurants in non-mesa mode */}
               {showDeliverySelector(mesaToken, isRestaurant) && (
