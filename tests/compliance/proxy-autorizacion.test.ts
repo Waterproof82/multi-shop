@@ -159,6 +159,33 @@ describe('qué rutas exigen autenticación (sin credenciales)', () => {
     const res = await proxy(peticion('/api/admin/productos', { metodo: 'OPTIONS' }));
     expect(res.status).toBe(204);
   });
+
+  /**
+   * NO todas las rutas públicas salen por el mismo sitio, y la diferencia se ve
+   * en las cabeceras.
+   *
+   * `/api/admin/login` no cumple ninguna condición de la cadena, así que CAE
+   * hasta el final y recibe el tratamiento de página: nonce, CSP y CORS.
+   * `/api/tpv/empleados/login` y los cron de laborcontrol hacen `return
+   * NextResponse.next()` ANTES, y por tanto no reciben nada de eso.
+   *
+   * Se caracteriza porque es exactamente lo que un refactor "uniformador" se
+   * llevaría por delante sin que fallara nada visible.
+   */
+  it('las rutas públicas que caen hasta el final reciben CSP y CORS', async () => {
+    const res = await proxy(peticion('/api/admin/login'));
+    expect(res.headers.get('content-security-policy')).toBeTruthy();
+    expect(res.headers.get('vary')).toBe('Origin');
+  });
+
+  it.each(['/api/tpv/empleados/login', '/api/laborcontrol/cron/seal'])(
+    '%s sale antes y NO lleva CSP ni CORS',
+    async (ruta) => {
+      const res = await proxy(peticion(ruta));
+      expect(res.headers.get('content-security-policy')).toBeNull();
+      expect(res.headers.get('vary')).toBeNull();
+    },
+  );
 });
 
 // ── Suite 2: ramas de autorización de admin ───────────────────────────────────

@@ -1,11 +1,14 @@
 # Deuda de complejidad cognitiva — plan pendiente
 
-Estado a 2026-08-07. Rama `perf/latency-fase1`.
+Estado a 2026-08-09.
 
-**15 funciones** siguen por encima del umbral de complejidad cognitiva 15 (regla
-SonarQube S3776). Se cerraron 15 en el bloque backend; lo que queda es casi todo
-React, y **no se puede refactorizar con seguridad todavía** porque no hay forma
-de probarlo.
+**14 funciones** siguen por encima del umbral de complejidad cognitiva 15 (regla
+SonarQube S3776). Se cerraron 15 en el bloque backend y `proxy.ts` en agosto;
+**las 14 que quedan son todas React**.
+
+Ya no están bloqueadas: el harness existe (ver más abajo). Lo que falta es
+decidir qué comportamiento cubrir en cada una, que es trabajo de producto además
+de técnico.
 
 ---
 
@@ -100,17 +103,32 @@ silencio**, sin error ni hueco visible.
 
 ## Pendientes, por orden de valor
 
-### 1. `proxy.ts:389` — complejidad 28
+### 1. `proxy.ts` — HECHO (2026-08-09). De 27 a bajo umbral
 
-**Lo único de backend que queda, y va aparte.** Contiene autenticación, CSRF y
-la construcción de la CSP. Un fallo aquí no degrada una pantalla: abre el
-sistema.
+Se cumplieron las tres condiciones que este documento exigía: 51 tests de
+caracterización primero (`tests/compliance/proxy-autorizacion.test.ts`,
+verificados por mutación), los E2E de seguridad en verde antes y después
+(65 tests entre `waiter-csrf`, `kitchen-bar-csrf` y `kitchen-csrf-browser`), y
+sin mezclar con otros cambios.
 
-Condiciones para tocarlo:
-- Tests de caracterización primero, cubriendo cada rama de autorización.
-- Los tests E2E de seguridad existentes (`e2e/waiter-csrf.spec.ts`) en verde
-  antes y después.
-- Sin mezclar con otros cambios en el mismo commit.
+Extraído de `proxy()`: `isWaiterRoute`, `isPublicTpvRoute`,
+`handleAdminOrEmployeeAuth` (la pareja admin→empleado que se repetía en `/api/tpv`
+y `/api/laborcontrol`), `handleSuperadminAuth` y `buildPageResponse`.
+
+**Dos cosas que aparecieron al mirarlo de cerca:**
+
+1. `const url = request.nextUrl.clone()` estaba declarado y **nunca se usaba**.
+   Un clon de URL por petición, para nada. Eliminado.
+
+2. Las rutas públicas **no salen todas por el mismo sitio**, y eso cambia sus
+   cabeceras. `/api/admin/login` no cumple ninguna condición de la cadena, así
+   que cae hasta el final y recibe nonce, CSP y CORS. `/api/tpv/empleados/login`
+   y los cron de laborcontrol hacen `return NextResponse.next()` antes, y **no
+   reciben nada de eso**. Es una asimetría real que un refactor "uniformador" se
+   llevaría por delante sin que fallara nada visible. Está congelada en tests.
+
+> La complejidad real era **27**, no 28: este documento la había registrado con
+> una unidad de más. Medir antes de tocar, siempre.
 
 ### 2. `mesa-orders-client.tsx:1248` — complejidad 78
 
