@@ -134,7 +134,12 @@ describe('código de respuesta de Redsys', () => {
   };
 
   it('0000 a 0099 es pago aceptado', async () => {
-    expect((await conCustomPago('0000')).success && (await conCustomPago('0000')).data).toMatchObject({ paymentStatus: 'paid' });
+    // Ojo: antes esto invocaba `conCustomPago('0000')` DOS veces y comprobaba el
+    // `success` de una contra el `data` de la otra. Son objetos distintos, así
+    // que TypeScript no podía estrechar el Result — y el webhook se ejecutaba
+    // dos veces por assertion.
+    const r00 = await conCustomPago('0000');
+    expect(r00.success && r00.data).toMatchObject({ paymentStatus: 'paid' });
     const r99 = await conCustomPago('0099');
     expect(r99.success && r99.data.paymentStatus).toBe('paid');
   });

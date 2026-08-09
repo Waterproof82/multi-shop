@@ -396,7 +396,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
             {displayDescription}
           </p>
         )}
-        <AllergenBadges alergenos={item.alergenos} className="mb-2" />
+        <AllergenBadges alergenos={item.alergenos} language={safeLanguage} className="mb-2" />
         <div className="flex items-center justify-between gap-3 pt-3 mt-auto border-t border-border/50">
           <span className="text-lg font-bold text-foreground tabular-nums group-hover:text-primary transition-colors duration-200">
             {formatPrice(item.price, 'EUR', safeLanguage)}

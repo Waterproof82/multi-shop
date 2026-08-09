@@ -406,6 +406,15 @@ export function HistorialClient({ pedidos, cobros, turnoAperturaAt, tipoImpuesto
 
                   {isExpanded && (
                     <div className="border-t border-[#e2e8f0] px-4 py-3 bg-[#f8fafc]">
+                      {/*
+                        NOSONAR(S6479) — el indice como key es CORRECTO aqui.
+                        `PedidoItem` no tiene id (solo nombre, cantidad, precio) y
+                        un mismo producto puede repetirse en una comanda, asi que no
+                        existe clave unica. El peligro del indice aparece cuando la
+                        lista se reordena, filtra o inserta; esta es el detalle de una
+                        comanda ya cerrada y no puede mutar. Usar `${nombre}-${idx}`
+                        seria PEOR: aparenta unicidad sin tenerla.
+                      */}
                       {p.items.map((it, idx) => (
                         <div key={idx} className="flex items-center gap-3 py-1.5">
                           <span className="w-5 h-5 rounded bg-[#e2e8f0] text-[#64748b] text-xs flex items-center justify-center shrink-0 font-semibold">

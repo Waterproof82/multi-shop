@@ -20,7 +20,19 @@ import { crearFakeSupabase, llamadasDe, type FakeSupabase } from '../helpers/fak
 
 let fake: FakeSupabase;
 let pedidosDeSesion: { id: string; total: number; detalle_pedido: unknown[] }[] = [];
-const updateOrderItemsSpy = vi.fn(async () => ({ success: true as const, data: undefined }));
+/** Forma de un ítem tal y como lo reescribe el caso de uso. */
+type ItemReescrito = { nombre: string; cantidad: number; precio: number };
+
+// El espía declara la firma REAL de `updateOrderItems`. Con `vi.fn(async () => …)`
+// —sin parámetros— `mock.calls` queda tipado como tupla vacía y leer `[1]` o `[2]`
+// es un error de tipos que solo se veía silenciado porque `tests/` no entraba en
+// el typecheck.
+const updateOrderItemsSpy = vi.fn(
+  async (_pedidoId: string, _items: ItemReescrito[], _total: number) => ({
+    success: true as const,
+    data: undefined,
+  }),
+);
 
 vi.mock('@/core/infrastructure/database/supabase-client', () => ({
   getSupabaseClient: () => fake,
@@ -28,7 +40,8 @@ vi.mock('@/core/infrastructure/database/supabase-client', () => ({
 vi.mock('@/core/infrastructure/database', () => ({
   getPedidoRepository: () => ({
     findBySesionId: async () => ({ success: true as const, data: pedidosDeSesion }),
-    updateOrderItems: (...a: unknown[]) => updateOrderItemsSpy(...(a as [])),
+    updateOrderItems: (pedidoId: string, items: ItemReescrito[], total: number) =>
+      updateOrderItemsSpy(pedidoId, items, total),
   }),
 }));
 vi.mock('@/core/infrastructure/logging/logger', () => ({
@@ -48,12 +61,12 @@ function quitar(nombre: string, precio: number, cantidad: number) {
   });
 }
 
-/** Argumentos con los que se reescribió un pedido. */
-function itemsReescritos(llamada = 0) {
-  return updateOrderItemsSpy.mock.calls[llamada]?.[1] as Record<string, unknown>[] | undefined;
+/** Argumentos con los que se reescribió un pedido. Ya no hacen falta casts. */
+function itemsReescritos(llamada = 0): ItemReescrito[] | undefined {
+  return updateOrderItemsSpy.mock.calls[llamada]?.[1];
 }
-function totalReescrito(llamada = 0) {
-  return updateOrderItemsSpy.mock.calls[llamada]?.[2] as number | undefined;
+function totalReescrito(llamada = 0): number | undefined {
+  return updateOrderItemsSpy.mock.calls[llamada]?.[2];
 }
 
 beforeEach(() => {

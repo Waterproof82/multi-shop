@@ -27,9 +27,14 @@ import {
 import type { Category, Product } from '../../src/core/domain/entities/types';
 import type { ComplementoGrupo, ProductoComplementoAsignacion } from '../../src/core/domain/entities/complemento-types';
 
-const grupo = (id: string, nombre = id) => ({ id, nombre } as ComplementoGrupo);
+// Fixtures deliberadamente PARCIALES: `agruparComplementosPorProducto` solo lee
+// estos campos, y construir los 11 restantes seria ruido que esconde lo que el
+// test mira de verdad. El doble `as unknown as` es feo a proposito — dice en voz
+// alta "esto no es un ComplementoGrupo completo", en vez de un `as` simple que
+// aparenta que si lo es.
+const grupo = (id: string, nombre = id) => ({ id, nombre }) as unknown as ComplementoGrupo;
 const asignacion = (productoId: string, grupoId: string, orden: number) =>
-  ({ productoId, grupoId, orden } as ProductoComplementoAsignacion);
+  ({ productoId, grupoId, orden }) as unknown as ProductoComplementoAsignacion;
 
 describe('agruparComplementosPorProducto', () => {
   it('respeta el orden configurado, no el de llegada', () => {
@@ -116,14 +121,18 @@ describe('indexarCategoriasComplemento', () => {
       [categoriaComplemento('c-salsas', 'c-carnes', {
         complementoObligatorio: true,
         nombre: 'Elige salsa',
-        translations: { en: { nombre: 'Choose sauce' } } as Category['translations'],
+        // `Category['translations']` es `{ en?: string }`, NO `{ en?: { nombre } }`
+        // (esa es la forma del ítem de carrito, otro tipo). El test pasaba con la
+        // forma equivocada porque la función copia el valor sin mirarlo: verificaba
+        // la propagación con un valor imposible en producción.
+        translations: { en: 'Choose sauce' },
       })],
       [],
     );
 
     expect(indice.obligatorio.get('c-carnes')).toBe(true);
     expect(indice.nombre.get('c-carnes')).toBe('Elige salsa');
-    expect(indice.traducciones.get('c-carnes')).toEqual({ en: { nombre: 'Choose sauce' } });
+    expect(indice.traducciones.get('c-carnes')).toEqual({ en: 'Choose sauce' });
   });
 
   it('deja fuera del índice de nombres las categorías sin nombre', () => {

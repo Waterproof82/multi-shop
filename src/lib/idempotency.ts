@@ -67,6 +67,11 @@ function stableStringify(value: unknown): string {
   const entries = Object.entries(value as Record<string, unknown>)
     .filter(([, v]) => v !== undefined)
     .sort(([a], [b]) => a.localeCompare(b));
+  // NOSONAR(S4624) — el template anidado es la forma idiomática de serializar
+  // JSON, y desarmarlo aquí no mejora la lectura: la añade. Esta función genera
+  // la huella que identifica un pedido, así que un cambio de forma en su salida
+  // cambia las claves de idempotencia y deja de reconocer reintentos legítimos
+  // como duplicados. No se toca por una regla de estilo.
   return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${stableStringify(v)}`).join(',')}}`;
 }
 
