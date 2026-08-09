@@ -234,12 +234,43 @@ criterio: cada una nombraba un estado resuelto con un ternario suelto.
 `ModalBorrarItem` (dos pantallas: el aviso de "ya preparado" y el selector de
 unidades), `ProgresoDeDivision`, y el tipo inline del `useState`.
 
-**Lo que NO se hizo, y por qué.** Extraer la sección de pago entera (424 líneas)
-habría necesitado **25 props**. Un componente con 25 props no es un componente,
-es un pliegue de código: mueve el número sin mejorar nada. Partirla de verdad
-pide un hook `usePagoDeMesa` que posea el estado de cobro y los handlers, y eso
-es un cambio de diseño con PR propio — el mismo criterio que se aplicó a
-`cart-drawer`.
+**Lo que no se hizo en esos dos commits, y por qué.** Extraer la sección de pago
+entera (424 líneas) habría necesitado **25 props**. Un componente con 25 props no
+es un componente, es un pliegue de código: mueve el número sin mejorar nada.
+
+### El hook que faltaba — `usePagoDeMesa` (2026-08-09)
+
+Lo anterior tenía solución, y no era pasar menos información: era **dejar de
+tener el estado de cobro suelto**.
+
+Estaba disperso en nueve `useState`, dos `useRef`, cuatro efectos y siete
+manejadores dentro del componente. Ninguno de ellos superaba el umbral —esto no
+era complejidad medida— pero entre todos hacían imposible mover la sección de
+pago a ningún sitio.
+
+`usePagoDeMesa` los posee. Depende de cuatro cosas de fuera y **ninguna es de
+cobro**: la mesa, la sesión cargada, cómo actualizarla y cómo recargarla. Esa
+era la costura, y hasta que el estado no tuvo dueño no se veía.
+
+Con el hook, `SeccionDePago` pasa de necesitar 25 props a **13** — y una de ellas
+(`pago`) sustituye a nueve. El resultado medido:
+
+| | |
+|---|---|
+| `usePagoDeMesa` | 0 |
+| `SeccionDePago` | 7 |
+| `MesaOrdersClient` | **6** (empezó en 78) |
+
+**Cambió el orden de los efectos, y conviene saberlo.** Los del hook se declaran
+antes que los del componente, así que ahora la liberación del bloqueo obsoleto y
+la del hueco de división se disparan **antes** del primer `refresh()`, no
+después. En este caso es igual o mejor —el refresco ve el estado ya liberado—,
+pero es un cambio real, no un movimiento puro: mover hooks a un hook propio
+reordena los efectos, y si alguno dependiera del orden, se rompería en silencio.
+
+**La lección general**: cuando extraer un componente pide más de ~15 props, el
+problema no es el componente, es que el estado que necesita no tiene dueño.
+Busca el hook antes que el componente.
 
 ## Patrones que han funcionado
 
@@ -291,12 +322,11 @@ de la función que se elige.
 
 ## Lo que queda (2026-08-09)
 
-Nada por encima del umbral.
+Nada.
 
-Sí queda **una deuda de diseño** que estos refactors anotaron en vez de resolver:
-la sección de pago de `mesa-orders-client` sigue dentro del componente porque
-sacarla bien pide un hook `usePagoDeMesa`. Ver más arriba. No es complejidad
-medida — es una responsabilidad en el sitio equivocado, y merece su propio PR.
+La deuda de diseño que estos refactors habían anotado —la sección de pago de
+`mesa-orders-client`, que no se podía extraer porque necesitaba 25 props— se
+cerró con `usePagoDeMesa`. Ver más abajo.
 
 ### El patrón que ha funcionado en las quince cerradas
 
