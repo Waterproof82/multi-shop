@@ -527,6 +527,62 @@ function buildSeleccion(
   return seleccion;
 }
 
+/**
+ * Bebidas antes que comidas, y dentro de cada bloque por nombre.
+ *
+ * No es estético: el camarero sirve las bebidas primero, así que la cuenta se
+ * lee en el mismo orden en que salió la comanda.
+ */
+function bebidasPrimero<T extends { tipo_producto?: string; nombre: string }>(items: T[]): T[] {
+  const orden = (t: T) => (t.tipo_producto === 'bebida' ? 0 : 1);
+  return [...items].sort((a, b) => orden(a) - orden(b) || a.nombre.localeCompare(b.nombre));
+}
+
+/**
+ * Une las unidades YA PAGADAS de un mismo producto en una sola línea.
+ *
+ * Dos comensales que pidieron lo mismo por separado generan dos ítems distintos;
+ * en la cuenta tiene que verse "2x Caña", no dos líneas de una. La clave incluye
+ * los complementos ORDENADOS: una caña con limón y otra sin él no son la misma
+ * línea, pero el orden en que se pidieron los complementos no debe separarlas.
+ *
+ * Los cancelados se ignoran: no se cobran.
+ */
+function agruparYaPagados(
+  orders: MesaOrder[],
+  unidadesPagadas: (pedidoId: string, itemIdx: number) => number,
+) {
+  const porClave = new Map<string, { nombre: string; precio: number; cantidad: number; complementos?: { nombre: string; precio: number }[] }>();
+
+  for (const order of orders) {
+    order.items.forEach((item, idx) => {
+      if (item.cancelled) return;
+      const pagadas = unidadesPagadas(order.id, idx);
+      if (pagadas <= 0) return;
+
+      const firmaComplementos = (item.complementos ?? [])
+        .map(c => c.nombre)
+        .sort((a, b) => a.localeCompare(b))
+        .join(',');
+      const clave = `${item.nombre}||${item.precio}||${firmaComplementos}`;
+
+      const yaVisto = porClave.get(clave);
+      if (yaVisto) {
+        yaVisto.cantidad += pagadas;
+        return;
+      }
+      porClave.set(clave, {
+        nombre: item.nombre,
+        precio: item.precio,
+        cantidad: pagadas,
+        complementos: item.complementos,
+      });
+    });
+  }
+
+  return Array.from(porClave.entries()).map(([key, val]) => ({ key, ...val }));
+}
+
 function CustomSelectionView({
   orders, itemsPagados, turnoId, mesaId, lang, isWaiterMode, onCancelled, onCommitted, onPaid,
 }: Readonly<{
@@ -638,25 +694,7 @@ function CustomSelectionView({
     onCancelled();
   };
 
-  const paidMergeMap = new Map<string, { nombre: string; precio: number; cantidad: number; complementos?: { nombre: string; precio: number }[] }>();
-  for (const order of orders) {
-    for (let idx = 0; idx < order.items.length; idx++) {
-      const item = order.items[idx];
-      if (item.cancelled) continue;
-      const paid = getPaidUnits(order.id, idx);
-      if (paid > 0) {
-        const ck = (item.complementos ?? []).map(c => c.nombre).sort((a, b) => a.localeCompare(b)).join(',');
-        const k = `${item.nombre}||${item.precio}||${ck}`;
-        const existing = paidMergeMap.get(k);
-        if (existing) {
-          existing.cantidad += paid;
-        } else {
-          paidMergeMap.set(k, { nombre: item.nombre, precio: item.precio, cantidad: paid, complementos: item.complementos });
-        }
-      }
-    }
-  }
-  const fullyPaidItems = Array.from(paidMergeMap.entries()).map(([key, val]) => ({ key, ...val }));
+  const fullyPaidItems = agruparYaPagados(orders, getPaidUnits);
 
   return (
     <div className="flex flex-col min-h-screen bg-[#f0ede8]">
@@ -665,12 +703,7 @@ function CustomSelectionView({
       </div>
       <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4">
         {groupedItems.length > 0 && (() => {
-          const sorted = [...groupedItems].sort((a, b) => {
-            const aTipo = a.tipo_producto === 'bebida' ? 0 : 1;
-            const bTipo = b.tipo_producto === 'bebida' ? 0 : 1;
-            if (aTipo !== bTipo) return aTipo - bTipo;
-            return a.nombre.localeCompare(b.nombre);
-          });
+          const sorted = bebidasPrimero(groupedItems);
           const hasBebidas = sorted.some(g => g.tipo_producto === 'bebida');
           const firstComidaIdx = sorted.findIndex(g => g.tipo_producto !== 'bebida');
           return (

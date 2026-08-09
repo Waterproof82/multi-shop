@@ -946,6 +946,61 @@ interface CartDrawerProps {
   deliveryHabilitado?: boolean;
 }
 
+/**
+ * Errores de los datos del cliente, o `null` si están todos bien.
+ *
+ * Devuelve los TRES a la vez en vez de parar en el primero: rellenar un
+ * formulario, verlo fallar, corregir y verlo fallar otra vez por el campo de al
+ * lado es la forma más rápida de que alguien abandone un pedido.
+ */
+function validarDatosDelCliente(datos: {
+  nombre: string;
+  telefono: string;
+  isRestaurant: boolean;
+  deliveryMethod: DeliveryMethod;
+  deliveryLatitude: number | null;
+  deliveryLongitude: number | null;
+  t: typeof t;
+  language: Parameters<typeof t>[1];
+}): { nombre?: string; telefono?: string; delivery?: string } | null {
+  const nombre = validateNameInput(datos.nombre, datos.t, datos.language);
+  const telefono = validatePhoneInput(datos.telefono, datos.t, datos.language);
+  const delivery = resolveDeliveryError(
+    datos.isRestaurant, datos.deliveryMethod, datos.deliveryLatitude, datos.deliveryLongitude, datos.t, datos.language,
+  );
+
+  if (!nombre && !telefono && !delivery) return null;
+  return { nombre, telefono, delivery };
+}
+
+/**
+ * Cuerpo del pedido estándar.
+ *
+ * El teléfono se manda con prefijo internacional y sin nada que no sea dígito:
+ * la gente escribe espacios, guiones y paréntesis, y el proveedor de SMS los
+ * rechaza sin decir por qué.
+ */
+function construirPayloadEstandar(datos: {
+  items: CartItem[];
+  nombre: string;
+  telefono: string;
+  countryCode: string;
+  email: string;
+  language: Parameters<typeof t>[1];
+  discountCode: string;
+}): Record<string, unknown> {
+  const prefijo = COUNTRY_CODES.find(c => c.code === datos.countryCode)?.dialCode || '34';
+
+  return {
+    items: datos.items.map(mapCartItemPayload),
+    nombre: datos.nombre,
+    telefono: prefijo + datos.telefono.replaceAll(/\D/g, ''),
+    email: datos.email,
+    idioma: datos.language,
+    codigoDescuento: datos.discountCode || undefined,
+  };
+}
+
 export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = false, deliveryHabilitado = false }: Readonly<CartDrawerProps>) {
   const {
     items,
@@ -1025,26 +1080,18 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
       return;
     }
 
-    // Standard (non-mesa) flow: validate PII
-    const nombreError = validateNameInput(nombre, t, language);
-    const telefonoError = validatePhoneInput(telefono, t, language);
-    const deliveryError = resolveDeliveryError(isRestaurant, deliveryMethod, deliveryLatitude, deliveryLongitude, t, language);
-    if (nombreError || telefonoError || deliveryError) {
-      setErrors({ nombre: nombreError, telefono: telefonoError, delivery: deliveryError });
+    // Flujo estándar (sin mesa): aquí sí hay datos personales que validar.
+    const errores = validarDatosDelCliente({
+      nombre, telefono, isRestaurant, deliveryMethod, deliveryLatitude, deliveryLongitude, t, language,
+    });
+    if (errores) {
+      setErrors(errores);
       return;
     }
 
-    const selectedCountry = COUNTRY_CODES.find(c => c.code === countryCode);
-    const dialCode = selectedCountry?.dialCode || '34';
-
-    const payload: Record<string, unknown> = {
-      items: items.map(mapCartItemPayload),
-      nombre,
-      telefono: dialCode + telefono.replaceAll(/\D/g, ''),
-      email,
-      idioma: language,
-      codigoDescuento: discountCode || undefined,
-    };
+    const payload = construirPayloadEstandar({
+      items, nombre, telefono, countryCode, email, language, discountCode,
+    });
 
     // Delegate the heavy response handling to a module-level helper
     await processStandardOrderResponse(payload, {
