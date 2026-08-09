@@ -130,10 +130,6 @@ function ComplementDialog({ state, onConfirm, onClose }: Readonly<ComplementDial
     onConfirm(complementos, precioTotal);
   }
 
-  function fmt(euros: number): string {
-    return euros.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
-  }
-
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-white">
       {/* Header */}
@@ -176,45 +172,19 @@ function ComplementDialog({ state, onConfirm, onClose }: Readonly<ComplementDial
                 />
               </div>
               <div className="flex flex-col gap-2">
-                {grupo.opciones.map(opt => {
-                  const isSelected = selectedByGroup[grupo.id]?.has(opt.id) ?? false;
-                  const toggle = grupo.tipo === 'radio'
-                    ? () => toggleRadio(grupo.id, opt.id)
-                    : () => toggleCheckbox(grupo.id, opt.id);
-                  return (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      role={grupo.tipo === 'radio' ? 'radio' : 'checkbox'}
-                      aria-checked={isSelected}
-                      onClick={toggle}
-                      className="flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all text-left"
-                      style={{
-                        background: isSelected ? '#eff6ff' : '#f8fafc',
-                        borderColor: isSelected ? '#2563eb' : '#e2e8f0',
-                      }}
-                    >
-                      <span
-                        className="w-4 h-4 shrink-0 flex items-center justify-center border-2"
-                        style={{
-                          borderRadius: grupo.tipo === 'radio' ? '50%' : '4px',
-                          borderColor: isSelected ? '#2563eb' : '#d1d5db',
-                        }}
-                      >
-                        {isSelected && grupo.tipo === 'radio' && (
-                          <span className="w-2 h-2 rounded-full bg-[#2563eb]" />
-                        )}
-                        {isSelected && grupo.tipo === 'checkbox' && (
-                          <span className="text-[10px] font-bold leading-none text-[#2563eb]">✓</span>
-                        )}
-                      </span>
-                      <span className="flex-1 text-sm text-[#0f172a] font-medium">{opt.name}</span>
-                      {opt.precio > 0 && (
-                        <span className="text-xs text-[#2563eb] shrink-0">+{fmt(opt.precio)}</span>
-                      )}
-                    </button>
-                  );
-                })}
+                {grupo.opciones.map(opt => (
+                  <OpcionComplemento
+                    key={opt.id}
+                    opcion={opt}
+                    esRadio={grupo.tipo === 'radio'}
+                    seleccionada={selectedByGroup[grupo.id]?.has(opt.id) ?? false}
+                    onToggle={() =>
+                      grupo.tipo === 'radio'
+                        ? toggleRadio(grupo.id, opt.id)
+                        : toggleCheckbox(grupo.id, opt.id)
+                    }
+                  />
+                ))}
               </div>
             </div>
           );
@@ -247,6 +217,58 @@ function ComplementDialog({ state, onConfirm, onClose }: Readonly<ComplementDial
         </div>
       </div>
     </div>
+  );
+}
+
+/** No depende de nada del componente: vive en el módulo y la usan los dos. */
+function fmt(euros: number): string {
+  return euros.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+}
+
+/**
+ * Una opción de complemento. Radio y checkbox comparten TODO menos la forma del
+ * indicador y la marca de dentro, así que eran el mismo bloque con seis
+ * ternarios repartidos por los estilos.
+ *
+ * `role` se deriva del tipo de grupo: un grupo `radio` es excluyente, y anunciar
+ * sus opciones como checkbox le diría a un lector de pantalla que se pueden
+ * marcar varias.
+ */
+function OpcionComplemento({ opcion, esRadio, seleccionada, onToggle }: Readonly<{
+  opcion: { id: string; name: string; precio: number };
+  esRadio: boolean;
+  seleccionada: boolean;
+  onToggle: () => void;
+}>) {
+  return (
+    <button
+      type="button"
+      role={esRadio ? 'radio' : 'checkbox'}
+      aria-checked={seleccionada}
+      onClick={onToggle}
+      className="flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all text-left"
+      style={{
+        background: seleccionada ? '#eff6ff' : '#f8fafc',
+        borderColor: seleccionada ? '#2563eb' : '#e2e8f0',
+      }}
+    >
+      <span
+        className="w-4 h-4 shrink-0 flex items-center justify-center border-2"
+        style={{
+          borderRadius: esRadio ? '50%' : '4px',
+          borderColor: seleccionada ? '#2563eb' : '#d1d5db',
+        }}
+      >
+        {seleccionada && esRadio && <span className="w-2 h-2 rounded-full bg-[#2563eb]" />}
+        {seleccionada && !esRadio && (
+          <span className="text-[10px] font-bold leading-none text-[#2563eb]">✓</span>
+        )}
+      </span>
+      <span className="flex-1 text-sm text-[#0f172a] font-medium">{opcion.name}</span>
+      {opcion.precio > 0 && (
+        <span className="text-xs text-[#2563eb] shrink-0">+{fmt(opcion.precio)}</span>
+      )}
+    </button>
   );
 }
 
