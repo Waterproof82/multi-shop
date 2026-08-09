@@ -36,6 +36,36 @@ jobs:
 
       - run: pnpm typecheck
 
+  # Corre TODA la suite de vitest (proyectos `unit` y `ui`) en cada push y PR.
+  #
+  # No se apoya en `compliance.yml` a proposito: aquel esta filtrado por rutas
+  # (migraciones, rutas de API concretas, `tests/compliance/**`), y
+  # `src/components/**` NO esta en la lista. Un PR que solo tocara un componente
+  # se saltaba los tests estaticos — incluido el guard que impide reintroducir
+  # `next/image` sobre imagenes ya optimizadas, que vive precisamente para
+  # atrapar un cambio en `src/components/**`.
+  #
+  # Este workflow solo ignora `docs/**` y `*.md`, asi que aqui no hay hueco.
+  vitest:
+    name: Vitest — Unit & UI
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm test
+
   build:
     name: Build
     runs-on: ubuntu-latest
