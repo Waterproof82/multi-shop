@@ -2,13 +2,12 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { cookies, headers } from 'next/headers';
 import {
-  getAuthAdminUseCase,
   getProductUseCase,
   getCategoryUseCase,
   getMesaSesionUseCase,
   getComplementoGrupoRepository,
 } from '@/core/infrastructure/database';
-import { verifyTpvEmployeeToken } from '@/lib/tpv-employee-auth';
+import { resolverSesionTpv } from '@/lib/tpv/sesion-servidor';
 import { SupabaseTpvRepository } from '@/core/infrastructure/repositories/supabase-tpv.repository';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { TpvHeader } from '@/components/tpv/TpvHeader';
@@ -16,10 +15,7 @@ import { TpvRolProvider } from '@/lib/tpv-rol-ctx';
 import { TpvCatalogProvider } from '@/lib/tpv-catalog-ctx';
 import { TpvAccionesProvider } from '@/lib/tpv-acciones-ctx';
 import { AccionesPanel } from '@/components/tpv/AccionesActions';
-import type { RolAdmin } from '@/core/domain/repositories/IAdminRepository';
 import { TpvSwRegistrar } from '@/components/tpv-sw-registrar';
-
-const VALID_ROLES = new Set<RolAdmin>(['superadmin', 'admin', 'encargado', 'cajero']);
 
 // Rutas donde no se requiere un turno activo
 const TURNO_OPTIONAL_PREFIXES = [
@@ -29,6 +25,16 @@ const TURNO_OPTIONAL_PREFIXES = [
   '/tpv/mermas',
   '/tpv/jornada',
 ];
+
+/** Solo hace falta en sesión de empleado: el admin trae el nombre en el token. */
+async function nombreDeEmpresa(empresaId: string): Promise<string> {
+  const { data } = await getSupabaseClient()
+    .from('empresas')
+    .select('nombre')
+    .eq('id', empresaId)
+    .maybeSingle();
+  return (data as { nombre: string } | null)?.nombre ?? '';
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -48,43 +54,13 @@ export default async function TpvLayout({ children }: { readonly children: React
   }
 
   const cookieStore = await cookies();
-  let rol: RolAdmin | null = null;
-  let empresaNombre = '';
-  let empresaId: string | null = null;
-  let isEmployeeSession = false;
+  const sesion = await resolverSesionTpv(cookieStore);
+  if (!sesion) redirect('/tpv/login');
 
-  // 1. Try admin_token first
-  const adminToken = cookieStore.get('admin_token')?.value;
-  if (adminToken) {
-    const admin = await getAuthAdminUseCase().verifyToken(adminToken);
-    if (admin && VALID_ROLES.has(admin.rol)) {
-      rol = admin.rol;
-      empresaNombre = admin.empresa?.nombre ?? '';
-      empresaId = admin.empresaId ?? admin.empresa?.id ?? null;
-    }
-  }
-
-  // 2. Fallback to tpv_employee_token
-  if (!rol) {
-    const employeeToken = cookieStore.get('tpv_employee_token')?.value;
-    if (employeeToken) {
-      const payload = await verifyTpvEmployeeToken(employeeToken);
-      if (payload) {
-        rol = payload.rol;
-        isEmployeeSession = true;
-        empresaId = payload.empresaId;
-        const supabase = getSupabaseClient();
-        const { data } = await supabase
-          .from('empresas')
-          .select('nombre')
-          .eq('id', payload.empresaId)
-          .maybeSingle();
-        empresaNombre = (data as { nombre: string } | null)?.nombre ?? '';
-      }
-    }
-  }
-
-  if (!rol || !empresaId) redirect('/tpv/login');
+  const { rol, empresaId, esEmpleado: isEmployeeSession } = sesion;
+  // El nombre solo llega gratis con el token de admin; en sesión de empleado hay
+  // que buscarlo, y esta pantalla sí lo pinta en la cabecera.
+  const empresaNombre = sesion.empresaNombre ?? await nombreDeEmpresa(empresaId);
 
   // Fetch all catalog data in parallel — runs once per layout lifetime (not on tab navigation)
   const repo = new SupabaseTpvRepository();

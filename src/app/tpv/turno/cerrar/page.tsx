@@ -1,11 +1,9 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
-import { getAuthAdminUseCase } from '@/core/infrastructure/database';
-import { verifyTpvEmployeeToken } from '@/lib/tpv-employee-auth';
+import { resolverSesionTpv } from '@/lib/tpv/sesion-servidor';
 import { SupabaseTpvRepository } from '@/core/infrastructure/repositories/supabase-tpv.repository';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { TurnoCerrarForm } from '@/components/tpv/TurnoCerrarForm';
-import type { RolAdmin } from '@/core/domain/repositories/IAdminRepository';
 
 const EMPTY_STATS = {
   totalEfectivoCents: 0,
@@ -17,30 +15,10 @@ const EMPTY_STATS = {
 
 export default async function TurnoCerrarPage() {
   const cookieStore = await cookies();
-  let rol: RolAdmin = 'cajero';
-  let empresaId: string | null = null;
-  let empleadoId: string | undefined;
+  const sesion = await resolverSesionTpv(cookieStore);
+  if (!sesion) redirect('/tpv/login');
 
-  const adminToken = cookieStore.get('admin_token')?.value;
-  if (adminToken) {
-    const admin = await getAuthAdminUseCase().verifyToken(adminToken);
-    if (admin?.empresaId) {
-      rol = admin.rol;
-      empresaId = admin.empresaId;
-    }
-  }
-
-  if (!empresaId) {
-    const employeeToken = cookieStore.get('tpv_employee_token')?.value;
-    if (!employeeToken) redirect('/tpv/login');
-    const payload = await verifyTpvEmployeeToken(employeeToken);
-    if (!payload) redirect('/tpv/login');
-    rol = payload.rol;
-    empresaId = payload.empresaId;
-    empleadoId = payload.empleadoId;
-  }
-
-  if (!empresaId) redirect('/tpv/login');
+  const { rol, empresaId, empleadoId } = sesion;
 
   const isBlindClose = rol === 'cajero';
 
