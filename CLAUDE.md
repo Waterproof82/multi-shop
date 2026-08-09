@@ -175,6 +175,25 @@ Tras CADA `supabase db push` o `supabase migration up`:
 - **Race en validate loop**: `confirmingRef` como mirror del estado. Relay retorna temprano si `confirmingRef.current.size > 0`.
 - **Broadcast llega antes del commit**: para eventos transaccionales (auto-cancel), usar `postgres_changes` no broadcast.
 
+## Complejidad Cognitiva (S3776) — Como se cerro y como no volver
+
+> Ver doc completo: `docs/context/deuda-complejidad.md` (manual de medicion y patrones; las 15 estan cerradas)
+
+- **Medir ANTES de leer el codigo**: script con umbral 0 sobre un fichero lista todas sus funciones. NO usar SonarLint del IDE (subestima). NO presupuestar recortando el fichero por trozos (dos recortes disjuntos sumaron 103 sobre un total real de 78).
+- **En JSX solo cuentan los TERNARIOS**: `{x && <p/>}` = 0; `{x ? : }` = 1 al nivel superior, **3 a profundidad 3**. Los de dentro de `.map()`/IIFE no cuentan (funcion anidada). Buscar ternarios profundos antes que bloques grandes — `cart-drawer` estuvo dos intentos atascada por buscar lo segundo.
+- **Las funciones anidadas NO suman a la contenedora** — extraer handlers no mueve la aguja.
+- **Si extraer un componente pide >~15 props, el estado no tiene dueno**: buscar el hook antes que el componente (asi nacio `usePagoDeMesa`).
+- **Mover hooks a un hook propio REORDENA los efectos** (los del hook corren antes que los del componente). No es un movimiento puro — verificar que nada dependa del orden.
+- **Patron ganador**: tabla de reglas que devuelve el MOTIVO/VISTA, no un booleano. Test primero, y en pantallas que tocan dinero, equivalencia exhaustiva contra copia literal del codigo viejo antes de sustituir.
+- **`substring` vs `slice` con indice -1 NO son equivalentes**: `substring(0,-1)` → `''`; `slice(0,-1)` → recorta el ultimo caracter.
+
+## Mesa/Cobros — Modulos con contrato congelado en tests
+
+- **`src/lib/mesa/vista-mesa.ts`** — que pantalla ve el comensal (`vistaParaMesa`). Las 4 reglas son MUTUAMENTE EXCLUYENTES: aqui el orden NO es contrato (al reves que en `banner-visibilidad.ts` — no asumir lo mismo). 31 tests en `tests/compliance/mesa-vista.test.ts`.
+- **`usePagoDeMesa`** (en `mesa-orders-client.tsx`) — dueno de TODO el estado de cobro (locks, mismatch, division, Redsys, bfcache). Depende solo de mesaId/sessionData/setSessionData/refresh. El estado de cobro nuevo va AQUI, no en el componente.
+- **`src/lib/waiter/cierre-al-salir.ts`** — que comandas se cierran al cerrar la pestana de barra. El envio (`parchearAlSalir`, `keepalive`) es fuego y olvido: NO verificable; la decision si (15 tests). Heredado y congelado: un pedido enteramente servido sin cuenta atras corriendo NO se cierra al salir.
+- **`DatosDelComensal`** (en `cart-drawer.tsx`) — **RGPD: en modo mesa NO se piden datos personales** (la mesa ya identifica el pedido). Invertir la condicion no rompe nada visible y pone la tienda a recoger PII de comensales. 12 tests UI que comprueban AUSENCIA de campos (`tests/ui/datos-del-comensal.test.tsx`).
+
 ## WaiterBanner — Re-autenticacion sin recarga
 
 `WaiterLoginForm.handlePinSubmit` dispara `window.dispatchEvent(new CustomEvent('waiter-auth-changed'))` al hacer login. `WaiterBanner` escucha ese evento y re-llama `/api/waiter/me`.
