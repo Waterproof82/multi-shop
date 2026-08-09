@@ -42,6 +42,44 @@ function buildAeatUrl(nif: string, cobro: TpvCobro): string {
   return `https://www2.agenciatributaria.gob.es/wlpl/TIKE-CONT/ValidarQR?${params.toString()}`;
 }
 
+/**
+ * La pantalla de confirmación tiene TRES estados, no dos booleanos.
+ *
+ * Estaban expresados como `esOffline ? … : esParcial ? … : …` repetido tres
+ * veces (anillo, icono y título), y desanidar cada ternario por separado habría
+ * dejado la misma idea repartida en tres sitios. El estado existía; solo le
+ * faltaba nombre.
+ *
+ * El orden importa: offline gana sobre parcial. Un cobro parcial que además está
+ * encolado debe avisar de que NO ha salido de la máquina — es lo que el cajero
+ * necesita saber antes que ninguna otra cosa.
+ */
+type EstadoConfirmacion = 'offline' | 'parcial' | 'completo';
+
+function estadoConfirmacion(esOffline: boolean, esParcial: boolean): EstadoConfirmacion {
+  if (esOffline) return 'offline';
+  if (esParcial) return 'parcial';
+  return 'completo';
+}
+
+const APARIENCIA: Record<EstadoConfirmacion, { anillo: string; icono: string; titulo: string }> = {
+  offline: {
+    anillo: 'bg-[#f59e0b22] border-[#f59e0b]',
+    icono: '~',
+    titulo: 'Cobro en cola offline',
+  },
+  parcial: {
+    anillo: 'bg-[#f9731622] border-[#f97316]',
+    icono: '½',
+    titulo: 'Cobro parcial registrado',
+  },
+  completo: {
+    anillo: 'bg-[#22c55e22] border-[#22c55e]',
+    icono: '✓',
+    titulo: '¡Cobrado!',
+  },
+};
+
 export function CobroConfirmado({
   totalFinalCents,
   metodo,
@@ -101,13 +139,15 @@ export function CobroConfirmado({
     void print(ticket);
   }
 
+  const apariencia = APARIENCIA[estadoConfirmacion(esOffline, esParcial)];
+
   return (
     <div className="flex items-start justify-center w-full h-full overflow-y-auto py-8">
       <div className="flex flex-col items-center gap-6 max-w-sm w-full">
-        <div className={`w-20 h-20 rounded-full flex items-center justify-center text-4xl border-2 ${esOffline ? 'bg-[#f59e0b22] border-[#f59e0b]' : esParcial ? 'bg-[#f9731622] border-[#f97316]' : 'bg-[#22c55e22] border-[#22c55e]'}`}>
-          {esOffline ? '~' : esParcial ? '½' : '✓'}
+        <div className={`w-20 h-20 rounded-full flex items-center justify-center text-4xl border-2 ${apariencia.anillo}`}>
+          {apariencia.icono}
         </div>
-        <h2 className="text-2xl font-bold">{esOffline ? 'Cobro en cola offline' : esParcial ? 'Cobro parcial registrado' : '¡Cobrado!'}</h2>
+        <h2 className="text-2xl font-bold">{apariencia.titulo}</h2>
         {esOffline && (
           <p className="text-xs text-[#f59e0b] text-center">
             Sin conexión — se sincronizará automáticamente al recuperar la red.
@@ -171,6 +211,13 @@ export function CobroConfirmado({
           {/* Item lines — shown when detalleItems is available */}
           {cobro?.detalleItems && cobro.detalleItems.length > 0 && (
             <div className="border-t border-[#e2e8f0] pt-3">
+              {/*
+                NOSONAR(S6479) — el índice como key es CORRECTO aquí. Son las
+                líneas de un cobro YA EMITIDO: no tienen id, el mismo producto
+                puede repetirse, y la lista es inmutable por definición legal —
+                un ticket emitido no se reordena. Ver mismo criterio en
+                `HistorialClient.tsx`.
+              */}
               {cobro.detalleItems.map((item, i) => (
                 <div key={i} className="flex justify-between text-xs text-[#6b7280]">
                   <span>{item.cantidad}x {item.nombre}</span>

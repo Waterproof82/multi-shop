@@ -141,6 +141,21 @@ export class BrowserPrinter implements ThermalPrinter {
     // painted before the print dialog opens — otherwise it renders blank.
     await new Promise<void>((resolve) => {
       win.addEventListener('load', () => resolve(), { once: true });
+      // NOSONAR(S1874) — `document.write` está deprecado, y aquí se queda.
+      //
+      // Esta clase NO es un fallback: `usePrinter` la instancia directa, así que
+      // es la que saca TODOS los tickets fiscales. La alternativa moderna (Blob +
+      // `URL.createObjectURL` y navegar la ventana) cambia el camino de carga y
+      // cómo interactúa con el bloqueador de ventanas emergentes.
+      //
+      // Y el bloque de abajo demuestra que esto ya se afinó contra navegadores
+      // reales: el `readyState === 'complete'` existe porque alguien se encontró
+      // con que el evento `load` llegaba antes de tiempo. Reescribirlo sin una
+      // impresora delante es cambiar código probado en producción por código que
+      // solo he leído.
+      //
+      // Migrarlo es una tarea legítima, pero necesita verificación manual con una
+      // impresora térmica real. Anotado en `docs/context/electron-tpv.md`.
       win.document.write(html);
       win.document.close();
       // Fallback: if load already fired (some browsers do this synchronously)
