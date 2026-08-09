@@ -770,7 +770,7 @@ PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test e2e/waiter-csrf.sp
 PLAYWRIGHT_BASE_URL=... NEXT_PUBLIC_SUPABASE_URL=... NEXT_PUBLIC_SUPABASE_ANON_KEY=... npx playwright test e2e/waiter-csrf.spec.ts
 ```
 
-Los tests 4 y 5 (CSRF con token válido) requieren `PLAYWRIGHT_WAITER_TOKEN` — se omiten con skip si no está definido.
+Los tests 4 y 5 (CSRF con token válido) requieren `PLAYWRIGHT_WAITER_PIN`: el `waiter_token` se obtiene haciendo login con el PIN en el `beforeAll`, no se pasa como secreto.
 
 ---
 

@@ -115,9 +115,9 @@ test.describe('Routing — auth barrier (sin vars de entorno)', () => {
   });
 
   test('POST /api/waiter/mesa con waiter_token pero sin csrf_token → 403 (regresión)', async () => {
-    const token = process.env.PLAYWRIGHT_WAITER_TOKEN ?? sessionWaiterToken;
+    const token = sessionWaiterToken;
     if (!token) {
-      test.skip(true, 'PLAYWRIGHT_WAITER_TOKEN o PLAYWRIGHT_WAITER_PIN no definido');
+      test.skip(true, 'PLAYWRIGHT_WAITER_PIN no definido — sin login no hay waiter_token');
       return;
     }
     const res = await request.post('/api/waiter/mesa', {
@@ -146,9 +146,9 @@ test.describe('Routing — auth barrier (sin vars de entorno)', () => {
   });
 
   test('POST /api/waiter/mesas/{id}/close con token pero sin csrf_token → 403 (regresión)', async () => {
-    const token = process.env.PLAYWRIGHT_WAITER_TOKEN ?? sessionWaiterToken;
+    const token = sessionWaiterToken;
     if (!token) {
-      test.skip(true, 'PLAYWRIGHT_WAITER_TOKEN o PLAYWRIGHT_WAITER_PIN no definido');
+      test.skip(true, 'PLAYWRIGHT_WAITER_PIN no definido — sin login no hay waiter_token');
       return;
     }
     const res = await request.post('/api/waiter/mesas/00000000-0000-0000-0000-000000000001/close', {
@@ -158,9 +158,9 @@ test.describe('Routing — auth barrier (sin vars de entorno)', () => {
   });
 
   test('POST /api/waiter/mesas/{id}/open con token pero sin csrf_token → 403 (regresión)', async () => {
-    const token = process.env.PLAYWRIGHT_WAITER_TOKEN ?? sessionWaiterToken;
+    const token = sessionWaiterToken;
     if (!token) {
-      test.skip(true, 'PLAYWRIGHT_WAITER_TOKEN o PLAYWRIGHT_WAITER_PIN no definido');
+      test.skip(true, 'PLAYWRIGHT_WAITER_PIN no definido — sin login no hay waiter_token');
       return;
     }
     const res = await request.post('/api/waiter/mesas/00000000-0000-0000-0000-000000000001/open', {
