@@ -35,6 +35,7 @@
 import { useCallback, useMemo, useEffect, useRef, useState, useReducer } from 'react';
 import { Wine, ChevronLeft, ChevronDown, ChevronsUpDown, Table2, CheckCheck, Trash2, Layers } from 'lucide-react';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
+import { pedidosCompletosAlSalir, estadoAlCerrarPedido } from '@/lib/waiter/cierre-al-salir';
 
 const STORAGE_KEY = 'bar_served_keys';
 
@@ -60,6 +61,31 @@ function clearServedKeysForOrder(orderId: string) {
     const updated = new Set([...existing].filter(k => !k.startsWith(`${orderId}:`)));
     persistServedKeys(updated);
   } catch { /* ignore */ }
+}
+
+/**
+ * PATCH disparado mientras la pestana se esta cerrando.
+ *
+ * `keepalive` es fuego y olvido: el navegador lo intenta despues de que la
+ * pagina muera, pero **no hay respuesta que comprobar, ni reintento, ni forma de
+ * saber si llego**. Por eso la marca optimista se persiste en local ANTES de
+ * llamar aqui, y por eso la unica parte verificable de todo el cierre es la
+ * decision (`@/lib/waiter/cierre-al-salir`), no el envio.
+ *
+ * No confundir con `fetchWithCsrf`: aquel vive en una pagina viva y puede
+ * reaccionar al resultado. Este no.
+ */
+function parchearAlSalir(url: string, estado: 'anotado' | 'servido') {
+  const csrf = getCsrfToken();
+  fetch(url, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(csrf ? { 'x-csrf-token': csrf } : {}),
+    },
+    body: JSON.stringify({ estado }),
+    keepalive: true,
+  }).catch(() => {});
 }
 
 const COUNTDOWN_SECONDS = 5;
@@ -449,48 +475,22 @@ export default function BarPage() {
         const current = loadServedKeys();
         for (const [key, item] of pending.entries()) {
           current.add(key);
-          const csrfTkn = getCsrfToken();
-          fetch(`/api/waiter/kitchen/items/${encodeURIComponent(item.orderId)}/${item.detallePedidoIdx}/status`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(csrfTkn ? { 'x-csrf-token': csrfTkn } : {}),
-            },
-            body: JSON.stringify({ estado: 'servido' }),
-            keepalive: true,
-          }).catch(() => {});
+          parchearAlSalir(
+            `/api/waiter/kitchen/items/${encodeURIComponent(item.orderId)}/${item.detallePedidoIdx}/status`,
+            'servido',
+          );
         }
         persistServedKeys(current);
       }
 
       // Fire PATCH only for orders where ALL items are now covered (pending + already served)
-      const byOrder = new Map<string, { count: number; total: number }>();
-      for (const item of pending.values()) {
-        const e = byOrder.get(item.orderId);
-        byOrder.set(item.orderId, { count: (e?.count ?? 0) + 1, total: item.totalInOrder });
-      }
-      for (const k of served) {
-        const oid = k.substring(0, k.lastIndexOf(':'));
-        const e = byOrder.get(oid);
-        if (e) byOrder.set(oid, { ...e, count: e.count + 1 });
-      }
-
-      for (const [orderId, { count, total }] of byOrder) {
-        if (count >= total) {
-          const order = ordersRef.current.find(o => o.id === orderId);
-          const nuevoEstado = order?.hasComida ? 'anotado' : 'servido';
-          clearServedKeysForOrder(orderId);
-          const csrfTknOrder = getCsrfToken();
-          fetch(`/api/waiter/orders/${encodeURIComponent(orderId)}/status`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(csrfTknOrder ? { 'x-csrf-token': csrfTknOrder } : {}),
-            },
-            body: JSON.stringify({ estado: nuevoEstado }),
-            keepalive: true,
-          }).catch(() => {});
-        }
+      for (const orderId of pedidosCompletosAlSalir([...pending.values()], served)) {
+        const order = ordersRef.current.find(o => o.id === orderId);
+        clearServedKeysForOrder(orderId);
+        parchearAlSalir(
+          `/api/waiter/orders/${encodeURIComponent(orderId)}/status`,
+          estadoAlCerrarPedido(order?.hasComida ?? false),
+        );
       }
     };
 

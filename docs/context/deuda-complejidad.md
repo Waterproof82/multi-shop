@@ -1,15 +1,17 @@
-# Deuda de complejidad cognitiva — plan pendiente
+# Complejidad cognitiva — cómo se cerró y cómo no volver
 
 Estado a 2026-08-09.
 
-**1 función** sigue por encima del umbral de complejidad cognitiva 15 (regla
-SonarQube S3776), de las 15 que había al empezar. Se cerraron el bloque backend,
-`proxy.ts`, y trece componentes de React en agosto de 2026 — entre ellos
-`mesa-orders-client` (78, la peor del repo) y `cart-drawer`, que llevaba dos
-intentos fallidos.
+**Cero funciones** por encima del umbral de complejidad cognitiva 15 (regla
+SonarQube S3776), de las 15 que había al empezar.
 
-La que queda, `waiter/bar`, **pide sesión propia**, y el porqué está al final del
-documento.
+Este documento ya no es un plan pendiente: es **cómo medir y qué patrones
+funcionaron**, para que la próxima que aparezca se cierre en una tarde y no en
+once sesiones. Léelo entero antes de tocar la primera línea de cualquier función
+que vuelva a pasar de 15.
+
+Lo último en caer fue el `beforeunload` de `/waiter/bar` (21), que era código de
+resiliencia offline y llevaba tres iteraciones aparcado por eso.
 
 ---
 
@@ -289,18 +291,14 @@ de la función que se elige.
 
 ## Lo que queda (2026-08-09)
 
-```
-21  src/app/waiter/bar/page.tsx:441              DELICADA — beforeunload offline
-```
+Nada por encima del umbral.
 
-Y una deuda de diseño que este refactor dejó anotada en vez de resolver: la
-sección de pago de `mesa-orders-client` sigue dentro del componente porque
-sacarla bien pide un hook `usePagoDeMesa`. Ver más arriba.
+Sí queda **una deuda de diseño** que estos refactors anotaron en vez de resolver:
+la sección de pago de `mesa-orders-client` sigue dentro del componente porque
+sacarla bien pide un hook `usePagoDeMesa`. Ver más arriba. No es complejidad
+medida — es una responsabilidad en el sitio equivocado, y merece su propio PR.
 
-Los números de línea se mueven en cuanto alguien toca el fichero. **Medir antes
-de ir a buscarlos.**
-
-### El patrón que ha funcionado en las once cerradas
+### El patrón que ha funcionado en las quince cerradas
 
 1. **Un ternario anidado casi siempre es un ESTADO SIN NOMBRE.** No lo desanides
    rama a rama: eso deja la misma idea repartida. Dale un tipo (`type Estado =
@@ -345,25 +343,52 @@ de campos — que es justo lo que ningún test de "se ve bien" comprueba nunca.
 
 Los 12 tests están verificados por mutación: invirtiendo la condición fallan 11.
 
-### La delicada que queda — leer esto antes de tocarla
+### `waiter/bar` — de 21 a bajo umbral (2026-08-09)
 
-**`waiter/bar:441`** es un `beforeunload` que persiste comandas en vuelo y
-dispara un PATCH por ítem. Es código de resiliencia offline: lo que se pierda
-ahí son comandas reales que el cocinero no ve. Antes de refactorizarlo hay que
-entender qué garantiza hoy —y qué no— sobre pestañas que se cierran a media
-operación. Ver [`offline-y-resiliencia.md`](./offline-y-resiliencia.md).
+La última, y la que llevaba tres iteraciones aparcada por delicada: un
+`beforeunload` que persiste comandas en vuelo y dispara PATCH por ítem. Lo que se
+pierda ahí son bebidas reales que el sistema da por servidas sin estarlo.
 
-**No la metas en el mismo PR que otra cosa.**
+**Lo que había que entender antes de tocar**, y que ahora está escrito en el
+código: la ejecución usa `keepalive`, que es **fuego y olvido**. El navegador
+intenta la petición después de que la página muera, pero no hay respuesta que
+comprobar, ni reintento, ni forma de saber si llegó. La marca optimista se
+persiste en `localStorage` **antes** de disparar. Es decir: **la única parte de
+todo el cierre que se puede verificar es la decisión, no el envío.**
 
-El orden que funcionó en `mesa-orders-client`, que era la otra delicada, y que
-vale igual aquí:
+Por eso el refactor separa exactamente eso. `src/lib/waiter/cierre-al-salir.ts`
+decide qué pedidos quedan completos; `parchearAlSalir()` los manda. 15 tests
+sobre la decisión; el envío queda documentado como no verificable, que es más
+honesto que fingir que se prueba.
 
-1. Medir con umbral 0 **antes de leer el código**. Ahorra justo el trabajo que no
-   sirve: allí descartó de golpe los veinte efectos, que era donde parecía estar
-   la dificultad.
-2. Extraer primero la decisión **pura**, probarla en `unit`, y **demostrar la
-   equivalencia con el código viejo sobre todas las combinaciones** antes de
-   sustituirlo. En una pantalla que toca dinero, los tests de caracterización
-   dicen que lo nuevo hace lo que quisiste; la equivalencia exhaustiva dice que
-   hace lo que hacía.
-3. Solo después, sacar lo que solo pinta.
+**Un `substring` que casi se convierte en `slice`.** Al extraer
+`pedidoDeClave()` usé `slice` por costumbre. Sin `:` en la clave el índice es
+`-1`, y ahí **no son equivalentes**: `substring` lo trunca a 0 y devuelve cadena
+vacía —lo que hacía el original—; `slice` cuenta desde el final y devuelve la
+clave sin su último carácter, un id inventado que no casa con ningún pedido.
+Lo cazó el test que había escrito *antes* de mirar la implementación. Sin ese
+test, el cambio era invisible y el fallo aparecería solo con datos raros.
+
+**Dos comportamientos heredados congelados sin corregir:**
+
+1. **Un pedido enteramente servido, sin ninguna cuenta atrás corriendo, NO se
+   cierra.** La agrupación se siembra solo con los ítems en vuelo, y los
+   servidos únicamente suman a pedidos ya presentes. Si el camarero sirve todo y
+   después cierra la pestaña, el PATCH de pedido no sale y el pedido se queda
+   abierto en el servidor. Es lo que hacía el `if (e)` original.
+2. **El total lo fija el último ítem en vuelo de ese pedido**, no el mayor ni el
+   primero, porque el bucle lo sobrescribe en cada vuelta.
+
+### El orden que funcionó en las dos delicadas
+
+1. Medir con umbral 0 **antes de leer el código**. En `mesa-orders-client`
+   descartó de golpe los veinte efectos, que era donde parecía estar la
+   dificultad.
+2. Extraer primero la decisión **pura** y probarla en `unit`. Escribir el test
+   **antes** de mirar cómo está implementada: así el test describe el
+   comportamiento, no la implementación — y es lo que cazó el `substring`.
+3. Cuando toca dinero, además **demostrar la equivalencia con el código viejo
+   sobre todas las combinaciones** antes de sustituirlo. Los tests de
+   caracterización dicen que lo nuevo hace lo que quisiste; la equivalencia
+   exhaustiva dice que hace lo que hacía.
+4. Solo después, sacar lo que solo pinta o solo envía.
