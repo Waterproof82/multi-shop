@@ -2,12 +2,13 @@
 
 Estado a 2026-08-09.
 
-**3 funciones** siguen por encima del umbral de complejidad cognitiva 15 (regla
+**2 funciones** siguen por encima del umbral de complejidad cognitiva 15 (regla
 SonarQube S3776), de las 15 que había al empezar. Se cerraron el bloque backend,
-`proxy.ts`, y once componentes de React en agosto de 2026.
+`proxy.ts`, y doce componentes de React en agosto de 2026 — la última,
+`mesa-orders-client` (78, la peor del repo).
 
-Ninguna está bloqueada: el harness de React existe (ver más abajo). **Dos de las
-tres piden sesión propia**, y el porqué está al final del documento.
+Ninguna está bloqueada: el harness de React existe (ver más abajo). **La de
+`waiter/bar` pide sesión propia**, y el porqué está al final del documento.
 
 ---
 
@@ -62,10 +63,23 @@ Dos detalles que no son evidentes y cambian cómo se lee la salida:
 - **El plugin de ESLint mide cada función POR SEPARADO.** La complejidad de una
   función anidada NO suma a la de su contenedora. Si un componente marca 16 y
   tiene dentro un handler de 10, ese 16 es todo suyo: sacar el handler no moverá
-  la aguja.
-- **Los condicionales del JSX (`{x && <p/>}`) no cuentan.** Por eso `cart-drawer`
-  se atascó (ver más abajo): se extrajeron seis piezas de JSX y el número no se
-  movió.
+  la aguja. Comprobado en seco: una contenedora cuyo único contenido es un
+  handler con tres `if` anidados marca **0**, y el handler marca 6.
+- **En JSX solo cuentan los ternarios, y valen 1 punto cada uno.** `{x && <p/>}`
+  cuesta **0**; `{x ? <p/> : <q/>}` cuesta **1**. Un ternario dentro de otro paga
+  el anidamiento; dentro de un `&&` no. Por eso `cart-drawer` se atascó: se
+  extrajeron seis piezas de JSX que no llevaban ternarios dentro.
+- **Un `.map()` o un IIFE en medio del JSX es una función anidada**, así que sus
+  ternarios NO cuentan para el componente. Al contar candidatos a mano, descartar
+  todo lo que esté dentro de un callback: en `mesa-orders-client` eran 47
+  ternarios en bruto y solo ~18 contaban.
+
+> **Cuidado al medir por trozos.** Recortar un fichero y medir la diferencia
+> parece que atribuye complejidad a cada zona, y no es fiable: en
+> `mesa-orders-client` dos recortes disjuntos sumaban 103 puntos sobre un total
+> de 78. El refactor real confirmó uno de los dos y desmintió el otro. Sirve para
+> saber **dónde mirar**, no para presupuestar. Lo que sí es fiable es medir el
+> fichero entero después de cada extracción.
 
 ---
 
@@ -172,6 +186,54 @@ bug hoy, y las dos están congeladas para que no cuesten una tarde:
 
 ---
 
+### `mesa-orders-client.tsx` — de 78 a 14 (2026-08-09)
+
+La peor del repo, y la que decide qué ve el comensal cuando paga. Se hizo en dos
+commits, midiendo entre medias: **78 → 28 → 14**.
+
+**Dónde estaba.** Midiendo con umbral 0, las otras 100 funciones del fichero
+estaban sanas (máximo 15). Y dentro del componente, los **veinte `useEffect`**
+—bfcache, `popstate`, Realtime, locks de pago, recuperación tras volver de
+Redsys— sumaban **3 puntos entre todos**. Toda la deuda estaba en dos sitios:
+elegir pantalla y pintarla. Vale la pena decirlo porque la intuición dice lo
+contrario: los efectos parecen lo difícil, y no lo eran.
+
+**Primer commit — la decisión.** El componente no es una pantalla, son cinco, y
+elegía con cuatro `if (...) return <Vista/>` seguidos. Extraído a
+`src/lib/mesa/vista-mesa.ts` como tabla de reglas que devuelve **la vista**
+(`'esperando-cobro-propio'`), no un booleano. Pintar es de `VistaDeTurno`.
+
+**A diferencia del `waiter-banner`, aquí el orden de las reglas NO es contrato**:
+las cuatro son mutuamente excluyentes y hay un test que lo comprueba. Se dice
+explícitamente en el módulo porque quien venga del banner va a asumir lo
+contrario y va a evitar tocarlo por miedo.
+
+Antes de sustituir nada se comprobó la equivalencia con las cuatro guardas
+originales sobre **las 660 combinaciones** de sesión, turno, modo camarero y
+panel oculto: 0 divergencias. La sonda se borró después; lo que queda son los 31
+tests de caracterización.
+
+Dos comportamientos heredados congelados sin corregir:
+
+1. Con un `activeTurnoId` obsoleto y otro comensal seleccionando, se ve **la
+   cuenta completa** en vez de la pantalla de espera. La auto-limpieza no rescata
+   el caso: solo limpia turnos pagados o cancelados.
+2. La regla de espera no exige sesión cargada; las otras tres sí. Hoy es inocua.
+
+**Segundo commit — lo que solo pinta.** Cinco piezas fuera, todas por el mismo
+criterio: cada una nombraba un estado resuelto con un ternario suelto.
+`TotalDeLaCuenta` (el pie son dos cifras distintas según haya cobro parcial),
+`BotonDePago` (el mismo ternario carga/contenido repetido tres veces),
+`ModalBorrarItem` (dos pantallas: el aviso de "ya preparado" y el selector de
+unidades), `ProgresoDeDivision`, y el tipo inline del `useState`.
+
+**Lo que NO se hizo, y por qué.** Extraer la sección de pago entera (424 líneas)
+habría necesitado **25 props**. Un componente con 25 props no es un componente,
+es un pliegue de código: mueve el número sin mejorar nada. Partirla de verdad
+pide un hook `usePagoDeMesa` que posea el estado de cobro y los handlers, y eso
+es un cambio de diseño con PR propio — el mismo criterio que se aplicó a
+`cart-drawer`.
+
 ## Patrones que han funcionado
 
 Extraídos del bloque backend ya cerrado. Reutilizables.
@@ -223,10 +285,13 @@ de la función que se elige.
 ## Lo que queda (2026-08-09)
 
 ```
-78  src/components/mesa-orders-client.tsx:1281   DELICADA — la cuenta del comensal
 21  src/app/waiter/bar/page.tsx:441              DELICADA — beforeunload offline
 17  src/components/cart-drawer.tsx:1004          intentada, NO conseguida
 ```
+
+Y una deuda de diseño que este refactor dejó anotada en vez de resolver: la
+sección de pago de `mesa-orders-client` sigue dentro del componente porque
+sacarla bien pide un hook `usePagoDeMesa`. Ver más arriba.
 
 Los números de línea se mueven en cuanto alguien toca el fichero. **Medir antes
 de ir a buscarlos.**
@@ -263,7 +328,7 @@ Antes de reintentarlo: medir con umbral 0 y comprobar que sigue siendo así. Si 
 único camino es partir el componente en dos por responsabilidad (carrito vs.
 datos de entrega), eso es un cambio de diseño y merece su propio PR.
 
-### Las dos delicadas — leer esto antes de tocarlas
+### La delicada que queda — leer esto antes de tocarla
 
 **`waiter/bar:441`** es un `beforeunload` que persiste comandas en vuelo y
 dispara un PATCH por ítem. Es código de resiliencia offline: lo que se pierda
@@ -271,15 +336,17 @@ ahí son comandas reales que el cocinero no ve. Antes de refactorizarlo hay que
 entender qué garantiza hoy —y qué no— sobre pestañas que se cierran a media
 operación. Ver [`offline-y-resiliencia.md`](./offline-y-resiliencia.md).
 
-**`mesa-orders-client:1281`** (78) es la pantalla donde el comensal paga.
-El orden que ha funcionado en todo lo demás:
+**No la metas en el mismo PR que otra cosa.**
 
-1. Extraer primero las funciones **puras** —cálculos de totales, agrupaciones,
-   decisiones de visibilidad—. Se prueban sin montar nada, y el harness de
-   `tests/ui/` ya existe para lo que sí necesite render.
-2. Decidir **qué comportamiento cubrir** antes de mover código. No es "tests de
-   componentes" en abstracto: qué se muestra según el estado de la sesión, qué
-   pasa al pulsar pagar, cómo reacciona a un evento de Realtime. Esa decisión es
-   de producto tanto como técnica.
+El orden que funcionó en `mesa-orders-client`, que era la otra delicada, y que
+vale igual aquí:
 
-**No las metas en el mismo PR que otra cosa.**
+1. Medir con umbral 0 **antes de leer el código**. Ahorra justo el trabajo que no
+   sirve: allí descartó de golpe los veinte efectos, que era donde parecía estar
+   la dificultad.
+2. Extraer primero la decisión **pura**, probarla en `unit`, y **demostrar la
+   equivalencia con el código viejo sobre todas las combinaciones** antes de
+   sustituirlo. En una pantalla que toca dinero, los tests de caracterización
+   dicen que lo nuevo hace lo que quisiste; la equivalencia exhaustiva dice que
+   hace lo que hacía.
+3. Solo después, sacar lo que solo pinta.
