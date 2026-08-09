@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getCsrfToken } from '@/lib/csrf-client';
+import { refTicketVisible } from '@/lib/tpv/ticket-ref';
 
 interface PedidoItem {
   nombre: string;
@@ -90,11 +91,6 @@ function fmtDate(iso: string): string {
 
 type Tab = 'pedidos' | 'cobros';
 
-/** Referencia visible de un ticket: `SERIE-000123`. */
-function refTicket(serie: string, numeroTicket: number): string {
-  return `${serie}-${String(numeroTicket).padStart(6, '0')}`;
-}
-
 /**
  * Ticket que anula un rectificativo, o `null` si no hay ninguno.
  *
@@ -106,10 +102,10 @@ function refTicket(serie: string, numeroTicket: number): string {
 function etiquetaOriginal(c: CobroRow, cobros: readonly CobroRow[]): string | null {
   if (c.rectificaCobroId !== null) {
     const enLista = cobros.find(o => o.id === c.rectificaCobroId);
-    if (enLista) return refTicket(enLista.serie, enLista.numeroTicket);
+    if (enLista) return refTicketVisible(enLista.serie, enLista.numeroTicket);
   }
   if (c.originalTicket) {
-    return `${refTicket(c.originalTicket.serie, c.originalTicket.numeroTicket)} (otro turno)`;
+    return `${refTicketVisible(c.originalTicket.serie, c.originalTicket.numeroTicket)} (otro turno)`;
   }
   return null;
 }
@@ -168,7 +164,7 @@ function CobrosList({ cobros }: Readonly<{ cobros: CobroRow[] }>) {
         return (
           <div key={c.id} className="bg-white border border-[#e2e8f0] rounded-xl px-4 py-3 flex items-center gap-4 shadow-sm">
             <span className="font-mono text-xs text-[#64748b] w-20 shrink-0">
-              {refTicket(c.serie, c.numeroTicket)}
+              {refTicketVisible(c.serie, c.numeroTicket)}
             </span>
             <span className="text-xs text-[#64748b] shrink-0 w-10">
               {fmtTime(c.cobradoAt)}
