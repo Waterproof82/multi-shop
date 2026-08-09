@@ -1497,6 +1497,300 @@ function ModalBorrarItem({ item, cantidad, borrando, onCerrar, onCantidad, onAsu
 }
 
 /**
+ * Todo el estado de COBRO de la mesa, en un solo sitio.
+ *
+ * Estaba disperso en nueve `useState`, dos `useRef`, tres efectos y siete
+ * manejadores dentro de `MesaOrdersClient`. No era complejidad medida —el
+ * componente estaba bajo umbral— pero hacia imposible extraer la seccion de
+ * pago: necesitaba 25 props, y un componente con 25 props no es un componente.
+ *
+ * Depende de cuatro cosas de fuera y ninguna es de cobro: la mesa, la sesion
+ * cargada, como actualizarla y como recargarla. Esa es la costura.
+ */
+function usePagoDeMesa({ mesaId, sessionData, setSessionData, refresh }: Readonly<{
+  mesaId: string;
+  sessionData: MesaSessionData | null;
+  setSessionData: React.Dispatch<React.SetStateAction<MesaSessionData | null>>;
+  refresh: () => Promise<void>;
+}>) {
+  const [paying, setPaying] = useState(false);
+  const [settingDivision, setSettingDivision] = useState(false);
+  const [cancellingDivision, setCancellingDivision] = useState(false);
+  const [manualPaying, setManualPaying] = useState(false);
+  const [verifyingTotal, setVerifyingTotal] = useState(false);
+  const [showDivisionModal, setShowDivisionModal] = useState(false);
+  const [showDivisionTypeModal, setShowDivisionTypeModal] = useState(false);
+  // Se restauran de sessionStorage: ambos tienen que sobrevivir a la vuelta de
+  // Redsys y al boton de atras.
+  const [totalMismatch, setTotalMismatch] = useState<{
+    oldTotal: number;
+    newTotal: number;
+    pendingAction: PendingAction;
+  } | null>(() => getStoredMismatch(mesaId));
+  const [isInitiatingPayment, setIsInitiatingPayment] = useState(() => getStoredPaymentLock(mesaId));
+
+  const releaseCheckoutLock = useCallback(() => {
+    setIsInitiatingPayment(false);
+    try {
+      sessionStorage.removeItem(`mesa-lock-${mesaId}`);
+      sessionStorage.removeItem(`mesa-mismatch-${mesaId}`);
+    } catch { /* ignore */ }
+    void fetch(`/api/mesas/${encodeURIComponent(mesaId)}/lock`, { method: 'DELETE' }).catch(() => null);
+  }, [mesaId]);
+
+  // Refs to read current state in the unmount cleanup (avoids stale closures)
+  const isInitiatingPaymentRef = useRef(isInitiatingPayment);
+  const payingRef = useRef(paying);
+  useEffect(() => { isInitiatingPaymentRef.current = isInitiatingPayment; }, [isInitiatingPayment]);
+  useEffect(() => { payingRef.current = paying; }, [paying]);
+
+  // If the payer navigates away while owning the lock (but before reaching Redsys),
+  // release the lock so others aren't stuck. If paying=true, they're at Redsys — keep the lock.
+  useEffect(() => {
+    return () => {
+      if (isInitiatingPaymentRef.current && !payingRef.current) {
+        try { sessionStorage.removeItem(`mesa-lock-${mesaId}`); } catch { /* */ }
+        void fetch(`/api/mesas/${encodeURIComponent(mesaId)}/lock`, { method: 'DELETE' }).catch(() => null);
+      }
+    };
+  }, [mesaId]);
+
+  // On mount: if isInitiatingPayment is still true it means the user had navigated to
+  // Redsys (paying=true kept the lock) and then did a full-page back navigation.
+  // Release the stale lock immediately so the ticket is usable again.
+  useEffect(() => {
+    if (isInitiatingPayment) {
+      releaseCheckoutLock();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // On mount: if there is a stored division paymentOrderRef from a previous payment
+  // attempt, release that pending slot. Covers two cases:
+  //   1. User cancelled at Redsys (urlKo redirect back to this page).
+  //   2. User silently abandoned (closed the app, lost connectivity).
+  // The update is atomic (WHERE status='pending') — a no-op if the webhook
+  // already marked the row as 'paid' or 'failed'.
+  useEffect(() => {
+    const storedRef = (() => {
+      try { return sessionStorage.getItem(`mesa-division-ref-${mesaId}`); }
+      catch { return null; }
+    })();
+    if (!storedRef) return;
+    void fetch(`/api/mesas/${encodeURIComponent(mesaId)}/division-slot`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentOrderRef: storedRef }),
+    }).then(() => {
+      try { sessionStorage.removeItem(`mesa-division-ref-${mesaId}`); } catch { /* ignore */ }
+    }).catch(() => { /* non-blocking */ });
+  }, [mesaId]);
+
+  const handleRedsys409 = (
+    body: { code?: string; newTotalCents?: number },
+    esDivision: boolean,
+  ) => {
+    if (body.code === 'ALREADY_PAID') {
+      releaseCheckoutLock();
+      setPaying(false);
+      void refresh();
+      return;
+    }
+    const mismatch = buildTotalMismatch(body, sessionData?.total ?? 0, esDivision);
+    if (mismatch) {
+      setSessionData(prev => prev ? { ...prev, total: mismatch.newTotal } : prev);
+      setTotalMismatch(mismatch);
+      try { sessionStorage.setItem(`mesa-mismatch-${mesaId}`, JSON.stringify(mismatch)); } catch { /* ignore */ }
+    }
+    setPaying(false);
+  };
+
+  const handleRedsysSuccess = (
+    formData: { DS_MERCHANT_PARAMETERS: string; DS_SIGNATURE: string; DS_SIGNATURE_VERSION: string; paymentOrderRef?: string },
+    esDivision: boolean,
+  ) => {
+    if (esDivision && formData.paymentOrderRef) {
+      try { sessionStorage.setItem(`mesa-division-ref-${mesaId}`, formData.paymentOrderRef); } catch { /* ignore */ }
+    }
+    const redsysUrl = process.env.NEXT_PUBLIC_REDSYS_URL ?? 'https://sis-t.redsys.es:25443/sis/realizarPago';
+    submitRedsysForm(formData, redsysUrl);
+  };
+
+  const initiateRedsys = async (esDivision: boolean, expectedTotalCents?: number) => {
+    if (paying) return;
+    setPaying(true);
+    try {
+      const res = await fetch('/api/redsys/initiate-mesa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mesaId, esDivision, expectedTotalCents }),
+      });
+      if (res.status === 409) {
+        handleRedsys409(await res.json() as { code?: string; newTotalCents?: number }, esDivision);
+        return;
+      }
+      if (res.status === 423) {
+        releaseCheckoutLock();
+        setPaying(false);
+        void refresh();
+        return;
+      }
+      if (!res.ok) {
+        console.error('[initiateRedsys] API error', res.status, await res.text().catch(() => ''));
+        setPaying(false);
+        return;
+      }
+      handleRedsysSuccess(
+        await res.json() as { DS_MERCHANT_PARAMETERS: string; DS_SIGNATURE: string; DS_SIGNATURE_VERSION: string; paymentOrderRef?: string },
+        esDivision,
+      );
+    } catch (e) {
+      console.error('[initiateRedsys] exception', e);
+      setPaying(false);
+    }
+  };
+
+  const confirmarDivision = async (numPersonas: number) => {
+    setShowDivisionModal(false);
+    setSettingDivision(true);
+    try {
+      // Re-verify total hasn't changed while the modal was open
+      let verifiedTotal = sessionData?.total ?? 0;
+      const checkRes = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/orders`);
+      if (checkRes.ok) {
+        const fresh = await checkRes.json() as MesaSessionData;
+        const currentTotal = sessionData?.total ?? 0;
+        if (Math.abs(fresh.total - currentTotal) > 0.005) {
+          setSessionData(fresh);
+          const mismatch = { oldTotal: currentTotal, newTotal: fresh.total, pendingAction: 'division-modal' as PendingAction };
+          setTotalMismatch(mismatch);
+          try { sessionStorage.setItem(`mesa-mismatch-${mesaId}`, JSON.stringify(mismatch)); } catch { /* ignore */ }
+          return;
+        }
+        verifiedTotal = fresh.total;
+        setSessionData(fresh);
+      }
+      // Release the checkout lock BEFORE POSTing to /division.
+      // comprobarAntesDePagar sets pago_en_curso=true when acquiring the lock,
+      // and the division route rejects with 409 when pago_en_curso is active.
+      releaseCheckoutLock();
+      const divisionRes = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/division`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ numPersonas }),
+      });
+      if (!divisionRes.ok) return;
+      // Division is set — go straight to Redsys; no extra click needed.
+      void initiateRedsys(true, Math.max(1, Math.round(verifiedTotal * 100)));
+    } finally {
+      setSettingDivision(false);
+    }
+  };
+
+  const ejecutarAccionPendiente = (action: PendingAction) => {
+    setTotalMismatch(null);
+    try { sessionStorage.removeItem(`mesa-mismatch-${mesaId}`); } catch { /* ignore */ }
+    const expectedCents = getExpectedCents(sessionData);
+    if (action === 'full') {
+      void initiateRedsys(false, expectedCents);
+    } else if (action === 'division-modal') {
+      setShowDivisionModal(true);
+    } else {
+      void initiateRedsys(true, expectedCents);
+    }
+  };
+
+  const comprobarAntesDePagar = async (action: PendingAction) => {
+    if (paying || verifyingTotal) return;
+    setVerifyingTotal(true);
+    try {
+      // Acquire checkout lock — signals all other users on this mesa to redirect to ticket.
+      // Skip for division-pay: each share is independent and the DB-level mesa_division_pagos
+      // table already handles concurrency. Using a global lock would block simultaneous payers.
+      // Skip if we already own it (e.g. re-checking after a totalMismatch confirmation).
+      if (!isInitiatingPayment && action !== 'division-pay') {
+        const lockRes = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/lock`, { method: 'POST' });
+        if (lockRes.status === 423) {
+          void refresh();
+          return;
+        }
+        setIsInitiatingPayment(true);
+        try { sessionStorage.setItem(`mesa-lock-${mesaId}`, 'true'); } catch { /* ignore */ }
+      }
+      // Verify total against fresh DB state
+      const res = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/orders`);
+      if (!res.ok) { ejecutarAccionPendiente(action); return; }
+      const fresh = await res.json() as MesaSessionData;
+
+      // Guard: session may have been paid (e.g. waiter manual payment) while this
+      // user was going through the checkout flow — bail out and show the paid screen.
+      const freshFullyPaid = fresh.sesionPagada ||
+        (fresh.division ? fresh.division.pagosRealizados >= fresh.division.personas : false);
+      if (freshFullyPaid) {
+        setSessionData(fresh);
+        releaseCheckoutLock();
+        return;
+      }
+
+      const currentTotal = sessionData?.total ?? 0;
+      if (Math.abs(fresh.total - currentTotal) > 0.005) {
+        setSessionData(fresh);
+        const mismatch = { oldTotal: currentTotal, newTotal: fresh.total, pendingAction: action };
+        setTotalMismatch(mismatch);
+        try { sessionStorage.setItem(`mesa-mismatch-${mesaId}`, JSON.stringify(mismatch)); } catch { /* ignore */ }
+      } else {
+        setSessionData(fresh);
+        ejecutarAccionPendiente(action);
+      }
+    } catch {
+      ejecutarAccionPendiente(action);
+    } finally {
+      setVerifyingTotal(false);
+    }
+  };
+
+  const cancelarDivision = async () => {
+    setCancellingDivision(true);
+    try {
+      await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/division`, { method: 'DELETE' });
+      await refresh();
+    } finally {
+      setCancellingDivision(false);
+    }
+  };
+
+  const registrarPagoManual = async () => {
+    if (manualPaying) return;
+    setManualPaying(true);
+    try {
+      await fetchWithCsrf(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/manual-payment`, { method: 'POST' });
+      await refresh();
+    } finally {
+      setManualPaying(false);
+    }
+  };
+
+  /**
+   * Vuelta desde bfcache. En movil el navegador restaura la pagina de cache en
+   * vez de recargarla, asi que `paying` sigue en `true` y el spinner se queda
+   * girando para siempre. Solo devuelve el estado de COBRO a cero: el turno
+   * personalizado lo limpia quien lo posee.
+   */
+  const restablecerTrasBfcache = useCallback(() => {
+    setPaying(false);
+    if (isInitiatingPaymentRef.current) releaseCheckoutLock();
+  }, [releaseCheckoutLock]);
+
+  return {
+    paying, settingDivision, cancellingDivision, manualPaying, verifyingTotal,
+    showDivisionModal, showDivisionTypeModal, totalMismatch, isInitiatingPayment,
+    setShowDivisionModal, setShowDivisionTypeModal, setTotalMismatch,
+    releaseCheckoutLock, comprobarAntesDePagar, ejecutarAccionPendiente,
+    confirmarDivision, cancelarDivision, registrarPagoManual, restablecerTrasBfcache,
+  };
+}
+
+/**
  * Reparto de la cuenta a partes iguales: cuantos pagan, cuanto toca a cada uno
  * y cuantos han pagado ya. Solo pinta; quien decide si aparece es la cuenta.
  */
@@ -1686,6 +1980,383 @@ function VistaDeTurno({
   );
 }
 
+/**
+ * Todo lo que tiene que ver con pagar la cuenta: propina, reparto, avisos de
+ * desfase, botones de cobro y el desglose del camarero.
+ *
+ * Antes vivia dentro de `MesaOrdersClient` y no se podia sacar: necesitaba 25
+ * props. La diferencia no es que ahora se pase menos informacion, es que el
+ * estado de cobro dejo de estar suelto — `usePagoDeMesa` lo posee, y llega
+ * aqui como UNA cosa con nombre en vez de nueve sueltas.
+ */
+function SeccionDePago({
+  pago, mesaId, sessionData, allItems, division, fullyPaid, externalPaymentInProgress,
+  hasPlatosPoServir, hasDeferred, manualPayLabel, isWaiterMode, lang,
+  onReclamarTurno, onRecargar,
+}: Readonly<{
+  pago: ReturnType<typeof usePagoDeMesa>;
+  mesaId: string;
+  sessionData: MesaSessionData | null;
+  allItems: readonly OrderItem[];
+  division: DivisionState | null;
+  fullyPaid: boolean;
+  externalPaymentInProgress: boolean;
+  hasPlatosPoServir: boolean;
+  hasDeferred: boolean;
+  manualPayLabel: string;
+  isWaiterMode: boolean;
+  lang: Parameters<typeof t>[1];
+  onReclamarTurno: () => void;
+  onRecargar: () => Promise<void>;
+}>) {
+  // Sin items, o con los pagos apagados y sin camarero, no hay nada que cobrar.
+  if (allItems.length === 0 || !(sessionData?.pagosHabilitados || isWaiterMode)) return null;
+
+  const {
+    totalMismatch, paying, verifyingTotal, settingDivision, cancellingDivision, manualPaying,
+    setShowDivisionModal, setShowDivisionTypeModal, setTotalMismatch, releaseCheckoutLock,
+  } = pago;
+  const refresh = onRecargar;
+  const handleClaimCustomTurn = onReclamarTurno;
+
+  return (
+      <div
+        className="mt-6 rounded-3xl overflow-hidden"
+        style={{ border: "1px solid #e8e0d8" }}
+      >
+      <div className="flex flex-col gap-3 p-5">
+
+        {/* Tip selector — customer-facing only, not waiter */}
+        {sessionData?.pagosHabilitados && !isWaiterMode && !fullyPaid && (
+          <TipSelector
+            mesaId={mesaId}
+            propinaCents={sessionData.propinaCents ?? 0}
+            lang={lang}
+            disabled={paying || verifyingTotal || settingDivision}
+          />
+        )}
+
+        {/* Secure payment header — customer-facing only, not waiter */}
+        {sessionData?.pagosHabilitados && !isWaiterMode && !fullyPaid && (
+          <div className="flex items-center gap-1.5 mb-1">
+            <ShieldCheck size={12} strokeWidth={2} style={{ color: "#8a7560" }} />
+            <span
+              className="text-[10px] uppercase tracking-[0.18em]"
+              style={{ color: "#8a7560", fontFamily: "monospace" }}
+            >
+              Pago seguro
+            </span>
+          </div>
+        )}
+
+        {/* Division block — hide if fully paid without going through the division flow */}
+        {division && (!fullyPaid || division.pagosRealizados > 0) && (
+          <ProgresoDeDivision
+            division={division}
+            fullyPaid={fullyPaid}
+            externalPaymentInProgress={externalPaymentInProgress}
+            settingDivision={settingDivision}
+            cancellingDivision={cancellingDivision}
+            lang={lang}
+            onEditar={() => setShowDivisionModal(true)}
+            onCancelar={() => { void pago.cancelarDivision(); }}
+          />
+        )}
+
+        {/* Payment in progress — another user is paying */}
+        {externalPaymentInProgress && (
+          <div
+            className="rounded-2xl p-5 flex items-center gap-4"
+            style={{ backgroundColor: '#1a1612', fontFamily: 'monospace' }}
+          >
+            <CreditCard size={22} strokeWidth={1.5} style={{ color: '#fffcf7', flexShrink: 0 }} />
+            <div className="flex flex-col gap-1">
+              <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#fffcf7' }}>
+                {t('mesaPagoEnCurso', lang)}
+              </p>
+              <p className="text-xs" style={{ color: '#8a7560' }}>
+                {t('mesaPagoEnCursoDesc', lang)}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Total updated warning */}
+        {totalMismatch && (
+          <div
+            className="rounded-2xl p-5 flex flex-col gap-3"
+            style={{ backgroundColor: "#fff8e1", border: "1.5px solid #f59e0b", fontFamily: "monospace" }}
+          >
+            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "#92400e" }}>
+              {t("mesaTotalUpdated", lang)}
+            </p>
+            <div className="flex items-center justify-between text-sm">
+              <span style={{ color: "#b0a090", textDecoration: "line-through" }}>
+                {formatPrice(totalMismatch.oldTotal, "EUR", lang)}
+              </span>
+              <span style={{ color: "#78350f" }}>→</span>
+              <span className="font-bold" style={{ color: "#1a1612" }}>
+                {formatPrice(totalMismatch.newTotal, "EUR", lang)}
+              </span>
+            </div>
+            <div className="flex gap-2 mt-1">
+              <button
+                type="button"
+                onClick={() => { pago.ejecutarAccionPendiente(totalMismatch.pendingAction); }}
+                className="flex-1 py-3 rounded-xl text-xs font-bold tracking-widest uppercase"
+                style={{ backgroundColor: "#1a1612", color: "#fffcf7" }}
+              >
+                {t("mesaTotalUpdatedConfirm", lang)}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTotalMismatch(null);
+                  releaseCheckoutLock();
+                  void refresh();
+                }}
+                className="py-3 px-4 rounded-xl text-xs font-bold tracking-widest uppercase"
+                style={{ backgroundColor: "transparent", color: "#8a7560", border: "1.5px solid #c9b99a" }}
+              >
+                {t("cancel", lang)}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Unserved orders warning — client-facing */}
+        {!isWaiterMode && hasPlatosPoServir && !fullyPaid && !externalPaymentInProgress && (
+          <div className="flex items-start gap-2 rounded-xl px-3 py-2.5" style={{ background: "oklch(28% 0.08 252 / 0.08)", border: "1px solid oklch(50% 0.08 252 / 0.3)" }}>
+            <span style={{ fontSize: "0.85rem" }}>🍽</span>
+            <p className="text-xs leading-snug" style={{ color: "#5a4f45", fontFamily: "monospace" }}>
+              {t("mesaPlatosPoServir", lang)}
+            </p>
+          </div>
+        )}
+
+        {/* Buttons */}
+        {!division && !fullyPaid && !totalMismatch && !externalPaymentInProgress && !isWaiterMode && (
+          <div className="flex gap-3">
+            <BotonDePago
+              lang={lang}
+              cargando={paying || verifyingTotal}
+              deshabilitado={paying || settingDivision || verifyingTotal || hasPlatosPoServir}
+              onClick={() => { void pago.comprobarAntesDePagar('full'); }}
+              className="flex-1 py-5 rounded-2xl text-xs font-bold tracking-widest uppercase transition-all disabled:opacity-50 flex flex-col items-center gap-2 active:scale-[0.98]"
+              style={{ backgroundColor: "#1a1612", color: "#fffcf7", fontFamily: "monospace" }}
+            >
+              <Receipt size={20} strokeWidth={1.5} />{t("mesaPayTotal", lang)}
+            </BotonDePago>
+            <BotonDePago
+              lang={lang}
+              cargando={settingDivision || verifyingTotal}
+              deshabilitado={paying || settingDivision || verifyingTotal || hasPlatosPoServir}
+              onClick={() => setShowDivisionTypeModal(true)}
+              className="flex-1 py-5 rounded-2xl text-xs font-bold tracking-widest uppercase transition-all disabled:opacity-50 flex flex-col items-center gap-2 active:scale-[0.98]"
+              style={{ backgroundColor: "transparent", color: "#1a1612", fontFamily: "monospace", border: "2px solid #1a1612" }}
+            >
+              <Users size={20} strokeWidth={1.5} />{t("mesaDivideCheck", lang)}
+            </BotonDePago>
+          </div>
+        )}
+
+        {/* Pagar mi parte */}
+        {division && !fullyPaid && !totalMismatch && !externalPaymentInProgress && !isWaiterMode && (
+          <BotonDePago
+            lang={lang}
+            cargando={paying || verifyingTotal}
+            deshabilitado={paying || verifyingTotal || hasPlatosPoServir}
+            onClick={() => { void pago.comprobarAntesDePagar('division-pay'); }}
+            className="w-full py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
+            style={{ backgroundColor: "#1a1612", color: "#fffcf7", fontFamily: "monospace" }}
+          >
+            <CreditCard size={14} strokeWidth={2} />
+            {`${t("mesaPayShare", lang)} ${formatPrice(division.importePorPersona, "EUR", lang)}`}
+          </BotonDePago>
+        )}
+
+        {/* Waiter: custom split breakdown — only when something has actually been paid */}
+        {isWaiterMode && sessionData?.divisionTipo === 'personalizado' && (sessionData.pagadoCents ?? 0) > 0 && (() => {
+          const paidGroupMap = new Map<string, { nombre: string; precio: number; cantidad: number; complementos?: { nombre: string; precio: number }[] }>();
+          for (const order of sessionData.orders) {
+            for (let idx = 0; idx < order.items.length; idx++) {
+              const item = order.items[idx];
+              if (item.cancelled) continue;
+              const paid = (sessionData.itemsPagados ?? [])
+                .filter(p => p.pedido_id === order.id && p.item_idx === idx)
+                .reduce((s, p) => s + p.unidades_pagadas, 0);
+              if (paid <= 0) continue;
+              const ck = (item.complementos ?? []).map(c => c.nombre).sort((a, b) => a.localeCompare(b)).join(',');
+              const k = `${item.nombre}||${item.precio}||${ck}`;
+              const ex = paidGroupMap.get(k);
+              if (ex) { ex.cantidad += paid; } else {
+                paidGroupMap.set(k, { nombre: item.nombre, precio: item.precio, cantidad: paid, complementos: item.complementos });
+              }
+            }
+          }
+          const paidGroups = Array.from(paidGroupMap.entries()).map(([key, val]) => ({ key, ...val }));
+          const pagadoCents = sessionData.pagadoCents ?? 0;
+          const pendienteCents = Math.max(0, Math.round(sessionData.total * 100) - pagadoCents);
+          return (
+            <div className="rounded-xl border border-[#e8e0d8] bg-white overflow-hidden">
+              <div className="border-b border-[#e8e0d8] bg-[#f8f4ef] px-4 py-3 flex items-center justify-between">
+                <p className="text-sm font-semibold text-[#1a1612]">Pago personalizado</p>
+                <span className="text-xs text-[#8a7d6b]">✓ Pagado</span>
+              </div>
+              {paidGroups.length === 0 ? (
+                <p className="px-4 py-3 text-sm text-[#b0a090]">Sin pagos registrados aún</p>
+              ) : (
+                <div className="divide-y divide-[#f0ede8]">
+                  {paidGroups.map(({ key, nombre, precio, cantidad, complementos }) => (
+                    <div key={key} className="flex items-start justify-between px-4 py-2.5 text-sm">
+                      <div className="flex flex-col gap-0.5">
+                        <span style={{ color: "#1a1612" }}>{cantidad}× {nombre}</span>
+                        {complementos && complementos.length > 0 && (
+                          <span className="text-xs" style={{ color: "#b0a090" }}>
+                            + {complementos.map(c => c.nombre).join(", ")}
+                          </span>
+                        )}
+                      </div>
+                      <span className="tabular-nums shrink-0 ml-3" style={{ color: "#6aaa7a", fontFamily: "monospace" }}>
+                        {formatPrice(precio * cantidad, "EUR", lang)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="border-t border-[#e8e0d8] bg-[#f8f4ef] px-4 py-3 flex flex-col gap-1 text-sm" style={{ fontFamily: "monospace" }}>
+                <div className="flex justify-between">
+                  <span style={{ color: "#6aaa7a" }}>Pagado</span>
+                  <span className="tabular-nums font-semibold" style={{ color: "#6aaa7a" }}>
+                    {formatPrice(pagadoCents / 100, "EUR", lang)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span style={{ color: "#8a7d6b" }}>Pendiente</span>
+                  <span className="tabular-nums font-semibold" style={{ color: "#1a1612" }}>
+                    {formatPrice(pendienteCents / 100, "EUR", lang)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Waiter: manual payment button */}
+        {isWaiterMode && !fullyPaid && !externalPaymentInProgress && (
+          <div className="flex flex-col gap-2">
+            {sessionData?.customTurno && (sessionData.customTurno.status === 'en_seleccion' || sessionData.customTurno.status === 'en_pago') && (
+              <div className="flex items-start gap-2 rounded-xl px-3 py-2.5" style={{ background: "oklch(28% 0.14 145 / 0.1)", border: "1px solid oklch(50% 0.14 145 / 0.3)" }}>
+                <span style={{ fontSize: "0.85rem" }}>💳</span>
+                <div className="flex flex-col gap-0.5">
+                  <p className="text-xs leading-snug font-semibold" style={{ color: "oklch(35% 0.10 145)", fontFamily: "monospace" }}>
+                    Turno activo — {sessionData.customTurno.status === 'en_seleccion' ? 'seleccionando ítems' : 'pago en curso'}
+                  </p>
+                  {sessionData.customTurno.importeCents != null && sessionData.customTurno.importeCents > 0 && (
+                    <p className="text-xs" style={{ color: "oklch(40% 0.08 145)", fontFamily: "monospace" }}>
+                      Importe: {formatPrice(sessionData.customTurno.importeCents / 100, "EUR", lang)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+            {/* Waiter: simulate personalizado selection — hidden when equal-division is active or a custom turn is already running */}
+            {!division && !sessionData?.customTurno && (
+              <button
+                type="button"
+                onClick={() => { void handleClaimCustomTurn(); }}
+                disabled={hasDeferred || hasPlatosPoServir}
+                className="w-full py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ backgroundColor: "oklch(22% 0.12 300)", color: "oklch(80% 0.18 300)", border: "1px solid oklch(50% 0.22 300 / 0.6)", fontFamily: "monospace" }}
+              >
+                <span className="flex items-center justify-center gap-2">
+                  <SplitSquareVertical size={16} strokeWidth={2} />
+                  Pago personalizado
+                </span>
+              </button>
+            )}
+            {hasPlatosPoServir && (
+              <div className="flex items-start gap-2 rounded-xl px-3 py-2.5" style={{ background: "oklch(28% 0.08 252 / 0.1)", border: "1px solid oklch(50% 0.08 252 / 0.35)" }}>
+                <span style={{ fontSize: "0.85rem" }}>🍽</span>
+                <p className="text-xs leading-snug" style={{ color: "oklch(40% 0.06 252)", fontFamily: "monospace" }}>
+                  Quedan pedidos sin servir. Sírvelos antes de cobrar.
+                </p>
+              </div>
+            )}
+            {hasDeferred && (
+              <div className="flex items-start gap-2 rounded-xl px-3 py-2.5" style={{ background: "oklch(28% 0.10 55 / 0.15)", border: "1px solid oklch(55% 0.18 55 / 0.4)" }}>
+                <span style={{ color: "oklch(55% 0.18 55)", fontSize: "0.85rem" }}>⚠</span>
+                <p className="text-xs leading-snug" style={{ color: "oklch(45% 0.14 55)", fontFamily: "monospace" }}>
+                  Hay ítems retenidos. Libéralos o elimínalos antes de cobrar.
+                </p>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => { void pago.registrarPagoManual(); }}
+              disabled={manualPaying || hasDeferred || hasPlatosPoServir}
+              className="w-full py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ backgroundColor: "#1a1612", color: "#fffcf7", fontFamily: "monospace" }}
+            >
+              <span className="flex items-center justify-center gap-2">
+                {sessionData?.division
+                  ? <CreditCard size={16} strokeWidth={2} />
+                  : <Receipt size={16} strokeWidth={2} />
+                }
+                {manualPayLabel}
+              </span>
+            </button>
+          </div>
+        )}
+
+        {/* Fully paid confirmation */}
+        {fullyPaid && (
+          <div
+            className="rounded-2xl p-6 flex flex-col items-center gap-3"
+            style={{ backgroundColor: "#fffcf7", fontFamily: "monospace" }}
+          >
+            <div
+              className="flex items-center justify-center rounded-full"
+              style={{ width: 52, height: 52, backgroundColor: "#dcfce7" }}
+            >
+              <span style={{ fontSize: 26 }}>✓</span>
+            </div>
+            <p
+              className="text-sm font-bold tracking-widest uppercase"
+              style={{ color: "#1a1612" }}
+            >
+              {t("mesaDivisionComplete", lang)}
+            </p>
+            <p
+              className="text-2xl font-bold tabular-nums"
+              style={{ color: "#1a1612" }}
+            >
+              {formatPrice(sessionData?.total ?? 0, "EUR", lang)}
+            </p>
+          </div>
+        )}
+
+      </div>
+
+        {/* Trust badge — Redsys + Visa + Mastercard */}
+        {sessionData?.pagosHabilitados && !isWaiterMode && (
+          <div
+            className="flex justify-center items-center py-3"
+            style={{ borderTop: "1px dashed #e8e0d8", backgroundColor: "#ffffff" }}
+          >
+            <Image
+              src="/tpv-redsys-woocommerce.jpg"
+              alt="Pago procesado por Redsys. Aceptamos Visa y Mastercard."
+              width={128}
+              height={40}
+              style={{ opacity: 0.6, objectFit: "contain" }}
+            />
+          </div>
+        )}
+      </div>
+  );
+}
+
 // Sin prop `isWaiter`: el componente ya lo resuelve solo, comparando la mesa
 // guardada del camarero con la actual (`esSesionDeCamarero`, más abajo). El prop
 // que llegaba desde el servidor no lo leía nadie, así que quitarlo no cambia el
@@ -1697,9 +2368,6 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
   const [sessionData, setSessionData] = useState<MesaSessionData | null>(null);
   const [mesaInfo, setMesaInfo] = useState<MesaInfo | null>(null);
   const [loading, setLoading] = useState(true);
-  const [paying, setPaying] = useState(false);
-  const [showDivisionModal, setShowDivisionModal] = useState(false);
-  const [showDivisionTypeModal, setShowDivisionTypeModal] = useState(false);
 
   const [hidingRemainingActions, setHidingRemainingActions] = useState(() => getStoredHidingActions(mesaId));
   useEffect(() => {
@@ -1713,23 +2381,10 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
   // poll — prevents auto-clearing it during the brief window between claim() and the
   // first refresh that returns the new customTurno.
   const activeTurnoConfirmedRef = useRef(false);
-  const [settingDivision, setSettingDivision] = useState(false);
-  const [cancellingDivision, setCancellingDivision] = useState(false);
   const [cancellingCustomTurn, setCancellingCustomTurn] = useState(false);
-  const [manualPaying, setManualPaying] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ItemPendienteDeBorrar | null>(null);
   const [deleteQty, setDeleteQty] = useState(1);
   const [deleting, setDeleting] = useState(false);
-  const [verifyingTotal, setVerifyingTotal] = useState(false);
-  // Restore mismatch warning if the payer navigated away and came back (back button)
-  const [totalMismatch, setTotalMismatch] = useState<{
-    oldTotal: number;
-    newTotal: number;
-    pendingAction: PendingAction;
-  } | null>(() => getStoredMismatch(mesaId));
-  // true while THIS user owns the checkout lock (they clicked "Pagar" / "Dividir cuenta").
-  // Persisted in sessionStorage so it survives in-app navigation (back button recovery).
-  const [isInitiatingPayment, setIsInitiatingPayment] = useState(() => getStoredPaymentLock(mesaId));
 
   // True when the current session belongs to a waiter impersonating this table.
   // Waiters should not see payment buttons — the customer pays, not the waiter.
@@ -1747,14 +2402,12 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
     finally { setLoading(false); }
   }, [mesaId]);
 
-  const releaseCheckoutLock = useCallback(() => {
-    setIsInitiatingPayment(false);
-    try {
-      sessionStorage.removeItem(`mesa-lock-${mesaId}`);
-      sessionStorage.removeItem(`mesa-mismatch-${mesaId}`);
-    } catch { /* ignore */ }
-    void fetch(`/api/mesas/${encodeURIComponent(mesaId)}/lock`, { method: 'DELETE' }).catch(() => null);
-  }, [mesaId]);
+  const pago = usePagoDeMesa({ mesaId, sessionData, setSessionData, refresh });
+  const {
+    paying, settingDivision, cancellingDivision, manualPaying, verifyingTotal,
+    showDivisionModal, showDivisionTypeModal, totalMismatch, isInitiatingPayment,
+    setShowDivisionModal, setShowDivisionTypeModal, setTotalMismatch, releaseCheckoutLock,
+  } = pago;
 
   useEffect(() => {
     void refresh();
@@ -1814,44 +2467,6 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
     }
   }, [sessionData, activeTurnoId, mesaId]);
 
-  // On mount: if there is a stored division paymentOrderRef from a previous payment
-  // attempt, release that pending slot. Covers two cases:
-  //   1. User cancelled at Redsys (urlKo redirect back to this page).
-  //   2. User silently abandoned (closed the app, lost connectivity).
-  // The update is atomic (WHERE status='pending') — a no-op if the webhook
-  // already marked the row as 'paid' or 'failed'.
-  useEffect(() => {
-    const storedRef = (() => {
-      try { return sessionStorage.getItem(`mesa-division-ref-${mesaId}`); }
-      catch { return null; }
-    })();
-    if (!storedRef) return;
-    void fetch(`/api/mesas/${encodeURIComponent(mesaId)}/division-slot`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paymentOrderRef: storedRef }),
-    }).then(() => {
-      try { sessionStorage.removeItem(`mesa-division-ref-${mesaId}`); } catch { /* ignore */ }
-    }).catch(() => { /* non-blocking */ });
-  }, [mesaId]);
-
-  // Refs to read current state in the unmount cleanup (avoids stale closures)
-  const isInitiatingPaymentRef = useRef(isInitiatingPayment);
-  const payingRef = useRef(paying);
-  useEffect(() => { isInitiatingPaymentRef.current = isInitiatingPayment; }, [isInitiatingPayment]);
-  useEffect(() => { payingRef.current = paying; }, [paying]);
-
-  // If the payer navigates away while owning the lock (but before reaching Redsys),
-  // release the lock so others aren't stuck. If paying=true, they're at Redsys — keep the lock.
-  useEffect(() => {
-    return () => {
-      if (isInitiatingPaymentRef.current && !payingRef.current) {
-        try { sessionStorage.removeItem(`mesa-lock-${mesaId}`); } catch { /* */ }
-        void fetch(`/api/mesas/${encodeURIComponent(mesaId)}/lock`, { method: 'DELETE' }).catch(() => null);
-      }
-    };
-  }, [mesaId]);
-
   const cancelCustomTurn = useCallback(async () => {
     setCancellingCustomTurn(true);
     try {
@@ -1884,26 +2499,15 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
     void refresh();
   }, [mesaId, refresh]);
 
-  // On mount: if isInitiatingPayment is still true it means the user had navigated to
-  // Redsys (paying=true kept the lock) and then did a full-page back navigation.
-  // Release the stale lock immediately so the ticket is usable again.
-  useEffect(() => {
-    if (isInitiatingPayment) {
-      releaseCheckoutLock();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // bfcache recovery: on mobile the browser often restores the page from cache instead
   // of doing a full reload. The pageshow event fires with persisted=true in that case,
-  // leaving paying=true in memory (spinner stuck forever). Reset all payment state.
+  // leaving paying=true in memory (spinner stuck forever). El estado de cobro lo
+  // devuelve a cero el hook; aqui solo queda el turno personalizado, que es suyo.
+  const { restablecerTrasBfcache } = pago;
   useEffect(() => {
     const handlePageShow = (event: PageTransitionEvent) => {
       if (!event.persisted) return;
-      setPaying(false);
-      if (isInitiatingPaymentRef.current) {
-        releaseCheckoutLock();
-      }
+      restablecerTrasBfcache();
       const storedTurno = (() => { try { return sessionStorage.getItem(`mesa-custom-turno-${mesaId}`); } catch { return null; } })();
       if (storedTurno) {
         void fetch(`/api/redsys/cancel-mesa?mesaId=${encodeURIComponent(mesaId)}`).catch(() => null);
@@ -1914,7 +2518,7 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
     };
     window.addEventListener('pageshow', handlePageShow);
     return () => window.removeEventListener('pageshow', handlePageShow);
-  }, [mesaId, releaseCheckoutLock, refresh]);
+  }, [mesaId, restablecerTrasBfcache, refresh]);
 
   useEffect(() => {
     fetch(`/api/mesas?token=${encodeURIComponent(mesaId)}`)
@@ -1924,179 +2528,6 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
       })
       .catch(() => null);
   }, [mesaId]);
-
-  const handleRedsys409 = (
-    body: { code?: string; newTotalCents?: number },
-    esDivision: boolean,
-  ) => {
-    if (body.code === 'ALREADY_PAID') {
-      releaseCheckoutLock();
-      setPaying(false);
-      void refresh();
-      return;
-    }
-    const mismatch = buildTotalMismatch(body, sessionData?.total ?? 0, esDivision);
-    if (mismatch) {
-      setSessionData(prev => prev ? { ...prev, total: mismatch.newTotal } : prev);
-      setTotalMismatch(mismatch);
-      try { sessionStorage.setItem(`mesa-mismatch-${mesaId}`, JSON.stringify(mismatch)); } catch { /* ignore */ }
-    }
-    setPaying(false);
-  };
-
-  const handleRedsysSuccess = (
-    formData: { DS_MERCHANT_PARAMETERS: string; DS_SIGNATURE: string; DS_SIGNATURE_VERSION: string; paymentOrderRef?: string },
-    esDivision: boolean,
-  ) => {
-    if (esDivision && formData.paymentOrderRef) {
-      try { sessionStorage.setItem(`mesa-division-ref-${mesaId}`, formData.paymentOrderRef); } catch { /* ignore */ }
-    }
-    const redsysUrl = process.env.NEXT_PUBLIC_REDSYS_URL ?? 'https://sis-t.redsys.es:25443/sis/realizarPago';
-    submitRedsysForm(formData, redsysUrl);
-  };
-
-  const initiateRedsys = async (esDivision: boolean, expectedTotalCents?: number) => {
-    if (paying) return;
-    setPaying(true);
-    try {
-      const res = await fetch('/api/redsys/initiate-mesa', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mesaId, esDivision, expectedTotalCents }),
-      });
-      if (res.status === 409) {
-        handleRedsys409(await res.json() as { code?: string; newTotalCents?: number }, esDivision);
-        return;
-      }
-      if (res.status === 423) {
-        releaseCheckoutLock();
-        setPaying(false);
-        void refresh();
-        return;
-      }
-      if (!res.ok) {
-        console.error('[initiateRedsys] API error', res.status, await res.text().catch(() => ''));
-        setPaying(false);
-        return;
-      }
-      handleRedsysSuccess(
-        await res.json() as { DS_MERCHANT_PARAMETERS: string; DS_SIGNATURE: string; DS_SIGNATURE_VERSION: string; paymentOrderRef?: string },
-        esDivision,
-      );
-    } catch (e) {
-      console.error('[initiateRedsys] exception', e);
-      setPaying(false);
-    }
-  };
-
-  const handleConfirmDivision = async (numPersonas: number) => {
-    setShowDivisionModal(false);
-    setSettingDivision(true);
-    try {
-      // Re-verify total hasn't changed while the modal was open
-      let verifiedTotal = sessionData?.total ?? 0;
-      const checkRes = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/orders`);
-      if (checkRes.ok) {
-        const fresh = await checkRes.json() as MesaSessionData;
-        const currentTotal = sessionData?.total ?? 0;
-        if (Math.abs(fresh.total - currentTotal) > 0.005) {
-          setSessionData(fresh);
-          const mismatch = { oldTotal: currentTotal, newTotal: fresh.total, pendingAction: 'division-modal' as PendingAction };
-          setTotalMismatch(mismatch);
-          try { sessionStorage.setItem(`mesa-mismatch-${mesaId}`, JSON.stringify(mismatch)); } catch { /* ignore */ }
-          return;
-        }
-        verifiedTotal = fresh.total;
-        setSessionData(fresh);
-      }
-      // Release the checkout lock BEFORE POSTing to /division.
-      // handlePrePaymentCheck sets pago_en_curso=true when acquiring the lock,
-      // and the division route rejects with 409 when pago_en_curso is active.
-      releaseCheckoutLock();
-      const divisionRes = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/division`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ numPersonas }),
-      });
-      if (!divisionRes.ok) return;
-      // Division is set — go straight to Redsys; no extra click needed.
-      void initiateRedsys(true, Math.max(1, Math.round(verifiedTotal * 100)));
-    } finally {
-      setSettingDivision(false);
-    }
-  };
-
-  const executePendingAction = (action: PendingAction) => {
-    setTotalMismatch(null);
-    try { sessionStorage.removeItem(`mesa-mismatch-${mesaId}`); } catch { /* ignore */ }
-    const expectedCents = getExpectedCents(sessionData);
-    if (action === 'full') {
-      void initiateRedsys(false, expectedCents);
-    } else if (action === 'division-modal') {
-      setShowDivisionModal(true);
-    } else {
-      void initiateRedsys(true, expectedCents);
-    }
-  };
-
-  const handlePrePaymentCheck = async (action: PendingAction) => {
-    if (paying || verifyingTotal) return;
-    setVerifyingTotal(true);
-    try {
-      // Acquire checkout lock — signals all other users on this mesa to redirect to ticket.
-      // Skip for division-pay: each share is independent and the DB-level mesa_division_pagos
-      // table already handles concurrency. Using a global lock would block simultaneous payers.
-      // Skip if we already own it (e.g. re-checking after a totalMismatch confirmation).
-      if (!isInitiatingPayment && action !== 'division-pay') {
-        const lockRes = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/lock`, { method: 'POST' });
-        if (lockRes.status === 423) {
-          void refresh();
-          return;
-        }
-        setIsInitiatingPayment(true);
-        try { sessionStorage.setItem(`mesa-lock-${mesaId}`, 'true'); } catch { /* ignore */ }
-      }
-      // Verify total against fresh DB state
-      const res = await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/orders`);
-      if (!res.ok) { executePendingAction(action); return; }
-      const fresh = await res.json() as MesaSessionData;
-
-      // Guard: session may have been paid (e.g. waiter manual payment) while this
-      // user was going through the checkout flow — bail out and show the paid screen.
-      const freshFullyPaid = fresh.sesionPagada ||
-        (fresh.division ? fresh.division.pagosRealizados >= fresh.division.personas : false);
-      if (freshFullyPaid) {
-        setSessionData(fresh);
-        releaseCheckoutLock();
-        return;
-      }
-
-      const currentTotal = sessionData?.total ?? 0;
-      if (Math.abs(fresh.total - currentTotal) > 0.005) {
-        setSessionData(fresh);
-        const mismatch = { oldTotal: currentTotal, newTotal: fresh.total, pendingAction: action };
-        setTotalMismatch(mismatch);
-        try { sessionStorage.setItem(`mesa-mismatch-${mesaId}`, JSON.stringify(mismatch)); } catch { /* ignore */ }
-      } else {
-        setSessionData(fresh);
-        executePendingAction(action);
-      }
-    } catch {
-      executePendingAction(action);
-    } finally {
-      setVerifyingTotal(false);
-    }
-  };
-
-  const handleCancelDivision = async () => {
-    setCancellingDivision(true);
-    try {
-      await fetch(`/api/mesas/${encodeURIComponent(mesaId)}/division`, { method: 'DELETE' });
-      await refresh();
-    } finally {
-      setCancellingDivision(false);
-    }
-  };
 
   const handleClaimCustomTurn = useCallback(async () => {
     try {
@@ -2127,17 +2558,6 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
       setDeleting(false);
     }
   }, [pendingDelete, deleteQty, deleting, mesaId, refresh]);
-
-  const handleManualPayment = async () => {
-    if (manualPaying) return;
-    setManualPaying(true);
-    try {
-      await fetchWithCsrf(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/manual-payment`, { method: 'POST' });
-      await refresh();
-    } finally {
-      setManualPaying(false);
-    }
-  };
 
 
   const division = sessionData?.division ?? null;
@@ -2216,7 +2636,7 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
           void refresh();
         }}
         onPagoManual={async () => {
-          await handleManualPayment();
+          await pago.registrarPagoManual();
           setActiveTurnoId(null);
           try { sessionStorage.removeItem(`mesa-custom-turno-${mesaId}`); } catch { /* ignore */ }
         }}
@@ -2510,343 +2930,22 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
           </div>
         )}
 
-        {/* Payment section */}
-        {allItems.length > 0 && (sessionData?.pagosHabilitados || isWaiterMode) && (
-          <div
-            className="mt-6 rounded-3xl overflow-hidden"
-            style={{ border: "1px solid #e8e0d8" }}
-          >
-          <div className="flex flex-col gap-3 p-5">
-
-            {/* Tip selector — customer-facing only, not waiter */}
-            {sessionData?.pagosHabilitados && !isWaiterMode && !fullyPaid && (
-              <TipSelector
-                mesaId={mesaId}
-                propinaCents={sessionData.propinaCents ?? 0}
-                lang={lang}
-                disabled={paying || verifyingTotal || settingDivision}
-              />
-            )}
-
-            {/* Secure payment header — customer-facing only, not waiter */}
-            {sessionData?.pagosHabilitados && !isWaiterMode && !fullyPaid && (
-              <div className="flex items-center gap-1.5 mb-1">
-                <ShieldCheck size={12} strokeWidth={2} style={{ color: "#8a7560" }} />
-                <span
-                  className="text-[10px] uppercase tracking-[0.18em]"
-                  style={{ color: "#8a7560", fontFamily: "monospace" }}
-                >
-                  Pago seguro
-                </span>
-              </div>
-            )}
-
-            {/* Division block — hide if fully paid without going through the division flow */}
-            {division && (!fullyPaid || division.pagosRealizados > 0) && (
-              <ProgresoDeDivision
-                division={division}
-                fullyPaid={fullyPaid}
-                externalPaymentInProgress={externalPaymentInProgress}
-                settingDivision={settingDivision}
-                cancellingDivision={cancellingDivision}
-                lang={lang}
-                onEditar={() => setShowDivisionModal(true)}
-                onCancelar={() => { void handleCancelDivision(); }}
-              />
-            )}
-
-            {/* Payment in progress — another user is paying */}
-            {externalPaymentInProgress && (
-              <div
-                className="rounded-2xl p-5 flex items-center gap-4"
-                style={{ backgroundColor: '#1a1612', fontFamily: 'monospace' }}
-              >
-                <CreditCard size={22} strokeWidth={1.5} style={{ color: '#fffcf7', flexShrink: 0 }} />
-                <div className="flex flex-col gap-1">
-                  <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#fffcf7' }}>
-                    {t('mesaPagoEnCurso', lang)}
-                  </p>
-                  <p className="text-xs" style={{ color: '#8a7560' }}>
-                    {t('mesaPagoEnCursoDesc', lang)}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Total updated warning */}
-            {totalMismatch && (
-              <div
-                className="rounded-2xl p-5 flex flex-col gap-3"
-                style={{ backgroundColor: "#fff8e1", border: "1.5px solid #f59e0b", fontFamily: "monospace" }}
-              >
-                <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "#92400e" }}>
-                  {t("mesaTotalUpdated", lang)}
-                </p>
-                <div className="flex items-center justify-between text-sm">
-                  <span style={{ color: "#b0a090", textDecoration: "line-through" }}>
-                    {formatPrice(totalMismatch.oldTotal, "EUR", lang)}
-                  </span>
-                  <span style={{ color: "#78350f" }}>→</span>
-                  <span className="font-bold" style={{ color: "#1a1612" }}>
-                    {formatPrice(totalMismatch.newTotal, "EUR", lang)}
-                  </span>
-                </div>
-                <div className="flex gap-2 mt-1">
-                  <button
-                    type="button"
-                    onClick={() => { executePendingAction(totalMismatch.pendingAction); }}
-                    className="flex-1 py-3 rounded-xl text-xs font-bold tracking-widest uppercase"
-                    style={{ backgroundColor: "#1a1612", color: "#fffcf7" }}
-                  >
-                    {t("mesaTotalUpdatedConfirm", lang)}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTotalMismatch(null);
-                      releaseCheckoutLock();
-                      void refresh();
-                    }}
-                    className="py-3 px-4 rounded-xl text-xs font-bold tracking-widest uppercase"
-                    style={{ backgroundColor: "transparent", color: "#8a7560", border: "1.5px solid #c9b99a" }}
-                  >
-                    {t("cancel", lang)}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Unserved orders warning — client-facing */}
-            {!isWaiterMode && hasPlatosPoServir && !fullyPaid && !externalPaymentInProgress && (
-              <div className="flex items-start gap-2 rounded-xl px-3 py-2.5" style={{ background: "oklch(28% 0.08 252 / 0.08)", border: "1px solid oklch(50% 0.08 252 / 0.3)" }}>
-                <span style={{ fontSize: "0.85rem" }}>🍽</span>
-                <p className="text-xs leading-snug" style={{ color: "#5a4f45", fontFamily: "monospace" }}>
-                  {t("mesaPlatosPoServir", lang)}
-                </p>
-              </div>
-            )}
-
-            {/* Buttons */}
-            {!division && !fullyPaid && !totalMismatch && !externalPaymentInProgress && !isWaiterMode && (
-              <div className="flex gap-3">
-                <BotonDePago
-                  lang={lang}
-                  cargando={paying || verifyingTotal}
-                  deshabilitado={paying || settingDivision || verifyingTotal || hasPlatosPoServir}
-                  onClick={() => { void handlePrePaymentCheck('full'); }}
-                  className="flex-1 py-5 rounded-2xl text-xs font-bold tracking-widest uppercase transition-all disabled:opacity-50 flex flex-col items-center gap-2 active:scale-[0.98]"
-                  style={{ backgroundColor: "#1a1612", color: "#fffcf7", fontFamily: "monospace" }}
-                >
-                  <Receipt size={20} strokeWidth={1.5} />{t("mesaPayTotal", lang)}
-                </BotonDePago>
-                <BotonDePago
-                  lang={lang}
-                  cargando={settingDivision || verifyingTotal}
-                  deshabilitado={paying || settingDivision || verifyingTotal || hasPlatosPoServir}
-                  onClick={() => setShowDivisionTypeModal(true)}
-                  className="flex-1 py-5 rounded-2xl text-xs font-bold tracking-widest uppercase transition-all disabled:opacity-50 flex flex-col items-center gap-2 active:scale-[0.98]"
-                  style={{ backgroundColor: "transparent", color: "#1a1612", fontFamily: "monospace", border: "2px solid #1a1612" }}
-                >
-                  <Users size={20} strokeWidth={1.5} />{t("mesaDivideCheck", lang)}
-                </BotonDePago>
-              </div>
-            )}
-
-            {/* Pagar mi parte */}
-            {division && !fullyPaid && !totalMismatch && !externalPaymentInProgress && !isWaiterMode && (
-              <BotonDePago
-                lang={lang}
-                cargando={paying || verifyingTotal}
-                deshabilitado={paying || verifyingTotal || hasPlatosPoServir}
-                onClick={() => { void handlePrePaymentCheck('division-pay'); }}
-                className="w-full py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
-                style={{ backgroundColor: "#1a1612", color: "#fffcf7", fontFamily: "monospace" }}
-              >
-                <CreditCard size={14} strokeWidth={2} />
-                {`${t("mesaPayShare", lang)} ${formatPrice(division.importePorPersona, "EUR", lang)}`}
-              </BotonDePago>
-            )}
-
-            {/* Waiter: custom split breakdown — only when something has actually been paid */}
-            {isWaiterMode && sessionData?.divisionTipo === 'personalizado' && (sessionData.pagadoCents ?? 0) > 0 && (() => {
-              const paidGroupMap = new Map<string, { nombre: string; precio: number; cantidad: number; complementos?: { nombre: string; precio: number }[] }>();
-              for (const order of sessionData.orders) {
-                for (let idx = 0; idx < order.items.length; idx++) {
-                  const item = order.items[idx];
-                  if (item.cancelled) continue;
-                  const paid = (sessionData.itemsPagados ?? [])
-                    .filter(p => p.pedido_id === order.id && p.item_idx === idx)
-                    .reduce((s, p) => s + p.unidades_pagadas, 0);
-                  if (paid <= 0) continue;
-                  const ck = (item.complementos ?? []).map(c => c.nombre).sort((a, b) => a.localeCompare(b)).join(',');
-                  const k = `${item.nombre}||${item.precio}||${ck}`;
-                  const ex = paidGroupMap.get(k);
-                  if (ex) { ex.cantidad += paid; } else {
-                    paidGroupMap.set(k, { nombre: item.nombre, precio: item.precio, cantidad: paid, complementos: item.complementos });
-                  }
-                }
-              }
-              const paidGroups = Array.from(paidGroupMap.entries()).map(([key, val]) => ({ key, ...val }));
-              const pagadoCents = sessionData.pagadoCents ?? 0;
-              const pendienteCents = Math.max(0, Math.round(sessionData.total * 100) - pagadoCents);
-              return (
-                <div className="rounded-xl border border-[#e8e0d8] bg-white overflow-hidden">
-                  <div className="border-b border-[#e8e0d8] bg-[#f8f4ef] px-4 py-3 flex items-center justify-between">
-                    <p className="text-sm font-semibold text-[#1a1612]">Pago personalizado</p>
-                    <span className="text-xs text-[#8a7d6b]">✓ Pagado</span>
-                  </div>
-                  {paidGroups.length === 0 ? (
-                    <p className="px-4 py-3 text-sm text-[#b0a090]">Sin pagos registrados aún</p>
-                  ) : (
-                    <div className="divide-y divide-[#f0ede8]">
-                      {paidGroups.map(({ key, nombre, precio, cantidad, complementos }) => (
-                        <div key={key} className="flex items-start justify-between px-4 py-2.5 text-sm">
-                          <div className="flex flex-col gap-0.5">
-                            <span style={{ color: "#1a1612" }}>{cantidad}× {nombre}</span>
-                            {complementos && complementos.length > 0 && (
-                              <span className="text-xs" style={{ color: "#b0a090" }}>
-                                + {complementos.map(c => c.nombre).join(", ")}
-                              </span>
-                            )}
-                          </div>
-                          <span className="tabular-nums shrink-0 ml-3" style={{ color: "#6aaa7a", fontFamily: "monospace" }}>
-                            {formatPrice(precio * cantidad, "EUR", lang)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div className="border-t border-[#e8e0d8] bg-[#f8f4ef] px-4 py-3 flex flex-col gap-1 text-sm" style={{ fontFamily: "monospace" }}>
-                    <div className="flex justify-between">
-                      <span style={{ color: "#6aaa7a" }}>Pagado</span>
-                      <span className="tabular-nums font-semibold" style={{ color: "#6aaa7a" }}>
-                        {formatPrice(pagadoCents / 100, "EUR", lang)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span style={{ color: "#8a7d6b" }}>Pendiente</span>
-                      <span className="tabular-nums font-semibold" style={{ color: "#1a1612" }}>
-                        {formatPrice(pendienteCents / 100, "EUR", lang)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Waiter: manual payment button */}
-            {isWaiterMode && !fullyPaid && !externalPaymentInProgress && (
-              <div className="flex flex-col gap-2">
-                {sessionData?.customTurno && (sessionData.customTurno.status === 'en_seleccion' || sessionData.customTurno.status === 'en_pago') && (
-                  <div className="flex items-start gap-2 rounded-xl px-3 py-2.5" style={{ background: "oklch(28% 0.14 145 / 0.1)", border: "1px solid oklch(50% 0.14 145 / 0.3)" }}>
-                    <span style={{ fontSize: "0.85rem" }}>💳</span>
-                    <div className="flex flex-col gap-0.5">
-                      <p className="text-xs leading-snug font-semibold" style={{ color: "oklch(35% 0.10 145)", fontFamily: "monospace" }}>
-                        Turno activo — {sessionData.customTurno.status === 'en_seleccion' ? 'seleccionando ítems' : 'pago en curso'}
-                      </p>
-                      {sessionData.customTurno.importeCents != null && sessionData.customTurno.importeCents > 0 && (
-                        <p className="text-xs" style={{ color: "oklch(40% 0.08 145)", fontFamily: "monospace" }}>
-                          Importe: {formatPrice(sessionData.customTurno.importeCents / 100, "EUR", lang)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
-                {/* Waiter: simulate personalizado selection — hidden when equal-division is active or a custom turn is already running */}
-                {!division && !sessionData?.customTurno && (
-                  <button
-                    type="button"
-                    onClick={() => { void handleClaimCustomTurn(); }}
-                    disabled={hasDeferred || hasPlatosPoServir}
-                    className="w-full py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-                    style={{ backgroundColor: "oklch(22% 0.12 300)", color: "oklch(80% 0.18 300)", border: "1px solid oklch(50% 0.22 300 / 0.6)", fontFamily: "monospace" }}
-                  >
-                    <span className="flex items-center justify-center gap-2">
-                      <SplitSquareVertical size={16} strokeWidth={2} />
-                      Pago personalizado
-                    </span>
-                  </button>
-                )}
-                {hasPlatosPoServir && (
-                  <div className="flex items-start gap-2 rounded-xl px-3 py-2.5" style={{ background: "oklch(28% 0.08 252 / 0.1)", border: "1px solid oklch(50% 0.08 252 / 0.35)" }}>
-                    <span style={{ fontSize: "0.85rem" }}>🍽</span>
-                    <p className="text-xs leading-snug" style={{ color: "oklch(40% 0.06 252)", fontFamily: "monospace" }}>
-                      Quedan pedidos sin servir. Sírvelos antes de cobrar.
-                    </p>
-                  </div>
-                )}
-                {hasDeferred && (
-                  <div className="flex items-start gap-2 rounded-xl px-3 py-2.5" style={{ background: "oklch(28% 0.10 55 / 0.15)", border: "1px solid oklch(55% 0.18 55 / 0.4)" }}>
-                    <span style={{ color: "oklch(55% 0.18 55)", fontSize: "0.85rem" }}>⚠</span>
-                    <p className="text-xs leading-snug" style={{ color: "oklch(45% 0.14 55)", fontFamily: "monospace" }}>
-                      Hay ítems retenidos. Libéralos o elimínalos antes de cobrar.
-                    </p>
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => { void handleManualPayment(); }}
-                  disabled={manualPaying || hasDeferred || hasPlatosPoServir}
-                  className="w-full py-4 rounded-2xl text-sm font-bold tracking-widest uppercase transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ backgroundColor: "#1a1612", color: "#fffcf7", fontFamily: "monospace" }}
-                >
-                  <span className="flex items-center justify-center gap-2">
-                    {sessionData?.division
-                      ? <CreditCard size={16} strokeWidth={2} />
-                      : <Receipt size={16} strokeWidth={2} />
-                    }
-                    {manualPayLabel}
-                  </span>
-                </button>
-              </div>
-            )}
-
-            {/* Fully paid confirmation */}
-            {fullyPaid && (
-              <div
-                className="rounded-2xl p-6 flex flex-col items-center gap-3"
-                style={{ backgroundColor: "#fffcf7", fontFamily: "monospace" }}
-              >
-                <div
-                  className="flex items-center justify-center rounded-full"
-                  style={{ width: 52, height: 52, backgroundColor: "#dcfce7" }}
-                >
-                  <span style={{ fontSize: 26 }}>✓</span>
-                </div>
-                <p
-                  className="text-sm font-bold tracking-widest uppercase"
-                  style={{ color: "#1a1612" }}
-                >
-                  {t("mesaDivisionComplete", lang)}
-                </p>
-                <p
-                  className="text-2xl font-bold tabular-nums"
-                  style={{ color: "#1a1612" }}
-                >
-                  {formatPrice(sessionData?.total ?? 0, "EUR", lang)}
-                </p>
-              </div>
-            )}
-
-          </div>
-
-            {/* Trust badge — Redsys + Visa + Mastercard */}
-            {sessionData?.pagosHabilitados && !isWaiterMode && (
-              <div
-                className="flex justify-center items-center py-3"
-                style={{ borderTop: "1px dashed #e8e0d8", backgroundColor: "#ffffff" }}
-              >
-                <Image
-                  src="/tpv-redsys-woocommerce.jpg"
-                  alt="Pago procesado por Redsys. Aceptamos Visa y Mastercard."
-                  width={128}
-                  height={40}
-                  style={{ opacity: 0.6, objectFit: "contain" }}
-                />
-              </div>
-            )}
-          </div>
-        )}
+        <SeccionDePago
+          pago={pago}
+          sessionData={sessionData}
+          allItems={allItems}
+          division={division}
+          fullyPaid={fullyPaid}
+          externalPaymentInProgress={externalPaymentInProgress}
+          hasPlatosPoServir={hasPlatosPoServir}
+          hasDeferred={hasDeferred}
+          manualPayLabel={manualPayLabel}
+          isWaiterMode={isWaiterMode}
+          lang={lang}
+          mesaId={mesaId}
+          onReclamarTurno={() => { void handleClaimCustomTurn(); }}
+          onRecargar={refresh}
+        />
       </div>
 
       {/* Division modal */}
@@ -2870,7 +2969,7 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
           onClose={() => setShowDivisionTypeModal(false)}
           onSelectEqual={() => {
             setShowDivisionTypeModal(false);
-            void handlePrePaymentCheck('division-modal');
+            void pago.comprobarAntesDePagar('division-modal');
           }}
           onSelectCustom={() => {
             setShowDivisionTypeModal(false);
@@ -2883,7 +2982,7 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
         <DivisionModal
           total={sessionData.total + (sessionData.propinaCents ?? 0) / 100}
           lang={lang}
-          onConfirm={(n) => { void handleConfirmDivision(n); }}
+          onConfirm={(n) => { void pago.confirmarDivision(n); }}
           onClose={() => { releaseCheckoutLock(); setShowDivisionModal(false); }}
         />
       )}
