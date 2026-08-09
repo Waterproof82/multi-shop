@@ -16,7 +16,7 @@ roto.
 | Evento | Contra qué | Tests que corren |
 |---|---|---|
 | Pull request | preview efímera de ESE commit | ~143 de 214 |
-| Push a `main`/`develop` | alias del entorno, tras confirmar el despliegue | ~205 de 214 |
+| Push a `main`/`develop` | alias del entorno, tras confirmar el despliegue | 209 de 214 |
 
 La diferencia no es arbitraria: el tenant se resuelve por **hostname**, y una
 preview tiene un host efímero que no está en `empresas.dominio`. Sin tenant, los
@@ -42,6 +42,28 @@ secrets del repositorio (van a un almacén aparte), y rellenarlo sería dar la
 
 Todos los tests con `test.skip(!process.env.X, ...)` se omiten limpiamente si falta la env var — nunca fallan por eso.
 
+## Los 5 tests que se saltan SIEMPRE, y por qué está bien
+
+`209 de 214` es el techo sano, no una cobertura incompleta. Los 5 que faltan son
+`e2e/compliance/empresa-config-toggles.spec.ts`, y se saltan por esto:
+
+```
+Test que ESCRIBE en una empresa real. Ejecutar con
+PLAYWRIGHT_ALLOW_MUTATING_TESTS=1 y preferiblemente contra un entorno de pruebas.
+```
+
+Apagan y encienden `mostrar_promociones`, `mostrar_tgtg` y `mostrar_logo` sobre
+una empresa **real**. Activarlos en CI haría que cada push toqueteara la web
+pública del restaurante. **Es una barrera deliberada: no la quites para subir un
+número.** Si algún día hay un entorno de pruebas aislado, ahí sí.
+
+> **`PLAYWRIGHT_WAITER_TOKEN` ya no existe** (agosto 2026). Era un override
+> `?? sessionWaiterToken` que nadie usaba: el `waiter_token` se obtiene haciendo
+> `POST /api/waiter/auth` con `PLAYWRIGHT_WAITER_PIN` en el `beforeAll`. Se
+> eliminó porque hacía daño activo — los mensajes de skip decían "TOKEN o PIN no
+> definido" cuando el PIN sí estaba, y eso llevó a diagnosticar un secreto
+> faltante que no faltaba.
+
 ## Git hooks (Husky)
 
 Instalados vía `"prepare": "husky"` en `package.json` — se activan solos al correr `pnpm install`, no hace falta configurarlos a mano en ningún clon.
@@ -63,7 +85,7 @@ Un hook que falla **aborta** el commit/push — no es una advertencia. `--no-ver
 | `.github/workflows/compliance.yml` | Push/PR a `main`/`develop` que toque `supabase/migrations/**`, `src/app/api/tpv/**`, `src/app/api/laborcontrol/**`, `src/app/api/admin/rgpd/**`, `src/app/api/mesas/**`, `src/app/api/glovo/**`, `src/proxy.ts`, `electron/main.ts`, `tests/compliance/**` o `e2e/compliance/**` — además lunes 03:00 UTC y manual | `pnpm test:compliance` + `npx playwright test e2e/compliance/` contra `https://mermelada-tomate.vercel.app` |
 | `.github/workflows/e2e.yml` | Todo push/PR a `main`/`develop` (sin filtro de paths — cambios de UI en cualquier lado pueden afectar estos flujos) | `npx playwright test e2e/` completo, mismo target |
 
-Los workflows de Playwright pasan `PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` y `SUPABASE_URL` desde secrets/vars del repo. `e2e.yml` también reenvía `PLAYWRIGHT_WAITER_PIN`/`PLAYWRIGHT_WAITER_TOKEN`/`PLAYWRIGHT_ADMIN_EMAIL`/`PLAYWRIGHT_ADMIN_PASSWORD` si existen como secrets — si no están configurados, esos tests puntuales se omiten en CI exactamente igual que en local.
+Los workflows de Playwright pasan `PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` y `SUPABASE_URL` desde secrets/vars del repo. `e2e.yml` también reenvía `PLAYWRIGHT_WAITER_PIN`/`PLAYWRIGHT_ADMIN_EMAIL`/`PLAYWRIGHT_ADMIN_PASSWORD` si existen como secrets — si no están configurados, esos tests puntuales se omiten en CI exactamente igual que en local.
 
 **Por qué vitest corre en `ci.yml` y no solo en `compliance.yml`** (agosto 2026):
 `compliance.yml` está filtrado por rutas —migraciones, unas rutas de API
