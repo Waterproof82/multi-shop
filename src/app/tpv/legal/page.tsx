@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { getAuthAdminUseCase } from '@/core/infrastructure/database';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
-import { verifyTpvEmployeeToken } from '@/lib/tpv-employee-auth';
+import { resolverSesionTpv } from '@/lib/tpv/sesion-servidor';
 import { LegalChainVerify } from '@/components/tpv/LegalChainVerify';
 import { InspectorTokenGenerator } from '@/components/tpv/InspectorTokenGenerator';
 import { RltAccessLink } from '@/components/tpv/RltAccessLink';
@@ -88,26 +88,12 @@ function CheckItem({ label, status, detail }: Readonly<CheckItemProps>) {
 }
 
 export default async function TpvLegalPage() {
-  const cookieStore = await cookies();
-  let empresaId: string | null = null;
-  let isAdmin = false;
-
-  const adminToken = cookieStore.get('admin_token')?.value;
-  if (adminToken) {
-    const admin = await getAuthAdminUseCase().verifyToken(adminToken);
-    if (admin?.empresaId) {
-      empresaId = admin.empresaId;
-      isAdmin = true;
-    }
-  }
-
-  if (!empresaId) {
-    const employeeToken = cookieStore.get('tpv_employee_token')?.value;
-    if (employeeToken) {
-      const payload = await verifyTpvEmployeeToken(employeeToken);
-      if (payload) empresaId = payload.empresaId;
-    }
-  }
+  // Sin sesión NO se redirige: esta página es pública para inspectores de
+  // Hacienda (Art. 12 RD 1007/2023). Lo único que cambia es que no se cargan
+  // los datos dinámicos.
+  const sesion = await resolverSesionTpv(await cookies());
+  const empresaId = sesion?.empresaId ?? null;
+  const isAdmin = sesion?.esEmpleado === false;
 
   // Página accesible públicamente (sin auth) para inspectores de Hacienda — Art. 12 RD 1007/2023.
   // El contenido dinámico (stats, modo) solo se carga cuando hay sesión activa.
