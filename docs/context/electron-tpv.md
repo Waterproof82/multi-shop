@@ -42,3 +42,24 @@ Editar SIEMPRE los `.ts` fuente, NUNCA los `.js` en `electron/dist/`.
 - **`electron/dist/` en `.gitignore`** — los bundles no se commitean. Siempre recompilar antes de distribuir.
 - **`electron-store` debe ser v8.x** — v9+ es ESM-only; esbuild compila a CJS (`--platform=node`). No actualizar a v9+ sin cambiar el target de esbuild.
 - **`pnpm.onlyBuiltDependencies: ['electron']`** — necesario en pnpm v10 para permitir la descarga del binario de Electron.
+
+## Pendiente verificable solo con impresora real
+
+`src/lib/tpv/printer/browser-printer.ts` usa `document.write`, que está
+deprecado (SonarLint S1874). **Se queda a propósito**, con un `NOSONAR` que
+explica por qué:
+
+- `BrowserPrinter` no es un fallback. `usePrinter` la instancia directa, así que
+  es la que saca **todos** los tickets fiscales.
+- La alternativa moderna —construir un `Blob`, `URL.createObjectURL` y navegar la
+  ventana— cambia el camino de carga y cómo interactúa con el bloqueador de
+  ventanas emergentes.
+- El código ya está afinado contra navegadores reales: el
+  `if (win.document.readyState === 'complete') resolve()` existe porque alguien
+  se encontró con que el evento `load` llegaba antes de tiempo y el QR salía en
+  blanco. Eso no se deduce leyendo, se descubre imprimiendo.
+
+**Para migrarlo hace falta una impresora térmica delante** y comprobar tres
+cosas: que el QR de la AEAT se pinta (no en blanco), que el diálogo de impresión
+abre a la primera, y que la ventana se cierra sola después. Sin esa verificación,
+el cambio no compensa: cambia código probado en producción por código solo leído.
