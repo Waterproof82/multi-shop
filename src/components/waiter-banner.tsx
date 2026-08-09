@@ -12,6 +12,7 @@ import { useCart } from "@/lib/cart-context";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { mesaSesionChannel } from "@/lib/realtime-channels";
+import { motivoParaOcultarBanner, seccionDeRuta } from "@/lib/waiter/banner-visibilidad";
 
 const BG            = "oklch(17% 0.025 252)";
 const BORDER        = "oklch(42% 0.14 62 / 0.35)";
@@ -494,29 +495,14 @@ export function WaiterBanner() {
     }
   }
 
-  // Not ready yet
-  if (!authChecked) return null;
-
-  // Not a waiter at all → hide everything
-  if (!isWaiter) return null;
-
-  // Admin/superadmin/TPV panels are never waiter context
-  if (pathname.startsWith('/admin') || pathname.startsWith('/superadmin') || pathname.startsWith('/tpv')) return null;
-
-  // Kitchen page has its own header — don't render the waiter banner there
-  if (pathname.startsWith('/kitchen')) return null;
-
-  // Tracking page is customer-facing — never show the waiter banner there
-  if (pathname.startsWith('/tracking/')) return null;
-
   const hasMesa = mesaLabel !== null;
 
-  // Customer-facing pages — hide banner unless the waiter is impersonating a mesa
-  if (pathname.startsWith('/mesa/') && !hasMesa) return null;
+  // Donde NO se pinta el banner. Eran ocho guardas sueltas aqui dentro; ahora
+  // cada una tiene nombre y test propio en `@/lib/waiter/banner-visibilidad`.
+  if (motivoParaOcultarBanner({ authChecked, isWaiter, pathname, hasMesa })) return null;
 
-  let sectionLabel: string | null = null;
-  if (pathname === '/waiter/kitchen') sectionLabel = t('waiterKitchen', lang);
-  else if (pathname === '/waiter/bar') sectionLabel = t('waiterBar', lang);
+  const claveSeccion = seccionDeRuta(pathname);
+  const sectionLabel = claveSeccion === null ? null : t(claveSeccion, lang);
 
   function renderDropdownContent() {
     if (loadingMesas) {
@@ -580,10 +566,6 @@ export function WaiterBanner() {
       </ul>
     );
   }
-
-  // On the customer store page, only show the banner if the waiter has a mesa selected.
-  // Without a mesa in sessionStorage we're in customer context — hide the waiter UI.
-  if (pathname === '/' && !hasMesa) return null;
 
   return (
     <>
