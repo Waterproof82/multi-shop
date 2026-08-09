@@ -61,18 +61,40 @@ Refactorizar `mesa-orders-client.tsx` (complejidad **78**, la pantalla donde el
 comensal ve y paga su cuenta) sin red de seguridad es exactamente el atajo que
 este trabajo ha evitado en todo el bloque backend. **No hacerlo.**
 
-### Trabajo previo necesario
+### Trabajo previo — HECHO (2026-08-09)
 
-1. `pnpm add -D jsdom @testing-library/react @testing-library/user-event @testing-library/jest-dom`
-2. En `vitest.config.ts`: `environmentMatchGlobs` para que `tests/ui/**` use
-   `jsdom` y el resto siga en `node` (la suite actual tarda ~2 s; meter jsdom en
-   todo la ralentizaría sin motivo).
-3. Un `setup.ts` con `@testing-library/jest-dom` y limpieza entre tests.
-4. Decidir **qué se quiere cubrir**. No es "tests de componentes" en abstracto:
-   son comportamientos concretos —qué se muestra según el estado de la sesión,
-   qué pasa al pulsar pagar, cómo reacciona a un evento de Realtime—.
+El harness ya existe. `jsdom`, `@testing-library/react`, `user-event` y
+`jest-dom` instalados; `tests/ui/setup.ts` con limpieza entre tests; y en
+`vitest.config.ts` **dos proyectos** en vez de un entorno único:
+
+| Proyecto | Entorno | Coge | Corre en |
+|---|---|---|---|
+| `unit` | `node` | `tests/**/*.test.ts` | ~1,9 s |
+| `ui` | `jsdom` | `tests/ui/**/*.test.tsx` | ~1,5 s |
+
+> **Corrección respecto a lo que decía este documento:** recomendaba
+> `environmentMatchGlobs`. Esa opción **se eliminó en Vitest 4** (el proyecto
+> usa la 4.1.10). El sustituto es `projects`. Si alguien copia la receta vieja,
+> no falla con un error claro: la opción se ignora en silencio y todo acaba
+> corriendo en `node`.
+
+**Lo que encontró el harness en su primera ejecución**, antes de correr un solo
+test: `react` estaba en 19.2.8 y `react-dom` en 19.2.0. React 19 exige que
+coincidan exactamente. Llevaba tiempo así y nadie lo veía porque **ningún test
+renderizaba React**. Corregido en la misma PR.
+
+### Lo que queda por decidir
+
+**Qué se quiere cubrir.** No es "tests de componentes" en abstracto: son
+comportamientos concretos —qué se muestra según el estado de la sesión, qué pasa
+al pulsar pagar, cómo reacciona a un evento de Realtime—.
 
 Esa decisión es de producto tanto como técnica, y merece empezarse en frío.
+
+El primer test (`tests/ui/allergen-badges.test.tsx`) se eligió por valor, no por
+facilidad: los alérgenos son información de seguridad alimentaria. Y ya documenta
+un riesgo real — **un alérgeno con la clave mal escrita en la BBDD desaparece en
+silencio**, sin error ni hueco visible.
 
 ---
 

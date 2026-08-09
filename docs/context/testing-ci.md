@@ -33,7 +33,9 @@ secrets del repositorio (van a un almacén aparte), y rellenarlo sería dar la
 |---------|-------|-----------|----------|
 | `pnpm lint` | ESLint | Estilo y reglas de código en `src/**/*.{ts,tsx}` | — |
 | `pnpm typecheck` | `tsc --noEmit` | Tipos en todo el proyecto (`tsconfig.typecheck.json`) | — |
+| `pnpm test` | Vitest | **Todo**: proyectos `unit` + `ui`. Es lo que corre CI y el hook de `pre-push` | — |
 | `pnpm test:compliance` | Vitest | Tests estáticos rápidos: secrets hardcodeados, patrones de código inseguro, invariantes sin red (`tests/compliance/`) | — |
+| `pnpm test:ui` | Vitest + jsdom | Tests que montan componentes React (`tests/ui/**/*.test.tsx`) | — |
 | `npx playwright test e2e/compliance/` | Playwright | Regresión legal/fiscal contra Supabase real: RLS, inalterabilidad, cadenas de hash, RGPD (`e2e/compliance/`) | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY` |
 | `npx playwright test e2e/` | Playwright | Suite completa: lo anterior + flujos de camarero/cocina/CSRF/DB smoke | Igual que arriba; algunos tests adicionales requieren `PLAYWRIGHT_WAITER_PIN`, `PLAYWRIGHT_ADMIN_EMAIL`/`PASSWORD` — se omiten (skip) si no están definidos |
 | `pnpm db:smoke` | `supabase db query --linked` | Verifica que las funciones DB con `digest()` (pgcrypto) son invocables tras una migración | Login activo del Supabase CLI (`supabase login`) |
@@ -57,11 +59,20 @@ Un hook que falla **aborta** el commit/push — no es una advertencia. `--no-ver
 
 | Workflow | Trigger | Qué corre |
 |----------|---------|-----------|
-| `.github/workflows/ci.yml` | Todo push/PR a `main`/`develop` | `pnpm lint` + `pnpm typecheck` + `pnpm build` |
+| `.github/workflows/ci.yml` | Todo push/PR a `main`/`develop` | `pnpm lint` + `pnpm typecheck` + **`pnpm test`** + `pnpm build` |
 | `.github/workflows/compliance.yml` | Push/PR a `main`/`develop` que toque `supabase/migrations/**`, `src/app/api/tpv/**`, `src/app/api/laborcontrol/**`, `src/app/api/admin/rgpd/**`, `src/app/api/mesas/**`, `src/app/api/glovo/**`, `src/proxy.ts`, `electron/main.ts`, `tests/compliance/**` o `e2e/compliance/**` — además lunes 03:00 UTC y manual | `pnpm test:compliance` + `npx playwright test e2e/compliance/` contra `https://mermelada-tomate.vercel.app` |
 | `.github/workflows/e2e.yml` | Todo push/PR a `main`/`develop` (sin filtro de paths — cambios de UI en cualquier lado pueden afectar estos flujos) | `npx playwright test e2e/` completo, mismo target |
 
 Los workflows de Playwright pasan `PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` y `SUPABASE_URL` desde secrets/vars del repo. `e2e.yml` también reenvía `PLAYWRIGHT_WAITER_PIN`/`PLAYWRIGHT_WAITER_TOKEN`/`PLAYWRIGHT_ADMIN_EMAIL`/`PLAYWRIGHT_ADMIN_PASSWORD` si existen como secrets — si no están configurados, esos tests puntuales se omiten en CI exactamente igual que en local.
+
+**Por qué vitest corre en `ci.yml` y no solo en `compliance.yml`** (agosto 2026):
+`compliance.yml` está filtrado por rutas —migraciones, unas rutas de API
+concretas, `src/proxy.ts`, `tests/compliance/**`— y **`src/components/**` no está
+en esa lista**. Un PR que solo tocara un componente se saltaba entera la suite
+estática, incluido el guard que impide reintroducir `next/image` sobre imágenes
+ya optimizadas (ver [`imagenes.md`](./imagenes.md)) — un guard cuyo único trabajo
+es vigilar precisamente `src/components/**`. `ci.yml` solo ignora `docs/**` y
+`*.md`, así que ahí no queda hueco.
 
 `compliance.yml` y `e2e.yml` se solapan parcialmente (`e2e.yml` incluye `e2e/compliance/`) — es intencional: `compliance.yml` da feedback rápido y dirigido en cambios de migración/legal, `e2e.yml` es el gate exhaustivo en todo push. El costo de correr esos tests dos veces es bajo (son idempotentes, de solo lectura o con guards de limpieza) frente al valor de no depender de acordarse de tocar el path correcto.
 
