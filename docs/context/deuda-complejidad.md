@@ -2,13 +2,13 @@
 
 Estado a 2026-08-09.
 
-**14 funciones** siguen por encima del umbral de complejidad cognitiva 15 (regla
-SonarQube S3776). Se cerraron 15 en el bloque backend y `proxy.ts` en agosto;
-**las 14 que quedan son todas React**.
+**5 funciones** siguen por encima del umbral de complejidad cognitiva 15 (regla
+SonarQube S3776). Se cerraron 15 en el bloque backend, `proxy.ts`, y otras nueve
+de React en agosto de 2026.
 
-Ya no están bloqueadas: el harness existe (ver más abajo). Lo que falta es
-decidir qué comportamiento cubrir en cada una, que es trabajo de producto además
-de técnico.
+Ninguna está ya bloqueada: el harness existe (ver más abajo). El detalle de las
+5 que faltan, y por qué dos de ellas piden sesión propia, está al final del
+documento.
 
 ---
 
@@ -215,3 +215,50 @@ de la función que se elige.
 - **No editar archivos mientras corre un `git commit`**: el hook de Husky ejecuta
   typecheck y falla con la edición a medias.
 - El hook llega a tardar >10 min ocasionalmente. Commitear de uno en uno.
+
+---
+
+## Lo que queda (2026-08-09)
+
+```
+78  src/components/mesa-orders-client.tsx:1248   DELICADA
+21  src/app/waiter/bar/page.tsx:441              DELICADA
+18  src/components/mesa-orders-client.tsx:530
+17  src/components/cart-drawer.tsx:949
+16  src/components/waiter-banner.tsx:137
+```
+
+### Las tres mecánicas
+
+Mismo tipo que las nueve ya cerradas. El patrón que ha funcionado en todas:
+
+1. **Un ternario anidado casi siempre es un ESTADO SIN NOMBRE.** No lo desanides
+   rama a rama: eso deja la misma idea repartida. Dale un tipo (`type Estado =
+   'a' | 'b' | 'c'`) y una tabla `Record<Estado, …>`. Con el Record, añadir un
+   estado nuevo obliga a rellenarlo — TypeScript no lo deja incompleto.
+2. **Bloques JSX repetidos con ternarios dentro**: extrae un componente. En
+   `SeoCell` eran doce ramas para decir cuatro cosas.
+3. **Mide después de cada extracción, no al final.** `tgtg-reserva-popup` tenía
+   la complejidad en TRES sitios (efecto, handler y JSX); bajar el primero no
+   movió la aguja ni un punto.
+
+### Las dos delicadas — leer esto antes de tocarlas
+
+**`waiter/bar:441`** es un `beforeunload` que persiste comandas en vuelo y
+dispara un PATCH por ítem. Es código de resiliencia offline: lo que se pierda
+ahí son comandas reales que el cocinero no ve. Antes de refactorizarlo hay que
+entender qué garantiza hoy —y qué no— sobre pestañas que se cierran a media
+operación. Ver [`offline-y-resiliencia.md`](./offline-y-resiliencia.md).
+
+**`mesa-orders-client:1248`** (78) es la pantalla donde el comensal paga.
+El orden que ha funcionado en todo lo demás:
+
+1. Extraer primero las funciones **puras** —cálculos de totales, agrupaciones,
+   decisiones de visibilidad—. Se prueban sin montar nada, y el harness de
+   `tests/ui/` ya existe para lo que sí necesite render.
+2. Decidir **qué comportamiento cubrir** antes de mover código. No es "tests de
+   componentes" en abstracto: qué se muestra según el estado de la sesión, qué
+   pasa al pulsar pagar, cómo reacciona a un evento de Realtime. Esa decisión es
+   de producto tanto como técnica.
+
+**No las metas en el mismo PR que otra cosa.**
