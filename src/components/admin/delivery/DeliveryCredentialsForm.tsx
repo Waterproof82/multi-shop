@@ -24,11 +24,85 @@ interface FieldProps {
   isSet?: boolean;
 }
 
-function Field({ label, id, value, onChange, placeholder, hint, textarea, secret, isSet }: Readonly<FieldProps>) {
+const CLASE_CONTROL =
+  'min-h-[44px] w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground';
+
+/**
+ * Placeholder de un campo que ya tiene valor guardado.
+ *
+ * Las credenciales NO se devuelven del servidor —solo si están puestas o no—, así
+ * que el campo llega vacío aunque haya una guardada. Sin este aviso, quien edita
+ * otra cosa del formulario cree que la borró.
+ */
+function placeholderDeCredencial(isSet: boolean, placeholder?: string): string | undefined {
+  return isSet ? '(dejar vacío para mantener el existente)' : placeholder;
+}
+
+type ControlProps = Readonly<
+  Pick<FieldProps, 'id' | 'value' | 'onChange' | 'placeholder' | 'isSet'>
+>;
+
+function ControlLargo({ id, value, onChange, placeholder, isSet }: ControlProps) {
+  return (
+    <textarea
+      id={id}
+      rows={5}
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholderDeCredencial(Boolean(isSet), placeholder)}
+      className={`${CLASE_CONTROL} resize-y font-mono text-xs`}
+    />
+  );
+}
+
+function ControlSecreto({ id, value, onChange, placeholder, isSet }: ControlProps) {
+  // El estado vive aquí, que es el único control que lo usa. Antes estaba en
+  // `Field` y se creaba también para los campos que nunca se ocultan.
   const [show, setShow] = useState(false);
 
-  const inputClass =
-    'min-h-[44px] w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground';
+  return (
+    <div className="relative">
+      <input
+        id={id}
+        type={show ? 'text' : 'password'}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholderDeCredencial(Boolean(isSet), placeholder)}
+        className={`${CLASE_CONTROL} pr-10`}
+      />
+      <button
+        type="button"
+        onClick={() => setShow(s => !s)}
+        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+        aria-label={show ? 'Ocultar' : 'Mostrar'}
+      >
+        {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+      </button>
+    </div>
+  );
+}
+
+function ControlSimple({ id, value, onChange, placeholder }: ControlProps) {
+  return (
+    <input
+      id={id}
+      type="text"
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      className={CLASE_CONTROL}
+    />
+  );
+}
+
+function Field({ label, id, value, onChange, placeholder, hint, textarea, secret, isSet }: Readonly<FieldProps>) {
+  const control = { id, value, onChange, placeholder, isSet };
+
+  function renderControl() {
+    if (textarea) return <ControlLargo {...control} />;
+    if (secret) return <ControlSecreto {...control} />;
+    return <ControlSimple {...control} />;
+  }
 
   return (
     <div className="space-y-1.5">
@@ -38,44 +112,7 @@ function Field({ label, id, value, onChange, placeholder, hint, textarea, secret
           <span className="ml-2 text-xs text-green-500 font-normal">✓ guardado</span>
         )}
       </label>
-      {textarea ? (
-        <textarea
-          id={id}
-          rows={5}
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          placeholder={isSet ? '(dejar vacío para mantener el existente)' : placeholder}
-          className={`${inputClass} resize-y font-mono text-xs`}
-        />
-      ) : secret ? (
-        <div className="relative">
-          <input
-            id={id}
-            type={show ? 'text' : 'password'}
-            value={value}
-            onChange={e => onChange(e.target.value)}
-            placeholder={isSet ? '(dejar vacío para mantener el existente)' : placeholder}
-            className={`${inputClass} pr-10`}
-          />
-          <button
-            type="button"
-            onClick={() => setShow(s => !s)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-            aria-label={show ? 'Ocultar' : 'Mostrar'}
-          >
-            {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          </button>
-        </div>
-      ) : (
-        <input
-          id={id}
-          type="text"
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          placeholder={placeholder}
-          className={inputClass}
-        />
-      )}
+      {renderControl()}
       {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
     </div>
   );
