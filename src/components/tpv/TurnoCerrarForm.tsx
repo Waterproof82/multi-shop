@@ -27,6 +27,35 @@ function fmt(cents: number) {
   return (cents / 100).toLocaleString('es-ES', { minimumFractionDigits: 2 }) + ' €';
 }
 
+/**
+ * Copia local del informe Z en Electron.
+ *
+ * Best-effort A PROPÓSITO: si falla se registra pero NO se bloquea el cierre.
+ * El informe ya está guardado en el servidor; impedir cerrar el turno porque no
+ * se pudo escribir un backup dejaría al cajero atrapado al final de su jornada.
+ */
+function guardarBackupFiscalLocal(data: InformeZData): void {
+  const guardado = window.electronAPI?.saveFiscalSnapshot(data);
+  if (guardado === undefined) return;
+
+  guardado
+    .then(result => {
+      if (!result.success) {
+        logClientError(new Error(result.error ?? 'Backup fiscal local fallido'), 'saveFiscalSnapshot');
+      }
+    })
+    .catch(err => { logClientError(err, 'saveFiscalSnapshot'); });
+}
+
+/** Mensaje a mostrar cuando el cierre falla, con un texto por defecto usable. */
+async function mensajeDeError(res: Response): Promise<string> {
+  try {
+    const err = (await res.json()) as { error?: string };
+    if (typeof err.error === 'string') return err.error;
+  } catch { /* el cuerpo no era JSON: nos quedamos con el texto por defecto */ }
+  return 'Error al cerrar el turno. Inténtalo de nuevo.';
+}
+
 function getDiferenciaColorClass(diferenciaCents: number): string {
   if (diferenciaCents === 0) return 'text-[#22c55e]';
   if (diferenciaCents > 0) return 'text-[#eab308]';
@@ -96,16 +125,7 @@ export function TurnoCerrarForm({ turno, stats, mesasAbiertas, isBlindClose, emp
         const nextNav = isEmployeeSession ? '/tpv/login' : '/tpv/turno/abrir';
         if (zRes.ok) {
           const data = (await zRes.json()) as InformeZData;
-          const snapshotPromise = window.electronAPI?.saveFiscalSnapshot(data);
-          if (snapshotPromise !== undefined) {
-            snapshotPromise
-              .then(result => {
-                if (!result.success) {
-                  logClientError(new Error(result.error ?? 'Backup fiscal local fallido'), 'saveFiscalSnapshot');
-                }
-              })
-              .catch(err => { logClientError(err, 'saveFiscalSnapshot'); });
-          }
+          guardarBackupFiscalLocal(data);
           setInformeZ(data);
         } else if (isEmployeeSession && empleadoId) {
           setPendingNav(nextNav);
@@ -114,12 +134,7 @@ export function TurnoCerrarForm({ turno, stats, mesasAbiertas, isBlindClose, emp
           router.push(nextNav);
         }
       } else {
-        let msg = 'Error al cerrar el turno. Inténtalo de nuevo.';
-        try {
-          const err = (await res.json()) as { error?: string };
-          if (typeof err.error === 'string') msg = err.error;
-        } catch { /* usa msg por defecto */ }
-        setError(msg);
+        setError(await mensajeDeError(res));
       }
     } catch {
       setError('Sin conexión. Comprueba la red e inténtalo de nuevo.');
