@@ -2,13 +2,12 @@
 
 Estado a 2026-08-09.
 
-**5 funciones** siguen por encima del umbral de complejidad cognitiva 15 (regla
-SonarQube S3776). Se cerraron 15 en el bloque backend, `proxy.ts`, y otras nueve
-de React en agosto de 2026.
+**3 funciones** siguen por encima del umbral de complejidad cognitiva 15 (regla
+SonarQube S3776), de las 15 que había al empezar. Se cerraron el bloque backend,
+`proxy.ts`, y once componentes de React en agosto de 2026.
 
-Ninguna está ya bloqueada: el harness existe (ver más abajo). El detalle de las
-5 que faltan, y por qué dos de ellas piden sesión propia, está al final del
-documento.
+Ninguna está bloqueada: el harness de React existe (ver más abajo). **Dos de las
+tres piden sesión propia**, y el porqué está al final del documento.
 
 ---
 
@@ -52,22 +51,32 @@ for (const r of res) {
 }
 ```
 
+**Truco que ahorra la mitad del trabajo:** con el umbral en **0** y un solo
+fichero, la regla lista *todas* sus funciones con su complejidad, no solo las que
+pasan de 15. Es la forma barata de saber **dónde** está repartida antes de tocar
+nada — el número por fichero no dice si es un bloque gordo o veinte guardas
+sueltas, y esa diferencia decide el refactor.
+
+Dos detalles que no son evidentes y cambian cómo se lee la salida:
+
+- **El plugin de ESLint mide cada función POR SEPARADO.** La complejidad de una
+  función anidada NO suma a la de su contenedora. Si un componente marca 16 y
+  tiene dentro un handler de 10, ese 16 es todo suyo: sacar el handler no moverá
+  la aguja.
+- **Los condicionales del JSX (`{x && <p/>}`) no cuentan.** Por eso `cart-drawer`
+  se atascó (ver más abajo): se extrajeron seis piezas de JSX y el número no se
+  movió.
+
 ---
 
-## BLOQUEO: los componentes React no se pueden probar
+## Harness de React — HECHO (2026-08-09)
 
-14 de las 15 pendientes son componentes o páginas. **El proyecto no tiene `jsdom`
-ni Testing Library configurados**, así que no hay manera de escribir la prueba de
-caracterización que debe preceder a cada refactor.
+Durante un tiempo esto fue un bloqueo real: no había `jsdom` ni Testing Library,
+así que no se podía escribir la prueba de caracterización que debe preceder a
+cada refactor de componente. Ya no.
 
-Refactorizar `mesa-orders-client.tsx` (complejidad **78**, la pantalla donde el
-comensal ve y paga su cuenta) sin red de seguridad es exactamente el atajo que
-este trabajo ha evitado en todo el bloque backend. **No hacerlo.**
-
-### Trabajo previo — HECHO (2026-08-09)
-
-El harness ya existe. `jsdom`, `@testing-library/react`, `user-event` y
-`jest-dom` instalados; `tests/ui/setup.ts` con limpieza entre tests; y en
+`jsdom`, `@testing-library/react`, `user-event` y `jest-dom` instalados;
+`tests/ui/setup.ts` con limpieza entre tests; y en
 `vitest.config.ts` **dos proyectos** en vez de un entorno único:
 
 | Proyecto | Entorno | Coge | Corre en |
@@ -86,24 +95,30 @@ test: `react` estaba en 19.2.8 y `react-dom` en 19.2.0. React 19 exige que
 coincidan exactamente. Llevaba tiempo así y nadie lo veía porque **ningún test
 renderizaba React**. Corregido en la misma PR.
 
-### Lo que queda por decidir
+### Cuándo montar React y cuándo no
 
-**Qué se quiere cubrir.** No es "tests de componentes" en abstracto: son
-comportamientos concretos —qué se muestra según el estado de la sesión, qué pasa
-al pulsar pagar, cómo reacciona a un evento de Realtime—.
+Hasta ahora **ningún refactor de complejidad ha necesitado el proyecto `ui`**.
+El patrón que ha bastado en las once: sacar la decisión a una función pura en
+`src/lib/`, probarla en `unit` (que corre en ~2 s, en cada commit), y dejar en el
+componente solo el render. `banner-visibilidad.ts` es el ejemplo más limpio.
 
-Esa decisión es de producto tanto como técnica, y merece empezarse en frío.
+Montar el componente es para lo que de verdad no se puede separar: qué se
+muestra según el estado de la sesión, qué pasa al pulsar pagar, cómo reacciona a
+un evento de Realtime. Ahí sí, y esa decisión es de producto tanto como técnica.
 
-El primer test (`tests/ui/allergen-badges.test.tsx`) se eligió por valor, no por
-facilidad: los alérgenos son información de seguridad alimentaria. Y ya documenta
-un riesgo real — **un alérgeno con la clave mal escrita en la BBDD desaparece en
-silencio**, sin error ni hueco visible.
+El primer test que sí monta (`tests/ui/allergen-badges.test.tsx`) se eligió por
+valor, no por facilidad: los alérgenos son información de seguridad alimentaria.
+Y ya documenta un riesgo real — **un alérgeno con la clave mal escrita en la BBDD
+desaparece en silencio**, sin error ni hueco visible.
 
 ---
 
-## Pendientes, por orden de valor
+## Cerradas — lo que dejó cada una
 
-### 1. `proxy.ts` — HECHO (2026-08-09). De 27 a bajo umbral
+Solo las que enseñaron algo. El resto siguió los patrones de más abajo sin
+sorpresas.
+
+### `proxy.ts` — de 27 a bajo umbral (2026-08-09)
 
 Se cumplieron las tres condiciones que este documento exigía: 51 tests de
 caracterización primero (`tests/compliance/proxy-autorizacion.test.ts`,
@@ -130,43 +145,30 @@ y `/api/laborcontrol`), `handleSuperadminAuth` y `buildPageResponse`.
 > La complejidad real era **27**, no 28: este documento la había registrado con
 > una unidad de más. Medir antes de tocar, siempre.
 
-### 2. `mesa-orders-client.tsx:1248` — complejidad 78
+### `waiter-banner.tsx` — de 16 a 7 (2026-08-09)
 
-La peor del proyecto, y la de mayor impacto: es la cuenta del comensal. Bloqueada
-por el harness de React.
+Caso de libro de **complejidad sin un solo bloque gordo**. Midiendo con umbral 0
+el componente marcaba 16 y su handler más pesado 10 — pero como el plugin no
+suma las anidadas, ese 16 salía entero de **ocho `if (...) return null` seguidos**
+más un `if/else if` para el rótulo de sección. Sacar handlers no habría movido
+nada.
 
-Cuando se aborde, el orden que ha funcionado en el bloque backend:
-extraer primero las funciones **puras** (cálculos de totales, agrupaciones,
-decisiones de visibilidad), que son las que se pueden probar sin montar nada.
+Extraído a `src/lib/waiter/banner-visibilidad.ts` como tabla de reglas
+`{ motivo, oculta }`, con `motivoParaOcultarBanner()` devolviendo **el motivo, no
+un booleano**. El motivo es lo que hace legible el test: `'tienda-sin-mesa'` dice
+lo que `false` no dice.
 
-### 3. Resto de componentes
+**El orden de las reglas es parte del contrato.** `isWaiter` arranca en `false`,
+así que si `'no-es-camarero'` ganara a `'auth-sin-comprobar'`, el primer render de
+cada carga contaría como fallo de auth y dispararía el redirect a `/waiter`. Hay
+test para eso.
 
-| Complejidad | Archivo |
-|---|---|
-| 24 | `src/components/tgtg-reserva-popup.tsx:51` |
-| 23 | `src/app/tpv/layout.tsx:40` |
-| 21 | `src/components/tpv/TurnoCerrarForm.tsx:70` |
-| 21 | `src/app/waiter/bar/page.tsx:441` |
-| 20 | `src/app/tpv/turno/cerrar/page.tsx:18` |
-| 18 | `src/components/mesa-orders-client.tsx:530` |
-| 18 | `src/app/superadmin/empresas-table.tsx:203` |
-| 17 | `src/components/cart-drawer.tsx:949` |
-| 17 | `src/components/admin/delivery/DeliveryCredentialsForm.tsx:27` |
-| 16 | `src/components/waiter-banner.tsx:137` |
-| 16 | `src/components/tpv/MenuPanel.tsx:179` |
-| 16 | `src/app/tpv/legal/page.tsx:90` |
-| 16 | `src/app/admin/(protected)/page.tsx:19` |
+Dos asimetrías heredadas que aparecieron al escribir los tests. Ninguna es un
+bug hoy, y las dos están congeladas para que no cuesten una tarde:
 
-### Nota sobre `cart-drawer.tsx`
-
-Se intentó y **se atascó en 17**. Bajó de 19 extrayendo seis piezas
-(`DiscountSection`, `TotalsSection`, `FieldError`, `detectMesaFromUrl`,
-`validarCodigoDescuento`, `camposTrasCambioDeEntrega`) y ahí se quedó.
-
-Dato contraintuitivo medido: **extraer condicionales del JSX (`{x && <p/>}`) no
-mueve la métrica**. Está dominada por otra cosa. Quien lo retome, que lea las
-*secondary locations* del informe de Sonar en vez de ir a ciegas como se hizo
-aquí.
+1. `/admin` se compara **por prefijo sin barra**, así que una futura
+   `/administracion` también ocultaría el banner, en silencio.
+2. `/tracking/` **sí lleva barra**, así que `/tracking` a secas lo muestra.
 
 ---
 
@@ -221,26 +223,45 @@ de la función que se elige.
 ## Lo que queda (2026-08-09)
 
 ```
-78  src/components/mesa-orders-client.tsx:1248   DELICADA
-21  src/app/waiter/bar/page.tsx:441              DELICADA
-18  src/components/mesa-orders-client.tsx:530
-17  src/components/cart-drawer.tsx:949
-16  src/components/waiter-banner.tsx:137
+78  src/components/mesa-orders-client.tsx:1281   DELICADA — la cuenta del comensal
+21  src/app/waiter/bar/page.tsx:441              DELICADA — beforeunload offline
+17  src/components/cart-drawer.tsx:1004          intentada, NO conseguida
 ```
 
-### Las tres mecánicas
+Los números de línea se mueven en cuanto alguien toca el fichero. **Medir antes
+de ir a buscarlos.**
 
-Mismo tipo que las nueve ya cerradas. El patrón que ha funcionado en todas:
+### El patrón que ha funcionado en las once cerradas
 
 1. **Un ternario anidado casi siempre es un ESTADO SIN NOMBRE.** No lo desanides
    rama a rama: eso deja la misma idea repartida. Dale un tipo (`type Estado =
    'a' | 'b' | 'c'`) y una tabla `Record<Estado, …>`. Con el Record, añadir un
    estado nuevo obliga a rellenarlo — TypeScript no lo deja incompleto.
-2. **Bloques JSX repetidos con ternarios dentro**: extrae un componente. En
+2. **Una cadena de guardas también es un estado sin nombre**, aunque no haya
+   ningún ternario. Ver `waiter-banner` más arriba: ocho `return null` seguidos.
+   Tabla de reglas, y que devuelva el motivo.
+3. **Bloques JSX repetidos con ternarios dentro**: extrae un componente. En
    `SeoCell` eran doce ramas para decir cuatro cosas.
-3. **Mide después de cada extracción, no al final.** `tgtg-reserva-popup` tenía
+4. **Mide después de cada extracción, no al final.** `tgtg-reserva-popup` tenía
    la complejidad en TRES sitios (efecto, handler y JSX); bajar el primero no
    movió la aguja ni un punto.
+5. **Empieza midiendo con umbral 0** para saber dónde está repartida. Ahorra
+   justo el trabajo que no sirve.
+
+### `cart-drawer.tsx` — intentada y atascada en 17
+
+Bajó de 19 extrayendo seis piezas (`DiscountSection`, `TotalsSection`,
+`FieldError`, `detectMesaFromUrl`, `validarCodigoDescuento`,
+`camposTrasCambioDeEntrega`) y ahí se quedó.
+
+Lo que queda **está repartido por el cuerpo del componente** —guardas de envío,
+estados de descuento, flujo de delivery—, no en un bloque extraíble. Sacar trozos
+sueltos movería el número sin mejorar nada, que es exactamente lo que no se busca
+aquí.
+
+Antes de reintentarlo: medir con umbral 0 y comprobar que sigue siendo así. Si el
+único camino es partir el componente en dos por responsabilidad (carrito vs.
+datos de entrega), eso es un cambio de diseño y merece su propio PR.
 
 ### Las dos delicadas — leer esto antes de tocarlas
 
@@ -250,7 +271,7 @@ ahí son comandas reales que el cocinero no ve. Antes de refactorizarlo hay que
 entender qué garantiza hoy —y qué no— sobre pestañas que se cierran a media
 operación. Ver [`offline-y-resiliencia.md`](./offline-y-resiliencia.md).
 
-**`mesa-orders-client:1248`** (78) es la pantalla donde el comensal paga.
+**`mesa-orders-client:1281`** (78) es la pantalla donde el comensal paga.
 El orden que ha funcionado en todo lo demás:
 
 1. Extraer primero las funciones **puras** —cálculos de totales, agrupaciones,
