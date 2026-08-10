@@ -66,8 +66,12 @@ export class ErrorLogger {
       });
     }
 
-    // Forward to Sentry (server-side only — client errors go via logClientError)
-    if (globalThis.window === undefined) {
+    // Forward to Sentry (server-side only — client errors go via logClientError).
+    // 'warning' se loguea para auditoría pero NO se captura como excepción:
+    // son fallos esperados de negocio (credenciales inválidas, validación),
+    // no bugs de la aplicación. Capturarlos igual que un error real ahoga el
+    // dashboard con ruido y consume cuota de eventos sin aportar señal.
+    if (globalThis.window === undefined && data.severity !== 'warning') {
       const { captureException } = await import('@sentry/nextjs');
       captureException(new Error(data.mensaje), {
         tags: {
