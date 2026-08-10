@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { OfflineBanner } from '@/components/waiter/offline-banner';
 import { PushRegistrar } from '@/components/waiter/push-registrar';
+import { WaiterCatalogProvider } from '@/lib/waiter-catalog-ctx';
 
 export const metadata: Metadata = {
   other: {
@@ -12,10 +13,10 @@ export const metadata: Metadata = {
 
 export default function WaiterLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <>
+    <WaiterCatalogProvider>
       <PushRegistrar />
       <OfflineBanner />
       {children}
-    </>
+    </WaiterCatalogProvider>
   );
 }

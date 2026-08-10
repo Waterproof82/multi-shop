@@ -99,6 +99,11 @@ test.describe('DB smoke — auth barrier (sin credenciales)', () => {
     expect(res.status()).not.toBe(500);
     expect([400, 401, 403, 404, 422]).toContain(res.status());
   });
+
+  test('GET /api/waiter/catalog sin token responde 401', async () => {
+    const res = await request.get('/api/waiter/catalog');
+    expect(res.status()).toBe(401);
+  });
 });
 
 
