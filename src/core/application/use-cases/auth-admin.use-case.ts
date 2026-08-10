@@ -130,12 +130,14 @@ export class AuthAdminUseCase {
 
       return result.data;
     } catch (e) {
+      // 'warning': un token expirado o malformado llega en CADA request cuya
+      // sesion vencio (24h) — ciclo de vida normal, no un bug de la app.
       await logger.logAndReturnError(
         'TOKEN_VERIFY_FAILED',
         e instanceof Error ? e.message : 'Token verification failed',
         'use-case',
         'AuthAdminUseCase.verifyToken',
-        { details: { hasToken: !!token } }
+        { details: { hasToken: !!token }, severity: 'warning' }
       );
       return null;
     }
