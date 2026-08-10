@@ -7,8 +7,11 @@
  * fichero (78, el peor del repo).
  *
  * Esta es la pantalla donde el comensal PAGA, asi que lo que se congela aqui es
- * el comportamiento QUE YA HABIA, incluidos dos casos que parecen erratas y que
- * NO se corrigen en este refactor (ver los tests del final).
+ * el comportamiento QUE YA HABIA, incluido un caso que parece errata y que NO
+ * se corrige en este refactor (ver el test del final).
+ *
+ * Excepcion: el caso del `activeTurnoId` obsoleto SI se corrigio (decision
+ * explicita, no heredada) -- ver `turnoEsAjeno` en vista-mesa.ts.
  */
 import { describe, it, expect } from 'vitest';
 import {
@@ -65,6 +68,18 @@ describe('vistaParaMesa', () => {
       expect(vistaParaMesa(turnoAjeno(status))).toBe('esperando-turno-ajeno');
     },
   );
+
+  it('con un activeTurnoId obsoleto (no vacio, pero de otro turno), tambien muestra la espera', () => {
+    // El dispositivo reclamo un turno que ya no existe en la sesion: fue
+    // reemplazado por uno nuevo de OTRO comensal, sin pasar por pagado/cancelado
+    // (shouldClearActiveTurno no lo limpia). `turnoEsAjeno` debe reconocer esto
+    // comparando ids, no solo comprobando que activeTurnoId este vacio -- si no,
+    // el comensal ve la cuenta completa mientras otro esta eligiendo o pagando.
+    expect(vistaParaMesa(ctx({
+      sesion: { divisionTipo: 'personalizado', sesionPagada: false, customTurno: { id: 'T9', status: 'en_seleccion' } },
+      activeTurnoId: 'T1-obsoleto',
+    }))).toBe('esperando-turno-ajeno');
+  });
 
   it.each(['pagado', 'cancelado'] as const)(
     'con el turno de otro ya %s, deja de esperar',
@@ -166,20 +181,6 @@ describe('vistaParaMesa — el orden de las reglas no es contrato', () => {
 });
 
 describe('vistaParaMesa — comportamientos heredados que NO se corrigen aqui', () => {
-  it('con un activeTurnoId obsoleto y otro comensal seleccionando, se ve el ticket, no la espera', () => {
-    // `activeTurnoId` apunta a un turno que ya no es el de la sesion. La regla
-    // de espera exige `activeTurnoId` vacio, asi que no aplica; y la de
-    // seleccion exige que los ids coincidan, tampoco. Resultado: el comensal ve
-    // la cuenta completa mientras otro esta eligiendo sus items.
-    //
-    // El efecto de auto-limpieza (`shouldClearActiveTurno`) no lo rescata: solo
-    // limpia si el turno esta pagado o cancelado, y este esta en seleccion.
-    expect(vistaParaMesa(ctx({
-      sesion: { divisionTipo: 'personalizado', sesionPagada: false, customTurno: { id: 'T9', status: 'en_seleccion' } },
-      activeTurnoId: 'T1-obsoleto',
-    }))).toBe('ticket');
-  });
-
   it('la regla de espera no exige sesion cargada; las otras tres si', () => {
     // Asimetria heredada: la guarda de espera leia `sessionData?.customTurno`
     // con optional chaining, las otras tres comprobaban `sessionData &&` antes.

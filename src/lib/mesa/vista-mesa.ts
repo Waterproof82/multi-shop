@@ -53,10 +53,19 @@ function turnoEsPropio(ctx: ContextoVistaMesa): boolean {
   return !!ctx.activeTurnoId && turno?.id === ctx.activeTurnoId;
 }
 
-/** Hay un turno abierto y no lo reclamo este dispositivo. */
+/**
+ * Hay un turno abierto y no es el que reclamo este dispositivo.
+ *
+ * Compara IDS, no solo si `activeTurnoId` esta vacio: un `activeTurnoId`
+ * obsoleto (el turno que reclamo este dispositivo ya no es el de la sesion,
+ * porque otro comensal abrio uno nuevo sin que el nuestro pasara por
+ * `pagado`/`cancelado`) tambien cuenta como ajeno. Si no, el comensal ve la
+ * cuenta completa mientras otro esta eligiendo o pagando.
+ */
 function turnoEsAjeno(ctx: ContextoVistaMesa): boolean {
-  const status = ctx.sesion?.customTurno?.status;
-  return (status === 'en_seleccion' || status === 'en_pago') && !ctx.activeTurnoId;
+  const turno = ctx.sesion?.customTurno;
+  const status = turno?.status;
+  return (status === 'en_seleccion' || status === 'en_pago') && turno?.id !== ctx.activeTurnoId;
 }
 
 type Regla = Readonly<{
