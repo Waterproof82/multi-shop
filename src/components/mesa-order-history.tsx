@@ -6,26 +6,26 @@ import { ReceiptText } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import { t } from "@/lib/translations";
 import { getWaiterMesa } from "@/components/waiter-login-form";
+import { useMesaId } from "@/lib/mesa/use-mesa-id";
 
 export function MesaOrderHistory() {
   const { language } = useLanguage();
   const lang = language;
+  const mesaFromRoute = useMesaId();
   const [mesaId, setMesaId] = useState<string | null>(null);
   const [orderCount, setOrderCount] = useState(0);
   const [bouncing, setBouncing] = useState(false);
   const prevCountRef = useRef(0);
 
   useEffect(() => {
-    // URL param takes priority (customer), fall back to sessionStorage (waiter navigation)
-    const params = new URLSearchParams(globalThis.location.search);
-    const token = params.get("mesa");
-    if (token) {
-      setMesaId(token);
+    // Context/URL takes priority (customer), fall back to sessionStorage (waiter navigation)
+    if (mesaFromRoute) {
+      setMesaId(mesaFromRoute);
       return;
     }
     const stored = getWaiterMesa();
     if (stored) setMesaId(stored.mesaId);
-  }, []);
+  }, [mesaFromRoute]);
 
   const fetchCount = useCallback(async (id: string) => {
     try {
