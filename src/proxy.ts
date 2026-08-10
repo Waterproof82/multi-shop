@@ -143,54 +143,6 @@ async function handleAdminAuth(request: NextRequest, origin: string | null): Pro
   }
 }
 
-async function handleCartAccessToken(url: URL, accessToken: string): Promise<NextResponse> {
-  const sanitizedToken = accessToken.replaceAll(/[^a-zA-Z0-9._-]/g, '');
-  const secretKey = process.env.CART_TOKEN_SECRET;
-
-  if (!secretKey) {
-    if (process.env.NODE_ENV === 'production') {
-      return new NextResponse('Server configuration error', { status: 500 });
-    }
-    return NextResponse.next();
-  }
-
-  try {
-    const secret = new TextEncoder().encode(secretKey);
-    // Require 'cart-access' audience to prevent token confusion with admin JWTs
-    const { payload } = await jwtVerify(sanitizedToken, secret, { audience: 'cart-access' });
-
-    // If the cart token has a jti, check revocation (fail-closed in prod).
-    // Cart tokens generated without jti are accepted today (short 15-min TTL);
-    // once generation includes jti this will revoke on-demand.
-    if (payload.jti && await isTokenRevoked(payload.jti)) {
-      url.searchParams.delete('access');
-      return NextResponse.redirect(url);
-    }
-
-    url.searchParams.delete('access');
-    const response = NextResponse.redirect(url);
-
-    let maxAge = 15 * 60;
-    if (payload?.exp) {
-      const now = Math.floor(Date.now() / 1000);
-      maxAge = Math.max(payload.exp - now, 0);
-    }
-
-    response.cookies.set('access_token', sanitizedToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-      maxAge,
-    });
-
-    return response;
-  } catch {
-    url.searchParams.delete('access');
-    return NextResponse.redirect(url);
-  }
-}
-
 function normalizeR2Origin(raw: string | undefined): string {
   if (!raw) return '';
   // Strip any existing protocol so we always produce a clean https:// origin
@@ -386,83 +338,57 @@ async function handleTpvEmployeeAuth(request: NextRequest, origin: string | null
   return addCorsHeaders(response, origin);
 }
 
-export async function proxy(request: NextRequest) {
-  const url = request.nextUrl.clone();
-  const path = request.nextUrl.pathname;
-  const origin = request.headers.get('origin');
+/** Cocina usa el mismo PIN que el camarero; auth y logout quedan fuera. */
+function isWaiterRoute(path: string): boolean {
+  if (path.startsWith('/api/kitchen')) return true;
+  return path.startsWith('/api/waiter') && path !== '/api/waiter/auth' && path !== '/api/waiter/logout';
+}
 
-  // Preflight CORS
-  if (request.method === 'OPTIONS' && path.startsWith('/api/')) {
-    return addCorsHeaders(new NextResponse(null, { status: 204 }), origin);
+/**
+ * Rutas de /api/tpv que no exigen sesión.
+ *
+ * El token del inspector viaja en `Authorization: Bearer`, NUNCA en query param:
+ * un query param acaba escrito en los logs de acceso del CDN y del servidor.
+ */
+function isPublicTpvRoute(path: string, request: NextRequest): boolean {
+  if (path === '/api/tpv/empleados/login' || path === '/api/tpv/empleados/logout' || path === '/api/tpv/activate') {
+    return true;
   }
+  if (path !== '/api/tpv/audit/export') return false;
+  return request.headers.get('authorization')?.startsWith('Bearer ') ?? false;
+}
 
-  // Admin auth (protected routes)
-  if (path.startsWith('/api/admin') && !isPublicRoute(path)) {
-    return handleAdminAuth(request, origin);
+/**
+ * Admin primero, empleado de TPV después. Lo comparten /api/tpv y /api/laborcontrol.
+ *
+ * El ORDEN es parte del contrato: un admin que abre el TPV lleva `admin_token`,
+ * y probar primero el de empleado le asignaría el rol equivocado.
+ */
+async function handleAdminOrEmployeeAuth(request: NextRequest, origin: string | null): Promise<NextResponse> {
+  const adminResult = await handleAdminAuth(request, origin);
+  if (adminResult.status === 200) return adminResult;
+  return handleTpvEmployeeAuth(request, origin);
+}
+
+/** Una sesión de admin válida NO basta: hace falta además el rol. */
+async function handleSuperadminAuth(request: NextRequest, origin: string | null): Promise<NextResponse> {
+  const adminAuthResponse = await handleAdminAuth(request, origin);
+  if (adminAuthResponse.status !== 200) return adminAuthResponse;
+  if (adminAuthResponse.headers.get('x-admin-rol') !== 'superadmin') {
+    return addCorsHeaders(errorResponse('Acceso denegado', 403), origin);
   }
+  return adminAuthResponse;
+}
 
-  // Waiter auth (protected routes — all /api/waiter/* except /api/waiter/auth and /api/waiter/logout)
-  if (path.startsWith('/api/waiter') && path !== '/api/waiter/auth' && path !== '/api/waiter/logout') {
-    return handleWaiterAuth(request, origin);
-  }
-
-  // Kitchen auth — same PIN as waiter
-  if (path.startsWith('/api/kitchen')) {
-    return handleWaiterAuth(request, origin);
-  }
-
-  // TPV auth: login and logout are public; all others try admin_token then tpv_employee_token
-  if (path.startsWith('/api/tpv')) {
-    if (path === '/api/tpv/empleados/login' || path === '/api/tpv/empleados/logout' || path === '/api/tpv/activate') {
-      return NextResponse.next();
-    }
-    // Inspector token: allow unauthenticated access to the audit export endpoint
-    // Token must be passed in Authorization: Bearer header (not query param) to avoid URL exposure in logs
-    if (path === '/api/tpv/audit/export' && request.headers.get('authorization')?.startsWith('Bearer ')) {
-      return NextResponse.next();
-    }
-    const adminResult = await handleAdminAuth(request, origin);
-    if (adminResult.status === 200) return adminResult;
-    return handleTpvEmployeeAuth(request, origin);
-  }
-
-  // LaborControl auth: cron endpoints are public (CRON_SECRET guard handled inside the route)
-  // All others try admin_token first, then tpv_employee_token
-  if (path.startsWith('/api/laborcontrol')) {
-    if (path.startsWith('/api/laborcontrol/cron/')) {
-      return NextResponse.next();
-    }
-    const adminResult = await handleAdminAuth(request, origin);
-    if (adminResult.status === 200) return adminResult;
-    return handleTpvEmployeeAuth(request, origin);
-  }
-
-  // Glovo manual dispatch — admin-only action. /api/glovo/webhook (HMAC-verified
-  // internally, called by Glovo's own servers) and /api/glovo/quote (public,
-  // domain-scoped) must stay outside this check.
-  if (path === '/api/glovo/order') {
-    return handleAdminAuth(request, origin);
-  }
-
-  // Superadmin auth (protected routes)
-  if (path.startsWith('/api/superadmin')) {
-    const adminAuthResponse = await handleAdminAuth(request, origin);
-    if (adminAuthResponse.status !== 200) {
-      return adminAuthResponse;
-    }
-    const rol = adminAuthResponse.headers.get('x-admin-rol');
-    if (rol !== 'superadmin') {
-      return addCorsHeaders(errorResponse('Acceso denegado', 403), origin);
-    }
-    return adminAuthResponse;
-  }
-
-  // Access token for cart
-  const accessToken = url.searchParams.get('access');
-  if (accessToken) {
-    return handleCartAccessToken(url, accessToken);
-  }
-
+/**
+ * Respuesta normal: nonce por petición + CSP, y CORS si la ruta es de API.
+ *
+ * Aquí caen también las rutas públicas que NO hacen `return` antes — por ejemplo
+ * `/api/admin/login`. Es una asimetría real y deliberada respecto a
+ * `/api/tpv/empleados/login`, que sale antes y NO recibe ni CSP ni CORS.
+ * Está cubierta por `tests/compliance/proxy-autorizacion.test.ts`.
+ */
+function buildPageResponse(request: NextRequest, path: string, origin: string | null): NextResponse {
   // Generate per-request nonce for CSP (HIGH-005)
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const requestHeaders = new Headers(request.headers);
@@ -484,6 +410,56 @@ export async function proxy(request: NextRequest) {
   }
 
   return response;
+}
+
+/**
+ * ESTA CADENA ESTÁ ORDENADA Y EL ORDEN ES PARTE DEL CONTRATO.
+ *
+ * Añadir una ruta en el sitio equivocado, o mover un bloque, no rompe ningún
+ * test de negocio ni falla en desarrollo: solo deja una puerta abierta. La tabla
+ * completa —qué bloquea y qué pasa libre— está congelada en
+ * `tests/compliance/proxy-autorizacion.test.ts`.
+ */
+export async function proxy(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+  const origin = request.headers.get('origin');
+
+  // Preflight CORS
+  if (request.method === 'OPTIONS' && path.startsWith('/api/')) {
+    return addCorsHeaders(new NextResponse(null, { status: 204 }), origin);
+  }
+
+  if (path.startsWith('/api/admin') && !isPublicRoute(path)) {
+    return handleAdminAuth(request, origin);
+  }
+
+  if (isWaiterRoute(path)) {
+    return handleWaiterAuth(request, origin);
+  }
+
+  if (path.startsWith('/api/tpv')) {
+    if (isPublicTpvRoute(path, request)) return NextResponse.next();
+    return handleAdminOrEmployeeAuth(request, origin);
+  }
+
+  // Los cron de LaborControl validan CRON_SECRET dentro de la propia ruta.
+  if (path.startsWith('/api/laborcontrol')) {
+    if (path.startsWith('/api/laborcontrol/cron/')) return NextResponse.next();
+    return handleAdminOrEmployeeAuth(request, origin);
+  }
+
+  // Despacho manual a Glovo — acción de admin. /api/glovo/webhook (verifica HMAC
+  // internamente, lo llaman los servidores de Glovo) y /api/glovo/quote (público,
+  // acotado por dominio) deben quedar FUERA de este check.
+  if (path === '/api/glovo/order') {
+    return handleAdminAuth(request, origin);
+  }
+
+  if (path.startsWith('/api/superadmin')) {
+    return handleSuperadminAuth(request, origin);
+  }
+
+  return buildPageResponse(request, path, origin);
 }
 
 export const config = {

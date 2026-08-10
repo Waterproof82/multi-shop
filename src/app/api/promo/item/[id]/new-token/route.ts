@@ -6,8 +6,8 @@ import { generateReservaToken } from '@/lib/reserva-token';
 import { z } from 'zod';
 
 const schema = z.object({
-  email: z.string().email().max(254),
-  promoId: z.string().uuid(),
+  email: z.email().max(254),
+  promoId: z.uuid(),
 });
 
 export async function GET(

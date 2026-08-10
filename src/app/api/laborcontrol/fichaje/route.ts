@@ -6,7 +6,7 @@ import { z } from 'zod';
 
 // centroId is optional — if absent, resolved from the employee's active perfil laboral
 const RouteSchema = FichajeBodySchema.extend({
-  centroId: z.string().uuid().optional(),
+  centroId: z.uuid().optional(),
 });
 
 // POST /api/laborcontrol/fichaje
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 
   const parsed = RouteSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json({ error: z.flattenError(parsed.error) }, { status: 400 });
   }
 
   // Employee may only file for themselves

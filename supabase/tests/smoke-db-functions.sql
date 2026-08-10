@@ -124,9 +124,89 @@ BEGIN
   RAISE NOTICE '[SMOKE OK] digest() para cobros — hash = %', result_text;
 
 
+  -- ── 6. get_waiter_badge_counts ────────────────────────────────────────────
+  -- Alimenta los badges del WaiterBanner, la ruta más caliente del sistema.
+  -- Devuelve un jsonb con seis claves fijas; si una desaparece o se renombra,
+  -- el cliente lee undefined y pinta 0 SIN error visible — el camarero deja de
+  -- ver comandas y nada falla de forma ruidosa. De ahí que se verifique la forma
+  -- completa, no solo que la función sea invocable.
+
+  DECLARE
+    badge      JSONB;
+    badge_keys TEXT[] := ARRAY['cocinaTotal','cocinaListos','cocinaRetenidos',
+                               'bebidasTotal','pendientes','llamadas'];
+    k          TEXT;
+  BEGIN
+    badge := public.get_waiter_badge_counts(dummy);
+
+    IF badge IS NULL THEN
+      RAISE EXCEPTION '[SMOKE FAIL] get_waiter_badge_counts devolvió NULL';
+    END IF;
+
+    FOREACH k IN ARRAY badge_keys LOOP
+      IF NOT (badge ? k) THEN
+        RAISE EXCEPTION '[SMOKE FAIL] get_waiter_badge_counts: falta la clave "%" — el badge quedaría a 0 en silencio. Payload: %', k, badge;
+      END IF;
+      IF jsonb_typeof(badge -> k) <> 'number' THEN
+        RAISE EXCEPTION '[SMOKE FAIL] get_waiter_badge_counts: "%" no es número, es % ', k, jsonb_typeof(badge -> k);
+      END IF;
+      IF (badge ->> k)::numeric < 0 THEN
+        RAISE EXCEPTION '[SMOKE FAIL] get_waiter_badge_counts: "%" negativo (%)', k, badge ->> k;
+      END IF;
+    END LOOP;
+
+    -- Empresa inexistente: todo a cero. Si algo sale distinto de 0, el filtro de
+    -- tenant no está aislando y se estarían contando comandas de otra empresa.
+    IF (badge ->> 'cocinaTotal')::int <> 0 OR (badge ->> 'pendientes')::int <> 0
+       OR (badge ->> 'bebidasTotal')::int <> 0 OR (badge ->> 'llamadas')::int <> 0 THEN
+      RAISE EXCEPTION '[SMOKE FAIL] get_waiter_badge_counts: empresa inexistente devolvió conteos no nulos — fuga entre tenants: %', badge;
+    END IF;
+
+    RAISE NOTICE '[SMOKE OK] get_waiter_badge_counts — 6 claves numéricas, aislamiento de tenant OK';
+  END;
+
+
+  -- ── 7. Ninguna policy re-evalua auth.uid() por fila ───────────────────────
+  -- `auth.uid()` suelta dentro de una policy se evalua UNA VEZ POR FILA. Envuelta
+  -- en (SELECT ...) Postgres la promueve a InitPlan y la evalua una sola vez.
+  --
+  -- Este guard no esta aqui por las policies que ya existen —esas se corrigieron
+  -- en 20260803000002— sino por `lc_create_next_partition()`, que CREA policies
+  -- nuevas cada mes desde el cron. Si alguien edita ese generador y se deja la
+  -- forma sin envolver, el defecto vuelve solo, en silencio y de forma acumulativa:
+  -- una particion nueva con dos policies defectuosas cada mes.
+
+  DECLARE
+    r_pol   RECORD;
+    n_malas INT := 0;
+  BEGIN
+    FOR r_pol IN
+      SELECT tablename, policyname,
+             regexp_replace(
+               COALESCE(qual, '') || ' ' || COALESCE(with_check, ''),
+               '\(\s*SELECT\s+auth\.uid\(\)\s+AS\s+uid\)', '', 'g'
+             ) AS resto
+        FROM pg_policies
+       WHERE schemaname = 'public'
+    LOOP
+      IF r_pol.resto ~ 'auth\.uid\(\)' THEN
+        n_malas := n_malas + 1;
+        RAISE WARNING '[SMOKE FAIL] policy "%" en % usa auth.uid() sin envolver en (SELECT ...)',
+          r_pol.policyname, r_pol.tablename;
+      END IF;
+    END LOOP;
+
+    IF n_malas > 0 THEN
+      RAISE EXCEPTION '[SMOKE FAIL] % policy(s) re-evaluan auth.uid() por fila. Usar (SELECT auth.uid()). Si vienen de lc_create_next_partition(), corregir tambien el generador o volveran el mes que viene.', n_malas;
+    END IF;
+
+    RAISE NOTICE '[SMOKE OK] ninguna policy re-evalua auth.uid() por fila';
+  END;
+
+
   RAISE NOTICE '';
   RAISE NOTICE '════════════════════════════════════════';
-  RAISE NOTICE 'TODOS LOS SMOKE TESTS PASARON (5/5)';
+  RAISE NOTICE 'TODOS LOS SMOKE TESTS PASARON (7/7)';
   RAISE NOTICE '════════════════════════════════════════';
 
 END;

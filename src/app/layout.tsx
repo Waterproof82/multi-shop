@@ -17,6 +17,7 @@ import { getDomainFromHeaders } from "@/lib/domain-utils";
 import type { EmpresaPublic } from "@/core/domain/entities/types";
 import * as Sentry from '@sentry/nextjs';
 import { SentryProvider } from '@/components/sentry-provider';
+import { AnaliticaVercel } from '@/components/analitica-vercel';
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 const playfair = Playfair_Display({
@@ -199,6 +200,7 @@ export default async function RootLayout({
         </ThemeProvider>
         <SwRegistrar />
         <SentryProvider empresaId={empresa?.id ?? null} />
+        <AnaliticaVercel />
       </body>
     </html>
   );

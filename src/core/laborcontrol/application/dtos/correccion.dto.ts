@@ -1,11 +1,11 @@
 import { z } from 'zod';
 
 export const CorreccionBodySchema = z.object({
-  empleadoId:      z.string().uuid(),
-  centroId:        z.string().uuid(),
-  refCorreccion:   z.string().uuid(),
+  empleadoId:      z.uuid(),
+  centroId:        z.uuid(),
+  refCorreccion:   z.uuid(),
   accion:          z.enum(['rectificar', 'anular']),
-  timestampEvento: z.string().datetime().optional(),
+  timestampEvento: z.iso.datetime().optional(),
   motivo:          z.string().min(1).max(500),
 });
 

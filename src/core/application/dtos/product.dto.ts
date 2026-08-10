@@ -4,7 +4,7 @@ const imageFitValues = ['contain', 'cover', 'fill', 'none', 'scale-down'] as con
 
 // Schema for API validation (with i18n fields)
 export const createProductSchema = z.object({
-  empresaId: z.string().uuid(),
+  empresaId: z.uuid(),
   titulo_es: z.string().min(1, "El título en español es requerido").max(200),
   titulo_en: z.string().max(200).optional().nullable(),
   titulo_fr: z.string().max(200).optional().nullable(),
@@ -21,12 +21,12 @@ export const createProductSchema = z.object({
       return isNaN(num) ? 0 : num;
     })
     .pipe(z.number().min(0, "El precio no puede ser negativo")),
-  foto_url: z.string().url().refine(
+  foto_url: z.url().refine(
     (url) => url.startsWith('https://'),
     { message: 'foto_url must use HTTPS' }
   ).nullable().optional(),
   foto_object_fit: z.enum(imageFitValues).nullable().optional(),
-  categoria_id: z.string().uuid().nullable().optional(),
+  categoria_id: z.uuid().nullable().optional(),
   es_especial: z.boolean().default(false),
   activo: z.boolean().default(true),
   tipo_producto: z.enum(['comida', 'bebida']).default('comida'),
@@ -43,11 +43,11 @@ export const createProductSchema = z.object({
 export type CreateProductDTO = z.infer<typeof createProductSchema>;
 
 export const updateProductSchema = createProductSchema.partial().extend({
-  id: z.string().uuid(),
+  id: z.uuid(),
 });
 
 export type UpdateProductDTO = z.infer<typeof updateProductSchema>;
 
 export const productIdSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
 });

@@ -9,6 +9,7 @@
  * Requiere: PLAYWRIGHT_ADMIN_EMAIL + PLAYWRIGHT_ADMIN_PASSWORD para el test 2
  */
 import { test, expect, type APIRequestContext } from '@playwright/test';
+import { nuevoContexto } from '../helpers/contexto';
 
 function adminEmail(): string | undefined    { return process.env.PLAYWRIGHT_ADMIN_EMAIL; }
 function adminPassword(): string | undefined { return process.env.PLAYWRIGHT_ADMIN_PASSWORD; }
@@ -34,7 +35,7 @@ test.describe('TPV Audit Chain — verificación cadena (RD 1007/2023)', () => {
 
     test.beforeAll(async ({ playwright, baseURL }) => {
       if (!adminEmail() || !adminPassword()) return;
-      authedRequest = await playwright.request.newContext({ baseURL });
+      authedRequest = await nuevoContexto(playwright, baseURL);
       const res = await authedRequest.post('/api/admin/login', {
         data: { email: adminEmail()!, password: adminPassword()! },
       });

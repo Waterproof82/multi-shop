@@ -6,11 +6,59 @@ name: E2E
 # path filter: UI/API changes anywhere can affect these functional flows, so
 # it runs on every push/PR to main/develop, mirroring ci.yml's trigger.
 #
-# Tests that need extra credentials (PLAYWRIGHT_WAITER_PIN,
-# PLAYWRIGHT_ADMIN_EMAIL/PASSWORD, PLAYWRIGHT_WAITER_TOKEN) skip gracefully if
-# those secrets aren't configured in the repo — same behavior as running
-# locally without a full .env.local. Add them under
-# Settings > Secrets and variables > Actions to unlock that coverage in CI.
+# ── UNA PUERTA DE DOS NIVELES ────────────────────────────────────────────────
+# En los dos casos se prueba el despliegue de ESTE commit, nunca una URL fija.
+# Antes había una URL fija de producción, así que en un PR la suite interrogaba
+# el sitio YA DESPLEGADO en vez del código propuesto: pasaba en verde aunque el
+# PR estuviera completamente roto. Era monitorización disfrazada de puerta.
+#
+#   PULL REQUEST → preview efímera de Vercel → ~143 de 209 tests.
+#     Aislado y seguro: cada PR tiene su despliegue y no pisa a nadie.
+#
+#   PUSH a main/develop → alias del entorno de pruebas → los 209.
+#     Se espera a que el despliegue de ESE commit termine, y solo entonces se
+#     prueba el ALIAS. Es la clave: el alias ya apunta a este commit, y su
+#     hostname SÍ está dado de alta en `empresas.dominio`, así que la
+#     multi-tenencia resuelve y la suite entera corre. Probar la URL efímera
+#     del despliegue ejercitaría el mismo código pero perdería la mitad de los
+#     tests — que es exactamente lo que pasaba antes de este arreglo.
+#
+# POR QUÉ EN UN PR NO CORREN LOS 209
+# El tenant se resuelve por HOSTNAME: `parseMainDomain()` → `findByDomain()`,
+# la empresa sale del dominio de la petición. Una preview tiene un host efímero
+# (`multi-shop-<hash>-<team>.vercel.app`) que NO está en `empresas.dominio`, así
+# que no hay tenant, el login del camarero falla, y los ~55 flujos con sesión se
+# saltan. No es un fallo del CI: es consecuencia de que la multi-tenencia sea
+# por dominio, y no se arregla con secrets.
+#
+# Tampoco se puede falsear la cabecera `Host`: Vercel enruta con ella, así que
+# mandarla apuntando al entorno de pruebas devolvería ese despliegue en vez de
+# la preview — exactamente lo que se quiere evitar.
+#
+# Por eso la cobertura completa vive en el push posterior al merge, contra un
+# hostname fijo que sí está dado de alta como dominio de empresa.
+#
+# ── LO QUE NO SE CONSTRUYE AQUÍ, Y POR QUÉ ───────────────────────────────────
+# Sería más autónomo levantar la app en CI, pero `validateEnv()` exige
+# ACCESS_TOKEN_SECRET y CSRF_HMAC_SECRET, que no están entre los secrets del
+# repositorio: la app se negaría a arrancar. Vercel sí los tiene, así que se
+# reutiliza su despliegue en vez de duplicar configuración.
+#
+# ── COBERTURA QUE AÚN FALTA ──────────────────────────────────────────────────
+# `CRON_SECRET` no está definido: desbloquea un test de la purga RGPD.
+#
+# SIN DIAGNOSTICAR: ~10 tests que dependen del login de admin (db-smoke suite 3,
+# tpv-acid, tpv-chain-verify) siguen saltándose contra la preview aunque
+# PLAYWRIGHT_ADMIN_EMAIL y PLAYWRIGHT_ADMIN_PASSWORD SÍ están definidos.
+# `/api/admin/login` no resuelve el tenant por dominio, así que la explicación
+# de los 55 flujos de camarero NO aplica aquí — la causa es otra y está por
+# encontrar. Sospecha principal: el rate limit de Upstash, que en un despliegue
+# de preview puede no tener `UPSTASH_REDIS_REST_URL` configurada.
+#
+# Para diagnosticarlo hace falta llamar a la preview con la cabecera de bypass
+# y mirar qué devuelve `/api/admin/login`. Contra el entorno de pruebas (push a
+# main) esos tests sí corren, así que la cobertura no se pierde: solo llega más
+# tarde.
 
 on:
   push:
@@ -29,24 +77,35 @@ jobs:
   playwright-e2e:
     name: Playwright — Full E2E suite
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Sin secrets no puede correr — ver la nota al final del fichero.
+    if: github.actor != 'dependabot[bot]'
+    timeout-minutes: 25
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-      PLAYWRIGHT_BASE_URL: https://mermelada-tomate.vercel.app
       PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       PLAYWRIGHT_WAITER_PIN: ${{ secrets.PLAYWRIGHT_WAITER_PIN }}
-      PLAYWRIGHT_WAITER_TOKEN: ${{ secrets.PLAYWRIGHT_WAITER_TOKEN }}
       PLAYWRIGHT_ADMIN_EMAIL: ${{ secrets.PLAYWRIGHT_ADMIN_EMAIL }}
       PLAYWRIGHT_ADMIN_PASSWORD: ${{ secrets.PLAYWRIGHT_ADMIN_PASSWORD }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      # En un PR, espera a que Vercel termine la preview de ESTE commit y coge
+      # su URL. Sin esto, los tests interrogarían producción y darían verde
+      # aunque el PR estuviera roto.
+      - name: Resolver la URL a probar
+        id: destino
+        uses: ./.github/actions/resolver-url-a-probar
+        with:
+          url-entorno: https://mermelada-tomate.vercel.app
+          token: ${{ github.token }}
+          secreto-bypass: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
@@ -57,12 +116,30 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run full E2E suite
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ steps.destino.outputs.url }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: npx playwright test e2e/ --reporter=list
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-e2e-report
           path: playwright-report/
           retention-days: 30
+
+# ── POR QUÉ ESTE JOB NO CORRE EN LAS PRs DE DEPENDABOT ───────────────────────
+# GitHub NO entrega los secrets del repositorio a los workflows disparados por
+# Dependabot: van a un almacén aparte, que aquí está vacío a propósito. Llegan
+# todos en blanco y el job no puede ni resolver la preview.
+#
+# Y está bien que sea así. Una PR de Dependabot ejecuta "pnpm install" con una
+# versión de dependencia que nadie ha revisado, y sus scripts de postinstall
+# corren en el runner. Darles la service_role key y las credenciales de admin
+# sería exactamente el agujero que esa separación existe para tapar.
+#
+# Un bump de versión se valida de sobra con Build, Lint & Type Check y los tests
+# unitarios, que sí corren. Y la suite E2E completa pasa igualmente tras el
+# merge, en el push a main contra el entorno de pruebas: si un bump rompe algo
+# en tiempo de ejecución, ahí se ve antes de que llegue a ningún cliente.

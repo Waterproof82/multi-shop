@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
+import { ImagenSubida as Image } from '../components/ui/imagen-subida';
 import { getDomainFromHeaders } from "@/lib/domain-utils";
 import { getEmpresaByDomain } from "@/lib/server-services";
 

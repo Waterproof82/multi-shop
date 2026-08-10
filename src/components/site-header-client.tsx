@@ -1,7 +1,7 @@
 "use client";
 
 import { ShoppingCart, BellRing } from "lucide-react";
-import Image from "next/image";
+import { ImagenSubida as Image } from './ui/imagen-subida';
 import { Button } from "@/components/ui/button";
 import { LanguageSelector } from "@/components/language-selector";
 import { t } from "@/lib/translations";
@@ -9,6 +9,7 @@ import { useEffect, useState, useRef } from "react";
 import { useCart } from "@/lib/cart-context";
 import { useLanguage } from "@/lib/language-context";
 import { getWaiterMesa } from "@/components/waiter-login-form";
+import { useMesaId } from "@/lib/mesa/use-mesa-id";
 import type { EmpresaPublic } from "@/core/domain/entities/types";
 
 const SCROLL_OFFSET_PX = 140;
@@ -23,14 +24,12 @@ export function SiteHeaderClient({ showCart, empresa }: SiteHeaderClientProps) {
   const { language } = useLanguage();
   const [animate, setAnimate] = useState(false);
   const [waiterActive, setWaiterActive] = useState(false);
-  const [mesaId, setMesaId] = useState<string | null>(null);
+  const mesaId = useMesaId();
   const [calling, setCalling] = useState(false);
   const [called, setCalled] = useState(false);
 
   useEffect(() => {
     setWaiterActive(!!getWaiterMesa());
-    const mesa = new URLSearchParams(window.location.search).get('mesa');
-    setMesaId(mesa);
   }, []);
 
   const handleCallWaiter = async () => {

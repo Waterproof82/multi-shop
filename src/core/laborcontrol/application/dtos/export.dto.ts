@@ -2,9 +2,9 @@ import { z } from 'zod';
 
 export const ExportQuerySchema = z.object({
   tipo:          z.enum(['pdf', 'excel']),
-  empleadoId:    z.string().uuid().optional(),
-  from:          z.string().date(),
-  to:            z.string().date(),
+  empleadoId:    z.uuid().optional(),
+  from:          z.iso.date(),
+  to:            z.iso.date(),
   incluirPausas: z.coerce.boolean().default(true),
 });
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
+import { ImagenSubida as Image } from '../../components/ui/imagen-subida';
 import { Building2, Globe, MapPin, Image as ImageIcon, FileText, Share2, ExternalLink, FileSearch, ChevronDown, ChevronRight } from 'lucide-react';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { PillSwitch } from '@/components/ui/pill-switch';
@@ -136,7 +136,7 @@ function TipoSelector({ empresaId, tipo, totalMesas, onTipoChange }: TipoSelecto
   return (
     <div className="flex flex-col items-center gap-1.5">
       <div className="flex items-center gap-1">
-        <button
+        <button type="button"
           onClick={() => void handleChange('tienda')}
           disabled={saving}
           className={`px-2 py-1 text-xs rounded-l-full border transition-colors disabled:opacity-50 ${
@@ -147,7 +147,7 @@ function TipoSelector({ empresaId, tipo, totalMesas, onTipoChange }: TipoSelecto
         >
           Tienda
         </button>
-        <button
+        <button type="button"
           onClick={() => void handleChange('restaurante')}
           disabled={saving}
           className={`px-2 py-1 text-xs rounded-r-full border transition-colors disabled:opacity-50 ${
@@ -200,6 +200,37 @@ function GoogleReviewsField({ empresaId, initialValue }: { readonly empresaId: s
   );
 }
 
+/** Verde si está todo, ámbar a media tabla, rojo por debajo. */
+function colorDePuntuacion(score: number, total: number): string {
+  if (score === total) return 'text-emerald-400';
+  if (score >= total / 2) return 'text-amber-400';
+  return 'text-red-400';
+}
+
+/**
+ * Un indicador SEO. Los cuatro eran el mismo bloque copiado, con tres ternarios
+ * cada uno sobre el mismo booleano: doce ramas para decir cuatro cosas.
+ *
+ * `title` y `aria-label` dicen cosas distintas a propósito: el title explica qué
+ * falta y cómo suena bien leído en voz alta; la etiqueta es corta porque un
+ * lector de pantalla la recita dentro de una fila con muchas más columnas.
+ */
+function IndicadorSeo({ ok, Icono, titulo, etiqueta }: Readonly<{
+  ok: boolean;
+  Icono: React.ComponentType<{ className?: string; 'aria-label'?: string }>;
+  titulo: { ok: string; falta: string };
+  etiqueta: { ok: string; falta: string };
+}>) {
+  return (
+    <span
+      className={`p-1.5 rounded ${ok ? 'text-emerald-400' : 'text-red-400/60'}`}
+      title={ok ? `✓ ${titulo.ok}` : `✗ ${titulo.falta}`}
+    >
+      <Icono className="h-4 w-4" aria-label={ok ? etiqueta.ok : etiqueta.falta} />
+    </span>
+  );
+}
+
 function SeoCell({ seoStatus, dominio, expanded }: {
   seoStatus: EmpresaRow['seoStatus'];
   dominio: string;
@@ -215,7 +246,7 @@ function SeoCell({ seoStatus, dominio, expanded }: {
   const total = checks.length;
 
   if (!expanded) {
-    const color = score === total ? 'text-emerald-400' : score >= total / 2 ? 'text-amber-400' : 'text-red-400';
+    const color = colorDePuntuacion(score, total);
     return (
       <span className={`text-sm font-medium tabular-nums ${color}`}>
         {score}/{total}
@@ -225,30 +256,30 @@ function SeoCell({ seoStatus, dominio, expanded }: {
 
   return (
     <div className="flex items-center justify-center gap-2" role="group" aria-label="Estado SEO">
-      <span
-        className={`p-1.5 rounded ${seoStatus.hasLogo ? 'text-emerald-400' : 'text-red-400/60'}`}
-        title={seoStatus.hasLogo ? '✓ Logo configurado' : '✗ Falta logo'}
-      >
-        <ImageIcon className="h-4 w-4" aria-label={seoStatus.hasLogo ? 'Con logo' : 'Sin logo'} />
-      </span>
-      <span
-        className={`p-1.5 rounded ${seoStatus.hasDescription ? 'text-emerald-400' : 'text-red-400/60'}`}
-        title={seoStatus.hasDescription ? '✓ Descripción configurada' : '✗ Falta descripción'}
-      >
-        <FileText className="h-4 w-4" aria-label={seoStatus.hasDescription ? 'Con descripción' : 'Sin descripción'} />
-      </span>
-      <span
-        className={`p-1.5 rounded ${seoStatus.hasGeoCoordinates ? 'text-emerald-400' : 'text-red-400/60'}`}
-        title={seoStatus.hasGeoCoordinates ? '✓ GPS detectado en url_mapa' : '✗ Falta GPS en url_mapa'}
-      >
-        <MapPin className="h-4 w-4" aria-label={seoStatus.hasGeoCoordinates ? 'Con geo' : 'Sin geo'} />
-      </span>
-      <span
-        className={`p-1.5 rounded ${seoStatus.hasFb || seoStatus.hasInstagram ? 'text-emerald-400' : 'text-red-400/60'}`}
-        title={seoStatus.hasFb || seoStatus.hasInstagram ? '✓ Redes sociales configuradas' : '✗ Falta Facebook o Instagram'}
-      >
-        <Share2 className="h-4 w-4" aria-label={seoStatus.hasFb || seoStatus.hasInstagram ? 'Con redes' : 'Sin redes'} />
-      </span>
+      <IndicadorSeo
+        ok={seoStatus.hasLogo}
+        Icono={ImageIcon}
+        titulo={{ ok: 'Logo configurado', falta: 'Falta logo' }}
+        etiqueta={{ ok: 'Con logo', falta: 'Sin logo' }}
+      />
+      <IndicadorSeo
+        ok={seoStatus.hasDescription}
+        Icono={FileText}
+        titulo={{ ok: 'Descripción configurada', falta: 'Falta descripción' }}
+        etiqueta={{ ok: 'Con descripción', falta: 'Sin descripción' }}
+      />
+      <IndicadorSeo
+        ok={seoStatus.hasGeoCoordinates}
+        Icono={MapPin}
+        titulo={{ ok: 'GPS detectado en url_mapa', falta: 'Falta GPS en url_mapa' }}
+        etiqueta={{ ok: 'Con geo', falta: 'Sin geo' }}
+      />
+      <IndicadorSeo
+        ok={seoStatus.hasFb || seoStatus.hasInstagram}
+        Icono={Share2}
+        titulo={{ ok: 'Redes sociales configuradas', falta: 'Falta Facebook o Instagram' }}
+        etiqueta={{ ok: 'Con redes', falta: 'Sin redes' }}
+      />
       <a
         href={`https://${dominio}/sitemap.xml`}
         target="_blank"

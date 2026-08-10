@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import Image from 'next/image';
+import { ImagenSubida as Image } from './imagen-subida';
 import { Upload, Loader2, Pencil, Trash2, Camera, ChevronDown, Maximize2 } from 'lucide-react';
 import { getCsrfToken } from '@/lib/csrf-client';
 import { useLanguage } from '@/lib/language-context';
@@ -21,7 +21,8 @@ interface ImageUploaderProps {
   readonly value: string;
   readonly onChange: (url: string) => void;
   readonly label?: string;
-  readonly empresaSlug?: string;
+  // Nada de `empresaSlug`: la subida se aísla por `empresaId` (ver `efectivoEmpresaId`
+  // y la query de /api/admin/upload-image). El slug se recibía y se ignoraba.
   readonly empresaIdProp?: string;
   readonly previewClassName?: string;
   readonly previewStyle?: React.CSSProperties;
@@ -37,7 +38,6 @@ export function ImageUploader({
   value,
   onChange,
   label = 'Imagen',
-  empresaSlug = 'default',
   empresaIdProp,
   previewClassName = 'relative group rounded-lg overflow-hidden border h-48',
   previewStyle,

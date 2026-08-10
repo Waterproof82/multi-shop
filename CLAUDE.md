@@ -51,6 +51,12 @@ Todo el codebase usa `Result<T, AppError>`.
   El test `e2e/compliance/supabase-security-definer.spec.ts` verifica esto automaticamente en CI.
 - **Particiones RLS:** Las tablas de particion NO heredan RLS del padre. Cada particion nueva necesita `ENABLE ROW LEVEL SECURITY` + policies propias. `lc_create_next_partition()` lo hace automaticamente.
 - **delete-all en produccion:** `DELETE /api/admin/pedidos/delete-all` tiene guard `NODE_ENV === 'production'` → 403. Nunca eliminar ese guard.
+- **`pedidos.es_prueba` (CRITICO):** unica excepcion al bloqueo de DELETE del Art.66 LGT. `pedidos_block_delete` solo deja borrar filas con `es_prueba = true` y sin cobros asociados, y registra cada borrado en `pedidos_prueba_purga_log` (solo insercion).
+  - El flag es **inmutable**: el trigger `pedidos_es_prueba_inmutable` bloquea cualquier UPDATE sobre esa columna. Sin eso, marcar un pedido facturado como prueba y borrarlo seria una puerta trasera al registro fiscal.
+  - **NUNCA exponer `es_prueba` en un DTO de Zod ni en un mapper de repositorio.** Si el cliente pudiera activarlo, seria un vector para sacar ingresos de los totales fiscales. Solo se fija en el INSERT con service_role (tests E2E).
+  - Los pedidos con el flag quedan excluidos de `get_pedido_stats_ano`. Purga en lote: `SELECT purge_pedidos_prueba(empresa_id)`.
+  - El test `e2e/compliance/pedidos-borrado-pruebas.spec.ts` verifica las barreras en CI.
+- **Tests E2E que insertan pedidos:** deben poner `es_prueba: true` en el INSERT y borrarlos en el teardown. Sin el flag las filas son imborrables y se acumulan en la tabla con retencion fiscal, inflando los conteos del dashboard (paso de verdad: 200 filas acumuladas duplicaban el numero de pedidos de julio 2026).
 - **E2E tests de seguridad:** `e2e/waiter-csrf.spec.ts` cubre CSRF + RLS. Ejecutar con `PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test e2e/`.
 
 ## Base de Datos (Trampas Comunes)
@@ -86,6 +92,24 @@ CREATE POLICY "Admin ve mi_tabla"
 -- ... INSERT / UPDATE / DELETE con mismo patron (TO authenticated, WITH CHECK explicito en INSERT)
 ```
 
+**InitPlan — envolver SIEMPRE `auth.uid()` en `(SELECT ...)`:**
+Dentro de un `EXISTS` correlacionado (o de cualquier qual que el planificador no pueda
+promover), `auth.uid()` se evalua UNA VEZ POR FILA. Envuelta, Postgres la convierte en
+InitPlan y la evalua una sola vez para todo el plan:
+```sql
+-- MAL:  pa.id = auth.uid()
+-- BIEN: pa.id = (SELECT auth.uid())
+```
+Aplica igual a `get_mi_empresa_id()`, que ademas consulta `perfiles_admin` en cada
+evaluacion. Ojo: el advisor `auth_rls_initplan` de Supabase NO detecta las funciones
+envoltorio — solo matchea `auth.<fn>()` literal, asi que `get_mi_empresa_id()` sin
+envolver pasa desapercibida. El smoke test (seccion 7 de `smoke-db-functions.sql`)
+verifica el caso de `auth.uid()` en CI.
+
+**Si la policy la genera una funcion** (p. ej. `lc_create_next_partition()` crea las
+policies de cada particion nueva desde el cron): corregir el GENERADOR, no solo las
+policies existentes. Si no, el defecto vuelve solo cada mes.
+
 ### 2. GRANTs explícitos (obligatorio desde oct 2026 — Supabase Data API, y ahora tambien a nivel de DB)
 Desde el 2026-07-31, `public` ya NO otorga privilegios por defecto a `anon`/`authenticated` en tablas nuevas (`ALTER DEFAULT PRIVILEGES` revocado — ver `security.md`). Esto ya no es solo una buena práctica: sin este bloque, la tabla es **completamente inaccesible** para `authenticated`/`anon`, incluso con RLS bien configurado.
 ```sql
@@ -104,6 +128,17 @@ Usar siempre en RLS policies para aislar datos por empresa.
 - **Accesibilidad:** Touch targets min 44px. Focus rings estandar. `aria-labels` traducidos.
 - **I18n:** Usar `t()` de `@/lib/translations` para TODO el texto de UI.
 - **Imagenes:** Usar `ImageUploader` (auto-optimiza WebP). `object-contain` por defecto.
+
+## Imagenes — Trampas Criticas
+
+> Ver doc completo: `docs/context/imagenes.md`
+
+- **NUNCA `import Image from 'next/image'` para pintar salida de `ImageUploader`.** Usar `ImagenSubida` (`src/components/ui/imagen-subida.tsx`).
+  `optimizeImage()` ya reescala a **480x480 WebP q0.8** antes de subir. `next/image` con `sizes` en `vw` pide los 8 anchos de dispositivo por defecto (640-3840), **todos MAYORES que el original**: 8 transformaciones facturadas por foto para producir 8 imagenes peores. Con 38 fotos, una sola carga en frio = ~300 transformaciones (aviso de Vercel al 75% de 5.000, agosto 2026).
+- **No hace falta trafico real para gastarlas**: basta un bot rastreando (`robots.ts` permite `/`), que expire la cache de imagen (4 h en Next 16) o un dia de muchos despliegues.
+- **Se pierde en silencio**: el autocompletado ofrece `next/image` primero, y reintroducirlo no rompe nada visible — solo la factura. Lo cubre `tests/compliance/imagenes-sin-doble-optimizacion.test.ts` (29 casos). **Si creas una pantalla nueva que pinta subidas, anadela a esa lista.**
+- **Excepcion**: imagenes que NO pasan por `ImageUploader` (terceros, APIs externas, originales grandes) si deben usar `next/image` normal.
+- El banner se pinta como `backgroundImage` en CSS (`hero-banner.tsx`), no con `next/image` — no aplica.
 
 ## Comandos Utiles
 - Dev: `pnpm dev`
@@ -139,6 +174,25 @@ Tras CADA `supabase db push` o `supabase migration up`:
 - **WebSocket singleton**: multiples `postgres_changes` en la misma tabla pueden silenciarse. `WaiterBanner` escucha centralmente y dispara `CustomEvent('waiter-realtime-update')` como fallback DOM.
 - **Race en validate loop**: `confirmingRef` como mirror del estado. Relay retorna temprano si `confirmingRef.current.size > 0`.
 - **Broadcast llega antes del commit**: para eventos transaccionales (auto-cancel), usar `postgres_changes` no broadcast.
+
+## Complejidad Cognitiva (S3776) — Como se cerro y como no volver
+
+> Ver doc completo: `docs/context/deuda-complejidad.md` (manual de medicion y patrones; las 15 estan cerradas)
+
+- **Medir ANTES de leer el codigo**: script con umbral 0 sobre un fichero lista todas sus funciones. NO usar SonarLint del IDE (subestima). NO presupuestar recortando el fichero por trozos (dos recortes disjuntos sumaron 103 sobre un total real de 78).
+- **En JSX solo cuentan los TERNARIOS**: `{x && <p/>}` = 0; `{x ? : }` = 1 al nivel superior, **3 a profundidad 3**. Los de dentro de `.map()`/IIFE no cuentan (funcion anidada). Buscar ternarios profundos antes que bloques grandes — `cart-drawer` estuvo dos intentos atascada por buscar lo segundo.
+- **Las funciones anidadas NO suman a la contenedora** — extraer handlers no mueve la aguja.
+- **Si extraer un componente pide >~15 props, el estado no tiene dueno**: buscar el hook antes que el componente (asi nacio `usePagoDeMesa`).
+- **Mover hooks a un hook propio REORDENA los efectos** (los del hook corren antes que los del componente). No es un movimiento puro — verificar que nada dependa del orden.
+- **Patron ganador**: tabla de reglas que devuelve el MOTIVO/VISTA, no un booleano. Test primero, y en pantallas que tocan dinero, equivalencia exhaustiva contra copia literal del codigo viejo antes de sustituir.
+- **`substring` vs `slice` con indice -1 NO son equivalentes**: `substring(0,-1)` → `''`; `slice(0,-1)` → recorta el ultimo caracter.
+
+## Mesa/Cobros — Modulos con contrato congelado en tests
+
+- **`src/lib/mesa/vista-mesa.ts`** — que pantalla ve el comensal (`vistaParaMesa`). Las 4 reglas son MUTUAMENTE EXCLUYENTES: aqui el orden NO es contrato (al reves que en `banner-visibilidad.ts` — no asumir lo mismo). 31 tests en `tests/compliance/mesa-vista.test.ts`.
+- **`usePagoDeMesa`** (en `mesa-orders-client.tsx`) — dueno de TODO el estado de cobro (locks, mismatch, division, Redsys, bfcache). Depende solo de mesaId/sessionData/setSessionData/refresh. El estado de cobro nuevo va AQUI, no en el componente.
+- **`src/lib/waiter/cierre-al-salir.ts`** — que comandas se cierran al cerrar la pestana de barra. El envio (`parchearAlSalir`, `keepalive`) es fuego y olvido: NO verificable; la decision si (15 tests). Heredado y congelado: un pedido enteramente servido sin cuenta atras corriendo NO se cierra al salir.
+- **`DatosDelComensal`** (en `cart-drawer.tsx`) — **RGPD: en modo mesa NO se piden datos personales** (la mesa ya identifica el pedido). Invertir la condicion no rompe nada visible y pone la tienda a recoger PII de comensales. 12 tests UI que comprueban AUSENCIA de campos (`tests/ui/datos-del-comensal.test.tsx`).
 
 ## WaiterBanner — Re-autenticacion sin recarga
 
@@ -176,13 +230,21 @@ Tras CADA `supabase db push` o `supabase migration up`:
 - **`delivery_habilitado`** en `empresas` (DEFAULT `false`): activa "Zona de entrega" en sidebar. Controlable desde superadmin.
 - Mesas / Pagos Mesa / Validacion solo se muestran para `tipo === 'restaurante'`.
 
-## Service Worker PWA — Trampas Criticas
+## Offline, Resiliencia y UI Optimista — Trampas Criticas
 
-> Ver doc completo: `docs/context/pwa-offline-system.md`
+> Ver doc completo: `docs/context/offline-y-resiliencia.md`
+> (service worker en detalle: `docs/context/pwa-offline-system.md`)
 
+- **`fetch()` solo falla rapido cuando NO hay red.** Con red DEGRADADA —WiFi asociado sin salida, 4G a una raya— se queda colgado. Es el origen de casi todo el diseno offline de esta app.
+- **UI optimista (`patchEstado`)**: ante error del SERVIDOR se hace rollback (la intencion no era valida); ante fallo de RED **no se revierte** y se encola (la intencion sigue siendo valida). Confundir ambos obliga al cocinero a repetir la accion.
+- **Cola offline: solo comandos IDEMPOTENTES.** Los pedidos NO se encolan aunque ya exista clave de idempotencia — reproducir una comanda minutos despues manda comida a una mesa que puede haberse levantado.
+- **Colapso por `key`**: reproducir estados desordenados dejaria el item en el estado equivocado.
+- **Con la pantalla apagada los timers se congelan.** Sincronizar solo con `setInterval` deja un agujero; hay que escuchar `visibilitychange` + `pageshow`, filtrando el sentido (`isResumeSignal`).
+- **`navigator.onLine` miente en positivo, no en negativo.** Sirve para evitar un intento condenado, no para confiar en que hay red.
+- **Background Sync API no existe en el WebView de Android** (donde vive el APK de Capacitor) ni es fiable en Electron. Evaluada y descartada.
 - `public/sw.js` es plain JS, scope `/waiter`. Solo se registra en produccion.
-- **`navigator.onLine` guard obligatorio** en `WaiterBanner` — sin el, un `Failed to fetch` offline expulsa al camarero.
 - **`/api/*` es NetworkOnly siempre** — nunca cachear auth ni datos de pedidos.
+- **`NetworkFirst` con timeout de 3s** en `/waiter/*` y `bell.mp3`. Sin el, red degradada = pantalla en blanco.
 
 ## SEO Multi-Tenant
 

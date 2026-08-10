@@ -4,7 +4,7 @@ import { getPedidoRepository } from '@/core/infrastructure/database';
 import { rateLimitTracking } from '@/core/infrastructure/api/rate-limit';
 import { editMessageReplyMarkup } from '@/core/infrastructure/services/telegram.service';
 
-const tokenSchema = z.string().uuid();
+const tokenSchema = z.uuid();
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);

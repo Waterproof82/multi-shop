@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { getMesaSesionUseCase, getMesaSesionRepository, getPedidoRepository, getAuditLogRepository } from '@/core/infrastructure/database';
 import { resolveActor } from '@/core/infrastructure/api/audit-actor';
 
-const mesaIdSchema = z.string().uuid('El mesaId debe ser un UUID válido');
+const mesaIdSchema = z.uuid('El mesaId debe ser un UUID válido');
 
 export async function POST(
   request: NextRequest,

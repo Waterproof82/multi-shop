@@ -4,8 +4,8 @@ import type { Result, AppError } from '@/core/domain/entities/types';
 import type { PedidoCompraItem } from '@/core/domain/entities/compras-types';
 
 const schema = z.object({
-  pedidoId: z.string().uuid(),
-  catalogoCompraId: z.string().uuid(),
+  pedidoId: z.uuid(),
+  catalogoCompraId: z.uuid(),
   cantidad: z.number().positive(),
 });
 

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getCsrfToken } from '@/lib/csrf-client';
+import { refTicketVisible } from '@/lib/tpv/ticket-ref';
 
 interface PedidoItem {
   nombre: string;
@@ -90,6 +91,25 @@ function fmtDate(iso: string): string {
 
 type Tab = 'pedidos' | 'cobros';
 
+/**
+ * Ticket que anula un rectificativo, o `null` si no hay ninguno.
+ *
+ * El original puede no estar en la lista que se muestra: si se cobro en otro
+ * turno, solo llega denormalizado en `originalTicket`. De ahi los dos caminos
+ * y el sufijo, que existe para que el cajero no busque en vano un ticket que
+ * no va a encontrar en esta pantalla.
+ */
+function etiquetaOriginal(c: CobroRow, cobros: readonly CobroRow[]): string | null {
+  if (c.rectificaCobroId !== null) {
+    const enLista = cobros.find(o => o.id === c.rectificaCobroId);
+    if (enLista) return refTicketVisible(enLista.serie, enLista.numeroTicket);
+  }
+  if (c.originalTicket) {
+    return `${refTicketVisible(c.originalTicket.serie, c.originalTicket.numeroTicket)} (otro turno)`;
+  }
+  return null;
+}
+
 function CobrosList({ cobros }: Readonly<{ cobros: CobroRow[] }>) {
   const router = useRouter();
   const [rectificando, setRectificando] = useState<string | null>(null);
@@ -139,19 +159,12 @@ function CobrosList({ cobros }: Readonly<{ cobros: CobroRow[] }>) {
         const importe = c.importeCobradoCents / 100;
         const isNegative = importe < 0;
 
-        const originalEnLista = isRectificativo
-          ? cobros.find(o => o.id === c.rectificaCobroId) ?? null
-          : null;
-        const originalLabel = originalEnLista
-          ? `${originalEnLista.serie}-${String(originalEnLista.numeroTicket).padStart(6, '0')}`
-          : c.originalTicket
-          ? `${c.originalTicket.serie}-${String(c.originalTicket.numeroTicket).padStart(6, '0')} (otro turno)`
-          : null;
+        const originalLabel = etiquetaOriginal(c, cobros);
 
         return (
           <div key={c.id} className="bg-white border border-[#e2e8f0] rounded-xl px-4 py-3 flex items-center gap-4 shadow-sm">
             <span className="font-mono text-xs text-[#64748b] w-20 shrink-0">
-              {c.serie}-{String(c.numeroTicket).padStart(6, '0')}
+              {refTicketVisible(c.serie, c.numeroTicket)}
             </span>
             <span className="text-xs text-[#64748b] shrink-0 w-10">
               {fmtTime(c.cobradoAt)}
@@ -220,6 +233,12 @@ function turnoLabel(t: TurnoOption): string {
     ? new Date(t.cierreAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
     : '';
   return `${apertura}–${cierre} · ${t.operadorNombre}`;
+}
+
+function mesaLabel(p: PedidoRow): string {
+  if (p.mesaNumero === null) return 'Sin mesa';
+  if (!p.mesaNombre) return `Mesa ${p.mesaNumero}`;
+  return `Mesa ${p.mesaNumero} · ${p.mesaNombre}`;
 }
 
 export function HistorialClient({ pedidos, cobros, turnoAperturaAt, tipoImpuesto, turnos, turnoId }: Readonly<Props>) {
@@ -342,9 +361,6 @@ export function HistorialClient({ pedidos, cobros, turnoAperturaAt, tipoImpuesto
             {pedidos.map(p => {
               const isExpanded = expanded === p.id;
               const color = ESTADO_COLOR[p.estado] ?? '#64748b';
-              const mesaLabel = p.mesaNumero !== null
-                ? `Mesa ${p.mesaNumero}${p.mesaNombre ? ` · ${p.mesaNombre}` : ''}`
-                : 'Sin mesa';
 
               return (
                 <div
@@ -365,7 +381,7 @@ export function HistorialClient({ pedidos, cobros, turnoAperturaAt, tipoImpuesto
                     </span>
 
                     <span className="text-sm text-[#0f172a] font-medium flex-1 truncate">
-                      {mesaLabel}
+                      {mesaLabel(p)}
                     </span>
 
                     <span
@@ -386,6 +402,15 @@ export function HistorialClient({ pedidos, cobros, turnoAperturaAt, tipoImpuesto
 
                   {isExpanded && (
                     <div className="border-t border-[#e2e8f0] px-4 py-3 bg-[#f8fafc]">
+                      {/*
+                        NOSONAR(S6479) — el indice como key es CORRECTO aqui.
+                        `PedidoItem` no tiene id (solo nombre, cantidad, precio) y
+                        un mismo producto puede repetirse en una comanda, asi que no
+                        existe clave unica. El peligro del indice aparece cuando la
+                        lista se reordena, filtra o inserta; esta es el detalle de una
+                        comanda ya cerrada y no puede mutar. Usar `${nombre}-${idx}`
+                        seria PEOR: aparenta unicidad sin tenerla.
+                      */}
                       {p.items.map((it, idx) => (
                         <div key={idx} className="flex items-center gap-3 py-1.5">
                           <span className="w-5 h-5 rounded bg-[#e2e8f0] text-[#64748b] text-xs flex items-center justify-center shrink-0 font-semibold">

@@ -6,6 +6,8 @@ import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 import { PAYMENT_LOCK_EXPIRY_MS } from '@/core/domain/constants/pedido';
 import { validateMesaClientToken } from '@/core/infrastructure/api/validate-mesa-client-token';
 import { verifyWaiterToken } from '@/lib/waiter-auth';
+import { fingerprintPayload, readIdempotencyKey } from '@/lib/idempotency';
+import { IDEMPOTENCY_MISMATCH_CODE, type IdempotencyContext } from '@/core/application/use-cases/pedido.use-case';
 
 const itemsSchema = z.array(z.object({
   item: z.object({
@@ -46,7 +48,7 @@ const defaultPedidoSchema = z.object({
     v => /^\+?[0-9\s\-()+]+$/.test(v),
     { message: 'Formato de teléfono no válido' }
   ),
-  email: z.string().email().optional().or(z.literal('')),
+  email: z.email().optional().or(z.literal('')),
   idioma: z.enum(['es', 'en', 'fr', 'it', 'de']).optional(),
   codigoDescuento: z.string().max(30).optional(),
   // Delivery fields (restaurant only)
@@ -113,7 +115,23 @@ function resolveInitialEstado(
   return 'pendiente';
 }
 
-async function handleMesaOrder(empresa: EmpresaOrderData, data: MesaData, request: Request): Promise<NextResponse> {
+/**
+ * Misma clave, contenido distinto. 409 es la respuesta correcta y NO debe
+ * incluir nada del pedido encontrado: devolver su `tracking_token` a quien
+ * acertó la clave con otro cuerpo sería entregar la comanda de un tercero.
+ */
+const idempotencyConflict = () =>
+  NextResponse.json(
+    { error: 'Esta clave de idempotencia ya se usó con un pedido distinto.' },
+    { status: 409 }
+  );
+
+async function handleMesaOrder(
+  empresa: EmpresaOrderData,
+  data: MesaData,
+  request: Request,
+  idempotency: IdempotencyContext | undefined
+): Promise<NextResponse> {
   const isWaiter = await isWaiterRequest(request);
 
   // Guard: mesa ordering must be enabled for this empresa.
@@ -144,13 +162,13 @@ async function handleMesaOrder(empresa: EmpresaOrderData, data: MesaData, reques
   const pedidoResult = await getPedidoUseCase().createMesaOrder(
     empresa.id,
     { items: data.items, mesa_id: data.mesa_id, idioma: data.idioma, pase: data.pase },
-    mesaResult.data.numero,
-    mesaResult.data.nombre,
-    initialEstado
+    initialEstado,
+    idempotency
   );
 
   if (!pedidoResult.success) {
     const errorCode = pedidoResult.error.code;
+    if (errorCode === IDEMPOTENCY_MISMATCH_CODE) return idempotencyConflict();
     // Trigger check_session_not_locked raises PAYMENT_IN_PROGRESS if pago_en_curso=true.
     // This covers the sub-ms window where checkMesaPaymentLock read false but the lock committed.
     if (pedidoResult.error.message?.includes('PAYMENT_IN_PROGRESS')) {
@@ -174,18 +192,25 @@ async function handleMesaOrder(empresa: EmpresaOrderData, data: MesaData, reques
   });
 }
 
-async function handleDefaultOrder(empresa: EmpresaOrderData, data: DefaultData, isPedidos: boolean): Promise<NextResponse> {
+async function handleDefaultOrder(
+  empresa: EmpresaOrderData,
+  data: DefaultData,
+  isPedidos: boolean,
+  idempotency: IdempotencyContext | undefined
+): Promise<NextResponse> {
   const pedidoResult = await getPedidoUseCase().create(
     empresa.id,
     data,
     empresa.tipo ?? 'tienda',
     empresa.telegram_chat_id ?? null,
     isPedidos,
-    empresa.pagos_pickup_habilitados ?? false
+    empresa.pagos_pickup_habilitados ?? false,
+    idempotency
   );
 
   if (!pedidoResult.success) {
     const errorCode = pedidoResult.error.code;
+    if (errorCode === IDEMPOTENCY_MISMATCH_CODE) return idempotencyConflict();
     if (['PRODUCT_NOT_FOUND', 'CODE_EXPIRED', 'CODE_ALREADY_USED', 'EMAIL_MISMATCH'].includes(errorCode)) {
       return NextResponse.json({ error: pedidoResult.error.message }, { status: 400 });
     }
@@ -229,6 +254,17 @@ export async function POST(request: Request) {
   }
 
   const data = parsed.data;
-  if (data.tipo === 'mesa') return handleMesaOrder(empresa, data, request);
-  return handleDefaultOrder(empresa, data, isPedidos);
+
+  // La huella se calcula sobre el cuerpo YA VALIDADO, no sobre el texto crudo.
+  // Es lo que hace que dos reintentos byte-a-byte distintos (otro orden de
+  // claves, un campo opcional ausente en uno) sigan reconociéndose como el
+  // mismo pedido. La clave llega solo por cabecera: en el cuerpo sería un campo
+  // más del pedido y Zod la rechazaría.
+  const idempotencyKey = readIdempotencyKey(request);
+  const idempotency: IdempotencyContext | undefined = idempotencyKey
+    ? { key: idempotencyKey, fingerprint: await fingerprintPayload(data) }
+    : undefined;
+
+  if (data.tipo === 'mesa') return handleMesaOrder(empresa, data, request, idempotency);
+  return handleDefaultOrder(empresa, data, isPedidos, idempotency);
 }

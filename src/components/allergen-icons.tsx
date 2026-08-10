@@ -1,3 +1,4 @@
+import { cn } from '@/lib/utils';
 import { t } from '@/lib/translations';
 import type { translations } from '@/lib/translations';
 import type { Language } from '@/lib/language-context';
@@ -223,29 +224,68 @@ const ALLERGEN_ICON_MAP: Record<AllergenKey, (props: SvgProps) => React.ReactEle
   molluscs: MolluscsIcon,
 };
 
+/**
+ * Icono de alergeno.
+ *
+ * `label` decide si el icono EXISTE para un lector de pantalla:
+ *
+ * - **Con `label`** → `role="img"` + `aria-label`. Se usa cuando el icono va
+ *   solo y es el unico portador de la informacion (`AllergenBadges`).
+ * - **Sin `label`** → `aria-hidden`. Se usa cuando al lado ya hay texto visible
+ *   con el nombre del alergeno (`AllergenList`, el formulario de admin).
+ *   Etiquetarlo ahi haria que el lector lo anunciara DOS VECES.
+ *
+ * El defecto es ocultarlo, que es el lado seguro: un icono decorativo mudo
+ * molesta menos que uno que duplica lo que ya se lee.
+ */
 export function AllergenIcon({
   allergen,
+  label,
   ...props
-}: Readonly<{ allergen: AllergenKey } & React.SVGProps<SVGSVGElement>>): React.ReactElement | null {
+}: Readonly<
+  { allergen: AllergenKey; label?: string } & React.SVGProps<SVGSVGElement>
+>): React.ReactElement | null {
   const Icon = ALLERGEN_ICON_MAP[allergen];
   if (!Icon) return null;
-  return <Icon {...props} />;
+  const accesibilidad = label
+    ? { role: 'img' as const, 'aria-label': label }
+    : { 'aria-hidden': true, focusable: false as const };
+  return <Icon {...props} {...accesibilidad} />;
 }
 
+/**
+ * Fila de iconos de alergenos, SIN texto al lado.
+ *
+ * Por eso `language` es obligatorio: aqui el icono es lo unico que informa, asi
+ * que necesita nombre accesible o la advertencia no existe para quien usa un
+ * lector de pantalla. Y es informacion de seguridad alimentaria, no adorno.
+ */
 export function AllergenBadges({
   alergenos,
+  language,
   className,
-}: Readonly<{ alergenos?: string[]; className?: string }>): React.ReactElement | null {
+}: Readonly<{
+  alergenos?: string[];
+  language: Language;
+  className?: string;
+}>): React.ReactElement | null {
   if (!alergenos?.length) return null;
   return (
-    <div className={`flex flex-wrap gap-1${className ? ` ${className}` : ''}`}>
-      {alergenos.map((a) => (
-        <AllergenIcon
-          key={a}
-          allergen={a as AllergenKey}
-          className="w-5 h-5 text-muted-foreground"
-        />
-      ))}
+    <div className={cn('flex flex-wrap gap-1', className)}>
+      {alergenos.map((a) => {
+        const key = a as AllergenKey;
+        const claveTraduccion = ALLERGEN_TRANSLATION_KEY[key];
+        return (
+          <AllergenIcon
+            key={a}
+            allergen={key}
+            // Si la clave no esta traducida se cae al valor crudo: preferible
+            // anunciar 'cacahuetes' que no anunciar nada.
+            label={claveTraduccion ? t(claveTraduccion, language) : a}
+            className="w-5 h-5 text-muted-foreground"
+          />
+        );
+      })}
     </div>
   );
 }

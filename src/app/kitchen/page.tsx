@@ -1,12 +1,18 @@
 'use client';
 
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, useReducer } from 'react';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import { fetchWithCsrf, ensureCsrfToken } from '@/lib/csrf-client';
 import { UtensilsCrossed, LogOut } from 'lucide-react';
 import type { ItemEstado } from '@/core/domain/repositories/IPedidoRepository';
+import { loadKitchenSnapshot, saveKitchenSnapshot } from '@/lib/kitchen/kitchen-snapshot-db';
+import { useRealtimeDegraded } from '@/hooks/waiter/useRealtimeDegraded';
+
+/** Clave del snapshot local de esta vista. Cada pantalla tiene su propia forma
+ *  de item, así que no comparten scope. */
+const SNAPSHOT_SCOPE = 'kitchen';
 
 interface KitchenItem {
   pedidoId: string;
@@ -51,6 +57,12 @@ const EN_PREP_BORDER  = 'oklch(80% 0.32 142)'; // bright lime — overrides time
 
 const THRESHOLD         = 80;
 const COUNTDOWN_SECONDS = 5;
+
+/** Cadencia del reloj visual. Los contadores se muestran en minutos y las
+ *  bandas de color cambian a los 10/20/30/45/60 min, así que refrescar cada
+ *  segundo era 10 veces más de lo necesario para lo que se ve en pantalla.
+ *  La cuenta atrás de 5 s tiene su propio intervalo y no depende de este. */
+const CLOCK_TICK_MS = 10000;
 
 function makeKey(pedidoId: string, itemIdx: number) {
   return `${pedidoId}:${itemIdx}`;
@@ -168,7 +180,7 @@ function CountdownCard({ item, remaining, lang, onCancelCountdown }: Readonly<Co
           {item.complementos && <span className="text-[10px]" style={{ color: 'oklch(78% 0.03 252)' }}>({item.complementos})</span>}
           {item.nota && <span className="text-xs font-medium italic block mt-0.5 px-1.5 py-0.5 rounded" style={{ color: 'oklch(88% 0.18 85)', background: 'oklch(28% 0.12 85 / 0.45)' }}>✎ {item.nota}</span>}
         </div>
-        <button className="rounded px-2 py-1 text-[10px] font-bold shrink-0"
+        <button type="button" className="rounded px-2 py-1 text-[10px] font-bold shrink-0"
           style={{ background: 'oklch(26% 0.08 25)', color: 'oklch(75% 0.18 25)' }}
           onClick={() => onCancelCountdown(item.pedidoId, item.itemIdx)}>
           {t('kitchenCountdownCancel', lang)}
@@ -252,8 +264,18 @@ export default function KitchenPage() {
   const [pendingMergedAction, setPendingMergedAction] = useState<{ items: KitchenItem[]; action: ItemEstado } | null>(null);
 
   const [waiterEmpresaId, setWaiterEmpresaId] = useState<string | null>(null);
+  // Contador del reloj visual. Su único cometido es provocar el repintado para
+  // refrescar tiempos y colores; deliberadamente NO forma parte de `items`,
+  // para que los agrupamientos memoizados no se invaliden en cada tick.
+  const [, tickClock] = useReducer((n: number) => n + 1, 0);
 
   const timersRef      = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
+  // Mirror síncrono de `items` — permite capturar el estado previo de un item
+  // para el rollback sin leer estado obsoleto desde un closure.
+  const itemsRef       = useRef<KitchenItem[]>([]);
+  // Marca que ya llegó al menos una respuesta del servidor: impide que la
+  // hidratación desde IndexedDB (asíncrona) pise datos más frescos.
+  const hasServerDataRef = useRef(false);
   const pointerStartX  = useRef<number | null>(null);
   const swipingKey     = useRef<string | null>(null);
   const prevCountRef   = useRef<number | null>(null);
@@ -271,8 +293,29 @@ export default function KitchenPage() {
       const activeCount = incoming.filter(i => i.estado === 'pendiente' || i.estado === 'en_preparacion').length;
       if (prevCountRef.current !== null && activeCount > prevCountRef.current) playBell();
       prevCountRef.current = activeCount;
+      hasServerDataRef.current = true;
       setItems(incoming);
+      void saveKitchenSnapshot(SNAPSHOT_SCOPE, incoming);
     } catch { /* ignore */ }
+  }, []);
+
+  // Detecta la caída de los canales y sondea mientras dure, sin tocar el ciclo
+  // de vida de las suscripciones.
+  const { realtimeDegraded, trackChannelStatus } = useRealtimeDegraded(fetchItems);
+
+  // Hidratación cache-first: pinta el último listado conocido mientras el fetch
+  // viaja, para que un arranque en frío con wifi lenta no muestre "sin pedidos"
+  // (indistinguible de "no hay nada pendiente", el peor falso negativo en cocina).
+  //
+  // El guard es lo importante: esta lectura de IndexedDB es asíncrona y puede
+  // resolver DESPUÉS de que el servidor o un evento Realtime ya hayan traído
+  // datos frescos. Si eso pasa, se descarta — nunca pisa lo autoritativo.
+  useEffect(() => {
+    void loadKitchenSnapshot<KitchenItem>(SNAPSHOT_SCOPE).then(cached => {
+      if (!cached || cached.length === 0) return;
+      if (hasServerDataRef.current) return;
+      setItems(cached);
+    });
   }, []);
 
   // Fetch empresaId on mount — guards the Realtime subscription against StrictMode double-mount.
@@ -320,30 +363,18 @@ export default function KitchenPage() {
       .channel(channelNameRef.current)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados', filter: `empresa_id=eq.${waiterEmpresaId}` }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos', filter: `empresa_id=eq.${waiterEmpresaId}` }, scheduleRefresh)
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('[Realtime] kitchen-standalone postgres_changes error:', status);
-        }
-      });
+      .subscribe((status) => trackChannelStatus(status, 'kitchen-standalone postgres_changes'));
 
     // Broadcast channels — fired by DB triggers
     const broadcastItems = supabase
       .channel('waiter-items-update')
       .on('broadcast', { event: 'item-update' }, scheduleRefresh)
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('[Realtime] kitchen waiter-items-update error:', status);
-        }
-      });
+      .subscribe((status) => trackChannelStatus(status, 'kitchen waiter-items-update'));
 
     const broadcastOrders = supabase
       .channel('waiter-new-order')
       .on('broadcast', { event: 'new-order' }, scheduleRefresh)
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('[Realtime] kitchen waiter-new-order error:', status);
-        }
-      });
+      .subscribe((status) => trackChannelStatus(status, 'kitchen waiter-new-order'));
 
     // DOM relay — fallback for when WaiterBanner (on waiter pages) dispatches this event
     const onRealtimeRelay = () => { void fetchItems(); };
@@ -356,11 +387,26 @@ export default function KitchenPage() {
       void supabase.removeChannel(broadcastItems);
       void supabase.removeChannel(broadcastOrders);
     };
-  }, [fetchItems, waiterEmpresaId]);
+  }, [fetchItems, waiterEmpresaId, trackChannelStatus]);
 
-  // Visual timer tick — no network calls
+  // Keep the synchronous mirror in step with the rendered list.
+  useEffect(() => { itemsRef.current = items; }, [items]);
+
+
+  // Reloj visual — refresca los colores y contadores por tiempo transcurrido.
+  //
+  // Antes esto hacía `setItems(p => [...p])`: creaba un array nuevo cada
+  // segundo solo para forzar el repintado, lo que invalidaba cualquier
+  // memoización posible sobre `items` y obligaba a reagrupar y reordenar la
+  // lista entera 60 veces por minuto, indefinidamente, en una tablet que está
+  // encendida todo el servicio.
+  //
+  // Ahora el reloj es un contador independiente: `items` solo cambia cuando
+  // cambian los datos de verdad, así que los agrupamientos memoizados de abajo
+  // sobreviven al tick. El repintado sigue ocurriendo porque el contador es
+  // estado del componente.
   useEffect(() => {
-    const tick = setInterval(() => setItems(p => [...p]), 1000);
+    const tick = setInterval(tickClock, CLOCK_TICK_MS);
     return () => clearInterval(tick);
   }, []);
 
@@ -372,14 +418,35 @@ export default function KitchenPage() {
 
   // ── Countdown ──────────────────────────────────────────────────────────────
 
+  // ── Local state helpers (optimistic updates) ───────────────────────────────
+
+  const setItemEstado = useCallback((pedidoId: string, itemIdx: number, estado: ItemEstado) => {
+    setItems(prev => prev.map(i =>
+      (i.pedidoId === pedidoId && i.itemIdx === itemIdx) ? { ...i, estado } : i
+    ));
+  }, []);
+
+  const removeItem = useCallback((pedidoId: string, itemIdx: number) => {
+    setItems(prev => prev.filter(notMatchingItem(pedidoId, itemIdx)));
+  }, []);
+
+  const addItemBackIfMissing = useCallback((item: KitchenItem) => {
+    setItems(prev => prev.some(i => i.pedidoId === item.pedidoId && i.itemIdx === item.itemIdx)
+      ? prev
+      : [...prev, item]);
+  }, []);
+
   const applyItemListo = useCallback((pedidoId: string, itemIdx: number) => {
+    // Optimista: el item desaparece al instante y solo vuelve si el PATCH falla.
+    const previous = itemsRef.current.find(i => i.pedidoId === pedidoId && i.itemIdx === itemIdx);
+    removeItem(pedidoId, itemIdx);
     void fetchWithCsrf(`/api/kitchen/items/${encodeURIComponent(pedidoId)}/${itemIdx}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ estado: 'listo' }),
-    }).then(r => {
-      if (r.ok) setItems(prev => prev.filter(notMatchingItem(pedidoId, itemIdx)));
-    });
-  }, []);
+    })
+      .then(r => { if (!r.ok && previous) addItemBackIfMissing(previous); })
+      .catch(() => { if (previous) addItemBackIfMissing(previous); });
+  }, [removeItem, addItemBackIfMissing]);
 
   const startCountdown = useCallback((pedidoId: string, itemIdx: number) => {
     const key = makeKey(pedidoId, itemIdx);
@@ -410,13 +477,23 @@ export default function KitchenPage() {
 
   // ── PATCH ──────────────────────────────────────────────────────────────────
 
+  /** Optimista: aplica el estado en local al instante y solo revierte si el
+   *  servidor rechaza o la red falla. Antes esperaba el PATCH y además
+   *  disparaba un GET completo, congelando el swipe durante dos roundtrips. */
   const patchEstado = useCallback(async (pedidoId: string, itemIdx: number, estado: ItemEstado) => {
-    const r = await fetchWithCsrf(`/api/kitchen/items/${encodeURIComponent(pedidoId)}/${itemIdx}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ estado }),
-    });
-    if (r.ok) void fetchItems();
-  }, [fetchItems]);
+    const previous = itemsRef.current.find(i => i.pedidoId === pedidoId && i.itemIdx === itemIdx);
+    const rollback = () => { if (previous) setItemEstado(pedidoId, itemIdx, previous.estado); };
+    setItemEstado(pedidoId, itemIdx, estado);
+    try {
+      const r = await fetchWithCsrf(`/api/kitchen/items/${encodeURIComponent(pedidoId)}/${itemIdx}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ estado }),
+      });
+      if (!r.ok) rollback();
+    } catch {
+      rollback();
+    }
+  }, [setItemEstado]);
 
   const confirmMergedAction = useCallback(async () => {
     if (!pendingMergedAction) return;
@@ -492,8 +569,17 @@ export default function KitchenPage() {
 
   // ── Derived data ───────────────────────────────────────────────────────────
 
-  const activeItems = items.filter(i => i.estado === 'pendiente' || i.estado === 'en_preparacion');
-  const grouped     = (groupBy === 'mesa' ? groupByMesa(activeItems) : groupByPedido(activeItems)) as Map<string, AnyGroupValue>;
+  // Memoizados: el filtrado, el agrupamiento y el `.sort()` de groupByMesa solo
+  // se recalculan cuando cambian los datos o el criterio, no en cada tick del
+  // reloj. Es lo que hace que separar el reloj de `items` merezca la pena.
+  const activeItems = useMemo(
+    () => items.filter(i => i.estado === 'pendiente' || i.estado === 'en_preparacion'),
+    [items],
+  );
+  const grouped = useMemo(
+    () => (groupBy === 'mesa' ? groupByMesa(activeItems) : groupByPedido(activeItems)) as Map<string, AnyGroupValue>,
+    [activeItems, groupBy],
+  );
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -502,6 +588,15 @@ export default function KitchenPage() {
 
       {/* Header */}
       <div className="sticky top-0 z-20 flex flex-col" style={{ background: BG, borderBottom: '1px solid oklch(28% 0.06 252 / 0.5)' }}>
+      {realtimeDegraded && (
+        <output
+          aria-live="polite"
+          className="w-full px-4 py-2 text-center text-xs font-semibold"
+          style={{ background: 'oklch(30% 0.14 62)', color: 'oklch(85% 0.16 62)' }}
+        >
+          {t('realtimeReconnecting', lang)}
+        </output>
+      )}
       <div className="px-4 pt-4 pb-2 flex items-center gap-3 overflow-x-auto scrollbar-none" style={{ scrollbarWidth: 'none' }}>
         <div className="flex items-center justify-center w-9 h-9 rounded-xl" style={{ background: 'oklch(26% 0.12 252)' }}>
           <UtensilsCrossed className="w-5 h-5" style={{ color: 'oklch(72% 0.18 252)' }} />
@@ -693,14 +788,14 @@ export default function KitchenPage() {
               </span>
             </div>
             <div className="flex gap-2">
-              <button
+              <button type="button"
                 onClick={() => setPendingMergedAction(null)}
                 className="flex-1 rounded-lg px-3 py-2 text-xs font-semibold"
                 style={{ background: 'oklch(20% 0.04 252)', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
               >
                 {t('kitchenCountdownCancel', lang)}
               </button>
-              <button
+              <button type="button"
                 onClick={() => void confirmMergedAction()}
                 className="flex-1 rounded-lg px-3 py-2 text-xs font-semibold"
                 style={{

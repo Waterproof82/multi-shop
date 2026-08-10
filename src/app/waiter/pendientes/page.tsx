@@ -1,11 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useReducer } from 'react';
 import { ChevronLeft, ChevronDown, Table2, UtensilsCrossed, Wine, Pause, CheckCheck, Trash2, Layers } from 'lucide-react';
 import { getSupabaseAnonClient } from '@/core/infrastructure/database/supabase-client';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
+import { useRealtimeDegraded } from '@/hooks/waiter/useRealtimeDegraded';
 import { fetchWithCsrf, ensureCsrfToken } from '@/lib/csrf-client';
+
+/** Cadencia del reloj visual. Los contadores se muestran en minutos y las
+ *  bandas de color cambian a los 10/20/30/45/60 min, asi que refrescar cada
+ *  segundo era 10 veces mas de lo necesario para lo que se ve en pantalla. */
+const CLOCK_TICK_MS = 10000;
 
 interface PendienteItem {
   idx: number;
@@ -351,6 +357,10 @@ export default function WaiterPendientesPage() {
   const [isTabVisible, setIsTabVisible] = useState(true);
   const [waiterEmpresaId, setWaiterEmpresaId] = useState<string | null>(null);
   const [mesas, setMesas] = useState<PendienteMesa[]>([]);
+  // Contador del reloj visual. Su unico cometido es provocar el repintado para
+  // refrescar tiempos y colores; deliberadamente NO forma parte de los datos,
+  // para que los agrupamientos memoizados no se invaliden en cada tick.
+  const [, tickClock] = useReducer((n: number) => n + 1, 0);
   // selectedMap: ítems marcados con ✓ (se incluirán en la confirmación selectiva)
   const [selectedMap, setSelectedMap] = useState<Record<string, Set<string>>>({});
   // pausedMap: ítems con pausa activa (se confirmarán como retenidos)
@@ -394,6 +404,19 @@ export default function WaiterPendientesPage() {
     } catch { /* ignore */ }
   }, []);
 
+  // Detecta la caída de los canales y sondea mientras dure, sin tocar el ciclo
+  // de vida de las suscripciones.
+  //
+  // El `pauseWhen` NO es opcional aquí: durante el validate loop, `confirmingRef`
+  // debe bloquear cualquier fetch, o se lee estado parcial entre iteraciones
+  // (trampa #3 de docs/context/realtime-channels.md). Sin este guard, el sondeo
+  // cada 15 s reintroduciría esa misma race por la puerta de atrás.
+  const isConfirming = useCallback(() => confirmingRef.current.size > 0, []);
+  const { realtimeDegraded, trackChannelStatus } = useRealtimeDegraded(
+    fetchPendientes,
+    { pauseWhen: isConfirming },
+  );
+
   useEffect(() => {
     if (!isTabVisible) return;
     if (!waiterEmpresaId) return;
@@ -411,11 +434,7 @@ export default function WaiterPendientesPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos', filter: `empresa_id=eq.${waiterEmpresaId}` }, trigger)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_item_estados', filter: `empresa_id=eq.${waiterEmpresaId}` }, trigger)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'mesa_sesiones', filter: `empresa_id=eq.${waiterEmpresaId}` }, trigger)
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('[Realtime] waiter-pendientes error:', status);
-        }
-      });
+      .subscribe((status) => trackChannelStatus(status, 'waiter-pendientes error'));
 
     // Fallback: WaiterBanner relays Realtime events via DOM for cases where
     // the direct postgres_changes subscription doesn't fire (known Supabase JS
@@ -436,7 +455,7 @@ export default function WaiterPendientesPage() {
       void supabase.removeChannel(channel);
       globalThis.removeEventListener('waiter-realtime-update', bannerRelay);
     };
-  }, [fetchPendientes, isTabVisible, waiterEmpresaId]);
+  }, [fetchPendientes, isTabVisible, waiterEmpresaId, trackChannelStatus]);
 
   // Re-fetch when tab becomes visible again so stale data is refreshed immediately.
   useEffect(() => {
@@ -449,7 +468,7 @@ export default function WaiterPendientesPage() {
   useEffect(() => { void ensureCsrfToken(); }, []);
 
   useEffect(() => {
-    const tick = setInterval(() => setMesas(p => [...p]), 1000);
+    const tick = setInterval(tickClock, CLOCK_TICK_MS);
     return () => clearInterval(tick);
   }, []);
 
@@ -765,6 +784,15 @@ export default function WaiterPendientesPage() {
 
   return (
     <div className="min-h-screen" style={{ background: BG }}>
+      {realtimeDegraded && (
+        <output
+          aria-live="polite"
+          className="fixed top-0 left-0 right-0 z-30 px-4 py-1.5 text-center text-xs font-semibold"
+          style={{ background: 'oklch(30% 0.14 62)', color: 'oklch(85% 0.16 62)' }}
+        >
+          {t('realtimeReconnecting', lang)}
+        </output>
+      )}
       <div className="fixed top-0 left-0 right-0 z-10 shadow-lg"
         style={{ background: 'oklch(17% 0.025 252)', borderBottom: '1px solid oklch(42% 0.10 252 / 0.35)' }}>
         <div className="flex h-11 items-center gap-3 px-4">
@@ -854,7 +882,7 @@ export default function WaiterPendientesPage() {
                         );
                       })}
                       {allSelected && cocinaItems.length > 0 && barItems.length > 0 && (
-                        <button
+                        <button type="button"
                           onClick={() => void handleConfirmBoth(mesa.mesaId)}
                           disabled={isConfirming}
                           className="flex items-center gap-1 rounded-lg px-3 py-2.5 text-xs font-semibold disabled:opacity-50"
@@ -865,7 +893,7 @@ export default function WaiterPendientesPage() {
                         </button>
                       )}
                       {hasSelCocina && (
-                        <button
+                        <button type="button"
                           onClick={() => void handleConfirm(mesa.mesaId, 'comida', 'selected')}
                           disabled={isConfirming}
                           className="flex items-center gap-1 rounded-lg px-3 py-2.5 text-xs font-semibold disabled:opacity-50"
@@ -875,7 +903,7 @@ export default function WaiterPendientesPage() {
                         </button>
                       )}
                       {hasSelBar && (
-                        <button
+                        <button type="button"
                           onClick={() => void handleConfirm(mesa.mesaId, 'bebida', 'selected')}
                           disabled={isConfirming}
                           className="flex items-center gap-1 rounded-lg px-3 py-2.5 text-xs font-semibold disabled:opacity-50"
@@ -884,7 +912,7 @@ export default function WaiterPendientesPage() {
                           <Wine className="w-3.5 h-3.5 shrink-0" />
                         </button>
                       )}
-                      <button
+                      <button type="button"
                         onClick={() => setGroupedMesas(prev => { const next = new Set(prev); if (next.has(mesa.mesaId)) { next.delete(mesa.mesaId); } else { next.add(mesa.mesaId); } return next; })}
                         title="Agrupar ítems"
                         className="flex items-center justify-center rounded-lg"
@@ -892,7 +920,7 @@ export default function WaiterPendientesPage() {
                       >
                         <Layers className="w-3.5 h-3.5" />
                       </button>
-                      <button
+                      <button type="button"
                         onClick={() => setCollapsedMesas(prev => { const next = new Set(prev); if (next.has(mesa.mesaId)) { next.delete(mesa.mesaId); } else { next.add(mesa.mesaId); } return next; })}
                         title={isCollapsed ? 'Expandir' : 'Contraer'}
                         className="flex items-center justify-center rounded-lg"
@@ -901,7 +929,7 @@ export default function WaiterPendientesPage() {
                         <ChevronDown className="w-3.5 h-3.5 transition-transform" style={{ transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }} />
                       </button>
                       {selected.size > 0 && (
-                        <button
+                        <button type="button"
                           onClick={() => setPendingDelete(mesa.mesaId)}
                           disabled={isConfirming}
                           className="flex items-center justify-center rounded-lg disabled:opacity-50"
@@ -918,7 +946,7 @@ export default function WaiterPendientesPage() {
                   <div className="flex items-center gap-2 px-3 py-2"
                     style={{ background: 'oklch(18% 0.03 252)', borderBottom: '1px solid oklch(35% 0.08 252 / 0.25)' }}>
                     <span className="text-[10px] font-mono" style={{ color: TEXT_DIM }} suppressHydrationWarning>{formatTimer(elapsed)}</span>
-                    <button
+                    <button type="button"
                       className="ml-auto text-[10px] px-2 py-0.5 rounded font-medium"
                       style={{
                         background: allSelected ? 'oklch(26% 0.12 148)' : 'oklch(20% 0.05 252)',
@@ -937,7 +965,7 @@ export default function WaiterPendientesPage() {
                       <div className="flex items-center gap-2 px-3 py-1.5"
                         style={{ background: 'oklch(17% 0.025 252)', borderBottom: '1px solid oklch(35% 0.08 252 / 0.4)' }}>
                         {cocinaItems.length > 0 && (
-                          <button
+                          <button type="button"
                             className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded font-medium"
                             style={{
                               background: allCocina ? 'oklch(26% 0.12 148)' : 'oklch(20% 0.05 252)',
@@ -950,7 +978,7 @@ export default function WaiterPendientesPage() {
                           </button>
                         )}
                         {barItems.length > 0 && (
-                          <button
+                          <button type="button"
                             className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded font-medium"
                             style={{
                               background: allBar ? 'oklch(22% 0.10 252)' : 'oklch(20% 0.05 252)',
@@ -1087,14 +1115,14 @@ export default function WaiterPendientesPage() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <button
+                <button type="button"
                   onClick={() => setPendingLanzarPase(null)}
                   className="flex-1 rounded-lg px-3 py-2.5 text-xs font-semibold"
                   style={{ background: 'oklch(20% 0.04 252)', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
                 >
                   Cancelar
                 </button>
-                <button
+                <button type="button"
                   onClick={() => { setPendingLanzarPase(null); void handleLanzarPase(mesaId, pase); }}
                   className="flex-1 rounded-lg px-3 py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5"
                   style={{ background: col.bg, color: col.text, border: `2px solid ${col.border}` }}
@@ -1146,14 +1174,14 @@ export default function WaiterPendientesPage() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <button
+                <button type="button"
                   onClick={() => setPendingDelete(null)}
                   className="flex-1 rounded-lg px-3 py-2.5 text-xs font-semibold"
                   style={{ background: 'oklch(20% 0.04 252)', color: TEXT_DIM, border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
                 >
                   {t('kitchenCountdownCancel', lang)}
                 </button>
-                <button
+                <button type="button"
                   onClick={() => void handleDeleteSelected(pendingDelete)}
                   className="flex-1 rounded-lg px-3 py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5"
                   style={{ background: 'oklch(30% 0.28 25)', color: 'oklch(88% 0.26 25)', border: '2px solid oklch(52% 0.32 25 / 0.7)' }}

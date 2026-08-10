@@ -399,7 +399,6 @@ export function register() {
 |----------|:-:|:-:|
 | `ACCESS_TOKEN_SECRET` | ✓ | |
 | `CSRF_HMAC_SECRET` | ✓ | |
-| `CART_TOKEN_SECRET` | ✓ | |
 | `UNSUBSCRIBE_HMAC_SECRET` | | ✓ |
 | `NEXT_PUBLIC_SUPABASE_URL` | ✓ | |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✓ | |
@@ -771,7 +770,7 @@ PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test e2e/waiter-csrf.sp
 PLAYWRIGHT_BASE_URL=... NEXT_PUBLIC_SUPABASE_URL=... NEXT_PUBLIC_SUPABASE_ANON_KEY=... npx playwright test e2e/waiter-csrf.spec.ts
 ```
 
-Los tests 4 y 5 (CSRF con token válido) requieren `PLAYWRIGHT_WAITER_TOKEN` — se omiten con skip si no está definido.
+Los tests 4 y 5 (CSRF con token válido) requieren `PLAYWRIGHT_WAITER_PIN`: el `waiter_token` se obtiene haciendo login con el PIN en el `beforeAll`, no se pasa como secreto.
 
 ---
 
@@ -786,24 +785,6 @@ function safeJsonStringify(data: Record<string, unknown>): string {
     .replaceAll(String.raw`>`, String.raw`\u003e`)
     .replaceAll(String.raw`&`, String.raw`\u0026`);
 }
-```
-
----
-
-## Cart Access Token
-
-El proxy valida cart tokens (`?access=` query param) con `CART_TOKEN_SECRET` y requiere `aud: 'cart-access'` para prevenir token confusion con admin JWTs.
-
-Si `CART_TOKEN_SECRET` no está en producción, el proxy retorna **500** en lugar de ignorar el token y conceder acceso.
-
-Cuando se implemente la generación de cart tokens:
-
-```typescript
-new SignJWT({ /* claims */ })
-  .setProtectedHeader({ alg: 'HS256' })
-  .setAudience('cart-access')
-  .setExpirationTime('15m')
-  .sign(new TextEncoder().encode(process.env.CART_TOKEN_SECRET));
 ```
 
 ---
@@ -890,7 +871,6 @@ Configurado en el proxy para todas las rutas `/api/*`. Solo orígenes en:
 |----------|-----|--------------------|
 | `ACCESS_TOKEN_SECRET` | Firma JWT de sesión admin | ✓ Siempre |
 | `CSRF_HMAC_SECRET` | Firma HMAC de tokens CSRF | ✓ Siempre |
-| `CART_TOKEN_SECRET` | JWT de acceso al carrito | ✓ Siempre |
 | `UNSUBSCRIBE_HMAC_SECRET` | HMAC tokens de baja/alta promociones | ✓ Producción |
 | `NEXT_PUBLIC_SUPABASE_URL` | URL de Supabase | ✓ Siempre |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Clave anónima de Supabase | ✓ Siempre |
@@ -1169,7 +1149,6 @@ Lista de las 10 vulnerabilidades web más críticas publicada por la Open Web Ap
 | Item | Severidad | Notas |
 |------|-----------|-------|
 | `GLOVO_WEBHOOK_SECRET` en entorno | High | El scaffold HMAC-SHA256 está implementado. Requiere configurar la variable en `.env` y Vercel cuando Glovo entre en producción. |
-| Cart token generación con `jti` | Low | El proxy valida `aud: 'cart-access'` y llama `isTokenRevoked(jti)` si el claim está presente. Cuando se implemente la generación, incluir `jti` para habilitar revocación completa. |
 | `unsafe-inline` en `style-src` | Low | Estándar para la mayoría de aplicaciones Next.js. Mejorable con style nonces si el framework lo soporta en el futuro. |
 | Order number gaps | Low | Si el INSERT falla tras `get_next_pedido_number`, el número se pierde. Operacionalmente menor, no es riesgo de seguridad. |
 | Rate limit por tenant en pedidos públicos | Low | La creación de pedidos y clientes usa rate limit por IP. Para tenants con mucho tráfico legítimo desde IPs compartidas (NAT corporativo), considerar rate limit compuesto `empresaId:ip`. |

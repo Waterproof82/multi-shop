@@ -17,6 +17,8 @@ import { formatPrice } from "@/lib/format-price"
 import { getWaiterMesa } from "@/components/waiter-login-form"
 import { useCart } from "@/lib/cart-context"
 import { QuantitySelectorDialog } from "@/components/quantity-selector-dialog"
+import { mesaSesionChannel } from "@/lib/realtime-channels"
+import { useMesaId } from "@/lib/mesa/use-mesa-id"
 
 // Lazy load cart components - only needed when showCart is true
 const CartDrawer = dynamic(
@@ -54,6 +56,7 @@ function getCategoryTab(cat: MenuCategoryVM): 'comida' | 'bebida' | 'empty' {
 export function MenuPage({ menuData, header, showCart = false, empresa, isWaiterMode = false }: Readonly<MenuPageProps>) {
   const { language } = useLanguage();
   const { clearCart, closeCart, isCartOpen } = useCart();
+  const mesaId = useMesaId();
   // Mirror exactly the WaiterBanner condition: waiter_token (server) + mesa selected (sessionStorage)
   const [waiterHasMesa, setWaiterHasMesa] = useState(false);
   const [waiterMesaLocked, setWaiterMesaLocked] = useState(false);
@@ -73,21 +76,23 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
   // Signal "Activa": mark session as customer-entered as soon as menu opens (not waiter)
   useEffect(() => {
     if (isWaiterMode) return;
-    const mesa = new URLSearchParams(globalThis.location.search).get('mesa');
-    if (!mesa) return;
-    void fetch(`/api/mesas/${encodeURIComponent(mesa)}/activate`, { method: 'POST' });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (!mesaId) return;
+    void fetch(`/api/mesas/${encodeURIComponent(mesaId)}/activate`, { method: 'POST' });
+  }, [isWaiterMode, mesaId]);
 
   // Close search when cart opens in waiter mode
   useEffect(() => {
     if (isCartOpen) setWaiterSearch("");
   }, [isCartOpen]);
 
+  const empresaId = empresa?.id;
   useEffect(() => {
-    const params = new URLSearchParams(globalThis.location.search);
-    const mesa = params.get('mesa');
+    const mesa = mesaId;
     if (!mesa) return;
+    // Sin empresa no se puede construir el nombre del canal, y un canal mal
+    // nombrado no da error: se suscribe y no llega nada nunca. Mejor no montar
+    // nada y quedarse solo con el sondeo de abajo, que sí funciona a ciegas.
+    if (!empresaId) return;
 
     // Polling: detect sesionPagada (fully paid) and division state (10s is fine — not time-critical)
     const check = async () => {
@@ -124,14 +129,14 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
-    // Channel name MUST match the topic the mesa_sesiones_notify_update trigger
-    // broadcasts to ('mesa-sesion-update') — for Realtime Broadcast routing, the
-    // channel name IS the routing key, unlike postgres_changes filters.
+    // El nombre del canal DEBE coincidir con el topic del trigger: en Realtime
+    // Broadcast el nombre es la clave de enrutado, no hay `filter`. Se construye
+    // desde el mismo helper que usa el trigger. Ver realtime-channels.ts.
     const channel = supabase
-      .channel('mesa-sesion-update')
+      .channel(mesaSesionChannel(empresaId))
       .on('broadcast', { event: 'update' }, (message: { payload: Record<string, unknown> }) => {
-        // Public broadcast channel — fired for every mesa in the company, so filter
-        // client-side to the mesa this component cares about.
+        // Canal compartido por todas las mesas de ESTA empresa (ya no por todas
+        // las empresas), así que sigue haciendo falta filtrar por mesa.
         if (message.payload['mesaId'] !== mesa) return;
         const pagoEnCurso = message.payload['pagoEnCurso'] === true;
         const sesionPagada = message.payload['sesionPagada'] === true;
@@ -152,7 +157,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [clearCart, closeCart, isWaiterMode]);
+  }, [clearCart, closeCart, isWaiterMode, empresaId, mesaId]);
 
   // Trap the browser back button while the "mesa en preparación" overlay is active
   // so the user cannot navigate away from the waiting screen.

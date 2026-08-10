@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 
-const mesaIdSchema = z.string().uuid('El mesaId debe ser un UUID válido');
+const mesaIdSchema = z.uuid('El mesaId debe ser un UUID válido');
 
 /**
  * POST /api/waiter/mesas/{mesaId}/dismiss-call

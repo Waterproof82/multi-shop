@@ -48,6 +48,99 @@ function resolveLanguage(urlLang: string | null, contextLanguage: Language): Lan
   return contextLanguage;
 }
 
+/** Cuánto se queda el aviso en pantalla antes de desaparecer solo. */
+const MS_AVISO_VISIBLE = 7000;
+
+/**
+ * ¿Se pasó la hora de recogida?
+ *
+ * La fecha y la hora vienen SIN zona horaria, así que el navegador las
+ * interpreta como hora LOCAL — que es justo lo que queremos: la recogida es
+ * presencial, y la hora que importa es la del sitio donde está el cliente, no
+ * la del servidor.
+ */
+export function haExpiradoLaRecogida(
+  fechaActivacion: string | null,
+  horaRecogidaFin: string | null,
+  ahora: Date,
+): boolean {
+  if (!fechaActivacion || !horaRecogidaFin) return false;
+  // La hora puede llegar como 'HH:MM' o como 'HH:MM:SS'.
+  const horaFin = horaRecogidaFin.length === 5 ? `${horaRecogidaFin}:00` : horaRecogidaFin;
+  return ahora > new Date(`${fechaActivacion}T${horaFin}`);
+}
+
+/**
+ * Por qué NO se puede reservar este ítem, o `null` si sí se puede.
+ *
+ * Pura a propósito, y con `ahora` inyectado: es la única regla de negocio del
+ * popup y así se puede probar sin montar nada ni esperar a que pase el tiempo.
+ * Todo lo demás en este fichero es pintar.
+ */
+export function motivoDeRechazo(
+  data: {
+    tokenUsed: boolean;
+    fechaActivacion: string | null;
+    horaRecogidaFin: string | null;
+    item: { cuponesDisponibles: number };
+  },
+  ahora: Date,
+): 'token_used' | 'expired' | 'no_cupones' | null {
+  if (data.tokenUsed) return 'token_used';
+  if (haExpiradoLaRecogida(data.fechaActivacion, data.horaRecogidaFin, ahora)) return 'expired';
+  if (data.item.cuponesDisponibles <= 0) return 'no_cupones';
+  return null;
+}
+
+/** Modos que el popup puede mostrar sin datos extra: un aviso y nada más. */
+type ModoAviso = 'success' | 'no_cupones' | 'token_used' | 'expired' | 'invalid';
+
+/**
+ * Qué texto lleva cada aviso. Sustituye a una cadena de cinco ternarios
+ * anidados: con la tabla, añadir un modo nuevo obliga a dar su mensaje —
+ * TypeScript no deja el `Record` incompleto.
+ */
+const MENSAJE_AVISO: Record<ModoAviso, Parameters<typeof t>[0]> = {
+  success: 'tgtgReservedSuccess',
+  no_cupones: 'tgtgNoStock',
+  token_used: 'tgtgTokenUsed',
+  expired: 'tgtgExpired',
+  invalid: 'tgtgTokenInvalid',
+};
+
+/**
+ * El predicado mira el ESTADO, no el modo suelto.
+ *
+ * Con `(mode: string) => mode is ModoAviso` TypeScript estrecha la cadena pero
+ * no el objeto, y al salir del `if` seguiría creyendo que `state` puede ser
+ * cualquier variante — perdiendo el acceso a `item`, `horaInicio` y `horaFin`
+ * del modo `confirm`. Tipando el predicado sobre el estado, la rama negativa
+ * queda correctamente reducida a `confirm`.
+ */
+type EstadoAviso = Extract<NonNullable<PopupState>, { mode: ModoAviso }>;
+
+function esAviso(estado: NonNullable<PopupState>): estado is EstadoAviso {
+  return Object.hasOwn(MENSAJE_AVISO, estado.mode);
+}
+
+/**
+ * Qué mostrar según lo que respondió la reserva.
+ *
+ * El `409` y `token_used` son el MISMO caso visto por el cliente: alguien ya usó
+ * ese enlace. El servidor los distingue por capa (HTTP frente a cuerpo); a quien
+ * mira la pantalla le da igual.
+ *
+ * Cualquier resultado que no reconozcamos cae en `invalid`, no en `success`:
+ * ante la duda, no se le dice a nadie que tiene una reserva que quizá no existe.
+ */
+export function modoTrasReservar(status: number, resultado: string | undefined): ModoAviso {
+  if (status === 409 || resultado === 'token_used') return 'token_used';
+  if (resultado === 'no_cupones') return 'no_cupones';
+  if (resultado === 'expired') return 'expired';
+  if (resultado === 'ok') return 'success';
+  return 'invalid';
+}
+
 function TgtgReservaPopupInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -86,84 +179,60 @@ function TgtgReservaPopupInner() {
     const tgtgParam = searchParams.get("tgtg");
     if (!tgtgParam) return;
 
-    if (tgtgParam === "ok") {
-      setState({ mode: "success" });
+    /** Muestra el aviso, limpia la URL y programa que se oculte solo. */
+    const avisar = (nuevo: PopupState) => {
+      setState(nuevo);
       cleanUrl();
-      const timer = setTimeout(() => setState(null), 7000);
+      return setTimeout(() => setState(null), MS_AVISO_VISIBLE);
+    };
+
+    if (tgtgParam === "ok") {
+      const timer = avisar({ mode: "success" });
       return () => clearTimeout(timer);
     }
 
     if (tgtgParam === "lleno") {
-      setState({ mode: "no_cupones" });
-      cleanUrl();
-      const timer = setTimeout(() => setState(null), 7000);
+      const timer = avisar({ mode: "no_cupones" });
       return () => clearTimeout(timer);
     }
 
-    if (tgtgParam === "confirm") {
-      const itemId = searchParams.get("itemId");
-      const promoId = searchParams.get("promoId");
-      const email = searchParams.get("email");
-      const token = searchParams.get("token");
+    if (tgtgParam !== "confirm") return;
 
-      if (!itemId || !promoId || !email || !token) {
-        setState({ mode: "invalid" });
-        cleanUrl();
-        const timer = setTimeout(() => setState(null), 7000);
-        return () => clearTimeout(timer);
-      }
+    const itemId = searchParams.get("itemId");
+    const promoId = searchParams.get("promoId");
+    const email = searchParams.get("email");
+    const token = searchParams.get("token");
 
-      setState({ mode: "loading" });
-
-      fetch(`/api/promo/item/${encodeURIComponent(itemId)}?promoId=${encodeURIComponent(promoId)}&token=${encodeURIComponent(token)}`)
-        .then(async (res) => {
-          if (!res.ok) throw new Error("not_found");
-          const data = await res.json() as { item: TgtgItemPublic; horaRecogidaInicio: string | null; horaRecogidaFin: string | null; fechaActivacion: string | null; tokenUsed: boolean };
-
-          if (data.tokenUsed) {
-            setState({ mode: "token_used" });
-            cleanUrl();
-            setTimeout(() => setState(null), 7000);
-            return;
-          }
-
-          // Check expiry client-side using browser local time (= restaurant's timezone)
-          if (data.fechaActivacion && data.horaRecogidaFin) {
-            const horaFinNorm = data.horaRecogidaFin.length === 5
-              ? `${data.horaRecogidaFin}:00`
-              : data.horaRecogidaFin;
-            // Parsed as LOCAL time by browsers (ES2015+ spec for datetime without timezone)
-            const pickupEnd = new Date(`${data.fechaActivacion}T${horaFinNorm}`);
-            if (new Date() > pickupEnd) {
-              setState({ mode: "expired" });
-              cleanUrl();
-              setTimeout(() => setState(null), 7000);
-              return;
-            }
-          }
-
-          if (data.item.cuponesDisponibles <= 0) {
-            setState({ mode: "no_cupones" });
-            cleanUrl();
-            setTimeout(() => setState(null), 7000);
-            return;
-          }
-
-          setState({
-            mode: "confirm",
-            item: data.item,
-            horaInicio: data.horaRecogidaInicio,
-            horaFin: data.horaRecogidaFin,
-            email,
-            token,
-          });
-        })
-        .catch(() => {
-          setState({ mode: "invalid" });
-          cleanUrl();
-          setTimeout(() => setState(null), 7000);
-        });
+    if (!itemId || !promoId || !email || !token) {
+      const timer = avisar({ mode: "invalid" });
+      return () => clearTimeout(timer);
     }
+
+    setState({ mode: "loading" });
+
+    fetch(`/api/promo/item/${encodeURIComponent(itemId)}?promoId=${encodeURIComponent(promoId)}&token=${encodeURIComponent(token)}`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error("not_found");
+        const data = await res.json() as { item: TgtgItemPublic; horaRecogidaInicio: string | null; horaRecogidaFin: string | null; fechaActivacion: string | null; tokenUsed: boolean };
+
+        const rechazo = motivoDeRechazo(data, new Date());
+        if (rechazo) {
+          avisar({ mode: rechazo });
+          return;
+        }
+
+        setState({
+          mode: "confirm",
+          item: data.item,
+          horaInicio: data.horaRecogidaInicio,
+          horaFin: data.horaRecogidaFin,
+          email,
+          token,
+        });
+      })
+      .catch(() => {
+        avisar({ mode: "invalid" });
+      });
   }, [searchParams, cleanUrl]);
 
   const handleConfirm = async () => {
@@ -184,27 +253,12 @@ function TgtgReservaPopupInner() {
       const data = await res.json() as { result?: string; error?: string };
 
       cleanUrl();
-
-      if (res.status === 409 || data.result === "token_used") {
-        setState({ mode: "token_used" });
-        setTimeout(() => setState(null), 7000);
-      } else if (data.result === "no_cupones") {
-        setState({ mode: "no_cupones" });
-        setTimeout(() => setState(null), 7000);
-      } else if (data.result === "expired") {
-        setState({ mode: "expired" });
-        setTimeout(() => setState(null), 7000);
-      } else if (data.result === "ok") {
-        setState({ mode: "success" });
-        setTimeout(() => setState(null), 7000);
-      } else {
-        setState({ mode: "invalid" });
-        setTimeout(() => setState(null), 7000);
-      }
+      setState({ mode: modoTrasReservar(res.status, data.result) });
+      setTimeout(() => setState(null), MS_AVISO_VISIBLE);
     } catch {
       setState({ mode: "invalid" });
       cleanUrl();
-      setTimeout(() => setState(null), 7000);
+      setTimeout(() => setState(null), MS_AVISO_VISIBLE);
     } finally {
       setSubmitting(false);
     }
@@ -230,14 +284,9 @@ function TgtgReservaPopupInner() {
   }
 
   // Status toasts
-  if (state.mode === "success" || state.mode === "no_cupones" || state.mode === "token_used" || state.mode === "expired" || state.mode === "invalid") {
+  if (esAviso(state)) {
     const isSuccess = state.mode === "success";
-    const msgKey =
-      state.mode === "success" ? "tgtgReservedSuccess" :
-      state.mode === "no_cupones" ? "tgtgNoStock" :
-      state.mode === "token_used" ? "tgtgTokenUsed" :
-      state.mode === "expired" ? "tgtgExpired" :
-      "tgtgTokenInvalid";
+    const msgKey = MENSAJE_AVISO[state.mode];
 
     return (
       <div
@@ -270,7 +319,7 @@ function TgtgReservaPopupInner() {
             <span className="font-semibold text-foreground text-sm">TooGoodToGo</span>
           </div>
           <div className="flex items-center gap-2">
-            <button
+            <button type="button"
               onClick={handleDismiss}
               aria-label={t("tgtgCancelButton", effectiveLang)}
               className="p-1 rounded-full text-muted-foreground hover:text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center"

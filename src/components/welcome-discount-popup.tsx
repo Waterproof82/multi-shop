@@ -6,7 +6,7 @@ import { Gift, Mail, X, Check, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { useLanguage, type Language } from '@/lib/language-context';
+import { type Language } from '@/lib/language-context';
 import { t } from '@/lib/translations';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 
@@ -50,7 +50,7 @@ export function WelcomeDiscountPopup({ empresaId, empresaNombre, porcentaje, idi
     localStorage.setItem(`welcome_discount_dismissed_${empresaId}`, 'true');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setError(null);
     setIsLoading(true);

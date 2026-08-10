@@ -129,8 +129,10 @@ async function cerrarMesaPagada(mesaId: string): Promise<boolean> {
 
 function TpvMesaCard({ mesa, turnoId, modo }: Readonly<{ mesa: MesaWithSession; turnoId: string | null; modo: 'cobrar' | 'seleccionar' }>) {
   const router = useRouter();
+  const { refreshMesas } = useTpvCatalog();
   const [confirmingClose, setConfirmingClose] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [closeError, setCloseError] = useState(false);
 
   const isPaid = mesa.sesionPagada;
   const isPaymentInProgress = (mesa.pagoEnCurso || mesa.divisionActiva) && !mesa.sesionPagada;
@@ -144,6 +146,7 @@ function TpvMesaCard({ mesa, turnoId, modo }: Readonly<{ mesa: MesaWithSession; 
   function handleClick() {
     if (!canInteract) return;
     if (isPaid) {
+      setCloseError(false);
       setConfirmingClose(true);
       return;
     }
@@ -164,12 +167,22 @@ function TpvMesaCard({ mesa, turnoId, modo }: Readonly<{ mesa: MesaWithSession; 
     setClosing(true);
     const ok = await cerrarMesaPagada(mesa.id);
     setClosing(false);
+    if (!ok) {
+      setCloseError(true);
+      return;
+    }
     setConfirmingClose(false);
-    if (ok) router.refresh();
+    // La accion es NUESTRA: no hace falta esperar al broadcast de Realtime
+    // para verla reflejada. refreshMesas() trae el estado fresco de una,
+    // sin depender de que el WS este conectado en ese instante.
+    // router.refresh() no alcanza aca: `mesas` vive en TpvCatalogProvider
+    // (estado de cliente), no en props de Server Component.
+    await refreshMesas();
   }
 
   function handleCancelClose() {
     setConfirmingClose(false);
+    setCloseError(false);
   }
 
   if (confirmingClose) {
@@ -185,6 +198,11 @@ function TpvMesaCard({ mesa, turnoId, modo }: Readonly<{ mesa: MesaWithSession; 
           <span className="text-[11px] font-semibold text-center leading-tight" style={{ color: '#7c3aed' }}>
             ¿Cerrar mesa {mesa.numero}?
           </span>
+          {closeError && (
+            <span role="alert" className="text-[10px] font-medium text-center leading-tight" style={{ color: '#dc2626' }}>
+              No se pudo cerrar la mesa. Probá de nuevo.
+            </span>
+          )}
           <button
             type="button"
             onClick={handleConfirmClose}

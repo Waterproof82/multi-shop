@@ -6,7 +6,7 @@ import { getSupabaseClient } from '@/core/infrastructure/database/supabase-clien
 import { initiateRedsysMesaPaymentUseCase } from '@/core/application/use-cases/payment/initiateRedsysMesaPaymentUseCase';
 
 const initiateMesaSchema = z.object({
-  mesaId: z.string().uuid(),
+  mesaId: z.uuid(),
   esDivision: z.boolean().default(false),
   /** Client's expected total in cents for race-condition guard */
   expectedTotalCents: z.number().int().positive().optional(),

@@ -10,10 +10,34 @@
  *   3. POST /api/tpv/cobro (sin auth) → < 500ms (auth check rápido)
  *
  * Nota: Los tiempos incluyen el round-trip. En CI pueden ser más altos.
+ *
+ * ── POR QUÉ HAY UN CALENTAMIENTO ─────────────────────────────────────────────
+ * Estos tests miden la latencia BASELINE, es decir con las funciones ya
+ * calientes. Contra una preview de Vercel recién creada la primera invocación
+ * paga el arranque en frío del runtime serverless: se han medido 864 ms en la
+ * ruta con umbral de 500 ms.
+ *
+ * Sin el calentamiento el test falla de forma intermitente y bloquea PRs sin
+ * que nada esté roto — que es la peor clase de test que se puede tener. Subir
+ * el umbral tampoco sirve: escondería una regresión real de latencia detrás de
+ * un margen inventado para absorber el cold start.
  */
 import { test, expect } from '@playwright/test';
+import { nuevoContexto } from '../helpers/contexto';
 
 test.describe('TPV Benchmarks — tiempos de respuesta (baseline)', () => {
+  test.beforeAll(async ({ playwright, baseURL }) => {
+    // Una llamada de cortesía a cada ruta medida, para que el runtime esté
+    // caliente cuando empiece a contar el cronómetro.
+    const ctx = await nuevoContexto(playwright, baseURL);
+    await Promise.all([
+      ctx.get('/api/tpv/audit/chain').catch(() => null),
+      ctx.get('/api/tpv/audit/export').catch(() => null),
+      ctx.post('/api/tpv/cobro', { data: {} }).catch(() => null),
+    ]);
+    await ctx.dispose();
+  });
+
   test('GET /api/tpv/audit/chain responde < 2000ms', async ({ request }) => {
     const start = Date.now();
     const res = await request.get('/api/tpv/audit/chain');

@@ -11,6 +11,56 @@ import { ScrollOnMount } from '@/components/scroll-on-mount';
 
 export const dynamic = 'force-dynamic';
 
+/** Holgura sobre los 5 que se pintan: `findAllByTenant` descarta después los
+ *  pedidos de sesiones de mesa aún abiertas, así que pedir justo 5 podría
+ *  dejar la lista corta. */
+const DASHBOARD_RECENT_PEDIDOS_LIMIT = 50;
+
+interface ConfigEmpresa {
+  nombre: string;
+  mostrarPromociones: boolean;
+  mostrarTgtg: boolean;
+}
+
+/** Lo que hace falta del admin autenticado, sin atarse a la forma completa. */
+interface AdminMinimo {
+  rol: string;
+  empresa?: { nombre?: string; mostrarPromociones?: boolean; mostrarTgtg?: boolean } | null;
+}
+
+/**
+ * Configuración visible de la empresa.
+ *
+ * Normalmente viene dentro del token y no hay que consultar nada. Dos
+ * excepciones obligan a ir a base de datos:
+ *
+ * - El **superadmin** entra "como" otra empresa (cookie `superadmin_empresa_id`),
+ *   así que la empresa de su token NO es la que está mirando.
+ * - Un admin cuyo token no trajo la empresa cargada.
+ *
+ * Los valores por defecto son PERMISIVOS (`true`): si no se puede leer la
+ * configuración, se muestran las secciones. Ocultarlas ante un fallo de lectura
+ * haría creer al dueño que perdió funcionalidad que sigue contratada.
+ */
+async function configDeEmpresa(admin: AdminMinimo, empresaId: string): Promise<ConfigEmpresa> {
+  const delToken: ConfigEmpresa = {
+    nombre: admin.empresa?.nombre ?? 'default',
+    mostrarPromociones: admin.empresa?.mostrarPromociones ?? true,
+    mostrarTgtg: admin.empresa?.mostrarTgtg ?? true,
+  };
+
+  if (admin.rol !== SUPERADMIN_ROLE && admin.empresa) return delToken;
+
+  const resultado = await getEmpresaUseCase().getById(empresaId);
+  if (!resultado.success || !resultado.data) return delToken;
+
+  return {
+    nombre: resultado.data.nombre || 'default',
+    mostrarPromociones: resultado.data.mostrarPromociones ?? true,
+    mostrarTgtg: resultado.data.mostrarTgtg ?? true,
+  };
+}
+
 export default async function AdminDashboard() {
   const cookieStore = await cookies();
   const token = cookieStore.get('admin_token')?.value;
@@ -39,25 +89,19 @@ export default async function AdminDashboard() {
     redirect('/admin/login');
   }
 
-  let empresaNombre = admin.empresa?.nombre ?? 'default';
-  let mostrarPromociones = admin.empresa?.mostrarPromociones ?? true;
-  let mostrarTgtg = admin.empresa?.mostrarTgtg ?? true;
-
-  if (admin.rol === SUPERADMIN_ROLE || !admin.empresa) {
-    const empresaResult = await getEmpresaUseCase().getById(empresaId);
-    if (empresaResult.success && empresaResult.data) {
-      empresaNombre = empresaResult.data.nombre || 'default';
-      mostrarPromociones = empresaResult.data.mostrarPromociones ?? true;
-      mostrarTgtg = empresaResult.data.mostrarTgtg ?? true;
-    }
-  }
+  const { nombre: empresaNombre, mostrarPromociones, mostrarTgtg } =
+    await configDeEmpresa(admin, empresaId);
 
   const emptyPromos: { success: true; data: { fecha_hora: string; numero_envios: number }[] } = { success: true, data: [] };
   const emptyTgtg: { success: true; data: TgtgWithItems[] } = { success: true, data: [] };
 
   const [menuResult, pedidosResult, statsResult, promosResult, tgtgResult] = await Promise.all([
     getMenuUseCase().execute(empresaId),
-    getPedidoUseCase().getAll(empresaId),
+    // El dashboard solo renderiza los 5 pedidos más recientes (ver
+    // `recentOrders` en admin-dashboard-client). Traer el histórico completo
+    // aquí hacía crecer esta carga con cada pedido acumulado del negocio.
+    // El margen sobre 5 cubre el filtrado posterior de sesiones abiertas.
+    getPedidoUseCase().getAll(empresaId, DASHBOARD_RECENT_PEDIDOS_LIMIT),
     getPedidoUseCase().getStats(empresaId, new Date().getMonth(), new Date().getFullYear()),
     mostrarPromociones ? getPromocionUseCase().getAll(empresaId) : Promise.resolve(emptyPromos),
     mostrarTgtg ? getTgtgUseCase().getAllRecent(empresaId) : Promise.resolve(emptyTgtg),

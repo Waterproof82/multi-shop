@@ -2,7 +2,6 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { StickyNote } from 'lucide-react';
 import type { ExistingOrder } from './MostradorClient';
 import { getCsrfToken } from '@/lib/csrf-client';
 

@@ -220,7 +220,7 @@ function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onClickListos, on
   return (
     <div className="relative flex flex-col gap-1.5 w-full">
       {/* Main card button */}
-      <button
+      <button type="button"
         onClick={onClick}
         disabled={isLoading}
         aria-label={`Mesa ${mesa.numero}${nameSuffix} (${statusLabel})`}
@@ -270,7 +270,7 @@ function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onClickListos, on
 
       {/* Preparado badge — shown when any pedido in session has been marked ready by kitchen */}
       {mesa.preparadoPedidoNumbers.length > 0 && (
-        <button
+        <button type="button"
           onClick={onClickListos}
           className="w-full rounded-lg px-2 py-1.5 flex items-center gap-1.5 active:brightness-125 transition-all text-left"
           style={{ background: 'oklch(18% 0.08 148 / 0.7)', border: '1px solid oklch(45% 0.15 148 / 0.5)' }}
@@ -284,7 +284,7 @@ function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onClickListos, on
 
       {/* Deferred items */}
       {mesa.itemsDiferidos.length > 0 && (
-        <button
+        <button type="button"
           onClick={onClickDeferred}
           className="w-full rounded-lg px-2 py-1.5 flex flex-col gap-0.5 cursor-pointer hover:brightness-125 transition-all text-left"
           style={{ background: 'oklch(18% 0.05 62 / 0.7)', border: '1px solid oklch(38% 0.1 62 / 0.5)' }}
@@ -310,7 +310,7 @@ function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onClickListos, on
 
       {/* Ver ticket */}
       {hasSession && (
-        <button
+        <button type="button"
           onClick={onViewTicket}
           className="w-full rounded-lg px-3 py-2.5 flex items-center justify-center gap-1.5 hover:brightness-125 transition-all"
           style={{ background: 'oklch(18% 0.04 252 / 0.7)', border: '1px solid oklch(35% 0.06 252 / 0.5)' }}
@@ -324,7 +324,7 @@ function MesaCard({ mesa, isLoading, onClick, onClickDeferred, onClickListos, on
 
       {/* Cerrar mesa — visible si hay pedidos, cliente activo, o sesión ya pagada pendiente de cierre */}
       {!!mesa.sesionId && (mesa.activeOrderCount > 0 || mesa.clienteActivo || isPaid) && !isPaymentInProgress && onCloseMesa && (
-        <button
+        <button type="button"
           onClick={onCloseMesa}
           className="w-full rounded-lg px-3 py-2.5 flex items-center justify-center gap-1.5 hover:brightness-125 transition-all"
           style={{ background: 'oklch(18% 0.06 290 / 0.7)', border: '1px solid oklch(42% 0.14 290 / 0.5)' }}
@@ -381,7 +381,7 @@ export function WaiterLoginForm() {
     };
 
     // mesa_sesiones no longer grants anon SELECT (RLS hardening), so postgres_changes
-    // never fires here anymore. We don't subscribe to the 'mesa-sesion-update' broadcast
+    // never fires here anymore. We don't subscribe to the mesa-sesion broadcast
     // channel directly either — WaiterBanner (mounted on this same page) already does
     // and both components share the same singleton client, so competing subscriptions to
     // the same channel name would silently drop each other (same issue already solved for
@@ -514,7 +514,7 @@ export function WaiterLoginForm() {
       if (res.ok) {
         const data = await res.json() as { mesaId: string; mesaNumero: number; mesaNombre: string | null };
         saveWaiterMesa({ mesaId: data.mesaId, mesaNumero: data.mesaNumero, mesaNombre: data.mesaNombre });
-        router.push(`/?mesa=${data.mesaId}${openCart ? '&cart=open' : ''}`);
+        router.push(`/waiter/mesa/${data.mesaId}${openCart ? '?cart=open' : ''}`);
       } else {
         setError("No se pudo acceder a la mesa");
       }
@@ -704,7 +704,7 @@ export function WaiterLoginForm() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <button
+              <button type="button"
                 onClick={() => {
                   const mesaKey = deferredMesa.nombre ?? `Mesa ${deferredMesa.numero}`;
                   router.push(`/waiter/kitchen?groupBy=retenidos&mesa=${encodeURIComponent(mesaKey)}`);
@@ -716,7 +716,7 @@ export function WaiterLoginForm() {
                 Abrir retenidos
               </button>
 
-              <button
+              <button type="button"
                 onClick={() => void handleLaunchRetenidos(deferredMesa)}
                 disabled={launching}
                 className="flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm font-semibold transition-colors text-left disabled:opacity-50"
@@ -727,7 +727,7 @@ export function WaiterLoginForm() {
               </button>
             </div>
 
-            <button
+            <button type="button"
               onClick={() => setDeferredMesa(null)}
               disabled={launching}
               className="text-xs text-center disabled:opacity-40"

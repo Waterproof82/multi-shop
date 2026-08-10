@@ -5,7 +5,7 @@ import { getEmpresaPublicRepository } from '@/core/infrastructure/database';
 import { getDomainFromHeaders, parseMainDomain } from '@/lib/domain-utils';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 
-const mesaIdSchema = z.string().uuid();
+const mesaIdSchema = z.uuid();
 
 /**
  * POST /api/mesas/{mesaId}/call-waiter

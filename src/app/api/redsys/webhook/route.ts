@@ -1,99 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
-import { processRedsysWebhookUseCase } from '@/core/application/use-cases/payment/processRedsysWebhookUseCase';
+import {
+  decodificarParametros,
+  processRedsysWebhookUseCase,
+} from '@/core/application/use-cases/payment/processRedsysWebhookUseCase';
+import {
+  leerParametrosRedsys,
+  resolverEmpresaDeLaOrden,
+  sonParametrosCompletos,
+} from '@/core/infrastructure/api/redsys-request';
 
-// Redsys retries if we return non-200 — ALWAYS return 200.
+/**
+ * Aviso de pago servidor-a-servidor de Redsys.
+ *
+ * SIEMPRE responde 200. Redsys reintenta ante cualquier otro código, y
+ * reintentar un cobro ya aplicado es peor que perder un aviso — para eso está
+ * además la vuelta del navegador (`confirm-mesa`) como red de seguridad.
+ * Por eso todos los caminos de fallo salen por el mismo `OK()`.
+ */
 const OK = () => NextResponse.json({ ok: true }, { status: 200 });
 
 export async function POST(request: NextRequest) {
   try {
-    const contentType = request.headers.get('content-type') ?? '';
+    const params = await leerParametrosRedsys(request);
+    if (!sonParametrosCompletos(params)) return OK();
 
-    let dsParameters: string | null = null;
-    let dsSignature: string | null = null;
-    let dsSignatureVersion: string | null = null;
+    const decodificado = decodificarParametros(params.dsParameters);
+    if (!decodificado) return OK();
 
-    if (contentType.includes('application/x-www-form-urlencoded')) {
-      const text = await request.text();
-      const params = new URLSearchParams(text);
-      dsParameters = params.get('Ds_MerchantParameters');
-      dsSignature = params.get('Ds_Signature');
-      dsSignatureVersion = params.get('Ds_SignatureVersion');
-    } else {
-      // JSON fallback
-      let body: Record<string, unknown>;
-      try {
-        body = (await request.json()) as Record<string, unknown>;
-      } catch {
-        return OK();
-      }
-      dsParameters = (body['Ds_MerchantParameters'] as string | null) ?? null;
-      dsSignature = (body['Ds_Signature'] as string | null) ?? null;
-      dsSignatureVersion = (body['Ds_SignatureVersion'] as string | null) ?? null;
-    }
-
-    if (!dsParameters || !dsSignature || !dsSignatureVersion) {
-      return OK();
-    }
-
-    // Decode Ds_MerchantParameters (Base64 → JSON) to get Ds_Order
-    let dsOrder: string | null = null;
-    try {
-      const decoded = Buffer.from(dsParameters, 'base64').toString('utf8');
-      const merchantParams = JSON.parse(decoded) as Record<string, unknown>;
-      dsOrder = (merchantParams['Ds_Order'] as string | undefined)
-        ?? (merchantParams['DS_MERCHANT_ORDER'] as string | undefined)
-        ?? null;
-    } catch {
-      return OK();
-    }
-
-    if (!dsOrder) return OK();
-
-    // Find empresaId by payment_order_ref — check all three payment tables
-    const supabase = getSupabaseClient();
-    let empresaId: string | null = null;
-
-    const { data: pedido } = await supabase
-      .from('pedidos')
-      .select('empresa_id')
-      .eq('payment_order_ref', dsOrder)
-      .maybeSingle();
-
-    if (pedido) {
-      empresaId = (pedido as Record<string, unknown>)['empresa_id'] as string;
-    } else {
-      const { data: divPago } = await supabase
-        .from('mesa_division_pagos')
-        .select('empresa_id')
-        .eq('payment_order_ref', dsOrder)
-        .maybeSingle();
-      if (divPago) {
-        empresaId = (divPago as Record<string, unknown>)['empresa_id'] as string;
-      } else {
-        const { data: customPago } = await supabase
-          .from('mesa_pagos_personalizados')
-          .select('empresa_id')
-          .eq('payment_order_ref', dsOrder)
-          .maybeSingle();
-        if (customPago) {
-          empresaId = (customPago as Record<string, unknown>)['empresa_id'] as string;
-        }
-      }
-    }
-
+    const empresaId = await resolverEmpresaDeLaOrden(decodificado.dsOrder);
     if (!empresaId) return OK();
 
-    await processRedsysWebhookUseCase({
-      dsParameters,
-      dsSignature,
-      dsSignatureVersion,
-      empresaId,
-    });
+    await processRedsysWebhookUseCase({ ...params, empresaId });
 
     return OK();
   } catch {
-    // Never let an exception produce a non-200 — Redsys would retry indefinitely
+    // Ninguna excepción puede acabar en un código distinto de 200: Redsys
+    // reintentaría indefinidamente.
     return OK();
   }
 }

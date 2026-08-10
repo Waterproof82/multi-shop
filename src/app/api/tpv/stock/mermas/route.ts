@@ -12,10 +12,10 @@ import { resolveActor } from '@/core/infrastructure/api/audit-actor';
 import { z } from 'zod';
 
 const MermaSchema = z.object({
-  ingredienteId: z.string().uuid(),
+  ingredienteId: z.uuid(),
   cantidad: z.number().positive(),
   motivo: z.enum(['caducidad', 'rotura', 'error_preparacion', 'otro']),
-  turnoId: z.string().uuid().nullable(),
+  turnoId: z.uuid().nullable(),
   operadorNombre: z.string().min(1).max(100),
   notas: z.string().max(500).optional(),
 });
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
 
   const parsed = MermaSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json({ error: z.flattenError(parsed.error) }, { status: 400 });
   }
 
   const repo = getStockRepository();

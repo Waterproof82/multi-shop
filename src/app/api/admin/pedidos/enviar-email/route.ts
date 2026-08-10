@@ -9,7 +9,7 @@ import { escapeHtml } from '@/lib/html-utils';
 const enviarEmailSchema = z.object({
   items: z.array(z.object({
     item: z.object({
-      id: z.string().uuid(),
+      id: z.uuid(),
       name: z.string().max(200),
       price: z.number().min(0).max(100_000),
     }),
@@ -23,7 +23,7 @@ const enviarEmailSchema = z.object({
   numeroOrden: z.number().int().optional(),
   nombre: z.string().max(100).optional(),
   telefono: z.string().max(20).optional(),
-  email: z.string().email().optional().or(z.literal('')),
+  email: z.email().optional().or(z.literal('')),
 });
 
 type OrderItem = z.infer<typeof enviarEmailSchema>['items'][number];

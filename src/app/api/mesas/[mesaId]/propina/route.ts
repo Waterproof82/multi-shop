@@ -5,7 +5,7 @@ import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 import { getSupabaseClient } from '@/core/infrastructure/database/supabase-client';
 import { getDomainFromHeaders, parseMainDomain } from '@/lib/domain-utils';
 
-const mesaIdSchema = z.string().uuid();
+const mesaIdSchema = z.uuid();
 const bodySchema = z.object({
   propinaCents: z.number().int().min(0).max(5000),
 });

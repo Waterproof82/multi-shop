@@ -15,31 +15,25 @@ let loggerInstance: ErrorLogger | null = null;
  */
 export class ErrorLogger {
   private readonly repository: SupabaseLogErrorRepository | null;
-  private readonly supabaseAvailable: boolean;
 
   constructor() {
     // Only try to initialize Supabase on server-side
     if (globalThis.window !== undefined) {
       this.repository = null;
-      this.supabaseAvailable = false;
       return;
     }
 
     let repository: SupabaseLogErrorRepository | null = null;
-    let supabaseAvailable = false;
 
     try {
       const supabase = getSupabaseClient();
       repository = new SupabaseLogErrorRepository(supabase);
-      supabaseAvailable = true;
     } catch (error) {
       console.warn('[ERROR_LOGGER] Supabase not configured, logging to console only:', error);
       repository = null;
-      supabaseAvailable = false;
     }
 
     this.repository = repository;
-    this.supabaseAvailable = supabaseAvailable;
   }
 
   /**
@@ -72,8 +66,12 @@ export class ErrorLogger {
       });
     }
 
-    // Forward to Sentry (server-side only — client errors go via logClientError)
-    if (globalThis.window === undefined) {
+    // Forward to Sentry (server-side only — client errors go via logClientError).
+    // 'warning' se loguea para auditoría pero NO se captura como excepción:
+    // son fallos esperados de negocio (credenciales inválidas, validación),
+    // no bugs de la aplicación. Capturarlos igual que un error real ahoga el
+    // dashboard con ruido y consume cuota de eventos sin aportar señal.
+    if (globalThis.window === undefined && data.severity !== 'warning') {
       const { captureException } = await import('@sentry/nextjs');
       captureException(new Error(data.mensaje), {
         tags: {

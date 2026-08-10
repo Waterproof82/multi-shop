@@ -4,8 +4,8 @@ import { getClienteUseCase } from '@/core/infrastructure/database';
 import { rateLimitPublic } from '@/core/infrastructure/api/rate-limit';
 import { verifyUnsubscribeToken } from '@/lib/unsubscribe-token';
 
-const emailSchema = z.string().email();
-const uuidSchema = z.string().uuid();
+const emailSchema = z.email();
+const uuidSchema = z.uuid();
 
 function getBaseUrl(request: Request): string {
   const url = new URL(request.url);

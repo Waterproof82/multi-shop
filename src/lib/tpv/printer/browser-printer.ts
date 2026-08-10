@@ -1,5 +1,6 @@
 import QRCode from 'qrcode';
 import type { PrintTicket, PrintTicketDesgloseItem, ThermalPrinter } from './types';
+import { numserieAeat } from '../ticket-ref';
 
 function fmt(cents: number): string {
   return (cents / 100).toLocaleString('es-ES', { minimumFractionDigits: 2 }) + ' \u20ac';
@@ -59,7 +60,8 @@ async function buildReceiptHtml(ticket: PrintTicket): Promise<string> {
   const dt = new Date(ticket.cobradoAt);
   const fecha = dt.toLocaleDateString('es-ES');
   const hora = dt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-  const serieNum = `${ticket.serie}${String(ticket.numeroTicket).padStart(6, '0')}`;
+  // Sin guion: alimenta el bloque del QR de la AEAT. Ver `ticket-ref.ts`.
+  const serieNum = numserieAeat(ticket.serie, ticket.numeroTicket);
   const cambio = ticket.metodoPago === 'efectivo'
     ? Math.max(0, ticket.entregadoCents - ticket.importeCobradoCents)
     : 0;
@@ -139,6 +141,21 @@ export class BrowserPrinter implements ThermalPrinter {
     // painted before the print dialog opens — otherwise it renders blank.
     await new Promise<void>((resolve) => {
       win.addEventListener('load', () => resolve(), { once: true });
+      // NOSONAR(S1874) — `document.write` está deprecado, y aquí se queda.
+      //
+      // Esta clase NO es un fallback: `usePrinter` la instancia directa, así que
+      // es la que saca TODOS los tickets fiscales. La alternativa moderna (Blob +
+      // `URL.createObjectURL` y navegar la ventana) cambia el camino de carga y
+      // cómo interactúa con el bloqueador de ventanas emergentes.
+      //
+      // Y el bloque de abajo demuestra que esto ya se afinó contra navegadores
+      // reales: el `readyState === 'complete'` existe porque alguien se encontró
+      // con que el evento `load` llegaba antes de tiempo. Reescribirlo sin una
+      // impresora delante es cambiar código probado en producción por código que
+      // solo he leído.
+      //
+      // Migrarlo es una tarea legítima, pero necesita verificación manual con una
+      // impresora térmica real. Anotado en `docs/context/electron-tpv.md`.
       win.document.write(html);
       win.document.close();
       // Fallback: if load already fired (some browsers do this synchronously)

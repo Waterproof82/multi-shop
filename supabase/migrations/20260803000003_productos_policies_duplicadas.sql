@@ -1,0 +1,43 @@
+-- Limpieza: eliminar dos policies de `productos` que quedaron como duplicados
+-- exactos (advisor `multiple_permissive_policies`, 2 de los 8 avisos).
+--
+-- HISTORIA
+-- "Allow insert foto_object_fit" y "Allow update foto_object_fit" nacieron para
+-- una feature concreta (el ajuste de encuadre de la foto del producto). En
+-- `20260710000001_security_hardening.sql` se reescribieron para exigir el mismo
+-- filtro de tenant que las policies de admin. A partir de ahi dejaron de aportar
+-- nada: su proposito original —abrir una rendija concreta— desaparecio, y lo que
+-- quedo fue una copia literal.
+--
+-- EQUIVALENCIA (verificada contra pg_policies antes de borrar)
+--   "Admin inserta productos"      INSERT  WITH CHECK (empresa_id = get_mi_empresa_id())
+--   "Allow insert foto_object_fit" INSERT  WITH CHECK (empresa_id = get_mi_empresa_id())
+--     -> identicas.
+--
+--   "Admin edita productos"        UPDATE  USING (empresa_id = get_mi_empresa_id())
+--                                          WITH CHECK (empresa_id = get_mi_empresa_id())
+--   "Allow update foto_object_fit" UPDATE  USING (empresa_id = get_mi_empresa_id())
+--                                          WITH CHECK (ausente)
+--     -> en una policy de UPDATE sin WITH CHECK, Postgres usa la expresion de
+--        USING tambien como check. Luego tambien son identicas.
+--
+-- Ambos pares tienen el mismo rol (`authenticated`). Como las policies PERMISSIVE
+-- se combinan con OR, quitar una que es copia de la otra no puede restringir el
+-- acceso de nadie: `A OR A` es `A`.
+--
+-- POR QUE MERECE LA PENA MAS ALLA DEL AVISO
+-- El nombre miente. "Allow update foto_object_fit" sugiere un permiso acotado a
+-- una columna, cuando en realidad concede UPDATE sobre la fila entera. Quien lea
+-- las policies buscando entender quien puede editar un producto se lleva una idea
+-- equivocada. Esa confusion, en una tabla con datos de precio, es mas cara que los
+-- microsegundos que ahorra el advisor.
+--
+-- NO SE TOCAN el resto de avisos `multiple_permissive_policies`
+-- (lc_fichajes*, lc_horas_extra, producto_complemento_grupos): ahi las policies
+-- NO son duplicados, expresan permisos distintos (admin vs RLT; via grupo vs via
+-- empresa). Fusionarlas exige reescribir la logica con un OR y perder los nombres
+-- que documentan a quien protege cada una. El ahorro es despreciable en tablas de
+-- este tamano; el riesgo de alterar una barrera de acceso, no.
+
+DROP POLICY IF EXISTS "Allow insert foto_object_fit" ON public.productos;
+DROP POLICY IF EXISTS "Allow update foto_object_fit" ON public.productos;

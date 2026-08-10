@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
 import { MesaOrdersClient } from "@/components/mesa-orders-client";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +12,8 @@ interface Props {
 
 export default async function MesaOrdersPage({ params }: Props) {
   const { mesaId } = await params;
-  const cookieStore = await cookies();
-  const isWaiter = !!(cookieStore.get("waiter_token")?.value);
-  return <MesaOrdersClient mesaId={mesaId} isWaiter={isWaiter} />;
+  // El modo camarero lo resuelve el propio cliente comparando su mesa guardada
+  // con esta. Aquí se leía además la cookie `waiter_token` para pasarlo como
+  // prop, pero el componente nunca lo leía: era trabajo de servidor tirado.
+  return <MesaOrdersClient mesaId={mesaId} />;
 }

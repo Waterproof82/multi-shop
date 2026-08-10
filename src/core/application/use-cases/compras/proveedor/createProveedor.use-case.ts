@@ -6,7 +6,7 @@ import type { Proveedor } from '@/core/domain/entities/compras-types';
 const schema = z.object({
   nombre: z.string().min(1).max(200),
   cif: z.string().max(20).optional(),
-  email: z.string().email().max(200).optional().or(z.literal('')),
+  email: z.email().max(200).optional().or(z.literal('')),
   telefono: z.string().max(30).optional(),
   condicionesPago: z.string().max(500).optional(),
   direccionFiscal: z.string().max(500).optional(),

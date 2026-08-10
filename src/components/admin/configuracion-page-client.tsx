@@ -38,7 +38,6 @@ interface EmpresaApariencia {
 interface ConfiguracionPageClientProps {
   empresaNombre: string;
   empresaId: string;
-  empresaSlug: string;
   empresaDatos: EmpresaDatos;
   empresaApariencia: EmpresaApariencia;
   colores: EmpresaColores | null;
@@ -53,7 +52,6 @@ interface ConfiguracionPageClientProps {
 export function ConfiguracionPageClient({
   empresaNombre,
   empresaId,
-  empresaSlug,
   empresaDatos,
   empresaApariencia,
   colores,
@@ -108,7 +106,7 @@ export function ConfiguracionPageClient({
         <p className="text-sm text-muted-foreground mb-6">
           {t("configAparienciaHelp", language)}
         </p>
-        <EmpresaAparienciaForm initialData={empresaApariencia} empresaSlug={empresaSlug} />
+        <EmpresaAparienciaForm initialData={empresaApariencia} />
       </div>
 
       {/* Módulos — solo superadmin */}
@@ -122,7 +120,6 @@ export function ConfiguracionPageClient({
             {t("configModulosHelp", language)}
           </p>
           <ModulosForm
-            empresaId={empresaId}
             mostrarPromociones={mostrarPromociones}
             mostrarTgtg={mostrarTgtg}
           />

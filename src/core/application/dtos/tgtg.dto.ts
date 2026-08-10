@@ -4,7 +4,6 @@ const tgtgItemSchema = z.object({
   titulo: z.string().min(1).max(200),
   descripcion: z.string().max(500).optional().nullable(),
   imagen_url: z
-    .string()
     .url()
     .refine((url) => url.startsWith('https://'), { message: 'imagen_url must use HTTPS' })
     .optional()
@@ -29,9 +28,9 @@ export const createTgtgSchema = z.object({
 });
 
 export const claimCuponSchema = z.object({
-  itemId: z.string().uuid(),
-  tgtgPromoId: z.string().uuid(),
-  email: z.string().email().max(255),
+  itemId: z.uuid(),
+  tgtgPromoId: z.uuid(),
+  email: z.email().max(255),
   token: z.string().min(10).max(500),
 });
 

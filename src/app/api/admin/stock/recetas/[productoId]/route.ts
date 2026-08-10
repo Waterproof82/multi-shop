@@ -10,7 +10,7 @@ import { getStockRepository } from '@/core/infrastructure/database';
 const replaceRecetaSchema = z.object({
   items: z.array(
     z.object({
-      ingredienteId: z.string().uuid(),
+      ingredienteId: z.uuid(),
       cantidadNecesaria: z.number().gt(0),
     })
   ),

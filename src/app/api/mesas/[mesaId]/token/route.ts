@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { getMesaClientTokenUseCase } from '@/core/infrastructure/database';
 import { rateLimitMesaTokenIssuance } from '@/core/infrastructure/api/rate-limit';
 
-const mesaIdSchema = z.string().uuid('El mesaId debe ser un UUID válido');
+const mesaIdSchema = z.uuid('El mesaId debe ser un UUID válido');
 
 export async function POST(
   _request: Request,

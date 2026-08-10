@@ -160,7 +160,7 @@ export default function MermasPage() {
     setForm((prev) => ({ ...prev, [key]: val }));
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.SyntheticEvent) {
     e.preventDefault();
     if (!turno) return;
 

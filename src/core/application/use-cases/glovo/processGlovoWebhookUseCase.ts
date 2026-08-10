@@ -33,13 +33,14 @@ export async function processGlovoWebhookUseCase(body: unknown): Promise<{ succe
     const glovoStatus = payload.status;
 
     if (!glovoOrderId || !glovoStatus) {
-      // Malformed webhook — log and return success (Glovo requires 200)
+      // Malformed webhook — log and return success (Glovo requires 200).
+      // 'warning': evento externo esperado, no un bug nuestro.
       await logger.logAndReturnError(
         'GLOVO_WEBHOOK_MALFORMED',
         'Missing orderId or status in Glovo webhook',
         'infrastructure',
         'processGlovoWebhookUseCase',
-        { details: { payload: JSON.stringify(payload).slice(0, 200) } }
+        { details: { payload: JSON.stringify(payload).slice(0, 200) }, severity: 'warning' }
       );
       return { success: true };
     }
@@ -54,13 +55,15 @@ export async function processGlovoWebhookUseCase(body: unknown): Promise<{ succe
       .maybeSingle();
 
     if (findError || !pedido) {
-      // Unknown order — log but still return 200
+      // Unknown order — log but still return 200.
+      // 'warning': carrera, reintento o pedido de prueba ya borrado — no un
+      // bug nuestro.
       await logger.logAndReturnError(
         'GLOVO_WEBHOOK_ORDER_NOT_FOUND',
         `No pedido found for glovo_order_id: ${glovoOrderId}`,
         'infrastructure',
         'processGlovoWebhookUseCase',
-        { details: { glovoOrderId } }
+        { details: { glovoOrderId }, severity: 'warning' }
       );
       return { success: true };
     }

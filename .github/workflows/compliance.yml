@@ -44,13 +44,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
@@ -62,7 +62,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: vitest-compliance-results
           path: coverage/
@@ -71,22 +71,36 @@ jobs:
   playwright-compliance:
     name: Playwright — E2E compliance tests
     runs-on: ubuntu-latest
+    # Sin secrets no puede correr — ver la nota al final del fichero.
+    if: github.actor != 'dependabot[bot]'
     timeout-minutes: 20
     needs: vitest-compliance
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-      PLAYWRIGHT_BASE_URL: https://mermelada-tomate.vercel.app
       # Service role key — required for DB-level trigger tests
       PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      PLAYWRIGHT_ADMIN_EMAIL: ${{ secrets.PLAYWRIGHT_ADMIN_EMAIL }}
+      PLAYWRIGHT_ADMIN_PASSWORD: ${{ secrets.PLAYWRIGHT_ADMIN_PASSWORD }}
+      PLAYWRIGHT_WAITER_PIN: ${{ secrets.PLAYWRIGHT_WAITER_PIN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      # Mismo motivo que en e2e.yml: en un PR hay que interrogar la preview de
+      # ESE commit, no el sitio ya desplegado.
+      - name: Resolver la URL a probar
+        id: destino
+        uses: ./.github/actions/resolver-url-a-probar
+        with:
+          url-entorno: https://mermelada-tomate.vercel.app
+          token: ${{ github.token }}
+          secreto-bypass: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
@@ -97,12 +111,15 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run compliance E2E tests
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ steps.destino.outputs.url }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: npx playwright test e2e/compliance/ --reporter=list
         continue-on-error: false
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-compliance-report
           path: playwright-report/
@@ -127,3 +144,18 @@ jobs:
             exit 1
           fi
           echo "PASS: All compliance tests passed"
+
+# ── POR QUÉ ESTE JOB NO CORRE EN LAS PRs DE DEPENDABOT ───────────────────────
+# GitHub NO entrega los secrets del repositorio a los workflows disparados por
+# Dependabot: van a un almacén aparte, que aquí está vacío a propósito. Llegan
+# todos en blanco y el job no puede ni resolver la preview.
+#
+# Y está bien que sea así. Una PR de Dependabot ejecuta "pnpm install" con una
+# versión de dependencia que nadie ha revisado, y sus scripts de postinstall
+# corren en el runner. Darles la service_role key y las credenciales de admin
+# sería exactamente el agujero que esa separación existe para tapar.
+#
+# Un bump de versión se valida de sobra con Build, Lint & Type Check y los tests
+# unitarios, que sí corren. Y la suite E2E completa pasa igualmente tras el
+# merge, en el push a main contra el entorno de pruebas: si un bump rompe algo
+# en tiempo de ejecución, ahí se ve antes de que llegue a ningún cliente.

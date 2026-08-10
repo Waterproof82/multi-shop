@@ -4,7 +4,7 @@ import type { Result, AppError } from '@/core/domain/entities/types';
 import type { FacturaProveedor } from '@/core/domain/entities/compras-types';
 
 const schema = z.object({
-  proveedorId: z.string().uuid(),
+  proveedorId: z.uuid(),
   numeroFactura: z.string().min(1).max(100),
   fechaFactura: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   baseImponible0Cents: z.number().int().min(0),
@@ -18,7 +18,7 @@ const schema = z.object({
   ivaSoportadoCents: z.number().int().min(0),
   totalFacturaCents: z.number().int().min(0),
   notas: z.string().max(1000).optional(),
-  albaranIds: z.array(z.string().uuid()).min(1),
+  albaranIds: z.array(z.uuid()).min(1),
 });
 
 function validateIvaMath(dto: z.infer<typeof schema>, ivaSoportado: number): boolean {
