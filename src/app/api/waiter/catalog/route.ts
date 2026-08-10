@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   // debe coincidir con la del token (header inyectado por el proxy).
   const fullDomain = await getDomainFromHeaders();
   const empresa = fullDomain ? await getEmpresaByDomain(fullDomain) : null;
-  if (!empresa || empresa.id !== empresaId) {
+  if (empresa?.id !== empresaId) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
   }
 

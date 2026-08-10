@@ -420,10 +420,10 @@ export function WaiterBanner() {
       }
       saveWaiterMesa({ mesaId: mesa.id, mesaNumero: mesa.numero, mesaNombre: mesa.nombre });
       setDropdownOpen(false);
-      // Reload completo a propósito, NO router.push: al cambiar de mesa hay que
-      // remontar CartProvider. Con navegación cliente el carrito de la mesa
-      // anterior sobrevive y sus items se filtran a la mesa nueva.
-      globalThis.location.href = `/?mesa=${mesa.id}`;
+      // Navegación cliente: useCarritoPorMesa aísla el carrito por mesa (vacía
+      // al cambiar), así que ya no hace falta el reload completo que evitaba
+      // que items de la mesa anterior se filtraran a la nueva.
+      router.push(`/waiter/mesa/${mesa.id}`);
     } finally {
       setSwitchingId(null);
     }
