@@ -514,7 +514,7 @@ export function WaiterLoginForm() {
       if (res.ok) {
         const data = await res.json() as { mesaId: string; mesaNumero: number; mesaNombre: string | null };
         saveWaiterMesa({ mesaId: data.mesaId, mesaNumero: data.mesaNumero, mesaNombre: data.mesaNombre });
-        router.push(`/?mesa=${data.mesaId}${openCart ? '&cart=open' : ''}`);
+        router.push(`/waiter/mesa/${data.mesaId}${openCart ? '?cart=open' : ''}`);
       } else {
         setError("No se pudo acceder a la mesa");
       }
