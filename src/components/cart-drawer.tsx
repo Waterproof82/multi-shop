@@ -37,6 +37,7 @@ import { COUNTRY_CODES, DEFAULT_COUNTRY_CODE } from "@/core/domain/constants/cou
 import { getTrackingTokens, addTrackingToken } from "@/lib/order-tracking";
 import { QRScannerGate, type QRGateState } from '@/components/qr-scanner-gate-lazy';
 import { IDEMPOTENCY_HEADER, buildIdempotencyKey } from "@/lib/idempotency";
+import { useMesaId } from "@/lib/mesa/use-mesa-id";
 
 const MESA_CLIENT_TOKEN_KEY = (mesaId: string) => `mesa_token_${mesaId}`;
 
@@ -455,7 +456,8 @@ interface MesaDetectionSetters {
 }
 
 /**
- * Resuelve a qué mesa pertenece esta pestaña, a partir de `?mesa=` en la URL.
+ * Resuelve a qué mesa pertenece esta pestaña, a partir del mesaId que entrega
+ * `useMesaId()` (context de ruta > `?mesa=` en la URL).
  *
  * Vive fuera del componente porque tiene tres caminos anidados —token presente,
  * respuesta de la API, fallo de red— y dentro inflaba la complejidad del
@@ -466,10 +468,8 @@ interface MesaDetectionSetters {
  * camarero la petición SÍ responde bien, así que el camino de error nunca se
  * alcanzaría y el modo camarero se perdería en silencio.
  */
-function detectMesaFromUrl(s: MesaDetectionSetters): void {
-  const params = new URLSearchParams(window.location.search);
-  const token = params.get('mesa');
-  const shouldOpenCart = params.get('cart') === 'open';
+function detectMesa(token: string | null, s: MesaDetectionSetters): void {
+  const shouldOpenCart = new URLSearchParams(window.location.search).get('cart') === 'open';
 
   if (!token) {
     applySessionStorageWaiter(s.setMesaToken, s.setMesaInfo, s.setIsWaiterMode);
@@ -1157,6 +1157,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
   const [orderSuccess, setOrderSuccess] = useState<{ numeroPedido: number } | null>(null);
   const [activeOrderTokens, setActiveOrderTokens] = useState<string[]>([]);
   const [showActiveOrdersDialog, setShowActiveOrdersDialog] = useState(false);
+  const mesaId = useMesaId();
   const [mesaToken, setMesaToken] = useState<string | null>(null);
   const [mesaInfo, setMesaInfo] = useState<MesaInfo | null>(null);
   const [mesaError, setMesaError] = useState(false);
@@ -1175,13 +1176,13 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
 
 
 
-  // Detect ?mesa= param (client-side only, SSR safe)
+  // Detect mesa (client-side only, SSR safe): useMesaId resuelve context > ?mesa=
   // Falls back to sessionStorage so waiter mode survives navigation without ?mesa= in the URL
   useEffect(() => {
-    detectMesaFromUrl({ setMesaToken, setMesaInfo, setIsWaiterMode, setMesaError, openCart });
+    detectMesa(mesaId, { setMesaToken, setMesaInfo, setIsWaiterMode, setMesaError, openCart });
   // openCart is stable (useCallback with no deps) — safe to include
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [mesaId]);
 
   useEffect(() => {
     setActiveOrderTokens(getTrackingTokens());
@@ -1259,8 +1260,8 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
 // Signal "Activa" state: when a real customer (non-waiter) adds their first item
   useEffect(() => {
     if (isWaiterMode || !mesaToken || items.length !== 1) return;
-    const mesaId = mesaInfo?.id ?? mesaToken;
-    void fetch(`/api/mesas/${encodeURIComponent(mesaId)}/activate`, { method: 'POST' });
+    const mesaActivar = mesaInfo?.id ?? mesaToken;
+    void fetch(`/api/mesas/${encodeURIComponent(mesaActivar)}/activate`, { method: 'POST' });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items.length]);
 
