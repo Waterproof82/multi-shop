@@ -40,7 +40,7 @@ export function WaiterCatalogProvider({ children }: Readonly<{ children: React.R
   const menuDataRef = useRef<MenuCategoryVM[] | null>(null);
   menuDataRef.current = menuData;
 
-  const instanceId = useId().replace(/:/g, '-');
+  const instanceId = useId().replaceAll(':', '-');
   const channelName = useRef(`waiter-catalog-${instanceId}`);
 
   const refresh = useCallback(async () => {

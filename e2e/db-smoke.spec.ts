@@ -112,13 +112,11 @@ test.describe('DB smoke — auth barrier (sin credenciales)', () => {
 // Llama las funciones DB directamente via Supabase REST para verificar
 // que digest() es reachable desde cada función.
 
-test.describe('DB smoke — RPC directa (service_role)', () => {
-  test('lc_canonical_payload RPC → 200 con payload v1|... (digest reachable)', async ({ request }) => {
-    if (!supabaseUrl() || !serviceRoleKey()) {
-      test.skip(true, 'NEXT_PUBLIC_SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY no definidos');
-      return;
-    }
+const skipServiceRole = !supabaseUrl() || !serviceRoleKey();
+const gatedServiceRoleDescribe = skipServiceRole ? test.describe.skip : test.describe;
 
+gatedServiceRoleDescribe('DB smoke — RPC directa (service_role)', () => {
+  test('lc_canonical_payload RPC → 200 con payload v1|... (digest reachable)', async ({ request }) => {
     const res = await request.post(
       `${supabaseUrl()}/rest/v1/rpc/lc_canonical_payload`,
       {
@@ -154,11 +152,6 @@ test.describe('DB smoke — RPC directa (service_role)', () => {
   });
 
   test('lc_verify_chain_segment RPC → 200 con status OK (digest reachable)', async ({ request }) => {
-    if (!supabaseUrl() || !serviceRoleKey()) {
-      test.skip(true, 'NEXT_PUBLIC_SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY no definidos');
-      return;
-    }
-
     const res = await request.post(
       `${supabaseUrl()}/rest/v1/rpc/lc_verify_chain_segment`,
       {
@@ -200,16 +193,16 @@ test.describe('DB smoke — RPC directa (service_role)', () => {
 function adminEmail(): string | undefined    { return process.env.PLAYWRIGHT_ADMIN_EMAIL; }
 function adminPassword(): string | undefined { return process.env.PLAYWRIGHT_ADMIN_PASSWORD; }
 
-test.describe('DB smoke — full API path (login automático)', () => {
+const skipAdmin = !adminEmail() || !adminPassword();
+const gatedAdminDescribe = skipAdmin ? test.describe.skip : test.describe;
+
+gatedAdminDescribe('DB smoke — full API path (login automático)', () => {
   let request: APIRequestContext;
   let csrfHeader: string | null = null;
 
   test.beforeAll(async ({ playwright, baseURL }) => {
-    if (!adminEmail() || !adminPassword()) return;
-
     request = await nuevoContexto(playwright, baseURL);
 
-    // Login: las cookies admin_token + csrf_token se guardan en el context automáticamente
     const loginRes = await request.post('/api/admin/login', {
       data: { email: adminEmail()!, password: adminPassword()! },
     });
@@ -224,18 +217,19 @@ test.describe('DB smoke — full API path (login automático)', () => {
     await request?.dispose();
   });
 
-  test('POST /api/laborcontrol/fichaje/kiosk con admin_token → no 500 (lc trigger digest reachable)', async () => {
-    if (!adminEmail() || !adminPassword()) {
-      test.skip(true, 'PLAYWRIGHT_ADMIN_EMAIL o PLAYWRIGHT_ADMIN_PASSWORD no definidos');
-      return;
-    }
+  // El describe solo gatea "¿hay credenciales configuradas?" — el login en
+  // beforeAll puede fallar igual (rate limit, credenciales inválidas en ese
+  // momento) y dejar csrfHeader en null. Sin este guard, mandar null como
+  // header revienta con "expected string, got object" en vez de saltar limpio.
+  test.beforeEach(() => {
     if (!csrfHeader) {
       test.skip(true, 'Login de admin falló en beforeAll — verificar credenciales');
-      return;
     }
+  });
 
+  test('POST /api/laborcontrol/fichaje/kiosk con admin_token → no 500 (lc trigger digest reachable)', async () => {
     const res = await request.post('/api/laborcontrol/fichaje/kiosk', {
-      headers: { 'x-csrf-token': csrfHeader },
+      headers: { 'x-csrf-token': csrfHeader! },
       data: { pin: '0000', tipo: 'entrada', accion: 'fichaje_entrada' },
     });
 
@@ -245,17 +239,8 @@ test.describe('DB smoke — full API path (login automático)', () => {
   });
 
   test('POST /api/tpv/cobro con admin_token → no 500 (tpv_cobro trigger digest reachable)', async () => {
-    if (!adminEmail() || !adminPassword()) {
-      test.skip(true, 'PLAYWRIGHT_ADMIN_EMAIL o PLAYWRIGHT_ADMIN_PASSWORD no definidos');
-      return;
-    }
-    if (!csrfHeader) {
-      test.skip(true, 'Login de admin falló en beforeAll — verificar credenciales');
-      return;
-    }
-
     const res = await request.post('/api/tpv/cobro', {
-      headers: { 'x-csrf-token': csrfHeader },
+      headers: { 'x-csrf-token': csrfHeader! },
       data: { turnoId: DUMMY_UUID, pedidoId: DUMMY_UUID, metodoPago: 'efectivo' },
     });
 
@@ -263,17 +248,8 @@ test.describe('DB smoke — full API path (login automático)', () => {
   });
 
   test('POST /api/tpv/turno/abrir con admin_token → no 500 (tpv_turno trigger digest reachable)', async () => {
-    if (!adminEmail() || !adminPassword()) {
-      test.skip(true, 'PLAYWRIGHT_ADMIN_EMAIL o PLAYWRIGHT_ADMIN_PASSWORD no definidos');
-      return;
-    }
-    if (!csrfHeader) {
-      test.skip(true, 'Login de admin falló en beforeAll — verificar credenciales');
-      return;
-    }
-
     const res = await request.post('/api/tpv/turno/abrir', {
-      headers: { 'x-csrf-token': csrfHeader },
+      headers: { 'x-csrf-token': csrfHeader! },
       data: { cajaId: DUMMY_UUID, efectivoInicial: 0 },
     });
 

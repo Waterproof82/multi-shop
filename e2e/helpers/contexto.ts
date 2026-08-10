@@ -1,4 +1,13 @@
-import type { APIRequestContext, Playwright } from '@playwright/test';
+import type { APIRequestContext } from '@playwright/test';
+
+type PlaywrightRequest = {
+  request: {
+    newContext: (options: {
+      baseURL?: string;
+      extraHTTPHeaders?: Record<string, string>;
+    }) => Promise<APIRequestContext>;
+  };
+};
 
 /**
  * Creación de contextos de petición que atraviesan la protección de Vercel.
@@ -10,7 +19,7 @@ import type { APIRequestContext, Playwright } from '@playwright/test';
  *
  * Contra una preview de Vercel con Deployment Protection activa, ese detalle es
  * la diferencia entre probar la app y no probar nada: sin la cabecera de bypass
- * el edge responde `401 Protected deployment` a todo, el login del camarero
+ * el edge responde `401 Protected deployment` a cualquier flujo, el login del camarero
  * falla, y los tests que dependen de él se SALTAN en silencio. El job sale en
  * verde habiendo ejercitado la mitad.
  *
@@ -33,7 +42,7 @@ export function cabecerasDePrueba(): Record<string, string> {
  * Sustituye a `playwright.request.newContext({ baseURL })` en todos los specs.
  */
 export function nuevoContexto(
-  playwright: Playwright,
+  playwright: PlaywrightRequest,
   baseURL: string | undefined,
   extra?: Record<string, string>,
 ): Promise<APIRequestContext> {
