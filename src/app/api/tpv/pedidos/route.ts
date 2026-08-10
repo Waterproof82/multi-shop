@@ -202,8 +202,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Mesa no encontrada' }, { status: 404 });
   }
 
-  const mesa = mesaResult.data;
-
   const pedidoResult = await getPedidoUseCase().createMesaOrder(
     empresaId,
     {
