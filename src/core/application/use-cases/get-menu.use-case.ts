@@ -107,16 +107,6 @@ export class GetMenuUseCase {
     return agruparComplementosPorProducto(asignaciones.data, grupos.data);
   }
 
-  private async registrarFallo(empresaId: string, mensaje: string, code: string, metodo: string): Promise<void> {
-    await logger.logAndReturnError(
-      'USE_CASE_ERROR',
-      mensaje,
-      'use-case',
-      'GetMenuUseCase.execute',
-      { empresaId, details: { code, method: metodo } },
-    );
-  }
-
   /**
    * Carta pública de la empresa: categorías con sus productos, subcategorías y
    * complementos, listas para pintar.
@@ -128,12 +118,13 @@ export class GetMenuUseCase {
         this.categoryRepo.findAllByTenant(empresaId),
       ]);
 
+      // El repositorio ya loguea el fallo con su propio código (DB_SELECT_ERROR,
+      // etc.) antes de devolver el Result — volver a loguearlo aquí duplicaba
+      // el evento en Sentry para un mismo incidente.
       if (!productos.success) {
-        await this.registrarFallo(empresaId, productos.error.message, productos.error.code, 'productRepo.findAllByTenant');
         return { error: productos.error.message };
       }
       if (!categorias.success) {
-        await this.registrarFallo(empresaId, categorias.error.message, categorias.error.code, 'categoryRepo.findAllByTenant');
         return { error: categorias.error.message };
       }
 
