@@ -20,12 +20,15 @@ export class SupabaseAdminRepository implements IAdminRepository {
       const { error, data } = await this.supabaseAnon.auth.signInWithPassword({ email, password });
       
       if (error) {
+        // 'warning', no 'error': credenciales invalidas es comportamiento
+        // normal de usuario (typo, contraseña olvidada), no un bug — no debe
+        // capturarse como excepcion en Sentry (ver ErrorLogger.logError).
         await logger.logAndReturnError(
           'AUTH_LOGIN_ERROR',
           error.message,
           'repository',
           'SupabaseAdminRepository.loginWithPassword',
-          { details: { email: anonymizeEmail(email), code: error.code, status: error.status } }
+          { details: { email: anonymizeEmail(email), code: error.code, status: error.status }, severity: 'warning' }
         );
         return { 
           success: false, 
