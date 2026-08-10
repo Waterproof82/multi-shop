@@ -40,9 +40,9 @@ name: E2E
 #
 # ── LO QUE NO SE CONSTRUYE AQUÍ, Y POR QUÉ ───────────────────────────────────
 # Sería más autónomo levantar la app en CI, pero `validateEnv()` exige
-# ACCESS_TOKEN_SECRET, CSRF_HMAC_SECRET y CART_TOKEN_SECRET, que no están entre
-# los secrets del repositorio: la app se negaría a arrancar. Vercel sí los
-# tiene, así que se reutiliza su despliegue en vez de duplicar configuración.
+# ACCESS_TOKEN_SECRET y CSRF_HMAC_SECRET, que no están entre los secrets del
+# repositorio: la app se negaría a arrancar. Vercel sí los tiene, así que se
+# reutiliza su despliegue en vez de duplicar configuración.
 #
 # ── COBERTURA QUE AÚN FALTA ──────────────────────────────────────────────────
 # `CRON_SECRET` no está definido: desbloquea un test de la purga RGPD.
