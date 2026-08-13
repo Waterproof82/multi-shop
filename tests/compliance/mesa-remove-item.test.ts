@@ -94,8 +94,10 @@ describe('cuántas unidades se quitan', () => {
     const res = await quitar('Vino', 10, 3);
 
     expect(res.success && res.data.totalRemoved).toBe(3);
-    expect(updateOrderItemsSpy).toHaveBeenCalledTimes(1); // p1 se borró entero
-    expect(itemsReescritos()).toEqual([{ nombre: 'Vino', precio: 10, cantidad: 1 }]);
+    // p1 se vacía entero (updateOrderItems con []), p2 baja de 2 a 1 unidad.
+    expect(updateOrderItemsSpy).toHaveBeenCalledTimes(2);
+    expect(itemsReescritos(0)).toEqual([]);
+    expect(itemsReescritos(1)).toEqual([{ nombre: 'Vino', precio: 10, cantidad: 1 }]);
   });
 
   it('nunca quita más unidades de las que existen', async () => {
@@ -139,17 +141,30 @@ describe('cuántas unidades se quitan', () => {
   });
 });
 
-describe('el pedido que se queda sin ítems se elimina', () => {
-  it('borra el pedido y SUS pagos por ítem, en ese orden', async () => {
+describe('el pedido que se queda sin ítems se vacía, nunca se borra', () => {
+  // `pedidos_no_delete` (Art.66 LGT) bloquea el DELETE real de una fila que
+  // no sea `es_prueba`: un DELETE de verdad aquí fallaría en producción.
+  it('reescribe detalle_pedido a vacío y total a 0 en vez de borrar la fila', async () => {
+    pedidosDeSesion = [{ id: 'p1', total: 10, detalle_pedido: [{ nombre: 'Vino', precio: 10, cantidad: 1 }] }];
+
+    const res = await quitar('Vino', 10, 1);
+
+    expect(res.success && res.data.totalRemoved).toBe(1);
+    expect(itemsReescritos()).toEqual([]);
+    expect(totalReescrito()).toBe(0);
+  });
+
+  it('marca el pedido como cancelado y limpia pagos y estados por ítem', async () => {
     pedidosDeSesion = [{ id: 'p1', total: 10, detalle_pedido: [{ nombre: 'Vino', precio: 10, cantidad: 1 }] }];
 
     await quitar('Vino', 10, 1);
 
+    const cancelado = llamadasDe(fake, 'pedidos').find((l) => l.operacion === 'update');
+    expect((cancelado?.payload as Record<string, unknown>)?.['estado']).toBe('cancelado');
+
     const borrados = fake.llamadas.filter((l) => l.operacion === 'delete').map((l) => l.tabla);
-    // Los pagos primero: si se borrara el pedido antes, quedarían filas
-    // huérfanas apuntando a un pedido inexistente.
-    expect(borrados).toEqual(['mesa_item_pagos', 'pedidos']);
-    expect(updateOrderItemsSpy).not.toHaveBeenCalled();
+    expect(borrados).toEqual(['mesa_item_pagos', 'pedido_item_estados']);
+    expect(fake.llamadas.some((l) => l.tabla === 'pedidos' && l.operacion === 'delete')).toBe(false);
   });
 });
 
