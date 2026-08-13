@@ -1380,10 +1380,11 @@ function AvisoItemPreparado({ onCancelar, onContinuar }: Readonly<{
 }
 
 /** Cuantas unidades del item se borran. */
-function SelectorDeUnidades({ item, cantidad, borrando, onCerrar, onCantidad, onConfirmar }: Readonly<{
+function SelectorDeUnidades({ item, cantidad, borrando, error, onCerrar, onCantidad, onConfirmar }: Readonly<{
   item: ItemPendienteDeBorrar;
   cantidad: number;
   borrando: boolean;
+  error?: string | null;
   onCerrar: () => void;
   onCantidad: (actualizar: (q: number) => number) => void;
   onConfirmar: () => void;
@@ -1400,6 +1401,9 @@ function SelectorDeUnidades({ item, cantidad, borrando, onCerrar, onCantidad, on
               <li key={`${c.nombre}-${c.precio}`} className="text-xs" style={{ color: "#8a7560" }}>↳ {c.nombre}</li>
             ))}
           </ul>
+        )}
+        {error && (
+          <p className="text-xs font-semibold" style={{ color: "oklch(50% 0.18 25)" }}>⚠️ {error}</p>
         )}
       </div>
       <div className="flex items-center justify-center gap-4">
@@ -1456,10 +1460,11 @@ function SelectorDeUnidades({ item, cantidad, borrando, onCerrar, onCantidad, on
  * Borrar un item de la comanda. Son DOS pantallas, no una: si cocina ya lo dio
  * por listo hay un aviso previo, y solo despues se elige cuantas unidades.
  */
-function ModalBorrarItem({ item, cantidad, borrando, onCerrar, onCantidad, onAsumirAviso, onConfirmar }: Readonly<{
+function ModalBorrarItem({ item, cantidad, borrando, error, onCerrar, onCantidad, onAsumirAviso, onConfirmar }: Readonly<{
   item: ItemPendienteDeBorrar;
   cantidad: number;
   borrando: boolean;
+  error?: string | null;
   onCerrar: () => void;
   onCantidad: (actualizar: (q: number) => number) => void;
   onAsumirAviso: () => void;
@@ -1487,6 +1492,7 @@ function ModalBorrarItem({ item, cantidad, borrando, onCerrar, onCantidad, onAsu
               item={item}
               cantidad={cantidad}
               borrando={borrando}
+              error={error}
               onCerrar={onCerrar}
               onCantidad={onCantidad}
               onConfirmar={onConfirmar}
@@ -2385,6 +2391,7 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
   const [pendingDelete, setPendingDelete] = useState<ItemPendienteDeBorrar | null>(null);
   const [deleteQty, setDeleteQty] = useState(1);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // True when the current session belongs to a waiter impersonating this table.
   // Waiters should not see payment buttons — the customer pays, not the waiter.
@@ -2543,8 +2550,9 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
   const handleDeleteItem = useCallback(async () => {
     if (!pendingDelete || deleting) return;
     setDeleting(true);
+    setDeleteError(null);
     try {
-      await fetchWithCsrf(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/orders/items`, {
+      const res = await fetchWithCsrf(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/orders/items`, {
         method: 'DELETE',
         body: JSON.stringify({
           nombre: pendingDelete.nombre,
@@ -2552,8 +2560,20 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
           cantidadAEliminar: deleteQty,
         }),
       });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null) as { error?: string } | null;
+        setDeleteError(body?.error ?? `Error al eliminar (${res.status})`);
+        return;
+      }
+      const body = await res.json().catch(() => null) as { totalRemoved?: number } | null;
+      if (!body?.totalRemoved) {
+        setDeleteError('No se encontró el ítem en la comanda — puede que ya se haya eliminado.');
+        return;
+      }
       setPendingDelete(null);
       await refresh();
+    } catch {
+      setDeleteError('Error de red al eliminar el ítem.');
     } finally {
       setDeleting(false);
     }
@@ -2771,6 +2791,7 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                               const isPreparado = isItemInPreparadoOrder(sessionData?.orders ?? [], item.nombre, item.precio);
                               setPendingDelete({ nombre: item.nombre, precio: item.precio, maxCantidad: item.cantidad, complementos: item.complementos, preparadoWarning: isPreparado });
                               setDeleteQty(1);
+                              setDeleteError(null);
                             }}
                             className="flex items-center justify-center shrink-0 w-5 h-5 rounded-full text-xs font-bold"
                             style={{ background: "oklch(35% 0.14 25 / 0.8)", color: "oklch(80% 0.10 25)" }}
@@ -2955,7 +2976,8 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
           item={pendingDelete}
           cantidad={deleteQty}
           borrando={deleting}
-          onCerrar={() => setPendingDelete(null)}
+          error={deleteError}
+          onCerrar={() => { setPendingDelete(null); setDeleteError(null); }}
           onCantidad={setDeleteQty}
           onAsumirAviso={() => setPendingDelete(d => d ? { ...d, preparadoWarning: false } : d)}
           onConfirmar={() => { void handleDeleteItem(); }}

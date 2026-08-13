@@ -114,10 +114,32 @@ async function sincronizarPagosPorItem(
   }
 }
 
-/** Elimina el pedido entero. Los pagos por ítem PRIMERO, para no dejar huérfanos. */
-async function eliminarPedido(supabase: Supabase, pedidoId: string): Promise<void> {
+/**
+ * Vacía un pedido que se queda sin ítems.
+ *
+ * NUNCA se borra la fila de `pedidos`: el trigger `pedidos_no_delete`
+ * (Art.66 LGT — retención fiscal mínima 5 años) lo bloquea con
+ * `RAISE EXCEPTION` para toda fila que no sea `es_prueba`. Una versión
+ * anterior de esta función intentaba el DELETE real y no comprobaba el
+ * error — el borrado fallaba en silencio, la fila quedaba intacta, y el
+ * caso de uso devolvía éxito igual. Detectado probando en vivo la mesa 1:
+ * el DELETE respondía 200 pero el pedido seguía en la tabla.
+ *
+ * En su lugar: `detalle_pedido` a `[]` y `total` a 0 (vía
+ * `updateOrderItems`, que sí revisa el error), estado a `cancelado` para
+ * que no cuente como pedido activo, y limpieza de `mesa_item_pagos` y
+ * `pedido_item_estados` — sus índices por posición ya no significan nada
+ * con el detalle vacío.
+ */
+async function vaciarPedido(supabase: Supabase, pedidoId: string): Promise<Result<void, AppError>> {
+  const actualizado = await getPedidoRepository().updateOrderItems(pedidoId, [], 0);
+  if (!actualizado.success) return actualizado;
+
+  await supabase.from('pedidos').update({ estado: 'cancelado' }).eq('id', pedidoId);
   await supabase.from('mesa_item_pagos').delete().eq('pedido_id', pedidoId);
-  await supabase.from('pedidos').delete().eq('id', pedidoId);
+  await supabase.from('pedido_item_estados').delete().eq('pedido_id', pedidoId);
+
+  return { success: true, data: undefined };
 }
 
 type Pedido = { id: string; detalle_pedido: unknown };
@@ -142,7 +164,8 @@ async function quitarDeUnPedido(
   const { items: nuevos, reubicacion } = reconstruirDetalle(items, input.nombre, input.precio, aQuitar);
 
   if (nuevos.length === 0) {
-    await eliminarPedido(supabase, pedido.id);
+    const vaciado = await vaciarPedido(supabase, pedido.id);
+    if (!vaciado.success) return vaciado;
     return { success: true, data: aQuitar };
   }
 

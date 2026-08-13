@@ -223,7 +223,10 @@ gatedAdminDescribe('DB smoke — full API path (login automático)', () => {
   // header revienta con "expected string, got object" en vez de saltar limpio.
   test.beforeEach(() => {
     if (!csrfHeader) {
-      test.skip(true, 'Login de admin falló en beforeAll — verificar credenciales');
+      // Razón explícita como segundo argumento: login de admin falló en
+      // beforeAll (rate limit o credenciales inválidas en ese momento). No es
+      // un test abandonado, es el guard descrito arriba.
+      test.skip(true, 'Login de admin falló en beforeAll — verificar credenciales'); // NOSONAR(S1607)
     }
   });
 
