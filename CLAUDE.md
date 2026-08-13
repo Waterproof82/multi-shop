@@ -193,6 +193,7 @@ Tras CADA `supabase db push` o `supabase migration up`:
 - **`usePagoDeMesa`** (en `mesa-orders-client.tsx`) — dueno de TODO el estado de cobro (locks, mismatch, division, Redsys, bfcache). Depende solo de mesaId/sessionData/setSessionData/refresh. El estado de cobro nuevo va AQUI, no en el componente.
 - **`src/lib/waiter/cierre-al-salir.ts`** — que comandas se cierran al cerrar la pestana de barra. El envio (`parchearAlSalir`, `keepalive`) es fuego y olvido: NO verificable; la decision si (15 tests). Heredado y congelado: un pedido enteramente servido sin cuenta atras corriendo NO se cierra al salir.
 - **`DatosDelComensal`** (en `cart-drawer.tsx`) — **RGPD: en modo mesa NO se piden datos personales** (la mesa ya identifica el pedido). Invertir la condicion no rompe nada visible y pone la tienda a recoger PII de comensales. 12 tests UI que comprueban AUSENCIA de campos (`tests/ui/datos-del-comensal.test.tsx`).
+- **`removeSessionItemUseCase.ts`** — borrar un item del ticket de mesa (camarero suplantando la mesa). Si el item borrado es el ULTIMO de su pedido, el pedido se vacia (`detalle_pedido: []`, `total: 0`, `estado: 'cancelado'`) — nunca se borra la fila (ver trigger `pedidos_no_delete` en la seccion de Compliance). 18 tests en `tests/compliance/mesa-remove-item.test.ts`.
 
 ## WaiterBanner — Re-autenticacion sin recarga
 
@@ -275,6 +276,7 @@ Tras CADA `supabase db push` o `supabase migration up`:
 - **`detalle_items[i].impuestoPorcentaje`** DEBE estar presente. Sin el, el trigger usa la tasa global como fallback legacy.
 - **`porcentaje_impuesto_override` NULL** = hereda de empresa. `0` = exento. No confundir.
 - **`pedidos` DELETE bloqueado** — trigger `pedidos_no_delete` (migracion `20260722000002`). Art.66 LGT — retencion fiscal minima 5 anos.
+  - **Trampa:** `supabase.from('pedidos').delete()` NO lanza excepcion en JS aunque el trigger la lance en Postgres — supabase-js la devuelve en `{ error }`. Si el codigo no revisa ese `error`, un DELETE bloqueado por el trigger queda como exito silencioso: la fila sigue intacta pero la funcion devuelve `success: true`. Paso de verdad: `removeSessionItemUseCase` (borrar el ultimo item de un pedido desde el panel de camarero) intentaba borrar la fila entera y no comprobaba el resultado — la API respondia 200 pero el pedido no se tocaba. Cualquier flujo que necesite "vaciar" un pedido debe reescribir `detalle_pedido: []` / `total: 0` via `updateOrderItems` (que si revisa el error), nunca intentar el DELETE real.
 - **RGPD purge**: Vercel Cron mensual (dia 1, 03:00 UTC). `CRON_SECRET` requerido. pg_cron NO disponible en plan Free de Supabase.
 
 ## TPV Catalog Cache — Contexto Cliente + Offline
