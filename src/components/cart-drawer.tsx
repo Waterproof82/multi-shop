@@ -1363,6 +1363,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
   return (
     <>
       <OrderToast show={showOrderToast} language={language} />
+      <SendingOverlay show={sending} language={language} />
       {shouldShowQrGate(qrGateState, mesaToken, isWaiterMode) && (
         <QRScannerGate
           mesaId={resolveActiveMesaId(mesaInfo, mesaToken!)}
