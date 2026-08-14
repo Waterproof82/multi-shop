@@ -90,8 +90,7 @@ const PAGE_BG = "#f0ede8";
 function mergeOrderItems(items: OrderItem[]): OrderItem[] {
   const map = new Map<string, OrderItem>();
   for (const item of items) {
-    const compsKey = (item.complementos ?? []).map(c => c.nombre).sort((a, b) => a.localeCompare(b)).join(',');
-    const key = `${item.nombre}||${item.precio}||${compsKey}`;
+    const key = mergeKeyFor(item.nombre, item.precio, item.complementos);
     const existing = map.get(key);
     if (existing) {
       existing.cantidad += item.cantidad;
@@ -2621,22 +2620,22 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null) as { error?: string } | null;
-        setDeleteBannerError(body?.error ?? `Error al eliminar (${res.status})`);
+        setDeleteBannerError(body?.error ?? t('deleteItemErrorStatus', lang).replace('{status}', String(res.status)));
         return;
       }
       const body = await res.json().catch(() => null) as { totalRemoved?: number } | null;
       if (!body?.totalRemoved) {
-        setDeleteBannerError('No se encontró el ítem en la comanda — puede que ya se haya eliminado.');
+        setDeleteBannerError(t('deleteItemNotFound', lang));
         return;
       }
       await refresh();
     } catch {
-      setDeleteBannerError('Error de red al eliminar el ítem.');
+      setDeleteBannerError(t('deleteItemNetworkError', lang));
     } finally {
       setPendingDeleteOverlay(prev => withoutPendingDelete(prev, key, qty));
       setDeleting(false);
     }
-  }, [pendingDelete, deleteQty, mesaId, refresh]);
+  }, [pendingDelete, deleteQty, mesaId, refresh, lang]);
 
 
   const division = sessionData?.division ?? null;
