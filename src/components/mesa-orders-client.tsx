@@ -2439,6 +2439,8 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
   const [deleteQty, setDeleteQty] = useState(1);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [pendingDeleteOverlay, setPendingDeleteOverlay] = useState<Map<string, number>>(new Map());
+  const [deleteBannerError, setDeleteBannerError] = useState<string | null>(null);
 
   // True when the current session belongs to a waiter impersonating this table.
   // Waiters should not see payment buttons — the customer pays, not the waiter.
@@ -2595,36 +2597,43 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
   }, [mesaId, refresh]);
 
   const handleDeleteItem = useCallback(async () => {
-    if (!pendingDelete || deleting) return;
-    setDeleting(true);
+    if (!pendingDelete) return;
+    const { nombre, precio, complementos } = pendingDelete;
+    const qty = deleteQty;
+    const key = mergeKeyFor(nombre, precio, complementos);
+
+    // Optimista: el modal se cierra y el item baja de cantidad ya, sin
+    // esperar al servidor. `finally` deshace el overlay tanto en éxito
+    // (refresh() ya trajo el dato real) como en fallo (rollback visual).
+    setPendingDelete(null);
     setDeleteError(null);
+    setDeleteBannerError(null);
+    setDeleting(true);
+    setPendingDeleteOverlay(prev => withPendingDelete(prev, key, qty));
+
     try {
       const res = await fetchWithCsrf(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/orders/items`, {
         method: 'DELETE',
-        body: JSON.stringify({
-          nombre: pendingDelete.nombre,
-          precio: pendingDelete.precio,
-          cantidadAEliminar: deleteQty,
-        }),
+        body: JSON.stringify({ nombre, precio, cantidadAEliminar: qty }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null) as { error?: string } | null;
-        setDeleteError(body?.error ?? `Error al eliminar (${res.status})`);
+        setDeleteBannerError(body?.error ?? `Error al eliminar (${res.status})`);
         return;
       }
       const body = await res.json().catch(() => null) as { totalRemoved?: number } | null;
       if (!body?.totalRemoved) {
-        setDeleteError('No se encontró el ítem en la comanda — puede que ya se haya eliminado.');
+        setDeleteBannerError('No se encontró el ítem en la comanda — puede que ya se haya eliminado.');
         return;
       }
-      setPendingDelete(null);
       await refresh();
     } catch {
-      setDeleteError('Error de red al eliminar el ítem.');
+      setDeleteBannerError('Error de red al eliminar el ítem.');
     } finally {
+      setPendingDeleteOverlay(prev => withoutPendingDelete(prev, key, qty));
       setDeleting(false);
     }
-  }, [pendingDelete, deleteQty, deleting, mesaId, refresh]);
+  }, [pendingDelete, deleteQty, mesaId, refresh]);
 
 
   const division = sessionData?.division ?? null;
@@ -2645,7 +2654,10 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
     return () => globalThis.removeEventListener('popstate', handlePopState);
   }, [shouldTrapBack]);
 
-  const allItems = mergeOrderItems(sessionData?.orders.flatMap((o) => o.items.filter(i => !i.cancelled)) ?? []);
+  const allItems = applyPendingDeleteOverlay(
+    mergeOrderItems(sessionData?.orders.flatMap((o) => o.items.filter(i => !i.cancelled)) ?? []),
+    pendingDeleteOverlay,
+  );
 
   // Merge keys of items that belong to at least one retenido order
   const retenidoItemKeys = new Set<string>(
@@ -2804,6 +2816,24 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
               )}
 
               <DottedRule />
+
+              {isWaiterMode && deleteBannerError && (
+                <div
+                  role="alert"
+                  className="flex items-center justify-between gap-2 mb-2 px-3 py-2 rounded-lg text-xs"
+                  style={{ background: "oklch(35% 0.14 25 / 0.12)", color: "oklch(45% 0.18 25)" }}
+                >
+                  <span>{deleteBannerError}</span>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteBannerError(null)}
+                    className="font-bold shrink-0 w-5 h-5 flex items-center justify-center"
+                    aria-label="Cerrar aviso"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
 
               {/* Column headers */}
               <div
