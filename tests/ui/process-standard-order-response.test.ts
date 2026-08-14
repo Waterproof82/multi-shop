@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { processStandardOrderResponse } from '@/components/cart-drawer';
 
 function buildOpts(overrides: Partial<Record<string, unknown>> = {}) {
@@ -36,6 +36,10 @@ function buildOpts(overrides: Partial<Record<string, unknown>> = {}) {
 }
 
 describe('processStandardOrderResponse', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('cierra el carrito ANTES de que la promesa de envío resuelva (optimista)', async () => {
     const { calls, opts } = buildOpts();
     let closedBeforeResolve = false;
@@ -80,5 +84,37 @@ describe('processStandardOrderResponse', () => {
     expect(calls).toContain('openCart');
     expect(calls).toContain('setErrors');
     expect(calls).not.toContain('clearCart');
+  });
+
+  it('éxito con trackingToken (rama generica de tracking): guarda el token, limpia el carrito y NUNCA reabre', async () => {
+    // Rama "generica de tracking" (data.trackingToken presente, sin ser Redsys
+    // ni restaurante): pagosPickupHabilitados=false + deliveryMethod=null +
+    // isRestaurant=false hacen que requiresRedsysRedirect(...) sea false, y
+    // data.tipo !== 'restaurante' descarta la rama de restaurante. Es la
+    // combinacion con menor mocking: solo necesita `window` (history/location),
+    // no `document` (que sí usaría la rama Redsys via submitRedsysPayment).
+    vi.useFakeTimers();
+    vi.stubGlobal('window', {
+      history: { state: null, replaceState: vi.fn() },
+      location: { href: '' },
+    });
+
+    const { calls, opts } = buildOpts({
+      sendStandardOrderFlow: vi.fn(async () => ({
+        ok: true,
+        data: { numeroPedido: 42, trackingToken: 'tok-123', tipo: 'estandar' },
+      })),
+    });
+
+    await processStandardOrderResponse({}, opts as any);
+    // redirectToTracking difiere la navegación con setTimeout(0,...) — hay
+    // que vaciarlo mientras `window` sigue stubbeado, o el callback dispara
+    // "window is not defined" tras el afterEach como excepción no controlada.
+    await vi.runAllTimersAsync();
+    vi.useRealTimers();
+
+    expect(calls).toContain('addTrackingToken');
+    expect(calls).toContain('clearCart');
+    expect(calls).not.toContain('openCart');
   });
 });
