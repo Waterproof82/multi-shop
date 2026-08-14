@@ -670,7 +670,7 @@ function redirectToTracking(
 }
 
 // Helper: process standard (non-mesa) order response and side-effects
-async function processStandardOrderResponse(
+export async function processStandardOrderResponse(
   payload: Record<string, unknown>,
   opts: {
     t: any;
@@ -685,6 +685,7 @@ async function processStandardOrderResponse(
     estimatedFeeCents: number | null;
     clearCart: () => void;
     closeCart: () => void;
+    openCart: () => void;
     addTrackingToken: (token: string) => void;
     setOrderSuccess: (v: { numeroPedido: number } | null) => void;
     setErrors: (e: any) => void;
@@ -710,6 +711,7 @@ async function processStandardOrderResponse(
     estimatedFeeCents,
     clearCart,
     closeCart,
+    openCart,
     addTrackingToken,
     setOrderSuccess,
     setErrors,
@@ -723,6 +725,9 @@ async function processStandardOrderResponse(
   } = opts;
 
   setSending(true);
+  // Optimista: el carrito se cierra ya. Los items no se tocan hasta que se
+  // conoce el resultado real — si falla, no hay nada que restaurar.
+  closeCart();
   try {
     attachDeliveryFields(payload, {
       isRestaurant,
@@ -737,6 +742,9 @@ async function processStandardOrderResponse(
     const { ok, data } = await sendStandardOrderFlow(payload, attemptKey);
 
     if (!ok) {
+      // Rollback: nunca se encola un pedido para reintento automático (ver
+      // CLAUDE.md) — se reabre el carrito intacto y el cliente reintenta a mano.
+      openCart();
       setErrors({ general: data.error || t('validationOrderError', language) });
       return;
     }
@@ -749,7 +757,6 @@ async function processStandardOrderResponse(
     if (data.trackingToken && data.pedidoId && requiresRedsysRedirect(pagosPickupHabilitados, deliveryMethod, isRestaurant)) {
       addTrackingToken(data.trackingToken);
       clearCart();
-      closeCart();
       await submitRedsysPayment(data.pedidoId, language, data.trackingToken, router, addTrackingToken);
       return;
     }
@@ -761,7 +768,6 @@ async function processStandardOrderResponse(
       if (window.history.state?.cartOpen) {
         window.history.replaceState({}, '', window.location.href);
       }
-      closeCart();
       const restauranteTrackingUrl = `/tracking/${data.trackingToken}`;
       setTimeout(() => { window.location.href = restauranteTrackingUrl; }, 0);
       return;
@@ -776,13 +782,15 @@ async function processStandardOrderResponse(
         addTrackingTokenFn: addTrackingToken,
       });
       clearCart();
-      closeCart();
       return;
     }
 
     // No tracking token: show success with order number
     setOrderSuccess({ numeroPedido: data.numeroPedido });
   } catch (e) {
+    // Fallo de red: misma política de rollback que el fallo de servidor — no
+    // hay encolado automático de pedidos (ver CLAUDE.md).
+    openCart();
     const errorMsg = e instanceof Error ? e.message : t('connectionError', language);
     setErrors({ general: errorMsg || t('connectionError', language) });
   } finally {
@@ -1266,6 +1274,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
       estimatedFeeCents,
       clearCart,
       closeCart,
+      openCart,
       addTrackingToken,
       setOrderSuccess,
       setErrors,
