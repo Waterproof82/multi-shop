@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, Check, Gift, UtensilsCrossed } from "lucide-react"
+import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, Check, Gift, UtensilsCrossed, Loader2 } from "lucide-react"
 import { useReducedMotion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -933,6 +933,22 @@ function OrderToast({ show, language }: Readonly<{ show: boolean; language: Lang
         </div>
         <p className="text-base font-bold text-foreground text-center leading-snug">
           {t('mesaOrderConfirmed', language)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export function SendingOverlay({ show, language }: Readonly<{ show: boolean; language: Language }>) {
+  if (!show) return null;
+  return (
+    <div className="fixed inset-0 z-[400] flex items-center justify-center pointer-events-none">
+      <div className="bg-card/95 backdrop-blur-md border border-border shadow-2xl rounded-3xl px-10 py-8 flex flex-col items-center gap-4 animate-in fade-in zoom-in-90 duration-300">
+        <div className="w-16 h-16 rounded-full bg-primary/10 border-2 border-primary/25 flex items-center justify-center">
+          <Loader2 className="size-8 text-primary animate-spin" strokeWidth={2.5} />
+        </div>
+        <p className="text-base font-bold text-foreground text-center leading-snug">
+          {t('orderSending', language)}
         </p>
       </div>
     </div>
