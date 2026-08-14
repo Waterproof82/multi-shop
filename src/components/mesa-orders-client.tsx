@@ -2611,6 +2611,9 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
     setDeleting(true);
     setPendingDeleteOverlay(prev => withPendingDelete(prev, key, qty));
 
+    // Excepción deliberada a la regla general de offline (ver CLAUDE.md): un fallo de
+    // red también revierte el overlay aquí, porque borrar cantidad no es idempotente
+    // (sin clave de idempotencia) — reintentar en cola arriesga un doble borrado.
     try {
       const res = await fetchWithCsrf(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/orders/items`, {
         method: 'DELETE',
@@ -2828,7 +2831,7 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
                     type="button"
                     onClick={() => setDeleteBannerError(null)}
                     className="font-bold shrink-0 w-5 h-5 flex items-center justify-center"
-                    aria-label="Cerrar aviso"
+                    aria-label={t("close", lang)}
                   >
                     ×
                   </button>
