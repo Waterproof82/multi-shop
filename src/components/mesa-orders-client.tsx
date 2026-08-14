@@ -16,7 +16,7 @@ import { GoogleReviewsWidget } from "@/components/google-reviews-widget";
 import { mesaSesionChannel } from "@/lib/realtime-channels";
 import { vistaParaMesa, type VistaMesa } from "@/lib/mesa/vista-mesa";
 
-interface OrderItem {
+export interface OrderItem {
   nombre: string;
   cantidad: number;
   precio: number;
@@ -100,6 +100,53 @@ function mergeOrderItems(items: OrderItem[]): OrderItem[] {
     }
   }
   return [...map.values()];
+}
+
+/**
+ * Key estable para matchear un item entre la vista mergeada y el overlay
+ * optimista de borrado. Mismo criterio que `mergeOrderItems`.
+ */
+export function mergeKeyFor(
+  nombre: string,
+  precio: number,
+  complementos?: { nombre: string; precio: number }[],
+): string {
+  const compsKey = (complementos ?? []).map(c => c.nombre).sort((a, b) => a.localeCompare(b)).join(',');
+  return `${nombre}||${precio}||${compsKey}`;
+}
+
+/** Suma `cantidad` a la entrada pendiente de `key`, sin mutar el mapa original. */
+export function withPendingDelete(overlay: Map<string, number>, key: string, cantidad: number): Map<string, number> {
+  const next = new Map(overlay);
+  next.set(key, (next.get(key) ?? 0) + cantidad);
+  return next;
+}
+
+/**
+ * Resta `cantidad` a la entrada pendiente de `key`. Si llega a 0 o menos,
+ * borra la key. Se usa tanto al confirmar el borrado (éxito) como al
+ * revertirlo (fallo) — ver `handleDeleteItem`.
+ */
+export function withoutPendingDelete(overlay: Map<string, number>, key: string, cantidad: number): Map<string, number> {
+  const restante = (overlay.get(key) ?? 0) - cantidad;
+  const next = new Map(overlay);
+  if (restante > 0) next.set(key, restante); else next.delete(key);
+  return next;
+}
+
+/**
+ * Aplica el overlay optimista sobre la vista mergeada: resta la cantidad
+ * pendiente de borrado a cada item y descarta los que llegan a 0. Vista
+ * pura para render — no toca `sessionData`.
+ */
+export function applyPendingDeleteOverlay(items: OrderItem[], overlay: Map<string, number>): OrderItem[] {
+  if (overlay.size === 0) return items;
+  return items
+    .map(item => {
+      const pendiente = overlay.get(mergeKeyFor(item.nombre, item.precio, item.complementos)) ?? 0;
+      return pendiente > 0 ? { ...item, cantidad: item.cantidad - pendiente } : item;
+    })
+    .filter(item => item.cantidad > 0);
 }
 
 function sortItemsByTypeAndName(a: OrderItem, b: OrderItem): number {
