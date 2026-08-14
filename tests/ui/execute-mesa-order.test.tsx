@@ -70,4 +70,26 @@ describe('executeMesaOrder — modo camarero (isWaiterMode=true, sin client toke
     expect(handlers.calls).toContain('setErrors');
     expect(handlers.calls).not.toContain('clearCart');
   });
+
+  it('SESSION_CLOSED: abre la puerta QR, sin reabrir el carrito ni limpiarlo', async () => {
+    const handlers = buildHandlers();
+    const sendFlow = vi.fn(async () => ({ ok: false, code: 'SESSION_CLOSED' }));
+
+    await executeMesaOrder('mesa-1', true, [ITEM], 'es', handlers, sendFlow);
+
+    expect(handlers.calls).toContain('setQrGateState');
+    expect(handlers.calls).not.toContain('openCart');
+    expect(handlers.calls).not.toContain('clearCart');
+  });
+
+  it('TOKEN_EXPIRED: abre la puerta QR, sin reabrir el carrito ni limpiarlo', async () => {
+    const handlers = buildHandlers();
+    const sendFlow = vi.fn(async () => ({ ok: false, code: 'TOKEN_EXPIRED' }));
+
+    await executeMesaOrder('mesa-1', true, [ITEM], 'es', handlers, sendFlow);
+
+    expect(handlers.calls).toContain('setQrGateState');
+    expect(handlers.calls).not.toContain('openCart');
+    expect(handlers.calls).not.toContain('clearCart');
+  });
 });
