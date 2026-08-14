@@ -865,9 +865,10 @@ function shouldShowQrGate(
   return qrGateState !== null && mesaToken !== null && !isWaiterMode;
 }
 
-interface MesaOrderHandlers {
+export interface MesaOrderHandlers {
   setSending: (b: boolean) => void;
   closeCart: () => void;
+  openCart: () => void;
   setQrGateState: (s: QRGateState | null) => void;
   clearCart: () => void;
   setShowOrderToast: (b: boolean) => void;
@@ -875,12 +876,13 @@ interface MesaOrderHandlers {
   attemptKey: AttemptKey;
 }
 
-async function executeMesaOrder(
+export async function executeMesaOrder(
   mesaId: string,
   isWaiterMode: boolean,
   items: CartItem[],
   language: Language,
   handlers: MesaOrderHandlers,
+  sendMesaOrderFlowFn: typeof sendMesaOrderFlow = sendMesaOrderFlow,
 ): Promise<void> {
   let clientToken: string | null = null;
   if (!isWaiterMode) {
@@ -894,8 +896,11 @@ async function executeMesaOrder(
   }
 
   handlers.setSending(true);
+  // Optimista: el carrito se cierra ya, antes de conocer el resultado real.
+  // Los items NO se tocan todavía — si falla, no hay nada que restaurar.
+  handlers.closeCart();
   try {
-    const result = await sendMesaOrderFlow(mesaId, clientToken, items, language, handlers.attemptKey);
+    const result = await sendMesaOrderFlowFn(mesaId, clientToken, items, language, handlers.attemptKey);
     if (result.ok && result.trackingToken) {
       // El pedido está confirmado: la clave del intento ya cumplió su función y
       // se descarta. Si no se descartara, el SIGUIENTE pedido de esta mesa
@@ -903,20 +908,21 @@ async function executeMesaOrder(
       handlers.attemptKey.reset();
       addTrackingToken(result.trackingToken);
       handlers.clearCart();
-      handlers.closeCart();
       handlers.setShowOrderToast(true);
       setTimeout(() => handlers.setShowOrderToast(false), 2000);
       window.dispatchEvent(new CustomEvent('mesa-order-placed'));
     } else if (result.code === 'SESSION_CLOSED') {
-      handlers.closeCart();
       handlers.setQrGateState('SESSION_CLOSED');
     } else if (result.code === 'TOKEN_EXPIRED') {
-      handlers.closeCart();
       handlers.setQrGateState('TOKEN_EXPIRED');
     } else {
+      // Rollback: nunca se encola un pedido para reintento automático (ver
+      // CLAUDE.md) — se reabre el carrito intacto y el camarero reintenta a mano.
+      handlers.openCart();
       handlers.setErrors({ general: result.error || t('validationOrderError', language) });
     }
   } catch {
+    handlers.openCart();
     handlers.setErrors({ general: t('connectionError', language) });
   } finally {
     handlers.setSending(false);
@@ -1228,7 +1234,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     // Mesa mode: skip PII validation, use mesa submit path
     if (mesaToken) {
       await executeMesaOrder(mesaInfo?.id ?? mesaToken, isWaiterMode, items, language, {
-        setSending, closeCart, setQrGateState, clearCart, setShowOrderToast, setErrors, attemptKey,
+        setSending, closeCart, openCart, setQrGateState, clearCart, setShowOrderToast, setErrors, attemptKey,
       });
       return;
     }
@@ -1271,7 +1277,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
       setSending,
       attemptKey,
     });
-  }, [mesaToken, mesaInfo, isWaiterMode, nombre, telefono, countryCode, email, deliveryMethod, deliveryAddress, deliveryPostalCode, deliveryLatitude, deliveryLongitude, isRestaurant, pagosPickupHabilitados, items, language, discountCode, estimatedFeeCents, clearCart, closeCart, router, attemptKey]);
+  }, [mesaToken, mesaInfo, isWaiterMode, nombre, telefono, countryCode, email, deliveryMethod, deliveryAddress, deliveryPostalCode, deliveryLatitude, deliveryLongitude, isRestaurant, pagosPickupHabilitados, items, language, discountCode, estimatedFeeCents, clearCart, closeCart, openCart, router, attemptKey]);
 
 // Signal "Activa" state: when a real customer (non-waiter) adds their first item
   useEffect(() => {
