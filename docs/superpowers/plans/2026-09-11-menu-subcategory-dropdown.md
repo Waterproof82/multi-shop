@@ -144,7 +144,7 @@ describe('transformOriginFromClick', () => {
   });
 
   it('da coordenadas positivas cuando el click está abajo a la derecha del centro', () => {
-    expect(transformOriginFromClick(900, 700, 1000, 800)).toBe('300px 300px');
+    expect(transformOriginFromClick(800, 700, 1000, 800)).toBe('300px 300px');
   });
 });
 ```
