@@ -96,6 +96,9 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
     ? category.descripcionTranslations[translationLang]
     : category.descripcion;
 
+  // Calculado una vez — se lee tanto para decidir la rama como para el .map().
+  const subcategoriasVisibles = subcategoriasConProductos(category);
+
   return (
     <section id={category.id} className="scroll-mt-20 sm:scroll-mt-32">
       <div className="mb-5 flex items-center gap-4 overflow-hidden">
@@ -117,9 +120,9 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
         </p>
       )}
 
-      {subcategoriasConProductos(category).length > 0 ? (
+      {subcategoriasVisibles.length > 0 ? (
         <div className="space-y-8">
-          {subcategoriasConProductos(category).map((subcat) => (
+          {subcategoriasVisibles.map((subcat) => (
             <SubcategorySection
               key={subcat.id}
               subcategory={subcat}
