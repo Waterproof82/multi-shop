@@ -123,6 +123,42 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.mi_tabla TO authenticated;
 Retorna el `empresa_id` del admin autenticado via `auth.uid()` → `perfiles_admin`.
 Usar siempre en RLS policies para aislar datos por empresa.
 
+### 4. Como aplicar la migracion (OBLIGATORIO — nunca MCP suelto)
+
+**Unica via correcta: crear el archivo `.sql` en `supabase/migrations/` y correr
+`supabase db push --linked`.** Esto es lo unico que escribe la versión en
+`supabase_migrations.schema_migrations` usando el timestamp del NOMBRE del
+archivo.
+
+**Prohibido aplicar DDL con `mcp__supabase__apply_migration` o
+`mcp__supabase__execute_sql` como via principal.** Esas herramientas ejecutan
+el SQL contra el remoto pero:
+- `apply_migration` genera su **propio** timestamp de version (el instante en
+  que se ejecuta), que casi nunca coincide con el del archivo local → la fila
+  del historial remoto queda con un ID distinto al del archivo.
+- `execute_sql` no toca `schema_migrations` en absoluto → el cambio queda vivo
+  en el esquema pero invisible para el historial, ni siquiera con ID distinto.
+
+Ambos casos producen el mismo sintoma: `supabase db push` falla con "Remote
+migration versions not found in local migrations directory" (aunque el
+esquema remoto SI tenga el cambio), porque local y remoto llevan la cuenta con
+IDs distintos para el mismo contenido. Asi nacio el drift reparado el
+2026-09-11 (33 migraciones duplicadas bajo dos IDs + 2 nunca trackeadas),
+diagnosticado comparando `mcp__supabase__list_migrations` (nombre) contra los
+archivos locales (nombre sin timestamp) y verificando en vivo con SQL directo
+(`pg_proc.proconfig`, `pg_default_acl`, `pg_policies`) antes de tocar el
+historial — nunca asumir por nombre sin confirmar contra el esquema real.
+
+**Excepcion permitida:** un fix urgente aplicado por necesidad via MCP
+(`apply_migration`/`execute_sql`) DEBE ir seguido, en la misma sesion, de:
+```
+supabase migration repair --status applied --linked <version_del_archivo_local>
+```
+(y `--status reverted <version_generada_por_mcp>` si `apply_migration` creo una
+fila fantasma) para que el historial quede 1:1 con el archivo, sin trucos.
+Verificar con `supabase migration list` que `Local == Remote` en esa fila antes
+de dar el fix por cerrado.
+
 ## UI & Design System (Tailwind v4)
 - **Tokens:** NUNCA hardcodear colores. Usar variables CSS del tenant.
 - **Accesibilidad:** Touch targets min 44px. Focus rings estandar. `aria-labels` traducidos.
