@@ -16,7 +16,7 @@ import { GoogleReviewsWidget } from "@/components/google-reviews-widget";
 import { mesaSesionChannel } from "@/lib/realtime-channels";
 import { vistaParaMesa, type VistaMesa } from "@/lib/mesa/vista-mesa";
 
-interface OrderItem {
+export interface OrderItem {
   nombre: string;
   cantidad: number;
   precio: number;
@@ -90,8 +90,7 @@ const PAGE_BG = "#f0ede8";
 function mergeOrderItems(items: OrderItem[]): OrderItem[] {
   const map = new Map<string, OrderItem>();
   for (const item of items) {
-    const compsKey = (item.complementos ?? []).map(c => c.nombre).sort((a, b) => a.localeCompare(b)).join(',');
-    const key = `${item.nombre}||${item.precio}||${compsKey}`;
+    const key = mergeKeyFor(item.nombre, item.precio, item.complementos);
     const existing = map.get(key);
     if (existing) {
       existing.cantidad += item.cantidad;
@@ -100,6 +99,53 @@ function mergeOrderItems(items: OrderItem[]): OrderItem[] {
     }
   }
   return [...map.values()];
+}
+
+/**
+ * Key estable para matchear un item entre la vista mergeada y el overlay
+ * optimista de borrado. Mismo criterio que `mergeOrderItems`.
+ */
+export function mergeKeyFor(
+  nombre: string,
+  precio: number,
+  complementos?: { nombre: string; precio: number }[],
+): string {
+  const compsKey = (complementos ?? []).map(c => c.nombre).sort((a, b) => a.localeCompare(b)).join(',');
+  return `${nombre}||${precio}||${compsKey}`;
+}
+
+/** Suma `cantidad` a la entrada pendiente de `key`, sin mutar el mapa original. */
+export function withPendingDelete(overlay: Map<string, number>, key: string, cantidad: number): Map<string, number> {
+  const next = new Map(overlay);
+  next.set(key, (next.get(key) ?? 0) + cantidad);
+  return next;
+}
+
+/**
+ * Resta `cantidad` a la entrada pendiente de `key`. Si llega a 0 o menos,
+ * borra la key. Se usa tanto al confirmar el borrado (éxito) como al
+ * revertirlo (fallo) — ver `handleDeleteItem`.
+ */
+export function withoutPendingDelete(overlay: Map<string, number>, key: string, cantidad: number): Map<string, number> {
+  const restante = (overlay.get(key) ?? 0) - cantidad;
+  const next = new Map(overlay);
+  if (restante > 0) next.set(key, restante); else next.delete(key);
+  return next;
+}
+
+/**
+ * Aplica el overlay optimista sobre la vista mergeada: resta la cantidad
+ * pendiente de borrado a cada item y descarta los que llegan a 0. Vista
+ * pura para render — no toca `sessionData`.
+ */
+export function applyPendingDeleteOverlay(items: OrderItem[], overlay: Map<string, number>): OrderItem[] {
+  if (overlay.size === 0) return items;
+  return items
+    .map(item => {
+      const pendiente = overlay.get(mergeKeyFor(item.nombre, item.precio, item.complementos)) ?? 0;
+      return pendiente > 0 ? { ...item, cantidad: item.cantidad - pendiente } : item;
+    })
+    .filter(item => item.cantidad > 0);
 }
 
 function sortItemsByTypeAndName(a: OrderItem, b: OrderItem): number {
@@ -2392,6 +2438,8 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
   const [deleteQty, setDeleteQty] = useState(1);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [pendingDeleteOverlay, setPendingDeleteOverlay] = useState<Map<string, number>>(new Map());
+  const [deleteBannerError, setDeleteBannerError] = useState<string | null>(null);
 
   // True when the current session belongs to a waiter impersonating this table.
   // Waiters should not see payment buttons — the customer pays, not the waiter.
@@ -2548,36 +2596,46 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
   }, [mesaId, refresh]);
 
   const handleDeleteItem = useCallback(async () => {
-    if (!pendingDelete || deleting) return;
-    setDeleting(true);
+    if (!pendingDelete) return;
+    const { nombre, precio, complementos } = pendingDelete;
+    const qty = deleteQty;
+    const key = mergeKeyFor(nombre, precio, complementos);
+
+    // Optimista: el modal se cierra y el item baja de cantidad ya, sin
+    // esperar al servidor. `finally` deshace el overlay tanto en éxito
+    // (refresh() ya trajo el dato real) como en fallo (rollback visual).
+    setPendingDelete(null);
     setDeleteError(null);
+    setDeleteBannerError(null);
+    setDeleting(true);
+    setPendingDeleteOverlay(prev => withPendingDelete(prev, key, qty));
+
+    // Excepción deliberada a la regla general de offline (ver CLAUDE.md): un fallo de
+    // red también revierte el overlay aquí, porque borrar cantidad no es idempotente
+    // (sin clave de idempotencia) — reintentar en cola arriesga un doble borrado.
     try {
       const res = await fetchWithCsrf(`/api/waiter/mesas/${encodeURIComponent(mesaId)}/orders/items`, {
         method: 'DELETE',
-        body: JSON.stringify({
-          nombre: pendingDelete.nombre,
-          precio: pendingDelete.precio,
-          cantidadAEliminar: deleteQty,
-        }),
+        body: JSON.stringify({ nombre, precio, cantidadAEliminar: qty }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null) as { error?: string } | null;
-        setDeleteError(body?.error ?? `Error al eliminar (${res.status})`);
+        setDeleteBannerError(body?.error ?? t('deleteItemErrorStatus', lang).replace('{status}', String(res.status)));
         return;
       }
       const body = await res.json().catch(() => null) as { totalRemoved?: number } | null;
       if (!body?.totalRemoved) {
-        setDeleteError('No se encontró el ítem en la comanda — puede que ya se haya eliminado.');
+        setDeleteBannerError(t('deleteItemNotFound', lang));
         return;
       }
-      setPendingDelete(null);
       await refresh();
     } catch {
-      setDeleteError('Error de red al eliminar el ítem.');
+      setDeleteBannerError(t('deleteItemNetworkError', lang));
     } finally {
+      setPendingDeleteOverlay(prev => withoutPendingDelete(prev, key, qty));
       setDeleting(false);
     }
-  }, [pendingDelete, deleteQty, deleting, mesaId, refresh]);
+  }, [pendingDelete, deleteQty, mesaId, refresh, lang]);
 
 
   const division = sessionData?.division ?? null;
@@ -2598,7 +2656,10 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
     return () => globalThis.removeEventListener('popstate', handlePopState);
   }, [shouldTrapBack]);
 
-  const allItems = mergeOrderItems(sessionData?.orders.flatMap((o) => o.items.filter(i => !i.cancelled)) ?? []);
+  const allItems = applyPendingDeleteOverlay(
+    mergeOrderItems(sessionData?.orders.flatMap((o) => o.items.filter(i => !i.cancelled)) ?? []),
+    pendingDeleteOverlay,
+  );
 
   // Merge keys of items that belong to at least one retenido order
   const retenidoItemKeys = new Set<string>(
@@ -2757,6 +2818,24 @@ export function MesaOrdersClient({ mesaId }: Readonly<{ mesaId: string }>) {
               )}
 
               <DottedRule />
+
+              {isWaiterMode && deleteBannerError && (
+                <div
+                  role="alert"
+                  className="flex items-center justify-between gap-2 mb-2 px-3 py-2 rounded-lg text-xs"
+                  style={{ background: "oklch(35% 0.14 25 / 0.12)", color: "oklch(45% 0.18 25)" }}
+                >
+                  <span>{deleteBannerError}</span>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteBannerError(null)}
+                    className="font-bold shrink-0 w-5 h-5 flex items-center justify-center"
+                    aria-label={t("close", lang)}
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
 
               {/* Column headers */}
               <div

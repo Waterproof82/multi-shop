@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, Check, Gift, UtensilsCrossed } from "lucide-react"
+import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, Check, Gift, UtensilsCrossed, Loader2 } from "lucide-react"
 import { useReducedMotion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -670,7 +670,7 @@ function redirectToTracking(
 }
 
 // Helper: process standard (non-mesa) order response and side-effects
-async function processStandardOrderResponse(
+export async function processStandardOrderResponse(
   payload: Record<string, unknown>,
   opts: {
     t: any;
@@ -685,6 +685,7 @@ async function processStandardOrderResponse(
     estimatedFeeCents: number | null;
     clearCart: () => void;
     closeCart: () => void;
+    openCart: () => void;
     addTrackingToken: (token: string) => void;
     setOrderSuccess: (v: { numeroPedido: number } | null) => void;
     setErrors: (e: any) => void;
@@ -710,6 +711,7 @@ async function processStandardOrderResponse(
     estimatedFeeCents,
     clearCart,
     closeCart,
+    openCart,
     addTrackingToken,
     setOrderSuccess,
     setErrors,
@@ -723,6 +725,9 @@ async function processStandardOrderResponse(
   } = opts;
 
   setSending(true);
+  // Optimista: el carrito se cierra ya. Los items no se tocan hasta que se
+  // conoce el resultado real — si falla, no hay nada que restaurar.
+  closeCart();
   try {
     attachDeliveryFields(payload, {
       isRestaurant,
@@ -737,6 +742,9 @@ async function processStandardOrderResponse(
     const { ok, data } = await sendStandardOrderFlow(payload, attemptKey);
 
     if (!ok) {
+      // Rollback: nunca se encola un pedido para reintento automático (ver
+      // CLAUDE.md) — se reabre el carrito intacto y el cliente reintenta a mano.
+      openCart();
       setErrors({ general: data.error || t('validationOrderError', language) });
       return;
     }
@@ -749,7 +757,6 @@ async function processStandardOrderResponse(
     if (data.trackingToken && data.pedidoId && requiresRedsysRedirect(pagosPickupHabilitados, deliveryMethod, isRestaurant)) {
       addTrackingToken(data.trackingToken);
       clearCart();
-      closeCart();
       await submitRedsysPayment(data.pedidoId, language, data.trackingToken, router, addTrackingToken);
       return;
     }
@@ -761,7 +768,6 @@ async function processStandardOrderResponse(
       if (window.history.state?.cartOpen) {
         window.history.replaceState({}, '', window.location.href);
       }
-      closeCart();
       const restauranteTrackingUrl = `/tracking/${data.trackingToken}`;
       setTimeout(() => { window.location.href = restauranteTrackingUrl; }, 0);
       return;
@@ -776,13 +782,15 @@ async function processStandardOrderResponse(
         addTrackingTokenFn: addTrackingToken,
       });
       clearCart();
-      closeCart();
       return;
     }
 
     // No tracking token: show success with order number
     setOrderSuccess({ numeroPedido: data.numeroPedido });
   } catch (e) {
+    // Fallo de red: misma política de rollback que el fallo de servidor — no
+    // hay encolado automático de pedidos (ver CLAUDE.md).
+    openCart();
     const errorMsg = e instanceof Error ? e.message : t('connectionError', language);
     setErrors({ general: errorMsg || t('connectionError', language) });
   } finally {
@@ -865,9 +873,10 @@ function shouldShowQrGate(
   return qrGateState !== null && mesaToken !== null && !isWaiterMode;
 }
 
-interface MesaOrderHandlers {
+export interface MesaOrderHandlers {
   setSending: (b: boolean) => void;
   closeCart: () => void;
+  openCart: () => void;
   setQrGateState: (s: QRGateState | null) => void;
   clearCart: () => void;
   setShowOrderToast: (b: boolean) => void;
@@ -875,12 +884,13 @@ interface MesaOrderHandlers {
   attemptKey: AttemptKey;
 }
 
-async function executeMesaOrder(
+export async function executeMesaOrder(
   mesaId: string,
   isWaiterMode: boolean,
   items: CartItem[],
   language: Language,
   handlers: MesaOrderHandlers,
+  sendMesaOrderFlowFn: typeof sendMesaOrderFlow = sendMesaOrderFlow,
 ): Promise<void> {
   let clientToken: string | null = null;
   if (!isWaiterMode) {
@@ -894,8 +904,11 @@ async function executeMesaOrder(
   }
 
   handlers.setSending(true);
+  // Optimista: el carrito se cierra ya, antes de conocer el resultado real.
+  // Los items NO se tocan todavía — si falla, no hay nada que restaurar.
+  handlers.closeCart();
   try {
-    const result = await sendMesaOrderFlow(mesaId, clientToken, items, language, handlers.attemptKey);
+    const result = await sendMesaOrderFlowFn(mesaId, clientToken, items, language, handlers.attemptKey);
     if (result.ok && result.trackingToken) {
       // El pedido está confirmado: la clave del intento ya cumplió su función y
       // se descarta. Si no se descartara, el SIGUIENTE pedido de esta mesa
@@ -903,20 +916,21 @@ async function executeMesaOrder(
       handlers.attemptKey.reset();
       addTrackingToken(result.trackingToken);
       handlers.clearCart();
-      handlers.closeCart();
       handlers.setShowOrderToast(true);
       setTimeout(() => handlers.setShowOrderToast(false), 2000);
       window.dispatchEvent(new CustomEvent('mesa-order-placed'));
     } else if (result.code === 'SESSION_CLOSED') {
-      handlers.closeCart();
       handlers.setQrGateState('SESSION_CLOSED');
     } else if (result.code === 'TOKEN_EXPIRED') {
-      handlers.closeCart();
       handlers.setQrGateState('TOKEN_EXPIRED');
     } else {
+      // Rollback: nunca se encola un pedido para reintento automático (ver
+      // CLAUDE.md) — se reabre el carrito intacto y el camarero reintenta a mano.
+      handlers.openCart();
       handlers.setErrors({ general: result.error || t('validationOrderError', language) });
     }
   } catch {
+    handlers.openCart();
     handlers.setErrors({ general: t('connectionError', language) });
   } finally {
     handlers.setSending(false);
@@ -933,6 +947,22 @@ function OrderToast({ show, language }: Readonly<{ show: boolean; language: Lang
         </div>
         <p className="text-base font-bold text-foreground text-center leading-snug">
           {t('mesaOrderConfirmed', language)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export function SendingOverlay({ show, language }: Readonly<{ show: boolean; language: Language }>) {
+  if (!show) return null;
+  return (
+    <div className="fixed inset-0 z-[400] flex items-center justify-center pointer-events-none">
+      <div className="bg-card/95 backdrop-blur-md border border-border shadow-2xl rounded-3xl px-10 py-8 flex flex-col items-center gap-4 animate-in fade-in zoom-in-90 duration-300">
+        <div className="w-16 h-16 rounded-full bg-primary/10 border-2 border-primary/25 flex items-center justify-center">
+          <Loader2 className="size-8 text-primary animate-spin" strokeWidth={2.5} />
+        </div>
+        <p className="text-base font-bold text-foreground text-center leading-snug">
+          {t('orderSending', language)}
         </p>
       </div>
     </div>
@@ -1212,7 +1242,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     // Mesa mode: skip PII validation, use mesa submit path
     if (mesaToken) {
       await executeMesaOrder(mesaInfo?.id ?? mesaToken, isWaiterMode, items, language, {
-        setSending, closeCart, setQrGateState, clearCart, setShowOrderToast, setErrors, attemptKey,
+        setSending, closeCart, openCart, setQrGateState, clearCart, setShowOrderToast, setErrors, attemptKey,
       });
       return;
     }
@@ -1244,6 +1274,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
       estimatedFeeCents,
       clearCart,
       closeCart,
+      openCart,
       addTrackingToken,
       setOrderSuccess,
       setErrors,
@@ -1255,7 +1286,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
       setSending,
       attemptKey,
     });
-  }, [mesaToken, mesaInfo, isWaiterMode, nombre, telefono, countryCode, email, deliveryMethod, deliveryAddress, deliveryPostalCode, deliveryLatitude, deliveryLongitude, isRestaurant, pagosPickupHabilitados, items, language, discountCode, estimatedFeeCents, clearCart, closeCart, router, attemptKey]);
+  }, [mesaToken, mesaInfo, isWaiterMode, nombre, telefono, countryCode, email, deliveryMethod, deliveryAddress, deliveryPostalCode, deliveryLatitude, deliveryLongitude, isRestaurant, pagosPickupHabilitados, items, language, discountCode, estimatedFeeCents, clearCart, closeCart, openCart, router, attemptKey]);
 
 // Signal "Activa" state: when a real customer (non-waiter) adds their first item
   useEffect(() => {
@@ -1332,6 +1363,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
   return (
     <>
       <OrderToast show={showOrderToast} language={language} />
+      <SendingOverlay show={sending} language={language} />
       {shouldShowQrGate(qrGateState, mesaToken, isWaiterMode) && (
         <QRScannerGate
           mesaId={resolveActiveMesaId(mesaInfo, mesaToken!)}
