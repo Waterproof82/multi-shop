@@ -67,6 +67,19 @@ export function motivoParaOcultarBanner(ctx: ContextoBanner): MotivoOculto | nul
   return REGLAS.find((regla) => regla.oculta(ctx))?.motivo ?? null;
 }
 
+/**
+ * Si el componente <WaiterBanner> debe montarse siquiera. El sistema de
+ * camareros/mesas es exclusivo de tipo === 'restaurante' (igual que su
+ * toggle en superadmin — ver CLAUDE.md). Evaluar esto ANTES de montar el
+ * componente evita el `fetch('/api/waiter/me')` de su primer useEffect:
+ * `motivoParaOcultarBanner` solo oculta la UI, pero corre DESPUES de que ese
+ * efecto ya disparo la llamada de red (401 legitimo pero innecesario para
+ * una tienda que nunca tuvo login de camarero).
+ */
+export function debeMontarseWaiterBanner(tipoEmpresa: string | null | undefined): boolean {
+  return tipoEmpresa === 'restaurante';
+}
+
 /** Claves de traduccion de las secciones que el banner rotula. */
 type ClaveSeccion = 'waiterKitchen' | 'waiterBar';
 

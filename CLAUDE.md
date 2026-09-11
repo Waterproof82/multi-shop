@@ -244,7 +244,7 @@ Tras CADA `supabase db push` o `supabase migration up`:
 - **`from_validation`** en `pedido_item_estados`: `false` = retenido en cocina; `true` = devuelto a pendientes. Nunca mezclar.
 - **Pausa prevalece sobre seleccion** en `handleConfirmBoth`. Item puede estar seleccionado Y pausado → va a `pausedIndices`. NO filtrar con `&& !selected.has(...)`.
 - **`validated_at`**: timer de cocina/bar cuenta desde validacion (`validated_at ?? created_at`), no desde creacion.
-- **`WaiterBanner`** renderiza en TODAS las paginas. Sonido `bell.mp3` solo con guard `pathname.startsWith('/waiter')`.
+- **`WaiterBanner`** solo se monta si `empresa?.tipo === 'restaurante'` (guard en `layout.tsx`) — para `tienda` ni se renderiza, evita el `fetch('/api/waiter/me')` (401 legitimo pero innecesario) en cada pagina. Dentro de ese universo, renderiza en TODAS las paginas del tenant restaurante; `motivoParaOcultarBanner()` decide su visibilidad, pero corre DESPUES de que el `useEffect` ya disparo el fetch — sirve para ocultar UI, no para evitar la llamada de red. Sonido `bell.mp3` solo con guard `pathname.startsWith('/waiter')`.
 
 ## Sistema de Stock & Mermas — Trampas Criticas
 

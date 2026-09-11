@@ -12,6 +12,7 @@ import { describe, it, expect } from 'vitest';
 import {
   motivoParaOcultarBanner,
   seccionDeRuta,
+  debeMontarseWaiterBanner,
   type ContextoBanner,
 } from '@/lib/waiter/banner-visibilidad';
 
@@ -126,5 +127,25 @@ describe('seccionDeRuta', () => {
 
   it('exige la ruta exacta, no un prefijo', () => {
     expect(seccionDeRuta('/waiter/kitchen/historial')).toBeNull();
+  });
+});
+
+describe('debeMontarseWaiterBanner', () => {
+  // Regresion: una empresa tipo 'tienda' (sin sistema de camareros) veia un
+  // 401 de fetch('/api/waiter/me') en cada pagina — el useEffect del banner
+  // disparaba la llamada antes de que motivoParaOcultarBanner tuviera chance
+  // de ocultar la UI. La solucion es no montar el componente en absoluto.
+  it('se monta para tipo restaurante', () => {
+    expect(debeMontarseWaiterBanner('restaurante')).toBe(true);
+  });
+
+  it.each([
+    ['tienda', 'tienda'],
+    [null, 'null (dominio no resuelto)'],
+    [undefined, 'undefined'],
+    ['', 'cadena vacia'],
+    ['otro-tipo-futuro', 'un tipo desconocido'],
+  ])('NO se monta para %s (%s)', (tipo: string | null | undefined, _desc: string) => {
+    expect(debeMontarseWaiterBanner(tipo)).toBe(false);
   });
 });

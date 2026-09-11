@@ -10,6 +10,7 @@ import { LanguageProvider } from "@/lib/language-context";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { LazyPromoToast, LazyTgtgReservaPopup } from "@/components/lazy-client-components";
 import { WaiterBanner } from "@/components/waiter-banner";
+import { debeMontarseWaiterBanner } from "@/lib/waiter/banner-visibilidad";
 import { ExitConfirmation } from "@/components/exit-confirmation";
 import { SwRegistrar } from "@/components/sw-registrar";
 import { getEmpresaByDomain } from "@/lib/server-services";
@@ -185,9 +186,11 @@ export default async function RootLayout({
                 >
                   Saltar al contenido principal
                 </a>
-                <Suspense>
-                  <WaiterBanner />
-                </Suspense>
+                {debeMontarseWaiterBanner(empresa?.tipo) && (
+                  <Suspense>
+                    <WaiterBanner />
+                  </Suspense>
+                )}
                 <main id="main-content">
                   {children}
                 </main>
