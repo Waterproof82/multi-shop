@@ -35,3 +35,26 @@ if (!window.matchMedia) {
     }),
   });
 }
+
+// jsdom tampoco implementa IntersectionObserver, y CategoryNav la usa para
+// resaltar la categoría visible mientras se hace scroll. Sin este doble
+// revienta con "IntersectionObserver is not defined" al montar — nunca se
+// había topado nadie porque CategoryNav no tenía tests hasta ahora.
+if (!window.IntersectionObserver) {
+  class IntersectionObserverStub {
+    observe = vi.fn();
+    unobserve = vi.fn();
+    disconnect = vi.fn();
+    takeRecords = () => [];
+  }
+  Object.defineProperty(window, 'IntersectionObserver', {
+    writable: true,
+    value: IntersectionObserverStub,
+  });
+}
+
+// jsdom no implementa scrollIntoView. category-nav.tsx lo llama para mantener
+// la pastilla activa visible dentro de la barra con scroll horizontal.
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = vi.fn();
+}

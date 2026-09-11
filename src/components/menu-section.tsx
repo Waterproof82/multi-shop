@@ -16,6 +16,7 @@ import { useLanguage, type Language } from "@/lib/language-context"
 import { t } from "@/lib/translations"
 import { formatPrice } from "@/lib/format-price"
 import { MenuCategoryVM, MenuItemVM, MenuSubcategoryVM } from "@/core/application/dtos/menu-view-model"
+import { subcategoriasConProductos } from "@/lib/menu/subcategorias"
 import { QuantitySelectorDialog } from "@/components/quantity-selector-dialog"
 import { AllergenBadges, AllergenList } from "@/components/allergen-icons"
 
@@ -95,6 +96,9 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
     ? category.descripcionTranslations[translationLang]
     : category.descripcion;
 
+  // Calculado una vez — se lee tanto para decidir la rama como para el .map().
+  const subcategoriasVisibles = subcategoriasConProductos(category);
+
   return (
     <section id={category.id} className="scroll-mt-20 sm:scroll-mt-32">
       <div className="mb-5 flex items-center gap-4 overflow-hidden">
@@ -116,9 +120,9 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
         </p>
       )}
 
-      {category.subcategories && category.subcategories.length > 0 ? (
+      {subcategoriasVisibles.length > 0 ? (
         <div className="space-y-8">
-          {category.subcategories.filter(s => s.products.length > 0).map((subcat) => (
+          {subcategoriasVisibles.map((subcat) => (
             <SubcategorySection
               key={subcat.id}
               subcategory={subcat}
@@ -213,7 +217,7 @@ const SubcategorySection = memo(function SubcategorySection(props: Readonly<{
     : subcategory.descripcion;
 
   return (
-    <div className="space-y-3">
+    <div id={subcategory.id} className="space-y-3 scroll-mt-20 sm:scroll-mt-32">
       <h3 className="font-serif text-lg font-semibold text-foreground flex items-center gap-2 min-w-0">
         <span className="w-1.5 h-1.5 rounded-full bg-primary/50 shrink-0" />
         <span className="min-w-0 break-words">{(translationLang && subcategory.translations?.[translationLang]?.name) || subcategory.nombre}</span>
