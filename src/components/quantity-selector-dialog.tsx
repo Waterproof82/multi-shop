@@ -220,12 +220,14 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
           </div>
         )}
         <DialogHeader className="px-5 pt-5 pb-4 shrink-0 border-b">
-          <DialogTitle>{t("selectQuantity", language)}</DialogTitle>
-          <DialogDescription>
-            {t("quantityFor", language)} {displayName}
-          </DialogDescription>
-          {displayDescription && (
-            <p className="text-sm text-muted-foreground pt-1">{displayDescription}</p>
+          <DialogTitle>{displayName}</DialogTitle>
+          {/* Radix exige un Description accesible (aria-describedby) para el
+              Dialog; sin descripcion propia del producto usamos el nombre
+              como fallback silencioso en vez de dejar el warning en consola. */}
+          {displayDescription ? (
+            <DialogDescription>{displayDescription}</DialogDescription>
+          ) : (
+            <DialogDescription className="sr-only">{displayName}</DialogDescription>
           )}
         </DialogHeader>
 
