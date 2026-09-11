@@ -5,6 +5,9 @@ import { cn } from "@/lib/utils"
 import type { MenuCategoryVM } from "@/core/application/dtos/menu-view-model"
 import { useLanguage } from "@/lib/language-context"
 import { t } from "@/lib/translations"
+import { subcategoriasConProductos, tieneSubcategoriasConProductos } from "@/lib/menu/subcategorias"
+import { transformOriginFromClick } from "@/lib/menu/transform-origin"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 
 interface CategoryNavProps {
   categories: MenuCategoryVM[]
@@ -17,10 +20,19 @@ interface CategoryNavProps {
 export function CategoryNav(props: Readonly<CategoryNavProps>) {
   const { categories, showTabs, tab, onTabChange, isWaiterMode } = props;
   const [activeId, setActiveId] = useState(categories[0]?.id ?? "")
+  const [subcatDialogFor, setSubcatDialogFor] = useState<string | null>(null)
+  const [dialogOrigin, setDialogOrigin] = useState<string>("50% 50%")
 
   // Reset active category when the visible categories list changes (e.g. tab switch)
   useEffect(() => {
     setActiveId(categories[0]?.id ?? "")
+  }, [categories])
+
+  // Same reason as above: if categories changes while the dialog is open,
+  // activeDialogCategory would become null and the dialog would stay open
+  // showing an empty panel.
+  useEffect(() => {
+    setSubcatDialogFor(null)
   }, [categories])
   const { language } = useLanguage()
   const navRef = useRef<HTMLDivElement>(null)
@@ -67,11 +79,16 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
     }
   }, [activeId])
 
-  const scrollTo = (id: string) => {
+  // `activeCategoryId` es la pastilla que debe quedar resaltada — por
+  // defecto la misma que el ancla de scroll, pero al saltar a una
+  // SUBCATEGORÍA debe seguir siendo la de la categoría PADRE (ninguna
+  // pastilla tiene el id de una subcategoría, así que sin este segundo
+  // parámetro el resaltado desaparecería tras elegir una).
+  const scrollTo = (id: string, activeCategoryId: string = id) => {
     const el = document.getElementById(id)
     if (el) {
       isManualScrolling.current = true
-      setActiveId(id)
+      setActiveId(activeCategoryId)
 
       requestAnimationFrame(() => {
         const offset = 140
@@ -86,6 +103,19 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
         }, 300)
       })
     }
+  }
+
+  const openSubcategoryDialog = (catId: string, e: React.MouseEvent<HTMLButtonElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const clickX = rect.left + rect.width / 2
+    const clickY = rect.top + rect.height / 2
+    setDialogOrigin(transformOriginFromClick(clickX, clickY, window.innerWidth, window.innerHeight))
+    setSubcatDialogFor(catId)
+  }
+
+  const pickAndClose = (targetId: string, activeCategoryId: string) => {
+    setSubcatDialogFor(null)
+    scrollTo(targetId, activeCategoryId)
   }
 
   const catLabel = (cat: MenuCategoryVM) =>
@@ -139,56 +169,103 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
     )
   }
 
+  const activeDialogCategory = categories.find((c) => c.id === subcatDialogFor) ?? null
+
   return (
-    <nav
-      ref={navRef}
-      className="sticky top-16 z-40 w-full overflow-x-auto border-b border-border bg-background/95 backdrop-blur-sm md:top-20 lg:top-20 [-webkit-overflow-scrolling:touch]"
-      style={{ scrollMarginTop: 'var(--scroll-offset, 4rem)' }}
-      aria-label={t("menuCategories", language)}
-    >
-      <div className="mx-auto max-w-6xl px-4 md:px-6">
-        <div className="flex flex-nowrap gap-1 py-2 items-center min-w-max">
-          {showTabs && onTabChange && (
+    <>
+      <nav
+        ref={navRef}
+        className="sticky top-16 z-40 w-full overflow-x-auto border-b border-border bg-background/95 backdrop-blur-sm md:top-20 lg:top-20 [-webkit-overflow-scrolling:touch]"
+        style={{ scrollMarginTop: 'var(--scroll-offset, 4rem)' }}
+        aria-label={t("menuCategories", language)}
+      >
+        <div className="mx-auto max-w-6xl px-4 md:px-6">
+          <div className="flex flex-nowrap gap-1 py-2 items-center min-w-max">
+            {showTabs && onTabChange && (
+              <>
+                {tab === 'bebidas' && (
+                  <button
+                    type="button"
+                    onClick={() => onTabChange('comida')}
+                    className="whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
+                  >
+                    🍳 {t("filterFood", language)}
+                  </button>
+                )}
+                {tab === 'comida' && (
+                  <button
+                    type="button"
+                    onClick={() => onTabChange('bebidas')}
+                    className="whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
+                  >
+                    🥤 {t("filterDrinks", language)}
+                  </button>
+                )}
+                <span className="h-5 w-px bg-border mx-1 shrink-0" aria-hidden />
+              </>
+            )}
+            {categories.map((cat) => {
+              const conSubcategorias = tieneSubcategoriasConProductos(cat)
+              return (
+                <button
+                  key={cat.id}
+                  data-id={cat.id}
+                  type="button"
+                  aria-haspopup={conSubcategorias ? "dialog" : undefined}
+                  onClick={(e) => conSubcategorias ? openSubcategoryDialog(cat.id, e) : scrollTo(cat.id)}
+                  className={cn(
+                    "whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px]",
+                    activeId === cat.id
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
+                  )}
+                >
+                  {catLabel(cat)}
+                  {conSubcategorias && <span aria-hidden="true" className="ml-1">▾</span>}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </nav>
+
+      <Dialog
+        open={subcatDialogFor !== null}
+        onOpenChange={(open) => { if (!open) setSubcatDialogFor(null) }}
+      >
+        <DialogContent style={{ transformOrigin: dialogOrigin }} className="sm:max-w-sm">
+          {activeDialogCategory && (
             <>
-              {tab === 'bebidas' && (
-                <button
-                  type="button"
-                  onClick={() => onTabChange('comida')}
-                  className="whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
-                >
-                  🍳 {t("filterFood", language)}
-                </button>
-              )}
-              {tab === 'comida' && (
-                <button
-                  type="button"
-                  onClick={() => onTabChange('bebidas')}
-                  className="whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
-                >
-                  🥤 {t("filterDrinks", language)}
-                </button>
-              )}
-              <span className="h-5 w-px bg-border mx-1 shrink-0" aria-hidden />
+              <DialogHeader>
+                <DialogTitle>{catLabel(activeDialogCategory)}</DialogTitle>
+                <DialogDescription>{t("chooseSubcategory", language)}</DialogDescription>
+              </DialogHeader>
+              <ul className="max-h-72 overflow-y-auto -mx-1">
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => pickAndClose(activeDialogCategory.id, activeDialogCategory.id)}
+                    className="w-full text-left px-3 py-2.5 rounded-md text-sm font-medium text-muted-foreground hover:bg-secondary"
+                  >
+                    {t("viewAllCollection", language)}
+                  </button>
+                </li>
+                {subcategoriasConProductos(activeDialogCategory).map((subcat) => (
+                  <li key={subcat.id}>
+                    <button
+                      type="button"
+                      onClick={() => pickAndClose(subcat.id, activeDialogCategory.id)}
+                      className="w-full text-left px-3 py-2.5 rounded-md text-sm hover:bg-secondary"
+                    >
+                      {(language !== "es" && subcat.translations?.[language]?.name) || subcat.nombre}
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </>
           )}
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              data-id={cat.id}
-              type="button"
-              onClick={() => scrollTo(cat.id)}
-              className={cn(
-                "whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[44px] min-w-[44px]",
-                activeId === cat.id
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
-              )}
-            >
-              {catLabel(cat)}
-            </button>
-          ))}
-        </div>
-      </div>
-    </nav>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
