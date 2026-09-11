@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { ImagenSubida } from "@/components/ui/imagen-subida"
 import { useCart, type CartItem } from "@/lib/cart-context"
 import { useLanguage, type Language } from "@/lib/language-context"
 import { t } from "@/lib/translations"
@@ -211,6 +212,34 @@ function getItemAnimationClass(justAdded: boolean | undefined, justRemoved: bool
   if (justAdded) return 'animate-cart-item-add';
   if (justRemoved) return 'animate-cart-item-remove';
   return '';
+}
+
+/**
+ * Miniatura de la linea del carrito. Los videos (`.mp4`) de producto no
+ * tienen un fotograma fijo utilizable como thumbnail, asi que se tratan igual
+ * que "sin imagen" — el icono generico evita renderizar un `<video>` sin
+ * controles y sin sonido en una lista de 44px.
+ */
+function CartItemThumbnail({ item, alt }: Readonly<{ item: CartItem['item']; alt: string }>) {
+  const hasStillImage = !!item.image && !item.image.endsWith('.mp4');
+  if (!hasStillImage) {
+    return (
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-muted">
+        <ShoppingBag className="size-5 text-muted-foreground" />
+      </div>
+    );
+  }
+  return (
+    <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md bg-muted">
+      <ImagenSubida
+        src={item.image!}
+        alt={alt}
+        fill
+        sizes="48px"
+        className={`object-${item.imageFit || 'cover'}`}
+      />
+    </div>
+  );
 }
 
 function mapCartItemPayload(ci: CartItem) {
@@ -1481,6 +1510,10 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                       key={ci.cartId}
                       className={`flex items-center gap-3 rounded-lg p-3 transition-all duration-200 group ${itemAnimationClass}`}
                     >
+                      <CartItemThumbnail
+                        item={ci.item}
+                        alt={(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}
+                      />
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-card-foreground text-base group-hover:text-primary transition-colors duration-200 flex items-center gap-1.5 flex-wrap">
                           <span className="truncate">{(language !== "es" && ci.item.translations?.[language]?.name) || ci.item.name}</span>

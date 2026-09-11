@@ -15,12 +15,59 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { RippleButton } from "@/components/ui/ripple-button"
+import { ImagenSubida } from "@/components/ui/imagen-subida"
 import { useLanguage } from "@/lib/language-context"
 import { useCart } from "@/lib/cart-context"
 import { t } from "@/lib/translations"
 import { formatPrice } from "@/lib/format-price"
 import type { MenuItemVM, ComplementGroupVM, ComplementVM } from "@/core/application/dtos/menu-view-model"
 import { AllergenList } from "@/components/allergen-icons"
+
+type LanguageKey = 'en' | 'fr' | 'it' | 'de';
+
+function asLanguageKey(language: string): LanguageKey | undefined {
+  return (['en', 'fr', 'it', 'de'].includes(language) ? language : undefined) as LanguageKey | undefined;
+}
+
+function resolveDescription(item: MenuItemVM, language: string): string | undefined {
+  const lang = asLanguageKey(language);
+  if (lang && item.translations?.[lang]?.description) {
+    return item.translations[lang].description;
+  }
+  return item.description;
+}
+
+/**
+ * Imagen (o video) de cabecera del dialogo. Los productos con `.mp4` en
+ * `image` (mismo campo que usan las tarjetas del catalogo) no tienen un
+ * fotograma fijo utilizable como imagen: se reproducen igual que en
+ * `menu-section.tsx` en vez de mostrarse rotos.
+ */
+function DialogMedia({ item, alt }: Readonly<{ item: MenuItemVM; alt: string }>) {
+  if (item.image?.endsWith('.mp4')) {
+    return (
+      <video
+        src={item.image}
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="h-full w-full object-cover"
+        aria-label={alt}
+      />
+    );
+  }
+  return (
+    <ImagenSubida
+      src={item.image!}
+      alt={alt}
+      fill
+      sizes="100vw"
+      className={`object-${item.imageFit || 'cover'}`}
+      loading="eager"
+    />
+  );
+}
 
 interface QuantitySelectorDialogProps {
   item: MenuItemVM | null
@@ -161,14 +208,25 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
 
   if (!item) return null
 
+  const displayName = (language !== "es" && item.translations?.[language]?.name) || item.name;
+  const displayDescription = resolveDescription(item, language);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-screen h-dvh overflow-hidden max-w-none sm:max-w-none rounded-none border-0 shadow-none flex flex-col p-0 gap-0 top-0 left-0 translate-x-0 translate-y-0" onOpenAutoFocus={(e) => e.preventDefault()}>
+        {item.image && (
+          <div className="relative h-40 sm:h-48 w-full shrink-0 overflow-hidden bg-muted">
+            <DialogMedia item={item} alt={displayName} />
+          </div>
+        )}
         <DialogHeader className="px-5 pt-5 pb-4 shrink-0 border-b">
           <DialogTitle>{t("selectQuantity", language)}</DialogTitle>
           <DialogDescription>
-            {t("quantityFor", language)} {(language !== "es" && item.translations?.[language]?.name) || item.name}
+            {t("quantityFor", language)} {displayName}
           </DialogDescription>
+          {displayDescription && (
+            <p className="text-sm text-muted-foreground pt-1">{displayDescription}</p>
+          )}
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto min-h-0 px-5 py-4 space-y-4">
