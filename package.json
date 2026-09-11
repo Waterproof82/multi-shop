@@ -44,7 +44,7 @@
     "@react-pdf/renderer": "^4.5.1",
     "@sentry/nextjs": "^10.69.0",
     "@smithy/node-http-handler": "^4.4.14",
-    "@supabase/supabase-js": "^2.112.2",
+    "@supabase/supabase-js": "^2.112.3",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.36.3",
     "@vercel/analytics": "^2.0.1",
