@@ -164,6 +164,7 @@ de dar el fix por cerrado.
 - **Accesibilidad:** Touch targets min 44px. Focus rings estandar. `aria-labels` traducidos.
 - **I18n:** Usar `t()` de `@/lib/translations` para TODO el texto de UI.
 - **Imagenes:** Usar `ImageUploader` (auto-optimiza WebP). `object-contain` por defecto.
+- **Z-index de overlays:** `Dialog` (`dialog.tsx`) usa `z-[210]`; `Select`/`DropdownMenu` (`select.tsx`/`dropdown-menu.tsx`) usan `z-[220]` — a proposito, MAS ALTO. Un popover de Radix (Select, DropdownMenu) montado DENTRO de un Dialog debe pintarse encima de el, no detras. Con un z-index menor, el listbox monta igual (`aria-expanded=true`, opciones reales en el DOM) pero queda pintado detras del fondo opaco del modal — visualmente indistinguible de "no se despliega, sin elementos". Paso de verdad: el selector de categoria de `ProductFormDialog` (2026-09-11). Si se agrega un overlay nuevo, verificar contra estos dos valores antes de elegir su z-index.
 
 ## Imagenes — Trampas Criticas
 
