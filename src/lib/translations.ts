@@ -52,6 +52,8 @@ export const translations = {
     menuCategories: "Categorías del catálogo",
     filterFood: "Comida",
     filterDrinks: "Bebidas",
+    viewAllCollection: "Ver toda la colección",
+    chooseSubcategory: "Elegí una subcategoría para ir directo",
     especial: "Especial",
     // Allergens
     allergenCrustaceans: "Crustáceos",
@@ -1052,6 +1054,8 @@ export const translations = {
     menuCategories: "Catalog categories",
     filterFood: "Food",
     filterDrinks: "Drinks",
+    viewAllCollection: "View all",
+    chooseSubcategory: "Choose a subcategory to jump straight there",
     especial: "Special",
     // Allergens
     allergenGluten: "Cereals containing gluten",
