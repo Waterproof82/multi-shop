@@ -9,6 +9,29 @@ function anonymizeEmail(email: string): string {
   return `${local.substring(0, 2)}***@${domain ?? '***'}`;
 }
 
+// PostgREST (Warp) mata hilos por su propio timeout de pool con ruido de fondo
+// constante (~1300/dia, ver Sentry 90fa6dffe0094f988d362627afa71f47) sin que
+// haya un incidente real de carga. Un login puede pisar ese reaping una vez
+// entre miles. Un unico retry inmediato alcanza porque no es una caida
+// sostenida, es una colision puntual con una conexion que ya fue descartada.
+const TRANSIENT_ERROR_PATTERN = /timeout|gateway/i;
+
+function selectPerfilConEmpresa(client: SupabaseClient, id: string) {
+  return client
+    .from("perfiles_admin")
+    .select("*, empresas(*)")
+    .eq("id", id)
+    .single();
+}
+
+async function selectPerfilConEmpresaConRetry(client: SupabaseClient, id: string) {
+  const first = await selectPerfilConEmpresa(client, id);
+  if (first.error && TRANSIENT_ERROR_PATTERN.test(first.error.message)) {
+    return selectPerfilConEmpresa(client, id);
+  }
+  return first;
+}
+
 export class SupabaseAdminRepository implements IAdminRepository {
   constructor(
     private readonly supabase: SupabaseClient,
@@ -62,11 +85,7 @@ export class SupabaseAdminRepository implements IAdminRepository {
 
   async findById(id: string): Promise<Result<AdminWithEmpresa | null>> {
     try {
-      const { data: perfil, error } = await this.supabase
-        .from("perfiles_admin")
-        .select("*")
-        .eq("id", id)
-        .single();
+      const { data: perfil, error } = await selectPerfilConEmpresaConRetry(this.supabase, id);
 
       if (error) {
         await logger.logAndReturnError(
@@ -107,33 +126,15 @@ export class SupabaseAdminRepository implements IAdminRepository {
         };
       }
 
-      if (!perfil.empresa_id) {
-        return { 
-          success: false, 
-          error: { 
-            code: 'EMPRESA_NOT_FOUND', 
-            message: 'Empresa no encontrada para el admin', 
-            module: 'repository', 
-            method: 'findById' 
-          } 
-        };
-      }
-
-      const { data: empresa } = await this.supabase
-        .from("empresas")
-        .select("*")
-        .eq("id", perfil.empresa_id)
-        .single();
-
-      if (!empresa) {
-        return { 
-          success: false, 
-          error: { 
-            code: 'EMPRESA_NOT_FOUND', 
-            message: 'Empresa no encontrada para el admin', 
-            module: 'repository', 
-            method: 'findById' 
-          } 
+      if (!perfil.empresa_id || !perfil.empresas) {
+        return {
+          success: false,
+          error: {
+            code: 'EMPRESA_NOT_FOUND',
+            message: 'Empresa no encontrada para el admin',
+            module: 'repository',
+            method: 'findById'
+          }
         };
       }
 
@@ -145,7 +146,7 @@ export class SupabaseAdminRepository implements IAdminRepository {
           nombreCompleto: perfil.nombre_completo,
           rol: perfil.rol as RolAdmin,
           email: "",
-          empresa: this.mapEmpresa(empresa),
+          empresa: this.mapEmpresa(perfil.empresas as Record<string, unknown>),
         },
       };
     } catch (e) {
