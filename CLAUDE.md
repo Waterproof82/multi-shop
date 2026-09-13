@@ -284,6 +284,14 @@ Tras CADA `supabase db push` o `supabase migration up`:
 - **`/api/*` es NetworkOnly siempre** — nunca cachear auth ni datos de pedidos.
 - **`NetworkFirst` con timeout de 3s** en `/waiter/*` y `bell.mp3`. Sin el, red degradada = pantalla en blanco.
 
+## Menú Público — Cache y Resiliencia (GET /)
+
+> Ver doc completo: `docs/context/menu-cache-y-resiliencia.md`
+
+- **`getCachedMenu`** (`unstable_cache`, TTL 1h, key `catalogTag(empresaId)` — por empresa, NO por dominio) solo se salta el cacheo si la función envuelta LANZA. `GetMenuUseCase.execute` devuelve `{error}` como valor normal ante un fallo transitorio: sin un `throw` explícito, ese error queda cacheado 1h para TODOS los subdominios del tenant. Cualquier otro `unstable_cache` que envuelva un `Result<T,E>` tiene el mismo riesgo.
+- **`findAllByTenant`** de categorías/productos/complementos reintenta una vez ante `/timeout|gateway/i` — ruido de fondo de PostgREST (Warp), mismo patrón que login y purga RGPD. Son SELECT puros, seguros de reintentar sin analizar idempotencia.
+- **LCP de imágenes de producto**: `MenuSection` decide `priority` (→ `loading="eager"`) por `index===0` de categoría + primeros 3 ítems (coincide con `lg:grid-cols-3`). Si la categoría usa subcategorías, se renderiza `SubcategorySection` — verificar que también reciba y propague `priority`; si no, toda categoría con subcategorías sirve su primera imagen en `lazy` sin importar el dispositivo.
+
 ## SEO Multi-Tenant
 
 > Ver doc completo: `docs/context/seo-multitenant.md`

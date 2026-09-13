@@ -4,6 +4,64 @@ import type { ComplementoGrupo, ComplementoOpcion, ProductoComplementoAsignacion
 import type { Result } from '@/core/domain/entities/types';
 import { logger } from '../logging/logger';
 
+// PostgREST (Warp) mata hilos por su propio timeout de pool con ruido de
+// fondo constante, sin que sea un incidente real de carga (ver Sentry
+// 329c2bc182a648458a742db51bd180af, mismo patron que en
+// SupabaseCategoryRepository.findAllByTenant, llamada hermana en el mismo
+// GetMenuUseCase). Ambos SELECT de este metodo son de solo lectura, asi que
+// un unico retry inmediato por consulta es seguro sin analizar idempotencia.
+const TRANSIENT_ERROR_PATTERN = /timeout|gateway/i;
+
+function findGruposQuery(client: SupabaseClient, empresaId: string) {
+  return client
+    .from('complemento_grupos')
+    .select('*')
+    .eq('empresa_id', empresaId)
+    .order('orden', { ascending: true });
+}
+
+async function findGruposConRetry(client: SupabaseClient, empresaId: string) {
+  const first = await findGruposQuery(client, empresaId);
+  if (first.error && TRANSIENT_ERROR_PATTERN.test(first.error.message)) {
+    return findGruposQuery(client, empresaId);
+  }
+  return first;
+}
+
+function findGruposByIdsQuery(client: SupabaseClient, grupoIds: string[], empresaId: string) {
+  return client
+    .from('complemento_grupos')
+    .select('*')
+    .in('id', grupoIds)
+    .eq('empresa_id', empresaId)
+    .order('orden', { ascending: true });
+}
+
+async function findGruposByIdsConRetry(client: SupabaseClient, grupoIds: string[], empresaId: string) {
+  const first = await findGruposByIdsQuery(client, grupoIds, empresaId);
+  if (first.error && TRANSIENT_ERROR_PATTERN.test(first.error.message)) {
+    return findGruposByIdsQuery(client, grupoIds, empresaId);
+  }
+  return first;
+}
+
+function findOpcionesQuery(client: SupabaseClient, grupoIds: string[]) {
+  return client
+    .from('complemento_opciones')
+    .select('*')
+    .in('grupo_id', grupoIds)
+    .eq('activo', true)
+    .order('orden', { ascending: true });
+}
+
+async function findOpcionesConRetry(client: SupabaseClient, grupoIds: string[]) {
+  const first = await findOpcionesQuery(client, grupoIds);
+  if (first.error && TRANSIENT_ERROR_PATTERN.test(first.error.message)) {
+    return findOpcionesQuery(client, grupoIds);
+  }
+  return first;
+}
+
 export class SupabaseComplementoGrupoRepository implements IComplementoGrupoRepository {
   constructor(private readonly supabase: SupabaseClient) {}
 
@@ -43,11 +101,7 @@ export class SupabaseComplementoGrupoRepository implements IComplementoGrupoRepo
 
   async findAllByTenant(empresaId: string): Promise<Result<ComplementoGrupo[]>> {
     try {
-      const { data: grupos, error: gErr } = await this.supabase
-        .from('complemento_grupos')
-        .select('*')
-        .eq('empresa_id', empresaId)
-        .order('orden', { ascending: true });
+      const { data: grupos, error: gErr } = await findGruposConRetry(this.supabase, empresaId);
 
       if (gErr) {
         await logger.logAndReturnError('DB_SELECT_ERROR', gErr.message, 'repository', 'SupabaseComplementoGrupoRepository.findAllByTenant', { empresaId });
@@ -57,12 +111,7 @@ export class SupabaseComplementoGrupoRepository implements IComplementoGrupoRepo
       if (!grupos || grupos.length === 0) return { success: true, data: [] };
 
       const grupoIds = (grupos as Record<string, unknown>[]).map(g => g.id as string);
-      const { data: opciones, error: oErr } = await this.supabase
-        .from('complemento_opciones')
-        .select('*')
-        .in('grupo_id', grupoIds)
-        .eq('activo', true)
-        .order('orden', { ascending: true });
+      const { data: opciones, error: oErr } = await findOpcionesConRetry(this.supabase, grupoIds);
 
       if (oErr) {
         await logger.logAndReturnError('DB_SELECT_ERROR', oErr.message, 'repository', 'SupabaseComplementoGrupoRepository.findAllByTenant.opciones', { empresaId });
@@ -92,12 +141,7 @@ export class SupabaseComplementoGrupoRepository implements IComplementoGrupoRepo
     try {
       if (grupoIds.length === 0) return { success: true, data: [] };
 
-      const { data: grupos, error: gErr } = await this.supabase
-        .from('complemento_grupos')
-        .select('*')
-        .in('id', grupoIds)
-        .eq('empresa_id', empresaId)
-        .order('orden', { ascending: true });
+      const { data: grupos, error: gErr } = await findGruposByIdsConRetry(this.supabase, grupoIds, empresaId);
 
       if (gErr) {
         await logger.logAndReturnError('DB_SELECT_ERROR', gErr.message, 'repository', 'SupabaseComplementoGrupoRepository.findByIds', { details: { grupoIds } });
@@ -106,12 +150,7 @@ export class SupabaseComplementoGrupoRepository implements IComplementoGrupoRepo
 
       if (!grupos || grupos.length === 0) return { success: true, data: [] };
 
-      const { data: opciones, error: oErr } = await this.supabase
-        .from('complemento_opciones')
-        .select('*')
-        .in('grupo_id', grupoIds)
-        .eq('activo', true)
-        .order('orden', { ascending: true });
+      const { data: opciones, error: oErr } = await findOpcionesConRetry(this.supabase, grupoIds);
 
       if (oErr) {
         await logger.logAndReturnError('DB_SELECT_ERROR', oErr.message, 'repository', 'SupabaseComplementoGrupoRepository.findByIds.opciones', { details: { grupoIds } });

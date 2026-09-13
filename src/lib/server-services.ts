@@ -54,11 +54,32 @@ export function extractMainDomain(fullDomain: string, subdomainConfig: string | 
 /**
  * Returns the public menu for an empresa, cached in Vercel's data cache.
  * TTL: 1 hour. Busted by revalidateTag(catalogTag(empresaId)) on mutations.
+ *
+ * `unstable_cache` cachea lo que la funcion RESUELVE, no solo lo que
+ * "tiene sentido" cachear — solo se salta el cacheo si la funcion lanza.
+ * `GetMenuUseCase.execute` devuelve `{ error }` como valor normal ante un
+ * fallo transitorio de PostgREST, asi que sin el `throw` de abajo ese error
+ * quedaba congelado como resultado cacheado durante los 3600s completos (o
+ * hasta el proximo revalidateTag), afectando a TODOS los dominios de la
+ * empresa por igual — la key es `catalogTag(empresaId)`, no por dominio (ver
+ * Sentry ca345ef3d53744ecb20dd05c7a578ed1, 2026-09-12: mismo empresa_id,
+ * mismo minuto de ventana, dominio distinto al del fallo original 30min
+ * antes). El try/catch de aqui devuelve el mismo shape `{ error }` de
+ * siempre para no romper el contrato de los callers (`page.tsx`,
+ * `api/waiter/catalog`).
  */
-export function getCachedMenu(empresaId: string) {
-  return unstable_cache(
-    async () => getMenuUseCase().execute(empresaId),
-    [catalogTag(empresaId)],
-    { tags: [catalogTag(empresaId)], revalidate: 3600 }
-  )();
+export async function getCachedMenu(empresaId: string) {
+  try {
+    return await unstable_cache(
+      async () => {
+        const result = await getMenuUseCase().execute(empresaId);
+        if (result.error) throw new Error(result.error);
+        return result;
+      },
+      [catalogTag(empresaId)],
+      { tags: [catalogTag(empresaId)], revalidate: 3600 }
+    )();
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
 }

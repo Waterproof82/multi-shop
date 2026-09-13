@@ -3,6 +3,30 @@ import { IProductRepository, CreateProductData, UpdateProductData } from "@/core
 import { Product, Result } from "@/core/domain/entities/types";
 import { logger } from "../logging/logger";
 
+// PostgREST (Warp) mata hilos por su propio timeout de pool con ruido de
+// fondo constante, sin que sea un incidente real de carga (ver Sentry
+// 329c2bc182a648458a742db51bd180af, mismo patron que en
+// SupabaseCategoryRepository.findAllByTenant, llamada hermana en el mismo
+// GetMenuUseCase). Al ser un SELECT sin efectos secundarios, un unico retry
+// inmediato es seguro sin necesidad de analizar idempotencia.
+const TRANSIENT_ERROR_PATTERN = /timeout|gateway/i;
+
+function findAllByTenantQuery(client: SupabaseClient, empresaId: string) {
+  return client
+    .from("productos")
+    .select("*")
+    .eq("empresa_id", empresaId)
+    .order("created_at", { ascending: false });
+}
+
+async function findAllByTenantConRetry(client: SupabaseClient, empresaId: string) {
+  const first = await findAllByTenantQuery(client, empresaId);
+  if (first.error && TRANSIENT_ERROR_PATTERN.test(first.error.message)) {
+    return findAllByTenantQuery(client, empresaId);
+  }
+  return first;
+}
+
 export class SupabaseProductRepository implements IProductRepository {
   constructor(private readonly supabase: SupabaseClient) {}
 
@@ -141,11 +165,7 @@ export class SupabaseProductRepository implements IProductRepository {
 
   async findAllByTenant(empresaId: string): Promise<Result<Product[]>> {
     try {
-      const { data, error } = await this.supabase
-        .from("productos")
-        .select("*")
-        .eq("empresa_id", empresaId)
-        .order("created_at", { ascending: false });
+      const { data, error } = await findAllByTenantConRetry(this.supabase, empresaId);
 
       if (error) {
         await logger.logAndReturnError(
