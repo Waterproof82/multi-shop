@@ -318,3 +318,22 @@ export interface ValoracionStats {
   total: number;
   distribucion: Record<string, number>;
 }
+
+export interface ModalidadEntrega {
+  id: string;
+  empresaId: string;
+  tipo: 'recogida' | 'domicilio';
+  icono: string;
+  nombre: string;
+  translations?: {
+    en?: string;
+    fr?: string;
+    it?: string;
+    de?: string;
+  };
+  precioCents: number;
+  tiempoMinMinutos: number | null;
+  tiempoMaxMinutos: number | null;
+  activo: boolean;
+  orden: number;
+}
