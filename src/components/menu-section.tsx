@@ -122,7 +122,7 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
 
       {subcategoriasVisibles.length > 0 ? (
         <div className="space-y-8">
-          {subcategoriasVisibles.map((subcat) => (
+          {subcategoriasVisibles.map((subcat, subIndex) => (
             <SubcategorySection
               key={subcat.id}
               subcategory={subcat}
@@ -134,6 +134,7 @@ export const MenuSection = memo(function MenuSection(props: Readonly<MenuSection
               complementCategoryName={category.complementCategoryName}
               complementCategoryTranslations={category.complementCategoryTranslations}
               hideImages={hideImages}
+              priority={priority && subIndex === 0}
             />
           ))}
         </div>
@@ -195,8 +196,9 @@ const SubcategorySection = memo(function SubcategorySection(props: Readonly<{
   complementCategoryName?: string;
   complementCategoryTranslations?: MenuCategoryVM['complementCategoryTranslations'];
   hideImages?: boolean;
+  priority?: boolean;
 }>) {
-  const { subcategory, translationLang, onItemClick, onDetailClick, showCart, shouldReduceMotion = false, complementCategoryName, complementCategoryTranslations, hideImages = false } = props;
+  const { subcategory, translationLang, onItemClick, onDetailClick, showCart, shouldReduceMotion = false, complementCategoryName, complementCategoryTranslations, hideImages = false, priority = false } = props;
 
   const subContainerVariants = shouldReduceMotion
     ? { hidden: {}, visible: {} }
@@ -234,7 +236,7 @@ const SubcategorySection = memo(function SubcategorySection(props: Readonly<{
         whileInView="visible"
         viewport={{ once: true, margin: "-40px" }}
       >
-        {subcategory.products.map((item) => (
+        {subcategory.products.map((item, index) => (
           <motion.div
             key={item.id}
             variants={subVariants}
@@ -246,6 +248,7 @@ const SubcategorySection = memo(function SubcategorySection(props: Readonly<{
               onItemClick={onItemClick}
               onDetailClick={onDetailClick}
               showCart={showCart}
+              priority={priority && index < 3}
               complementCategoryName={complementCategoryName}
               complementCategoryTranslations={complementCategoryTranslations}
               hideImages={hideImages}
