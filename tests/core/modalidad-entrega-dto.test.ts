@@ -50,4 +50,32 @@ describe('createModalidadEntregaSchema', () => {
     });
     expect(parsed.success).toBe(false);
   });
+
+  it('acepta tiempoMinMinutos igual a tiempoMaxMinutos', () => {
+    const parsed = createModalidadEntregaSchema.safeParse({
+      empresaId: '11111111-1111-1111-8111-111111111111',
+      tipo: 'domicilio',
+      icono: 'bike',
+      nombre_es: 'Envío exprés',
+      precioCents: 500,
+      tiempoMinMinutos: 100,
+      tiempoMaxMinutos: 100,
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it('rechaza recogida con solo tiempoMaxMinutos presente (sin tiempoMinMinutos)', () => {
+    const parsed = createModalidadEntregaSchema.safeParse({
+      empresaId: '11111111-1111-1111-8111-111111111111',
+      tipo: 'recogida',
+      icono: 'store',
+      nombre_es: 'Recogida rápida',
+      precioCents: 0,
+      tiempoMaxMinutos: 10,
+    });
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      expect(parsed.error.issues.some(i => i.path[0] === 'tiempoMaxMinutos')).toBe(true);
+    }
+  });
 });

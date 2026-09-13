@@ -16,10 +16,16 @@ const baseModalidadEntregaSchema = z.object({
 });
 
 export const createModalidadEntregaSchema = baseModalidadEntregaSchema
-  .refine(
-    (data) => data.tipo !== 'recogida' || (data.tiempoMinMinutos === undefined && data.tiempoMaxMinutos === undefined),
-    { message: 'Recogida no admite tiempo estimado (siempre es inmediata)', path: ['tiempoMinMinutos'] }
-  )
+  .superRefine((data, ctx) => {
+    if (data.tipo === 'recogida') {
+      if (data.tiempoMinMinutos !== undefined) {
+        ctx.addIssue({ code: 'custom', message: 'Recogida no admite tiempo estimado (siempre es inmediata)', path: ['tiempoMinMinutos'] });
+      }
+      if (data.tiempoMaxMinutos !== undefined) {
+        ctx.addIssue({ code: 'custom', message: 'Recogida no admite tiempo estimado (siempre es inmediata)', path: ['tiempoMaxMinutos'] });
+      }
+    }
+  })
   .refine(
     (data) => data.tiempoMinMinutos === undefined || data.tiempoMaxMinutos === undefined || data.tiempoMinMinutos <= data.tiempoMaxMinutos,
     { message: 'El tiempo mínimo no puede ser mayor que el máximo', path: ['tiempoMaxMinutos'] }
