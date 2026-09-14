@@ -45,4 +45,34 @@ describe('MapboxAddressInput', () => {
       postalCode: '28001',
     });
   });
+
+  it('llama onInputChange en cada tecla, no solo al seleccionar una sugerencia', async () => {
+    const onSelect = vi.fn();
+    const onInputChange = vi.fn();
+    render(
+      <LanguageProvider>
+        <MapboxAddressInput onSelect={onSelect} onInputChange={onInputChange} />
+      </LanguageProvider>
+    );
+
+    const input = screen.getByRole('textbox');
+
+    fireEvent.change(input, { target: { value: 'C' } });
+    expect(onInputChange).toHaveBeenCalledWith('C');
+
+    fireEvent.change(input, { target: { value: 'Ca' } });
+    expect(onInputChange).toHaveBeenCalledWith('Ca');
+
+    fireEvent.change(input, { target: { value: 'Calle Falsa' } });
+    expect(onInputChange).toHaveBeenCalledWith('Calle Falsa');
+    expect(onInputChange).toHaveBeenCalledTimes(3);
+
+    await vi.advanceTimersByTimeAsync(300);
+    await vi.advanceTimersByTimeAsync(0);
+
+    fireEvent.mouseDown(screen.getByText('Calle Falsa 123, Madrid'));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    // onInputChange no se llama de nuevo al seleccionar una sugerencia
+    expect(onInputChange).toHaveBeenCalledTimes(3);
+  });
 });

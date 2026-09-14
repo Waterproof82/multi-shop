@@ -163,7 +163,11 @@ export function DeliveryMethodSelector({
           </label>
 
           <MapboxAddressInput
-            disabled={disabled}
+            onInputChange={() => {
+              setSelectedAddress('');
+              setEstimatedFeeCents(null);
+              setFeeError(null);
+            }}
             onSelect={({ address, latitude, longitude, postalCode }) => {
               setSelectedAddress(address);
               setSelectedLatitude(latitude);

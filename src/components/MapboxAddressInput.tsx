@@ -21,10 +21,11 @@ const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? '';
 
 interface MapboxAddressInputProps {
   onSelect: (address: SelectedAddress) => void;
+  onInputChange?: (value: string) => void;
   disabled?: boolean;
 }
 
-export function MapboxAddressInput({ onSelect, disabled }: Readonly<MapboxAddressInputProps>) {
+export function MapboxAddressInput({ onSelect, onInputChange, disabled }: Readonly<MapboxAddressInputProps>) {
   const { language } = useLanguage();
   const [inputValue, setInputValue] = useState('');
   const [suggestions, setSuggestions] = useState<GeocodingFeature[]>([]);
@@ -33,6 +34,7 @@ export function MapboxAddressInput({ onSelect, disabled }: Readonly<MapboxAddres
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const q = e.target.value;
     setInputValue(q);
+    onInputChange?.(q);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (q.length < 3) { setSuggestions([]); return; }
     debounceRef.current = setTimeout(async () => {
@@ -44,7 +46,7 @@ export function MapboxAddressInput({ onSelect, disabled }: Readonly<MapboxAddres
         setSuggestions(data.features ?? []);
       } catch { /* silent */ }
     }, 300);
-  }, []);
+  }, [onInputChange]);
 
   const handleSelectSuggestion = useCallback((feature: GeocodingFeature) => {
     const [lng, lat] = feature.geometry.coordinates;
