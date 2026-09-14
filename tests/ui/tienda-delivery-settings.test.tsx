@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { LanguageProvider } from '@/lib/language-context';
 import { TiendaDeliverySettings } from '@/components/admin/TiendaDeliverySettings';
 import type { ModalidadEntregaRow } from '@/components/admin/ModalidadesEntregaForm';
@@ -75,5 +75,36 @@ describe('TiendaDeliverySettings', () => {
 
     expect(screen.queryByText('Recogida rápida')).not.toBeInTheDocument();
     expect(screen.getByText('Envío estándar')).toBeInTheDocument();
+  });
+
+  it('togglear recogida llama a fetchWithCsrf con el PUT correcto', async () => {
+    fetchWithCsrf.mockResolvedValue({ ok: true } as Response);
+    renderComponent(false, false);
+
+    const switchRecogida = screen.getByRole('switch', { name: /recogida en tienda/i });
+    fireEvent.click(switchRecogida);
+
+    await waitFor(() => {
+      expect(fetchWithCsrf).toHaveBeenCalledWith('/api/admin/empresa', {
+        method: 'PUT',
+        body: JSON.stringify({ recogida_tienda_habilitada: true }),
+      });
+    });
+  });
+
+  it('revierte el switch y muestra error si el PUT falla', async () => {
+    fetchWithCsrf.mockResolvedValue({
+      ok: false,
+      json: async () => ({ error: 'No se pudo guardar' }),
+    } as Response);
+    renderComponent(false, false);
+
+    const switchRecogida = screen.getByRole('switch', { name: /recogida en tienda/i });
+    fireEvent.click(switchRecogida);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('No se pudo guardar');
+    });
+    expect(switchRecogida).toHaveAttribute('aria-checked', 'false');
   });
 });

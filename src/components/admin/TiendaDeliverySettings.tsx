@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { PillSwitch } from '@/components/ui/pill-switch';
 import { ModalidadesEntregaForm, type ModalidadEntregaRow } from '@/components/admin/ModalidadesEntregaForm';
 import { fetchWithCsrf } from '@/lib/csrf-client';
@@ -36,6 +36,18 @@ async function extraerMensajeError(res: Response, language: Lang): Promise<strin
   return data.error ?? t('errorSaving', language);
 }
 
+function agregarCampo(prev: Set<CampoHabilitado>, campo: CampoHabilitado): Set<CampoHabilitado> {
+  const next = new Set(prev);
+  next.add(campo);
+  return next;
+}
+
+function quitarCampo(prev: Set<CampoHabilitado>, campo: CampoHabilitado): Set<CampoHabilitado> {
+  const next = new Set(prev);
+  next.delete(campo);
+  return next;
+}
+
 export function TiendaDeliverySettings({
   empresaId,
   recogidaHabilitada: recogidaInicial,
@@ -45,87 +57,95 @@ export function TiendaDeliverySettings({
   const { language } = useLanguage();
   const [recogidaHabilitada, setRecogidaHabilitada] = useState(recogidaInicial);
   const [envioHabilitado, setEnvioHabilitado] = useState(envioInicial);
-  const [savingCampo, setSavingCampo] = useState<CampoHabilitado | null>(null);
+  const [savingCampos, setSavingCampos] = useState<Set<CampoHabilitado>>(new Set());
   const [modalidades, setModalidades] = useState<ModalidadEntregaRow[]>(modalidadesIniciales);
   const [feedback, setFeedback] = useState<{ ok: boolean; message: string } | null>(null);
 
-  async function toggleHabilitado(
-    campo: CampoHabilitado,
-    valorActual: boolean,
-    setValor: (v: boolean) => void
-  ) {
-    const nuevoValor = !valorActual;
-    setValor(nuevoValor);
-    setSavingCampo(campo);
-    setFeedback(null);
-    try {
-      const res = await fetchWithCsrf('/api/admin/empresa', {
-        method: 'PUT',
-        body: JSON.stringify({ [campo]: nuevoValor }),
-      });
-      if (!res.ok) {
+  const toggleHabilitado = useCallback(
+    async (campo: CampoHabilitado, valorActual: boolean, setValor: (v: boolean) => void) => {
+      const nuevoValor = !valorActual;
+      setValor(nuevoValor);
+      setSavingCampos((prev) => agregarCampo(prev, campo));
+      setFeedback(null);
+      try {
+        const res = await fetchWithCsrf('/api/admin/empresa', {
+          method: 'PUT',
+          body: JSON.stringify({ [campo]: nuevoValor }),
+        });
+        if (!res.ok) {
+          setValor(valorActual);
+          setFeedback({ ok: false, message: await extraerMensajeError(res, language) });
+        }
+      } catch {
         setValor(valorActual);
-        setFeedback({ ok: false, message: await extraerMensajeError(res, language) });
+        setFeedback({ ok: false, message: t('connectionError', language) });
+      } finally {
+        setSavingCampos((prev) => quitarCampo(prev, campo));
       }
-    } catch {
-      setValor(valorActual);
-      setFeedback({ ok: false, message: t('connectionError', language) });
-    } finally {
-      setSavingCampo(null);
-    }
-  }
+    },
+    [language]
+  );
 
-  async function handleCreate(data: CreateModalidadInput) {
-    setFeedback(null);
-    try {
-      const res = await fetchWithCsrf('/api/admin/modalidades-entrega', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) {
-        setFeedback({ ok: false, message: await extraerMensajeError(res, language) });
-        return;
+  const handleCreate = useCallback(
+    async (data: CreateModalidadInput) => {
+      setFeedback(null);
+      try {
+        const res = await fetchWithCsrf('/api/admin/modalidades-entrega', {
+          method: 'POST',
+          body: JSON.stringify(data),
+        });
+        if (!res.ok) {
+          setFeedback({ ok: false, message: await extraerMensajeError(res, language) });
+          return;
+        }
+        const creada = (await res.json()) as ModalidadEntregaRow;
+        setModalidades((prev) => [...prev, creada]);
+      } catch {
+        setFeedback({ ok: false, message: t('connectionError', language) });
       }
-      const creada = (await res.json()) as ModalidadEntregaRow;
-      setModalidades((prev) => [...prev, creada]);
-    } catch {
-      setFeedback({ ok: false, message: t('connectionError', language) });
-    }
-  }
+    },
+    [language]
+  );
 
-  async function handleUpdate(id: string, data: Partial<ModalidadEntregaRow>) {
-    setFeedback(null);
-    try {
-      const res = await fetchWithCsrf(`/api/admin/modalidades-entrega?id=${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) {
-        setFeedback({ ok: false, message: await extraerMensajeError(res, language) });
-        return;
+  const handleUpdate = useCallback(
+    async (id: string, data: Partial<ModalidadEntregaRow>) => {
+      setFeedback(null);
+      try {
+        const res = await fetchWithCsrf(`/api/admin/modalidades-entrega?id=${id}`, {
+          method: 'PUT',
+          body: JSON.stringify(data),
+        });
+        if (!res.ok) {
+          setFeedback({ ok: false, message: await extraerMensajeError(res, language) });
+          return;
+        }
+        const actualizada = (await res.json()) as ModalidadEntregaRow;
+        setModalidades((prev) => prev.map((m) => (m.id === id ? actualizada : m)));
+      } catch {
+        setFeedback({ ok: false, message: t('connectionError', language) });
       }
-      const actualizada = (await res.json()) as ModalidadEntregaRow;
-      setModalidades((prev) => prev.map((m) => (m.id === id ? actualizada : m)));
-    } catch {
-      setFeedback({ ok: false, message: t('connectionError', language) });
-    }
-  }
+    },
+    [language]
+  );
 
-  async function handleDelete(id: string) {
-    setFeedback(null);
-    try {
-      const res = await fetchWithCsrf(`/api/admin/modalidades-entrega?id=${id}`, {
-        method: 'DELETE',
-      });
-      if (!res.ok) {
-        setFeedback({ ok: false, message: await extraerMensajeError(res, language) });
-        return;
+  const handleDelete = useCallback(
+    async (id: string) => {
+      setFeedback(null);
+      try {
+        const res = await fetchWithCsrf(`/api/admin/modalidades-entrega?id=${id}`, {
+          method: 'DELETE',
+        });
+        if (!res.ok) {
+          setFeedback({ ok: false, message: await extraerMensajeError(res, language) });
+          return;
+        }
+        setModalidades((prev) => prev.filter((m) => m.id !== id));
+      } catch {
+        setFeedback({ ok: false, message: t('connectionError', language) });
       }
-      setModalidades((prev) => prev.filter((m) => m.id !== id));
-    } catch {
-      setFeedback({ ok: false, message: t('connectionError', language) });
-    }
-  }
+    },
+    [language]
+  );
 
   return (
     <div className="space-y-10" data-empresa-id={empresaId}>
@@ -136,7 +156,7 @@ export function TiendaDeliverySettings({
             <span className="text-sm font-medium text-foreground">{t('tiendaRecogidaLabel', language)}</span>
             <PillSwitch
               checked={recogidaHabilitada}
-              disabled={savingCampo === 'recogida_tienda_habilitada'}
+              disabled={savingCampos.has('recogida_tienda_habilitada')}
               onChange={() =>
                 toggleHabilitado('recogida_tienda_habilitada', recogidaHabilitada, setRecogidaHabilitada)
               }
@@ -147,7 +167,7 @@ export function TiendaDeliverySettings({
             <span className="text-sm font-medium text-foreground">{t('tiendaEnvioLabel', language)}</span>
             <PillSwitch
               checked={envioHabilitado}
-              disabled={savingCampo === 'envio_domicilio_habilitado'}
+              disabled={savingCampos.has('envio_domicilio_habilitado')}
               onChange={() =>
                 toggleHabilitado('envio_domicilio_habilitado', envioHabilitado, setEnvioHabilitado)
               }
