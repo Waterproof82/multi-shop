@@ -1407,6 +1407,25 @@ git commit -m "refactor(delivery): extraer MapboxAddressInput de DeliveryMethodS
 - Modify: `src/lib/server-services.ts` (agregar función hermana de `getCachedMenu`)
 - Test: `tests/compliance/modalidades-entrega-catalogo-publico.test.ts`
 
+> **Nota de seguridad verificada durante Task 4 review — NO requiere migración nueva.**
+> Un revisor de código preguntó si `getModalidadEntregaUseCase()` (Task 6, wired con
+> `getSupabaseClient()` = service role) puede servir el catálogo público, dado que
+> `modalidades_entrega` tiene RLS `RESTRICTIVE` deny-all para `anon` (Task 1) y NO está
+> en la whitelist de "Lecturas públicas" que sí tienen `categorias`/`productos`/`empresas`
+> (`docs/context/security.md` §"Lecturas públicas": esas 3 tablas tienen SELECT
+> `qual=true` para `anon`, `modalidades_entrega` no).
+>
+> Verificado contra el precedente real más cercano: `getComplementoGrupoRepository()`
+> (`src/core/infrastructure/database/index.ts:106-108`) usa `getSupabaseClient()`
+> (service role) y ya alimenta HOY el mismo `getMenuUseCase()` público que renderiza
+> `page.tsx` para visitantes anónimos — service role bypasea RLS por completo, así que
+> el RESTRICTIVE-deny-anon de la Task 1 nunca se evalúa en este camino. El aislamiento
+> de tenant lo da el `.eq("empresa_id", empresaId)` explícito en la query del
+> repositorio (Task 4), no RLS — mismo nivel de seguridad que `complemento_grupos`.
+>
+> **Conclusión: reutilizar `getModalidadEntregaUseCase()` de Task 6 tal cual está
+> diseñado más abajo (Step 3). No agregar ninguna policy `TO anon` nueva.**
+
 - [ ] **Step 1: Escribir el test de compliance (falla primero)**
 
 ```typescript
