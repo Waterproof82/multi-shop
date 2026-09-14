@@ -21,11 +21,11 @@ export interface ModalidadEntregaRow {
 }
 
 const ICONOS_DISPONIBLES = [
-  { value: 'store', label: '🏪 Tienda' },
-  { value: 'bike', label: '🚲 Bici' },
-  { value: 'car', label: '🚗 Auto' },
-  { value: 'package', label: '📦 Paquete' },
-  { value: 'clock', label: '⏱️ Reloj' },
+  { value: 'store', emoji: '🏪', labelKey: 'deliveryModalityIconStore' },
+  { value: 'bike', emoji: '🚲', labelKey: 'deliveryModalityIconBike' },
+  { value: 'car', emoji: '🚗', labelKey: 'deliveryModalityIconCar' },
+  { value: 'package', emoji: '📦', labelKey: 'deliveryModalityIconPackage' },
+  { value: 'clock', emoji: '⏱️', labelKey: 'deliveryModalityIconClock' },
 ] as const;
 
 interface ModalidadesEntregaFormProps {
@@ -85,13 +85,13 @@ export function ModalidadesEntregaForm({
         {filteredModalidades.map((m) => (
           <li key={m.id} className="flex items-center gap-3 rounded-lg border border-border p-3">
             <span className="text-lg">
-              {ICONOS_DISPONIBLES.find((i) => i.value === m.icono)?.label.split(' ')[0]}
+              {ICONOS_DISPONIBLES.find((i) => i.value === m.icono)?.emoji}
             </span>
             <span className="flex-1 font-medium">{m.nombre}</span>
             <span className="text-sm text-muted-foreground">{(m.precioCents / 100).toFixed(2)}€</span>
             {tipo === 'domicilio' && m.tiempoMinMinutos !== null && (
               <span className="text-sm text-muted-foreground">
-                {m.tiempoMinMinutos}-{m.tiempoMaxMinutos} min
+                {m.tiempoMinMinutos}-{m.tiempoMaxMinutos} {t('deliveryModalityMinutesUnit', language)}
               </span>
             )}
             <Button
@@ -128,7 +128,7 @@ export function ModalidadesEntregaForm({
             <SelectContent>
               {ICONOS_DISPONIBLES.map((i) => (
                 <SelectItem key={i.value} value={i.value}>
-                  {i.label}
+                  {i.emoji} {t(i.labelKey, language)}
                 </SelectItem>
               ))}
             </SelectContent>
