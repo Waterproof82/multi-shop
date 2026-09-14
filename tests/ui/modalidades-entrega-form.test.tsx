@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { LanguageProvider } from '@/lib/language-context';
-import { ModalidadesEntregaForm } from '@/components/admin/ModalidadesEntregaForm';
+import { ModalidadesEntregaForm, type ModalidadEntregaRow } from '@/components/admin/ModalidadesEntregaForm';
 
 const modalidadRecogida = {
   id: 'm1',
@@ -17,7 +17,7 @@ const modalidadRecogida = {
 
 function renderForm(
   tipo: 'recogida' | 'domicilio',
-  modalidades: any[] = [],
+  modalidades: ModalidadEntregaRow[] = [],
   onCreate = vi.fn(),
   onUpdate = vi.fn(),
   onDelete = vi.fn()
@@ -90,5 +90,20 @@ describe('ModalidadesEntregaForm', () => {
         tiempoMaxMinutos: 180,
       })
     );
+  });
+
+  it('llama a onUpdate para alternar activo al hacer click en el botón de activar/desactivar', () => {
+    const onUpdate = vi.fn();
+    const modalidadActiva = { ...modalidadRecogida, activo: true };
+    renderForm('recogida', [modalidadActiva], vi.fn(), onUpdate);
+    fireEvent.click(screen.getByRole('button', { name: /desactivar/i }));
+    expect(onUpdate).toHaveBeenCalledWith('m1', { activo: false });
+  });
+
+  it('llama a onDelete al hacer click en el botón de borrar', () => {
+    const onDelete = vi.fn();
+    renderForm('recogida', [modalidadRecogida], vi.fn(), vi.fn(), onDelete);
+    fireEvent.click(screen.getByRole('button', { name: /borrar modalidad/i }));
+    expect(onDelete).toHaveBeenCalledWith('m1');
   });
 });
