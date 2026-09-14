@@ -3,10 +3,10 @@ import { ModalidadEntrega, Result } from "@/core/domain/entities/types";
 import { CreateModalidadEntregaDTO, UpdateModalidadEntregaDTO } from "@/core/application/dtos/modalidad-entrega.dto";
 import { logger } from "@/core/infrastructure/logging/logger";
 
-function propagarError<T>(result: { success: false; error: { code: string; message: string; details?: unknown } }, method: string): Result<T> {
+function propagarError<T>(result: { success: false; error: { code: string; message: string; details?: Record<string, unknown> } }, method: string): Result<T> {
   return {
     success: false,
-    error: { code: result.error.code, message: result.error.message, module: 'use-case', method, details: result.error.details as Record<string, unknown> | undefined },
+    error: { code: result.error.code, message: result.error.message, module: 'use-case', method, details: result.error.details },
   };
 }
 
