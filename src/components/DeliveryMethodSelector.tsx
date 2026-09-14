@@ -1,17 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { MapPin, Store } from 'lucide-react';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
-
-interface GeocodingFeature {
-  place_name: string;
-  geometry: { coordinates: [number, number] };
-  context?: { id: string; text: string }[];
-}
-
-const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? '';
+import { MapboxAddressInput } from './MapboxAddressInput';
 
 interface DeliveryData {
   address: string;
@@ -39,8 +32,6 @@ export function DeliveryMethodSelector({
 }: Readonly<DeliveryMethodSelectorProps>) {
   const { language } = useLanguage();
 
-  const [inputValue, setInputValue] = useState('');
-  const [suggestions, setSuggestions] = useState<GeocodingFeature[]>([]);
   const [selectedAddress, setSelectedAddress] = useState('');
   const [selectedLatitude, setSelectedLatitude] = useState<number | null>(null);
   const [selectedLongitude, setSelectedLongitude] = useState<number | null>(null);
@@ -48,7 +39,6 @@ export function DeliveryMethodSelector({
   const [estimatedFeeCents, setEstimatedFeeCents] = useState<number | null>(null);
   const [loadingFee, setLoadingFee] = useState(false);
   const [feeError, setFeeError] = useState<string | null>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Auto-select recogida when it's the only available method
   useEffect(() => {
@@ -60,8 +50,6 @@ export function DeliveryMethodSelector({
   // Clear state when method changes away from delivery
   useEffect(() => {
     if (value !== 'delivery') {
-      setInputValue('');
-      setSuggestions([]);
       setSelectedAddress('');
       setSelectedLatitude(null);
       setSelectedLongitude(null);
@@ -70,38 +58,6 @@ export function DeliveryMethodSelector({
       setFeeError(null);
     }
   }, [value]);
-
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const q = e.target.value;
-    setInputValue(q);
-    setSelectedAddress('');
-    setEstimatedFeeCents(null);
-    setFeeError(null);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (q.length < 3) { setSuggestions([]); return; }
-    debounceRef.current = setTimeout(async () => {
-      try {
-        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?access_token=${MAPBOX_TOKEN}&country=ES&types=address&language=es&limit=5`;
-        const res = await fetch(url);
-        if (!res.ok) return;
-        const data = await res.json() as { features: GeocodingFeature[] };
-        setSuggestions(data.features ?? []);
-      } catch { /* silent */ }
-    }, 300);
-  }, []);
-
-  const handleSelectSuggestion = useCallback((feature: GeocodingFeature) => {
-    const [lng, lat] = feature.geometry.coordinates;
-    const postalCode = feature.context?.find((c) => c.id.startsWith('postcode'))?.text ?? '';
-    setInputValue(feature.place_name);
-    setSelectedAddress(feature.place_name);
-    setSelectedLatitude(lat);
-    setSelectedLongitude(lng);
-    setSelectedPostalCode(postalCode);
-    setSuggestions([]);
-    setEstimatedFeeCents(null);
-    setFeeError(null);
-  }, []);
 
   const handleFetchFee = useCallback(async () => {
     if (selectedLatitude === null || selectedLongitude === null || !selectedAddress) return;
@@ -206,31 +162,17 @@ export function DeliveryMethodSelector({
             {t('deliveryAddress', language)}
           </label>
 
-          <div className="relative">
-            <input
-              type="text"
-              value={inputValue}
-              onChange={handleInputChange}
-              placeholder={t('deliveryAddressPlaceholder', language)}
-              className="min-h-[44px] w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              autoComplete="off"
-            />
-            {suggestions.length > 0 && (
-              <ul className="absolute left-0 right-0 top-full mt-1 z-[200] rounded-lg border border-border bg-popover shadow-lg overflow-hidden">
-                {suggestions.map((s) => (
-                  <li key={s.place_name}>
-                    <button
-                      type="button"
-                      className="w-full text-left px-3 py-2 text-sm text-popover-foreground hover:bg-muted transition-colors"
-                      onMouseDown={(e) => { e.preventDefault(); handleSelectSuggestion(s); }}
-                    >
-                      {s.place_name}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <MapboxAddressInput
+            disabled={disabled}
+            onSelect={({ address, latitude, longitude, postalCode }) => {
+              setSelectedAddress(address);
+              setSelectedLatitude(latitude);
+              setSelectedLongitude(longitude);
+              setSelectedPostalCode(postalCode);
+              setEstimatedFeeCents(null);
+              setFeeError(null);
+            }}
+          />
 
           {feeError && (
             <p role="alert" className="text-xs text-destructive">
