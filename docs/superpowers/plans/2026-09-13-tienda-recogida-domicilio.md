@@ -1545,6 +1545,22 @@ git commit -m "feat(menu): exponer modalidades de entrega activas en el catalogo
 - Create: `src/components/TiendaFulfillmentSelector.tsx`
 - Test: `tests/ui/tienda-fulfillment-selector.test.tsx`
 
+> **Nota de la review final de Task 11** (no bloqueante, pero aplicá el patrón
+> corregido, no el original): al pasarle `onInputChange`/`onSelect` a
+> `MapboxAddressInput`, envolvé ambos callbacks en `useCallback` en
+> `TiendaFulfillmentSelector` (con sus dependencias reales) — `DeliveryMethodSelector`
+> los pasa como lambdas inline nuevas en cada render, que funciona porque el
+> debounce interno de `MapboxAddressInput` usa un `useRef` (no depende de la
+> identidad del callback), pero no vale la pena copiar ese detalle mientras se
+> pueda evitar en un componente nuevo.
+>
+> También: `MapboxAddressInput.tsx` en sí (y `DeliveryMethodSelector.tsx`, que
+> nunca tuvo test) no tienen cobertura de integración a nivel del padre — si
+> este componente termina siendo más complejo que `DeliveryMethodSelector` en
+> el uso del input de dirección, vale la pena agregar al menos un test que
+> ejercite `TiendaFulfillmentSelector` completo con la dirección, no solo
+> `MapboxAddressInput` aislado.
+
 - [ ] **Step 1: Escribir los tests de las reglas de visibilidad (fallan primero)**
 
 ```typescript
