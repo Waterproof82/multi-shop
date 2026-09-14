@@ -153,6 +153,9 @@ export interface IPedidoRepository {
       latitude_entrega?: number;
       longitude_entrega?: number;
       estimated_delivery_fee_cents?: number;
+      modalidad_entrega_id?: string;
+      modalidad_entrega_tipo?: string;
+      modalidad_entrega_precio_cents?: number;
     },
     idempotency?: { key: string; fingerprint: string }
   ): Promise<Result<{ id: string; numero_pedido: number; total: number; trackingToken?: string }>>;

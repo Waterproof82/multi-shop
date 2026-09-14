@@ -3,6 +3,7 @@ import { IClienteRepository } from "@/core/domain/repositories/IClienteRepositor
 import { IProductRepository } from "@/core/domain/repositories/IProductRepository";
 import { ICodigoDescuentoRepository } from "@/core/domain/repositories/ICodigoDescuentoRepository";
 import { IMesaSesionRepository } from "@/core/domain/repositories/IMesaSesionRepository";
+import { ModalidadEntregaUseCase } from "@/core/application/use-cases/modalidad-entrega.use-case";
 import { AppError, Pedido, Result } from "@/core/domain/entities/types";
 import { logger } from "@/core/infrastructure/logging/logger";
 import { IDEMPOTENCY_REPLAY_CODE } from "@/core/domain/constants/pedido";
@@ -47,6 +48,11 @@ export interface CreatePedidoDTO {
   latitude_entrega?: number;
   longitude_entrega?: number;
   estimated_delivery_fee_cents?: number;
+  // Modalidad de entrega (tienda). El `tipo` de aquí es solo lo que dice el
+  // cliente — nunca se persiste tal cual, PedidoUseCase.create lo revalida
+  // contra la DB vía ModalidadEntregaUseCase.validarPrecioVigente.
+  modalidad_entrega_id?: string;
+  modalidad_entrega_tipo?: 'recogida' | 'domicilio';
 }
 
 export interface CreateMesaPedidoDTO {
@@ -99,7 +105,8 @@ export class PedidoUseCase {
     private readonly clienteRepo: IClienteRepository,
     private readonly productRepo: IProductRepository,
     private readonly descuentoRepo: ICodigoDescuentoRepository,
-    private readonly mesaSesionRepo: IMesaSesionRepository
+    private readonly mesaSesionRepo: IMesaSesionRepository,
+    private readonly modalidadEntregaUseCase: ModalidadEntregaUseCase
   ) {}
 
   /**
@@ -348,20 +355,27 @@ export class PedidoUseCase {
     serverTotal: number,
     isDelivery: boolean,
     deliveryFeeCents: number | undefined,
-    discountData?: { applied: true; finalTotal: number } | { applied: false }
+    discountData?: { applied: true; finalTotal: number } | { applied: false },
+    modalidadPrecioCents = 0
   ): number {
     let total = serverTotal;
-    
+
     // Apply discount first
     if (discountData?.applied) {
       total = discountData.finalTotal;
     }
-    
+
     // Add delivery fee
     if (isDelivery && deliveryFeeCents) {
       total = Math.round((total * 100 + deliveryFeeCents)) / 100;
     }
-    
+
+    // Add modalidad de entrega price (tienda) — precioCents ya viene revalidado
+    // server-side (ver Step 2.5 en create()), nunca del cliente.
+    if (modalidadPrecioCents > 0) {
+      total = Math.round((total * 100 + modalidadPrecioCents)) / 100;
+    }
+
     return total;
   }
 
@@ -435,6 +449,36 @@ export class PedidoUseCase {
         latitude_entrega: data.latitude_entrega,
         longitude_entrega: data.longitude_entrega,
         estimated_delivery_fee_cents: data.estimated_delivery_fee_cents,
+      } : {}),
+    };
+  }
+
+  /**
+   * Payload de persistencia para la modalidad de entrega (tienda).
+   *
+   * `modalidadTipoValidado` es el `tipo` devuelto por
+   * `ModalidadEntregaUseCase.validarPrecioVigente` — NUNCA
+   * `data.modalidad_entrega_tipo` (lo que manda el cliente). Un cliente podría
+   * mandar `tipo: 'recogida'` para una modalidad que en la DB es 'domicilio' e
+   * intentar así que el pedido se guarde sin dirección de envío. Usar el
+   * validado en ambos lugares (el campo persistido y la condición que decide
+   * si se incluye la dirección) cierra ese vector.
+   */
+  private buildModalidadPayload(
+    data: CreatePedidoDTO,
+    modalidadTipoValidado: 'recogida' | 'domicilio' | undefined,
+    modalidadPrecioCents: number
+  ) {
+    if (!data.modalidad_entrega_id || !modalidadTipoValidado) return undefined;
+    return {
+      modalidad_entrega_id: data.modalidad_entrega_id,
+      modalidad_entrega_tipo: modalidadTipoValidado,
+      modalidad_entrega_precio_cents: modalidadPrecioCents,
+      ...(modalidadTipoValidado === 'domicilio' ? {
+        direccion_entrega: data.direccion_entrega,
+        codigo_postal: data.codigo_postal,
+        latitude_entrega: data.latitude_entrega,
+        longitude_entrega: data.longitude_entrega,
       } : {}),
     };
   }
@@ -568,6 +612,20 @@ export class PedidoUseCase {
         return { success: false, error: priceResult.error };
       }
 
+      // Step 2.5: revalidar precio y tipo de la modalidad de entrega (tienda)
+      // ANTES de calcular el total — nunca confiar en el precio/tipo que
+      // manda el cliente (ver PedidoUseCase.buildModalidadPayload).
+      let modalidadPrecioCents = 0;
+      let modalidadTipoValidado: 'recogida' | 'domicilio' | undefined;
+      if (data.modalidad_entrega_id) {
+        const modalidadResult = await this.modalidadEntregaUseCase.validarPrecioVigente(data.modalidad_entrega_id, empresaId);
+        if (!modalidadResult.success) {
+          return { success: false, error: modalidadResult.error };
+        }
+        modalidadPrecioCents = modalidadResult.data.precioCents;
+        modalidadTipoValidado = modalidadResult.data.tipo;
+      }
+
       // Step 3: Apply discount if provided
       let finalTotal = priceResult.data.serverTotal;
       let discountData: { codigoDescuentoId: string; descuentoPorcentaje: number; totalSinDescuento: number } | undefined;
@@ -598,7 +656,8 @@ export class PedidoUseCase {
         priceResult.data.serverTotal,
         isDelivery,
         data.estimated_delivery_fee_cents,
-        discountData ? { applied: true, finalTotal } : { applied: false }
+        discountData ? { applied: true, finalTotal } : { applied: false },
+        modalidadPrecioCents
       );
       const trackingToken = this.shouldGenerateTrackingToken(empresaTipo, esPedidos, isDelivery)
         ? crypto.randomUUID()
@@ -613,7 +672,7 @@ export class PedidoUseCase {
         finalTotal,
         discountData,
         trackingToken,
-        this.buildOrigenPayload(data, isDelivery),
+        { ...this.buildOrigenPayload(data, isDelivery), ...this.buildModalidadPayload(data, modalidadTipoValidado, modalidadPrecioCents) },
         idempotency
       );
       if (!pedidoResult.success) {

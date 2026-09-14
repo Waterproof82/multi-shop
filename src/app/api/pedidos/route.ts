@@ -58,9 +58,18 @@ const defaultPedidoSchema = z.object({
   latitude_entrega: z.number().min(-90).max(90).optional(),
   longitude_entrega: z.number().min(-180).max(180).optional(),
   estimated_delivery_fee_cents: z.number().int().min(0).max(100000).optional(),
+  // Modalidad de entrega (tienda). Nota: NO se acepta un
+  // `modalidad_entrega_precio_cents` del cliente a propósito — el servidor lo
+  // vuelve a leer de la DB en PedidoUseCase.create. Si el cliente lo manda,
+  // Zod lo descarta silenciosamente por no estar en el schema.
+  modalidad_entrega_id: z.uuid().optional(),
+  modalidad_entrega_tipo: z.enum(['recogida', 'domicilio']).optional(),
 }).refine(data => !data.codigoDescuento || (data.email && data.email.length > 0), {
   message: 'Email is required when using a discount code',
   path: ['email'],
+}).refine(data => !data.modalidad_entrega_id || !!data.modalidad_entrega_tipo, {
+  message: 'modalidad_entrega_tipo es requerido junto con modalidad_entrega_id',
+  path: ['modalidad_entrega_tipo'],
 });
 
 // z.discriminatedUnion does not support .refine() in Zod v3 — use z.union instead

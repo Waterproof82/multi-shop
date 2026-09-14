@@ -157,7 +157,8 @@ export function getPedidoUseCase(): PedidoUseCase {
     getClienteRepository(),
     getProductRepository(),
     getDescuentoRepository(),
-    getMesaSesionRepository()
+    getMesaSesionRepository(),
+    getModalidadEntregaUseCase()
   );
   return _pedidoUseCase!;
 }
