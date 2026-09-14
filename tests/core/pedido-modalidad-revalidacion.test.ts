@@ -258,4 +258,63 @@ describe('PedidoUseCase.create — revalidación server-side de la modalidad de 
     expect(payload.direccion_entrega).toBeUndefined();
     expect(payload.codigo_postal).toBeUndefined();
   });
+
+  it('camino positivo: tipo validado domicilio SÍ propaga la dirección que mandó el cliente', async () => {
+    const modalidadEntregaUseCase = {
+      validarPrecioVigente: vi.fn().mockResolvedValue({
+        success: true,
+        data: { precioCents: 350, tipo: 'domicilio' },
+      }),
+    } as unknown as ModalidadEntregaUseCase;
+    const { useCase, pedidoRepoCreate } = buildUseCase(modalidadEntregaUseCase);
+
+    const dto = baseDto({
+      modalidad_entrega_id: 'm3',
+      modalidad_entrega_tipo: 'domicilio',
+      direccion_entrega: 'Calle Falsa 123',
+      codigo_postal: '28001',
+      latitude_entrega: 40.4,
+      longitude_entrega: -3.7,
+    });
+
+    await useCase.create('empresa-1', dto, 'tienda', null, false, false);
+
+    const [, , , , , , payload] = pedidoRepoCreate.mock.calls[0] as [
+      string, string, unknown, number, unknown, unknown, Record<string, unknown>
+    ];
+    expect(payload.modalidad_entrega_tipo).toBe('domicilio');
+    expect(payload.direccion_entrega).toBe('Calle Falsa 123');
+    expect(payload.codigo_postal).toBe('28001');
+    expect(payload.latitude_entrega).toBe(40.4);
+    expect(payload.longitude_entrega).toBe(-3.7);
+  });
+
+  it('NO revalida ni persiste modalidad si la empresa es restaurante, aunque el body mande modalidad_entrega_id', async () => {
+    // Bug real encontrado en la review de Task 16: la revalidación se
+    // disparaba solo por `if (data.modalidad_entrega_id)`, sin chequear
+    // `empresaTipo === 'tienda'`. Las filas de `modalidades_entrega` son
+    // tenant-scoped y hoy solo las crea el admin de tienda, pero nada a nivel
+    // de API lo impedía — si alguna vez una empresa restaurante tuviera una
+    // fila (o el admin CRUD no gateado la creara), el precio de "modalidad"
+    // se sumaría al total de un pedido de restaurante, fuera del sistema
+    // Glovo+Redsys que el diseño declara independiente a propósito.
+    const modalidadEntregaUseCase = {
+      validarPrecioVigente: vi.fn().mockResolvedValue({
+        success: true,
+        data: { precioCents: 999, tipo: 'domicilio' },
+      }),
+    } as unknown as ModalidadEntregaUseCase;
+    const { useCase, pedidoRepoCreate } = buildUseCase(modalidadEntregaUseCase);
+
+    const dto = baseDto({ modalidad_entrega_id: 'm-fuga', modalidad_entrega_tipo: 'domicilio' });
+    const result = await useCase.create('empresa-restaurante', dto, 'restaurante', null, false, false);
+
+    expect(result.success).toBe(true);
+    expect(modalidadEntregaUseCase.validarPrecioVigente).not.toHaveBeenCalled();
+    const [, , , finalTotal, , , payload] = pedidoRepoCreate.mock.calls[0] as [
+      string, string, unknown, number, unknown, unknown, Record<string, unknown> | undefined
+    ];
+    expect(finalTotal).toBeCloseTo(10); // solo el producto, sin los 999cts
+    expect(payload?.modalidad_entrega_id).toBeUndefined();
+  });
 });

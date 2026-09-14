@@ -454,6 +454,36 @@ export class PedidoUseCase {
   }
 
   /**
+   * Revalida contra la DB el precio y tipo de la modalidad de entrega
+   * (tienda) que mandó el cliente — nunca se confía en `data.modalidad_entrega_tipo`
+   * ni en un `modalidad_entrega_precio_cents` (que ni siquiera acepta el
+   * schema Zod de la ruta).
+   *
+   * Gateado por `empresaTipo === 'tienda'`: las modalidades de entrega son un
+   * concepto exclusivo de tienda, deliberadamente independiente del
+   * Glovo+Redsys de restaurante. Sin este gate, un pedido de RESTAURANTE que
+   * incluyera `modalidad_entrega_id` en el body dispararía la misma
+   * revalidación — inofensivo hoy porque la UI de admin solo crea filas de
+   * `modalidades_entrega` para empresas tipo tienda, pero nada a nivel de API
+   * lo impedía. Extraído de `create()` también para bajar su complejidad
+   * cognitiva (S3776, ver docs/context/deuda-complejidad.md).
+   */
+  private async revalidarModalidadEntrega(
+    data: CreatePedidoDTO,
+    empresaId: string,
+    empresaTipo: string
+  ): Promise<Result<{ precioCents: number; tipo: 'recogida' | 'domicilio' | undefined }>> {
+    if (empresaTipo !== 'tienda' || !data.modalidad_entrega_id) {
+      return { success: true, data: { precioCents: 0, tipo: undefined } };
+    }
+    const modalidadResult = await this.modalidadEntregaUseCase.validarPrecioVigente(data.modalidad_entrega_id, empresaId);
+    if (!modalidadResult.success) {
+      return { success: false, error: modalidadResult.error };
+    }
+    return { success: true, data: { precioCents: modalidadResult.data.precioCents, tipo: modalidadResult.data.tipo } };
+  }
+
+  /**
    * Payload de persistencia para la modalidad de entrega (tienda).
    *
    * `modalidadTipoValidado` es el `tipo` devuelto por
@@ -614,17 +644,12 @@ export class PedidoUseCase {
 
       // Step 2.5: revalidar precio y tipo de la modalidad de entrega (tienda)
       // ANTES de calcular el total — nunca confiar en el precio/tipo que
-      // manda el cliente (ver PedidoUseCase.buildModalidadPayload).
-      let modalidadPrecioCents = 0;
-      let modalidadTipoValidado: 'recogida' | 'domicilio' | undefined;
-      if (data.modalidad_entrega_id) {
-        const modalidadResult = await this.modalidadEntregaUseCase.validarPrecioVigente(data.modalidad_entrega_id, empresaId);
-        if (!modalidadResult.success) {
-          return { success: false, error: modalidadResult.error };
-        }
-        modalidadPrecioCents = modalidadResult.data.precioCents;
-        modalidadTipoValidado = modalidadResult.data.tipo;
+      // manda el cliente (ver revalidarModalidadEntrega / buildModalidadPayload).
+      const modalidadResult = await this.revalidarModalidadEntrega(data, empresaId, empresaTipo);
+      if (!modalidadResult.success) {
+        return { success: false, error: modalidadResult.error };
       }
+      const { precioCents: modalidadPrecioCents, tipo: modalidadTipoValidado } = modalidadResult.data;
 
       // Step 3: Apply discount if provided
       let finalTotal = priceResult.data.serverTotal;

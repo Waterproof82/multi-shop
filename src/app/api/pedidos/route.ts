@@ -70,6 +70,16 @@ const defaultPedidoSchema = z.object({
 }).refine(data => !data.modalidad_entrega_id || !!data.modalidad_entrega_tipo, {
   message: 'modalidad_entrega_tipo es requerido junto con modalidad_entrega_id',
   path: ['modalidad_entrega_tipo'],
+}).refine(data => !data.origen || !data.modalidad_entrega_id, {
+  // `origen` (recogida/delivery) es del sistema de restaurante (Glovo);
+  // `modalidad_entrega_id` es del sistema de tienda, deliberadamente
+  // independiente. Sin este refine, un body con ambos campos podía dejar en
+  // el pedido persistido un `modalidad_entrega_tipo: 'recogida'` junto con
+  // `direccion_entrega` heredada del `origen: 'delivery'` — ninguno de los
+  // dos helpers de payload sobrescribe los campos del otro, así que el
+  // spread final quedaba con un estado inconsistente.
+  message: 'origen y modalidad_entrega_id son de sistemas de entrega distintos, no se pueden combinar',
+  path: ['modalidad_entrega_id'],
 });
 
 // z.discriminatedUnion does not support .refine() in Zod v3 — use z.union instead

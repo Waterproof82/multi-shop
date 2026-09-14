@@ -2336,6 +2336,43 @@ git add src/app/api/pedidos/route.ts src/core/application/use-cases/pedido.use-c
 git commit -m "feat(pedidos): revalidar precio de modalidad de entrega server-side y persistirlo"
 ```
 
+> **Hallazgos de la review de código (post-implementación):**
+> 1. **Complejidad cognitiva de `create()` en 17** (medido con el script de
+>    `docs/context/deuda-complejidad.md`, no con el IDE — real, por encima del
+>    límite de 15). Fix: el bloque del Step 2.5 se extrajo a un método propio
+>    `revalidarModalidadEntrega(data, empresaId, empresaTipo)` que devuelve
+>    `Result<{precioCents, tipo}>`, mismo patrón que el resto de pasos de
+>    `create()`. Complejidad final de `create()`: **15** (en el límite, no por
+>    encima).
+> 2. **Sin gate por `empresaTipo === 'tienda'` antes de revalidar** — la
+>    condición era solo `if (data.modalidad_entrega_id)`. Nada en el schema
+>    Zod ni en `/api/admin/modalidades-entrega` impedía que una empresa
+>    `tipo === 'restaurante'` tuviera filas en `modalidades_entrega`; si eso
+>    pasara, su precio se sumaría al total de un pedido de restaurante fuera
+>    del sistema Glovo+Redsys que el diseño declara independiente a propósito.
+>    Fix: `revalidarModalidadEntrega` ahora empieza con
+>    `if (empresaTipo !== 'tienda' || !data.modalidad_entrega_id) return { success: true, data: { precioCents: 0, tipo: undefined } }`.
+>    Este `empresaTipo` es SIEMPRE el de `empresa.tipo` leído server-side en
+>    `route.ts` (nunca el que manda el cliente en el body) — cierra el vector
+>    por completo en el único punto de aplicación real (`PedidoUseCase.create`),
+>    sin necesidad de tocar además la API admin de modalidades (evaluado y
+>    descartado: sería defensa en profundidad, no necesario para cerrar el
+>    hueco — un restaurante con filas fantasma en `modalidades_entrega` no
+>    puede hacer que su precio se aplique a un pedido, porque `empresaTipo` en
+>    ese pedido siempre será `'restaurante'`, real).
+> 3. **`origen` + `modalidad_entrega_id` combinados en el mismo body** no
+>    estaba bloqueado por Zod — podía dejar un pedido con
+>    `modalidad_entrega_tipo: 'recogida'` pero con `direccion_entrega`
+>    heredada del `origen: 'delivery'` (ninguno de los dos payload-builders
+>    pisa los campos del otro). Fix: nuevo `.refine()` en
+>    `defaultPedidoSchema` (`src/app/api/pedidos/route.ts`) que rechaza el
+>    body si vienen ambos campos.
+> 4. Se agregaron 2 tests de regresión a
+>    `tests/core/pedido-modalidad-revalidacion.test.ts`: el camino positivo de
+>    domicilio (la dirección SÍ se propaga cuando corresponde — antes solo
+>    estaba cubierta su ausencia) y el gate por `empresaTipo` (un restaurante
+>    con `modalidad_entrega_id` en el body no revalida ni persiste nada).
+
 **Checkpoint Fase 4:** `pnpm lint && pnpm build` + toda la suite de vitest en verde.
 
 ---
