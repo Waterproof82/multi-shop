@@ -2301,6 +2301,21 @@ git commit -m "feat(pedidos): revalidar precio de modalidad de entrega server-si
 **Files:**
 - Modify: `src/lib/translations.ts` (5 bloques de idioma: es, en, fr, it, de)
 
+> **Gap de seguridad de superficie de API encontrado en la review de Task 10
+> (no bloqueante para esta task, pero anotado para no perderlo):**
+> `updateModalidadEntregaSchema` (en `src/core/application/dtos/modalidad-entrega.dto.ts`)
+> se deriva de `baseModalidadEntregaSchema` directo y NO reaplica el
+> `.superRefine`/`.refine` que sí tiene `createModalidadEntregaSchema` — así que
+> un `PUT /api/admin/modalidades-entrega?id=...` hoy no está protegido contra
+> `tiempoMinMinutos > tiempoMaxMinutos` ni contra agregar tiempo a una
+> modalidad de `recogida`. La UI actual (`ModalidadesEntregaForm`'s toggle de
+> activo/inactivo) solo manda `{ activo: bool }` en sus `onUpdate`, así que no
+> lo ejercita hoy — pero si en el futuro se agrega edición completa de una
+> modalidad existente (no solo activar/desactivar), hay que agregar la misma
+> validación cruzada al schema de update antes de habilitarla. El CHECK
+> constraint de la DB (`tiempo_solo_domicilio`) sigue siendo el respaldo
+> final, pero fallaría con un 500 crudo de Postgres, no un 400 legible.
+
 - [ ] **Step 1: Agregar las claves de traducción nuevas en los 5 bloques de idioma**
 
 Junto a `deliveryMethodPickup`/`deliveryMethodHome` (buscar esas claves en cada uno de los 5 bloques — líneas ~717, ~1719, ~2238, ~2738 y el bloque de `de` que sigue el mismo patrón), agregar:
