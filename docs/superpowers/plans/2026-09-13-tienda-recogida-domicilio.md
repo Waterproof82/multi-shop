@@ -959,7 +959,7 @@ const modalidadRecogida = {
 };
 
 describe('ModalidadesEntregaForm', () => {
-  it('el formulario de tipo recogida NO muestra campos de tiempo estimado', () => {
+  it('el formulario de tipo recogida NO muestra campos de tiempo mínimo/máximo', () => {
     render(
       <ModalidadesEntregaForm
         tipo="recogida"
@@ -969,7 +969,13 @@ describe('ModalidadesEntregaForm', () => {
         onDelete={vi.fn()}
       />
     );
-    expect(screen.queryByLabelText(/tiempo estimado/i)).not.toBeInTheDocument();
+    // OJO: los campos se llaman "Tiempo mínimo (min)"/"Tiempo máximo (min)"
+    // (ver Step 3 más abajo) — NINGÚN campo se llama "tiempo estimado". Un
+    // queryByLabelText(/tiempo estimado/i) sería un placebo: pasaría siempre,
+    // incluso con el componente roto, porque ese string no existe en ningún
+    // lado. Verificado contra el código real durante la review de Task 9.
+    expect(screen.queryByLabelText(/tiempo mínimo/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/tiempo máximo/i)).not.toBeInTheDocument();
   });
 
   it('el formulario de tipo domicilio SÍ muestra campos de tiempo mínimo y máximo', () => {
