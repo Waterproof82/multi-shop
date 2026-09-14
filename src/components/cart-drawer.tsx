@@ -38,7 +38,7 @@ import { COUNTRY_CODES, DEFAULT_COUNTRY_CODE } from "@/core/domain/constants/cou
 import { getTrackingTokens, addTrackingToken } from "@/lib/order-tracking";
 import { QRScannerGate, type QRGateState } from '@/components/qr-scanner-gate-lazy';
 import { IDEMPOTENCY_HEADER, buildIdempotencyKey } from "@/lib/idempotency";
-import type { ModalidadEntrega } from "@/core/domain/entities/types"
+import { TiendaFulfillmentSelector, type ModalidadEntregaPublica } from "@/components/TiendaFulfillmentSelector";
 import { useMesaId } from "@/lib/mesa/use-mesa-id";
 
 const MESA_CLIENT_TOKEN_KEY = (mesaId: string) => `mesa_token_${mesaId}`;
@@ -843,9 +843,10 @@ function computeCartTotals(
   estimatedFeeCents: number | null,
   discountValid: { valid: boolean; porcentaje: number } | null,
   totalPrice: number,
+  modalidadEntregaPrecioCents: number,
 ): { deliveryFee: number; discountedPrice: number; grandTotal: number } {
   const isDelivery = deliveryMethod === 'delivery';
-  const deliveryFee = (isDelivery && estimatedFeeCents ? estimatedFeeCents : 0) / 100;
+  const deliveryFee = (isDelivery && estimatedFeeCents ? estimatedFeeCents : 0) / 100 + modalidadEntregaPrecioCents / 100;
   const discountedPrice = discountValid?.valid
     ? Math.round(totalPrice * (1 - discountValid.porcentaje / 100) * 100) / 100
     : totalPrice;
@@ -876,6 +877,15 @@ function resolveActiveMesaId(mesaInfo: MesaInfo | null, mesaToken: string): stri
 
 function showDeliverySelector(mesaToken: string | null, isRestaurant: boolean | undefined): boolean {
   return !mesaToken && !!isRestaurant;
+}
+
+export function usaWizardTienda(
+  isRestaurant: boolean,
+  mesaToken: string | null,
+  recogidaHabilitada: boolean,
+  envioHabilitado: boolean
+): boolean {
+  return !isRestaurant && !mesaToken && (recogidaHabilitada || envioHabilitado);
 }
 
 function showDiscountSection(mesaToken: string | null): boolean {
@@ -1004,10 +1014,9 @@ interface CartDrawerProps {
   isRestaurant?: boolean;
   pagosPickupHabilitados?: boolean;
   deliveryHabilitado?: boolean;
-  // TODO(Task 13/14): usar en el wizard de recogida/domicilio del carrito.
-  // Aceptada aquí solo para que Task 12 pueda threadear el dato hasta este
-  // punto sin tocar lógica de CartDrawer.
-  modalidadesEntrega?: ModalidadEntrega[];
+  recogidaTiendaHabilitada?: boolean;
+  envioDomicilioHabilitado?: boolean;
+  modalidadesEntrega?: ModalidadEntregaPublica[];
 }
 
 /**
@@ -1201,7 +1210,14 @@ export function DatosDelComensal({
   );
 }
 
-export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = false, deliveryHabilitado = false }: Readonly<CartDrawerProps>) {
+export function CartDrawer({
+  isRestaurant = false,
+  pagosPickupHabilitados = false,
+  deliveryHabilitado = false,
+  recogidaTiendaHabilitada = false,
+  envioDomicilioHabilitado = false,
+  modalidadesEntrega = [],
+}: Readonly<CartDrawerProps>) {
   const {
     items,
     updateQuantity,
@@ -1252,6 +1268,14 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
     setActiveOrderTokens(getTrackingTokens());
   }, [isCartOpen]);
 
+  useEffect(() => {
+    if (isCartOpen) setStep('items');
+  }, [isCartOpen]);
+
+  useEffect(() => {
+    if (items.length === 0) setStep('items');
+  }, [items.length]);
+
 
   const [discountCode, setDiscountCode] = useState('');
   const [discountValid, setDiscountValid] = useState<{ valid: boolean; porcentaje: number } | null>(null);
@@ -1269,6 +1293,13 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
   const [deliveryLongitude, setDeliveryLongitude] = useState<number | null>(null);
   const [estimatedFeeCents, setEstimatedFeeCents] = useState<number | null>(null);
   const [errors, setErrors] = useState<{ nombre?: string; telefono?: string; delivery?: string; general?: string }>({});
+
+  const [step, setStep] = useState<'items' | 'checkout'>('items');
+  const [modalidadEntregaId, setModalidadEntregaId] = useState<string | null>(null);
+  const [modalidadEntregaTipo, setModalidadEntregaTipo] = useState<'recogida' | 'domicilio' | null>(null);
+  const [modalidadEntregaPrecioCents, setModalidadEntregaPrecioCents] = useState(0);
+
+  const usaWizard = usaWizardTienda(isRestaurant, mesaToken, recogidaTiendaHabilitada, envioDomicilioHabilitado);
 
   const handleConfirmOrder = useCallback(async () => {
     setErrors({});
@@ -1392,7 +1423,13 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
   }, [deliveryMethod]);
 
   const isDelivery = deliveryMethod === 'delivery';
-  const { deliveryFee, grandTotal } = computeCartTotals(deliveryMethod, estimatedFeeCents, discountValid, totalPrice);
+  const { deliveryFee, grandTotal } = computeCartTotals(
+    deliveryMethod,
+    estimatedFeeCents,
+    discountValid,
+    totalPrice,
+    usaWizard ? modalidadEntregaPrecioCents : 0,
+  );
 
   return (
     <>
@@ -1505,6 +1542,8 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
           </div>
         ) : (
           <div className="flex-1 flex flex-col min-h-0 overflow-y-auto px-4 py-2">
+            {(!usaWizard || step === 'items') && (
+            <>
             <ul className="flex flex-col gap-2 cv-auto" style={{ contentVisibility: 'auto' }}>
               {items.map((ci) => {
                 const complementPrice = ci.selectedComplements?.reduce((sum, c) => sum + c.price, 0) || 0;
@@ -1590,8 +1629,30 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                 );
               })}
             </ul>
+            {usaWizard && (
+              <Button
+                type="button"
+                onClick={() => setStep('checkout')}
+                disabled={items.length === 0}
+                className="w-full min-h-[44px] mt-3"
+              >
+                {t('continueButton', language)} — {formatPrice(totalPrice, 'EUR', language)}
+              </Button>
+            )}
+            </>
+            )}
 
+            {(!usaWizard || step === 'checkout') && (
             <div className="mt-auto shrink-0 border-t border-border pt-3 pb-4 bg-background">
+              {usaWizard && (
+                <button
+                  type="button"
+                  onClick={() => setStep('items')}
+                  className="w-full text-left text-sm text-muted-foreground mb-3 flex items-center gap-1"
+                >
+                  ← {items.length} {items.length === 1 ? t('itemSingular', language) : t('itemsPlural', language)} · {formatPrice(totalPrice, 'EUR', language)} — {t('backButton', language)}
+                </button>
+              )}
               <DatosDelComensal
                 mesaToken={mesaToken}
                 mesaInfo={mesaInfo}
@@ -1615,6 +1676,27 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                   deliveryHabilitado={deliveryHabilitado}
                   onChange={handleDeliveryChange}
                   orderTotalCents={Math.round(totalPrice * 100)}
+                  disabled={sending}
+                />
+              )}
+
+              {!isRestaurant && !mesaToken && (
+                <TiendaFulfillmentSelector
+                  recogidaHabilitada={recogidaTiendaHabilitada}
+                  envioHabilitado={envioDomicilioHabilitado}
+                  modalidades={modalidadesEntrega}
+                  value={modalidadEntregaTipo}
+                  onChange={(tipo, id, precioCents) => {
+                    setModalidadEntregaTipo(tipo);
+                    setModalidadEntregaId(id);
+                    setModalidadEntregaPrecioCents(precioCents);
+                  }}
+                  onAddressSelect={({ address, latitude, longitude, postalCode }) => {
+                    setDeliveryAddress(address);
+                    setDeliveryLatitude(latitude);
+                    setDeliveryLongitude(longitude);
+                    setDeliveryPostalCode(postalCode);
+                  }}
                   disabled={sending}
                 />
               )}
@@ -1697,6 +1779,7 @@ export function CartDrawer({ isRestaurant = false, pagosPickupHabilitados = fals
                 </Button>
               </div>
             </div>
+            )}
           </div>
         )}
       </SheetContent>

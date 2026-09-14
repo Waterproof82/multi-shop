@@ -364,7 +364,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
       {/* Cart components — only when cart is active */}
       {showCart && !mesaEsperandoActivacion && (
         <>
-          <CartDrawer isRestaurant={empresa?.tipo === 'restaurante'} pagosPickupHabilitados={empresa?.pagosPickupHabilitados} deliveryHabilitado={empresa?.deliveryHabilitado} modalidadesEntrega={modalidadesEntrega ?? []} />
+          <CartDrawer isRestaurant={empresa?.tipo === 'restaurante'} pagosPickupHabilitados={empresa?.pagosPickupHabilitados} deliveryHabilitado={empresa?.deliveryHabilitado} recogidaTiendaHabilitada={empresa?.recogidaTiendaHabilitada} envioDomicilioHabilitado={empresa?.envioDomicilioHabilitado} modalidadesEntrega={modalidadesEntrega ?? []} />
           <ActiveOrderBanner />
         </>
       )}
