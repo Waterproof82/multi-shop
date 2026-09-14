@@ -379,17 +379,20 @@ interface TotalsSectionProps {
   readonly language: Language;
   readonly totalPrice: number;
   readonly deliveryFee: number;
+  readonly modalidadFee: number;
+  readonly modalidadLabel: string | null;
   readonly grandTotal: number;
   readonly isDelivery: boolean;
   readonly discountValid: { valid: boolean; porcentaje: number } | null;
 }
 
 /**
- * Desglose del importe: subtotal tachado si hay descuento, coste de entrega si
- * aplica, y total. Vive fuera de `CartDrawer` porque sus dos filas condicionales
+ * Desglose del importe: subtotal tachado si hay descuento, coste de entrega
+ * (Glovo, restaurante) o de la modalidad elegida (recogida/domicilio, tienda)
+ * si aplica, y total. Vive fuera de `CartDrawer` porque sus filas condicionales
  * cargaban la complejidad del componente y no dependen de nada más suyo.
  */
-function TotalsSection({ language, totalPrice, deliveryFee, grandTotal, isDelivery, discountValid }: TotalsSectionProps) {
+function TotalsSection({ language, totalPrice, deliveryFee, modalidadFee, modalidadLabel, grandTotal, isDelivery, discountValid }: TotalsSectionProps) {
   return (
     <div className="mb-4 space-y-1">
       {discountValid?.valid && (
@@ -402,6 +405,12 @@ function TotalsSection({ language, totalPrice, deliveryFee, grandTotal, isDelive
         <div className="flex items-center justify-between text-sm text-muted-foreground">
           <span>{t("deliveryCost", language)}</span>
           <span>{formatPrice(deliveryFee, 'EUR', language)}</span>
+        </div>
+      )}
+      {showModalidadCostRow(modalidadFee, modalidadLabel) && (
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <span>{modalidadLabel}</span>
+          <span>{formatPrice(modalidadFee, 'EUR', language)}</span>
         </div>
       )}
       <div className="flex items-center justify-between">
@@ -844,13 +853,20 @@ function computeCartTotals(
   discountValid: { valid: boolean; porcentaje: number } | null,
   totalPrice: number,
   modalidadEntregaPrecioCents: number,
-): { deliveryFee: number; discountedPrice: number; grandTotal: number } {
+): { deliveryFee: number; modalidadFee: number; discountedPrice: number; grandTotal: number } {
   const isDelivery = deliveryMethod === 'delivery';
-  const deliveryFee = (isDelivery && estimatedFeeCents ? estimatedFeeCents : 0) / 100 + modalidadEntregaPrecioCents / 100;
+  // deliveryFee = tarifa Glovo (restaurante). modalidadFee = precio de la
+  // modalidad de tienda (recogida/domicilio). Se mantienen separados porque
+  // cada uno se muestra en una fila propia de TotalsSection — sumarlos en una
+  // sola variable dejaba el precio de la modalidad de tienda sin ninguna fila
+  // que lo mostrara (showDeliveryCostRow exige isDelivery, que para tienda
+  // nunca es true) y el cliente veía un total mayor sin desglose.
+  const deliveryFee = (isDelivery && estimatedFeeCents ? estimatedFeeCents : 0) / 100;
+  const modalidadFee = modalidadEntregaPrecioCents / 100;
   const discountedPrice = discountValid?.valid
     ? Math.round(totalPrice * (1 - discountValid.porcentaje / 100) * 100) / 100
     : totalPrice;
-  return { deliveryFee, discountedPrice, grandTotal: discountedPrice + deliveryFee };
+  return { deliveryFee, modalidadFee, discountedPrice, grandTotal: discountedPrice + deliveryFee + modalidadFee };
 }
 
 function showNoPaymentBanner(
@@ -894,6 +910,10 @@ function showDiscountSection(mesaToken: string | null): boolean {
 
 function showDeliveryCostRow(isDelivery: boolean, deliveryFee: number): boolean {
   return isDelivery && deliveryFee > 0;
+}
+
+function showModalidadCostRow(modalidadFee: number, modalidadLabel: string | null): boolean {
+  return modalidadFee > 0 && modalidadLabel !== null;
 }
 
 function grandTotalColorClass(discountValid: { valid: boolean } | null): string {
@@ -1423,13 +1443,19 @@ export function CartDrawer({
   }, [deliveryMethod]);
 
   const isDelivery = deliveryMethod === 'delivery';
-  const { deliveryFee, grandTotal } = computeCartTotals(
+  const { deliveryFee, modalidadFee, grandTotal } = computeCartTotals(
     deliveryMethod,
     estimatedFeeCents,
     discountValid,
     totalPrice,
     usaWizard ? modalidadEntregaPrecioCents : 0,
   );
+  // Nombre de la modalidad elegida, para etiquetar su fila en TotalsSection.
+  // Se busca por id en vez de recibirlo directo de TiendaFulfillmentSelector
+  // para no tocar su contrato (onChange ya está congelado por sus tests).
+  const modalidadLabel = usaWizard
+    ? modalidadesEntrega.find((m) => m.id === modalidadEntregaId)?.nombre ?? null
+    : null;
 
   return (
     <>
@@ -1719,6 +1745,8 @@ export function CartDrawer({
                 language={language}
                 totalPrice={totalPrice}
                 deliveryFee={deliveryFee}
+                modalidadFee={modalidadFee}
+                modalidadLabel={modalidadLabel}
                 grandTotal={grandTotal}
                 isDelivery={isDelivery}
                 discountValid={discountValid}

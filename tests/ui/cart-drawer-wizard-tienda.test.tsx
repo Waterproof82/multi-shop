@@ -113,4 +113,36 @@ describe('CartDrawer — wizard de tienda (recogida/domicilio activo, sin mesa)'
 
     expect(screen.getByText('11,50 €')).toBeInTheDocument();
   });
+
+  it('desglosa el precio de la modalidad en su propia fila, no solo sumado al total', () => {
+    // Bug real: computeCartTotals sumaba el precio de la modalidad dentro de
+    // `deliveryFee`, pero la fila que lo mostraba (showDeliveryCostRow) solo
+    // se activa con `isDelivery` — un concepto exclusivo del selector Glovo
+    // de restaurante, que en tienda nunca se pone en true. El cargo quedaba
+    // sumado al total sin ninguna línea que lo explicara.
+    const modalidades: ModalidadEntregaPublica[] = [
+      {
+        id: 'm1',
+        tipo: 'recogida',
+        icono: '🏬',
+        nombre: 'Recogida rápida',
+        precioCents: 150,
+        tiempoMinMinutos: null,
+        tiempoMaxMinutos: null,
+        activo: true,
+        orden: 0,
+      },
+    ];
+    pintarCartDrawerConItem({ modalidadesEntrega: modalidades });
+
+    fireEvent.click(screen.getByRole('button', { name: /continuar/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /recoger en tienda/i }));
+
+    // Aparece dos veces: una en la fila de la lista de TiendaFulfillmentSelector
+    // (la que ya existía) y otra nueva en el desglose de TotalsSection — si
+    // solo apareciera una vez, la fila de desglose no se estaría pintando.
+    expect(screen.getAllByText('Recogida rápida')).toHaveLength(2);
+    expect(screen.getAllByText('1,50 €')).toHaveLength(2);
+    expect(screen.getByText('11,50 €')).toBeInTheDocument();
+  });
 });
