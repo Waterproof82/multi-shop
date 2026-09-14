@@ -1945,6 +1945,25 @@ git add src/components/cart-drawer.tsx tests/ui/cart-drawer-wizard-tienda.test.t
 git commit -m "feat(carrito): wizard de 2 pasos para tienda con modalidades de entrega"
 ```
 
+> **Hallazgo de la verificación (post-implementación, no estaba en el plan
+> original):** el Step 10 no dice dónde sumar `modalidadEntregaPrecioCents`
+> al total. El implementer lo sumó dentro de `deliveryFee` en
+> `computeCartTotals` — pero la fila que muestra `deliveryFee` en
+> `TotalsSection` (`showDeliveryCostRow`) exige `isDelivery`, que es
+> `deliveryMethod === 'delivery'`: un estado que solo pone `DeliveryMethodSelector`
+> (montado únicamente para restaurante, `showDeliverySelector`). Para tienda
+> `deliveryMethod` queda `null` para siempre → la fila nunca se pinta → el
+> cargo de la modalidad quedaba sumado al total SIN ninguna línea que lo
+> explicara. Fix: `computeCartTotals` devuelve `deliveryFee` (Glovo) y
+> `modalidadFee` (tienda) por separado; `TotalsSection` pinta una fila propia
+> para `modalidadFee`, etiquetada con el **nombre real de la modalidad**
+> (buscado por `modalidadEntregaId` en `modalidadesEntrega`, sin tocar el
+> contrato ya congelado de `TiendaFulfillmentSelector.onChange`). Ese nombre
+> es texto libre del admin (no copy de UI) — no necesita clave de `t()`, y el
+> Step de i18n del Task 17 NO debe "corregirlo" a una traducción genérica.
+> Test de regresión agregado y verificado empíricamente (revert del fix →
+> falla solo ese test → restore → pasa).
+
 ---
 
 ### Task 15: Payload del pedido (cliente) — sumar el precio de la modalidad
