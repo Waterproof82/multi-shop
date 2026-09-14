@@ -630,6 +630,34 @@ function attachDeliveryFields(
   }
 }
 
+// Helper: attach modalidad de entrega fields to order payload (tienda: recogida/domicilio)
+export function attachModalidadFields(
+  payload: Record<string, unknown>,
+  opts: {
+    modalidadEntregaId: string | null;
+    modalidadEntregaTipo: 'recogida' | 'domicilio' | null;
+    modalidadEntregaPrecioCents: number;
+    deliveryAddress: string;
+    deliveryPostalCode: string;
+    deliveryLatitude: number | null;
+    deliveryLongitude: number | null;
+  }
+) {
+  const { modalidadEntregaId, modalidadEntregaTipo, modalidadEntregaPrecioCents, deliveryAddress, deliveryPostalCode, deliveryLatitude, deliveryLongitude } = opts;
+  if (!modalidadEntregaId || !modalidadEntregaTipo) return;
+  Object.assign(payload, {
+    modalidad_entrega_id: modalidadEntregaId,
+    modalidad_entrega_tipo: modalidadEntregaTipo,
+    modalidad_entrega_precio_cents: modalidadEntregaPrecioCents,
+    ...(modalidadEntregaTipo === 'domicilio' ? {
+      direccion_entrega: deliveryAddress,
+      codigo_postal: deliveryPostalCode,
+      latitude_entrega: deliveryLatitude,
+      longitude_entrega: deliveryLongitude,
+    } : {}),
+  });
+}
+
 // Helper: determine if order requires redirect to Redsys payment gateway
 function requiresRedsysRedirect(
   pagosPickupHabilitados: boolean,
@@ -722,6 +750,9 @@ export async function processStandardOrderResponse(
     deliveryLatitude: number | null;
     deliveryLongitude: number | null;
     estimatedFeeCents: number | null;
+    modalidadEntregaId: string | null;
+    modalidadEntregaTipo: 'recogida' | 'domicilio' | null;
+    modalidadEntregaPrecioCents: number;
     clearCart: () => void;
     closeCart: () => void;
     openCart: () => void;
@@ -748,6 +779,9 @@ export async function processStandardOrderResponse(
     deliveryLatitude,
     deliveryLongitude,
     estimatedFeeCents,
+    modalidadEntregaId,
+    modalidadEntregaTipo,
+    modalidadEntregaPrecioCents,
     clearCart,
     closeCart,
     openCart,
@@ -776,6 +810,16 @@ export async function processStandardOrderResponse(
       deliveryLatitude,
       deliveryLongitude,
       estimatedFeeCents,
+    });
+
+    attachModalidadFields(payload, {
+      modalidadEntregaId,
+      modalidadEntregaTipo,
+      modalidadEntregaPrecioCents,
+      deliveryAddress,
+      deliveryPostalCode,
+      deliveryLatitude,
+      deliveryLongitude,
     });
 
     const { ok, data } = await sendStandardOrderFlow(payload, attemptKey);
@@ -1357,6 +1401,9 @@ export function CartDrawer({
       deliveryLatitude,
       deliveryLongitude,
       estimatedFeeCents,
+      modalidadEntregaId,
+      modalidadEntregaTipo,
+      modalidadEntregaPrecioCents,
       clearCart,
       closeCart,
       openCart,
@@ -1371,7 +1418,7 @@ export function CartDrawer({
       setSending,
       attemptKey,
     });
-  }, [mesaToken, mesaInfo, isWaiterMode, nombre, telefono, countryCode, email, deliveryMethod, deliveryAddress, deliveryPostalCode, deliveryLatitude, deliveryLongitude, isRestaurant, pagosPickupHabilitados, items, language, discountCode, estimatedFeeCents, clearCart, closeCart, openCart, router, attemptKey]);
+  }, [mesaToken, mesaInfo, isWaiterMode, nombre, telefono, countryCode, email, deliveryMethod, deliveryAddress, deliveryPostalCode, deliveryLatitude, deliveryLongitude, isRestaurant, pagosPickupHabilitados, items, language, discountCode, estimatedFeeCents, modalidadEntregaId, modalidadEntregaTipo, modalidadEntregaPrecioCents, clearCart, closeCart, openCart, router, attemptKey]);
 
 // Signal "Activa" state: when a real customer (non-waiter) adds their first item
   useEffect(() => {
