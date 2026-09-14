@@ -1163,6 +1163,16 @@ rg -n "isSuperAdmin|empresa.tipo|DeliveryCredentialsForm" "src/app/admin/(protec
 
 para ubicar exactamente cómo se lee `empresa.tipo` hoy (o si hay que agregarlo al `getById`/`getEmpresaByDomain` de esa página).
 
+> **Nota encontrada en la review de Task 8:** `GET /api/admin/empresa` NO expone
+> `deliveryHabilitado` (ni ahora `recogidaTiendaHabilitada`/`envioDomicilioHabilitado`)
+> — esa ruta re-serializa a mano un subconjunto curado de campos de `Empresa`
+> (nombre, contacto, promos, impuestos), no la ficha completa. Si `/admin/delivery`
+> de restaurante lee su propio `deliveryHabilitado` desde OTRO lado (probablemente
+> `getEmpresaByDomain`/`getEmpresaPublicRepository()`, o un fetch server-side
+> directo con `getEmpresaUseCase().getById()` sin pasar por esta ruta), replicar
+> ESE MISMO mecanismo para los dos toggles nuevos — no asumir que alcanza con
+> `GET /api/admin/empresa`, ya que ese endpoint no los va a traer.
+
 - [ ] **Step 2: Envolver el contenido existente en `{empresa.tipo === 'restaurante' && (...)}`**
 
 Todo el JSX que hoy renderiza incondicionalmente (zona de cobertura, Glovo, Redsys) pasa a estar envuelto en esa condición — sin tocar una línea de su contenido interno.
