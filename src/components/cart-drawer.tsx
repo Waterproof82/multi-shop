@@ -1706,7 +1706,7 @@ export function CartDrawer({
                 />
               )}
 
-              {!isRestaurant && !mesaToken && (
+              {usaWizard && (
                 <TiendaFulfillmentSelector
                   recogidaHabilitada={recogidaTiendaHabilitada}
                   envioHabilitado={envioDomicilioHabilitado}
