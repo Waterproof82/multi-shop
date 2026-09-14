@@ -2116,15 +2116,23 @@ En el constructor de `PedidoUseCase`, agregar el nuevo dependency (revisar el co
 En `create()` (línea ~535+), después del Step 2 (`validateProductPrices`, línea ~566-569) y antes del Step 3 (descuento, línea ~571+), insertar:
 
 ```typescript
-// Step 2.5: revalidar precio de la modalidad de entrega (tienda) — nunca
-// confiar en el precio que manda el cliente.
+// Step 2.5: revalidar precio Y tipo de la modalidad de entrega (tienda) —
+// nunca confiar en lo que manda el cliente. Un cliente podría mandar un
+// precioCents correcto pero un modalidad_entrega_tipo manipulado (p. ej.
+// forzar 'recogida' para evitar mandar direccion_entrega, o 'domicilio'
+// para intentar otro efecto secundario) — por eso NO se usa
+// `data.modalidad_entrega_tipo` para nada río abajo. `modalidadTipoValidado`
+// es el único valor de tipo que debe persistirse o usarse para decidir
+// qué campos de dirección incluir.
 let modalidadPrecioCents = 0;
+let modalidadTipoValidado: 'recogida' | 'domicilio' | undefined;
 if (data.modalidad_entrega_id) {
   const modalidadResult = await this.modalidadEntregaUseCase.validarPrecioVigente(data.modalidad_entrega_id, empresaId);
   if (!modalidadResult.success) {
     return { success: false, error: modalidadResult.error };
   }
   modalidadPrecioCents = modalidadResult.data.precioCents;
+  modalidadTipoValidado = modalidadResult.data.tipo;
 }
 ```
 
@@ -2157,13 +2165,22 @@ Y en la llamada (línea 597-602), agregar el quinto argumento: `modalidadPrecioC
 - [ ] **Step 5: Construir el payload de persistencia, mismo patrón que `buildOrigenPayload` (línea 428-440)**
 
 ```typescript
-private buildModalidadPayload(data: CreatePedidoDTO, modalidadPrecioCents: number) {
-  if (!data.modalidad_entrega_id || !data.modalidad_entrega_tipo) return undefined;
+// Recibe `modalidadTipoValidado` (del Step 3, ya revalidado contra la DB) —
+// NUNCA `data.modalidad_entrega_tipo` (el que manda el cliente). Ese campo
+// del DTO solo sirve para gatillar el refine de Zod que exige que venga
+// junto al id; el valor que se persiste y que decide qué campos de
+// dirección incluir es siempre el validado.
+private buildModalidadPayload(
+  data: CreatePedidoDTO,
+  modalidadPrecioCents: number,
+  modalidadTipoValidado: 'recogida' | 'domicilio' | undefined
+) {
+  if (!data.modalidad_entrega_id || !modalidadTipoValidado) return undefined;
   return {
     modalidad_entrega_id: data.modalidad_entrega_id,
-    modalidad_entrega_tipo: data.modalidad_entrega_tipo,
+    modalidad_entrega_tipo: modalidadTipoValidado,
     modalidad_entrega_precio_cents: modalidadPrecioCents,
-    ...(data.modalidad_entrega_tipo === 'domicilio' ? {
+    ...(modalidadTipoValidado === 'domicilio' ? {
       direccion_entrega: data.direccion_entrega,
       codigo_postal: data.codigo_postal,
       latitude_entrega: data.latitude_entrega,
@@ -2190,7 +2207,7 @@ const pedidoResult = await this.pedidoRepo.create(
   finalTotal,
   discountData,
   trackingToken,
-  { ...this.buildOrigenPayload(data, isDelivery), ...this.buildModalidadPayload(data, modalidadPrecioCents) },
+  { ...this.buildOrigenPayload(data, isDelivery), ...this.buildModalidadPayload(data, modalidadPrecioCents, modalidadTipoValidado) },
   idempotency
 );
 ```

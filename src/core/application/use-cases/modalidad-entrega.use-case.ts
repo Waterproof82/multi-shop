@@ -67,6 +67,14 @@ export class ModalidadEntregaUseCase {
    * Revalida servidor-side el precio de una modalidad antes de crear un
    * pedido — nunca confiar en el precio que manda el cliente. Falla si la
    * modalidad no existe, no es de esta empresa, o está `activo=false`.
+   *
+   * El `tipo` que devuelve este método TAMBIÉN es el validado, no el que
+   * pueda mandar el cliente. Cualquier caller que persista `tipo` junto al
+   * precio (p. ej. al armar el payload del pedido) DEBE usar `result.data.tipo`
+   * de esta respuesta — nunca `data.modalidad_entrega_tipo` del request. Un
+   * cliente podría mandar `precioCents` correcto pero `tipo` manipulado para
+   * intentar que el pedido se guarde como 'recogida' evitando la dirección de
+   * envío, o viceversa.
    */
   async validarPrecioVigente(modalidadId: string, empresaId: string): Promise<Result<{ precioCents: number; tipo: 'recogida' | 'domicilio' }>> {
     try {
