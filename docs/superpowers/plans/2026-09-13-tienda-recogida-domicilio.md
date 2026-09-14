@@ -1179,6 +1179,18 @@ para ubicar exactamente cómo se lee `empresa.tipo` hoy (o si hay que agregarlo 
 > ESE MISMO mecanismo para los dos toggles nuevos — no asumir que alcanza con
 > `GET /api/admin/empresa`, ya que ese endpoint no los va a traer.
 
+> **Nota encontrada en la review final de Task 9:** `ModalidadesEntregaForm`
+> no valida el rango de tiempo de una modalidad de domicilio antes de enviar
+> — si el admin deja "Tiempo mínimo"/"Tiempo máximo" vacíos, `handleSubmit`
+> usa `Number(tiempoMin) || 0`, así que se crea silenciosamente una modalidad
+> con `tiempoMinMinutos: 0, tiempoMaxMinutos: 0` en vez de bloquear el envío o
+> pedir el dato. Tampoco valida que `min <= max` (esa regla SÍ está en el Zod
+> schema del backend, así que un envío inválido devuelve 400 — pero la UX es
+> mala: el admin ve un error genérico del servidor en vez de un aviso claro
+> en el campo). Si esta página (Task 10) envuelve al formulario con su propio
+> manejo de errores de API, mostrar el mensaje de validación del backend de
+> forma legible en vez de dejarlo como error genérico.
+
 - [ ] **Step 2: Envolver el contenido existente en `{empresa.tipo === 'restaurante' && (...)}`**
 
 Todo el JSX que hoy renderiza incondicionalmente (zona de cobertura, Glovo, Redsys) pasa a estar envuelto en esa condición — sin tocar una línea de su contenido interno.
