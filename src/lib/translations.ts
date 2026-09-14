@@ -736,6 +736,8 @@ export const translations = {
     deliveryModalityIconPackage: "Paquete",
     deliveryModalityIconClock: "Reloj",
     deliveryModalityMinutesUnit: "min",
+    tiendaRecogidaLabel: "Recogida en tienda",
+    tiendaEnvioLabel: "Envío a domicilio",
     // Tracking delivery
     orderOnItsWay: "Tu pedido está en camino",
     orderEtaDisplay: "Estimamos que llegará en aproximadamente {minutes} minutos",
@@ -1753,6 +1755,8 @@ export const translations = {
     deliveryModalityIconPackage: "Package",
     deliveryModalityIconClock: "Clock",
     deliveryModalityMinutesUnit: "min",
+    tiendaRecogidaLabel: "Store pickup",
+    tiendaEnvioLabel: "Home delivery",
     // Tracking delivery
     orderOnItsWay: "Your order is on its way",
     orderEtaDisplay: "We estimate it will arrive in approximately {minutes} minutes",
@@ -2287,6 +2291,8 @@ export const translations = {
     deliveryModalityIconPackage: "Colis",
     deliveryModalityIconClock: "Horloge",
     deliveryModalityMinutesUnit: "min",
+    tiendaRecogidaLabel: "Retrait en magasin",
+    tiendaEnvioLabel: "Livraison à domicile",
     // Tracking delivery
     orderOnItsWay: "Votre commande est en route",
     orderEtaDisplay: "Nous estimons qu'elle arrivera dans environ {minutes} minutes",
@@ -2802,6 +2808,8 @@ export const translations = {
     deliveryModalityIconPackage: "Pacco",
     deliveryModalityIconClock: "Orologio",
     deliveryModalityMinutesUnit: "min",
+    tiendaRecogidaLabel: "Ritiro in negozio",
+    tiendaEnvioLabel: "Consegna a domicilio",
     // Tracking delivery
     orderOnItsWay: "Il tuo ordine è in arrivo",
     orderEtaDisplay: "Stimiamo che arriverà in circa {minutes} minuti",
@@ -3317,6 +3325,8 @@ export const translations = {
     deliveryModalityIconPackage: "Paket",
     deliveryModalityIconClock: "Uhr",
     deliveryModalityMinutesUnit: "Min.",
+    tiendaRecogidaLabel: "Abholung im Laden",
+    tiendaEnvioLabel: "Lieferung nach Hause",
     // Tracking delivery
     orderOnItsWay: "Ihre Bestellung ist unterwegs",
     orderEtaDisplay: "Wir schätzen, dass sie in etwa {minutes} Minuten ankommt",

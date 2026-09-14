@@ -1,9 +1,10 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { getAuthAdminUseCase } from '@/core/infrastructure/database';
+import { getAuthAdminUseCase, getEmpresaUseCase, getModalidadEntregaUseCase } from '@/core/infrastructure/database';
 import { SUPERADMIN_ROLE } from '@/core/domain/repositories/IAdminRepository';
 import { getDeliverySettingsUseCase } from '@/core/application/use-cases/delivery/getDeliverySettingsUseCase';
 import { DeliveryCredentialsForm } from '@/components/admin/delivery/DeliveryCredentialsForm';
+import { TiendaDeliverySettings } from '@/components/admin/TiendaDeliverySettings';
 import { Settings } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -40,23 +41,40 @@ export default async function DeliveryPage() {
     redsys_secret_key_set: false,
   };
 
+  const empresaResult = await getEmpresaUseCase().getById(empresaId!);
+  const empresa = empresaResult.success ? empresaResult.data : null;
+
+  const modalidadesResult = await getModalidadEntregaUseCase().getAll(empresaId!);
+  const modalidadesIniciales = modalidadesResult.success ? modalidadesResult.data : [];
+
   return (
     <div className="p-6 max-w-2xl space-y-10">
-      {/* Credentials section */}
-      <section>
-        <div className="flex items-center gap-3 mb-6">
-          <Settings className="w-6 h-6 text-cyan-400 shrink-0" aria-hidden="true" />
-          <div>
-            <h2 className="text-2xl font-bold text-white">Integración de entrega</h2>
-            <p className="text-sm text-slate-400 mt-0.5">
-              Credenciales de Glovo Business y Redsys TPV Virtual
-            </p>
+      {/* Credentials section — solo restaurante (Glovo/Redsys) */}
+      {empresa?.tipo === 'restaurante' && (
+        <section>
+          <div className="flex items-center gap-3 mb-6">
+            <Settings className="w-6 h-6 text-cyan-400 shrink-0" aria-hidden="true" />
+            <div>
+              <h2 className="text-2xl font-bold text-white">Integración de entrega</h2>
+              <p className="text-sm text-slate-400 mt-0.5">
+                Credenciales de Glovo Business y Redsys TPV Virtual
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="rounded-xl border border-white/10 bg-white/5 p-6">
-          <DeliveryCredentialsForm initial={initialSettings} isSuperAdmin={isSuperAdmin} />
-        </div>
-      </section>
+          <div className="rounded-xl border border-white/10 bg-white/5 p-6">
+            <DeliveryCredentialsForm initial={initialSettings} isSuperAdmin={isSuperAdmin} />
+          </div>
+        </section>
+      )}
+
+      {empresa?.tipo === 'tienda' && (
+        <TiendaDeliverySettings
+          empresaId={empresaId!}
+          recogidaHabilitada={empresa.recogidaTiendaHabilitada ?? false}
+          envioHabilitado={empresa.envioDomicilioHabilitado ?? false}
+          modalidadesIniciales={modalidadesIniciales}
+        />
+      )}
     </div>
   );
 }
