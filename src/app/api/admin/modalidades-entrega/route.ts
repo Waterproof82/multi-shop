@@ -58,6 +58,11 @@ export async function PUT(request: NextRequest) {
     return validationErrorResponse('Invalid request body');
   }
   const { id: _bodyId, ...updateData } = body as Record<string, unknown>;
+
+  if ('tipo' in updateData) {
+    return validationErrorResponse('No se puede cambiar el tipo de una modalidad de entrega existente. Borrala y creá una nueva.');
+  }
+
   const parsed = updateModalidadEntregaSchema.safeParse(updateData);
 
   if (!parsed.success) {

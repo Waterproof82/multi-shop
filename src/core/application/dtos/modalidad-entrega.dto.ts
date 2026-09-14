@@ -31,7 +31,7 @@ export const createModalidadEntregaSchema = baseModalidadEntregaSchema
     { message: 'El tiempo mínimo no puede ser mayor que el máximo', path: ['tiempoMaxMinutos'] }
   );
 
-export const updateModalidadEntregaSchema = baseModalidadEntregaSchema.partial().extend({
+export const updateModalidadEntregaSchema = baseModalidadEntregaSchema.omit({ tipo: true }).partial().extend({
   activo: z.boolean().optional(),
 });
 

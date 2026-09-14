@@ -935,6 +935,16 @@ git commit -m "feat(empresa): toggles recogida_tienda_habilitada y envio_domicil
 - Create: `src/components/admin/ModalidadesEntregaForm.tsx`
 - Test: `tests/ui/modalidades-entrega-form.test.tsx`
 
+> **Nota de forma lectura/escritura (encontrada en la review de Task 7):**
+> a diferencia de `/api/admin/categorias`, la ruta `/api/admin/modalidades-entrega`
+> NO tiene un `toAdminModalidad()`/transform de respuesta. El `GET`/`POST`/`PUT`
+> devuelven el objeto de dominio `ModalidadEntrega` tal cual (`nombre` plano +
+> `translations: { en, fr, it, de }` anidado), mientras que el payload de
+> escritura que acepta el `POST`/`PUT` espera `nombre_es`/`nombre_en`/etc. planos.
+> Si este formulario prellena campos de edición a partir de una respuesta `GET`,
+> tiene que mapear `translations.en` → `nombre_en` a mano — no asumir que la
+> forma de lectura y escritura coinciden como sí pasa en el form de categorías.
+
 - [ ] **Step 1: Escribir el test de comportamiento (falla primero)**
 
 ```typescript
