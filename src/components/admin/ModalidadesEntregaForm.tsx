@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Trash2 } from 'lucide-react';
+import { useLanguage } from '@/lib/language-context';
+import { t } from '@/lib/translations';
 
 export interface ModalidadEntregaRow {
   id: string;
@@ -48,6 +50,7 @@ export function ModalidadesEntregaForm({
   onUpdate,
   onDelete,
 }: Readonly<ModalidadesEntregaFormProps>) {
+  const { language } = useLanguage();
   const [icono, setIcono] = useState<string>(ICONOS_DISPONIBLES[0].value);
   const [nombre, setNombre] = useState('');
   const [precio, setPrecio] = useState('0');
@@ -96,7 +99,7 @@ export function ModalidadesEntregaForm({
               variant="ghost"
               size="icon"
               onClick={() => onUpdate(m.id, { activo: !m.activo })}
-              aria-label={m.activo ? 'Desactivar' : 'Activar'}
+              aria-label={m.activo ? t('deliveryModalityDeactivate', language) : t('deliveryModalityActivate', language)}
             >
               {m.activo ? '✓' : '○'}
             </Button>
@@ -105,7 +108,7 @@ export function ModalidadesEntregaForm({
               variant="ghost"
               size="icon"
               onClick={() => onDelete(m.id)}
-              aria-label="Borrar modalidad"
+              aria-label={t('deliveryModalityDelete', language)}
             >
               <Trash2 className="size-4" />
             </Button>
@@ -116,7 +119,7 @@ export function ModalidadesEntregaForm({
       <div className="grid grid-cols-2 gap-3 rounded-lg border border-dashed border-border p-3">
         <div>
           <label htmlFor={`icono-${tipo}`} className="text-xs font-medium text-muted-foreground block mb-1">
-            Icono
+            {t('deliveryModalityIcon', language)}
           </label>
           <Select value={icono} onValueChange={setIcono}>
             <SelectTrigger id={`icono-${tipo}`}>
@@ -133,7 +136,7 @@ export function ModalidadesEntregaForm({
         </div>
         <div>
           <label htmlFor={`nombre-${tipo}`} className="text-xs font-medium text-muted-foreground block mb-1">
-            Nombre
+            {t('deliveryModalityName', language)}
           </label>
           <Input
             id={`nombre-${tipo}`}
@@ -144,7 +147,7 @@ export function ModalidadesEntregaForm({
         </div>
         <div>
           <label htmlFor={`precio-${tipo}`} className="text-xs font-medium text-muted-foreground block mb-1">
-            Precio (€)
+            {t('deliveryModalityPrice', language)}
           </label>
           <Input
             id={`precio-${tipo}`}
@@ -162,7 +165,7 @@ export function ModalidadesEntregaForm({
                 htmlFor={`tiempo-min-${tipo}`}
                 className="text-xs font-medium text-muted-foreground block mb-1"
               >
-                Tiempo mínimo (min)
+                {t('deliveryModalityMinTime', language)}
               </label>
               <Input
                 id={`tiempo-min-${tipo}`}
@@ -177,7 +180,7 @@ export function ModalidadesEntregaForm({
                 htmlFor={`tiempo-max-${tipo}`}
                 className="text-xs font-medium text-muted-foreground block mb-1"
               >
-                Tiempo máximo (min)
+                {t('deliveryModalityMaxTime', language)}
               </label>
               <Input
                 id={`tiempo-max-${tipo}`}
@@ -195,7 +198,7 @@ export function ModalidadesEntregaForm({
           disabled={!nombre.trim()}
           className="col-span-2"
         >
-          Añadir modalidad
+          {t('deliveryModalityAddButton', language)}
         </Button>
       </div>
     </div>
