@@ -38,6 +38,7 @@ import { COUNTRY_CODES, DEFAULT_COUNTRY_CODE } from "@/core/domain/constants/cou
 import { getTrackingTokens, addTrackingToken } from "@/lib/order-tracking";
 import { QRScannerGate, type QRGateState } from '@/components/qr-scanner-gate-lazy';
 import { IDEMPOTENCY_HEADER, buildIdempotencyKey } from "@/lib/idempotency";
+import type { ModalidadEntrega } from "@/core/domain/entities/types"
 import { useMesaId } from "@/lib/mesa/use-mesa-id";
 
 const MESA_CLIENT_TOKEN_KEY = (mesaId: string) => `mesa_token_${mesaId}`;
@@ -1003,6 +1004,10 @@ interface CartDrawerProps {
   isRestaurant?: boolean;
   pagosPickupHabilitados?: boolean;
   deliveryHabilitado?: boolean;
+  // TODO(Task 13/14): usar en el wizard de recogida/domicilio del carrito.
+  // Aceptada aquí solo para que Task 12 pueda threadear el dato hasta este
+  // punto sin tocar lógica de CartDrawer.
+  modalidadesEntrega?: ModalidadEntrega[];
 }
 
 /**

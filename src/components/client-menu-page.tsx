@@ -10,7 +10,7 @@ import { MenuSection } from "@/components/menu-section"
 import { SiteFooter } from "@/components/site-footer"
 import { PromoNotification } from "@/components/promo-notification"
 import { ActiveOrderBanner } from "@/components/active-order-banner"
-import type { EmpresaPublic } from "@/core/domain/entities/types"
+import type { EmpresaPublic, ModalidadEntrega } from "@/core/domain/entities/types"
 import { useLanguage } from "@/lib/language-context"
 import { t } from "@/lib/translations"
 import { formatPrice } from "@/lib/format-price"
@@ -44,6 +44,7 @@ interface MenuPageProps {
   showCart?: boolean;
   empresa?: EmpresaPublic | null;
   isWaiterMode?: boolean;
+  modalidadesEntrega?: ModalidadEntrega[];
 }
 
 
@@ -53,7 +54,7 @@ function getCategoryTab(cat: MenuCategoryVM): 'comida' | 'bebida' | 'empty' {
   return cat.tipoProducto ?? 'comida';
 }
 
-export function MenuPage({ menuData, header, showCart = false, empresa, isWaiterMode = false }: Readonly<MenuPageProps>) {
+export function MenuPage({ menuData, header, showCart = false, empresa, isWaiterMode = false, modalidadesEntrega }: Readonly<MenuPageProps>) {
   const { language } = useLanguage();
   const { clearCart, closeCart, isCartOpen } = useCart();
   const mesaId = useMesaId();
@@ -363,7 +364,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
       {/* Cart components — only when cart is active */}
       {showCart && !mesaEsperandoActivacion && (
         <>
-          <CartDrawer isRestaurant={empresa?.tipo === 'restaurante'} pagosPickupHabilitados={empresa?.pagosPickupHabilitados} deliveryHabilitado={empresa?.deliveryHabilitado} />
+          <CartDrawer isRestaurant={empresa?.tipo === 'restaurante'} pagosPickupHabilitados={empresa?.pagosPickupHabilitados} deliveryHabilitado={empresa?.deliveryHabilitado} modalidadesEntrega={modalidadesEntrega ?? []} />
           <ActiveOrderBanner />
         </>
       )}

@@ -5,7 +5,7 @@ import { getSupabaseAnonClient } from "@/core/infrastructure/database/supabase-c
 import { SupabaseProductRepository } from "@/core/infrastructure/database/SupabaseProductRepository";
 import { SupabaseCategoryRepository } from "@/core/infrastructure/database/SupabaseCategoryRepository";
 import { GetMenuUseCase } from "@/core/application/use-cases/get-menu.use-case";
-import { getEmpresaPublicRepository, getComplementoGrupoRepository } from "@/core/infrastructure/database";
+import { getEmpresaPublicRepository, getComplementoGrupoRepository, getModalidadEntregaUseCase } from "@/core/infrastructure/database";
 import { parseMainDomain } from "@/lib/domain-utils";
 import { logger } from "@/core/infrastructure/logging/logger";
 import type { EmpresaPublic } from "@/core/domain/entities/types";
@@ -82,4 +82,16 @@ export async function getCachedMenu(empresaId: string) {
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }
+}
+
+/**
+ * Returns the active, publicly visible modalidades de entrega (recogida en
+ * tienda / envío a domicilio) for an empresa. Sin `unstable_cache`: la lista
+ * es chica y el admin quiere ver sus cambios reflejados de inmediato, a
+ * diferencia del menú que sí necesita el TTL de 1h.
+ */
+export async function getModalidadesEntregaPublicas(empresaId: string) {
+  const result = await getModalidadEntregaUseCase().getActivasPublicas(empresaId);
+  if (!result.success) return [];
+  return result.data;
 }
