@@ -107,7 +107,14 @@ export function TiendaFulfillmentSelector({
             type="button"
             role="tab"
             aria-selected={value === 'recogida'}
-            onClick={() => onChange('recogida', modalidadesRecogida[0].id, modalidadesRecogida[0].precioCents)}
+            onClick={() => {
+              // Limpiar la selección manual del tab anterior: sin esto,
+              // `idSeleccionado` seguía apuntando a un id que no existe en
+              // este tab (el fallback a modalidadesDelTab[0] solo actúa
+              // mientras modalidadSeleccionada sea null).
+              setModalidadSeleccionada(null);
+              onChange('recogida', modalidadesRecogida[0].id, modalidadesRecogida[0].precioCents);
+            }}
             disabled={disabled}
             className={`rounded-xl border-2 px-3 py-3 text-sm font-medium ${value === 'recogida' ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-background'}`}
           >
@@ -119,7 +126,10 @@ export function TiendaFulfillmentSelector({
             type="button"
             role="tab"
             aria-selected={value === 'domicilio'}
-            onClick={() => onChange('domicilio', modalidadesDomicilio[0].id, modalidadesDomicilio[0].precioCents)}
+            onClick={() => {
+              setModalidadSeleccionada(null);
+              onChange('domicilio', modalidadesDomicilio[0].id, modalidadesDomicilio[0].precioCents);
+            }}
             disabled={disabled}
             className={`rounded-xl border-2 px-3 py-3 text-sm font-medium ${value === 'domicilio' ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-background'}`}
           >

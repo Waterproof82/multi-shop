@@ -1,5 +1,6 @@
+import { useState, type ReactElement } from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, fireEvent } from '@testing-library/react';
 import { LanguageProvider } from '@/lib/language-context';
 import { TiendaFulfillmentSelector, debeMostrarSelector, type ModalidadEntregaPublica } from '@/components/TiendaFulfillmentSelector';
 
@@ -13,6 +14,17 @@ const recogida: ModalidadEntregaPublica = {
   tiempoMaxMinutos: null,
   activo: true,
   orden: 0,
+};
+const recogidaProgramada: ModalidadEntregaPublica = {
+  id: 'r2',
+  tipo: 'recogida',
+  icono: 'clock',
+  nombre: 'Recogida programada',
+  precioCents: 100,
+  tiempoMinMinutos: null,
+  tiempoMaxMinutos: null,
+  activo: true,
+  orden: 1,
 };
 const domicilio: ModalidadEntregaPublica = {
   id: 'd1',
@@ -30,12 +42,14 @@ const domicilio: ModalidadEntregaPublica = {
 // necesita LanguageProvider como wrapper — el snippet original del plan
 // renderizaba sin él y hubiese lanzado "useLanguage must be used within
 // LanguageProvider" antes de llegar a ninguna aserción.
-function renderSelector(props: Readonly<Parameters<typeof TiendaFulfillmentSelector>[0]>) {
-  return render(
-    <LanguageProvider>
-      <TiendaFulfillmentSelector {...props} />
-    </LanguageProvider>
-  );
+function renderSelector(
+  propsOrNode: Readonly<Parameters<typeof TiendaFulfillmentSelector>[0]> | ReactElement,
+  isNode = false
+) {
+  const children = isNode
+    ? (propsOrNode as ReactElement)
+    : <TiendaFulfillmentSelector {...(propsOrNode as Readonly<Parameters<typeof TiendaFulfillmentSelector>[0]>)} />;
+  return render(<LanguageProvider>{children}</LanguageProvider>);
 }
 
 describe('debeMostrarSelector', () => {
@@ -106,5 +120,37 @@ describe('TiendaFulfillmentSelector', () => {
     const botones = within(lista).getAllByRole('button');
     expect(botones[0].className).toContain('border-primary');
     expect(botones[1].className).not.toContain('border-primary');
+  });
+
+  it('resalta la primera modalidad del tab nuevo (no una modalidad obsoleta del tab anterior) al cambiar de tab tras una selección manual', () => {
+    // Wrapper controlado: refleja lo que hace el padre real (Task 14) —
+    // `value` vive afuera y se actualiza con lo que onChange le informe.
+    // Reproduce el escenario exacto del bug: click en un item NO default de
+    // un tab, después cambiar de tab, y verificar que se resalta el primero
+    // del tab nuevo — no un id obsoleto del tab anterior que no matchea
+    // ninguna fila del tab nuevo.
+    function Wrapper() {
+      const [value, setValue] = useState<'recogida' | 'domicilio' | null>('recogida');
+      return (
+        <TiendaFulfillmentSelector
+          recogidaHabilitada
+          envioHabilitado
+          modalidades={[recogida, recogidaProgramada, domicilio]}
+          value={value}
+          onChange={(tipo) => setValue(tipo)}
+          onAddressSelect={vi.fn()}
+        />
+      );
+    }
+    renderSelector(<Wrapper />, true);
+
+    const listaRecogida = screen.getByRole('list');
+    fireEvent.click(within(listaRecogida).getAllByRole('button')[1]); // selecciona "Recogida programada", no la default
+
+    fireEvent.click(screen.getByRole('tab', { name: /domicilio/i }));
+
+    const listaDomicilio = screen.getByRole('list');
+    const botonDomicilio = within(listaDomicilio).getByRole('button');
+    expect(botonDomicilio.className).toContain('border-primary');
   });
 });
