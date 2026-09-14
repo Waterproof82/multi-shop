@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { LanguageProvider } from '@/lib/language-context';
 import { TiendaFulfillmentSelector, debeMostrarSelector, type ModalidadEntregaPublica } from '@/components/TiendaFulfillmentSelector';
 
@@ -76,5 +76,35 @@ describe('TiendaFulfillmentSelector', () => {
     });
     expect(screen.getByText(/3,50/)).toBeInTheDocument();
     expect(screen.getByText(/120-180/)).toBeInTheDocument();
+  });
+
+  it('resalta la primera modalidad automáticamente cuando el tab tiene una sola opción', () => {
+    renderSelector({
+      recogidaHabilitada: false,
+      envioHabilitado: true,
+      modalidades: [domicilio],
+      value: 'domicilio',
+      onChange: vi.fn(),
+      onAddressSelect: vi.fn(),
+    });
+    const lista = screen.getByRole('list');
+    const boton = within(lista).getByRole('button');
+    expect(boton.className).toContain('border-primary');
+  });
+
+  it('resalta la primera modalidad del tab activo al cambiar de tab con múltiples opciones', () => {
+    const domicilioExpres = { ...domicilio, id: 'd2', nombre: 'Envío exprés', precioCents: 500 };
+    renderSelector({
+      recogidaHabilitada: false,
+      envioHabilitado: true,
+      modalidades: [domicilio, domicilioExpres],
+      value: 'domicilio',
+      onChange: vi.fn(),
+      onAddressSelect: vi.fn(),
+    });
+    const lista = screen.getByRole('list');
+    const botones = within(lista).getAllByRole('button');
+    expect(botones[0].className).toContain('border-primary');
+    expect(botones[1].className).not.toContain('border-primary');
   });
 });

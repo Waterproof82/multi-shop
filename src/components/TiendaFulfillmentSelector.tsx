@@ -32,6 +32,24 @@ export function debeMostrarSelector(
   return hayRecogida || hayDomicilio;
 }
 
+/**
+ * Modalidades del tab activo, acotadas a los flags de visibilidad reales
+ * (no solo a `value`): si el padre alguna vez pasa un `value` para un tab
+ * que no está visible (drift de estado), no hay que mostrar ni su lista de
+ * precios ni el input de dirección — el botón de ese tab ni siquiera existe.
+ */
+function modalidadesParaTab(
+  value: 'recogida' | 'domicilio' | null,
+  mostrarRecogida: boolean,
+  mostrarDomicilio: boolean,
+  modalidadesRecogida: ModalidadEntregaPublica[],
+  modalidadesDomicilio: ModalidadEntregaPublica[]
+): ModalidadEntregaPublica[] {
+  if (value === 'domicilio' && mostrarDomicilio) return modalidadesDomicilio;
+  if (mostrarRecogida) return modalidadesRecogida;
+  return [];
+}
+
 interface TiendaFulfillmentSelectorProps {
   recogidaHabilitada: boolean;
   envioHabilitado: boolean;
@@ -71,7 +89,15 @@ export function TiendaFulfillmentSelector({
 
   if (!mostrarRecogida && !mostrarDomicilio) return null;
 
-  const modalidadesDelTab = value === 'domicilio' ? modalidadesDomicilio : modalidadesRecogida;
+  const modalidadesDelTab = modalidadesParaTab(value, mostrarRecogida, mostrarDomicilio, modalidadesRecogida, modalidadesDomicilio);
+
+  // Fallback a la primera modalidad de la lista: al hacer click en un tab,
+  // `onChange` ya se dispara con `modalidadesXxx[0]`, pero `setModalidadSeleccionada`
+  // solo lo actualizan los botones de la lista — sin este fallback la fila
+  // "efectiva" (la que ya recibió el padre) no se ve resaltada hasta el
+  // próximo click, y al cambiar de tab puede quedar resaltada una modalidad
+  // de OTRO tab.
+  const idSeleccionado = modalidadSeleccionada ?? modalidadesDelTab[0]?.id ?? null;
 
   return (
     <div className="space-y-3 mb-3">
@@ -109,7 +135,7 @@ export function TiendaFulfillmentSelector({
               <button
                 type="button"
                 onClick={() => { setModalidadSeleccionada(m.id); onChange(value, m.id, m.precioCents); }}
-                className={`w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-sm text-left ${modalidadSeleccionada === m.id ? 'border-primary bg-primary/5' : 'border-border'}`}
+                className={`w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-sm text-left ${idSeleccionado === m.id ? 'border-primary bg-primary/5' : 'border-border'}`}
               >
                 <span>{m.nombre}</span>
                 <span className="ml-auto text-muted-foreground">{formatPrice(m.precioCents / 100, 'EUR', language)}</span>
@@ -122,7 +148,7 @@ export function TiendaFulfillmentSelector({
         </ul>
       )}
 
-      {value === 'domicilio' && (
+      {value === 'domicilio' && mostrarDomicilio && (
         <MapboxAddressInput disabled={disabled} onSelect={handleAddressSelect} />
       )}
     </div>
