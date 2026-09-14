@@ -31,6 +31,7 @@ const CAMPOS_DIRECTOS = [
   'tipo_impuesto', 'porcentaje_impuesto', 'mostrar_logo', 'validacion_pedidos_habilitada',
   'mostrar_promociones', 'mostrar_tgtg', 'descuento_bienvenida_activo',
   'descuento_bienvenida_porcentaje', 'descuento_bienvenida_duracion', 'tipo',
+  'recogida_tienda_habilitada', 'envio_domicilio_habilitado',
 ] as const satisfies ReadonlyArray<keyof UpdateEmpresaData>;
 
 /**
@@ -85,6 +86,8 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
           mostrarTgtg: empresa.mostrar_tgtg ?? true,
           mesasHabilitadas: empresa.mesas_habilitadas ?? true,
           deliveryHabilitado: empresa.delivery_habilitado ?? false,
+          recogidaTiendaHabilitada: ((empresa as Record<string, unknown>).recogida_tienda_habilitada as boolean | null) ?? false,
+          envioDomicilioHabilitado: ((empresa as Record<string, unknown>).envio_domicilio_habilitado as boolean | null) ?? false,
           moneda: empresa.moneda ?? 'EUR',
           emailNotification: empresa.email_notification,
           colores,
@@ -231,7 +234,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
     fb, instagram, url_mapa,
     direccion, telefono_whatsapp, email_notification, nif, razon_social,
     descuento_bienvenida_activo, descuento_bienvenida_porcentaje, descuento_bienvenida_duracion,
-    mesas_habilitadas, pagos_pickup_habilitados, delivery_habilitado
+    mesas_habilitadas, pagos_pickup_habilitados, delivery_habilitado, recogida_tienda_habilitada, envio_domicilio_habilitado
   `;
 
   private static mapTranslations(data: Record<string, unknown>, prefix: string): { es?: string | null; en?: string | null; fr?: string | null; it?: string | null; de?: string | null } | null {
@@ -290,6 +293,8 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
       mesasHabilitadas: (data.mesas_habilitadas as boolean) ?? true,
       pagosPickupHabilitados: (data.pagos_pickup_habilitados as boolean) ?? false,
       deliveryHabilitado: (data.delivery_habilitado as boolean) ?? false,
+      recogidaTiendaHabilitada: (data.recogida_tienda_habilitada as boolean) ?? false,
+      envioDomicilioHabilitado: (data.envio_domicilio_habilitado as boolean) ?? false,
     };
   }
 

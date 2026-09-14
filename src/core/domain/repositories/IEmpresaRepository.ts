@@ -24,6 +24,8 @@ export interface UpdateEmpresaData {
   tipo?: 'tienda' | 'restaurante';
   validacion_pedidos_habilitada?: boolean;
   delivery_habilitado?: boolean;
+  recogida_tienda_habilitada?: boolean;
+  envio_domicilio_habilitado?: boolean;
   nif?: string | null;
   razon_social?: string | null;
   tipo_impuesto?: 'iva' | 'igic';

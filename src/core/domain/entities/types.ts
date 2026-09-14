@@ -93,6 +93,8 @@ export interface Empresa {
   descuentoBienvenidaPorcentaje: number;
   descuentoBienvenidaDuracion?: number | null;
   deliveryHabilitado: boolean;
+  recogidaTiendaHabilitada?: boolean;
+  envioDomicilioHabilitado?: boolean;
   googleReviewsUrl: string | null;
   nif?: string | null;
   tipoImpuesto?: 'iva' | 'igic';
@@ -141,6 +143,8 @@ export interface EmpresaPublic {
   mesasHabilitadas?: boolean;
   pagosPickupHabilitados?: boolean;
   deliveryHabilitado?: boolean;
+  recogidaTiendaHabilitada?: boolean;
+  envioDomicilioHabilitado?: boolean;
 }
 
 export interface Cliente {
