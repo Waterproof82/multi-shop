@@ -15,7 +15,7 @@ const modalidadRecogida = {
 };
 
 describe('ModalidadesEntregaForm', () => {
-  it('el formulario de tipo recogida NO muestra campos de tiempo estimado', () => {
+  it('el formulario de tipo recogida NO muestra campos de tiempo mínimo/máximo', () => {
     render(
       <ModalidadesEntregaForm
         tipo="recogida"
