@@ -1753,6 +1753,17 @@ git commit -m "feat(carrito): componente TiendaFulfillmentSelector"
 > envioHabilitado)`. Mesa, waiter y restaurante quedan bit a bit iguales —
 > este helper es la única puerta de entrada al comportamiento nuevo.
 
+> **Nota especulativa de la review final de Task 13** (no bloqueante — el
+> flujo real de datos de este task no la dispara): `TiendaFulfillmentSelector`
+> resetea su selección manual (`modalidadSeleccionada`) al cambiar de tab,
+> pero NO si `modalidades` cambia de forma mientras el mismo tab sigue
+> activo (ej. el admin desactiva la modalidad seleccionada y el catálogo se
+> refresca en vivo). Como `cart-drawer.tsx` carga `modalidadesEntrega` una
+> sola vez al montar (Task 12, sin refetch en caliente), este caso no se da
+> hoy — pero si en el futuro se agrega un refresh en vivo del catálogo
+> mientras el carrito está abierto, revisar si la modalidad seleccionada
+> sigue existiendo en la lista nueva antes de confiar en el fallback.
+
 - [ ] **Step 1: Escribir el test de la función pura de gating (falla primero)**
 
 ```typescript
