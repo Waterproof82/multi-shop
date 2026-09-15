@@ -2,27 +2,18 @@ import { describe, it, expect } from 'vitest';
 import { createModalidadEntregaSchema, updateModalidadEntregaSchema } from '@/core/application/dtos/modalidad-entrega.dto';
 
 describe('createModalidadEntregaSchema', () => {
-  it('acepta recogida sin tiempoMinMinutos/tiempoMaxMinutos', () => {
+  it('rechaza tipo recogida — ya no es una modalidad creable, es implícita en el backend', () => {
     const parsed = createModalidadEntregaSchema.safeParse({
       empresaId: '11111111-1111-1111-8111-111111111111',
       tipo: 'recogida',
       icono: 'store',
       nombre_es: 'Recogida rápida',
       precioCents: 0,
-    });
-    expect(parsed.success).toBe(true);
-  });
-
-  it('rechaza recogida con tiempoMinMinutos presente', () => {
-    const parsed = createModalidadEntregaSchema.safeParse({
-      empresaId: '11111111-1111-1111-8111-111111111111',
-      tipo: 'recogida',
-      icono: 'store',
-      nombre_es: 'Recogida rápida',
-      precioCents: 0,
-      tiempoMinMinutos: 10,
     });
     expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      expect(parsed.error.issues.some(i => i.path[0] === 'tipo')).toBe(true);
+    }
   });
 
   it('acepta domicilio con rango de tiempo', () => {
@@ -64,60 +55,20 @@ describe('createModalidadEntregaSchema', () => {
     expect(parsed.success).toBe(true);
   });
 
-  it('rechaza recogida con solo tiempoMaxMinutos presente (sin tiempoMinMinutos)', () => {
-    const parsed = createModalidadEntregaSchema.safeParse({
-      empresaId: '11111111-1111-1111-8111-111111111111',
-      tipo: 'recogida',
-      icono: 'store',
-      nombre_es: 'Recogida rápida',
-      precioCents: 0,
-      tiempoMaxMinutos: 10,
-    });
-    expect(parsed.success).toBe(false);
-    if (!parsed.success) {
-      expect(parsed.error.issues.some(i => i.path[0] === 'tiempoMaxMinutos')).toBe(true);
-    }
-  });
-
   it('sigue aplicando orden=0 por defecto al crear si no se manda', () => {
     const parsed = createModalidadEntregaSchema.safeParse({
       empresaId: '11111111-1111-1111-8111-111111111111',
-      tipo: 'recogida',
-      icono: 'store',
-      nombre_es: 'Recogida rápida',
-      precioCents: 0,
+      tipo: 'domicilio',
+      icono: 'bike',
+      nombre_es: 'Envío estándar',
+      precioCents: 350,
+      tiempoMinMinutos: 30,
+      tiempoMaxMinutos: 60,
     });
     expect(parsed.success).toBe(true);
     if (parsed.success) {
       expect(parsed.data.orden).toBe(0);
     }
-  });
-
-  it('rechaza precioCents distinto de 0 cuando tipo es recogida', () => {
-    const result = createModalidadEntregaSchema.safeParse({
-      empresaId: '11111111-1111-1111-8111-111111111111',
-      tipo: 'recogida',
-      icono: 'store',
-      nombre_es: 'Recogida express',
-      precioCents: 150,
-      orden: 0,
-    });
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues[0].path).toEqual(['precioCents']);
-    }
-  });
-
-  it('acepta precioCents 0 cuando tipo es recogida', () => {
-    const result = createModalidadEntregaSchema.safeParse({
-      empresaId: '11111111-1111-1111-8111-111111111111',
-      tipo: 'recogida',
-      icono: 'store',
-      nombre_es: 'Recogida',
-      precioCents: 0,
-      orden: 0,
-    });
-    expect(result.success).toBe(true);
   });
 });
 

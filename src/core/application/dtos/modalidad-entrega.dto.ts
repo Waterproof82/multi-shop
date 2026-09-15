@@ -22,19 +22,12 @@ const baseModalidadEntregaSchema = z.object({
 });
 
 export const createModalidadEntregaSchema = baseModalidadEntregaSchema
-  .extend({ orden: z.number().int().min(0).default(0) })
-  .superRefine((data, ctx) => {
-    if (data.tipo === 'recogida') {
-      if (data.tiempoMinMinutos !== undefined) {
-        ctx.addIssue({ code: 'custom', message: 'Recogida no admite tiempo estimado (siempre es inmediata)', path: ['tiempoMinMinutos'] });
-      }
-      if (data.tiempoMaxMinutos !== undefined) {
-        ctx.addIssue({ code: 'custom', message: 'Recogida no admite tiempo estimado (siempre es inmediata)', path: ['tiempoMaxMinutos'] });
-      }
-      if (data.precioCents !== 0) {
-        ctx.addIssue({ code: 'custom', message: 'Recogida siempre es gratis (precio debe ser 0)', path: ['precioCents'] });
-      }
-    }
+  .extend({
+    orden: z.number().int().min(0).default(0),
+    // Recogida ya no es una modalidad creable — es implícita y gratuita en
+    // el backend (ver PedidoUseCase.revalidarModalidadEntrega). Solo
+    // domicilio se sigue configurando desde el admin.
+    tipo: z.literal('domicilio'),
   })
   .refine(
     (data) => data.tiempoMinMinutos === undefined || data.tiempoMaxMinutos === undefined || data.tiempoMinMinutos <= data.tiempoMaxMinutos,
