@@ -92,6 +92,33 @@ describe('createModalidadEntregaSchema', () => {
       expect(parsed.data.orden).toBe(0);
     }
   });
+
+  it('rechaza precioCents distinto de 0 cuando tipo es recogida', () => {
+    const result = createModalidadEntregaSchema.safeParse({
+      empresaId: '11111111-1111-1111-8111-111111111111',
+      tipo: 'recogida',
+      icono: 'store',
+      nombre_es: 'Recogida express',
+      precioCents: 150,
+      orden: 0,
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].path).toEqual(['precioCents']);
+    }
+  });
+
+  it('acepta precioCents 0 cuando tipo es recogida', () => {
+    const result = createModalidadEntregaSchema.safeParse({
+      empresaId: '11111111-1111-1111-8111-111111111111',
+      tipo: 'recogida',
+      icono: 'store',
+      nombre_es: 'Recogida',
+      precioCents: 0,
+      orden: 0,
+    });
+    expect(result.success).toBe(true);
+  });
 });
 
 // I5 — `.default(0)` en el campo base sobrevivía a `.partial()` en Zod v4: cada

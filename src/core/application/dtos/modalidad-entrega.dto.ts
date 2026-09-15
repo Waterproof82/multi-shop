@@ -31,6 +31,9 @@ export const createModalidadEntregaSchema = baseModalidadEntregaSchema
       if (data.tiempoMaxMinutos !== undefined) {
         ctx.addIssue({ code: 'custom', message: 'Recogida no admite tiempo estimado (siempre es inmediata)', path: ['tiempoMaxMinutos'] });
       }
+      if (data.precioCents !== 0) {
+        ctx.addIssue({ code: 'custom', message: 'Recogida siempre es gratis (precio debe ser 0)', path: ['precioCents'] });
+      }
     }
   })
   .refine(
