@@ -76,12 +76,12 @@ export function ModalidadesEntregaForm({
     <div className="space-y-4">
       <ul className="space-y-2">
         {filteredModalidades.map((m) => (
-          <li key={m.id} className="flex items-center gap-3 rounded-lg border border-border p-3">
+          <li key={m.id} className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 p-3">
             <span className="text-lg">{emojiDeIcono(m.icono)}</span>
-            <span className="flex-1 font-medium">{m.nombre}</span>
-            <span className="text-sm text-muted-foreground">{(m.precioCents / 100).toFixed(2)}€</span>
+            <span className="flex-1 font-medium text-white">{m.nombre}</span>
+            <span className="text-sm text-slate-400">{(m.precioCents / 100).toFixed(2)}€</span>
             {tipo === 'domicilio' && m.tiempoMinMinutos !== null && (
-              <span className="text-sm text-muted-foreground">
+              <span className="text-sm text-slate-400">
                 {m.tiempoMinMinutos}-{m.tiempoMaxMinutos} {t('deliveryModalityMinutesUnit', language)}
               </span>
             )}
@@ -107,9 +107,9 @@ export function ModalidadesEntregaForm({
         ))}
       </ul>
 
-      <div className="grid grid-cols-2 gap-3 rounded-lg border border-dashed border-border p-3">
+      <div className="grid grid-cols-2 gap-3 rounded-lg border border-dashed border-white/20 p-3">
         <div>
-          <label htmlFor={`icono-${tipo}`} className="text-xs font-medium text-muted-foreground block mb-1">
+          <label htmlFor={`icono-${tipo}`} className="text-xs font-medium text-slate-400 block mb-1">
             {t('deliveryModalityIcon', language)}
           </label>
           <Select value={icono} onValueChange={setIcono}>
@@ -126,7 +126,7 @@ export function ModalidadesEntregaForm({
           </Select>
         </div>
         <div>
-          <label htmlFor={`nombre-${tipo}`} className="text-xs font-medium text-muted-foreground block mb-1">
+          <label htmlFor={`nombre-${tipo}`} className="text-xs font-medium text-slate-400 block mb-1">
             {t('deliveryModalityName', language)}
           </label>
           <Input
@@ -138,7 +138,7 @@ export function ModalidadesEntregaForm({
         </div>
         {tipo === 'domicilio' && (
           <div>
-            <label htmlFor={`precio-${tipo}`} className="text-xs font-medium text-muted-foreground block mb-1">
+            <label htmlFor={`precio-${tipo}`} className="text-xs font-medium text-slate-400 block mb-1">
               {t('deliveryModalityPrice', language)}
             </label>
             <Input
@@ -156,7 +156,7 @@ export function ModalidadesEntregaForm({
             <div>
               <label
                 htmlFor={`tiempo-min-${tipo}`}
-                className="text-xs font-medium text-muted-foreground block mb-1"
+                className="text-xs font-medium text-slate-400 block mb-1"
               >
                 {t('deliveryModalityMinTime', language)}
               </label>
@@ -171,7 +171,7 @@ export function ModalidadesEntregaForm({
             <div>
               <label
                 htmlFor={`tiempo-max-${tipo}`}
-                className="text-xs font-medium text-muted-foreground block mb-1"
+                className="text-xs font-medium text-slate-400 block mb-1"
               >
                 {t('deliveryModalityMaxTime', language)}
               </label>

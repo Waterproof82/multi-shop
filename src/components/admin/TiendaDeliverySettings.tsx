@@ -153,7 +153,7 @@ export function TiendaDeliverySettings({
         <h2 className="text-2xl font-bold text-white mb-6">{t('deliveryMethodTitle', language)}</h2>
         <div className="rounded-xl border border-white/10 bg-white/5 p-6 space-y-4">
           <div className="flex items-center justify-between gap-4">
-            <span className="text-sm font-medium text-foreground">{t('tiendaRecogidaLabel', language)}</span>
+            <span className="text-sm font-medium text-white">{t('tiendaRecogidaLabel', language)}</span>
             <PillSwitch
               checked={recogidaHabilitada}
               disabled={savingCampos.has('recogida_tienda_habilitada')}
@@ -164,7 +164,7 @@ export function TiendaDeliverySettings({
             />
           </div>
           <div className="flex items-center justify-between gap-4">
-            <span className="text-sm font-medium text-foreground">{t('tiendaEnvioLabel', language)}</span>
+            <span className="text-sm font-medium text-white">{t('tiendaEnvioLabel', language)}</span>
             <PillSwitch
               checked={envioHabilitado}
               disabled={savingCampos.has('envio_domicilio_habilitado')}
