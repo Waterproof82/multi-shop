@@ -381,7 +381,7 @@ describe('PedidoUseCase.create — revalidación server-side de la modalidad de 
     const modalidadEntregaUseCase = {
       validarPrecioVigente: vi.fn().mockResolvedValue({
         success: true,
-        data: { precioCents: 150, tipo: 'recogida' },
+        data: { precioCents: 0, tipo: 'recogida' },
       }),
     } as unknown as ModalidadEntregaUseCase;
     const { useCase, pedidoRepoCreate } = buildUseCase(modalidadEntregaUseCase);

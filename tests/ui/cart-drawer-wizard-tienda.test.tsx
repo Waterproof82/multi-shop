@@ -96,20 +96,20 @@ describe('CartDrawer — wizard de tienda (recogida/domicilio activo, sin mesa)'
     const modalidades: ModalidadEntregaPublica[] = [
       {
         id: 'm1',
-        tipo: 'recogida',
-        icono: '🏬',
-        nombre: 'Recogida rápida',
+        tipo: 'domicilio',
+        icono: '🚲',
+        nombre: 'Envío exprés',
         precioCents: 150,
-        tiempoMinMinutos: null,
-        tiempoMaxMinutos: null,
+        tiempoMinMinutos: 30,
+        tiempoMaxMinutos: 45,
         activo: true,
         orden: 0,
       },
     ];
-    pintarCartDrawerConItem({ modalidadesEntrega: modalidades });
+    pintarCartDrawerConItem({ envioDomicilioHabilitado: true, modalidadesEntrega: modalidades });
 
     fireEvent.click(screen.getByRole('button', { name: /continuar/i }));
-    fireEvent.click(screen.getByRole('tab', { name: /recoger en tienda/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /envío a domicilio/i }));
 
     expect(screen.getByText('11,50 €')).toBeInTheDocument();
   });
@@ -123,25 +123,30 @@ describe('CartDrawer — wizard de tienda (recogida/domicilio activo, sin mesa)'
     const modalidades: ModalidadEntregaPublica[] = [
       {
         id: 'm1',
-        tipo: 'recogida',
-        icono: '🏬',
-        nombre: 'Recogida rápida',
+        tipo: 'domicilio',
+        icono: '🚲',
+        nombre: 'Envío exprés',
         precioCents: 150,
+        // null (no 30/45 como en el test anterior): con un rango de tiempo
+        // no nulo, TiendaFulfillmentSelector concatena " · 30-45 min" al
+        // precio en la fila de la lista ("1,50 € · 30-45 min"), lo que rompe
+        // el match exacto de getAllByText('1,50 €') contra esa fila. La fila
+        // de desglose de TotalsSection sí pinta el precio limpio siempre.
         tiempoMinMinutos: null,
         tiempoMaxMinutos: null,
         activo: true,
         orden: 0,
       },
     ];
-    pintarCartDrawerConItem({ modalidadesEntrega: modalidades });
+    pintarCartDrawerConItem({ envioDomicilioHabilitado: true, modalidadesEntrega: modalidades });
 
     fireEvent.click(screen.getByRole('button', { name: /continuar/i }));
-    fireEvent.click(screen.getByRole('tab', { name: /recoger en tienda/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /envío a domicilio/i }));
 
     // Aparece dos veces: una en la fila de la lista de TiendaFulfillmentSelector
     // (la que ya existía) y otra nueva en el desglose de TotalsSection — si
     // solo apareciera una vez, la fila de desglose no se estaría pintando.
-    expect(screen.getAllByText('Recogida rápida')).toHaveLength(2);
+    expect(screen.getAllByText('Envío exprés')).toHaveLength(2);
     expect(screen.getAllByText('1,50 €')).toHaveLength(2);
     expect(screen.getByText('11,50 €')).toBeInTheDocument();
   });
