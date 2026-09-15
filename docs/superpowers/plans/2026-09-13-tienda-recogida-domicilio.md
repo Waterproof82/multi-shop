@@ -2542,3 +2542,16 @@ La feature es hoy write-only: nada muestra `modalidad_entrega_tipo`/`direccion_e
 **Tests:** al menos un test que confirme que el badge/vista de tienda se renderiza cuando `pedido.modalidad_entrega_tipo` está presente (test de UI sobre `page.tsx` si ya hay suite de tests para ese archivo, si no existe ninguna hoy no es obligatorio crear el harness completo — evaluar el costo/beneficio y decidir).
 
 **Checkpoint:** mismo que Task 18.
+
+---
+
+## Fase 7 — Seguimiento post-lanzamiento (2026-09-15)
+
+Tras verificar en vivo con la empresa "Mermelada de Tomate", el usuario pidió
+4 mejoras de UI/UX (iconos que no se pintaban, lista de domicilio poco clara,
+recogida simplificada a siempre-gratis, colores del panel admin) que
+crecieron a un cambio de alcance real (recogida deja de aceptar precio en
+todo el sistema, no solo en la UI). Ver diseño y plan propios:
+
+- `docs/superpowers/specs/2026-09-15-mejoras-ui-modalidades-entrega-design.md`
+- `docs/superpowers/plans/2026-09-15-mejoras-ui-modalidades-entrega.md`
