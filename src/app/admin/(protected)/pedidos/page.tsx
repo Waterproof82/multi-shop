@@ -52,6 +52,8 @@ interface Pedido {
   sesion: MesaSesionDate | null;
   delivery_fee_cents?: number | null;
   origen?: string | null;
+  modalidad_entrega_tipo?: 'recogida' | 'domicilio' | null;
+  direccion_entrega?: string | null;
 }
 
 const ORIGEN_ORDER: Record<string, number> = { mesa: 0, recogida: 1, delivery: 2, web: 3 };
@@ -120,7 +122,46 @@ function comparePedidos(a: Pedido, b: Pedido, sortField: keyof Pedido | 'origen'
   return 0;
 }
 
-function renderOrigenBadge(pedido: Pedido) {
+interface TiendaModalidadBadgeInfo {
+  labelKey: 'tiendaRecogidaLabel' | 'tiendaEnvioLabel';
+  direccion: string | null;
+}
+
+/**
+ * `modalidad_entrega_tipo` solo existe en pedidos de tienda (revalidada
+ * server-side en `revalidarModalidadEntrega`, ver pedido.use-case.ts) — un
+ * pedido de restaurante nunca lo trae. Se comprueba ANTES que
+ * `tracking_token` en `renderOrigenBadge`: `shouldGenerateTrackingToken()`
+ * también setea `tracking_token` en TODO pedido de tienda (recogida Y
+ * domicilio), así que sin este chequeo primero un envío a domicilio caería
+ * en la rama de tracking_token y se mostraría como "Recogida".
+ */
+export function getTiendaModalidadBadgeInfo(pedido: Pick<Pedido, 'modalidad_entrega_tipo' | 'direccion_entrega'>): TiendaModalidadBadgeInfo | null {
+  if (pedido.modalidad_entrega_tipo === 'domicilio') {
+    return { labelKey: 'tiendaEnvioLabel', direccion: pedido.direccion_entrega ?? null };
+  }
+  if (pedido.modalidad_entrega_tipo === 'recogida') {
+    return { labelKey: 'tiendaRecogidaLabel', direccion: null };
+  }
+  return null;
+}
+
+export function renderOrigenBadge(pedido: Pedido, language: Language) {
+  const tiendaInfo = getTiendaModalidadBadgeInfo(pedido);
+  if (tiendaInfo) {
+    return (
+      <span className="inline-flex flex-col items-start gap-0.5">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-500/20 text-purple-300 border border-purple-400/30">
+          {t(tiendaInfo.labelKey, language)}
+        </span>
+        {tiendaInfo.direccion && (
+          <span className="text-[11px] text-muted-foreground truncate max-w-[180px]" title={tiendaInfo.direccion}>
+            {tiendaInfo.direccion}
+          </span>
+        )}
+      </span>
+    );
+  }
   if (pedido.mesa_id) {
     const label = pedido.mesas ? `Mesa ${pedido.mesas.numero}` : 'Mesa';
     return (
@@ -640,7 +681,7 @@ export default function PedidosPage() {
                         #{pedido.numero_pedido}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        {renderOrigenBadge(pedido)}
+                        {renderOrigenBadge(pedido, language)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                         {pedido.clientes?.nombre || '-'}
@@ -675,6 +716,11 @@ export default function PedidosPage() {
                         <td colSpan={8} className="px-4 py-4 bg-muted/30">
                           <div className="max-w-2xl">
                             <h4 className="font-medium mb-2 text-foreground">{t("orderDetails", language)}</h4>
+                            {pedido.modalidad_entrega_tipo === 'domicilio' && pedido.direccion_entrega && (
+                              <p className="mb-2 text-sm text-muted-foreground">
+                                <span className="font-medium text-foreground">{t('deliveryAddress', language)}:</span> {pedido.direccion_entrega}
+                              </p>
+                            )}
                             <ul className="space-y-2 text-sm text-foreground">
                               {groupPedidoItems(pedido.detalle_pedido ?? []).map((item) => {
                                 const complementoTotal = item.complementos.reduce((sum, comp) => sum + (comp.precio || comp.price || 0), 0);

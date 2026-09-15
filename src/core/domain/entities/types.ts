@@ -219,6 +219,7 @@ export interface Pedido {
   paymentAmountCents?: number | null;
   delivery_fee_cents?: number | null;
   origen?: string | null;
+  modalidadEntregaTipo?: 'recogida' | 'domicilio' | null;
 }
 
 export interface Promocion {
