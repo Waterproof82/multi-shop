@@ -174,18 +174,35 @@ function validatePhoneInput(phone: string, translate: TranslateFn, language: Lan
   return undefined;
 }
 
+/**
+ * C1: un pedido de tienda con modalidad 'domicilio' sin dirección
+ * (lat/lng) no debe poder confirmarse — mismo hueco que el de restaurante,
+ * reusa el mismo mensaje (`deliverySelectValidAddress`) en vez de UI nueva.
+ */
+function faltaDireccionDomicilio(
+  modalidadEntregaTipo: 'recogida' | 'domicilio' | null,
+  deliveryLatitude: number | null,
+  deliveryLongitude: number | null
+): boolean {
+  return modalidadEntregaTipo === 'domicilio' && (deliveryLatitude === null || deliveryLongitude === null);
+}
+
 function resolveDeliveryError(
   isRestaurant: boolean,
   deliveryMethod: DeliveryMethod,
   deliveryLatitude: number | null,
   deliveryLongitude: number | null,
   translate: TranslateFn,
-  language: Language
+  language: Language,
+  modalidadEntregaTipo: 'recogida' | 'domicilio' | null = null
 ): string | undefined {
   if (isRestaurant && deliveryMethod === null) {
     return translate('deliveryMethodTitle', language);
   }
   if (isRestaurant && deliveryMethod === 'delivery' && (deliveryLatitude === null || deliveryLongitude === null)) {
+    return translate('deliverySelectValidAddress', language);
+  }
+  if (faltaDireccionDomicilio(modalidadEntregaTipo, deliveryLatitude, deliveryLongitude)) {
     return translate('deliverySelectValidAddress', language);
   }
   return undefined;
@@ -887,8 +904,13 @@ function computeIsDeliveryIncomplete(
   deliveryMethod: DeliveryMethod,
   deliveryLatitude: number | null,
   estimatedFeeCents: number | null,
+  modalidadEntregaTipo: 'recogida' | 'domicilio' | null = null,
+  deliveryLongitude: number | null = null,
 ): boolean {
-  return !!(isRestaurant && !mesaToken && deliveryMethod === 'delivery' && (deliveryLatitude === null || estimatedFeeCents === null));
+  if (isRestaurant && !mesaToken && deliveryMethod === 'delivery' && (deliveryLatitude === null || estimatedFeeCents === null)) {
+    return true;
+  }
+  return !mesaToken && faltaDireccionDomicilio(modalidadEntregaTipo, deliveryLatitude, deliveryLongitude);
 }
 
 function computeCartTotals(
@@ -1099,11 +1121,13 @@ function validarDatosDelCliente(datos: {
   deliveryLongitude: number | null;
   t: typeof t;
   language: Parameters<typeof t>[1];
+  modalidadEntregaTipo?: 'recogida' | 'domicilio' | null;
 }): { nombre?: string; telefono?: string; delivery?: string } | null {
   const nombre = validateNameInput(datos.nombre, datos.t, datos.language);
   const telefono = validatePhoneInput(datos.telefono, datos.t, datos.language);
   const delivery = resolveDeliveryError(
     datos.isRestaurant, datos.deliveryMethod, datos.deliveryLatitude, datos.deliveryLongitude, datos.t, datos.language,
+    datos.modalidadEntregaTipo ?? null,
   );
 
   if (!nombre && !telefono && !delivery) return null;
@@ -1378,7 +1402,7 @@ export function CartDrawer({
 
     // Flujo estándar (sin mesa): aquí sí hay datos personales que validar.
     const errores = validarDatosDelCliente({
-      nombre, telefono, isRestaurant, deliveryMethod, deliveryLatitude, deliveryLongitude, t, language,
+      nombre, telefono, isRestaurant, deliveryMethod, deliveryLatitude, deliveryLongitude, t, language, modalidadEntregaTipo,
     });
     if (errores) {
       setErrors(errores);
@@ -1428,7 +1452,7 @@ export function CartDrawer({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items.length]);
 
-  const isDeliveryIncomplete = computeIsDeliveryIncomplete(isRestaurant, mesaToken, deliveryMethod, deliveryLatitude, estimatedFeeCents);
+  const isDeliveryIncomplete = computeIsDeliveryIncomplete(isRestaurant, mesaToken, deliveryMethod, deliveryLatitude, estimatedFeeCents, modalidadEntregaTipo, deliveryLongitude);
 
   const handleDialogClose = useCallback((open: boolean) => {
     if (!open) {

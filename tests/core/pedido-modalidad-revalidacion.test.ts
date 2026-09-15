@@ -175,9 +175,15 @@ describe('PedidoUseCase.create — revalidación server-side de la modalidad de 
     // El cliente manda 'recogida' — intenta hacerse pasar por una modalidad sin
     // dirección para saltarse la recogida de domicilio, o simplemente su UI
     // quedó desincronizada. El servidor NUNCA debe confiar en este campo.
+    // Sí manda dirección (el wizard la pide igual mientras hay un tab
+    // 'domicilio' activo) — el punto de este test es el tipo/precio
+    // persistidos, no C1 (cubierto aparte más abajo).
     const dto = baseDto({
       modalidad_entrega_id: 'm1',
       modalidad_entrega_tipo: 'recogida',
+      direccion_entrega: 'Calle Falsa 123',
+      latitude_entrega: 40.4,
+      longitude_entrega: -3.7,
     });
 
     const result = await useCase.create('empresa-1', dto, 'tienda', null, false, false);
@@ -287,6 +293,104 @@ describe('PedidoUseCase.create — revalidación server-side de la modalidad de 
     expect(payload.codigo_postal).toBe('28001');
     expect(payload.latitude_entrega).toBe(40.4);
     expect(payload.longitude_entrega).toBe(-3.7);
+  });
+
+  // ─── C1: un pedido de domicilio no puede confirmarse sin dirección ────────
+  // Bug real hallado en la revisión final: nada, ni cliente ni servidor,
+  // bloqueaba crear un pedido con modalidad 'domicilio' sin
+  // direccion_entrega/latitude_entrega/longitude_entrega. Se cobraba el envío
+  // y la tienda no tenía adónde mandarlo.
+  it('falla con MODALIDAD_ENTREGA_SIN_DIRECCION si el tipo validado es domicilio y falta direccion_entrega', async () => {
+    const modalidadEntregaUseCase = {
+      validarPrecioVigente: vi.fn().mockResolvedValue({
+        success: true,
+        data: { precioCents: 350, tipo: 'domicilio' },
+      }),
+    } as unknown as ModalidadEntregaUseCase;
+    const { useCase, pedidoRepoCreate } = buildUseCase(modalidadEntregaUseCase);
+
+    const dto = baseDto({
+      modalidad_entrega_id: 'm1',
+      modalidad_entrega_tipo: 'domicilio',
+      // Sin direccion_entrega ni lat/lng — el hueco real.
+      latitude_entrega: 40.4,
+      longitude_entrega: -3.7,
+    });
+
+    const result = await useCase.create('empresa-1', dto, 'tienda', null, false, false);
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.code).toBe('MODALIDAD_ENTREGA_SIN_DIRECCION');
+    }
+    expect(pedidoRepoCreate).not.toHaveBeenCalled();
+  });
+
+  it('falla con MODALIDAD_ENTREGA_SIN_DIRECCION si direccion_entrega es solo espacios en blanco', async () => {
+    const modalidadEntregaUseCase = {
+      validarPrecioVigente: vi.fn().mockResolvedValue({
+        success: true,
+        data: { precioCents: 350, tipo: 'domicilio' },
+      }),
+    } as unknown as ModalidadEntregaUseCase;
+    const { useCase, pedidoRepoCreate } = buildUseCase(modalidadEntregaUseCase);
+
+    const dto = baseDto({
+      modalidad_entrega_id: 'm1',
+      modalidad_entrega_tipo: 'domicilio',
+      direccion_entrega: '   ',
+      latitude_entrega: 40.4,
+      longitude_entrega: -3.7,
+    });
+
+    const result = await useCase.create('empresa-1', dto, 'tienda', null, false, false);
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.code).toBe('MODALIDAD_ENTREGA_SIN_DIRECCION');
+    }
+    expect(pedidoRepoCreate).not.toHaveBeenCalled();
+  });
+
+  it('falla con MODALIDAD_ENTREGA_SIN_DIRECCION si faltan latitude_entrega/longitude_entrega', async () => {
+    const modalidadEntregaUseCase = {
+      validarPrecioVigente: vi.fn().mockResolvedValue({
+        success: true,
+        data: { precioCents: 350, tipo: 'domicilio' },
+      }),
+    } as unknown as ModalidadEntregaUseCase;
+    const { useCase, pedidoRepoCreate } = buildUseCase(modalidadEntregaUseCase);
+
+    const dto = baseDto({
+      modalidad_entrega_id: 'm1',
+      modalidad_entrega_tipo: 'domicilio',
+      direccion_entrega: 'Calle Falsa 123',
+      // Sin latitude_entrega/longitude_entrega
+    });
+
+    const result = await useCase.create('empresa-1', dto, 'tienda', null, false, false);
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.code).toBe('MODALIDAD_ENTREGA_SIN_DIRECCION');
+    }
+    expect(pedidoRepoCreate).not.toHaveBeenCalled();
+  });
+
+  it('NO exige dirección si el tipo validado es recogida, aunque falte todo', async () => {
+    const modalidadEntregaUseCase = {
+      validarPrecioVigente: vi.fn().mockResolvedValue({
+        success: true,
+        data: { precioCents: 150, tipo: 'recogida' },
+      }),
+    } as unknown as ModalidadEntregaUseCase;
+    const { useCase, pedidoRepoCreate } = buildUseCase(modalidadEntregaUseCase);
+
+    const dto = baseDto({ modalidad_entrega_id: 'm1', modalidad_entrega_tipo: 'recogida' });
+    const result = await useCase.create('empresa-1', dto, 'tienda', null, false, false);
+
+    expect(result.success).toBe(true);
+    expect(pedidoRepoCreate).toHaveBeenCalledTimes(1);
   });
 
   it('NO revalida ni persiste modalidad si la empresa es restaurante, aunque el body mande modalidad_entrega_id', async () => {

@@ -230,7 +230,7 @@ async function handleDefaultOrder(
   if (!pedidoResult.success) {
     const errorCode = pedidoResult.error.code;
     if (errorCode === IDEMPOTENCY_MISMATCH_CODE) return idempotencyConflict();
-    if (['PRODUCT_NOT_FOUND', 'CODE_EXPIRED', 'CODE_ALREADY_USED', 'EMAIL_MISMATCH'].includes(errorCode)) {
+    if (['PRODUCT_NOT_FOUND', 'CODE_EXPIRED', 'CODE_ALREADY_USED', 'EMAIL_MISMATCH', 'MODALIDAD_ENTREGA_INVALIDA', 'MODALIDAD_ENTREGA_SIN_DIRECCION'].includes(errorCode)) {
       return NextResponse.json({ error: pedidoResult.error.message }, { status: 400 });
     }
     return NextResponse.json({ error: 'Error al crear el pedido' }, { status: 500 });

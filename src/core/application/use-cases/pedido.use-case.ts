@@ -87,6 +87,19 @@ export interface PedidoStats {
 }
 
 /**
+ * ¿Trae el DTO una dirección de entrega utilizable para un envío a
+ * domicilio? Exige `direccion_entrega` no vacía (tras `.trim()`) y ambas
+ * coordenadas (`latitude_entrega`/`longitude_entrega`) presentes.
+ *
+ * Función pura de módulo (S3776) — no inline en `revalidarModalidadEntrega`.
+ * C1: sin este chequeo, un pedido con modalidad 'domicilio' se confirmaba
+ * (y cobraba el envío) sin dirección alguna a la que mandarlo.
+ */
+function tieneDireccionValida(data: Pick<CreatePedidoDTO, 'direccion_entrega' | 'latitude_entrega' | 'longitude_entrega'>): boolean {
+  return !!data.direccion_entrega?.trim() && data.latitude_entrega !== undefined && data.longitude_entrega !== undefined;
+}
+
+/**
  * Result of discount validation for pedido creation
  */
 type DiscountResult = {
@@ -467,6 +480,11 @@ export class PedidoUseCase {
    * `modalidades_entrega` para empresas tipo tienda, pero nada a nivel de API
    * lo impedía. Extraído de `create()` también para bajar su complejidad
    * cognitiva (S3776, ver docs/context/deuda-complejidad.md).
+   *
+   * C1: cuando el tipo VALIDADO (nunca el que manda el cliente) es
+   * 'domicilio', exige dirección — sin este chequeo un pedido de envío se
+   * confirmaba y cobraba sin dirección alguna a la que mandarlo (ver
+   * `tieneDireccionValida`).
    */
   private async revalidarModalidadEntrega(
     data: CreatePedidoDTO,
@@ -479,6 +497,17 @@ export class PedidoUseCase {
     const modalidadResult = await this.modalidadEntregaUseCase.validarPrecioVigente(data.modalidad_entrega_id, empresaId);
     if (!modalidadResult.success) {
       return { success: false, error: modalidadResult.error };
+    }
+    if (modalidadResult.data.tipo === 'domicilio' && !tieneDireccionValida(data)) {
+      return {
+        success: false,
+        error: {
+          code: 'MODALIDAD_ENTREGA_SIN_DIRECCION',
+          message: 'La modalidad de envío a domicilio requiere una dirección de entrega válida',
+          module: 'use-case',
+          method: 'PedidoUseCase.revalidarModalidadEntrega',
+        },
+      };
     }
     return { success: true, data: { precioCents: modalidadResult.data.precioCents, tipo: modalidadResult.data.tipo } };
   }

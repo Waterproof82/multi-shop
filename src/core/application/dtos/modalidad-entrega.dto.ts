@@ -12,10 +12,17 @@ const baseModalidadEntregaSchema = z.object({
   precioCents: z.number().int().min(0).max(100_000),
   tiempoMinMinutos: z.number().int().min(0).max(10_080).optional(),
   tiempoMaxMinutos: z.number().int().min(0).max(10_080).optional(),
-  orden: z.number().int().min(0).default(0),
+  // Sin `.default(0)` aquí a propósito (I5): en Zod v4 un `.default()` del
+  // schema base SOBREVIVE a `.partial()` — `updateModalidadEntregaSchema`
+  // reescribiría `orden=0` en cada PUT aunque el caller no lo mandara,
+  // pisando el valor real guardado. El default solo vive en
+  // `createModalidadEntregaSchema`, donde SÍ tiene sentido (una fila nueva
+  // sin orden explícito).
+  orden: z.number().int().min(0),
 });
 
 export const createModalidadEntregaSchema = baseModalidadEntregaSchema
+  .extend({ orden: z.number().int().min(0).default(0) })
   .superRefine((data, ctx) => {
     if (data.tipo === 'recogida') {
       if (data.tiempoMinMinutos !== undefined) {

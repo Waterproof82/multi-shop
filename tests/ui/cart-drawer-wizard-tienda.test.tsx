@@ -145,4 +145,70 @@ describe('CartDrawer — wizard de tienda (recogida/domicilio activo, sin mesa)'
     expect(screen.getAllByText('1,50 €')).toHaveLength(2);
     expect(screen.getByText('11,50 €')).toBeInTheDocument();
   });
+
+  // C1 (Task 18): un pedido de domicilio se podía confirmar sin dirección —
+  // ni el cliente ni el servidor lo bloqueaban. Este bloque cubre el lado
+  // cliente: gatear el submit reusando el mismo patrón de mensaje/deshabilitar
+  // que ya existía para restaurante, sin duplicar UI nueva.
+  it('deshabilita el botón de enviar si se elige domicilio y no se seleccionó dirección (sin lat/lng)', () => {
+    const modalidades: ModalidadEntregaPublica[] = [
+      {
+        id: 'm-domicilio',
+        tipo: 'domicilio',
+        icono: '🛵',
+        nombre: 'Envío estándar',
+        precioCents: 350,
+        tiempoMinMinutos: 120,
+        tiempoMaxMinutos: 180,
+        activo: true,
+        orden: 0,
+      },
+    ];
+    pintarCartDrawerConItem({ envioDomicilioHabilitado: true, modalidadesEntrega: modalidades });
+
+    fireEvent.click(screen.getByRole('button', { name: /continuar/i }));
+    // La confirmación de edad es una condición aparte (LOPDGDD Art.7) —
+    // marcarla para aislar la condición que este test ejercita: la dirección
+    // de domicilio, no la edad.
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('tab', { name: /envío a domicilio/i }));
+
+    expect(screen.getByRole('button', { name: /enviar pedido/i })).toBeDisabled();
+    expect(screen.getByText('Selecciona una dirección válida')).toBeInTheDocument();
+  });
+
+  it('NO bloquea el botón de enviar en recogida, aunque domicilio esté habilitado (el bloqueo es específico de domicilio)', () => {
+    const modalidades: ModalidadEntregaPublica[] = [
+      {
+        id: 'm-recogida',
+        tipo: 'recogida',
+        icono: '🏬',
+        nombre: 'Recogida rápida',
+        precioCents: 0,
+        tiempoMinMinutos: null,
+        tiempoMaxMinutos: null,
+        activo: true,
+        orden: 0,
+      },
+      {
+        id: 'm-domicilio',
+        tipo: 'domicilio',
+        icono: '🛵',
+        nombre: 'Envío estándar',
+        precioCents: 350,
+        tiempoMinMinutos: 120,
+        tiempoMaxMinutos: 180,
+        activo: true,
+        orden: 0,
+      },
+    ];
+    pintarCartDrawerConItem({ envioDomicilioHabilitado: true, modalidadesEntrega: modalidades });
+
+    fireEvent.click(screen.getByRole('button', { name: /continuar/i }));
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('tab', { name: /recoger en tienda/i }));
+
+    expect(screen.getByRole('button', { name: /enviar pedido/i })).not.toBeDisabled();
+    expect(screen.queryByText('Selecciona una dirección válida')).not.toBeInTheDocument();
+  });
 });
