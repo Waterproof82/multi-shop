@@ -70,7 +70,6 @@ export default async function DeliveryPage() {
       {empresa?.tipo === 'tienda' && (
         <TiendaDeliverySettings
           empresaId={empresaId!}
-          recogidaHabilitada={empresa.recogidaTiendaHabilitada ?? false}
           envioHabilitado={empresa.envioDomicilioHabilitado ?? false}
           modalidadesIniciales={modalidadesIniciales}
         />

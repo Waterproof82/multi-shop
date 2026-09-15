@@ -9,20 +9,17 @@ import { t } from '@/lib/translations';
 
 interface TiendaDeliverySettingsProps {
   empresaId: string;
-  recogidaHabilitada: boolean;
   envioHabilitado: boolean;
   modalidadesIniciales: ModalidadEntregaRow[];
 }
 
-type CampoHabilitado = 'recogida_tienda_habilitada' | 'envio_domicilio_habilitado';
-
 interface CreateModalidadInput {
-  tipo: 'recogida' | 'domicilio';
+  tipo: 'domicilio';
   icono: string;
   nombre_es: string;
   precioCents: number;
-  tiempoMinMinutos?: number;
-  tiempoMaxMinutos?: number;
+  tiempoMinMinutos: number;
+  tiempoMaxMinutos: number;
 }
 
 type Lang = Parameters<typeof t>[1];
@@ -36,55 +33,38 @@ async function extraerMensajeError(res: Response, language: Lang): Promise<strin
   return data.error ?? t('errorSaving', language);
 }
 
-function agregarCampo(prev: Set<CampoHabilitado>, campo: CampoHabilitado): Set<CampoHabilitado> {
-  const next = new Set(prev);
-  next.add(campo);
-  return next;
-}
-
-function quitarCampo(prev: Set<CampoHabilitado>, campo: CampoHabilitado): Set<CampoHabilitado> {
-  const next = new Set(prev);
-  next.delete(campo);
-  return next;
-}
-
 export function TiendaDeliverySettings({
   empresaId,
-  recogidaHabilitada: recogidaInicial,
   envioHabilitado: envioInicial,
   modalidadesIniciales,
 }: Readonly<TiendaDeliverySettingsProps>) {
   const { language } = useLanguage();
-  const [recogidaHabilitada, setRecogidaHabilitada] = useState(recogidaInicial);
   const [envioHabilitado, setEnvioHabilitado] = useState(envioInicial);
-  const [savingCampos, setSavingCampos] = useState<Set<CampoHabilitado>>(new Set());
+  const [savingEnvio, setSavingEnvio] = useState(false);
   const [modalidades, setModalidades] = useState<ModalidadEntregaRow[]>(modalidadesIniciales);
   const [feedback, setFeedback] = useState<{ ok: boolean; message: string } | null>(null);
 
-  const toggleHabilitado = useCallback(
-    async (campo: CampoHabilitado, valorActual: boolean, setValor: (v: boolean) => void) => {
-      const nuevoValor = !valorActual;
-      setValor(nuevoValor);
-      setSavingCampos((prev) => agregarCampo(prev, campo));
-      setFeedback(null);
-      try {
-        const res = await fetchWithCsrf('/api/admin/empresa', {
-          method: 'PUT',
-          body: JSON.stringify({ [campo]: nuevoValor }),
-        });
-        if (!res.ok) {
-          setValor(valorActual);
-          setFeedback({ ok: false, message: await extraerMensajeError(res, language) });
-        }
-      } catch {
-        setValor(valorActual);
-        setFeedback({ ok: false, message: t('connectionError', language) });
-      } finally {
-        setSavingCampos((prev) => quitarCampo(prev, campo));
+  const toggleEnvio = useCallback(async () => {
+    const nuevoValor = !envioHabilitado;
+    setEnvioHabilitado(nuevoValor);
+    setSavingEnvio(true);
+    setFeedback(null);
+    try {
+      const res = await fetchWithCsrf('/api/admin/empresa', {
+        method: 'PUT',
+        body: JSON.stringify({ envio_domicilio_habilitado: nuevoValor }),
+      });
+      if (!res.ok) {
+        setEnvioHabilitado(!nuevoValor);
+        setFeedback({ ok: false, message: await extraerMensajeError(res, language) });
       }
-    },
-    [language]
-  );
+    } catch {
+      setEnvioHabilitado(!nuevoValor);
+      setFeedback({ ok: false, message: t('connectionError', language) });
+    } finally {
+      setSavingEnvio(false);
+    }
+  }, [envioHabilitado, language]);
 
   const handleCreate = useCallback(
     async (data: CreateModalidadInput) => {
@@ -153,24 +133,11 @@ export function TiendaDeliverySettings({
         <h2 className="text-2xl font-bold text-white mb-6">{t('deliveryMethodTitle', language)}</h2>
         <div className="rounded-xl border border-white/10 bg-white/5 p-6 space-y-4">
           <div className="flex items-center justify-between gap-4">
-            <span className="text-sm font-medium text-white">{t('tiendaRecogidaLabel', language)}</span>
-            <PillSwitch
-              checked={recogidaHabilitada}
-              disabled={savingCampos.has('recogida_tienda_habilitada')}
-              onChange={() =>
-                toggleHabilitado('recogida_tienda_habilitada', recogidaHabilitada, setRecogidaHabilitada)
-              }
-              ariaLabel={t('tiendaRecogidaLabel', language)}
-            />
-          </div>
-          <div className="flex items-center justify-between gap-4">
             <span className="text-sm font-medium text-white">{t('tiendaEnvioLabel', language)}</span>
             <PillSwitch
               checked={envioHabilitado}
-              disabled={savingCampos.has('envio_domicilio_habilitado')}
-              onChange={() =>
-                toggleHabilitado('envio_domicilio_habilitado', envioHabilitado, setEnvioHabilitado)
-              }
+              disabled={savingEnvio}
+              onChange={toggleEnvio}
               ariaLabel={t('tiendaEnvioLabel', language)}
             />
           </div>
@@ -186,28 +153,12 @@ export function TiendaDeliverySettings({
         </p>
       )}
 
-      {recogidaHabilitada && (
-        <section className="space-y-3">
-          <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
-            {t('tiendaRecogidaLabel', language)}
-          </h3>
-          <ModalidadesEntregaForm
-            tipo="recogida"
-            modalidades={modalidades}
-            onCreate={handleCreate}
-            onUpdate={handleUpdate}
-            onDelete={handleDelete}
-          />
-        </section>
-      )}
-
       {envioHabilitado && (
         <section className="space-y-3">
           <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
             {t('tiendaEnvioLabel', language)}
           </h3>
           <ModalidadesEntregaForm
-            tipo="domicilio"
             modalidades={modalidades}
             onCreate={handleCreate}
             onUpdate={handleUpdate}

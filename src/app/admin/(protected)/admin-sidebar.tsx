@@ -177,10 +177,10 @@ export function isItemVisible(item: NavItemDef, ctx: FilterCtx): boolean {
   if (item.requiresTgtg && !ctx.mostrarTgtg) return false;
   if (item.requiresRestaurant && !ctx.isRestaurant) return false;
   // `deliveryHabilitado` es el flag viejo, exclusivo del sistema Glovo de
-  // restaurante. Para tienda, "/admin/delivery" es la ÚNICA puerta a los
-  // toggles recogida_tienda_habilitada/envio_domicilio_habilitado — sin este
-  // OR, esos toggles nacen en false y no hay forma de llegar a la pantalla
-  // que los prende, aunque el resto de la feature esté bien implementada.
+  // restaurante. Para tienda, "/admin/delivery" es la ÚNICA puerta al
+  // toggle envio_domicilio_habilitado — sin este OR, ese toggle nace en
+  // false y no hay forma de llegar a la pantalla que lo prende, aunque el
+  // resto de la feature esté bien implementada.
   if (item.requiresDelivery && !ctx.deliveryHabilitado && !ctx.isTienda) return false;
   return true;
 }

@@ -22,22 +22,20 @@ export interface ModalidadEntregaRow {
 }
 
 interface ModalidadesEntregaFormProps {
-  tipo: 'recogida' | 'domicilio';
   modalidades: ModalidadEntregaRow[];
   onCreate: (data: {
-    tipo: 'recogida' | 'domicilio';
+    tipo: 'domicilio';
     icono: string;
     nombre_es: string;
     precioCents: number;
-    tiempoMinMinutos?: number;
-    tiempoMaxMinutos?: number;
+    tiempoMinMinutos: number;
+    tiempoMaxMinutos: number;
   }) => void;
   onUpdate: (id: string, data: Partial<ModalidadEntregaRow>) => void;
   onDelete: (id: string) => void;
 }
 
 export function ModalidadesEntregaForm({
-  tipo,
   modalidades,
   onCreate,
   onUpdate,
@@ -51,18 +49,13 @@ export function ModalidadesEntregaForm({
   const [tiempoMax, setTiempoMax] = useState('');
 
   const handleSubmit = () => {
-    const precioCents = tipo === 'recogida' ? 0 : Math.round(Number(precio) * 100);
     onCreate({
-      tipo,
+      tipo: 'domicilio',
       icono,
       nombre_es: nombre,
-      precioCents,
-      ...(tipo === 'domicilio'
-        ? {
-            tiempoMinMinutos: Number(tiempoMin) || 0,
-            tiempoMaxMinutos: Number(tiempoMax) || 0,
-          }
-        : {}),
+      precioCents: Math.round(Number(precio) * 100),
+      tiempoMinMinutos: Number(tiempoMin) || 0,
+      tiempoMaxMinutos: Number(tiempoMax) || 0,
     });
     setNombre('');
     setPrecio('0');
@@ -70,17 +63,15 @@ export function ModalidadesEntregaForm({
     setTiempoMax('');
   };
 
-  const filteredModalidades = modalidades.filter((m) => m.tipo === tipo);
-
   return (
     <div className="space-y-4">
       <ul className="space-y-2">
-        {filteredModalidades.map((m) => (
+        {modalidades.map((m) => (
           <li key={m.id} className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 p-3">
             <span className="text-lg">{emojiDeIcono(m.icono)}</span>
             <span className="flex-1 font-medium text-white">{m.nombre}</span>
             <span className="text-sm text-slate-400">{(m.precioCents / 100).toFixed(2)}€</span>
-            {tipo === 'domicilio' && m.tiempoMinMinutos !== null && (
+            {m.tiempoMinMinutos !== null && (
               <span className="text-sm text-slate-400">
                 {m.tiempoMinMinutos}-{m.tiempoMaxMinutos} {t('deliveryModalityMinutesUnit', language)}
               </span>
@@ -109,11 +100,11 @@ export function ModalidadesEntregaForm({
 
       <div className="grid grid-cols-2 gap-3 rounded-lg border border-dashed border-white/20 p-3">
         <div>
-          <label htmlFor={`icono-${tipo}`} className="text-xs font-medium text-slate-400 block mb-1">
+          <label htmlFor="icono-domicilio" className="text-xs font-medium text-slate-400 block mb-1">
             {t('deliveryModalityIcon', language)}
           </label>
           <Select value={icono} onValueChange={setIcono}>
-            <SelectTrigger id={`icono-${tipo}`}>
+            <SelectTrigger id="icono-domicilio">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -126,65 +117,53 @@ export function ModalidadesEntregaForm({
           </Select>
         </div>
         <div>
-          <label htmlFor={`nombre-${tipo}`} className="text-xs font-medium text-slate-400 block mb-1">
+          <label htmlFor="nombre-domicilio" className="text-xs font-medium text-slate-400 block mb-1">
             {t('deliveryModalityName', language)}
           </label>
           <Input
-            id={`nombre-${tipo}`}
+            id="nombre-domicilio"
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
             maxLength={100}
           />
         </div>
-        {tipo === 'domicilio' && (
-          <div>
-            <label htmlFor={`precio-${tipo}`} className="text-xs font-medium text-slate-400 block mb-1">
-              {t('deliveryModalityPrice', language)}
-            </label>
-            <Input
-              id={`precio-${tipo}`}
-              type="number"
-              min="0"
-              step="0.10"
-              value={precio}
-              onChange={(e) => setPrecio(e.target.value)}
-            />
-          </div>
-        )}
-        {tipo === 'domicilio' && (
-          <>
-            <div>
-              <label
-                htmlFor={`tiempo-min-${tipo}`}
-                className="text-xs font-medium text-slate-400 block mb-1"
-              >
-                {t('deliveryModalityMinTime', language)}
-              </label>
-              <Input
-                id={`tiempo-min-${tipo}`}
-                type="number"
-                min="0"
-                value={tiempoMin}
-                onChange={(e) => setTiempoMin(e.target.value)}
-              />
-            </div>
-            <div>
-              <label
-                htmlFor={`tiempo-max-${tipo}`}
-                className="text-xs font-medium text-slate-400 block mb-1"
-              >
-                {t('deliveryModalityMaxTime', language)}
-              </label>
-              <Input
-                id={`tiempo-max-${tipo}`}
-                type="number"
-                min="0"
-                value={tiempoMax}
-                onChange={(e) => setTiempoMax(e.target.value)}
-              />
-            </div>
-          </>
-        )}
+        <div>
+          <label htmlFor="precio-domicilio" className="text-xs font-medium text-slate-400 block mb-1">
+            {t('deliveryModalityPrice', language)}
+          </label>
+          <Input
+            id="precio-domicilio"
+            type="number"
+            min="0"
+            step="0.10"
+            value={precio}
+            onChange={(e) => setPrecio(e.target.value)}
+          />
+        </div>
+        <div>
+          <label htmlFor="tiempo-min-domicilio" className="text-xs font-medium text-slate-400 block mb-1">
+            {t('deliveryModalityMinTime', language)}
+          </label>
+          <Input
+            id="tiempo-min-domicilio"
+            type="number"
+            min="0"
+            value={tiempoMin}
+            onChange={(e) => setTiempoMin(e.target.value)}
+          />
+        </div>
+        <div>
+          <label htmlFor="tiempo-max-domicilio" className="text-xs font-medium text-slate-400 block mb-1">
+            {t('deliveryModalityMaxTime', language)}
+          </label>
+          <Input
+            id="tiempo-max-domicilio"
+            type="number"
+            min="0"
+            value={tiempoMax}
+            onChange={(e) => setTiempoMax(e.target.value)}
+          />
+        </div>
         <Button
           type="button"
           onClick={handleSubmit}

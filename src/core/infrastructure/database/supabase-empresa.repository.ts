@@ -31,7 +31,7 @@ const CAMPOS_DIRECTOS = [
   'tipo_impuesto', 'porcentaje_impuesto', 'mostrar_logo', 'validacion_pedidos_habilitada',
   'mostrar_promociones', 'mostrar_tgtg', 'descuento_bienvenida_activo',
   'descuento_bienvenida_porcentaje', 'descuento_bienvenida_duracion', 'tipo',
-  'recogida_tienda_habilitada', 'envio_domicilio_habilitado',
+  'envio_domicilio_habilitado',
 ] as const satisfies ReadonlyArray<keyof UpdateEmpresaData>;
 
 /**
@@ -54,7 +54,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
     try {
       const { data: empresa } = await this.supabase
         .from('empresas')
-        .select('email_notification, telefono_whatsapp, nombre, logo_url, mostrar_logo, fb, instagram, url_mapa, direccion, nif, tipo_impuesto, porcentaje_impuesto, dominio, slug, url_image, banner_fit, descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de, mostrar_carrito, mostrar_promociones, mostrar_tgtg, mesas_habilitadas, moneda, subdomain_pedidos, tipo, color_primary, color_primary_foreground, color_secondary, color_secondary_foreground, color_accent, color_accent_foreground, color_background, color_foreground, descuento_bienvenida_activo, descuento_bienvenida_porcentaje, descuento_bienvenida_duracion, delivery_habilitado, recogida_tienda_habilitada, envio_domicilio_habilitado, razon_social')
+        .select('email_notification, telefono_whatsapp, nombre, logo_url, mostrar_logo, fb, instagram, url_mapa, direccion, nif, tipo_impuesto, porcentaje_impuesto, dominio, slug, url_image, banner_fit, descripcion_es, descripcion_en, descripcion_fr, descripcion_it, descripcion_de, mostrar_carrito, mostrar_promociones, mostrar_tgtg, mesas_habilitadas, moneda, subdomain_pedidos, tipo, color_primary, color_primary_foreground, color_secondary, color_secondary_foreground, color_accent, color_accent_foreground, color_background, color_foreground, descuento_bienvenida_activo, descuento_bienvenida_porcentaje, descuento_bienvenida_duracion, delivery_habilitado, envio_domicilio_habilitado, razon_social')
         .eq('id', empresaId)
         .single();
 
@@ -86,7 +86,6 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
           mostrarTgtg: empresa.mostrar_tgtg ?? true,
           mesasHabilitadas: empresa.mesas_habilitadas ?? true,
           deliveryHabilitado: empresa.delivery_habilitado ?? false,
-          recogidaTiendaHabilitada: empresa.recogida_tienda_habilitada ?? false,
           envioDomicilioHabilitado: empresa.envio_domicilio_habilitado ?? false,
           moneda: empresa.moneda ?? 'EUR',
           emailNotification: empresa.email_notification,
@@ -234,7 +233,7 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
     fb, instagram, url_mapa,
     direccion, telefono_whatsapp, email_notification, nif, razon_social,
     descuento_bienvenida_activo, descuento_bienvenida_porcentaje, descuento_bienvenida_duracion,
-    mesas_habilitadas, pagos_pickup_habilitados, delivery_habilitado, recogida_tienda_habilitada, envio_domicilio_habilitado
+    mesas_habilitadas, pagos_pickup_habilitados, delivery_habilitado, envio_domicilio_habilitado
   `;
 
   private static mapTranslations(data: Record<string, unknown>, prefix: string): { es?: string | null; en?: string | null; fr?: string | null; it?: string | null; de?: string | null } | null {
@@ -293,7 +292,6 @@ export class SupabaseEmpresaRepository implements IEmpresaRepository {
       mesasHabilitadas: (data.mesas_habilitadas as boolean) ?? true,
       pagosPickupHabilitados: (data.pagos_pickup_habilitados as boolean) ?? false,
       deliveryHabilitado: (data.delivery_habilitado as boolean) ?? false,
-      recogidaTiendaHabilitada: (data.recogida_tienda_habilitada as boolean) ?? false,
       envioDomicilioHabilitado: (data.envio_domicilio_habilitado as boolean) ?? false,
     };
   }
