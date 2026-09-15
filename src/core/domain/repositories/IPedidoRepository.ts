@@ -153,7 +153,10 @@ export interface IPedidoRepository {
       latitude_entrega?: number;
       longitude_entrega?: number;
       estimated_delivery_fee_cents?: number;
-      modalidad_entrega_id?: string;
+      // `| null` porque recogida implícita (tienda, sin modalidad_entrega_id
+      // en el body) persiste explícitamente `null` — no hay fila que
+      // referenciar. Ver PedidoUseCase.buildModalidadPayload.
+      modalidad_entrega_id?: string | null;
       modalidad_entrega_tipo?: string;
       modalidad_entrega_precio_cents?: number;
     },

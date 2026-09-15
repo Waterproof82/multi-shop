@@ -204,7 +204,7 @@ describe('PedidoUseCase.create — revalidación server-side de la modalidad de 
     expect(payload.modalidad_entrega_id).toBe('m1');
   });
 
-  it('no persiste campos de modalidad si el pedido no incluye modalidad_entrega_id', async () => {
+  it('un pedido de tienda sin modalidad_entrega_id en el body persiste recogida implícita, gratis, sin id', async () => {
     const modalidadEntregaUseCase = {
       validarPrecioVigente: vi.fn(),
     } as unknown as ModalidadEntregaUseCase;
@@ -215,10 +215,12 @@ describe('PedidoUseCase.create — revalidación server-side de la modalidad de 
     expect(result.success).toBe(true);
     expect(modalidadEntregaUseCase.validarPrecioVigente).not.toHaveBeenCalled();
     const [, , , finalTotal, , , payload] = pedidoRepoCreate.mock.calls[0] as [
-      string, string, unknown, number, unknown, unknown, Record<string, unknown> | undefined
+      string, string, unknown, number, unknown, unknown, Record<string, unknown>
     ];
-    expect(finalTotal).toBeCloseTo(10);
-    expect(payload?.modalidad_entrega_id).toBeUndefined();
+    expect(finalTotal).toBeCloseTo(10); // solo el producto, recogida no suma nada
+    expect(payload.modalidad_entrega_tipo).toBe('recogida');
+    expect(payload.modalidad_entrega_id).toBeNull();
+    expect(payload.modalidad_entrega_precio_cents).toBe(0);
   });
 
   it('falla sin crear el pedido si la modalidad ya no está disponible (inactiva o de otra empresa)', async () => {

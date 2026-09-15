@@ -491,8 +491,15 @@ export class PedidoUseCase {
     empresaId: string,
     empresaTipo: string
   ): Promise<Result<{ precioCents: number; tipo: 'recogida' | 'domicilio' | undefined }>> {
-    if (empresaTipo !== 'tienda' || !data.modalidad_entrega_id) {
+    // Sin modalidad_entrega_id, un pedido de tienda es recogida implícita —
+    // el cliente nunca manda nada para recogida (no existe fila que
+    // referenciar desde que se eliminó del admin). Restaurante/mesa siguen
+    // sin marcar nada (`undefined`), es un concepto exclusivo de tienda.
+    if (empresaTipo !== 'tienda') {
       return { success: true, data: { precioCents: 0, tipo: undefined } };
+    }
+    if (!data.modalidad_entrega_id) {
+      return { success: true, data: { precioCents: 0, tipo: 'recogida' } };
     }
     const modalidadResult = await this.modalidadEntregaUseCase.validarPrecioVigente(data.modalidad_entrega_id, empresaId);
     if (!modalidadResult.success) {
@@ -528,9 +535,13 @@ export class PedidoUseCase {
     modalidadTipoValidado: 'recogida' | 'domicilio' | undefined,
     modalidadPrecioCents: number
   ) {
-    if (!data.modalidad_entrega_id || !modalidadTipoValidado) return undefined;
+    // Ya no se exige `data.modalidad_entrega_id` — recogida implícita no
+    // tiene id (no existe fila que referenciar), pero igual se persiste
+    // `modalidad_entrega_tipo: 'recogida'` para que el panel admin siga
+    // mostrando el badge correspondiente (ver getTiendaModalidadBadgeInfo).
+    if (!modalidadTipoValidado) return undefined;
     return {
-      modalidad_entrega_id: data.modalidad_entrega_id,
+      modalidad_entrega_id: data.modalidad_entrega_id ?? null,
       modalidad_entrega_tipo: modalidadTipoValidado,
       modalidad_entrega_precio_cents: modalidadPrecioCents,
       ...(modalidadTipoValidado === 'domicilio' ? {
