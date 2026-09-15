@@ -3,7 +3,8 @@
 import { useCallback, useState } from 'react';
 import { formatPrice } from '@/lib/format-price';
 import { t } from '@/lib/translations';
-import { useLanguage } from '@/lib/language-context';
+import { useLanguage, type Language } from '@/lib/language-context';
+import { emojiDeIcono } from '@/lib/modalidad-entrega-iconos';
 import { MapboxAddressInput, type SelectedAddress } from './MapboxAddressInput';
 
 export interface ModalidadEntregaPublica {
@@ -49,6 +50,16 @@ function modalidadesParaTab(
   if (value === 'domicilio' && mostrarDomicilio) return modalidadesDomicilio;
   if (mostrarRecogida) return modalidadesRecogida;
   return [];
+}
+
+/**
+ * Recogida es siempre gratis (Task 1-2 de este plan lo garantizan server-side
+ * y en la DB) — por eso su columna derecha nunca es un precio, es un texto
+ * fijo. Domicilio sí muestra su precio real.
+ */
+function columnaDerecha(m: ModalidadEntregaPublica, language: Language): string {
+  if (m.tipo === 'recogida') return t('tiendaGratisLabel', language);
+  return formatPrice(m.precioCents / 100, 'EUR', language);
 }
 
 interface TiendaFulfillmentSelectorProps {
@@ -100,6 +111,12 @@ export function TiendaFulfillmentSelector({
   // de OTRO tab.
   const idSeleccionado = modalidadSeleccionada ?? modalidadesDelTab[0]?.id ?? null;
 
+  // Recogida con una sola opción no necesita lista clickeable — ya no hay
+  // nada para elegir, y desde Task 1-2 de este plan el precio de recogida
+  // siempre es 0, así que tampoco hay un precio que comparar entre filas.
+  const recogidaEsListaClickeable = modalidadesRecogida.length > 1;
+  const mostrarComoLista = value === 'domicilio' || recogidaEsListaClickeable;
+
   return (
     <div className="space-y-3 mb-3">
       <div className={`grid gap-2 ${mostrarRecogida && mostrarDomicilio ? 'grid-cols-2' : 'grid-cols-1'}`} role="tablist">
@@ -139,24 +156,35 @@ export function TiendaFulfillmentSelector({
         )}
       </div>
 
-      {value && modalidadesDelTab.length > 0 && (
+      {value && modalidadesDelTab.length > 0 && mostrarComoLista && (
         <ul className="space-y-1.5">
           {modalidadesDelTab.map((m) => (
             <li key={m.id}>
               <button
                 type="button"
                 onClick={() => { setModalidadSeleccionada(m.id); onChange(value, m.id, m.precioCents); }}
-                className={`w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-sm text-left ${idSeleccionado === m.id ? 'border-primary bg-primary/5' : 'border-border'}`}
+                className={`w-full flex items-center gap-3 rounded-lg border px-3 py-2 text-sm text-left ${idSeleccionado === m.id ? 'border-primary bg-primary/5' : 'border-border'}`}
               >
-                <span>{m.nombre}</span>
-                <span className="ml-auto text-muted-foreground">{formatPrice(m.precioCents / 100, 'EUR', language)}</span>
-                {m.tiempoMinMinutos !== null && (
-                  <span className="text-xs text-muted-foreground">{m.tiempoMinMinutos}-{m.tiempoMaxMinutos} min</span>
-                )}
+                <span className="text-lg leading-none">{emojiDeIcono(m.icono)}</span>
+                <span className="flex-1 font-semibold">{m.nombre}</span>
+                <span className="text-xs text-muted-foreground text-right shrink-0">
+                  {columnaDerecha(m, language)}
+                  {m.tiempoMinMinutos !== null && (
+                    <> · {m.tiempoMinMinutos}-{m.tiempoMaxMinutos} min</>
+                  )}
+                </span>
               </button>
             </li>
           ))}
         </ul>
+      )}
+
+      {value === 'recogida' && !mostrarComoLista && modalidadesDelTab[0] && (
+        <div className="w-full flex items-center gap-3 rounded-lg border border-border px-3 py-2 text-sm">
+          <span className="text-lg leading-none">{emojiDeIcono(modalidadesDelTab[0].icono)}</span>
+          <span className="flex-1 font-semibold">{modalidadesDelTab[0].nombre}</span>
+          <span className="text-xs text-muted-foreground shrink-0">{t('tiendaGratisLabel', language)}</span>
+        </div>
       )}
 
       {value === 'domicilio' && mostrarDomicilio && (

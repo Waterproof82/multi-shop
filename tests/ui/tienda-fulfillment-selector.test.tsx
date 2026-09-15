@@ -20,7 +20,7 @@ const recogidaProgramada: ModalidadEntregaPublica = {
   tipo: 'recogida',
   icono: 'clock',
   nombre: 'Recogida programada',
-  precioCents: 100,
+  precioCents: 0,
   tiempoMinMinutos: null,
   tiempoMaxMinutos: null,
   activo: true,
@@ -152,5 +152,47 @@ describe('TiendaFulfillmentSelector', () => {
     const listaDomicilio = screen.getByRole('list');
     const botonDomicilio = within(listaDomicilio).getByRole('button');
     expect(botonDomicilio.className).toContain('border-primary');
+  });
+
+  it('muestra el ícono de cada modalidad de domicilio', () => {
+    renderSelector({
+      recogidaHabilitada: false,
+      envioHabilitado: true,
+      modalidades: [domicilio],
+      value: 'domicilio',
+      onChange: vi.fn(),
+      onAddressSelect: vi.fn(),
+    });
+    expect(screen.getByText('🚲')).toBeInTheDocument();
+  });
+
+  it('recogida con una sola modalidad activa: línea fija sin botón, sin precio', () => {
+    renderSelector({
+      recogidaHabilitada: true,
+      envioHabilitado: false,
+      modalidades: [recogida],
+      value: 'recogida',
+      onChange: vi.fn(),
+      onAddressSelect: vi.fn(),
+    });
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
+    expect(screen.getByText('Gratis')).toBeInTheDocument();
+    expect(screen.queryByText('0,00 €')).not.toBeInTheDocument();
+  });
+
+  it('recogida con dos o más modalidades activas: lista clickeable, cada fila dice Gratis', () => {
+    const recogidaProgramada2 = { ...recogidaProgramada, precioCents: 0 };
+    renderSelector({
+      recogidaHabilitada: true,
+      envioHabilitado: false,
+      modalidades: [recogida, recogidaProgramada2],
+      value: 'recogida',
+      onChange: vi.fn(),
+      onAddressSelect: vi.fn(),
+    });
+    const lista = screen.getByRole('list');
+    const botones = within(lista).getAllByRole('button');
+    expect(botones).toHaveLength(2);
+    expect(within(lista).getAllByText('Gratis')).toHaveLength(2);
   });
 });

@@ -723,6 +723,7 @@ export const translations = {
     // Tienda (recogida/domicilio) — sistema independiente del Glovo de arriba.
     tiendaPickupTab: "Recoger en tienda",
     tiendaDeliveryTab: "Envío a domicilio",
+    tiendaGratisLabel: "Gratis",
     deliveryAddress: "Dirección de entrega",
     deliveryAddressPlaceholder: "Escribí tu dirección...",
     // Admin delivery
@@ -1749,6 +1750,7 @@ export const translations = {
     // Tienda (pickup/home delivery) — system independent from the Glovo one above.
     tiendaPickupTab: "Pick up in store",
     tiendaDeliveryTab: "Home delivery",
+    tiendaGratisLabel: "Free",
     deliveryAddress: "Delivery address",
     deliveryAddressPlaceholder: "Type your address...",
     // Admin delivery
@@ -2292,6 +2294,7 @@ export const translations = {
     // Tienda (retrait/livraison) — système indépendant du Glovo ci-dessus.
     tiendaPickupTab: "Retrait en magasin",
     tiendaDeliveryTab: "Livraison à domicile",
+    tiendaGratisLabel: "Gratuit",
     deliveryAddress: "Adresse de livraison",
     deliveryAddressPlaceholder: "Saisissez votre adresse...",
     // Admin delivery
@@ -2816,6 +2819,7 @@ export const translations = {
     // Tienda (ritiro/consegna) — sistema indipendente dal Glovo sopra.
     tiendaPickupTab: "Ritiro in negozio",
     tiendaDeliveryTab: "Consegna a domicilio",
+    tiendaGratisLabel: "Gratis",
     deliveryAddress: "Indirizzo di consegna",
     deliveryAddressPlaceholder: "Inserisci il tuo indirizzo...",
     // Admin delivery
@@ -3340,6 +3344,7 @@ export const translations = {
     // Tienda (Abholung/Lieferung) — System unabhängig vom Glovo oben.
     tiendaPickupTab: "Abholung im Geschäft",
     tiendaDeliveryTab: "Lieferung nach Hause",
+    tiendaGratisLabel: "Kostenlos",
     deliveryAddress: "Lieferadresse",
     deliveryAddressPlaceholder: "Gib deine Adresse ein...",
     // Admin delivery
