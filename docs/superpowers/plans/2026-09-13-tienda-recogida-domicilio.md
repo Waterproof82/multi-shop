@@ -2463,3 +2463,75 @@ Dado el tamaño (17 tasks, 5 fases tocando DB + admin + carrito), sugiero 4 PRs 
 2. **PR2** — Fase 2 (admin UI). Depende de PR1.
 3. **PR3** — Fase 3 (extracción Mapbox + catálogo público). Depende de PR1; el riesgo real de esta PR es no romper restaurante — vale la pena que un reviewer la vea sola.
 4. **PR4** — Fase 4 + 5 (carrito + i18n + verificación final). Depende de PR1 y PR3.
+
+> **Nota de la review final (post-Task 17):** se mergeó como una sola rama de
+> ~5.760 líneas en vez de las 4 PRs encadenadas de arriba. El revisor final
+> señala esto como probable causa de que C2 (ver Task 19) pasara
+> desapercibido hasta el final — nadie revisó "¿quién lee esto después?" como
+> pregunta aislada de una PR de solo Fase 4+5.
+
+---
+
+## Fase 6 — Hallazgos de la revisión final (post-Task 17)
+
+El code reviewer final (rango `49b54ad7..510329cc`, todo el feature) encontró
+2 Critical y 4 Important. Verificados uno por uno por el coordinador antes de
+escribir estas tareas — no se toma nada del reporte del reviewer por buena fe.
+
+### Task 18: Cerrar C1 (domicilio sin dirección), I3 (RLS sin WITH CHECK), I4 (FK sin ON DELETE), I5 (Zod default bug)
+
+**Files:**
+- New migration: `supabase/migrations/20260914000001_fix_modalidades_entrega_rls_fk.sql`
+- Modify: `src/core/application/use-cases/pedido.use-case.ts`
+- Modify: `src/app/api/pedidos/route.ts`
+- Modify: `src/components/cart-drawer.tsx`
+- Modify: `src/core/application/dtos/modalidad-entrega.dto.ts`
+- Tests: extender `tests/core/pedido-modalidad-revalidacion.test.ts`, `tests/ui/cart-drawer-wizard-tienda.test.tsx`, nuevo `tests/core/modalidad-entrega-dto.test.ts` (o extender el existente si ya hay uno)
+
+**C1 — Un pedido de domicilio se puede confirmar sin dirección (money bug, prioridad más alta):**
+
+Server-side (obligatorio, cierra el hueco real):
+- En `PedidoUseCase.revalidarModalidadEntrega` (`pedido.use-case.ts:471`), después de obtener `modalidadResult.data.tipo === 'domicilio'`, verificar que `data.direccion_entrega` (no vacío tras `.trim()`), `data.latitude_entrega` y `data.longitude_entrega` estén presentes. Si falta alguno, devolver `{ success: false, error: { code: 'MODALIDAD_ENTREGA_SIN_DIRECCION', message: '...', module: 'use-case', method: 'PedidoUseCase.revalidarModalidadEntrega' } }`. Extraer el chequeo a una función pura de módulo (ej. `tieneDireccionValida(data): boolean`) — no inline, por S3776.
+- **Bug relacionado encontrado al leer el código para esta task:** `handleDefaultOrder` en `src/app/api/pedidos/route.ts` (~línea 230) tiene una allowlist `['PRODUCT_NOT_FOUND', 'CODE_EXPIRED', 'CODE_ALREADY_USED', 'EMAIL_MISMATCH']` que mapea a 400 — cualquier otro código (incluyendo el YA EXISTENTE `MODALIDAD_ENTREGA_INVALIDA` de la Task 16, y el nuevo `MODALIDAD_ENTREGA_SIN_DIRECCION`) cae al 500 genérico `'Error al crear el pedido'`. Agregar ambos códigos a esa allowlist.
+
+Client-side (UX, no es la defensa real — solo evita el viaje redondo al servidor):
+- Extender la lógica de `cart-drawer.tsx` que hoy gatea el submit solo por `isRestaurant` (`resolveDeliveryError` línea ~177 y `computeIsDeliveryIncomplete` línea ~884) para que también contemple `modalidadEntregaTipo === 'domicilio' && (deliveryLatitude === null || deliveryLongitude === null)`. Reusar el mismo patrón de mensaje/deshabilitar submit que ya existe para restaurante, no duplicar UI nueva.
+
+**I3 — RLS UPDATE sin WITH CHECK:**
+```sql
+DROP POLICY "Admin actualiza modalidades_entrega" ON public.modalidades_entrega;
+CREATE POLICY "Admin actualiza modalidades_entrega"
+  ON public.modalidades_entrega FOR UPDATE TO authenticated
+  USING (empresa_id = (SELECT get_mi_empresa_id()))
+  WITH CHECK (empresa_id = (SELECT get_mi_empresa_id()));
+```
+
+**I4 — FK sin ON DELETE (una modalidad usada queda imborrable):**
+```sql
+ALTER TABLE public.pedidos DROP CONSTRAINT pedidos_modalidad_entrega_id_fkey;
+ALTER TABLE public.pedidos ADD CONSTRAINT pedidos_modalidad_entrega_id_fkey
+  FOREIGN KEY (modalidad_entrega_id) REFERENCES public.modalidades_entrega(id) ON DELETE SET NULL;
+```
+(Verificar el nombre real de la constraint con `\d pedidos` o el catálogo de Postgres antes de escribir el `DROP CONSTRAINT` — Postgres la nombra automáticamente y puede no ser exactamente ese string.)
+
+Aplicar la migración con `supabase db push --linked` (nunca MCP suelto, ver checklist de `CLAUDE.md`) y correr `pnpm db:smoke` después.
+
+**I5 — `.default(0)` en `orden` sobrevive a `.partial()` en Zod v4, reescribe `orden=0` en cada PUT:**
+En `src/core/application/dtos/modalidad-entrega.dto.ts`, sacar `.default(0)` del campo `orden` del schema base y ponerlo solo en `createModalidadEntregaSchema` (vía `.extend({ orden: z.number().int().min(0).default(0) })` o equivalente). Verificar con un test que `updateModalidadEntregaSchema.safeParse({ activo: false })` NO incluya `orden` en `data`.
+
+**Checkpoint:** `pnpm lint && pnpm typecheck && pnpm build && npx vitest run` + `pnpm db:smoke` en verde.
+
+### Task 19: C2 — Lectura de la modalidad de entrega en el pedido
+
+La feature es hoy write-only: nada muestra `modalidad_entrega_tipo`/`direccion_entrega` de vuelta. Sin esto la feature no es utilizable en producción — el operador de la tienda no puede saber si un pedido es recogida o domicilio.
+
+**Files (mínimo, a confirmar leyendo los archivos reales antes de escribir el diff — no asumir números de línea):**
+- `src/core/domain/entities/types.ts` — agregar `modalidadEntregaTipo`/`direccionEntrega` (y lo que ya exista de `direccion_entrega` puede que YA esté en `Pedido` para restaurante — confirmar antes de duplicar) a la interfaz `Pedido`.
+- `src/core/infrastructure/database/supabase-pedido.repository.ts` — `SELECT` de `findAllByTenant`/`findById` (los que alimentan el panel admin) y su mapper.
+- Vista de detalle/listado de pedidos en el admin (buscar dónde se renderiza `Pedido` en `src/app/admin/`) — mostrar tipo + dirección cuando `modalidadEntregaTipo` esté presente, mismo patrón visual que ya exista para `origen`/`direccion_entrega` de restaurante si lo hay.
+- `buildTelegramPedido` (`pedido.use-case.ts` ~línea 382) — agregar la línea de tipo/dirección al mensaje si corresponde.
+- i18n: cualquier label nuevo en los 5 idiomas.
+
+**Tests:** al menos un test que confirme que `findById`/`findAllByTenant` devuelven `modalidadEntregaTipo`/`direccionEntrega` cuando la fila los tiene, y que el mensaje de Telegram los incluye.
+
+**Checkpoint:** mismo que Task 18.
