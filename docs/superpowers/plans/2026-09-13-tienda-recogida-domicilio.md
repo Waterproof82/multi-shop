@@ -2525,13 +2525,20 @@ En `src/core/application/dtos/modalidad-entrega.dto.ts`, sacar `.default(0)` del
 
 La feature es hoy write-only: nada muestra `modalidad_entrega_tipo`/`direccion_entrega` de vuelta. Sin esto la feature no es utilizable en producción — el operador de la tienda no puede saber si un pedido es recogida o domicilio.
 
-**Files (mínimo, a confirmar leyendo los archivos reales antes de escribir el diff — no asumir números de línea):**
-- `src/core/domain/entities/types.ts` — agregar `modalidadEntregaTipo`/`direccionEntrega` (y lo que ya exista de `direccion_entrega` puede que YA esté en `Pedido` para restaurante — confirmar antes de duplicar) a la interfaz `Pedido`.
-- `src/core/infrastructure/database/supabase-pedido.repository.ts` — `SELECT` de `findAllByTenant`/`findById` (los que alimentan el panel admin) y su mapper.
-- Vista de detalle/listado de pedidos en el admin (buscar dónde se renderiza `Pedido` en `src/app/admin/`) — mostrar tipo + dirección cuando `modalidadEntregaTipo` esté presente, mismo patrón visual que ya exista para `origen`/`direccion_entrega` de restaurante si lo hay.
-- `buildTelegramPedido` (`pedido.use-case.ts` ~línea 382) — agregar la línea de tipo/dirección al mensaje si corresponde.
-- i18n: cualquier label nuevo en los 5 idiomas.
+**Investigación previa ya hecha (no repetir, partir de acá):**
 
-**Tests:** al menos un test que confirme que `findById`/`findAllByTenant` devuelven `modalidadEntregaTipo`/`direccionEntrega` cuando la fila los tiene, y que el mensaje de Telegram los incluye.
+- `PEDIDO_ADMIN_SELECT` en `supabase-pedido.repository.ts` (línea ~253) es `'*, clientes:..., mesas:..., sesion:...'` — el `*` YA trae `modalidad_entrega_id/tipo/precio_cents` y `direccion_entrega` en cada fila. **No hace falta tocar el SELECT ni el mapper de `findAllByTenant`/`findById`** — el JSON que ya devuelve `GET /api/admin/pedidos` (usa `getPedidoUseCase().getAllByMonth`/`getAll`, que pasan `result.data` sin re-mapear) ya incluye estos campos en snake_case. Verificar esto de nuevo antes de asumir, pero es el punto de partida.
+- La interfaz `Pedido` de `src/core/domain/entities/types.ts` (con `direccionEntrega` camelCase) **NO es la que usa el panel de pedidos** — `src/app/admin/(protected)/pedidos/page.tsx` declara su PROPIO tipo local `Pedido` (snake_case, ~línea 41-54) que refleja el JSON crudo de la API. Extender ESE tipo local, no el de `types.ts` (aunque no está de más agregar `modalidadEntregaTipo?`/reusar `direccionEntrega?` ahí también por completitud del dominio).
+- El panel YA tiene un patrón de badge de origen para restaurante: `renderOrigenBadge(pedido)` en `page.tsx` (~línea 123) pinta "Domicilio"/"Recogida"/"Mesa" según `pedido.origen`/`pedido.mesa_id`/`pedido.tracking_token`. Agregar una rama análoga para `pedido.modalidad_entrega_tipo` (tienda) — mismo componente, mismo estilo visual, con la dirección visible si `modalidad_entrega_tipo === 'domicilio'` (ej. tooltip o texto secundario con `direccion_entrega`).
+- `buildTelegramPedido` (`pedido.use-case.ts` ~línea 395) construye el `Pedido` para Telegram A MANO, campo por campo — hoy NO incluye `origen` ni `direccionEntrega` ni nada de modalidad (esto es un gap preexistente para restaurante también, fuera de alcance arreglarlo para restaurante en esta task — solo agregar los campos de modalidad que necesita tienda).
+- `notifyTelegramForCreate` (~línea 437) tiene un `return` temprano si `isDelivery` es true O si `isPickupWithPayment` (que para tienda es `pagosPickupHabilitados === true`, casi siempre el caso en producción) — es decir, **en la mayoría de los pedidos de tienda con pago habilitado, HOY no se manda ningún Telegram al crear el pedido** (se notifica vía webhook de pago). Confirmar este comportamiento antes de asumir que hay que tocar el mensaje de Telegram — si en la práctica casi nunca se manda notificación para tienda con modalidad, la parte de Telegram de esta task puede quedar en "agregar el campo por si acaso" con prioridad baja, y el foco real debe ser el panel admin (ese sí se usa siempre).
+
+**Files:**
+- `src/app/admin/(protected)/pedidos/page.tsx` — tipo local `Pedido` + `renderOrigenBadge` (o función hermana nueva) + cualquier vista de detalle si existe.
+- `src/core/domain/entities/types.ts` — agregar `modalidadEntregaTipo?: 'recogida' | 'domicilio' | null` a `Pedido` (completitud del dominio, aunque el panel admin no lo use directo).
+- `src/core/application/use-cases/pedido.use-case.ts` — `buildTelegramPedido` (agregar campos si corresponde, ver nota arriba sobre prioridad).
+- i18n: cualquier label nuevo en los 5 idiomas (el badge "Domicilio"/"Recogida" de restaurante hoy está hardcodeado en español en `page.tsx` — si se sigue ese mismo patrón para tienda, no introduce una regresión nueva, pero si se prefiere hacerlo bien, usar `t()`; decisión del implementer, dejar constancia de cuál se tomó).
+
+**Tests:** al menos un test que confirme que el badge/vista de tienda se renderiza cuando `pedido.modalidad_entrega_tipo` está presente (test de UI sobre `page.tsx` si ya hay suite de tests para ese archivo, si no existe ninguna hoy no es obligatorio crear el harness completo — evaluar el costo/beneficio y decidir).
 
 **Checkpoint:** mismo que Task 18.
