@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Trash2 } from 'lucide-react';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
+import { ICONOS_MODALIDAD_ENTREGA, emojiDeIcono } from '@/lib/modalidad-entrega-iconos';
 
 export interface ModalidadEntregaRow {
   id: string;
@@ -19,14 +20,6 @@ export interface ModalidadEntregaRow {
   activo: boolean;
   orden: number;
 }
-
-const ICONOS_DISPONIBLES = [
-  { value: 'store', emoji: '🏪', labelKey: 'deliveryModalityIconStore' },
-  { value: 'bike', emoji: '🚲', labelKey: 'deliveryModalityIconBike' },
-  { value: 'car', emoji: '🚗', labelKey: 'deliveryModalityIconCar' },
-  { value: 'package', emoji: '📦', labelKey: 'deliveryModalityIconPackage' },
-  { value: 'clock', emoji: '⏱️', labelKey: 'deliveryModalityIconClock' },
-] as const;
 
 interface ModalidadesEntregaFormProps {
   tipo: 'recogida' | 'domicilio';
@@ -51,7 +44,7 @@ export function ModalidadesEntregaForm({
   onDelete,
 }: Readonly<ModalidadesEntregaFormProps>) {
   const { language } = useLanguage();
-  const [icono, setIcono] = useState<string>(ICONOS_DISPONIBLES[0].value);
+  const [icono, setIcono] = useState<string>(ICONOS_MODALIDAD_ENTREGA[0].value);
   const [nombre, setNombre] = useState('');
   const [precio, setPrecio] = useState('0');
   const [tiempoMin, setTiempoMin] = useState('');
@@ -84,9 +77,7 @@ export function ModalidadesEntregaForm({
       <ul className="space-y-2">
         {filteredModalidades.map((m) => (
           <li key={m.id} className="flex items-center gap-3 rounded-lg border border-border p-3">
-            <span className="text-lg">
-              {ICONOS_DISPONIBLES.find((i) => i.value === m.icono)?.emoji}
-            </span>
+            <span className="text-lg">{emojiDeIcono(m.icono)}</span>
             <span className="flex-1 font-medium">{m.nombre}</span>
             <span className="text-sm text-muted-foreground">{(m.precioCents / 100).toFixed(2)}€</span>
             {tipo === 'domicilio' && m.tiempoMinMinutos !== null && (
@@ -126,7 +117,7 @@ export function ModalidadesEntregaForm({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {ICONOS_DISPONIBLES.map((i) => (
+              {ICONOS_MODALIDAD_ENTREGA.map((i) => (
                 <SelectItem key={i.value} value={i.value}>
                   {i.emoji} {t(i.labelKey, language)}
                 </SelectItem>
