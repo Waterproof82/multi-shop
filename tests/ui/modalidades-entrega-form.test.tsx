@@ -48,14 +48,11 @@ describe('ModalidadesEntregaForm', () => {
     expect(screen.getByLabelText(/tiempo máximo/i)).toBeInTheDocument();
   });
 
-  it('llama a onCreate con los datos del formulario al enviar', () => {
+  it('llama a onCreate con los datos del formulario al enviar (recogida, sin input de precio)', () => {
     const onCreate = vi.fn();
     renderForm('recogida', [], onCreate);
     fireEvent.change(screen.getByLabelText(/nombre/i), {
       target: { value: 'Recogida express' },
-    });
-    fireEvent.change(screen.getByLabelText(/precio/i), {
-      target: { value: '0' },
     });
     fireEvent.click(screen.getByRole('button', { name: /añadir modalidad/i }));
     expect(onCreate).toHaveBeenCalledWith(
@@ -64,6 +61,16 @@ describe('ModalidadesEntregaForm', () => {
         precioCents: 0,
       })
     );
+  });
+
+  it('el formulario de tipo recogida NO muestra el input de precio', () => {
+    renderForm('recogida', []);
+    expect(screen.queryByLabelText(/precio/i)).not.toBeInTheDocument();
+  });
+
+  it('el formulario de tipo domicilio SÍ muestra el input de precio', () => {
+    renderForm('domicilio', []);
+    expect(screen.getByLabelText(/precio/i)).toBeInTheDocument();
   });
 
   it('llama a onCreate con tiempoMinMinutos y tiempoMaxMinutos cuando tipo es domicilio', () => {

@@ -51,7 +51,7 @@ export function ModalidadesEntregaForm({
   const [tiempoMax, setTiempoMax] = useState('');
 
   const handleSubmit = () => {
-    const precioCents = Math.round(Number(precio) * 100);
+    const precioCents = tipo === 'recogida' ? 0 : Math.round(Number(precio) * 100);
     onCreate({
       tipo,
       icono,
@@ -136,19 +136,21 @@ export function ModalidadesEntregaForm({
             maxLength={100}
           />
         </div>
-        <div>
-          <label htmlFor={`precio-${tipo}`} className="text-xs font-medium text-muted-foreground block mb-1">
-            {t('deliveryModalityPrice', language)}
-          </label>
-          <Input
-            id={`precio-${tipo}`}
-            type="number"
-            min="0"
-            step="0.10"
-            value={precio}
-            onChange={(e) => setPrecio(e.target.value)}
-          />
-        </div>
+        {tipo === 'domicilio' && (
+          <div>
+            <label htmlFor={`precio-${tipo}`} className="text-xs font-medium text-muted-foreground block mb-1">
+              {t('deliveryModalityPrice', language)}
+            </label>
+            <Input
+              id={`precio-${tipo}`}
+              type="number"
+              min="0"
+              step="0.10"
+              value={precio}
+              onChange={(e) => setPrecio(e.target.value)}
+            />
+          </div>
+        )}
         {tipo === 'domicilio' && (
           <>
             <div>
