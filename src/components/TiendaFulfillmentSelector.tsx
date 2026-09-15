@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { formatPrice } from '@/lib/format-price';
+import { t } from '@/lib/translations';
 import { useLanguage } from '@/lib/language-context';
 import { MapboxAddressInput, type SelectedAddress } from './MapboxAddressInput';
 
@@ -118,7 +119,7 @@ export function TiendaFulfillmentSelector({
             disabled={disabled}
             className={`rounded-xl border-2 px-3 py-3 text-sm font-medium ${value === 'recogida' ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-background'}`}
           >
-            Recoger en tienda
+            {t('tiendaPickupTab', language)}
           </button>
         )}
         {mostrarDomicilio && (
@@ -133,7 +134,7 @@ export function TiendaFulfillmentSelector({
             disabled={disabled}
             className={`rounded-xl border-2 px-3 py-3 text-sm font-medium ${value === 'domicilio' ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-background'}`}
           >
-            Envío a domicilio
+            {t('tiendaDeliveryTab', language)}
           </button>
         )}
       </div>

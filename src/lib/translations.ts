@@ -720,6 +720,9 @@ export const translations = {
     deliveryMethodTitle: "Método de entrega",
     deliveryMethodPickup: "Recoger en local",
     deliveryMethodHome: "Entrega a domicilio",
+    // Tienda (recogida/domicilio) — sistema independiente del Glovo de arriba.
+    tiendaPickupTab: "Recoger en tienda",
+    tiendaDeliveryTab: "Envío a domicilio",
     deliveryAddress: "Dirección de entrega",
     deliveryAddressPlaceholder: "Escribí tu dirección...",
     // Admin delivery
@@ -1743,6 +1746,9 @@ export const translations = {
     deliveryMethodTitle: "Delivery method",
     deliveryMethodPickup: "Pick up in store",
     deliveryMethodHome: "Home delivery",
+    // Tienda (pickup/home delivery) — system independent from the Glovo one above.
+    tiendaPickupTab: "Pick up in store",
+    tiendaDeliveryTab: "Home delivery",
     deliveryAddress: "Delivery address",
     deliveryAddressPlaceholder: "Type your address...",
     // Admin delivery
@@ -2283,6 +2289,9 @@ export const translations = {
     deliveryMethodTitle: "Mode de livraison",
     deliveryMethodPickup: "Retrait en magasin",
     deliveryMethodHome: "Livraison à domicile",
+    // Tienda (retrait/livraison) — système indépendant du Glovo ci-dessus.
+    tiendaPickupTab: "Retrait en magasin",
+    tiendaDeliveryTab: "Livraison à domicile",
     deliveryAddress: "Adresse de livraison",
     deliveryAddressPlaceholder: "Saisissez votre adresse...",
     // Admin delivery
@@ -2804,6 +2813,9 @@ export const translations = {
     deliveryMethodTitle: "Metodo di consegna",
     deliveryMethodPickup: "Ritiro in negozio",
     deliveryMethodHome: "Consegna a domicilio",
+    // Tienda (ritiro/consegna) — sistema indipendente dal Glovo sopra.
+    tiendaPickupTab: "Ritiro in negozio",
+    tiendaDeliveryTab: "Consegna a domicilio",
     deliveryAddress: "Indirizzo di consegna",
     deliveryAddressPlaceholder: "Inserisci il tuo indirizzo...",
     // Admin delivery
@@ -3325,6 +3337,9 @@ export const translations = {
     deliveryMethodTitle: "Liefermethode",
     deliveryMethodPickup: "Abholung im Geschäft",
     deliveryMethodHome: "Lieferung nach Hause",
+    // Tienda (Abholung/Lieferung) — System unabhängig vom Glovo oben.
+    tiendaPickupTab: "Abholung im Geschäft",
+    tiendaDeliveryTab: "Lieferung nach Hause",
     deliveryAddress: "Lieferadresse",
     deliveryAddressPlaceholder: "Gib deine Adresse ein...",
     // Admin delivery
