@@ -3,9 +3,11 @@
 import { useCallback, useState } from 'react';
 import { formatPrice } from '@/lib/format-price';
 import { t } from '@/lib/translations';
-import { useLanguage, type Language } from '@/lib/language-context';
+import { useLanguage } from '@/lib/language-context';
 import { emojiDeIcono } from '@/lib/modalidad-entrega-iconos';
 import { MapboxAddressInput, type SelectedAddress } from './MapboxAddressInput';
+
+type Lang = Parameters<typeof t>[1];
 
 export interface ModalidadEntregaPublica {
   id: string;
@@ -57,7 +59,7 @@ function modalidadesParaTab(
  * y en la DB) — por eso su columna derecha nunca es un precio, es un texto
  * fijo. Domicilio sí muestra su precio real.
  */
-function columnaDerecha(m: ModalidadEntregaPublica, language: Language): string {
+function columnaDerecha(m: ModalidadEntregaPublica, language: Lang): string {
   if (m.tipo === 'recogida') return t('tiendaGratisLabel', language);
   return formatPrice(m.precioCents / 100, 'EUR', language);
 }
