@@ -73,6 +73,9 @@ function getMesaClientToken(mesaId: string): { token: string; expiresAt: string 
 }
 
 type DeliveryMethod = 'recogida' | 'delivery' | null;
+// Reusa el tipo de ModalidadEntregaPublica (ya importado) en vez de duplicar
+// el literal — evita una segunda fuente de verdad para el mismo dominio.
+type ModalidadEntregaTipo = ModalidadEntregaPublica['tipo'] | null;
 
 /**
  * Clave de idempotencia del intento en curso.
@@ -180,7 +183,7 @@ function validatePhoneInput(phone: string, translate: TranslateFn, language: Lan
  * reusa el mismo mensaje (`deliverySelectValidAddress`) en vez de UI nueva.
  */
 function faltaDireccionDomicilio(
-  modalidadEntregaTipo: 'recogida' | 'domicilio' | null,
+  modalidadEntregaTipo: ModalidadEntregaTipo,
   deliveryLatitude: number | null,
   deliveryLongitude: number | null
 ): boolean {
@@ -194,7 +197,7 @@ function resolveDeliveryError(
   deliveryLongitude: number | null,
   translate: TranslateFn,
   language: Language,
-  modalidadEntregaTipo: 'recogida' | 'domicilio' | null = null
+  modalidadEntregaTipo: ModalidadEntregaTipo = null
 ): string | undefined {
   if (isRestaurant && deliveryMethod === null) {
     return translate('deliveryMethodTitle', language);
@@ -652,7 +655,7 @@ export function attachModalidadFields(
   payload: Record<string, unknown>,
   opts: {
     modalidadEntregaId: string | null;
-    modalidadEntregaTipo: 'recogida' | 'domicilio' | null;
+    modalidadEntregaTipo: ModalidadEntregaTipo;
     modalidadEntregaPrecioCents: number;
     deliveryAddress: string;
     deliveryPostalCode: string;
@@ -768,7 +771,7 @@ export async function processStandardOrderResponse(
     deliveryLongitude: number | null;
     estimatedFeeCents: number | null;
     modalidadEntregaId: string | null;
-    modalidadEntregaTipo: 'recogida' | 'domicilio' | null;
+    modalidadEntregaTipo: ModalidadEntregaTipo;
     modalidadEntregaPrecioCents: number;
     clearCart: () => void;
     closeCart: () => void;
@@ -904,7 +907,7 @@ function computeIsDeliveryIncomplete(
   deliveryMethod: DeliveryMethod,
   deliveryLatitude: number | null,
   estimatedFeeCents: number | null,
-  modalidadEntregaTipo: 'recogida' | 'domicilio' | null = null,
+  modalidadEntregaTipo: ModalidadEntregaTipo = null,
   deliveryLongitude: number | null = null,
 ): boolean {
   if (isRestaurant && !mesaToken && deliveryMethod === 'delivery' && (deliveryLatitude === null || estimatedFeeCents === null)) {
@@ -1121,7 +1124,7 @@ function validarDatosDelCliente(datos: {
   deliveryLongitude: number | null;
   t: typeof t;
   language: Parameters<typeof t>[1];
-  modalidadEntregaTipo?: 'recogida' | 'domicilio' | null;
+  modalidadEntregaTipo?: ModalidadEntregaTipo;
 }): { nombre?: string; telefono?: string; delivery?: string } | null {
   const nombre = validateNameInput(datos.nombre, datos.t, datos.language);
   const telefono = validatePhoneInput(datos.telefono, datos.t, datos.language);
@@ -1384,7 +1387,7 @@ export function CartDrawer({
 
   const [step, setStep] = useState<'items' | 'checkout'>('items');
   const [modalidadEntregaId, setModalidadEntregaId] = useState<string | null>(null);
-  const [modalidadEntregaTipo, setModalidadEntregaTipo] = useState<'recogida' | 'domicilio' | null>(null);
+  const [modalidadEntregaTipo, setModalidadEntregaTipo] = useState<ModalidadEntregaTipo>(null);
   const [modalidadEntregaPrecioCents, setModalidadEntregaPrecioCents] = useState(0);
 
   const usaWizard = usaWizardTienda(isRestaurant, mesaToken, recogidaTiendaHabilitada, envioDomicilioHabilitado);

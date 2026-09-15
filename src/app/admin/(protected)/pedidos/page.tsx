@@ -132,7 +132,7 @@ interface TiendaModalidadBadgeInfo {
  * server-side en `revalidarModalidadEntrega`, ver pedido.use-case.ts) — un
  * pedido de restaurante nunca lo trae. Se comprueba ANTES que
  * `tracking_token` en `renderOrigenBadge`: `shouldGenerateTrackingToken()`
- * también setea `tracking_token` en TODO pedido de tienda (recogida Y
+ * también setea `tracking_token` en cualquier pedido de tienda (recogida Y
  * domicilio), así que sin este chequeo primero un envío a domicilio caería
  * en la rama de tracking_token y se mostraría como "Recogida".
  */
