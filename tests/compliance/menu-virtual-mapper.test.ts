@@ -116,4 +116,46 @@ describe('MenuMapper.toVirtualCategoryVM', () => {
 
     expect(vm.subcategories?.find(s => s.id === 'motos')?.products).toEqual([]);
   });
+
+  it('un producto en dos hojas distintas aparece duplicado en items (no se deduplica)', () => {
+    const exide = producto('exide');
+    const vm = MenuMapper.toVirtualCategoryVM(
+      nodo('vehiculos', null),
+      [nodo('coches', 'vehiculos'), nodo('motos', 'vehiculos')],
+      new Map([['coches', ['exide']], ['motos', ['exide']]]),
+      new Map([['exide', exide]]),
+      new Map([['cat-baterias', categoriaBaterias]]),
+    );
+
+    expect(vm.items.map(i => i.id)).toEqual(['exide', 'exide']);
+  });
+
+  it('propaga complementGroups del producto (sistema nuevo, no depende de categoría)', () => {
+    const exide = producto('exide');
+    const gruposPorProducto = new Map([['exide', [{ id: 'g1', name: 'Envío', tipo: 'radio' as const, obligatorio: false, opciones: [] }]]]);
+    const vm = MenuMapper.toVirtualCategoryVM(
+      nodo('vehiculos', null),
+      [nodo('coches', 'vehiculos')],
+      new Map([['coches', ['exide']]]),
+      new Map([['exide', exide]]),
+      new Map([['cat-baterias', categoriaBaterias]]),
+      gruposPorProducto,
+    );
+
+    expect(vm.subcategories?.[0]?.products[0]?.complementGroups).toEqual(gruposPorProducto.get('exide'));
+  });
+
+  it('producto sin complementGroups asignados no rompe (parametro opcional)', () => {
+    const exide = producto('exide');
+    const vm = MenuMapper.toVirtualCategoryVM(
+      nodo('vehiculos', null),
+      [nodo('coches', 'vehiculos')],
+      new Map([['coches', ['exide']]]),
+      new Map([['exide', exide]]),
+      new Map([['cat-baterias', categoriaBaterias]]),
+      // sin sexto argumento — debe funcionar igual que antes
+    );
+
+    expect(vm.subcategories?.[0]?.products[0]?.complementGroups).toBeUndefined();
+  });
 });

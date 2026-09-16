@@ -32,6 +32,16 @@ function mapProductTranslations(p: Product): TranslationMap {
   };
 }
 
+function mapNameOnlyTranslations(t?: { en?: string; fr?: string; it?: string; de?: string }): TranslationMap {
+  if (!t) return {};
+  return {
+    en: t.en ? { name: t.en } : undefined,
+    fr: t.fr ? { name: t.fr } : undefined,
+    it: t.it ? { name: t.it } : undefined,
+    de: t.de ? { name: t.de } : undefined,
+  };
+}
+
 function mapComplementProduct(c: Product): ComplementVM {
   return {
     id: c.id,
@@ -157,24 +167,24 @@ export class MenuMapper {
     productoIds: string[],
     productosPorId: Map<string, Product>,
     categoriasPorId: Map<string, Category>,
+    complementoGruposByProductId?: Map<string, ComplementGroupVM[]>,
   ): MenuSubcategoryVM {
     const productos = productoIds
       .map((id) => productosPorId.get(id))
       .filter((p): p is Product => p !== undefined && p.activo)
       .map((p) => {
         const categoriaReal = p.categoriaId ? categoriasPorId.get(p.categoriaId) : undefined;
-        return mapProductToItem(p, categoriaReal?.nombre ?? "uncategorized");
+        const item = mapProductToItem(p, categoriaReal?.nombre ?? "uncategorized");
+        return {
+          ...item,
+          complementGroups: complementoGruposByProductId?.get(p.id),
+        };
       });
 
     return {
       id: nodo.id,
       nombre: nodo.nombre,
-      translations: nodo.translations ? {
-        en: nodo.translations.en ? { name: nodo.translations.en } : undefined,
-        fr: nodo.translations.fr ? { name: nodo.translations.fr } : undefined,
-        it: nodo.translations.it ? { name: nodo.translations.it } : undefined,
-        de: nodo.translations.de ? { name: nodo.translations.de } : undefined,
-      } : undefined,
+      translations: mapNameOnlyTranslations(nodo.translations),
       products: productos,
     };
   }
@@ -185,9 +195,10 @@ export class MenuMapper {
     asignacionesPorNodo: Map<string, string[]>,
     productosPorId: Map<string, Product>,
     categoriasPorId: Map<string, Category>,
+    complementoGruposByProductId?: Map<string, ComplementGroupVM[]>,
   ): MenuCategoryVM {
     const subcategories = hijos.map((hijo) =>
-      MenuMapper.toVirtualSubcategoryVM(hijo, asignacionesPorNodo.get(hijo.id) ?? [], productosPorId, categoriasPorId)
+      MenuMapper.toVirtualSubcategoryVM(hijo, asignacionesPorNodo.get(hijo.id) ?? [], productosPorId, categoriasPorId, complementoGruposByProductId)
     );
 
     // items = unión de todos los hijos, con duplicados posibles si un producto
@@ -196,16 +207,19 @@ export class MenuMapper {
     // solo mira `items.length`, no `subcategories`.
     const items = subcategories.flatMap((s) => s.products);
 
+    // Igual que las categorías reales: si TODOS los items son bebida, el menú
+    // virtual cuenta como bebida para el split de pestañas del restaurante
+    // (getCategoryTab en client-menu-page.tsx). Mixto o vacío → undefined, que
+    // ya cae en "comida" por el fallback `cat.tipoProducto ?? 'comida'` existente.
+    const tipoProducto = items.length > 0 && items.every((item) => item.tipoProducto === 'bebida')
+      ? 'bebida' as const
+      : undefined;
+
     return {
       id: padre.id,
       label: padre.nombre,
-      tipoProducto: undefined,
-      translations: padre.translations ? {
-        en: padre.translations.en ? { name: padre.translations.en } : undefined,
-        fr: padre.translations.fr ? { name: padre.translations.fr } : undefined,
-        it: padre.translations.it ? { name: padre.translations.it } : undefined,
-        de: padre.translations.de ? { name: padre.translations.de } : undefined,
-      } : undefined,
+      tipoProducto,
+      translations: mapNameOnlyTranslations(padre.translations),
       subcategories: subcategories.length > 0 ? subcategories : undefined,
       items,
     };
