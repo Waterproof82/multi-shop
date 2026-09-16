@@ -49,6 +49,20 @@ export interface Category {
   };
 }
 
+export interface MenuVirtual {
+  id: string;
+  empresaId: string;
+  padreId: string | null;
+  nombre: string;
+  translations?: {
+    en?: string;
+    fr?: string;
+    it?: string;
+    de?: string;
+  };
+  orden: number;
+}
+
 export interface EmpresaColores {
   primary: string;
   primaryForeground: string;
