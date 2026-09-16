@@ -8,6 +8,44 @@ import type {
 import type { MenuVirtual, Result } from '@/core/domain/entities/types';
 import { logger } from '../logging/logger';
 
+// PostgREST (Warp) mata hilos por su propio timeout de pool con ruido de
+// fondo constante, sin que sea un incidente real de carga (mismo patron que
+// SupabaseComplementoGrupoRepository.findAllByTenant, llamada hermana en el
+// mismo GetMenuUseCase). Ambas queries son de solo lectura, asi que un unico
+// retry inmediato es seguro sin analizar idempotencia.
+const TRANSIENT_ERROR_PATTERN = /timeout|gateway/i;
+
+function findMenusVirtualesQuery(client: SupabaseClient, empresaId: string) {
+  return client
+    .from('menus_virtuales')
+    .select('*')
+    .eq('empresa_id', empresaId)
+    .order('orden', { ascending: true });
+}
+
+async function findMenusVirtualesConRetry(client: SupabaseClient, empresaId: string) {
+  const first = await findMenusVirtualesQuery(client, empresaId);
+  if (first.error && TRANSIENT_ERROR_PATTERN.test(first.error.message)) {
+    return findMenusVirtualesQuery(client, empresaId);
+  }
+  return first;
+}
+
+function findAsignacionesQuery(client: SupabaseClient, empresaId: string) {
+  return client
+    .from('menu_virtual_productos')
+    .select('menu_virtual_id, producto_id')
+    .eq('empresa_id', empresaId);
+}
+
+async function findAsignacionesConRetry(client: SupabaseClient, empresaId: string) {
+  const first = await findAsignacionesQuery(client, empresaId);
+  if (first.error && TRANSIENT_ERROR_PATTERN.test(first.error.message)) {
+    return findAsignacionesQuery(client, empresaId);
+  }
+  return first;
+}
+
 export class SupabaseMenuVirtualRepository implements IMenuVirtualRepository {
   constructor(private readonly supabase: SupabaseClient) {}
 
@@ -29,11 +67,7 @@ export class SupabaseMenuVirtualRepository implements IMenuVirtualRepository {
 
   async findAllByTenant(empresaId: string): Promise<Result<MenuVirtual[]>> {
     try {
-      const { data, error } = await this.supabase
-        .from('menus_virtuales')
-        .select('*')
-        .eq('empresa_id', empresaId)
-        .order('orden', { ascending: true });
+      const { data, error } = await findMenusVirtualesConRetry(this.supabase, empresaId);
 
       if (error) {
         await logger.logAndReturnError('DB_SELECT_ERROR', error.message, 'repository', 'SupabaseMenuVirtualRepository.findAllByTenant', { empresaId });
@@ -49,10 +83,7 @@ export class SupabaseMenuVirtualRepository implements IMenuVirtualRepository {
 
   async findAsignacionesByTenant(empresaId: string): Promise<Result<MenuVirtualProductoAsignacion[]>> {
     try {
-      const { data, error } = await this.supabase
-        .from('menu_virtual_productos')
-        .select('menu_virtual_id, producto_id')
-        .eq('empresa_id', empresaId);
+      const { data, error } = await findAsignacionesConRetry(this.supabase, empresaId);
 
       if (error) {
         await logger.logAndReturnError('DB_SELECT_ERROR', error.message, 'repository', 'SupabaseMenuVirtualRepository.findAsignacionesByTenant', { empresaId });
