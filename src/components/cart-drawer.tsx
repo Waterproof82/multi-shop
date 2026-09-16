@@ -967,10 +967,9 @@ function showDeliverySelector(mesaToken: string | null, isRestaurant: boolean | 
 export function usaWizardTienda(
   isRestaurant: boolean,
   mesaToken: string | null,
-  recogidaHabilitada: boolean,
   envioHabilitado: boolean
 ): boolean {
-  return !isRestaurant && !mesaToken && (recogidaHabilitada || envioHabilitado);
+  return !isRestaurant && !mesaToken && envioHabilitado;
 }
 
 function showDiscountSection(mesaToken: string | null): boolean {
@@ -1103,7 +1102,6 @@ interface CartDrawerProps {
   isRestaurant?: boolean;
   pagosPickupHabilitados?: boolean;
   deliveryHabilitado?: boolean;
-  recogidaTiendaHabilitada?: boolean;
   envioDomicilioHabilitado?: boolean;
   modalidadesEntrega?: ModalidadEntregaPublica[];
 }
@@ -1305,7 +1303,6 @@ export function CartDrawer({
   isRestaurant = false,
   pagosPickupHabilitados = false,
   deliveryHabilitado = false,
-  recogidaTiendaHabilitada = false,
   envioDomicilioHabilitado = false,
   modalidadesEntrega = [],
 }: Readonly<CartDrawerProps>) {
@@ -1390,7 +1387,7 @@ export function CartDrawer({
   const [modalidadEntregaTipo, setModalidadEntregaTipo] = useState<ModalidadEntregaTipo>(null);
   const [modalidadEntregaPrecioCents, setModalidadEntregaPrecioCents] = useState(0);
 
-  const usaWizard = usaWizardTienda(isRestaurant, mesaToken, recogidaTiendaHabilitada, envioDomicilioHabilitado);
+  const usaWizard = usaWizardTienda(isRestaurant, mesaToken, envioDomicilioHabilitado);
 
   const handleConfirmOrder = useCallback(async () => {
     setErrors({});
@@ -1782,7 +1779,6 @@ export function CartDrawer({
 
               {usaWizard && (
                 <TiendaFulfillmentSelector
-                  recogidaHabilitada={recogidaTiendaHabilitada}
                   envioHabilitado={envioDomicilioHabilitado}
                   modalidades={modalidadesEntrega}
                   value={modalidadEntregaTipo}

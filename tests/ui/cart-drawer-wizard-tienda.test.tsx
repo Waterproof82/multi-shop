@@ -25,20 +25,20 @@ vi.mock('next/navigation', () => ({
 }));
 
 describe('usaWizardTienda', () => {
-  it('false para restaurante, aunque tenga los toggles de tienda en true', () => {
-    expect(usaWizardTienda(true, null, true, true)).toBe(false);
+  it('false para restaurante, aunque envioHabilitado sea true', () => {
+    expect(usaWizardTienda(true, null, true)).toBe(false);
   });
 
   it('false en modo mesa', () => {
-    expect(usaWizardTienda(false, 'mesa-token', true, true)).toBe(false);
+    expect(usaWizardTienda(false, 'mesa-token', true)).toBe(false);
   });
 
-  it('false para tienda sin ningún toggle activo', () => {
-    expect(usaWizardTienda(false, null, false, false)).toBe(false);
+  it('false para tienda con envioHabilitado apagado', () => {
+    expect(usaWizardTienda(false, null, false)).toBe(false);
   });
 
-  it('true para tienda con al menos un toggle activo, sin mesa', () => {
-    expect(usaWizardTienda(false, null, true, false)).toBe(true);
+  it('true para tienda con envioHabilitado prendido, sin mesa', () => {
+    expect(usaWizardTienda(false, null, true)).toBe(true);
   });
 });
 
@@ -66,7 +66,7 @@ function pintarCartDrawerConItem(props: Partial<React.ComponentProps<typeof Cart
     <LanguageProvider>
       <CartProvider>
         <SembrarCarritoAbierto>
-          <CartDrawer isRestaurant={false} recogidaTiendaHabilitada={true} {...props} />
+          <CartDrawer isRestaurant={false} envioDomicilioHabilitado={true} {...props} />
         </SembrarCarritoAbierto>
       </CartProvider>
     </LanguageProvider>
@@ -109,7 +109,7 @@ describe('CartDrawer — wizard de tienda (recogida/domicilio activo, sin mesa)'
     pintarCartDrawerConItem({ envioDomicilioHabilitado: true, modalidadesEntrega: modalidades });
 
     fireEvent.click(screen.getByRole('button', { name: /continuar/i }));
-    fireEvent.click(screen.getByRole('tab', { name: /envío a domicilio/i }));
+    fireEvent.click(screen.getByRole('button', { name: /envío exprés/i }));
 
     expect(screen.getByText('11,50 €')).toBeInTheDocument();
   });
@@ -141,7 +141,7 @@ describe('CartDrawer — wizard de tienda (recogida/domicilio activo, sin mesa)'
     pintarCartDrawerConItem({ envioDomicilioHabilitado: true, modalidadesEntrega: modalidades });
 
     fireEvent.click(screen.getByRole('button', { name: /continuar/i }));
-    fireEvent.click(screen.getByRole('tab', { name: /envío a domicilio/i }));
+    fireEvent.click(screen.getByRole('button', { name: /envío exprés/i }));
 
     // Aparece dos veces: una en la fila de la lista de TiendaFulfillmentSelector
     // (la que ya existía) y otra nueva en el desglose de TotalsSection — si
@@ -176,7 +176,7 @@ describe('CartDrawer — wizard de tienda (recogida/domicilio activo, sin mesa)'
     // marcarla para aislar la condición que este test ejercita: la dirección
     // de domicilio, no la edad.
     fireEvent.click(screen.getByRole('checkbox'));
-    fireEvent.click(screen.getByRole('tab', { name: /envío a domicilio/i }));
+    fireEvent.click(screen.getByRole('button', { name: /envío estándar/i }));
 
     expect(screen.getByRole('button', { name: /enviar pedido/i })).toBeDisabled();
     expect(screen.getByText('Selecciona una dirección válida')).toBeInTheDocument();
@@ -211,7 +211,8 @@ describe('CartDrawer — wizard de tienda (recogida/domicilio activo, sin mesa)'
 
     fireEvent.click(screen.getByRole('button', { name: /continuar/i }));
     fireEvent.click(screen.getByRole('checkbox'));
-    fireEvent.click(screen.getByRole('tab', { name: /recoger en tienda/i }));
+    // "Recoger en local" está preseleccionada por defecto — sin necesidad de
+    // tocar nada del selector, el pedido ya está en recogida.
 
     expect(screen.getByRole('button', { name: /enviar pedido/i })).not.toBeDisabled();
     expect(screen.queryByText('Selecciona una dirección válida')).not.toBeInTheDocument();

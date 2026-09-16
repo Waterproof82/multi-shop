@@ -721,7 +721,7 @@ export const translations = {
     deliveryMethodPickup: "Recoger en local",
     deliveryMethodHome: "Entrega a domicilio",
     // Tienda (recogida/domicilio) — sistema independiente del Glovo de arriba.
-    tiendaPickupTab: "Recoger en tienda",
+    tiendaPickupTab: "Recoger en local",
     tiendaDeliveryTab: "Envío a domicilio",
     tiendaGratisLabel: "Gratis",
     deliveryAddress: "Dirección de entrega",

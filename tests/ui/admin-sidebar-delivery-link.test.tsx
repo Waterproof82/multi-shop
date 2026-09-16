@@ -4,9 +4,9 @@ import { isItemVisible } from '@/app/admin/(protected)/admin-sidebar';
 // Bug real: el link "/admin/delivery" del sidebar solo se mostraba si
 // deliveryHabilitado (el flag viejo, exclusivo de restaurante/Glovo) era
 // true — nunca chequeaba si la empresa es tipo tienda. Como
-// recogida_tienda_habilitada/envio_domicilio_habilitado (los toggles nuevos)
-// nacen en false, el admin de una tienda nunca podía navegar a la página
-// que los enciende: el link ni aparecía en el sidebar.
+// envio_domicilio_habilitado (el toggle nuevo) nace en false, el admin de
+// una tienda nunca podía navegar a la página que lo enciende: el link ni
+// aparecía en el sidebar.
 const ITEM_DELIVERY = {
   href: '/admin/delivery',
   labelKey: 'sidebarDelivery' as const,
