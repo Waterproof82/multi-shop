@@ -32,6 +32,7 @@ import { EmpleadoTpvLoginUseCase } from '@/core/application/use-cases/tpv/emplea
 import { SupabaseComplementoGrupoRepository } from './supabase-complemento-grupo.repository';
 import { SupabaseMenuVirtualRepository } from './SupabaseMenuVirtualRepository';
 import { ComplementoGrupoUseCase } from '@/core/application/use-cases/complemento-grupo.use-case';
+import { MenuVirtualUseCase } from '@/core/application/use-cases/menu-virtual.use-case';
 import { SupabaseModalidadEntregaRepository } from './SupabaseModalidadEntregaRepository';
 import { ModalidadEntregaUseCase } from '@/core/application/use-cases/modalidad-entrega.use-case';
 import { SupabaseStockRepository } from '../repositories/supabase-stock.repository';
@@ -245,6 +246,12 @@ let _complementoGrupoUseCase: ComplementoGrupoUseCase | undefined;
 export function getComplementoGrupoUseCase(): ComplementoGrupoUseCase {
   _complementoGrupoUseCase ??= new ComplementoGrupoUseCase(getComplementoGrupoRepository());
   return _complementoGrupoUseCase;
+}
+
+let _menuVirtualUseCase: MenuVirtualUseCase | undefined;
+export function getMenuVirtualUseCase(): MenuVirtualUseCase {
+  _menuVirtualUseCase ??= new MenuVirtualUseCase(getMenuVirtualRepository());
+  return _menuVirtualUseCase;
 }
 
 let _stockRepository: SupabaseStockRepository | undefined;
