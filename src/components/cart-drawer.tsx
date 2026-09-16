@@ -1745,9 +1745,15 @@ export function CartDrawer({
                 <button
                   type="button"
                   onClick={() => setStep('items')}
-                  className="w-full text-left text-sm text-muted-foreground mb-3 flex items-center gap-1"
+                  className="w-full flex items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 mb-3 text-left"
                 >
-                  ← {items.length} {items.length === 1 ? t('itemSingular', language) : t('itemsPlural', language)} · {formatPrice(totalPrice, 'EUR', language)} — {t('backButton', language)}
+                  <span className="flex items-center gap-1.5 text-sm font-semibold text-primary">
+                    <span aria-hidden="true">←</span>
+                    <span>{t('cartBackToCartLabel', language)}</span>
+                  </span>
+                  <span className="text-xs text-primary shrink-0">
+                    {items.length} {items.length === 1 ? t('itemSingular', language) : t('itemsPlural', language)} · {formatPrice(totalPrice, 'EUR', language)}
+                  </span>
                 </button>
               )}
               <DatosDelComensal
