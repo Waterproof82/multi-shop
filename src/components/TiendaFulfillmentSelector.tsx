@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
 import { formatPrice } from '@/lib/format-price';
 import { t } from '@/lib/translations';
 import { useLanguage } from '@/lib/language-context';
-import { emojiDeIcono } from '@/lib/modalidad-entrega-iconos';
+import { emojiDeIcono, formatRangoHorasModalidad } from '@/lib/modalidad-entrega-iconos';
 import { MapboxAddressInput, type SelectedAddress } from './MapboxAddressInput';
 
 type Lang = Parameters<typeof t>[1];
@@ -109,10 +109,15 @@ export function TiendaFulfillmentSelector({
             >
               <span className="text-lg leading-none">{emojiDeIcono(m.icono)}</span>
               <span className="flex-1 font-semibold">{m.nombre}</span>
-              <span className="text-xs text-muted-foreground text-right shrink-0">
-                {columnaDerecha(m.precioCents, language)}
-                {m.tiempoMinMinutos !== null && (
-                  <> · {m.tiempoMinMinutos}-{m.tiempoMaxMinutos} min</>
+              <span className="flex items-center gap-1.5 shrink-0">
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+                  {columnaDerecha(m.precioCents, language)}
+                </span>
+                {m.tiempoMinMinutos !== null && m.tiempoMaxMinutos !== null && (
+                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <span aria-hidden="true">🕐</span>
+                    {formatRangoHorasModalidad(m.tiempoMinMinutos, m.tiempoMaxMinutos, language)}
+                  </span>
                 )}
               </span>
             </button>

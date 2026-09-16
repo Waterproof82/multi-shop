@@ -26,6 +26,17 @@ const domicilioExpres: ModalidadEntregaPublica = {
   activo: true,
   orden: 1,
 };
+const domicilioHoraFija: ModalidadEntregaPublica = {
+  id: 'd3',
+  tipo: 'domicilio',
+  icono: 'package',
+  nombre: 'Battery Express',
+  precioCents: 1500,
+  tiempoMinMinutos: 24,
+  tiempoMaxMinutos: 24,
+  activo: true,
+  orden: 0,
+};
 
 function renderSelector(
   propsOrNode: Readonly<Parameters<typeof TiendaFulfillmentSelector>[0]> | ReactElement,
@@ -179,6 +190,33 @@ describe('TiendaFulfillmentSelector', () => {
     });
     expect(screen.getByText(/3,50/)).toBeInTheDocument();
     expect(screen.getByText(/120-180/)).toBeInTheDocument();
+  });
+
+  it('cuando el tiempo mínimo y máximo coinciden, muestra un solo valor sin rango', () => {
+    renderSelector({
+      envioHabilitado: true,
+      modalidades: [domicilioHoraFija],
+      value: null,
+      onChange: vi.fn(),
+      onAddressSelect: vi.fn(),
+    });
+    expect(screen.getByText('24 h')).toBeInTheDocument();
+    expect(screen.queryByText(/24-24/)).not.toBeInTheDocument();
+  });
+
+  it('el precio de domicilio se muestra en una pastilla separada de la hora', () => {
+    renderSelector({
+      envioHabilitado: true,
+      modalidades: [domicilio],
+      value: null,
+      onChange: vi.fn(),
+      onAddressSelect: vi.fn(),
+    });
+    const precio = screen.getByText('3,50 €');
+    const hora = screen.getByText('120-180 h');
+    expect(precio).not.toBe(hora);
+    expect(precio.className).toContain('rounded-full');
+    expect(hora.className).not.toContain('rounded-full');
   });
 
   it('con varias modalidades de domicilio, elegir la segunda la resalta y no a la primera', () => {

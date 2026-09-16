@@ -14,6 +14,17 @@ const modalidadDomicilio: ModalidadEntregaRow = {
   activo: true,
   orden: 0,
 };
+const modalidadHoraFija: ModalidadEntregaRow = {
+  id: 'm2',
+  tipo: 'domicilio',
+  icono: 'package',
+  nombre: 'Battery Express',
+  precioCents: 1500,
+  tiempoMinMinutos: 24,
+  tiempoMaxMinutos: 24,
+  activo: true,
+  orden: 0,
+};
 
 function renderForm(
   modalidades: ModalidadEntregaRow[] = [],
@@ -65,6 +76,17 @@ describe('ModalidadesEntregaForm', () => {
       tiempoMinMinutos: 120,
       tiempoMaxMinutos: 180,
     });
+  });
+
+  it('muestra el rango de horas de una modalidad existente con la unidad "h"', () => {
+    renderForm([modalidadDomicilio]);
+    expect(screen.getByText('30-60 h')).toBeInTheDocument();
+  });
+
+  it('cuando el tiempo mínimo y máximo coinciden, muestra un solo valor sin rango', () => {
+    renderForm([modalidadHoraFija]);
+    expect(screen.getByText('24 h')).toBeInTheDocument();
+    expect(screen.queryByText(/24-24/)).not.toBeInTheDocument();
   });
 
   it('llama a onUpdate para alternar activo al hacer click en el botón de activar/desactivar', () => {

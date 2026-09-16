@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Trash2 } from 'lucide-react';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
-import { ICONOS_MODALIDAD_ENTREGA, emojiDeIcono } from '@/lib/modalidad-entrega-iconos';
+import { ICONOS_MODALIDAD_ENTREGA, emojiDeIcono, formatRangoHorasModalidad } from '@/lib/modalidad-entrega-iconos';
 
 export interface ModalidadEntregaRow {
   id: string;
@@ -71,9 +71,9 @@ export function ModalidadesEntregaForm({
             <span className="text-lg">{emojiDeIcono(m.icono)}</span>
             <span className="flex-1 font-medium text-white">{m.nombre}</span>
             <span className="text-sm text-slate-400">{(m.precioCents / 100).toFixed(2)}€</span>
-            {m.tiempoMinMinutos !== null && (
+            {m.tiempoMinMinutos !== null && m.tiempoMaxMinutos !== null && (
               <span className="text-sm text-slate-400">
-                {m.tiempoMinMinutos}-{m.tiempoMaxMinutos} {t('deliveryModalityMinutesUnit', language)}
+                {formatRangoHorasModalidad(m.tiempoMinMinutos, m.tiempoMaxMinutos, language)}
               </span>
             )}
             <Button
