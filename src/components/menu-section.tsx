@@ -326,6 +326,7 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
   const { language: appLanguage } = useLanguage();
   const safeLanguage = appLanguage || "es";
   const [imageError, setImageError] = useState(false);
+  const [isImageZoomOpen, setIsImageZoomOpen] = useState(false);
   
   // Use static value initially, check on client only after mount
   const [shouldReduceMotionCard, setShouldReduceMotionCard] = useState(false);
@@ -385,6 +386,17 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
       {item.image && !imageError && !hideImages && (
         <div className="relative aspect-[16/10] w-full overflow-hidden">
           <CardMedia item={item} displayName={displayName} priority={priority} onError={() => setImageError(true)} shouldReduceMotion={shouldReduceMotionCard} />
+          {!item.image.endsWith(".mp4") && (
+            <button
+              type="button"
+              aria-label={`${t("viewImage", safeLanguage)}: ${displayName}`}
+              className="absolute inset-0 z-20 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsImageZoomOpen(true);
+              }}
+            />
+          )}
         </div>
       )}
       <div className="flex flex-1 flex-col p-4">
@@ -436,6 +448,25 @@ const MenuItemCard = memo(function MenuItemCard(props: Readonly<{
           </div>
         )}
       </div>
+      {item.image && !item.image.endsWith(".mp4") && (
+        <Dialog open={isImageZoomOpen} onOpenChange={setIsImageZoomOpen}>
+          <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-2xl p-0 overflow-hidden border-none bg-transparent shadow-none">
+            <DialogHeader className="sr-only">
+              <DialogTitle>{displayName}</DialogTitle>
+              <DialogDescription>{displayName}</DialogDescription>
+            </DialogHeader>
+            <div className="relative aspect-square w-full sm:aspect-[4/3]">
+              <Image
+                src={item.image}
+                alt={displayName}
+                fill
+                className="object-contain"
+                sizes="(max-width: 768px) 100vw, 700px"
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 })
