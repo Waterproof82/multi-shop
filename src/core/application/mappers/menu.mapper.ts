@@ -1,4 +1,4 @@
-import type { Product, Category } from "@/core/domain/entities/types";
+import type { Product, Category, MenuVirtual } from "@/core/domain/entities/types";
 import type { MenuItemVM, MenuSubcategoryVM, MenuCategoryVM, ComplementVM, ComplementGroupVM } from "@/core/application/dtos/menu-view-model";
 import type { ComplementoGrupo } from '@/core/domain/entities/complemento-types';
 
@@ -149,6 +149,65 @@ export class MenuMapper {
           complementGroups: complementoGruposByProductId?.get(p.id)?.map(mapComplementoGrupoToGroupVM),
         };
       }),
+    };
+  }
+
+  static toVirtualSubcategoryVM(
+    nodo: MenuVirtual,
+    productoIds: string[],
+    productosPorId: Map<string, Product>,
+    categoriasPorId: Map<string, Category>,
+  ): MenuSubcategoryVM {
+    const productos = productoIds
+      .map((id) => productosPorId.get(id))
+      .filter((p): p is Product => p !== undefined && p.activo)
+      .map((p) => {
+        const categoriaReal = p.categoriaId ? categoriasPorId.get(p.categoriaId) : undefined;
+        return mapProductToItem(p, categoriaReal?.nombre ?? "uncategorized");
+      });
+
+    return {
+      id: nodo.id,
+      nombre: nodo.nombre,
+      translations: nodo.translations ? {
+        en: nodo.translations.en ? { name: nodo.translations.en } : undefined,
+        fr: nodo.translations.fr ? { name: nodo.translations.fr } : undefined,
+        it: nodo.translations.it ? { name: nodo.translations.it } : undefined,
+        de: nodo.translations.de ? { name: nodo.translations.de } : undefined,
+      } : undefined,
+      products: productos,
+    };
+  }
+
+  static toVirtualCategoryVM(
+    padre: MenuVirtual,
+    hijos: MenuVirtual[],
+    asignacionesPorNodo: Map<string, string[]>,
+    productosPorId: Map<string, Product>,
+    categoriasPorId: Map<string, Category>,
+  ): MenuCategoryVM {
+    const subcategories = hijos.map((hijo) =>
+      MenuMapper.toVirtualSubcategoryVM(hijo, asignacionesPorNodo.get(hijo.id) ?? [], productosPorId, categoriasPorId)
+    );
+
+    // items = unión de todos los hijos, con duplicados posibles si un producto
+    // está en más de una hoja — mismo criterio que combinedProducts en
+    // toCategoryVM. Necesario porque el filtro final de GetMenuUseCase.execute
+    // solo mira `items.length`, no `subcategories`.
+    const items = subcategories.flatMap((s) => s.products);
+
+    return {
+      id: padre.id,
+      label: padre.nombre,
+      tipoProducto: undefined,
+      translations: padre.translations ? {
+        en: padre.translations.en ? { name: padre.translations.en } : undefined,
+        fr: padre.translations.fr ? { name: padre.translations.fr } : undefined,
+        it: padre.translations.it ? { name: padre.translations.it } : undefined,
+        de: padre.translations.de ? { name: padre.translations.de } : undefined,
+      } : undefined,
+      subcategories: subcategories.length > 0 ? subcategories : undefined,
+      items,
     };
   }
 }
