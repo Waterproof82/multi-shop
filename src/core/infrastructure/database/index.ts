@@ -30,6 +30,7 @@ import { MesaClientTokenUseCase } from '@/core/application/use-cases/mesa-client
 import { ValoracionUseCase } from '@/core/application/use-cases/valoracion.use-case';
 import { EmpleadoTpvLoginUseCase } from '@/core/application/use-cases/tpv/empleado-tpv-login.use-case';
 import { SupabaseComplementoGrupoRepository } from './supabase-complemento-grupo.repository';
+import { SupabaseMenuVirtualRepository } from './SupabaseMenuVirtualRepository';
 import { ComplementoGrupoUseCase } from '@/core/application/use-cases/complemento-grupo.use-case';
 import { SupabaseModalidadEntregaRepository } from './SupabaseModalidadEntregaRepository';
 import { ModalidadEntregaUseCase } from '@/core/application/use-cases/modalidad-entrega.use-case';
@@ -108,6 +109,12 @@ let _complementoGrupoRepository: SupabaseComplementoGrupoRepository | undefined;
 export function getComplementoGrupoRepository(): SupabaseComplementoGrupoRepository {
   _complementoGrupoRepository ??= new SupabaseComplementoGrupoRepository(getSupabaseClient());
   return _complementoGrupoRepository;
+}
+
+let _menuVirtualRepository: SupabaseMenuVirtualRepository | undefined;
+export function getMenuVirtualRepository(): SupabaseMenuVirtualRepository {
+  _menuVirtualRepository ??= new SupabaseMenuVirtualRepository(getSupabaseClient());
+  return _menuVirtualRepository;
 }
 
 let _empresaPublicRepository: SupabaseEmpresaRepository | undefined;
