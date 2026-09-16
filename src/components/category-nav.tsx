@@ -241,12 +241,13 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
                 <DialogDescription>{t("chooseSubcategory", language)}</DialogDescription>
               </DialogHeader>
               <ul className="max-h-72 overflow-y-auto -mx-1">
-                <li>
+                <li className="border-b border-border">
                   <button
                     type="button"
                     onClick={() => pickAndClose(activeDialogCategory.id, activeDialogCategory.id)}
-                    className="w-full text-left px-3 py-2.5 rounded-md text-sm font-medium text-muted-foreground hover:bg-secondary"
+                    className="w-full flex items-center gap-2 text-left px-3 py-3 rounded-md text-sm font-semibold text-muted-foreground hover:bg-secondary"
                   >
+                    <span aria-hidden="true">▸</span>
                     {t("viewAllCollection", language)}
                   </button>
                 </li>
@@ -255,8 +256,9 @@ export function CategoryNav(props: Readonly<CategoryNavProps>) {
                     <button
                       type="button"
                       onClick={() => pickAndClose(subcat.id, activeDialogCategory.id)}
-                      className="w-full text-left px-3 py-2.5 rounded-md text-sm hover:bg-secondary"
+                      className="w-full flex items-center gap-2 text-left px-3 py-3 rounded-md text-sm hover:bg-secondary"
                     >
+                      <span aria-hidden="true">▸</span>
                       {(language !== "es" && subcat.translations?.[language]?.name) || subcat.nombre}
                     </button>
                   </li>

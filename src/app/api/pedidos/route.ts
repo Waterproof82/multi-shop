@@ -58,9 +58,28 @@ const defaultPedidoSchema = z.object({
   latitude_entrega: z.number().min(-90).max(90).optional(),
   longitude_entrega: z.number().min(-180).max(180).optional(),
   estimated_delivery_fee_cents: z.number().int().min(0).max(100000).optional(),
+  // Modalidad de entrega (tienda). Nota: NO se acepta un
+  // `modalidad_entrega_precio_cents` del cliente a propósito — el servidor lo
+  // vuelve a leer de la DB en PedidoUseCase.create. Si el cliente lo manda,
+  // Zod lo descarta silenciosamente por no estar en el schema.
+  modalidad_entrega_id: z.uuid().optional(),
+  modalidad_entrega_tipo: z.enum(['recogida', 'domicilio']).optional(),
 }).refine(data => !data.codigoDescuento || (data.email && data.email.length > 0), {
   message: 'Email is required when using a discount code',
   path: ['email'],
+}).refine(data => !data.modalidad_entrega_id || !!data.modalidad_entrega_tipo, {
+  message: 'modalidad_entrega_tipo es requerido junto con modalidad_entrega_id',
+  path: ['modalidad_entrega_tipo'],
+}).refine(data => !data.origen || !data.modalidad_entrega_id, {
+  // `origen` (recogida/delivery) es del sistema de restaurante (Glovo);
+  // `modalidad_entrega_id` es del sistema de tienda, deliberadamente
+  // independiente. Sin este refine, un body con ambos campos podía dejar en
+  // el pedido persistido un `modalidad_entrega_tipo: 'recogida'` junto con
+  // `direccion_entrega` heredada del `origen: 'delivery'` — ninguno de los
+  // dos helpers de payload sobrescribe los campos del otro, así que el
+  // spread final quedaba con un estado inconsistente.
+  message: 'origen y modalidad_entrega_id son de sistemas de entrega distintos, no se pueden combinar',
+  path: ['modalidad_entrega_id'],
 });
 
 // z.discriminatedUnion does not support .refine() in Zod v3 — use z.union instead
@@ -211,7 +230,7 @@ async function handleDefaultOrder(
   if (!pedidoResult.success) {
     const errorCode = pedidoResult.error.code;
     if (errorCode === IDEMPOTENCY_MISMATCH_CODE) return idempotencyConflict();
-    if (['PRODUCT_NOT_FOUND', 'CODE_EXPIRED', 'CODE_ALREADY_USED', 'EMAIL_MISMATCH'].includes(errorCode)) {
+    if (['PRODUCT_NOT_FOUND', 'CODE_EXPIRED', 'CODE_ALREADY_USED', 'EMAIL_MISMATCH', 'MODALIDAD_ENTREGA_INVALIDA', 'MODALIDAD_ENTREGA_SIN_DIRECCION'].includes(errorCode)) {
       return NextResponse.json({ error: pedidoResult.error.message }, { status: 400 });
     }
     return NextResponse.json({ error: 'Error al crear el pedido' }, { status: 500 });

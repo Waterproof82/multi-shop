@@ -3,6 +3,7 @@ import { IClienteRepository } from "@/core/domain/repositories/IClienteRepositor
 import { IProductRepository } from "@/core/domain/repositories/IProductRepository";
 import { ICodigoDescuentoRepository } from "@/core/domain/repositories/ICodigoDescuentoRepository";
 import { IMesaSesionRepository } from "@/core/domain/repositories/IMesaSesionRepository";
+import { ModalidadEntregaUseCase } from "@/core/application/use-cases/modalidad-entrega.use-case";
 import { AppError, Pedido, Result } from "@/core/domain/entities/types";
 import { logger } from "@/core/infrastructure/logging/logger";
 import { IDEMPOTENCY_REPLAY_CODE } from "@/core/domain/constants/pedido";
@@ -47,6 +48,11 @@ export interface CreatePedidoDTO {
   latitude_entrega?: number;
   longitude_entrega?: number;
   estimated_delivery_fee_cents?: number;
+  // Modalidad de entrega (tienda). El `tipo` de aquí es solo lo que dice el
+  // cliente — nunca se persiste tal cual, PedidoUseCase.create lo revalida
+  // contra la DB vía ModalidadEntregaUseCase.validarPrecioVigente.
+  modalidad_entrega_id?: string;
+  modalidad_entrega_tipo?: 'recogida' | 'domicilio';
 }
 
 export interface CreateMesaPedidoDTO {
@@ -81,6 +87,19 @@ export interface PedidoStats {
 }
 
 /**
+ * ¿Trae el DTO una dirección de entrega utilizable para un envío a
+ * domicilio? Exige `direccion_entrega` no vacía (tras `.trim()`) y ambas
+ * coordenadas (`latitude_entrega`/`longitude_entrega`) presentes.
+ *
+ * Función pura de módulo (S3776) — no inline en `revalidarModalidadEntrega`.
+ * C1: sin este chequeo, un pedido con modalidad 'domicilio' se confirmaba
+ * (y cobraba el envío) sin dirección alguna a la que mandarlo.
+ */
+function tieneDireccionValida(data: Pick<CreatePedidoDTO, 'direccion_entrega' | 'latitude_entrega' | 'longitude_entrega'>): boolean {
+  return !!data.direccion_entrega?.trim() && data.latitude_entrega !== undefined && data.longitude_entrega !== undefined;
+}
+
+/**
  * Result of discount validation for pedido creation
  */
 type DiscountResult = {
@@ -99,7 +118,8 @@ export class PedidoUseCase {
     private readonly clienteRepo: IClienteRepository,
     private readonly productRepo: IProductRepository,
     private readonly descuentoRepo: ICodigoDescuentoRepository,
-    private readonly mesaSesionRepo: IMesaSesionRepository
+    private readonly mesaSesionRepo: IMesaSesionRepository,
+    private readonly modalidadEntregaUseCase: ModalidadEntregaUseCase
   ) {}
 
   /**
@@ -348,20 +368,27 @@ export class PedidoUseCase {
     serverTotal: number,
     isDelivery: boolean,
     deliveryFeeCents: number | undefined,
-    discountData?: { applied: true; finalTotal: number } | { applied: false }
+    discountData?: { applied: true; finalTotal: number } | { applied: false },
+    modalidadPrecioCents = 0
   ): number {
     let total = serverTotal;
-    
+
     // Apply discount first
     if (discountData?.applied) {
       total = discountData.finalTotal;
     }
-    
+
     // Add delivery fee
     if (isDelivery && deliveryFeeCents) {
       total = Math.round((total * 100 + deliveryFeeCents)) / 100;
     }
-    
+
+    // Add modalidad de entrega price (tienda) — precioCents ya viene revalidado
+    // server-side (ver Step 2.5 en create()), nunca del cliente.
+    if (modalidadPrecioCents > 0) {
+      total = Math.round((total * 100 + modalidadPrecioCents)) / 100;
+    }
+
     return total;
   }
 
@@ -435,6 +462,93 @@ export class PedidoUseCase {
         latitude_entrega: data.latitude_entrega,
         longitude_entrega: data.longitude_entrega,
         estimated_delivery_fee_cents: data.estimated_delivery_fee_cents,
+      } : {}),
+    };
+  }
+
+  /**
+   * Revalida contra la DB el precio y tipo de la modalidad de entrega
+   * (tienda) que mandó el cliente — nunca se confía en `data.modalidad_entrega_tipo`
+   * ni en un `modalidad_entrega_precio_cents` (que ni siquiera acepta el
+   * schema Zod de la ruta).
+   *
+   * Gateado por `empresaTipo === 'tienda'`: las modalidades de entrega son un
+   * concepto exclusivo de tienda, deliberadamente independiente del
+   * Glovo+Redsys de restaurante. Sin este gate, un pedido de RESTAURANTE que
+   * incluyera `modalidad_entrega_id` en el body dispararía la misma
+   * revalidación — inofensivo hoy porque la UI de admin solo crea filas de
+   * `modalidades_entrega` para empresas tipo tienda, pero nada a nivel de API
+   * lo impedía. Extraído de `create()` también para bajar su complejidad
+   * cognitiva (S3776, ver docs/context/deuda-complejidad.md).
+   *
+   * C1: cuando el tipo VALIDADO (nunca el que manda el cliente) es
+   * 'domicilio', exige dirección — sin este chequeo un pedido de envío se
+   * confirmaba y cobraba sin dirección alguna a la que mandarlo (ver
+   * `tieneDireccionValida`).
+   */
+  private async revalidarModalidadEntrega(
+    data: CreatePedidoDTO,
+    empresaId: string,
+    empresaTipo: string
+  ): Promise<Result<{ precioCents: number; tipo: 'recogida' | 'domicilio' | undefined }>> {
+    // Sin modalidad_entrega_id, un pedido de tienda es recogida implícita —
+    // el cliente nunca manda nada para recogida (no existe fila que
+    // referenciar desde que se eliminó del admin). Restaurante/mesa siguen
+    // sin marcar nada (`undefined`), es un concepto exclusivo de tienda.
+    if (empresaTipo !== 'tienda') {
+      return { success: true, data: { precioCents: 0, tipo: undefined } };
+    }
+    if (!data.modalidad_entrega_id) {
+      return { success: true, data: { precioCents: 0, tipo: 'recogida' } };
+    }
+    const modalidadResult = await this.modalidadEntregaUseCase.validarPrecioVigente(data.modalidad_entrega_id, empresaId);
+    if (!modalidadResult.success) {
+      return { success: false, error: modalidadResult.error };
+    }
+    if (modalidadResult.data.tipo === 'domicilio' && !tieneDireccionValida(data)) {
+      return {
+        success: false,
+        error: {
+          code: 'MODALIDAD_ENTREGA_SIN_DIRECCION',
+          message: 'La modalidad de envío a domicilio requiere una dirección de entrega válida',
+          module: 'use-case',
+          method: 'PedidoUseCase.revalidarModalidadEntrega',
+        },
+      };
+    }
+    return { success: true, data: { precioCents: modalidadResult.data.precioCents, tipo: modalidadResult.data.tipo } };
+  }
+
+  /**
+   * Payload de persistencia para la modalidad de entrega (tienda).
+   *
+   * `modalidadTipoValidado` es el `tipo` devuelto por
+   * `ModalidadEntregaUseCase.validarPrecioVigente` — NUNCA
+   * `data.modalidad_entrega_tipo` (lo que manda el cliente). Un cliente podría
+   * mandar `tipo: 'recogida'` para una modalidad que en la DB es 'domicilio' e
+   * intentar así que el pedido se guarde sin dirección de envío. Usar el
+   * validado en ambos lugares (el campo persistido y la condición que decide
+   * si se incluye la dirección) cierra ese vector.
+   */
+  private buildModalidadPayload(
+    data: CreatePedidoDTO,
+    modalidadTipoValidado: 'recogida' | 'domicilio' | undefined,
+    modalidadPrecioCents: number
+  ) {
+    // Ya no se exige `data.modalidad_entrega_id` — recogida implícita no
+    // tiene id (no existe fila que referenciar), pero igual se persiste
+    // `modalidad_entrega_tipo: 'recogida'` para que el panel admin siga
+    // mostrando el badge correspondiente (ver getTiendaModalidadBadgeInfo).
+    if (!modalidadTipoValidado) return undefined;
+    return {
+      modalidad_entrega_id: data.modalidad_entrega_id ?? null,
+      modalidad_entrega_tipo: modalidadTipoValidado,
+      modalidad_entrega_precio_cents: modalidadPrecioCents,
+      ...(modalidadTipoValidado === 'domicilio' ? {
+        direccion_entrega: data.direccion_entrega,
+        codigo_postal: data.codigo_postal,
+        latitude_entrega: data.latitude_entrega,
+        longitude_entrega: data.longitude_entrega,
       } : {}),
     };
   }
@@ -568,6 +682,15 @@ export class PedidoUseCase {
         return { success: false, error: priceResult.error };
       }
 
+      // Step 2.5: revalidar precio y tipo de la modalidad de entrega (tienda)
+      // ANTES de calcular el total — nunca confiar en el precio/tipo que
+      // manda el cliente (ver revalidarModalidadEntrega / buildModalidadPayload).
+      const modalidadResult = await this.revalidarModalidadEntrega(data, empresaId, empresaTipo);
+      if (!modalidadResult.success) {
+        return { success: false, error: modalidadResult.error };
+      }
+      const { precioCents: modalidadPrecioCents, tipo: modalidadTipoValidado } = modalidadResult.data;
+
       // Step 3: Apply discount if provided
       let finalTotal = priceResult.data.serverTotal;
       let discountData: { codigoDescuentoId: string; descuentoPorcentaje: number; totalSinDescuento: number } | undefined;
@@ -598,7 +721,8 @@ export class PedidoUseCase {
         priceResult.data.serverTotal,
         isDelivery,
         data.estimated_delivery_fee_cents,
-        discountData ? { applied: true, finalTotal } : { applied: false }
+        discountData ? { applied: true, finalTotal } : { applied: false },
+        modalidadPrecioCents
       );
       const trackingToken = this.shouldGenerateTrackingToken(empresaTipo, esPedidos, isDelivery)
         ? crypto.randomUUID()
@@ -613,7 +737,7 @@ export class PedidoUseCase {
         finalTotal,
         discountData,
         trackingToken,
-        this.buildOrigenPayload(data, isDelivery),
+        { ...this.buildOrigenPayload(data, isDelivery), ...this.buildModalidadPayload(data, modalidadTipoValidado, modalidadPrecioCents) },
         idempotency
       );
       if (!pedidoResult.success) {

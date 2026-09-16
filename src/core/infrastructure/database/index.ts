@@ -31,6 +31,8 @@ import { ValoracionUseCase } from '@/core/application/use-cases/valoracion.use-c
 import { EmpleadoTpvLoginUseCase } from '@/core/application/use-cases/tpv/empleado-tpv-login.use-case';
 import { SupabaseComplementoGrupoRepository } from './supabase-complemento-grupo.repository';
 import { ComplementoGrupoUseCase } from '@/core/application/use-cases/complemento-grupo.use-case';
+import { SupabaseModalidadEntregaRepository } from './SupabaseModalidadEntregaRepository';
+import { ModalidadEntregaUseCase } from '@/core/application/use-cases/modalidad-entrega.use-case';
 import { SupabaseStockRepository } from '../repositories/supabase-stock.repository';
 import { SupabaseTpvRepository } from '../repositories/supabase-tpv.repository';
 import type { IComprasRepository } from '@/core/domain/repositories/IComprasRepository';
@@ -130,6 +132,12 @@ export function getCategoryUseCase(): CategoryUseCase {
   return _categoryUseCase;
 }
 
+let _modalidadEntregaUseCase: ModalidadEntregaUseCase | undefined;
+export function getModalidadEntregaUseCase(): ModalidadEntregaUseCase {
+  _modalidadEntregaUseCase ??= new ModalidadEntregaUseCase(new SupabaseModalidadEntregaRepository(getSupabaseClient()));
+  return _modalidadEntregaUseCase;
+}
+
 let _clienteUseCase: ClienteUseCase | undefined;
 export function getClienteUseCase(): ClienteUseCase {
   _clienteUseCase ??= new ClienteUseCase(getClienteRepository());
@@ -149,7 +157,8 @@ export function getPedidoUseCase(): PedidoUseCase {
     getClienteRepository(),
     getProductRepository(),
     getDescuentoRepository(),
-    getMesaSesionRepository()
+    getMesaSesionRepository(),
+    getModalidadEntregaUseCase()
   );
   return _pedidoUseCase!;
 }

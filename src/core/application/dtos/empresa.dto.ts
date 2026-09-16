@@ -35,6 +35,7 @@ export const updateEmpresaSchema = z.object({
   mesas_habilitadas: z.boolean().optional(),
   validacion_pedidos_habilitada: z.boolean().optional(),
   delivery_habilitado: z.boolean().optional(),
+  envio_domicilio_habilitado: z.boolean().optional(),
   google_reviews_url: z.url().nullable().optional(),
 });
 

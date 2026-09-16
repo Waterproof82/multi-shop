@@ -93,6 +93,7 @@ export interface Empresa {
   descuentoBienvenidaPorcentaje: number;
   descuentoBienvenidaDuracion?: number | null;
   deliveryHabilitado: boolean;
+  envioDomicilioHabilitado: boolean;
   googleReviewsUrl: string | null;
   nif?: string | null;
   tipoImpuesto?: 'iva' | 'igic';
@@ -140,7 +141,8 @@ export interface EmpresaPublic {
   descuentoBienvenidaDuracion?: number | null;
   mesasHabilitadas?: boolean;
   pagosPickupHabilitados?: boolean;
-  deliveryHabilitado?: boolean;
+  deliveryHabilitado: boolean;
+  envioDomicilioHabilitado: boolean;
 }
 
 export interface Cliente {
@@ -215,6 +217,7 @@ export interface Pedido {
   paymentAmountCents?: number | null;
   delivery_fee_cents?: number | null;
   origen?: string | null;
+  modalidadEntregaTipo?: 'recogida' | 'domicilio' | null;
 }
 
 export interface Promocion {
@@ -317,4 +320,23 @@ export interface ValoracionStats {
   media: number;
   total: number;
   distribucion: Record<string, number>;
+}
+
+export interface ModalidadEntrega {
+  id: string;
+  empresaId: string;
+  tipo: 'recogida' | 'domicilio';
+  icono: string;
+  nombre: string;
+  translations?: {
+    en?: string;
+    fr?: string;
+    it?: string;
+    de?: string;
+  };
+  precioCents: number;
+  tiempoMinMinutos: number | null;
+  tiempoMaxMinutos: number | null;
+  activo: boolean;
+  orden: number;
 }

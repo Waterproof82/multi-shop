@@ -1,4 +1,4 @@
-import { getCachedMenu, getEmpresaByDomain, isPedidosSubdomain, extractMainDomain } from "@/lib/server-services"
+import { getCachedMenu, getEmpresaByDomain, isPedidosSubdomain, extractMainDomain, getModalidadesEntregaPublicas } from "@/lib/server-services"
 import { MenuPage } from "@/components/client-menu-page"
 import SiteHeaderWrapper from "@/components/site-header-wrapper";
 import type { MenuCategoryVM } from "@/core/application/dtos/menu-view-model"
@@ -78,13 +78,17 @@ export default async function Home({
     logger.logFromCatch(error, 'use-case', 'execute');
   }
 
+  const modalidadesEntrega = empresa?.tipo === 'tienda'
+    ? await getModalidadesEntregaPublicas(empresaId!)
+    : [];
+
   const header = await SiteHeaderWrapper({ showCart, empresa });
   const baseUrl = fullDomain ? `https://${fullDomain}` : "https://localhost:3000";
 
   return (
     <EmpresaThemeProvider colores={empresa?.colores || null}>
       {empresa && <JsonLd empresa={empresa} menuData={menuData} baseUrl={baseUrl} />}
-      <MenuPage menuData={menuData} header={header} showCart={showCart} empresa={empresa} isWaiterMode={isWaiterMode} />
+      <MenuPage menuData={menuData} header={header} showCart={showCart} empresa={empresa} isWaiterMode={isWaiterMode} modalidadesEntrega={modalidadesEntrega} />
     </EmpresaThemeProvider>
   );
 }

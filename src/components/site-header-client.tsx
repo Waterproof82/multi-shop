@@ -139,6 +139,22 @@ export function SiteHeaderClient({ showCart, empresa }: SiteHeaderClientProps) {
         </div>
       </div>
     </header>
+    {showCart && !waiterActive && totalItems > 0 && (
+      <button
+        type="button"
+        onClick={handleOpenCart}
+        aria-label={t("openCart", language)}
+        className="fixed bottom-5 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform duration-200 hover:scale-105 motion-reduce:hover:scale-100 animate-in fade-in-0 zoom-in-75 duration-200 md:right-6"
+      >
+        <ShoppingCart className="size-6" />
+        <span
+          key={totalItems}
+          className={`absolute -top-1 -right-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-destructive px-1 text-xs font-bold text-destructive-foreground ${animate ? 'animate-badge-pop motion-reduce:animate-none' : ''}`}
+        >
+          {totalItems}
+        </span>
+      </button>
+    )}
     </>
   );
 }

@@ -7,6 +7,37 @@ interface ClienteWithPedidos extends Cliente {
   numero_pedidos: number;
 }
 
+// PostgREST (Warp) mata hilos por su propio timeout de pool con ruido de
+// fondo constante, sin que sea un incidente real de carga (ver Sentry
+// 216a4f89b7634896bd758a52912cd766, 2026-09-11 16:15 UTC — mismo patron que
+// 90fa6dffe0094f988d362627afa71f47 en SupabaseAdminRepository.findById). El
+// UPDATE de purga es idempotente: mismo WHERE en cada intento, y si el hilo
+// se mata a mitad de transaccion Postgres hace rollback completo, asi que un
+// unico retry inmediato es seguro.
+const TRANSIENT_ERROR_PATTERN = /timeout|gateway/i;
+
+function purgeExpiredClientesQuery(client: SupabaseClient, cutoff: string) {
+  return client
+    .from('clientes')
+    .update({
+      nombre: 'ANONIMIZADO',
+      email: null,
+      telefono: null,
+      anonimizado_en: new Date().toISOString(),
+    })
+    .is('anonimizado_en', null)
+    .lt('ultima_actividad', cutoff)
+    .select('id');
+}
+
+async function purgeExpiredClientesConRetry(client: SupabaseClient, cutoff: string) {
+  const first = await purgeExpiredClientesQuery(client, cutoff);
+  if (first.error && TRANSIENT_ERROR_PATTERN.test(first.error.message)) {
+    return purgeExpiredClientesQuery(client, cutoff);
+  }
+  return first;
+}
+
 export class SupabaseClienteRepository implements IClienteRepository {
   constructor(private readonly supabase: SupabaseClient) {}
 
@@ -208,17 +239,7 @@ export class SupabaseClienteRepository implements IClienteRepository {
   async purgeExpiredClientes(): Promise<Result<number>> {
     try {
       const cutoff = new Date(Date.now() - 5 * 365.25 * 24 * 60 * 60 * 1000).toISOString();
-      const { data, error } = await this.supabase
-        .from('clientes')
-        .update({
-          nombre: 'ANONIMIZADO',
-          email: null,
-          telefono: null,
-          anonimizado_en: new Date().toISOString(),
-        })
-        .is('anonimizado_en', null)
-        .lt('ultima_actividad', cutoff)
-        .select('id');
+      const { data, error } = await purgeExpiredClientesConRetry(this.supabase, cutoff);
 
       if (error) {
         await logger.logAndReturnError(

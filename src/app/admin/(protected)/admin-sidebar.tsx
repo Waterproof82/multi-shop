@@ -49,6 +49,7 @@ interface FilterCtx {
   mostrarTgtg: boolean;
   isRestaurant: boolean;
   deliveryHabilitado: boolean;
+  isTienda: boolean;
 }
 
 // ── Color config (must use complete Tailwind class strings) ───────────────────
@@ -169,11 +170,18 @@ const NAV_ENTRIES: NavEntry[] = [
 
 // ── Filtering ─────────────────────────────────────────────────────────────────
 
-function isItemVisible(item: NavItemDef, ctx: FilterCtx): boolean {
+// Exportada para poder testear la visibilidad de cada item sin montar el
+// sidebar entero (mismo patrón que usaWizardTienda/debeMostrarSelector).
+export function isItemVisible(item: NavItemDef, ctx: FilterCtx): boolean {
   if (item.requiresPromo && !ctx.mostrarPromociones) return false;
   if (item.requiresTgtg && !ctx.mostrarTgtg) return false;
   if (item.requiresRestaurant && !ctx.isRestaurant) return false;
-  if (item.requiresDelivery && !ctx.deliveryHabilitado) return false;
+  // `deliveryHabilitado` es el flag viejo, exclusivo del sistema Glovo de
+  // restaurante. Para tienda, "/admin/delivery" es la ÚNICA puerta al
+  // toggle envio_domicilio_habilitado — sin este OR, ese toggle nace en
+  // false y no hay forma de llegar a la pantalla que lo prende, aunque el
+  // resto de la feature esté bien implementada.
+  if (item.requiresDelivery && !ctx.deliveryHabilitado && !ctx.isTienda) return false;
   return true;
 }
 
@@ -377,6 +385,7 @@ export function AdminSidebar({ empresaId: _empresaId }: Readonly<AdminSidebarPro
     mostrarTgtg,
     isRestaurant: empresaTipo === 'restaurante' && mesasHabilitadas,
     deliveryHabilitado,
+    isTienda: empresaTipo === 'tienda',
   };
 
   const visibleEntries = NAV_ENTRIES

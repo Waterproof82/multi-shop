@@ -52,6 +52,7 @@ describe('BOOLEANOS: false debe llegar como false, nunca como null', () => {
     'mostrar_promociones',
     'mostrar_tgtg',
     'descuento_bienvenida_activo',
+    'envio_domicilio_habilitado',
   ] as const;
 
   it.each(interruptores)('%s a false se guarda como false', (campo) => {
