@@ -204,11 +204,19 @@ export class GetMenuUseCase {
 
       const menuVirtualVMs = await this.construirMenusVirtuales(empresaId, productos.data, categoriasPorId, gruposPorProducto);
 
+      // Categorías reales y menús virtuales se intercalan por `orden` — el
+      // admin elige la posición relativa de ambos tipos de nodo desde sus
+      // respectivas pantallas, en vez de que los virtuales queden siempre al
+      // final. Sort estable (garantizado desde ES2019): a igual `orden`,
+      // las categorías reales mantienen su posición antes que las virtuales,
+      // que es el orden en que llegan en el spread.
+      const todasLasCategorias = [...menu, ...menuVirtualVMs].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
+
       // Una categoría sin nada que ofrecer no se pinta: dejaría un encabezado
       // vacío en la carta del cliente. Aplica igual a categorías reales y a
       // menús virtuales — toVirtualCategoryVM puebla `items` con la unión de
       // sus hojas justo para que este mismo filtro los alcance.
-      return { data: [...menu, ...menuVirtualVMs].filter(categoria => categoria.items.length > 0) };
+      return { data: todasLasCategorias.filter(categoria => categoria.items.length > 0) };
     } catch (e) {
       const appError = await logger.logFromCatch(e, 'use-case', 'GetMenuUseCase.execute', { empresaId });
       return { error: appError.message };
