@@ -99,13 +99,17 @@ Verificado antes de diseñar:
 
 ### Impacto en API
 
-Para pintar el badge de "N productos" en nodos hoja sin seleccionarlos uno
-por uno, `GET /api/admin/menus-virtuales` necesita devolver el conteo de
-productos asociados por nodo (hoy `MenuVirtual` no lo incluye). Se agrega
-`productosCount: number` al DTO de cada nodo, calculado con un `LEFT JOIN` +
-`COUNT` en el repositorio (una sola query para todos los nodos de la
-empresa, igual que hoy) en vez de N fetches desde el cliente — evita
-convertir la carga inicial de la pantalla en una cascada de requests.
+Para pintar el badge de "N productos" en nodos hoja, no hace falta SQL
+nuevo: `IMenuVirtualRepository.findAsignacionesByTenant` ya trae **todas**
+las asociaciones `(menuVirtualId, productoId)` de la empresa en una sola
+query (la usa `get-menu.use-case.ts` para el catálogo público). Se agrega
+`MenuVirtualUseCase.getProductCounts(empresaId)`, que llama a ese mismo
+método y agrupa en memoria (`Map<menuVirtualId, number>`). El route handler
+de `GET /api/admin/menus-virtuales` combina ambas respuestas
+(`getAll` + `getProductCounts`) y devuelve cada nodo con un campo
+`productosCount` agregado — sin tocar `MenuVirtual` (tipo de dominio
+compartido con la asignación masiva desde `productos/page.tsx`), solo el
+shape de la respuesta de este endpoint.
 
 ## Fuera de alcance
 
