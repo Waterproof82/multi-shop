@@ -171,6 +171,46 @@ describe('GetMenuUseCase.execute — orquestación de menús virtuales', () => {
     expect(data[0].items[0]?.id).toBe(virtual.items[0]?.id);
   });
 
+  it('un menú virtual con orden menor aparece ANTES que una categoría real (prueba el interleaving, no solo el empate)', async () => {
+    // A diferencia del test de arriba, aquí `orden` NO empata: el menú
+    // virtual tiene un `orden` numéricamente MENOR que la categoría real,
+    // aunque llegue después en el spread `[...menu, ...menuVirtualVMs]`. Si
+    // el comparador se rompiera (se invirtiera la resta, o se volviera a la
+    // concatenación simple), este test fallaría donde el del empate no lo
+    // haría.
+    const categoriaOrdenAlto: Category = { ...categoria1, orden: 10 };
+    const menuVirtualOrdenBajo: MenuVirtual = { ...menuVirtualPadre, orden: 1 };
+
+    const productRepo = {
+      findAllByTenant: vi.fn().mockResolvedValue({ success: true, data: [producto1] }),
+    } as unknown as IProductRepository;
+    const categoryRepo = {
+      findAllByTenant: vi.fn().mockResolvedValue({ success: true, data: [categoriaOrdenAlto] }),
+    } as unknown as ICategoryRepository;
+    const complementoRepo = {
+      findAssignmentsByProductos: vi.fn().mockResolvedValue({ success: true, data: [] }),
+      findAllByTenant: vi.fn().mockResolvedValue({ success: true, data: [] }),
+    } as unknown as IComplementoGrupoRepository;
+    const menuVirtualRepo = {
+      findAllByTenant: vi.fn().mockResolvedValue({ success: true, data: [menuVirtualOrdenBajo, menuVirtualHijo] }),
+      findAsignacionesByTenant: vi.fn().mockResolvedValue({ success: true, data: [asignacionVirtual] }),
+    } as unknown as IMenuVirtualRepository;
+
+    const useCase = new GetMenuUseCase(productRepo, categoryRepo, complementoRepo, menuVirtualRepo);
+
+    const resultado = await useCase.execute('empresa-1');
+
+    expect(resultado.error).toBeUndefined();
+    const data = resultado.data!;
+    expect(data).toHaveLength(2);
+
+    // El menú virtual (orden 1) debe ir primero...
+    expect(data[0]?.id).toBe('mv-padre');
+    // ...y la categoría real (orden 10) debe ir segunda, pese a llegar
+    // primero en el spread.
+    expect(data[1]?.id).toBe('category-cat-1');
+  });
+
   it('degrada con gracia: si el repo de menús virtuales falla, la carta real se sirve igual sin menús virtuales', async () => {
     const useCase = useCaseConMenusVirtuales({
       findAllByTenant: vi.fn().mockResolvedValue({
