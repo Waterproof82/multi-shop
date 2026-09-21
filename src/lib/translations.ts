@@ -511,7 +511,7 @@ export const translations = {
     menuVirtualProductosAsociados: "Productos asociados",
     menuVirtualBuscarProducto: "Buscar producto...",
     menuVirtualGuardar: "Guardar",
-    menuVirtualSinNodos: "Todavía no creaste ningún menú virtual.",
+    menuVirtualSinNodos: "Aún no has creado ningún menú virtual.",
     skipToContent: "Saltar al contenido principal",
     menuNotAvailable: "Catálogo no disponible en este momento.",
     contact: "Contacto",
