@@ -143,10 +143,10 @@ export default function ProductosPage() {
   }, [fetchData]);
 
   useEffect(() => {
-    void fetch('/api/admin/menus-virtuales')
+    void fetch(`/api/admin/menus-virtuales?empresaId=${effectiveEmpresaId}`)
       .then(res => res.ok ? res.json() : [])
       .then((data: { id: string; padreId: string | null; nombre: string }[]) => setMenusVirtuales(data));
-  }, []);
+  }, [effectiveEmpresaId]);
 
   const handleSubmit = async (e: { preventDefault: () => void }) => {
     e.preventDefault();
