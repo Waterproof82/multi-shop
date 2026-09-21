@@ -82,6 +82,7 @@ export function ModalidadesEntregaForm({
               size="icon"
               onClick={() => onUpdate(m.id, { activo: !m.activo })}
               aria-label={m.activo ? t('deliveryModalityDeactivate', language) : t('deliveryModalityActivate', language)}
+              className={m.activo ? 'text-emerald-400 hover:text-emerald-300' : 'text-slate-400 hover:text-white'}
             >
               {m.activo ? '✓' : '○'}
             </Button>
@@ -91,6 +92,7 @@ export function ModalidadesEntregaForm({
               size="icon"
               onClick={() => onDelete(m.id)}
               aria-label={t('deliveryModalityDelete', language)}
+              className="text-slate-400 hover:text-red-400"
             >
               <Trash2 className="size-4" />
             </Button>
@@ -104,7 +106,7 @@ export function ModalidadesEntregaForm({
             {t('deliveryModalityIcon', language)}
           </label>
           <Select value={icono} onValueChange={setIcono}>
-            <SelectTrigger id="icono-domicilio">
+            <SelectTrigger id="icono-domicilio" className="bg-background text-foreground">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -125,6 +127,7 @@ export function ModalidadesEntregaForm({
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
             maxLength={100}
+            className="bg-background text-foreground"
           />
         </div>
         <div>
@@ -138,6 +141,7 @@ export function ModalidadesEntregaForm({
             step="0.10"
             value={precio}
             onChange={(e) => setPrecio(e.target.value)}
+            className="bg-background text-foreground"
           />
         </div>
         <div>
@@ -150,6 +154,7 @@ export function ModalidadesEntregaForm({
             min="0"
             value={tiempoMin}
             onChange={(e) => setTiempoMin(e.target.value)}
+            className="bg-background text-foreground"
           />
         </div>
         <div>
@@ -162,6 +167,7 @@ export function ModalidadesEntregaForm({
             min="0"
             value={tiempoMax}
             onChange={(e) => setTiempoMax(e.target.value)}
+            className="bg-background text-foreground"
           />
         </div>
         <Button
