@@ -106,6 +106,7 @@ const NAV_ENTRIES: NavEntry[] = [
         { href: '/admin/categorias', labelKey: 'sidebarCategories', icon: Tags },
         { href: '/admin/productos', labelKey: 'sidebarProducts', icon: Package },
         { href: '/admin/complementos', labelKey: 'sidebarComplementos', icon: Layers, requiresRestaurant: true },
+        { href: '/admin/menus-virtuales', labelKey: 'sidebarMenusVirtuales', icon: Grid2X2 },
       ],
     },
   },
