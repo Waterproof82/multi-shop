@@ -83,12 +83,20 @@ Verificado antes de diseñar:
   `menuVirtualCrearSubcategoriaTitulo`, `menuVirtualNombrePlaceholder` (ES/EN,
   siguiendo el bloque existente en `translations.ts` L522-537 / L1586-1601).
 
-### 4. Feedback — toasts + diálogo de confirmación, sin `alert`/`confirm`
+### 4. Feedback — banner inline + diálogo de confirmación, sin `alert`/`confirm`
 
-- `handleGuardarProductos`: el `alert(...)` de error pasa a
-  `toast({ variant: 'destructive', description: t('menuVirtualGuardarProductosError', language) })`.
-  Éxito también muestra un toast breve (hoy no hay ninguna confirmación
-  visible al guardar).
+Corrección tras verificar en vivo: `src/hooks/use-toast.ts` y
+`src/components/ui/toaster.tsx` existen pero **no se usan en ningún lugar
+del código actual** (`<Toaster />` no está montado en ningún layout) — no es
+un patrón establecido, es infraestructura huérfana. El patrón que sí usan
+todas las pantallas de admin comparables (`productos/page.tsx`,
+`categorias/page.tsx`) es un estado local `error` + banner inline
+(`{error && <div className="...bg-destructive/10...">{error}</div>}`). Se
+sigue ESE patrón para consistencia real, no el hook sin usar:
+
+- `handleGuardarProductos` / `handleGuardarNombre`: el `alert(...)` de error
+  y los fallos silenciosos pasan a setear un `error` de estado local,
+  mostrado en el mismo banner inline que ya usa el resto del admin.
 - `handleEliminar`: el `confirm(...)` nativo se reemplaza por un diálogo de
   confirmación local (mismo look que `DeleteConfirmDialog`, pero definido en
   este archivo — no se importa el de `product-form-dialog.tsx` porque ese
