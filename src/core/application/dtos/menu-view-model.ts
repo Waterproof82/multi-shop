@@ -1,5 +1,18 @@
 type TranslationEntry = { name: string; description?: string };
 
+export interface TablaCeldaVM {
+  es: string;
+  en?: string;
+  fr?: string;
+  it?: string;
+  de?: string;
+}
+
+export interface ProductoTablaVM {
+  columnas: TablaCeldaVM[];
+  filas: TablaCeldaVM[][];
+}
+
 export interface ComplementVM {
   id: string;
   name: string;
@@ -49,6 +62,7 @@ export interface MenuItemVM {
   requiresComplement?: boolean;
   complementGroups?: ComplementGroupVM[];
   alergenos?: string[];
+  table?: ProductoTablaVM;
 }
 
 export interface MenuSubcategoryVM {
