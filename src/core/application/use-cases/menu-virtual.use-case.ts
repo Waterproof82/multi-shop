@@ -31,4 +31,8 @@ export class MenuVirtualUseCase {
   setProductos(menuVirtualId: string, productoIds: string[], empresaId: string): Promise<Result<void>> {
     return this.repo.setProductos(menuVirtualId, productoIds, empresaId);
   }
+
+  addProductos(menuVirtualId: string, productoIds: string[], empresaId: string): Promise<Result<void>> {
+    return this.repo.addProductos(menuVirtualId, productoIds, empresaId);
+  }
 }
