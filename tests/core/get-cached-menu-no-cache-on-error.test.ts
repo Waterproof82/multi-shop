@@ -46,6 +46,7 @@ vi.mock('@/core/infrastructure/database/SupabaseCategoryRepository', () => ({
 vi.mock('@/core/infrastructure/database', () => ({
   getEmpresaPublicRepository: vi.fn(),
   getComplementoGrupoRepository: vi.fn(),
+  getMenuVirtualRepository: vi.fn(),
 }));
 
 import { getCachedMenu } from '@/lib/server-services';

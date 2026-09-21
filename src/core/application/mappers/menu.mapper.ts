@@ -68,7 +68,7 @@ function mapProductToItem(product: Product, categoryName: string): MenuItemVM {
   };
 }
 
-function mapComplementoGrupoToGroupVM(grupo: ComplementoGrupo): ComplementGroupVM {
+export function mapComplementoGrupoToGroupVM(grupo: ComplementoGrupo): ComplementGroupVM {
   return {
     id: grupo.id,
     name: grupo.nombre_es,

@@ -5,7 +5,7 @@ import { getSupabaseAnonClient } from "@/core/infrastructure/database/supabase-c
 import { SupabaseProductRepository } from "@/core/infrastructure/database/SupabaseProductRepository";
 import { SupabaseCategoryRepository } from "@/core/infrastructure/database/SupabaseCategoryRepository";
 import { GetMenuUseCase } from "@/core/application/use-cases/get-menu.use-case";
-import { getEmpresaPublicRepository, getComplementoGrupoRepository, getModalidadEntregaUseCase } from "@/core/infrastructure/database";
+import { getEmpresaPublicRepository, getComplementoGrupoRepository, getMenuVirtualRepository, getModalidadEntregaUseCase } from "@/core/infrastructure/database";
 import { parseMainDomain } from "@/lib/domain-utils";
 import { logger } from "@/core/infrastructure/logging/logger";
 import type { EmpresaPublic } from "@/core/domain/entities/types";
@@ -16,7 +16,8 @@ export function getMenuUseCase(): GetMenuUseCase {
   return _menuUseCase ??= new GetMenuUseCase(
     new SupabaseProductRepository(getSupabaseAnonClient()),
     new SupabaseCategoryRepository(getSupabaseAnonClient()),
-    getComplementoGrupoRepository()
+    getComplementoGrupoRepository(),
+    getMenuVirtualRepository()
   );
 }
 

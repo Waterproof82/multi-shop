@@ -14,6 +14,7 @@ import { GetMenuUseCase } from '@/core/application/use-cases/get-menu.use-case';
 import type { IProductRepository } from '@/core/domain/repositories/IProductRepository';
 import type { ICategoryRepository } from '@/core/domain/repositories/ICategoryRepository';
 import type { IComplementoGrupoRepository } from '@/core/domain/repositories/IComplementoGrupoRepository';
+import type { IMenuVirtualRepository } from '@/core/domain/repositories/IMenuVirtualRepository';
 
 const { logAndReturnErrorMock } = vi.hoisted(() => ({
   logAndReturnErrorMock: vi.fn().mockResolvedValue({}),
@@ -32,7 +33,8 @@ function useCaseConProductRepoFallando(): GetMenuUseCase {
   const productRepo = { findAllByTenant: vi.fn().mockResolvedValue(dbErrorResult) } as unknown as IProductRepository;
   const categoryRepo = { findAllByTenant: vi.fn().mockResolvedValue({ success: true, data: [] }) } as unknown as ICategoryRepository;
   const complementoRepo = {} as IComplementoGrupoRepository;
-  return new GetMenuUseCase(productRepo, categoryRepo, complementoRepo);
+  const menuVirtualRepo = {} as IMenuVirtualRepository;
+  return new GetMenuUseCase(productRepo, categoryRepo, complementoRepo, menuVirtualRepo);
 }
 
 beforeEach(() => {
