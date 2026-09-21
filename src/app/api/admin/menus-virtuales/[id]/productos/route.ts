@@ -43,3 +43,27 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (result.success) revalidateTag(catalogTag(empresaId), {});
   return handleResultWithStatus(result);
 }
+
+export async function POST(request: NextRequest, { params }: Params) {
+  const ctx = await resolveAdminContextWithEmpresa(request);
+  if (ctx.error) return ctx.error;
+  const { empresaId } = ctx;
+
+  const { id } = await params;
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return validationErrorResponse('JSON inválido');
+  }
+
+  const parsed = setMenuVirtualProductosSchema.safeParse(body);
+  if (!parsed.success) {
+    return validationErrorResponse(parsed.error.issues[0]?.message ?? 'Datos inválidos');
+  }
+
+  const result = await getMenuVirtualUseCase().addProductos(id, parsed.data.productoIds, empresaId);
+  if (result.success) revalidateTag(catalogTag(empresaId), {});
+  return handleResultWithStatus(result);
+}
