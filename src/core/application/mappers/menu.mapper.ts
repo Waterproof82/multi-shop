@@ -131,6 +131,7 @@ export class MenuMapper {
     return {
       id: `category-${parentCat.id}`,
       label: parentCat.nombre ?? "Unnamed Category",
+      orden: parentCat.orden,
       descripcion: parentCat.descripcion || undefined,
       tipoProducto: parentCat.tipoProducto,
       translations: mapCategoryTranslations(parentCat),
@@ -218,6 +219,7 @@ export class MenuMapper {
     return {
       id: padre.id,
       label: padre.nombre,
+      orden: padre.orden,
       tipoProducto,
       translations: mapNameOnlyTranslations(padre.translations),
       subcategories: subcategories.length > 0 ? subcategories : undefined,

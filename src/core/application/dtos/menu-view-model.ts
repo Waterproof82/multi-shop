@@ -73,6 +73,7 @@ export interface MenuSubcategoryVM {
 export interface MenuCategoryVM {
   id: string;
   label: string;
+  orden?: number;
   descripcion?: string;
   tipoProducto?: 'comida' | 'bebida';
   items: MenuItemVM[];
