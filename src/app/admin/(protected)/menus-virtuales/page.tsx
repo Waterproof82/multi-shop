@@ -136,11 +136,14 @@ export default function MenusVirtualesPage() {
     if (!selectedId) return;
     setSavingProductos(true);
     try {
-      await fetchWithCsrf(`/api/admin/menus-virtuales/${selectedId}/productos`, {
+      const res = await fetchWithCsrf(`/api/admin/menus-virtuales/${selectedId}/productos`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ productoIds: selectedProductoIds }),
       });
+      if (!res.ok) {
+        alert(t('menuVirtualGuardarProductosError', language));
+      }
     } finally {
       setSavingProductos(false);
     }
@@ -226,6 +229,7 @@ export default function MenusVirtualesPage() {
                 value={productoSearch}
                 onChange={e => setProductoSearch(e.target.value)}
                 placeholder={t('menuVirtualBuscarProducto', language)}
+                aria-label={t('menuVirtualBuscarProducto', language)}
               />
               <div className="max-h-96 overflow-y-auto space-y-1 border border-border rounded-lg p-2">
                 {productosFiltrados.map(producto => (
