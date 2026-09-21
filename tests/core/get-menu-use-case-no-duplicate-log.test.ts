@@ -84,7 +84,6 @@ const producto1: Product = {
   tipoProducto: 'comida',
   createdAt: new Date('2026-01-01'),
   alergenos: [],
-  tabla: null,
 };
 
 const categoria1: Category = {

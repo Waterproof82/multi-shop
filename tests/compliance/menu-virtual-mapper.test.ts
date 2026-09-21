@@ -34,7 +34,6 @@ const producto = (id: string, overrides: Partial<Product> = {}): Product => ({
   tipoProducto: 'comida',
   createdAt: new Date(),
   alergenos: [],
-  tabla: null,
   ...overrides,
 });
 
