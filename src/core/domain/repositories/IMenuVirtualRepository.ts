@@ -28,4 +28,5 @@ export interface IMenuVirtualRepository {
   update(id: string, empresaId: string, data: UpdateMenuVirtualData): Promise<Result<MenuVirtual>>;
   delete(id: string, empresaId: string): Promise<Result<void>>;
   setProductos(menuVirtualId: string, productoIds: string[], empresaId: string): Promise<Result<void>>;
+  addProductos(menuVirtualId: string, productoIds: string[], empresaId: string): Promise<Result<void>>;
 }

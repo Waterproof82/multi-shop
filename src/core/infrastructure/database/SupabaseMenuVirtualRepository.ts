@@ -242,4 +242,43 @@ export class SupabaseMenuVirtualRepository implements IMenuVirtualRepository {
       return { success: false, error: appError };
     }
   }
+
+  async addProductos(menuVirtualId: string, productoIds: string[], empresaId: string): Promise<Result<void>> {
+    try {
+      if (productoIds.length === 0) return { success: true, data: undefined };
+
+      // orden continua desde el final de lo ya asociado, para no pisar el
+      // orden de las filas existentes ni dejarlas todas en 0.
+      const { count } = await this.supabase
+        .from('menu_virtual_productos')
+        .select('*', { count: 'exact', head: true })
+        .eq('menu_virtual_id', menuVirtualId)
+        .eq('empresa_id', empresaId);
+
+      const startOrden = count ?? 0;
+      const rows = productoIds.map((productoId, idx) => ({
+        empresa_id: empresaId,
+        menu_virtual_id: menuVirtualId,
+        producto_id: productoId,
+        orden: startOrden + idx,
+      }));
+
+      // upsert + ignoreDuplicates: si un producto ya estaba asociado a este
+      // nodo, la fila existente no se toca (no cambia su orden) — a
+      // diferencia de setProductos, esto NUNCA borra asociaciones previas.
+      const { error } = await this.supabase
+        .from('menu_virtual_productos')
+        .upsert(rows, { onConflict: 'menu_virtual_id,producto_id', ignoreDuplicates: true });
+
+      if (error) {
+        await logger.logAndReturnError('DB_INSERT_ERROR', error.message, 'repository', 'SupabaseMenuVirtualRepository.addProductos', { details: { menuVirtualId } });
+        return { success: false, error: { code: 'DB_ERROR', message: 'Error al agregar productos al menú virtual', module: 'repository', method: 'addProductos' } };
+      }
+
+      return { success: true, data: undefined };
+    } catch (e) {
+      const appError = await logger.logFromCatch(e, 'repository', 'SupabaseMenuVirtualRepository.addProductos', { details: { menuVirtualId } });
+      return { success: false, error: appError };
+    }
+  }
 }
