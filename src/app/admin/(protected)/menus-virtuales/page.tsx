@@ -30,6 +30,7 @@ export default function MenusVirtualesPage() {
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editNombre, setEditNombre] = useState('');
+  const [editOrden, setEditOrden] = useState(0);
   const [saving, setSaving] = useState(false);
 
   const [productos, setProductos] = useState<AdminProducto[]>([]);
@@ -63,6 +64,7 @@ export default function MenusVirtualesPage() {
   function handleSelect(nodo: MenuVirtual) {
     setSelectedId(nodo.id);
     setEditNombre(nodo.nombre);
+    setEditOrden(nodo.orden);
     setProductoSearch('');
     setSelectedProductoIds([]);
   }
@@ -107,7 +109,7 @@ export default function MenusVirtualesPage() {
       const res = await fetchWithCsrf(`/api/admin/menus-virtuales/${selectedId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nombre_es: editNombre }),
+        body: JSON.stringify({ nombre_es: editNombre, orden: editOrden }),
       });
       if (res.ok) {
         const updated = await res.json() as MenuVirtual;
@@ -201,17 +203,28 @@ export default function MenusVirtualesPage() {
 
       {selectedNodo && (
         <div className="space-y-6 max-w-xl">
-          <div className="flex items-end gap-2">
-            <div className="flex-1">
+          <div className="space-y-2">
+            <div>
               <label htmlFor="menu-virtual-nombre" className="text-sm font-medium text-foreground">{t('menuVirtualNombre', language)}</label>
               <Input id="menu-virtual-nombre" value={editNombre} onChange={e => setEditNombre(e.target.value)} />
             </div>
-            <Button onClick={handleGuardarNombre} disabled={saving} className="gap-2">
-              <Save className="w-4 h-4" /> {t('menuVirtualGuardar', language)}
-            </Button>
-            <Button variant="outline" onClick={() => handleEliminar(selectedNodo.id)} className="gap-2 text-destructive">
-              <Trash2 className="w-4 h-4" /> {t('menuVirtualEliminar', language)}
-            </Button>
+            <div className="flex items-end gap-2">
+              <div className="w-24">
+                <label htmlFor="menu-virtual-orden" className="text-sm font-medium text-foreground">{t('orderLabel', language)}</label>
+                <Input
+                  id="menu-virtual-orden"
+                  type="number"
+                  value={editOrden}
+                  onChange={e => setEditOrden(Number.parseInt(e.target.value) || 0)}
+                />
+              </div>
+              <Button onClick={handleGuardarNombre} disabled={saving} className="gap-2">
+                <Save className="w-4 h-4" /> {t('menuVirtualGuardar', language)}
+              </Button>
+              <Button variant="outline" onClick={() => handleEliminar(selectedNodo.id)} className="gap-2 text-destructive">
+                <Trash2 className="w-4 h-4" /> {t('menuVirtualEliminar', language)}
+              </Button>
+            </div>
           </div>
 
           {selectedEsHoja && (
