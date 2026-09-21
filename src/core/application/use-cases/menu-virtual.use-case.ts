@@ -16,6 +16,17 @@ export class MenuVirtualUseCase {
     return this.repo.findProductoIdsByMenuVirtual(menuVirtualId, empresaId);
   }
 
+  async getProductCounts(empresaId: string): Promise<Result<Map<string, number>>> {
+    const result = await this.repo.findAsignacionesByTenant(empresaId);
+    if (!result.success) return result;
+
+    const counts = new Map<string, number>();
+    for (const asignacion of result.data) {
+      counts.set(asignacion.menuVirtualId, (counts.get(asignacion.menuVirtualId) ?? 0) + 1);
+    }
+    return { success: true, data: counts };
+  }
+
   create(data: CreateMenuVirtualData): Promise<Result<MenuVirtual>> {
     return this.repo.create(data);
   }
