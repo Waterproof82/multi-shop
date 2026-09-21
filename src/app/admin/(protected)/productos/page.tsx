@@ -143,7 +143,11 @@ export default function ProductosPage() {
   }, [fetchData]);
 
   useEffect(() => {
-    void fetch(`/api/admin/menus-virtuales?empresaId=${effectiveEmpresaId}`)
+    void fetchWithCsrf(`/api/admin/menus-virtuales?empresaId=${effectiveEmpresaId}`, {}, {
+      maxRetries: 3,
+      baseDelay: 1000,
+      retryOn: (response) => response.status >= 500 || response.status === 429 || response.status === 408
+    })
       .then(res => res.ok ? res.json() : [])
       .then((data: { id: string; padreId: string | null; nombre: string }[]) => setMenusVirtuales(data));
   }, [effectiveEmpresaId]);
@@ -368,6 +372,8 @@ export default function ProductosPage() {
       });
   }, [menusVirtuales]);
 
+  const todosVisiblesSeleccionados = filteredProductos.length > 0 && filteredProductos.every(p => selectedIds.has(p.id));
+
   function toggleSeleccion(id: string) {
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -377,26 +383,28 @@ export default function ProductosPage() {
   }
 
   function toggleSeleccionarTodos() {
-    setSelectedIds(prev =>
-      prev.size === filteredProductos.length ? new Set() : new Set(filteredProductos.map(p => p.id))
-    );
+    setSelectedIds(prev => {
+      const todosSeleccionados = filteredProductos.length > 0 && filteredProductos.every(p => prev.has(p.id));
+      return todosSeleccionados ? new Set() : new Set(filteredProductos.map(p => p.id));
+    });
   }
 
   async function handleAsignar(nodoId: string) {
     setAsignando(true);
+    setError('');
     try {
-      const res = await fetchWithCsrf(`/api/admin/menus-virtuales/${nodoId}/productos`, {
+      const res = await fetchWithCsrf(`/api/admin/menus-virtuales/${nodoId}/productos?empresaId=${effectiveEmpresaId}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ productoIds: [...selectedIds] }),
       });
-      if (res.ok) {
-        alert(t('menuVirtualAsignarExito', language));
-        setSelectedIds(new Set());
-        setShowAsignarPicker(false);
-      } else {
-        alert(t('menuVirtualAsignarError', language));
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || t('menuVirtualAsignarError', language));
       }
+      setSelectedIds(new Set());
+      setShowAsignarPicker(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("unknownError", language));
     } finally {
       setAsignando(false);
     }
@@ -485,7 +493,12 @@ export default function ProductosPage() {
           <span className="text-sm text-foreground">
             {selectedIds.size} {t('menuVirtualProductosSeleccionadosSufijo', language)}
           </span>
-          <Button size="sm" onClick={() => setShowAsignarPicker(true)} disabled={nodosHoja.length === 0}>
+          <Button
+            size="sm"
+            onClick={() => setShowAsignarPicker(true)}
+            disabled={nodosHoja.length === 0}
+            title={nodosHoja.length === 0 ? t('menuVirtualSinNodos', language) : undefined}
+          >
             {t('menuVirtualAsignarAMenu', language)}
           </Button>
         </div>
@@ -513,7 +526,7 @@ export default function ProductosPage() {
                   <input
                     type="checkbox"
                     aria-label={t("selectAll", language)}
-                    checked={filteredProductos.length > 0 && selectedIds.size === filteredProductos.length}
+                    checked={todosVisiblesSeleccionados}
                     onChange={toggleSeleccionarTodos}
                     className="w-4 h-4 accent-primary shrink-0"
                   />
