@@ -1,7 +1,24 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Plus, Pencil, Trash2, Loader2, Search, ArrowUpDown, ArrowUp, ArrowDown, Languages, ChevronDown, ChevronRight, Tags, FolderTree, UtensilsCrossed, GlassWater } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
+import Link from 'next/link';
+import { Plus, Pencil, Trash2, Loader2, Search, ArrowUp, ArrowDown, Languages, ChevronDown, ChevronRight, Tags, FolderTree, UtensilsCrossed, GlassWater, GripVertical, ExternalLink } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -13,9 +30,10 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { fetchWithCsrf } from '@/lib/csrf-client';
-import { useLanguage } from '@/lib/language-context';
+import { useLanguage, type Language } from '@/lib/language-context';
 import { useAdmin } from '@/lib/admin-context';
 import { t } from '@/lib/translations';
+import { reordenarPorArrastre } from '@/lib/drag-reorder';
 
 interface Category {
   id: string;
@@ -55,6 +73,19 @@ interface CategoryFormData {
   tipo_producto: 'comida' | 'bebida';
 }
 
+interface MenuVirtualAdmin {
+  id: string;
+  empresaId: string;
+  padreId: string | null;
+  nombre: string;
+  orden: number;
+  productosCount: number;
+}
+
+type TopLevelNode =
+  | { kind: 'categoria'; id: string; orden: number; categoria: Category }
+  | { kind: 'menu_virtual'; id: string; orden: number; menu: MenuVirtualAdmin };
+
 const emptyForm: CategoryFormData = {
   nombre_es: '',
   nombre_en: '',
@@ -73,11 +104,310 @@ const emptyForm: CategoryFormData = {
   tipo_producto: 'comida',
 };
 
+function CategoryTypeBadges({ cat, parentName, empresaTipo, language }: Readonly<{
+  cat: Category;
+  parentName: string | null;
+  empresaTipo?: string;
+  language: Language;
+}>) {
+  return (
+    <div className="flex flex-col gap-1">
+      {cat.categoria_padre_id ? (
+        <>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-500/20 border border-teal-400/30 text-teal-300 text-xs font-medium">
+            {t("subcategory", language)}
+          </span>
+          {parentName && (
+            <span className="text-xs text-slate-400">
+              → {parentName}
+            </span>
+          )}
+        </>
+      ) : (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-700/50 border border-slate-600 text-slate-300 text-xs font-medium">
+          {t("mainCategory", language)}
+        </span>
+      )}
+      {empresaTipo === 'restaurante' && (cat.tipo_producto === 'bebida' ? (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-medium">
+          <GlassWater className="w-3 h-3" /> Bar
+        </span>
+      ) : (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500/20 border border-orange-400/30 text-orange-300 text-xs font-medium">
+          <UtensilsCrossed className="w-3 h-3" /> Cocina
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function CategorySubcategoriasBadge({ hasSubcategories, language }: Readonly<{ hasSubcategories: boolean; language: Language }>) {
+  if (!hasSubcategories) return <span className="text-slate-400">—</span>;
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 text-xs font-medium">
+      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+        <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+        <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
+      </svg>
+      {t("yes", language)}
+    </span>
+  );
+}
+
+function CategoryRowActions({ cat, language, onEdit, onDelete }: Readonly<{
+  cat: Category;
+  language: Language;
+  onEdit: () => void;
+  onDelete: () => void;
+}>) {
+  return (
+    <>
+      <button type="button"
+        onClick={onEdit}
+        aria-label={`${t("edit", language)} ${cat.nombre_es}`}
+        className="p-2 text-cyan-400 hover:text-cyan-300 mr-1 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center transition-colors"
+      >
+        <Pencil className="h-4 w-4" />
+      </button>
+      <button type="button"
+        onClick={onDelete}
+        aria-label={`${t("delete", language)} ${cat.nombre_es}`}
+        className="p-2 text-red-400 hover:text-red-300 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center transition-colors"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </>
+  );
+}
+
+function MenuVirtualRowActions({ menu, language }: Readonly<{ menu: MenuVirtualAdmin; language: Language }>) {
+  return (
+    <Link
+      href={`/admin/menus-virtuales?nodo=${menu.id}`}
+      aria-label={`${t("goToVirtualMenus", language)}: ${menu.nombre}`}
+      className="p-2 text-violet-400 hover:text-violet-300 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center transition-colors"
+    >
+      <ExternalLink className="h-4 w-4" />
+    </Link>
+  );
+}
+
+interface SortableMenuVirtualRowProps {
+  menu: MenuVirtualAdmin;
+  hasSubcategories: boolean;
+  language: Language;
+}
+
+function SortableMenuVirtualRow({ menu, hasSubcategories, language }: Readonly<SortableMenuVirtualRowProps>) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: menu.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <tr ref={setNodeRef} style={style} className="hover:bg-white/5 transition-colors border-b border-white/10">
+      <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-300">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            aria-label={t('orderLabel', language)}
+            className="touch-none p-1.5 -ml-1.5 text-slate-400 hover:text-white cursor-grab active:cursor-grabbing"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="w-3.5 h-3.5" />
+          </button>
+          {menu.orden}
+        </div>
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-white">
+        {menu.nombre}
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap text-sm">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-500/20 border border-violet-400/30 text-violet-300 text-xs font-medium">
+          {t("categoryTypeVirtualMenu", language)}
+        </span>
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap text-sm">
+        <CategorySubcategoriasBadge hasSubcategories={hasSubcategories} language={language} />
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-400">—</td>
+      <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
+        <MenuVirtualRowActions menu={menu} language={language} />
+      </td>
+    </tr>
+  );
+}
+
+interface SortableMenuVirtualCardProps {
+  menu: MenuVirtualAdmin;
+  language: Language;
+}
+
+function SortableMenuVirtualCard({ menu, language }: Readonly<SortableMenuVirtualCardProps>) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: menu.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="p-4 hover:bg-white/5 transition-colors flex items-start gap-2">
+      <button
+        type="button"
+        aria-label={t('orderLabel', language)}
+        className="touch-none p-1.5 mt-0.5 text-slate-400 hover:text-white cursor-grab active:cursor-grabbing"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="w-4 h-4" />
+      </button>
+      <div className="flex items-start justify-between flex-1">
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400">#{menu.orden}</span>
+            <p className="font-medium text-white">{menu.nombre}</p>
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-violet-500/20 border border-violet-400/30 text-violet-300 text-[10px] font-medium">
+              {t("categoryTypeVirtualMenu", language)}
+            </span>
+          </div>
+        </div>
+        <MenuVirtualRowActions menu={menu} language={language} />
+      </div>
+    </div>
+  );
+}
+
+interface SortableCategoryRowProps {
+  cat: Category;
+  parentName: string | null;
+  hasSubcategories: boolean;
+  complementoDeName: string | null;
+  empresaTipo?: string;
+  language: Language;
+  onEdit: () => void;
+  onDelete: () => void;
+}
+
+function SortableCategoryRow({ cat, parentName, hasSubcategories, complementoDeName, empresaTipo, language, onEdit, onDelete }: Readonly<SortableCategoryRowProps>) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: cat.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <tr ref={setNodeRef} style={style} className="hover:bg-white/5 transition-colors border-b border-white/10">
+      <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-300">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            aria-label={t('orderLabel', language)}
+            className="touch-none p-1.5 -ml-1.5 text-slate-400 hover:text-white cursor-grab active:cursor-grabbing"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="w-3.5 h-3.5" />
+          </button>
+          {cat.orden}
+        </div>
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-white">
+        {cat.nombre_es}
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap text-sm">
+        <CategoryTypeBadges cat={cat} parentName={parentName} empresaTipo={empresaTipo} language={language} />
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap text-sm">
+        <CategorySubcategoriasBadge hasSubcategories={hasSubcategories} language={language} />
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-400">{complementoDeName ?? '—'}</td>
+      <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
+        <CategoryRowActions cat={cat} language={language} onEdit={onEdit} onDelete={onDelete} />
+      </td>
+    </tr>
+  );
+}
+
+interface SortableCategoryCardProps {
+  cat: Category;
+  parentName: string | null;
+  hasSubcategories: boolean;
+  language: Language;
+  onEdit: () => void;
+  onDelete: () => void;
+}
+
+function SortableCategoryCard({ cat, parentName, hasSubcategories, language, onEdit, onDelete }: Readonly<SortableCategoryCardProps>) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: cat.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="p-4 hover:bg-white/5 transition-colors flex items-start gap-2">
+      <button
+        type="button"
+        aria-label={t('orderLabel', language)}
+        className="touch-none p-1.5 mt-0.5 text-slate-400 hover:text-white cursor-grab active:cursor-grabbing"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="w-4 h-4" />
+      </button>
+      <div className="flex items-start justify-between flex-1">
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400">#{cat.orden}</span>
+            <p className="font-medium text-white">{cat.nombre_es}</p>
+            {cat.categoria_padre_id && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-teal-500/20 border border-teal-400/30 text-teal-300 text-[10px] font-medium">
+                Sub
+              </span>
+            )}
+            {!cat.categoria_padre_id && hasSubcategories && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 text-[10px] font-medium">
+                {t("mainCategory", language)}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-400 mt-1">
+            {cat.categoria_padre_id && parentName ? `${t("subcategoryOf", language)} ${parentName}` : ''}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button type="button"
+            onClick={onEdit}
+            aria-label={`${t("edit", language)} ${cat.nombre_es}`}
+            className="p-2 text-cyan-400 hover:bg-cyan-500/20 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+          <button type="button"
+            onClick={onDelete}
+            aria-label={`${t("delete", language)} ${cat.nombre_es}`}
+            className="p-2 text-red-400 hover:bg-red-500/20 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CategoriasPage() {
   const { language } = useLanguage();
   const { empresaId, overrideEmpresaId, empresaTipo } = useAdmin();
   const effectiveEmpresaId = overrideEmpresaId || empresaId;
   const [categorias, setCategorias] = useState<Category[]>([]);
+  const [menusVirtuales, setMenusVirtuales] = useState<MenuVirtualAdmin[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -85,9 +415,13 @@ export default function CategoriasPage() {
   const [formData, setFormData] = useState<CategoryFormData>(emptyForm);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortField, setSortField] = useState<'orden' | 'nombre_es'>('orden');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [nameSortDirection, setNameSortDirection] = useState<'asc' | 'desc'>('asc');
   const [showTranslations, setShowTranslations] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   const fetchCategorias = useCallback(async () => {
     try {
@@ -102,9 +436,21 @@ export default function CategoriasPage() {
     }
   }, [language, effectiveEmpresaId]);
 
+  const fetchMenusVirtuales = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/menus-virtuales');
+      if (!res.ok) return;
+      const data = await res.json() as MenuVirtualAdmin[];
+      setMenusVirtuales(data);
+    } catch {
+      // best-effort: si falla, la tabla sigue mostrando las categorías reales igual
+    }
+  }, []);
+
   useEffect(() => {
     fetchCategorias();
-  }, [fetchCategorias]);
+    fetchMenusVirtuales();
+  }, [fetchCategorias, fetchMenusVirtuales]);
 
   const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
@@ -112,10 +458,10 @@ export default function CategoriasPage() {
     setError('');
 
     try {
-      const url = editingId 
-        ? `/api/admin/categorias?id=${editingId}&empresaId=${effectiveEmpresaId}` 
+      const url = editingId
+        ? `/api/admin/categorias?id=${editingId}&empresaId=${effectiveEmpresaId}`
         : `/api/admin/categorias?empresaId=${effectiveEmpresaId}`;
-      
+
       const method = editingId ? 'PUT' : 'POST';
 
       const res = await fetchWithCsrf(url, {
@@ -186,14 +532,83 @@ export default function CategoriasPage() {
     setEditingId(null);
   };
 
-  const handleSort = (field: 'orden' | 'nombre_es') => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
-    }
-  };
+  function toggleNameSort() {
+    setNameSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+  }
+
+  const padresCombinados = useMemo<TopLevelNode[]>(() => {
+    const nodosCategoria: TopLevelNode[] = categorias
+      .filter((c) => !c.categoria_padre_id)
+      .map((categoria) => ({ kind: 'categoria' as const, id: categoria.id, orden: categoria.orden, categoria }));
+    const nodosMenu: TopLevelNode[] = menusVirtuales
+      .filter((m) => !m.padreId)
+      .map((menu) => ({ kind: 'menu_virtual' as const, id: menu.id, orden: menu.orden, menu }));
+    return [...nodosCategoria, ...nodosMenu].sort((a, b) => a.orden - b.orden);
+  }, [categorias, menusVirtuales]);
+
+  const hijosDe = useCallback(
+    (padreId: string) => categorias.filter((c) => c.categoria_padre_id === padreId).sort((a, b) => a.orden - b.orden),
+    [categorias]
+  );
+
+  async function persistirOrdenCategorias(reordenados: Category[], original: Category[]) {
+    const cambiados = reordenados.filter((cat) => {
+      const previo = original.find((o) => o.id === cat.id);
+      return previo && previo.orden !== cat.orden;
+    });
+    await Promise.all(cambiados.map((cat) =>
+      fetchWithCsrf(`/api/admin/categorias?id=${cat.id}&empresaId=${effectiveEmpresaId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ orden: cat.orden }),
+      })
+    ));
+  }
+
+  async function persistirOrdenCombinado(reordenados: TopLevelNode[], original: TopLevelNode[]) {
+    const cambiados = reordenados.filter((nodo) => {
+      const previo = original.find((o) => o.id === nodo.id);
+      return previo && previo.orden !== nodo.orden;
+    });
+    await Promise.all(cambiados.map((nodo) =>
+      nodo.kind === 'categoria'
+        ? fetchWithCsrf(`/api/admin/categorias?id=${nodo.id}&empresaId=${effectiveEmpresaId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ orden: nodo.orden }),
+          })
+        : fetchWithCsrf(`/api/admin/menus-virtuales/${nodo.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ orden: nodo.orden }),
+          })
+    ));
+  }
+
+  function handleDragEndPadres(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over) return;
+    const reordenados = reordenarPorArrastre(padresCombinados, String(active.id), String(over.id));
+    if (reordenados === padresCombinados) return;
+    setCategorias((prev) => prev.map((c) => {
+      const match = reordenados.find((r) => r.kind === 'categoria' && r.id === c.id);
+      return match ? { ...c, orden: match.orden } : c;
+    }));
+    setMenusVirtuales((prev) => prev.map((m) => {
+      const match = reordenados.find((r) => r.kind === 'menu_virtual' && r.id === m.id);
+      return match ? { ...m, orden: match.orden } : m;
+    }));
+    void persistirOrdenCombinado(reordenados, padresCombinados);
+  }
+
+  function handleDragEndHijos(padreId: string, event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over) return;
+    const hijos = hijosDe(padreId);
+    const reordenados = reordenarPorArrastre(hijos, String(active.id), String(over.id));
+    if (reordenados === hijos) return;
+    setCategorias((prev) => prev.map((c) => reordenados.find((r) => r.id === c.id) ?? c));
+    void persistirOrdenCategorias(reordenados, hijos);
+  }
+
+  const isSearching = searchTerm.trim().length > 0;
 
   const filteredCategorias = categorias
     .filter((cat) => {
@@ -206,28 +621,24 @@ export default function CategoriasPage() {
         cat.nombre_de?.toLowerCase().includes(term)
       );
     })
-    .map(cat => {
-      const parentCat = cat.categoria_padre_id 
-        ? categorias.find(c => c.id === cat.categoria_padre_id) 
+    .map((cat) => {
+      const parentCat = cat.categoria_padre_id
+        ? categorias.find((c) => c.id === cat.categoria_padre_id)
         : null;
       return {
         ...cat,
-        hasSubcategories: categorias.some(c => c.categoria_padre_id === cat.id),
-        parentName: parentCat?.nombre_es || null
+        hasSubcategories: categorias.some((c) => c.categoria_padre_id === cat.id),
+        parentName: parentCat?.nombre_es || null,
       };
     })
     .sort((a, b) => {
-      // Put categories with subcategories first, then subcategories
       if (a.categoria_padre_id !== b.categoria_padre_id) {
         if (a.categoria_padre_id && !b.categoria_padre_id) return 1;
         if (!a.categoria_padre_id && b.categoria_padre_id) return -1;
       }
-      if (sortField === 'orden') {
-        return sortDirection === 'asc' ? a.orden - b.orden : b.orden - a.orden;
-      }
-      const aVal = String(a[sortField as keyof Category] ?? '').toLowerCase();
-      const bVal = String(b[sortField as keyof Category] ?? '').toLowerCase();
-      return sortDirection === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      const aVal = a.nombre_es?.toLowerCase() ?? '';
+      const bVal = b.nombre_es?.toLowerCase() ?? '';
+      return nameSortDirection === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
     });
 
   if (loading) {
@@ -295,28 +706,18 @@ export default function CategoriasPage() {
           <table className="min-w-full divide-y divide-white/10">
             <thead className="bg-white/5 border-b border-white/10">
               <tr>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase cursor-pointer hover:bg-white/10 transition-colors"
-                  onClick={() => handleSort('orden')}
-                >
-                    <div className="flex items-center gap-1">
-                      {t("orderLabel", language)}
-                      {sortField === 'orden' && (
-                        sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
-                      )}
-                      {sortField !== 'orden' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
-                    </div>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">
+                  {t("orderLabel", language)}
                 </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase cursor-pointer hover:bg-white/10 transition-colors"
-                  onClick={() => handleSort('nombre_es')}
+                <th
+                  className={`px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase ${isSearching ? 'cursor-pointer hover:bg-white/10 transition-colors' : ''}`}
+                  onClick={isSearching ? toggleNameSort : undefined}
                 >
                     <div className="flex items-center gap-1">
                       {t("nameES", language)}
-                      {sortField === 'nombre_es' && (
-                        sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                      {isSearching && (
+                        nameSortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
                       )}
-                      {sortField !== 'nombre_es' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                     </div>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">
@@ -334,83 +735,92 @@ export default function CategoriasPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/10">
-              {filteredCategorias.map((cat) => (
-                <tr key={cat.id} className="hover:bg-white/5 transition-colors border-b border-white/10">
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-300">
-                    {cat.orden}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-white">
-                    {cat.nombre_es}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm">
-                    <div className="flex flex-col gap-1">
-                      {cat.categoria_padre_id ? (
-                        <>
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-500/20 border border-teal-400/30 text-teal-300 text-xs font-medium">
-                            {t("subcategory", language)}
-                          </span>
-                          {cat.parentName && (
-                            <span className="text-xs text-slate-400">
-                              → {cat.parentName}
-                            </span>
+              {isSearching ? (
+                filteredCategorias.map((cat) => (
+                  <tr key={cat.id} className="hover:bg-white/5 transition-colors border-b border-white/10">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-300">
+                      {cat.orden}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-white">
+                      {cat.nombre_es}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm">
+                      <CategoryTypeBadges cat={cat} parentName={cat.parentName} empresaTipo={empresaTipo} language={language} />
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm">
+                      <CategorySubcategoriasBadge hasSubcategories={!!cat.hasSubcategories} language={language} />
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-400">
+                      {cat.categoria_complemento_de
+                        ? categorias.find(c => c.id === cat.categoria_complemento_de)?.nombre_es || '—'
+                        : '—'}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
+                      <CategoryRowActions cat={cat} language={language} onEdit={() => openEditModal(cat)} onDelete={() => handleDelete(cat.id)} />
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndPadres}>
+                  <SortableContext items={padresCombinados.map(n => n.id)} strategy={verticalListSortingStrategy}>
+                    {padresCombinados.map((nodo) => {
+                      if (nodo.kind === 'menu_virtual') {
+                        return (
+                          <SortableMenuVirtualRow
+                            key={nodo.id}
+                            menu={nodo.menu}
+                            hasSubcategories={menusVirtuales.some(m => m.padreId === nodo.id)}
+                            language={language}
+                          />
+                        );
+                      }
+                      const padre = nodo.categoria;
+                      const hijos = hijosDe(padre.id);
+                      return (
+                        <Fragment key={padre.id}>
+                          <SortableCategoryRow
+                            cat={padre}
+                            parentName={null}
+                            hasSubcategories={hijos.length > 0}
+                            complementoDeName={padre.categoria_complemento_de ? categorias.find(c => c.id === padre.categoria_complemento_de)?.nombre_es ?? null : null}
+                            empresaTipo={empresaTipo}
+                            language={language}
+                            onEdit={() => openEditModal(padre)}
+                            onDelete={() => handleDelete(padre.id)}
+                          />
+                          {hijos.length > 0 && (
+                            <DndContext
+                              sensors={sensors}
+                              collisionDetection={closestCenter}
+                              onDragEnd={(event) => handleDragEndHijos(padre.id, event)}
+                            >
+                              <SortableContext items={hijos.map(h => h.id)} strategy={verticalListSortingStrategy}>
+                                {hijos.map((hijo) => (
+                                  <SortableCategoryRow
+                                    key={hijo.id}
+                                    cat={hijo}
+                                    parentName={padre.nombre_es}
+                                    hasSubcategories={false}
+                                    complementoDeName={hijo.categoria_complemento_de ? categorias.find(c => c.id === hijo.categoria_complemento_de)?.nombre_es ?? null : null}
+                                    empresaTipo={empresaTipo}
+                                    language={language}
+                                    onEdit={() => openEditModal(hijo)}
+                                    onDelete={() => handleDelete(hijo.id)}
+                                  />
+                                ))}
+                              </SortableContext>
+                            </DndContext>
                           )}
-                        </>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-700/50 border border-slate-600 text-slate-300 text-xs font-medium">
-                          {t("mainCategory", language)}
-                        </span>
-                      )}
-                      {empresaTipo === 'restaurante' && (cat.tipo_producto === 'bebida' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-medium">
-                          <GlassWater className="w-3 h-3" /> Bar
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500/20 border border-orange-400/30 text-orange-300 text-xs font-medium">
-                          <UtensilsCrossed className="w-3 h-3" /> Cocina
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm">
-                    {cat.hasSubcategories ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 text-xs font-medium">
-                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
-                          <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
-                        </svg>
-                        {t("yes", language)}
-                      </span>
-                    ) : (
-                      <span className="text-slate-400">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-400">
-                    {cat.categoria_complemento_de 
-                      ? categorias.find(c => c.id === cat.categoria_complemento_de)?.nombre_es || '—'
-                      : '—'}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
-                    <button type="button"
-                      onClick={() => openEditModal(cat)}
-                      aria-label={`${t("edit", language)} ${cat.nombre_es}`}
-                      className="p-2 text-cyan-400 hover:text-cyan-300 mr-1 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center transition-colors"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button type="button"
-                      onClick={() => handleDelete(cat.id)}
-                      aria-label={`${t("delete", language)} ${cat.nombre_es}`}
-                      className="p-2 text-red-400 hover:text-red-300 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center transition-colors"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {filteredCategorias.length === 0 && (
+                        </Fragment>
+                      );
+                    })}
+                  </SortableContext>
+                </DndContext>
+              )}
+              {(isSearching ? filteredCategorias.length === 0 : padresCombinados.length === 0) && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-slate-400">
-                    {searchTerm ? t("noCategoriesFound", language) : t("noCategoriesYet", language)}
+                  <td colSpan={6} className="px-6 py-8 text-center text-slate-400">
+                    {isSearching ? t("noCategoriesFound", language) : t("noCategoriesYet", language)}
                   </td>
                 </tr>
               )}
@@ -420,50 +830,99 @@ export default function CategoriasPage() {
 
         {/* Mobile cards */}
         <div className="md:hidden divide-y divide-white/10">
-          {filteredCategorias.map((cat) => (
-            <div key={cat.id} className="p-4 hover:bg-white/5 transition-colors">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-400">#{cat.orden}</span>
-                    <p className="font-medium text-white">{cat.nombre_es}</p>
-                    {cat.categoria_padre_id && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-teal-500/20 border border-teal-400/30 text-teal-300 text-[10px] font-medium">
-                        Sub
-                      </span>
-                    )}
-                    {!cat.categoria_padre_id && cat.hasSubcategories && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 text-[10px] font-medium">
-                        {t("mainCategory", language)}
-                      </span>
-                    )}
+          {isSearching ? (
+            filteredCategorias.map((cat) => (
+              <div key={cat.id} className="p-4 hover:bg-white/5 transition-colors">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-400">#{cat.orden}</span>
+                      <p className="font-medium text-white">{cat.nombre_es}</p>
+                      {cat.categoria_padre_id && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-teal-500/20 border border-teal-400/30 text-teal-300 text-[10px] font-medium">
+                          Sub
+                        </span>
+                      )}
+                      {!cat.categoria_padre_id && cat.hasSubcategories && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 text-[10px] font-medium">
+                          {t("mainCategory", language)}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">
+                      {cat.categoria_padre_id && cat.parentName ? `${t("subcategoryOf", language)} ${cat.parentName}` : ''}
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-400 mt-1">
-                    {cat.categoria_padre_id && cat.parentName ? `${t("subcategoryOf", language)} ${cat.parentName}` : ''}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button type="button"
-                    onClick={() => openEditModal(cat)}
-                    aria-label={`${t("edit", language)} ${cat.nombre_es}`}
-                    className="p-2 text-cyan-400 hover:bg-cyan-500/20 dark:hover:bg-cyan-500/20 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
-                  <button type="button"
-                    onClick={() => handleDelete(cat.id)}
-                    aria-label={`${t("delete", language)} ${cat.nombre_es}`}
-                    className="p-2 text-red-400 hover:bg-red-500/20 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button type="button"
+                      onClick={() => openEditModal(cat)}
+                      aria-label={`${t("edit", language)} ${cat.nombre_es}`}
+                      className="p-2 text-cyan-400 hover:bg-cyan-500/20 dark:hover:bg-cyan-500/20 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button type="button"
+                      onClick={() => handleDelete(cat.id)}
+                      aria-label={`${t("delete", language)} ${cat.nombre_es}`}
+                      className="p-2 text-red-400 hover:bg-red-500/20 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-slate-900 focus-visible:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-          {filteredCategorias.length === 0 && (
+            ))
+          ) : (
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndPadres}>
+              <SortableContext items={padresCombinados.map(n => n.id)} strategy={verticalListSortingStrategy}>
+                {padresCombinados.map((nodo) => {
+                  if (nodo.kind === 'menu_virtual') {
+                    return <SortableMenuVirtualCard key={nodo.id} menu={nodo.menu} language={language} />;
+                  }
+                  const padre = nodo.categoria;
+                  const hijos = hijosDe(padre.id);
+                  return (
+                    <Fragment key={padre.id}>
+                      <SortableCategoryCard
+                        cat={padre}
+                        parentName={null}
+                        hasSubcategories={hijos.length > 0}
+                        language={language}
+                        onEdit={() => openEditModal(padre)}
+                        onDelete={() => handleDelete(padre.id)}
+                      />
+                      {hijos.length > 0 && (
+                        <DndContext
+                          sensors={sensors}
+                          collisionDetection={closestCenter}
+                          onDragEnd={(event) => handleDragEndHijos(padre.id, event)}
+                        >
+                          <SortableContext items={hijos.map(h => h.id)} strategy={verticalListSortingStrategy}>
+                            <div className="pl-6">
+                              {hijos.map((hijo) => (
+                                <SortableCategoryCard
+                                  key={hijo.id}
+                                  cat={hijo}
+                                  parentName={padre.nombre_es}
+                                  hasSubcategories={false}
+                                  language={language}
+                                  onEdit={() => openEditModal(hijo)}
+                                  onDelete={() => handleDelete(hijo.id)}
+                                />
+                              ))}
+                            </div>
+                          </SortableContext>
+                        </DndContext>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </SortableContext>
+            </DndContext>
+          )}
+          {(isSearching ? filteredCategorias.length === 0 : padresCombinados.length === 0) && (
             <div className="p-8 text-center text-slate-400">
-              {searchTerm ? t("noCategoriesFound", language) : t("noCategoriesYet", language)}
+              {isSearching ? t("noCategoriesFound", language) : t("noCategoriesYet", language)}
             </div>
           )}
         </div>
@@ -604,18 +1063,6 @@ export default function CategoriasPage() {
                 </div>
               </div>
             )}
-
-            <div>
-              <label htmlFor="orden" className="block text-sm font-medium text-foreground mb-1">
-                {t("orderLabel", language)}
-              </label>
-              <Input
-                id="orden"
-                type="number"
-                value={formData.orden}
-                onChange={(e) => setFormData({ ...formData, orden: Number.parseInt(e.target.value) || 0 })}
-              />
-            </div>
 
             <div>
               <label htmlFor="categoria_padre_id" className="block text-sm font-medium text-foreground mb-1">

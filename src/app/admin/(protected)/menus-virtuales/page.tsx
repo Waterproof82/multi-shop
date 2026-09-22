@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Plus, Trash2, Save, Loader2, Folder, Tag, GripVertical } from 'lucide-react';
 import {
   DndContext,
@@ -24,7 +24,7 @@ import { fetchWithCsrf } from '@/lib/csrf-client';
 import { useAdmin } from '@/lib/admin-context';
 import { useLanguage } from '@/lib/language-context';
 import { t } from '@/lib/translations';
-import { reordenarPorArrastre } from '@/lib/menu-virtual-reorder';
+import { reordenarPorArrastre } from '@/lib/drag-reorder';
 import { NuevoMenuVirtualDialog } from '@/components/admin/NuevoMenuVirtualDialog';
 import { EliminarMenuVirtualDialog } from '@/components/admin/EliminarMenuVirtualDialog';
 
@@ -154,6 +154,18 @@ export default function MenusVirtualesPage() {
     setSelectedProductoIds([]);
     setError('');
   }
+
+  const autoSelectedRef = useRef(false);
+  useEffect(() => {
+    if (loading || autoSelectedRef.current) return;
+    const nodoId = new URLSearchParams(window.location.search).get('nodo');
+    if (!nodoId) return;
+    const nodo = nodos.find(n => n.id === nodoId);
+    if (nodo) {
+      handleSelect(nodo);
+      autoSelectedRef.current = true;
+    }
+  }, [loading, nodos]);
 
   useEffect(() => {
     if (!selectedId || !selectedEsHoja) return;

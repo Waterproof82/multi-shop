@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { reordenarPorArrastre } from '../../src/lib/menu-virtual-reorder';
+import { reordenarPorArrastre } from '../../src/lib/drag-reorder';
 
 describe('reordenarPorArrastre', () => {
   it('mueve el nodo arrastrado a la posición del nodo soltado y reindexa orden 0..n-1', () => {

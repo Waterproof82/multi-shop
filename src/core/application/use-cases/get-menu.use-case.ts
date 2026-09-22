@@ -134,7 +134,10 @@ export class GetMenuUseCase {
     );
     const productosPorId = new Map(productos.map(p => [p.id, p]));
     const padres = nodos.data.filter(m => !m.padreId).sort((a, b) => a.orden - b.orden);
-    const hijosPorPadre = agruparPor(nodos.data.filter(m => m.padreId), m => m.padreId!);
+    const hijosPorPadre = agruparPor(
+      nodos.data.filter(m => m.padreId).sort((a, b) => a.orden - b.orden),
+      m => m.padreId!,
+    );
 
     // toVirtualCategoryVM espera el tipo VIEW-MODEL (ComplementGroupVM), no el
     // de dominio (ComplementoGrupo) — misma conversión que toCategoryVM hace
