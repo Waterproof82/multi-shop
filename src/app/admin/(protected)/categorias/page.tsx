@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
 import Link from 'next/link';
-import { Plus, Pencil, Trash2, Loader2, Search, ArrowUp, ArrowDown, Languages, ChevronDown, ChevronRight, Tags, FolderTree, UtensilsCrossed, GlassWater, GripVertical, ExternalLink } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Search, ArrowUp, ArrowDown, Languages, ChevronDown, ChevronRight, Tags, FolderTree, UtensilsCrossed, GlassWater, GripVertical, ExternalLink, CornerDownRight } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -209,18 +209,15 @@ function SortableMenuVirtualRow({ menu, hasSubcategories, language }: Readonly<S
   return (
     <tr ref={setNodeRef} style={style} className="hover:bg-white/5 transition-colors border-b border-white/10">
       <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-300">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            aria-label={t('orderLabel', language)}
-            className="touch-none p-1.5 -ml-1.5 text-slate-400 hover:text-white cursor-grab active:cursor-grabbing"
-            {...attributes}
-            {...listeners}
-          >
-            <GripVertical className="w-3.5 h-3.5" />
-          </button>
-          {menu.orden}
-        </div>
+        <button
+          type="button"
+          aria-label={t('orderLabel', language)}
+          className="touch-none p-1.5 -ml-1.5 text-slate-400 hover:text-white cursor-grab active:cursor-grabbing"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="w-3.5 h-3.5" />
+        </button>
       </td>
       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-white">
         {menu.nombre}
@@ -268,7 +265,6 @@ function SortableMenuVirtualCard({ menu, language }: Readonly<SortableMenuVirtua
       <div className="flex items-start justify-between flex-1">
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400">#{menu.orden}</span>
             <p className="font-medium text-white">{menu.nombre}</p>
             <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-violet-500/20 border border-violet-400/30 text-violet-300 text-[10px] font-medium">
               {t("categoryTypeVirtualMenu", language)}
@@ -303,21 +299,23 @@ function SortableCategoryRow({ cat, parentName, hasSubcategories, complementoDeN
   return (
     <tr ref={setNodeRef} style={style} className="hover:bg-white/5 transition-colors border-b border-white/10">
       <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-300">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            aria-label={t('orderLabel', language)}
-            className="touch-none p-1.5 -ml-1.5 text-slate-400 hover:text-white cursor-grab active:cursor-grabbing"
-            {...attributes}
-            {...listeners}
-          >
-            <GripVertical className="w-3.5 h-3.5" />
-          </button>
-          {cat.orden}
-        </div>
+        <button
+          type="button"
+          aria-label={t('orderLabel', language)}
+          className="touch-none p-1.5 -ml-1.5 text-slate-400 hover:text-white cursor-grab active:cursor-grabbing"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="w-3.5 h-3.5" />
+        </button>
       </td>
       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-white">
-        {cat.nombre_es}
+        <div className={`flex items-center gap-1.5 ${cat.categoria_padre_id ? 'pl-6 font-normal text-slate-200' : ''}`}>
+          {cat.categoria_padre_id && (
+            <CornerDownRight className="w-3.5 h-3.5 text-teal-400 shrink-0" aria-hidden="true" />
+          )}
+          <span>{cat.nombre_es}</span>
+        </div>
       </td>
       <td className="px-4 py-3 whitespace-nowrap text-sm">
         <CategoryTypeBadges cat={cat} parentName={parentName} empresaTipo={empresaTipo} language={language} />
@@ -364,7 +362,9 @@ function SortableCategoryCard({ cat, parentName, hasSubcategories, language, onE
       <div className="flex items-start justify-between flex-1">
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400">#{cat.orden}</span>
+            {cat.categoria_padre_id && (
+              <CornerDownRight className="w-3.5 h-3.5 text-teal-400 shrink-0" aria-hidden="true" />
+            )}
             <p className="font-medium text-white">{cat.nombre_es}</p>
             {cat.categoria_padre_id && (
               <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-teal-500/20 border border-teal-400/30 text-teal-300 text-[10px] font-medium">
@@ -898,7 +898,7 @@ export default function CategoriasPage() {
                           onDragEnd={(event) => handleDragEndHijos(padre.id, event)}
                         >
                           <SortableContext items={hijos.map(h => h.id)} strategy={verticalListSortingStrategy}>
-                            <div className="pl-6">
+                            <div className="ml-6 border-l-2 border-teal-400/20 divide-y divide-white/10">
                               {hijos.map((hijo) => (
                                 <SortableCategoryCard
                                   key={hijo.id}
