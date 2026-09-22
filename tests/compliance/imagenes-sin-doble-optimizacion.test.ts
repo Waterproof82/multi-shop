@@ -36,7 +36,6 @@ const RAIZ = resolve(__dirname, '../..');
 const DEBEN_USAR_ENVOLTORIO = [
   'src/components/menu-section.tsx',
   'src/components/cart-drawer.tsx',
-  'src/components/quantity-selector-dialog.tsx',
   'src/components/product-image-gallery.tsx',
   'src/components/tpv/MenuPanel.tsx',
   'src/components/hero-banner.tsx',
@@ -53,11 +52,22 @@ const DEBEN_USAR_ENVOLTORIO = [
   'src/app/admin/(protected)/toogoodtogo/page.tsx',
 ];
 
+/**
+ * Ficheros que ya no pintan imagenes de forma directa: delegan por completo
+ * en `ProductImageGallery` (que si esta en `DEBEN_USAR_ENVOLTORIO` y ya
+ * garantiza el envoltorio). Solo tiene sentido verificar que no reintroducen
+ * `next/image` — el chequeo de "usa el envoltorio ImagenSubida" no aplica
+ * porque no importan `imagen-subida` ellos mismos.
+ */
+const SIN_IMAGEN_PROPIA = [
+  'src/components/quantity-selector-dialog.tsx',
+];
+
 /** `import Image from 'next/image'` — el que reintroduce el coste. */
 const IMPORT_DIRECTO = /^import\s+Image\s+from\s+['"]next\/image['"]/m;
 
 describe('imágenes ya optimizadas', () => {
-  it.each(DEBEN_USAR_ENVOLTORIO)('%s no importa next/image directamente', (rel) => {
+  it.each([...DEBEN_USAR_ENVOLTORIO, ...SIN_IMAGEN_PROPIA])('%s no importa next/image directamente', (rel) => {
     const fuente = readFileSync(join(RAIZ, rel), 'utf8');
 
     expect(
