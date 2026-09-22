@@ -62,6 +62,7 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
   const [waiterHasMesa, setWaiterHasMesa] = useState(false);
   const [waiterMesaLocked, setWaiterMesaLocked] = useState(false);
   const [waiterSearch, setWaiterSearch] = useState("");
+  const [productSearch, setProductSearch] = useState("");
   const [waiterSelectedItem, setWaiterSelectedItem] = useState<MenuItemVM | null>(null);
   const [waiterDialogOpen, setWaiterDialogOpen] = useState(false);
   const [menuTab, setMenuTab] = useState<'comida' | 'bebidas'>('comida');
@@ -201,6 +202,27 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
     globalThis.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
+  const allProducts = useMemo<MenuItemVM[]>(() => {
+    // category.items ya incluye los productos de sus subcategorías (ver
+    // MenuMapper.toCategoryVM: combinedProducts = parentProducts + subcategoryProducts),
+    // así que sumar cat.subcategories[].products aparte los duplicaría. Dedupe por id.
+    const byId = new Map<string, MenuItemVM>();
+    for (const cat of menuData) {
+      for (const item of cat.items) byId.set(item.id, item);
+      for (const sub of cat.subcategories ?? []) {
+        for (const item of sub.products) byId.set(item.id, item);
+      }
+    }
+    return [...byId.values()];
+  }, [menuData]);
+
+  const productSearchQuery = productSearch.trim().toLowerCase();
+  const searchResultsCategory = useMemo<MenuCategoryVM | null>(() => {
+    if (!productSearchQuery) return null;
+    const items = allProducts.filter(p => p.name.toLowerCase().includes(productSearchQuery));
+    return { id: "__search_results__", label: t("searchResultsLabel", language), items };
+  }, [allProducts, productSearchQuery, language]);
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       {/* Mesa waiting-for-activation overlay — never shown to waiters, they manage the table */}
@@ -322,24 +344,49 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
           {header === undefined ? null : header}
           <PromoNotification />
           <HeroBanner empresa={empresa} bannerFit={empresa?.bannerFit ?? "contain"} />
+          <div className="w-full bg-background border-b border-border">
+            <div className="max-w-2xl mx-auto px-4 py-3">
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none text-base" aria-hidden="true">🔍</span>
+                <input
+                  type="search"
+                  value={productSearch}
+                  onChange={e => setProductSearch(e.target.value)}
+                  placeholder={t("searchProductsPlaceholder", language)}
+                  aria-label={t("searchProductsPlaceholder", language)}
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                />
+              </div>
+            </div>
+          </div>
         </>
       )}
 
       <div className="flex-1">
         {menuData.length > 0 ? (
           <>
-            <CategoryNav
-              categories={visibleCategories}
-              showTabs={showTabs}
-              tab={menuTab}
-              onTabChange={handleTabChange}
-              isWaiterMode={showWaiterSearch}
-            />
+            {!searchResultsCategory && (
+              <CategoryNav
+                categories={visibleCategories}
+                showTabs={showTabs}
+                tab={menuTab}
+                onTabChange={handleTabChange}
+                isWaiterMode={showWaiterSearch}
+              />
+            )}
             <div id="menu-content" className="container mx-auto max-w-6xl px-4 py-8 md:px-6">
               <div className="space-y-12 md:space-y-16">
-                {visibleCategories.map((category, index) => (
-                  <MenuSection key={category.id} category={category} showCart={showCart && !mesaPaymentLocked && !mesaEsperandoActivacion} priority={index === 0} hideImages={showWaiterSearch} />
-                ))}
+                {searchResultsCategory ? (
+                  searchResultsCategory.items.length > 0 ? (
+                    <MenuSection category={searchResultsCategory} showCart={showCart && !mesaPaymentLocked && !mesaEsperandoActivacion} priority hideImages={showWaiterSearch} />
+                  ) : (
+                    <p className="text-center text-muted-foreground py-12">{t("searchNoResults", language)}</p>
+                  )
+                ) : (
+                  visibleCategories.map((category, index) => (
+                    <MenuSection key={category.id} category={category} showCart={showCart && !mesaPaymentLocked && !mesaEsperandoActivacion} priority={index === 0} hideImages={showWaiterSearch} />
+                  ))
+                )}
               </div>
             </div>
           </>

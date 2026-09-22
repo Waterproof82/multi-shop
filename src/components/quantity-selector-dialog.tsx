@@ -20,7 +20,7 @@ import { useLanguage } from "@/lib/language-context"
 import { useCart } from "@/lib/cart-context"
 import { t } from "@/lib/translations"
 import { formatPrice } from "@/lib/format-price"
-import type { MenuItemVM, ComplementGroupVM, ComplementVM } from "@/core/application/dtos/menu-view-model"
+import type { MenuItemVM, ComplementGroupVM, ComplementVM, ProductoTablaVM, TablaCeldaVM } from "@/core/application/dtos/menu-view-model"
 import { AllergenList } from "@/components/allergen-icons"
 
 type LanguageKey = 'en' | 'fr' | 'it' | 'de';
@@ -35,6 +35,47 @@ function resolveDescription(item: MenuItemVM, language: string): string | undefi
     return item.translations[lang].description;
   }
   return item.description;
+}
+
+function resolveCelda(celda: TablaCeldaVM, language: string): string {
+  const lang = asLanguageKey(language);
+  if (lang && celda[lang]) return celda[lang];
+  return celda.es;
+}
+
+function ProductTable({ table, language }: Readonly<{ table: ProductoTablaVM; language: string }>) {
+  return (
+    <div className="rounded-xl border border-border overflow-hidden shadow-xs">
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="bg-primary/10">
+              {table.columnas.map((columna, i) => (
+                <th
+                  key={i}
+                  scope="col"
+                  className="whitespace-nowrap px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-primary"
+                >
+                  {resolveCelda(columna, language)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {table.filas.map((fila, r) => (
+              <tr key={r} className={r % 2 === 1 ? 'bg-muted/30' : undefined}>
+                {fila.map((celda, c) => (
+                  <td key={c} className="px-3 py-2 text-foreground">
+                    {resolveCelda(celda, language)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -304,6 +345,8 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
           )}
 
           <AllergenList alergenos={item.alergenos} language={language} />
+
+          {item.table && <ProductTable table={item.table} language={language} />}
 
           <div className="space-y-3">
           <div className="space-y-2">

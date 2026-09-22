@@ -1,6 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { IProductRepository, CreateProductData, UpdateProductData } from "@/core/domain/repositories/IProductRepository";
-import { Product, Result } from "@/core/domain/entities/types";
+import { Product, ProductoTabla, Result } from "@/core/domain/entities/types";
 import { logger } from "../logging/logger";
 
 // PostgREST (Warp) mata hilos por su propio timeout de pool con ruido de
@@ -53,6 +53,7 @@ export class SupabaseProductRepository implements IProductRepository {
       tipoProducto: (row.tipo_producto as string) === 'bebida' ? 'bebida' : 'comida',
       porcentajeImpuestoOverride: (row.porcentaje_impuesto_override as number | null) ?? null,
       alergenos: (row.alergenos as string[]) ?? [],
+      tabla: (row.tabla_info as ProductoTabla | null) ?? null,
       createdAt: new Date(row.created_at as string),
     };
   }
@@ -92,6 +93,7 @@ export class SupabaseProductRepository implements IProductRepository {
           activo: data.activo,
           tipo_producto: tipoProducto,
           alergenos: data.alergenos ?? [],
+          tabla_info: data.tabla_info ?? null,
         })
         .select()
         .single();
@@ -215,6 +217,10 @@ export class SupabaseProductRepository implements IProductRepository {
 
     if (data.porcentaje_impuesto_override !== undefined) {
       updatePayload.porcentaje_impuesto_override = data.porcentaje_impuesto_override ?? null;
+    }
+
+    if (data.tabla_info !== undefined) {
+      updatePayload.tabla_info = data.tabla_info ?? null;
     }
 
     return updatePayload;

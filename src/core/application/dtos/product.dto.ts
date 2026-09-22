@@ -1,6 +1,9 @@
 import { z } from "zod";
+import { tablaInfoShapeSchema } from "./tabla-info.dto";
 
 const imageFitValues = ['contain', 'cover', 'fill', 'none', 'scale-down'] as const;
+
+const tablaInfoSchema = tablaInfoShapeSchema.nullable().optional();
 
 // Schema for API validation (with i18n fields)
 export const createProductSchema = z.object({
@@ -38,6 +41,7 @@ export const createProductSchema = z.object({
       'sesame', 'sulphites', 'lupin', 'molluscs',
     ])
   ).optional().default([]),
+  tabla_info: tablaInfoSchema,
 });
 
 export type CreateProductDTO = z.infer<typeof createProductSchema>;

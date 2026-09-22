@@ -1,5 +1,5 @@
-import type { Product, Category, MenuVirtual } from "@/core/domain/entities/types";
-import type { MenuItemVM, MenuSubcategoryVM, MenuCategoryVM, ComplementVM, ComplementGroupVM } from "@/core/application/dtos/menu-view-model";
+import type { Product, Category, ProductoTabla, TablaCelda, MenuVirtual } from "@/core/domain/entities/types";
+import type { MenuItemVM, MenuSubcategoryVM, MenuCategoryVM, ComplementVM, ComplementGroupVM, ProductoTablaVM, TablaCeldaVM } from "@/core/application/dtos/menu-view-model";
 import type { ComplementoGrupo } from '@/core/domain/entities/complemento-types';
 
 type TranslationMap = MenuItemVM["translations"];
@@ -42,6 +42,23 @@ function mapNameOnlyTranslations(t?: { en?: string; fr?: string; it?: string; de
   };
 }
 
+function mapTablaCelda(celda: TablaCelda): TablaCeldaVM {
+  return {
+    es: celda.es,
+    en: celda.en || undefined,
+    fr: celda.fr || undefined,
+    it: celda.it || undefined,
+    de: celda.de || undefined,
+  };
+}
+
+function mapTabla(tabla: ProductoTabla): ProductoTablaVM {
+  return {
+    columnas: tabla.columnas.map(mapTablaCelda),
+    filas: tabla.filas.map((fila) => fila.map(mapTablaCelda)),
+  };
+}
+
 function mapComplementProduct(c: Product): ComplementVM {
   return {
     id: c.id,
@@ -65,6 +82,7 @@ function mapProductToItem(product: Product, categoryName: string): MenuItemVM {
     tipoProducto: product.tipoProducto,
     translations: mapProductTranslations(product),
     alergenos: product.alergenos ?? [],
+    table: product.tabla && product.tabla.columnas.length > 0 ? mapTabla(product.tabla) : undefined,
   };
 }
 

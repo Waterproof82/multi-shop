@@ -19,7 +19,9 @@ import { t } from '@/lib/translations';
 import { ProductFormDialog, DeleteConfirmDialog } from '@/components/admin/product-form-dialog';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import type { ProductoFormData } from '@/components/admin/product-form-dialog';
+import { emptyTablaForm, tablaFormFromApi, tablaFormToApi } from '@/components/admin/ProductTablaEditor';
 import type { ImageFit } from '@/core/application/dtos/menu-view-model';
+import type { ProductoTabla } from '@/core/domain/entities/types';
 import { SkeletonTable, SkeletonStats, Skeleton } from '@/components/ui/skeleton';
 import { formatPrice } from '@/lib/format-price';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -52,6 +54,7 @@ interface Producto {
   tipo_producto: 'comida' | 'bebida';
   porcentaje_impuesto_override: number | null;
   alergenos: string[];
+  tabla_info: ProductoTabla | null;
 }
 
 const emptyForm: ProductoFormData = {
@@ -74,6 +77,7 @@ const emptyForm: ProductoFormData = {
   tipo_producto: 'comida',
   porcentajeImpuestoOverride: null,
   alergenos: [],
+  tabla_info: emptyTablaForm(),
 };
 
 const SortIndicator = ({ field, currentField, direction }: { field: keyof Producto | 'categoria'; currentField: keyof Producto | 'categoria'; direction: 'asc' | 'desc' }) => {
@@ -180,6 +184,7 @@ export default function ProductosPage() {
         foto_url: formData.foto_url || null,
         foto_object_fit: formData.foto_object_fit || 'contain',
         porcentaje_impuesto_override: formData.porcentajeImpuestoOverride ?? null,
+        tabla_info: tablaFormToApi(formData.tabla_info),
       };
 
       const res = await fetchWithCsrf(url, {
@@ -228,6 +233,7 @@ export default function ProductosPage() {
       tipo_producto: producto.tipo_producto ?? 'comida',
       porcentajeImpuestoOverride: producto.porcentaje_impuesto_override ?? null,
       alergenos: producto.alergenos ?? [],
+      tabla_info: tablaFormFromApi(producto.tabla_info),
     });
     setEditingId(producto.id);
     setIsModalOpen(true);
@@ -813,6 +819,7 @@ export default function ProductosPage() {
         saving={saving}
         onSubmit={handleSubmit}
         empresaTipo={empresaTipo}
+        empresaId={effectiveEmpresaId}
       />
 
       <DeleteConfirmDialog
