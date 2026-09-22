@@ -434,7 +434,70 @@ git commit -m "feat(menu): expose product image2 in MenuItemVM"
 
 ---
 
-## Task 5: Admin form — second `ImageUploader` for `tienda`
+## Task 5: Translations — `productImage2` / `productImage2Help`
+
+**Files:**
+- Modify: `src/lib/translations.ts`
+
+**Note:** This task must run before Task 6 (admin form) — Task 6 calls
+`t("productImage2", language)`, and `t()`'s signature is
+`t(key: keyof TranslationObject, language: Language)`. `TranslationObject`
+is derived from `translations.es`, so until this task adds the key there,
+`pnpm build` in Task 6 would fail to typecheck.
+
+- [ ] **Step 1: Add the Spanish keys (required — `TranslationObject` is derived from `translations.es`)**
+
+In `src/lib/translations.ts`, in the `es` block, change:
+
+```ts
+    productImage: "Imagen del producto",
+    productImageHelp: "Proporción recomendada: 4:3. Se verá completa sin recortes.",
+```
+
+to:
+
+```ts
+    productImage: "Imagen del producto",
+    productImageHelp: "Proporción recomendada: 4:3. Se verá completa sin recortes.",
+    productImage2: "Imagen del producto (2)",
+    productImage2Help: "Segunda foto opcional. Se muestra junto a la primera en la tienda.",
+```
+
+- [ ] **Step 2: Add the English keys (matching the existing `productImage`/`productImageHelp` precedent — `fr`/`it`/`de` fall back to `es` automatically via `t()`, same as today)**
+
+In `src/lib/translations.ts`, in the `en` block, change:
+
+```ts
+    productImage: "Product image",
+    productImageHelp: "Recommended ratio: 4:3. Displayed in full without cropping.",
+```
+
+to:
+
+```ts
+    productImage: "Product image",
+    productImageHelp: "Recommended ratio: 4:3. Displayed in full without cropping.",
+    productImage2: "Product image (2)",
+    productImage2Help: "Optional second photo. Shown alongside the first one in the shop.",
+```
+
+- [ ] **Step 3: Typecheck**
+
+Run: `pnpm build`
+Expected: no TypeScript errors — `productImage2`/`productImage2Help` now
+exist on `TranslationObject` (nothing consumes them yet until Task 6, so
+this is just confirming the schema addition itself compiles clean).
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/lib/translations.ts
+git commit -m "feat(i18n): add productImage2 translation keys"
+```
+
+---
+
+## Task 6: Admin form — second `ImageUploader` for `tienda`
 
 **Files:**
 - Modify: `src/components/admin/product-form-dialog.tsx`
@@ -572,62 +635,6 @@ real safety net here).
 ```bash
 git add src/components/admin/product-form-dialog.tsx "src/app/admin/(protected)/productos/page.tsx"
 git commit -m "feat(admin): second product image uploader for tienda"
-```
-
----
-
-## Task 6: Translations — `productImage2` / `productImage2Help`
-
-**Files:**
-- Modify: `src/lib/translations.ts`
-
-- [ ] **Step 1: Add the Spanish keys (required — `TranslationObject` is derived from `translations.es`)**
-
-In `src/lib/translations.ts`, in the `es` block, change:
-
-```ts
-    productImage: "Imagen del producto",
-    productImageHelp: "Proporción recomendada: 4:3. Se verá completa sin recortes.",
-```
-
-to:
-
-```ts
-    productImage: "Imagen del producto",
-    productImageHelp: "Proporción recomendada: 4:3. Se verá completa sin recortes.",
-    productImage2: "Imagen del producto (2)",
-    productImage2Help: "Segunda foto opcional. Se muestra junto a la primera en la tienda.",
-```
-
-- [ ] **Step 2: Add the English keys (matching the existing `productImage`/`productImageHelp` precedent — `fr`/`it`/`de` fall back to `es` automatically via `t()`, same as today)**
-
-In `src/lib/translations.ts`, in the `en` block, change:
-
-```ts
-    productImage: "Product image",
-    productImageHelp: "Recommended ratio: 4:3. Displayed in full without cropping.",
-```
-
-to:
-
-```ts
-    productImage: "Product image",
-    productImageHelp: "Recommended ratio: 4:3. Displayed in full without cropping.",
-    productImage2: "Product image (2)",
-    productImage2Help: "Optional second photo. Shown alongside the first one in the shop.",
-```
-
-- [ ] **Step 3: Typecheck**
-
-Run: `pnpm build`
-Expected: no TypeScript errors — `t("productImage2", language)` (used in
-Task 5) now resolves against `TranslationObject`.
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add src/lib/translations.ts
-git commit -m "feat(i18n): add productImage2 translation keys"
 ```
 
 ---
