@@ -8,8 +8,20 @@ export async function GET(request: NextRequest) {
   if (ctx.error) return ctx.error;
   const { empresaId } = ctx;
 
-  const result = await getMenuVirtualUseCase().getAll(empresaId);
-  return handleResultWithStatus(result);
+  const [nodosResult, countsResult] = await Promise.all([
+    getMenuVirtualUseCase().getAll(empresaId),
+    getMenuVirtualUseCase().getProductCounts(empresaId),
+  ]);
+
+  if (!nodosResult.success) return handleResultWithStatus(nodosResult);
+  if (!countsResult.success) return handleResultWithStatus(countsResult);
+
+  const nodosConConteo = nodosResult.data.map(nodo => ({
+    ...nodo,
+    productosCount: countsResult.data.get(nodo.id) ?? 0,
+  }));
+
+  return handleResultWithStatus({ success: true as const, data: nodosConConteo });
 }
 
 export async function POST(request: NextRequest) {

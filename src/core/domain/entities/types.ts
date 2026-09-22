@@ -1,5 +1,26 @@
 export type ImageFit = 'contain' | 'cover' | 'fill' | 'none' | 'scale-down';
 
+export interface TablaCelda {
+  es: string;
+  en?: string | null;
+  fr?: string | null;
+  it?: string | null;
+  de?: string | null;
+}
+
+export interface ProductoTabla {
+  columnas: TablaCelda[];
+  filas: TablaCelda[][];
+}
+
+export interface TablaPlantilla {
+  id: string;
+  empresaId: string;
+  nombre: string;
+  columnas: TablaCelda[];
+  createdAt: Date;
+}
+
 export interface Product {
   id: string;
   empresaId: string;
@@ -23,6 +44,7 @@ export interface Product {
   createdAt: Date;
   porcentajeImpuestoOverride?: number | null;
   alergenos: string[];
+  tabla: ProductoTabla | null;
 }
 
 export interface Category {

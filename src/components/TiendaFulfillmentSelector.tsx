@@ -66,7 +66,9 @@ export function TiendaFulfillmentSelector({
     [onAddressSelect]
   );
 
-  const modalidadesDomicilio = modalidades.filter((m) => m.tipo === 'domicilio' && m.activo);
+  const modalidadesDomicilio = modalidades
+    .filter((m) => m.tipo === 'domicilio' && m.activo)
+    .sort((a, b) => a.precioCents - b.precioCents);
   if (!envioHabilitado || modalidadesDomicilio.length === 0) return null;
 
   // "Recoger en local" está preseleccionado mientras no se haya tocado

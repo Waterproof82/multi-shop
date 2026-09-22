@@ -30,6 +30,7 @@ function toAdminProduct(prod: Product) {
     tipo_producto: prod.tipoProducto,
     porcentaje_impuesto_override: prod.porcentajeImpuestoOverride ?? null,
     alergenos: prod.alergenos ?? [],
+    tabla_info: prod.tabla,
   };
 }
 

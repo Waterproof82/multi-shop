@@ -35,6 +35,8 @@ import { ComplementoGrupoUseCase } from '@/core/application/use-cases/complement
 import { MenuVirtualUseCase } from '@/core/application/use-cases/menu-virtual.use-case';
 import { SupabaseModalidadEntregaRepository } from './SupabaseModalidadEntregaRepository';
 import { ModalidadEntregaUseCase } from '@/core/application/use-cases/modalidad-entrega.use-case';
+import { SupabaseTablaPlantillaRepository } from './SupabaseTablaPlantillaRepository';
+import { TablaPlantillaUseCase } from '@/core/application/use-cases/tabla-plantilla.use-case';
 import { SupabaseStockRepository } from '../repositories/supabase-stock.repository';
 import { SupabaseTpvRepository } from '../repositories/supabase-tpv.repository';
 import type { IComprasRepository } from '@/core/domain/repositories/IComprasRepository';
@@ -144,6 +146,12 @@ let _modalidadEntregaUseCase: ModalidadEntregaUseCase | undefined;
 export function getModalidadEntregaUseCase(): ModalidadEntregaUseCase {
   _modalidadEntregaUseCase ??= new ModalidadEntregaUseCase(new SupabaseModalidadEntregaRepository(getSupabaseClient()));
   return _modalidadEntregaUseCase;
+}
+
+let _tablaPlantillaUseCase: TablaPlantillaUseCase | undefined;
+export function getTablaPlantillaUseCase(): TablaPlantillaUseCase {
+  _tablaPlantillaUseCase ??= new TablaPlantillaUseCase(new SupabaseTablaPlantillaRepository(getSupabaseClient()));
+  return _tablaPlantillaUseCase;
 }
 
 let _clienteUseCase: ClienteUseCase | undefined;
