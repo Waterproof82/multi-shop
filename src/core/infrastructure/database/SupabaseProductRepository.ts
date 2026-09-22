@@ -11,6 +11,11 @@ import { logger } from "../logging/logger";
 // inmediato es seguro sin necesidad de analizar idempotencia.
 const TRANSIENT_ERROR_PATTERN = /timeout|gateway/i;
 
+export function emptyStringToNull(value: string | null | undefined): string | null | undefined {
+  if (value === undefined || value === null) return value;
+  return value === "" ? null : value;
+}
+
 function findAllByTenantQuery(client: SupabaseClient, empresaId: string) {
   return client
     .from("productos")
@@ -47,6 +52,7 @@ export class SupabaseProductRepository implements IProductRepository {
       descripcion_de: row.descripcion_de as string | null,
       precio: Number.parseFloat(row.precio as string),
       fotoUrl: row.foto_url as string | null,
+      fotoUrl2: row.foto_url_2 as string | null,
       fotoObjectFit: (row.foto_object_fit as string | null) as Product['fotoObjectFit'],
       esEspecial: row.es_especial as boolean,
       activo: row.activo as boolean,
@@ -88,6 +94,7 @@ export class SupabaseProductRepository implements IProductRepository {
           descripcion_de: data.descripcion_de || null,
           precio: data.precio,
           foto_url: data.foto_url || null,
+          foto_url_2: data.foto_url_2 || null,
           foto_object_fit: data.foto_object_fit || 'contain',
           es_especial: data.es_especial,
           activo: data.activo,
@@ -212,7 +219,11 @@ export class SupabaseProductRepository implements IProductRepository {
     }
 
     if (data.foto_url !== undefined) {
-      updatePayload.foto_url = data.foto_url === "" ? null : data.foto_url;
+      updatePayload.foto_url = emptyStringToNull(data.foto_url);
+    }
+
+    if (data.foto_url_2 !== undefined) {
+      updatePayload.foto_url_2 = emptyStringToNull(data.foto_url_2);
     }
 
     if (data.porcentaje_impuesto_override !== undefined) {

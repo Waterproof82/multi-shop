@@ -37,6 +37,7 @@ export interface Product {
   descripcion_de: string | null;
   precio: number;
   fotoUrl: string | null;
+  fotoUrl2: string | null;
   fotoObjectFit: ImageFit | null;
   esEspecial: boolean;
   activo: boolean;

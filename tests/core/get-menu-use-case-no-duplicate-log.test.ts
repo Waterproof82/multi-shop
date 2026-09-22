@@ -78,6 +78,7 @@ const producto1: Product = {
   descripcion_de: null,
   precio: 10,
   fotoUrl: null,
+  fotoUrl2: null,
   fotoObjectFit: null,
   esEspecial: false,
   activo: true,

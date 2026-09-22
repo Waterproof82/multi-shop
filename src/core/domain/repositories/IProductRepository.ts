@@ -14,6 +14,7 @@ export interface CreateProductData {
   descripcion_de?: string | null;
   precio: number;
   foto_url?: string | null;
+  foto_url_2?: string | null;
   foto_object_fit?: ImageFit | null;
   categoria_id?: string | null;
   es_especial?: boolean;

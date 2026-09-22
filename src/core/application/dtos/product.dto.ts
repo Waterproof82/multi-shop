@@ -28,6 +28,10 @@ export const createProductSchema = z.object({
     (url) => url.startsWith('https://'),
     { message: 'foto_url must use HTTPS' }
   ).nullable().optional(),
+  foto_url_2: z.url().refine(
+    (url) => url.startsWith('https://'),
+    { message: 'foto_url_2 must use HTTPS' }
+  ).nullable().optional(),
   foto_object_fit: z.enum(imageFitValues).nullable().optional(),
   categoria_id: z.uuid().nullable().optional(),
   es_especial: z.boolean().default(false),
