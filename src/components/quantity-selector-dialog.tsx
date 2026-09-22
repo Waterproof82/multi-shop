@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { RippleButton } from "@/components/ui/ripple-button"
-import { ImagenSubida } from "@/components/ui/imagen-subida"
+import { ProductImageGallery } from "@/components/product-image-gallery"
 import { useLanguage } from "@/lib/language-context"
 import { useCart } from "@/lib/cart-context"
 import { t } from "@/lib/translations"
@@ -87,33 +87,22 @@ function ProductTable({ table, language }: Readonly<{ table: ProductoTablaVM; la
 }
 
 /**
- * Imagen (o video) de cabecera del dialogo. Los productos con `.mp4` en
- * `image` (mismo campo que usan las tarjetas del catalogo) no tienen un
- * fotograma fijo utilizable como imagen: se reproducen igual que en
- * `menu-section.tsx` en vez de mostrarse rotos.
+ * Video de cabecera del dialogo para productos con `.mp4` en `image` (mismo
+ * campo que usan las tarjetas del catalogo): no tienen un fotograma fijo
+ * utilizable como imagen, así que se reproducen igual que en
+ * `menu-section.tsx` en vez de mostrarse rotos. El slot de segunda imagen
+ * (`image2`) no aplica a video.
  */
-function DialogMedia({ item, alt }: Readonly<{ item: MenuItemVM; alt: string }>) {
-  if (item.image?.endsWith('.mp4')) {
-    return (
-      <video
-        src={item.image}
-        autoPlay
-        loop
-        muted
-        playsInline
-        className="h-full w-full object-cover"
-        aria-label={alt}
-      />
-    );
-  }
+function DialogVideo({ src, alt }: Readonly<{ src: string; alt: string }>) {
   return (
-    <ImagenSubida
-      src={item.image!}
-      alt={alt}
-      fill
-      sizes="100vw"
-      className={`object-${item.imageFit || 'cover'}`}
-      loading="eager"
+    <video
+      src={src}
+      autoPlay
+      loop
+      muted
+      playsInline
+      className="h-full w-full object-cover"
+      aria-label={alt}
     />
   );
 }
@@ -263,9 +252,20 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-screen h-dvh overflow-hidden max-w-none sm:max-w-none rounded-none border-0 shadow-none flex flex-col p-0 gap-0 top-0 left-0 translate-x-0 translate-y-0" onOpenAutoFocus={(e) => e.preventDefault()}>
-        {item.image && (
+        {item.image?.endsWith('.mp4') && (
           <div className="relative h-40 sm:h-48 w-full shrink-0 overflow-hidden bg-muted">
-            <DialogMedia item={item} alt={displayName} />
+            <DialogVideo src={item.image} alt={displayName} />
+          </div>
+        )}
+        {item.image && !item.image.endsWith('.mp4') && (
+          <div className="shrink-0 bg-muted">
+            <ProductImageGallery
+              images={item.image2 ? [item.image, item.image2] : [item.image]}
+              alt={displayName}
+              objectFit={item.imageFit}
+              mainImageClassName="relative h-40 sm:h-48 w-full overflow-hidden"
+              sizes="100vw"
+            />
           </div>
         )}
         <DialogHeader className="px-5 pt-5 pb-4 shrink-0 border-b">
