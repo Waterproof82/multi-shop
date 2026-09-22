@@ -7,7 +7,7 @@ import { catalogTag } from '@/lib/cache-tags';
 import type { Product } from '@/core/domain/entities/types';
 
 // Transform domain format to admin UI format
-function toAdminProduct(prod: Product) {
+export function toAdminProduct(prod: Product) {
   return {
     id: prod.id,
     empresa_id: prod.empresaId,
@@ -24,6 +24,7 @@ function toAdminProduct(prod: Product) {
     descripcion_de: prod.descripcion_de || null,
     precio: prod.precio,
     foto_url: prod.fotoUrl,
+    foto_url_2: prod.fotoUrl2,
     foto_object_fit: prod.fotoObjectFit || 'contain',
     es_especial: prod.esEspecial,
     activo: prod.activo,
