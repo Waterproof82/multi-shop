@@ -50,6 +50,7 @@ interface ProductoFormData {
   descripcion_de: string;
   precio: string;
   foto_url: string;
+  foto_url_2: string;
   foto_object_fit: ImageFit;
   categoria_id: string;
   es_especial: boolean;
@@ -421,6 +422,19 @@ export function ProductFormDialog({
                 helpText={t("productImageHelp", language)}
               />
             </div>
+
+            {empresaTipo === 'tienda' && (
+              <div className="col-span-2">
+                <ImageUploader
+                  value={formData.foto_url_2}
+                  onChange={(url) => onFormChange({ ...formData, foto_url_2: url })}
+                  objectFit={formData.foto_object_fit}
+                  onObjectFitChange={(fit) => onFormChange({ ...formData, foto_object_fit: fit })}
+                  label={t("productImage2", language)}
+                  helpText={t("productImage2Help", language)}
+                />
+              </div>
+            )}
 
             <div className="col-span-2">
               <button
