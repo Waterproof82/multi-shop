@@ -49,6 +49,7 @@ export interface MenuItemVM {
   price: number;
   category: string;
   image?: string;
+  image2?: string;
   imageFit?: ImageFit;
   highlight?: boolean;
   tipoProducto?: 'comida' | 'bebida';
