@@ -43,6 +43,14 @@ function resolveCelda(celda: TablaCeldaVM, language: string): string {
   return celda.es;
 }
 
+function filaKey(fila: TablaCeldaVM[]): string {
+  return fila.map(celda => celda.es).join('|');
+}
+
+function zipCeldaConColumna(fila: TablaCeldaVM[], columnas: TablaCeldaVM[]): { celda: TablaCeldaVM; columnaKey: string }[] {
+  return fila.map((celda, idx) => ({ celda, columnaKey: columnas[idx]?.es ?? celda.es }));
+}
+
 function ProductTable({ table, language }: Readonly<{ table: ProductoTablaVM; language: string }>) {
   return (
     <div className="rounded-xl border border-border overflow-hidden shadow-xs">
@@ -50,9 +58,9 @@ function ProductTable({ table, language }: Readonly<{ table: ProductoTablaVM; la
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="bg-primary/10">
-              {table.columnas.map((columna, i) => (
+              {table.columnas.map((columna) => (
                 <th
-                  key={i}
+                  key={columna.es}
                   scope="col"
                   className="whitespace-nowrap px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-primary"
                 >
@@ -63,9 +71,9 @@ function ProductTable({ table, language }: Readonly<{ table: ProductoTablaVM; la
           </thead>
           <tbody className="divide-y divide-border">
             {table.filas.map((fila, r) => (
-              <tr key={r} className={r % 2 === 1 ? 'bg-muted/30' : undefined}>
-                {fila.map((celda, c) => (
-                  <td key={c} className="px-3 py-2 text-foreground">
+              <tr key={filaKey(fila)} className={r % 2 === 1 ? 'bg-muted/30' : undefined}>
+                {zipCeldaConColumna(fila, table.columnas).map(({ celda, columnaKey }) => (
+                  <td key={columnaKey} className="px-3 py-2 text-foreground">
                     {resolveCelda(celda, language)}
                   </td>
                 ))}
