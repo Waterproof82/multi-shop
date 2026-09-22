@@ -361,6 +361,17 @@ Tras CADA `supabase db push` o `supabase migration up`:
 - **`setProductoGrupos`** es destructiva — PUT reemplaza TODOS los grupos. Enviar lista COMPLETA.
 - **NO llamar `revalidateTag`** en `/api/admin/productos/[productoId]/complementos` — no tiene `unstable_cache`.
 
+## Menús Virtuales
+
+> Ver doc completo: `docs/context/menus-virtuales.md`
+
+- **Árboles de navegación aditivos** sobre productos existentes (`menus_virtuales` self-referencing + `menu_virtual_productos` many-to-many) — no tocan `categorias`/`productos.categoria_id`. Un producto puede aparecer en su categoría real Y en uno o varios menús virtuales sin duplicarse.
+- **RLS deniega anon del todo** (a diferencia de `categorias`/`productos`, que tienen SELECT público) — el catálogo público las lee con `getSupabaseClient()` (service_role) vía `GetMenuUseCase`, mismo patrón que `producto_complemento_grupos`.
+- **`toVirtualCategoryVM` debe poblar `items` del nodo padre como la unión de todos los productos de sus hojas** — el filtro final de `GetMenuUseCase.execute()` (`categoria.items.length > 0`) solo mira `items`, no `subcategories`; un menú virtual con productos solo en subcategorías se descartaría por error si no se replican ahí.
+- **Categorías reales y menús virtuales se intercalan por `orden`** (merge-sort estable en `get-menu.use-case.ts`), no se concatenan al final. El admin ajusta el `orden` de un menú virtual desde `/admin/menus-virtuales` para ubicarlo entre categorías reales.
+- **Dos vías de escritura para asociar productos — no confundir:** `setProductos` (PUT, reemplaza-todo, pantalla de árbol) vs `addProductos` (POST, aditivo con `ignoreDuplicates`, asignación masiva desde `/admin/productos`). Usar `setProductos` en el flujo masivo borraría asociaciones previas del nodo.
+- **`successResponse` con `Result<void>` (hallazgo de este feature, gotcha general):** `NextResponse.json(undefined, ...)` lanza "Value is not JSON serializable" — afecta a cualquier endpoint admin que retorne `Result<void>` (deletes, sets). Ya corregido en el helper compartido (`data ?? null`); si un endpoint nuevo devuelve `Result<void>`, no hace falta workaround.
+
 ## Sistema de Alergenos
 
 > Ver doc completo: `docs/context/alergenos-system.md`
