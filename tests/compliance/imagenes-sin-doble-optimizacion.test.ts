@@ -37,6 +37,7 @@ const DEBEN_USAR_ENVOLTORIO = [
   'src/components/menu-section.tsx',
   'src/components/cart-drawer.tsx',
   'src/components/quantity-selector-dialog.tsx',
+  'src/components/product-image-gallery.tsx',
   'src/components/tpv/MenuPanel.tsx',
   'src/components/hero-banner.tsx',
   'src/components/site-header-client.tsx',
