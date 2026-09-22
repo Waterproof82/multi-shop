@@ -1,6 +1,6 @@
 const MAX_WIDTH = 480;
 const MAX_HEIGHT = 480;
-const QUALITY = 0.8;
+const QUALITY = 1;
 
 const BANNER_MAX_WIDTH = 1920;
 const BANNER_MAX_HEIGHT = 1080;
