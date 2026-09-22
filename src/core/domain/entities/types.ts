@@ -57,6 +57,7 @@ export interface Category {
   categoriaComplementoDe: string | null;
   complementoObligatorio: boolean;
   categoriaPadreId: string | null;
+  activo: boolean;
   translations?: {
     en?: string;
     fr?: string;

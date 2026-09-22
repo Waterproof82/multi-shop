@@ -97,6 +97,7 @@ const categoria1: Category = {
   categoriaComplementoDe: null,
   complementoObligatorio: false,
   categoriaPadreId: null,
+  activo: true,
 };
 
 const menuVirtualPadre: MenuVirtual = {

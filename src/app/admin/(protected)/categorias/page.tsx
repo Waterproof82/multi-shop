@@ -52,6 +52,7 @@ interface Category {
   complemento_obligatorio: boolean;
   categoria_padre_id: string | null;
   tipo_producto: 'comida' | 'bebida';
+  activo: boolean;
   hasSubcategories?: boolean;
 }
 
@@ -154,6 +155,27 @@ function CategorySubcategoriasBadge({ hasSubcategories, language }: Readonly<{ h
   );
 }
 
+function CategoryStatusToggle({ activo, nombre, language, onToggle }: Readonly<{
+  activo: boolean;
+  nombre: string;
+  language: Language;
+  onToggle: () => void;
+}>) {
+  return (
+    <button type="button"
+      onClick={onToggle}
+      aria-label={`${activo ? t("inactive", language) : t("active", language)} ${nombre}`}
+      className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+        activo
+          ? 'bg-primary/10 text-primary hover:bg-primary/20'
+          : 'bg-destructive/10 text-destructive hover:bg-destructive/20'
+      }`}
+    >
+      {activo ? t("active", language) : t("inactive", language)}
+    </button>
+  );
+}
+
 function CategoryRowActions({ cat, language, onEdit, onDelete }: Readonly<{
   cat: Category;
   language: Language;
@@ -231,6 +253,7 @@ function SortableMenuVirtualRow({ menu, hasSubcategories, language }: Readonly<S
         <CategorySubcategoriasBadge hasSubcategories={hasSubcategories} language={language} />
       </td>
       <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-400">—</td>
+      <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-400">—</td>
       <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
         <MenuVirtualRowActions menu={menu} language={language} />
       </td>
@@ -286,9 +309,10 @@ interface SortableCategoryRowProps {
   language: Language;
   onEdit: () => void;
   onDelete: () => void;
+  onToggleActivo: () => void;
 }
 
-function SortableCategoryRow({ cat, parentName, hasSubcategories, complementoDeName, empresaTipo, language, onEdit, onDelete }: Readonly<SortableCategoryRowProps>) {
+function SortableCategoryRow({ cat, parentName, hasSubcategories, complementoDeName, empresaTipo, language, onEdit, onDelete, onToggleActivo }: Readonly<SortableCategoryRowProps>) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: cat.id });
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -324,6 +348,9 @@ function SortableCategoryRow({ cat, parentName, hasSubcategories, complementoDeN
         <CategorySubcategoriasBadge hasSubcategories={hasSubcategories} language={language} />
       </td>
       <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-400">{complementoDeName ?? '—'}</td>
+      <td className="px-4 py-3 whitespace-nowrap text-sm">
+        <CategoryStatusToggle activo={cat.activo} nombre={cat.nombre_es} language={language} onToggle={onToggleActivo} />
+      </td>
       <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
         <CategoryRowActions cat={cat} language={language} onEdit={onEdit} onDelete={onDelete} />
       </td>
@@ -338,9 +365,10 @@ interface SortableCategoryCardProps {
   language: Language;
   onEdit: () => void;
   onDelete: () => void;
+  onToggleActivo: () => void;
 }
 
-function SortableCategoryCard({ cat, parentName, hasSubcategories, language, onEdit, onDelete }: Readonly<SortableCategoryCardProps>) {
+function SortableCategoryCard({ cat, parentName, hasSubcategories, language, onEdit, onDelete, onToggleActivo }: Readonly<SortableCategoryCardProps>) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: cat.id });
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -380,6 +408,9 @@ function SortableCategoryCard({ cat, parentName, hasSubcategories, language, onE
           <p className="text-xs text-slate-400 mt-1">
             {cat.categoria_padre_id && parentName ? `${t("subcategoryOf", language)} ${parentName}` : ''}
           </p>
+          <div className="mt-2">
+            <CategoryStatusToggle activo={cat.activo} nombre={cat.nombre_es} language={language} onToggle={onToggleActivo} />
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <button type="button"
@@ -495,6 +526,22 @@ export default function CategoriasPage() {
       await fetchCategorias();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("unknownError", language));
+    }
+  };
+
+  const toggleActivo = async (cat: Category) => {
+    const newActivo = !cat.activo;
+    setCategorias(prev => prev.map(c => c.id === cat.id ? { ...c, activo: newActivo } : c));
+    try {
+      const res = await fetchWithCsrf(`/api/admin/categorias?id=${cat.id}&empresaId=${effectiveEmpresaId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ activo: newActivo }),
+      });
+      if (!res.ok) {
+        setCategorias(prev => prev.map(c => c.id === cat.id ? { ...c, activo: cat.activo } : c));
+      }
+    } catch {
+      setCategorias(prev => prev.map(c => c.id === cat.id ? { ...c, activo: cat.activo } : c));
     }
   };
 
@@ -729,6 +776,9 @@ export default function CategoriasPage() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">
                   {t("complementOf", language)}
                 </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">
+                  {t("status", language)}
+                </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-slate-300 uppercase">
                   {t("actions", language)}
                 </th>
@@ -754,6 +804,9 @@ export default function CategoriasPage() {
                       {cat.categoria_complemento_de
                         ? categorias.find(c => c.id === cat.categoria_complemento_de)?.nombre_es || '—'
                         : '—'}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm">
+                      <CategoryStatusToggle activo={cat.activo} nombre={cat.nombre_es} language={language} onToggle={() => toggleActivo(cat)} />
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
                       <CategoryRowActions cat={cat} language={language} onEdit={() => openEditModal(cat)} onDelete={() => handleDelete(cat.id)} />
@@ -787,6 +840,7 @@ export default function CategoriasPage() {
                             language={language}
                             onEdit={() => openEditModal(padre)}
                             onDelete={() => handleDelete(padre.id)}
+                            onToggleActivo={() => toggleActivo(padre)}
                           />
                           {hijos.length > 0 && (
                             <DndContext
@@ -806,6 +860,7 @@ export default function CategoriasPage() {
                                     language={language}
                                     onEdit={() => openEditModal(hijo)}
                                     onDelete={() => handleDelete(hijo.id)}
+                                    onToggleActivo={() => toggleActivo(hijo)}
                                   />
                                 ))}
                               </SortableContext>
@@ -819,7 +874,7 @@ export default function CategoriasPage() {
               )}
               {(isSearching ? filteredCategorias.length === 0 : padresCombinados.length === 0) && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-slate-400">
+                  <td colSpan={7} className="px-6 py-8 text-center text-slate-400">
                     {isSearching ? t("noCategoriesFound", language) : t("noCategoriesYet", language)}
                   </td>
                 </tr>
@@ -852,6 +907,9 @@ export default function CategoriasPage() {
                     <p className="text-xs text-slate-400 mt-1">
                       {cat.categoria_padre_id && cat.parentName ? `${t("subcategoryOf", language)} ${cat.parentName}` : ''}
                     </p>
+                    <div className="mt-2">
+                      <CategoryStatusToggle activo={cat.activo} nombre={cat.nombre_es} language={language} onToggle={() => toggleActivo(cat)} />
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <button type="button"
@@ -890,6 +948,7 @@ export default function CategoriasPage() {
                         language={language}
                         onEdit={() => openEditModal(padre)}
                         onDelete={() => handleDelete(padre.id)}
+                        onToggleActivo={() => toggleActivo(padre)}
                       />
                       {hijos.length > 0 && (
                         <DndContext
@@ -908,6 +967,7 @@ export default function CategoriasPage() {
                                   language={language}
                                   onEdit={() => openEditModal(hijo)}
                                   onDelete={() => handleDelete(hijo.id)}
+                                  onToggleActivo={() => toggleActivo(hijo)}
                                 />
                               ))}
                             </div>

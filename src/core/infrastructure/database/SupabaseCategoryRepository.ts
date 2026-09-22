@@ -16,7 +16,7 @@ const CAMPOS_CATEGORIA = [
   'nombre_es', 'nombre_en', 'nombre_fr', 'nombre_it', 'nombre_de',
   'descripcion_es', 'descripcion_en', 'descripcion_fr', 'descripcion_it', 'descripcion_de',
   'orden', 'categoria_complemento_de', 'complemento_obligatorio',
-  'categoria_padre_id', 'tipo_producto',
+  'categoria_padre_id', 'tipo_producto', 'activo',
 ] as const satisfies ReadonlyArray<keyof UpdateCategoryData>;
 
 // PostgREST (Warp) mata hilos por su propio timeout de pool con ruido de
@@ -57,6 +57,7 @@ export class SupabaseCategoryRepository implements ICategoryRepository {
       categoriaComplementoDe: (row.categoria_complemento_de as string | null) || null,
       complementoObligatorio: (row.complemento_obligatorio as boolean) || false,
       categoriaPadreId: (row.categoria_padre_id as string | null) || null,
+      activo: (row.activo as boolean) ?? true,
       translations: {
         en: (row.nombre_en as string | undefined) || undefined,
         fr: (row.nombre_fr as string | undefined) || undefined,
@@ -125,6 +126,7 @@ export class SupabaseCategoryRepository implements ICategoryRepository {
           complemento_obligatorio: data.complemento_obligatorio,
           categoria_padre_id: data.categoria_padre_id || null,
           tipo_producto: data.tipo_producto ?? 'comida',
+          activo: data.activo ?? true,
         })
         .select()
         .single();

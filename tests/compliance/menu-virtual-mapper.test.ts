@@ -45,7 +45,7 @@ const nodo = (id: string, padreId: string | null, nombre = id): MenuVirtual => (
 const categoriaBaterias: Category = {
   id: 'cat-baterias', empresaId: 'empresa-1', nombre: 'Baterías', descripcion: null,
   orden: 0, tipoProducto: 'comida', categoriaComplementoDe: null, complementoObligatorio: false,
-  categoriaPadreId: null,
+  categoriaPadreId: null, activo: true,
 };
 
 describe('MenuMapper.toVirtualCategoryVM', () => {

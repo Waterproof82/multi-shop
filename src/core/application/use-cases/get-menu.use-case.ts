@@ -184,7 +184,9 @@ export class GetMenuUseCase {
         productos.data,
       );
 
-      const principales = categorias.data.filter(c => !c.categoriaComplementoDe);
+      // Una categoría inactiva no se pinta en la carta pública, igual que un
+      // producto inactivo: mismo criterio, un nivel más arriba.
+      const principales = categorias.data.filter(c => !c.categoriaComplementoDe && c.activo);
       const padres = principales.filter(c => !c.categoriaPadreId).sort(porOrden);
       const subcategorias = agruparPor(
         principales.filter(c => c.categoriaPadreId).sort(porOrden),
