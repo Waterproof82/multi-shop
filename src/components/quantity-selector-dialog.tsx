@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { RippleButton } from "@/components/ui/ripple-button"
 import { ProductImageGallery } from "@/components/product-image-gallery"
+import { ImageZoomDialog } from "@/components/image-zoom-dialog"
 import { useLanguage } from "@/lib/language-context"
 import { useCart } from "@/lib/cart-context"
 import { t } from "@/lib/translations"
@@ -171,6 +172,8 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
   const [selectedPase, setSelectedPase] = useState<PaseKey | null>(null)
   const [note, setNote] = useState('')
   const [showNote, setShowNote] = useState(false)
+  const [isImageZoomOpen, setIsImageZoomOpen] = useState(false)
+  const [activeImageIndex, setActiveImageIndex] = useState(0)
   const { language } = useLanguage()
   const { addItem } = useCart()
 
@@ -184,6 +187,8 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
       setSelectedPase(null);
       setNote('');
       setShowNote(false);
+      setIsImageZoomOpen(false);
+      setActiveImageIndex(0);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, item?.id]);
@@ -265,8 +270,20 @@ export function QuantitySelectorDialog(props: Readonly<QuantitySelectorDialogPro
               objectFit={item.imageFit}
               mainImageClassName="relative h-40 sm:h-48 w-full overflow-hidden"
               sizes="100vw"
+              onImageClick={() => setIsImageZoomOpen(true)}
+              onIndexChange={setActiveImageIndex}
             />
           </div>
+        )}
+        {item.image && !item.image.endsWith('.mp4') && (
+          <ImageZoomDialog
+            open={isImageZoomOpen}
+            onOpenChange={setIsImageZoomOpen}
+            images={item.image2 ? [item.image, item.image2] : [item.image]}
+            alt={displayName}
+            objectFit={item.imageFit}
+            initialIndex={activeImageIndex}
+          />
         )}
         <DialogHeader className="px-5 pt-5 pb-4 shrink-0 border-b">
           <DialogTitle>{displayName}</DialogTitle>
