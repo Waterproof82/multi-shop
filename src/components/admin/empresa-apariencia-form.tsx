@@ -5,6 +5,7 @@ import { Languages, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 import { ImageUploader } from '@/components/ui/image-uploader';
 import { PillSwitch } from '@/components/ui/pill-switch';
 import { Textarea } from '@/components/ui/textarea';
+import { BannerSliderManager } from '@/components/admin/banner-slider-manager';
 import type { UpdateEmpresaDTO } from '@/core/application/dtos/empresa.dto';
 import { fetchWithCsrf } from '@/lib/csrf-client';
 import { logClientError } from '@/lib/client-error';
@@ -18,6 +19,8 @@ interface EmpresaAparienciaFormProps {
     mostrar_logo: boolean;
     url_image: string | null;
     banner_fit: "contain" | "cover" | "fill" | null;
+    tipo_banner: "imagen" | "slider";
+    banner_slides: string[];
     descripcion_es: string;
     descripcion_en: string;
     descripcion_fr: string;
@@ -105,6 +108,30 @@ export function EmpresaAparienciaForm({ initialData }: EmpresaAparienciaFormProp
     }
   };
 
+  const handleTipoBannerChange = async (tipo: "imagen" | "slider") => {
+    setFormData((prev) => ({ ...prev, tipo_banner: tipo }));
+    setSaved(false);
+    try {
+      const ok = await saveEmpresa({ tipo_banner: tipo }, efectivoEmpresaId);
+      if (!ok) setImageError('Error al guardar el tipo de banner');
+    } catch (error) {
+      logClientError(error, 'handleTipoBannerChange');
+      setImageError('Error al guardar el tipo de banner');
+    }
+  };
+
+  const handleSlidesChange = async (slides: string[]) => {
+    setFormData((prev) => ({ ...prev, banner_slides: slides }));
+    setSaved(false);
+    try {
+      const ok = await saveEmpresa({ banner_slides: slides }, efectivoEmpresaId);
+      if (!ok) setImageError('Error al guardar las imágenes del slider');
+    } catch (error) {
+      logClientError(error, 'handleSlidesChange');
+      setImageError('Error al guardar las imágenes del slider');
+    }
+  };
+
   const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSaving(true);
@@ -120,6 +147,25 @@ export function EmpresaAparienciaForm({ initialData }: EmpresaAparienciaFormProp
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="inline-flex rounded-full border border-input p-0.5">
+        <button
+          type="button"
+          onClick={() => handleTipoBannerChange('imagen')}
+          className={`px-4 py-1.5 rounded-full text-sm transition-colors ${formData.tipo_banner !== 'slider' ? 'bg-foreground text-background' : 'text-muted-foreground'}`}
+        >
+          {t('bannerModeStatic', language)}
+        </button>
+        <button
+          type="button"
+          onClick={() => handleTipoBannerChange('slider')}
+          className={`px-4 py-1.5 rounded-full text-sm transition-colors ${formData.tipo_banner === 'slider' ? 'bg-foreground text-background' : 'text-muted-foreground'}`}
+        >
+          {t('bannerModeSlider', language)}
+        </button>
+      </div>
+
+      {formData.tipo_banner !== 'slider' && (
+      <>
       {/* Logo de la empresa */}
       <div>
         <p className="text-sm font-medium text-foreground mb-2">
@@ -263,6 +309,20 @@ export function EmpresaAparienciaForm({ initialData }: EmpresaAparienciaFormProp
           <span className="text-primary text-sm">{t('savedSuccess', language)}</span>
         )}
       </div>
+      </>
+      )}
+
+      {formData.tipo_banner === 'slider' && (
+        <div>
+          <p className="text-sm font-medium text-foreground mb-2">
+            {t('bannerModeSlider', language)}
+          </p>
+          <p className="text-xs text-muted-foreground mb-3">
+            {t('bannerSliderHelp', language)}
+          </p>
+          <BannerSliderManager slides={formData.banner_slides} onChange={handleSlidesChange} />
+        </div>
+      )}
     </form>
   );
 }
