@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js"
 import dynamic from "next/dynamic"
 import { MenuCategoryVM, MenuItemVM } from "@/core/application/dtos/menu-view-model"
 import { HeroBanner } from "@/components/hero-banner"
+import { SliderBanner } from "@/components/slider-banner"
 import { CategoryNav } from "@/components/category-nav"
 import { MenuSection } from "@/components/menu-section"
 import { SiteFooter } from "@/components/site-footer"
@@ -343,7 +344,11 @@ export function MenuPage({ menuData, header, showCart = false, empresa, isWaiter
         <>
           {header === undefined ? null : header}
           <PromoNotification />
-          <HeroBanner empresa={empresa} bannerFit={empresa?.bannerFit ?? "contain"} />
+          {empresa?.tipoBanner === "slider" ? (
+            <SliderBanner slides={empresa.bannerSlides} empresaNombre={empresa.nombre} />
+          ) : (
+            <HeroBanner empresa={empresa} bannerFit={empresa?.bannerFit ?? "contain"} />
+          )}
           <div className="w-full bg-background border-b border-border">
             <div className="max-w-2xl mx-auto px-4 py-3">
               <div className="relative">
