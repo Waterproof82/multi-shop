@@ -59,6 +59,8 @@ export default async function ConfiguracionPage() {
     mostrar_logo: empresaData?.mostrarLogo ?? true,
     url_image: empresaData?.urlImage || null,
     banner_fit: empresaData?.bannerFit ?? 'contain',
+    tipo_banner: empresaData?.tipoBanner ?? 'imagen',
+    banner_slides: empresaData?.bannerSlides ?? [],
     descripcion_es: empresaData?.descripcion?.es || '',
     descripcion_en: empresaData?.descripcion?.en || '',
     descripcion_fr: empresaData?.descripcion?.fr || '',
