@@ -32,9 +32,10 @@ interface BannerSliderManagerProps {
 interface SortableSlideProps {
   readonly url: string;
   readonly onRemove: () => void;
+  readonly onReplace: (newUrl: string) => void;
 }
 
-function SortableSlide({ url, onRemove }: Readonly<SortableSlideProps>) {
+function SortableSlide({ url, onRemove, onReplace }: Readonly<SortableSlideProps>) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: url });
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -55,7 +56,10 @@ function SortableSlide({ url, onRemove }: Readonly<SortableSlideProps>) {
       </button>
       <ImageUploader
         value={url}
-        onChange={(newUrl) => { if (!newUrl) onRemove(); }}
+        onChange={(newUrl) => {
+          if (!newUrl) onRemove();
+          else onReplace(newUrl);
+        }}
         label=""
         previewClassName="relative group rounded-lg overflow-hidden border aspect-video"
         isBannerImage
@@ -89,13 +93,22 @@ export function BannerSliderManager({ slides, onChange }: Readonly<BannerSliderM
     onChange(slides.filter((slide) => slide !== url));
   }
 
+  function handleReplaceSlide(oldUrl: string, newUrl: string) {
+    onChange(slides.map((slide) => (slide === oldUrl ? newUrl : slide)));
+  }
+
   return (
     <div className="space-y-3">
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={slides} strategy={horizontalListSortingStrategy}>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {slides.map((url) => (
-              <SortableSlide key={url} url={url} onRemove={() => handleRemoveSlide(url)} />
+              <SortableSlide
+                key={url}
+                url={url}
+                onRemove={() => handleRemoveSlide(url)}
+                onReplace={(newUrl) => handleReplaceSlide(url, newUrl)}
+              />
             ))}
           </div>
         </SortableContext>

@@ -11,6 +11,7 @@ vi.mock('@/components/ui/image-uploader', () => ({
       <div data-testid="slide-thumb">
         <span>{value}</span>
         <button type="button" onClick={() => onChange('')}>Eliminar</button>
+        <button type="button" onClick={() => onChange('https://cdn.example.com/reemplazada.webp')}>Cambiar</button>
       </div>
     ) : (
       <button type="button" onClick={() => onChange('https://cdn.example.com/nueva.webp')}>Agregar</button>
@@ -27,6 +28,9 @@ function renderManager(slides: string[], onChange = vi.fn()) {
   return onChange;
 }
 
+// El reordenamiento por drag-and-drop (@dnd-kit) no se testea aquí: simular
+// eventos de puntero contra @dnd-kit en RTL es frágil y de bajo valor —
+// arrayMove() es una función de librería ya probada. Se verifica a mano.
 describe('BannerSliderManager', () => {
   it('muestra el slot de agregar cuando hay menos de 5 imágenes', () => {
     renderManager(['https://cdn.example.com/a.webp']);
@@ -59,5 +63,13 @@ describe('BannerSliderManager', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Eliminar' })[0]);
 
     expect(onChange).toHaveBeenCalledWith(['https://cdn.example.com/b.webp']);
+  });
+
+  it('al cambiar una imagen, llama onChange con la URL nueva en la misma posición', () => {
+    const onChange = renderManager(['https://cdn.example.com/a.webp', 'https://cdn.example.com/b.webp']);
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Cambiar' })[0]);
+
+    expect(onChange).toHaveBeenCalledWith(['https://cdn.example.com/reemplazada.webp', 'https://cdn.example.com/b.webp']);
   });
 });
