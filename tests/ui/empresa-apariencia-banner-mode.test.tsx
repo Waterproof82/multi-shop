@@ -22,7 +22,7 @@ const initialData: {
   logo_url: string | null;
   mostrar_logo: boolean;
   url_image: string | null;
-  banner_fit: 'contain' | 'cover' | 'fill';
+  banner_fit: 'contain' | 'cover' | 'fill' | null;
   tipo_banner: 'imagen' | 'slider';
   banner_slides: string[];
   descripcion_es: string;
