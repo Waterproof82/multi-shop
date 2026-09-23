@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { LanguageProvider } from '@/lib/language-context';
 import { SliderBanner } from '@/components/slider-banner';
 
@@ -40,21 +40,27 @@ describe('SliderBanner', () => {
   it('avanza automáticamente cada 5 segundos', () => {
     renderSlider();
 
-    vi.advanceTimersByTime(5000);
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
 
     expect(activeDotIndex()).toBe(1);
   });
 
   it('se pausa con el mouse encima y se reanuda al salir', () => {
     renderSlider();
-    const region = screen.getByRole('button', { name: /Imagen siguiente/ }).closest('div')!.parentElement!;
+    const region = screen.getByTestId('slider-banner-root');
 
     fireEvent.mouseEnter(region);
-    vi.advanceTimersByTime(6000);
+    act(() => {
+      vi.advanceTimersByTime(6000);
+    });
     expect(activeDotIndex()).toBe(0);
 
     fireEvent.mouseLeave(region);
-    vi.advanceTimersByTime(5000);
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
     expect(activeDotIndex()).toBe(1);
   });
 
@@ -80,7 +86,9 @@ describe('SliderBanner', () => {
     })) as unknown as typeof window.matchMedia;
 
     renderSlider();
-    vi.advanceTimersByTime(10000);
+    act(() => {
+      vi.advanceTimersByTime(10000);
+    });
     expect(activeDotIndex()).toBe(0);
 
     window.matchMedia = original;

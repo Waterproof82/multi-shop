@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { flushSync } from 'react-dom';
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { ImagenSubida as Image } from './ui/imagen-subida';
 import { useLanguage } from '@/lib/language-context';
@@ -23,37 +22,31 @@ function previousIndex(current: number, total: number): number {
   return (current - 1 + total) % total;
 }
 
-// Chequeo directo, no memoizado. `framer-motion`'s useReducedMotion() cachea
-// el resultado a nivel de modulo (`initPrefersReducedMotion` solo corre una
-// vez por proceso) — sirve para la duracion de la transicion, pero gatear el
-// autoplay con ese valor cacheado ignora cambios reales de matchMedia tras el
-// primer mount del proceso (p. ej. entre tests del mismo archivo).
-function prefersReducedMotionNow(): boolean {
+// Chequeo directo via matchMedia en vez de framer-motion's useReducedMotion():
+// ese hook cachea el resultado a nivel de modulo (initPrefersReducedMotion
+// corre una sola vez por proceso), asi que no reacciona a un cambio real del
+// setting del SO despues del primer mount del proceso.
+function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
 export function SliderBanner({ slides, empresaNombre }: Readonly<SliderBannerProps>) {
   const { language } = useLanguage();
-  const shouldReduceMotion = useReducedMotion() ?? false;
+  const shouldReduceMotion = prefersReducedMotion();
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (prefersReducedMotionNow() || paused || slides.length <= 1) return;
+    if (shouldReduceMotion || paused || slides.length <= 1) return;
     timerRef.current = setInterval(() => {
-      // flushSync: sin esto el avance queda encolado en el scheduler de React
-      // (via MessageChannel), que los fake timers de vitest no interceptan —
-      // el DOM nunca refleja el cambio dentro del mismo tick de test.
-      flushSync(() => {
-        setIndex((current) => nextIndex(current, slides.length));
-      });
+      setIndex((current) => nextIndex(current, slides.length));
     }, AUTOPLAY_MS);
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [paused, slides.length, index]);
+  }, [shouldReduceMotion, paused, slides.length, index]);
 
   if (slides.length === 0) return null;
 
@@ -61,6 +54,7 @@ export function SliderBanner({ slides, empresaNombre }: Readonly<SliderBannerPro
 
   return (
     <div
+      data-testid="slider-banner-root"
       className="relative h-[200px] md:h-[280px] overflow-hidden bg-primary"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
@@ -88,7 +82,7 @@ export function SliderBanner({ slides, empresaNombre }: Readonly<SliderBannerPro
       ))}
 
       {slides.length > 1 && (
-        <div className="contents">
+        <>
           <button
             type="button"
             onClick={() => setIndex(previousIndex(index, slides.length))}
@@ -118,7 +112,7 @@ export function SliderBanner({ slides, empresaNombre }: Readonly<SliderBannerPro
               </button>
             ))}
           </div>
-        </div>
+        </>
       )}
     </div>
   );
