@@ -114,6 +114,8 @@ export interface Empresa {
   emailNotification: string | null;
   urlImage: string | null;
   bannerFit: "contain" | "cover" | "fill" | null;
+  tipoBanner: "imagen" | "slider";
+  bannerSlides: string[];
   colores: EmpresaColores | null;
   descripcion: {
     es?: string | null;
@@ -159,6 +161,8 @@ export interface EmpresaPublic {
   mostrarLogo: boolean;
   urlImage: string | null;
   bannerFit: "contain" | "cover" | "fill" | null;
+  tipoBanner: "imagen" | "slider";
+  bannerSlides: string[];
   colores: EmpresaColores | null;
   descripcion: TranslatableText | null;
   titulo: string | null;
